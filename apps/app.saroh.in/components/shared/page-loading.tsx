@@ -299,37 +299,73 @@ function HomeBody(groups = 5) {
         </div>
     );
     return (
-        <div className="grid gap-[22px]">
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                {Array.from({ length: 4 }, (_, i) => (
-                    <div
-                        key={i}
-                        className={cn(
-                            CARD,
-                            "grid min-h-[104px] content-center gap-2.5 px-4 py-3.5",
-                        )}
-                    >
-                        <Skeleton className="h-3 w-[110px] max-w-full" />
-                        <Skeleton className="h-6 w-[70px]" />
-                        <Skeleton className="h-[11px] w-[150px] max-w-full" />
-                    </div>
-                ))}
-            </div>
-            <div className="grid items-start gap-[22px] min-[1100px]:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
-                <div className="grid gap-2.5">
+        <>
+            {/* The phone's Home (U17, `HPStates` loading): three figures
+                in one card, the Next band, and five group lines. */}
+            <div
+                data-loading-home="phone"
+                className="grid gap-[18px] sm:hidden"
+            >
+                <div className={cn(CARD, "grid grid-cols-3 overflow-hidden")}>
+                    {Array.from({ length: 3 }, (_, i) => (
+                        <div
+                            key={i}
+                            className={cn(
+                                "grid min-h-16 content-center gap-1.5 px-3 py-2.5",
+                                i > 0 && "border-l border-border/70",
+                            )}
+                        >
+                            <Skeleton className="h-6 w-[70%]" />
+                        </div>
+                    ))}
+                </div>
+                <Skeleton className="h-14 rounded-[14px]" />
+                <div className="grid gap-2">
                     <Skeleton className="h-[18px] w-[140px]" />
                     <div className={CARD}>
-                        {Array.from({ length: groups }, (_, i) => group(i))}
-                    </div>
-                </div>
-                <div className="grid gap-2.5">
-                    <Skeleton className="h-[18px] w-[140px]" />
-                    <div className={CARD}>
-                        {Array.from({ length: 4 }, (_, i) => group(i))}
+                        {Array.from({ length: groups }, (_, i) => (
+                            <div
+                                key={i}
+                                className="border-b border-border/70 px-3.5 py-4 last:border-b-0"
+                            >
+                                <Skeleton className="h-3.5 w-3/5" />
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>
-        </div>
+            <div className="hidden gap-[22px] sm:grid">
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    {Array.from({ length: 4 }, (_, i) => (
+                        <div
+                            key={i}
+                            className={cn(
+                                CARD,
+                                "grid min-h-[104px] content-center gap-2.5 px-4 py-3.5",
+                            )}
+                        >
+                            <Skeleton className="h-3 w-[110px] max-w-full" />
+                            <Skeleton className="h-6 w-[70px]" />
+                            <Skeleton className="h-[11px] w-[150px] max-w-full" />
+                        </div>
+                    ))}
+                </div>
+                <div className="grid items-start gap-[22px] min-[1100px]:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
+                    <div className="grid gap-2.5">
+                        <Skeleton className="h-[18px] w-[140px]" />
+                        <div className={CARD}>
+                            {Array.from({ length: groups }, (_, i) => group(i))}
+                        </div>
+                    </div>
+                    <div className="grid gap-2.5">
+                        <Skeleton className="h-[18px] w-[140px]" />
+                        <div className={CARD}>
+                            {Array.from({ length: 4 }, (_, i) => group(i))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </>
     );
 }
 

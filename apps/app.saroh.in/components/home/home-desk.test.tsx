@@ -256,13 +256,15 @@ describe("Home A at a desk", () => {
         expect(html).toContain('href="/analytics?period=4w"');
     });
 
-    it("draws the phone as it was below 640px: no tiles, the flat list", () => {
+    it("hands below 640px to the simplified phone Home (U17)", () => {
         const html = phone(render(home()));
-        expect(html).not.toContain("Today at a glance");
+        expect(html).toContain("data-phone-home");
+        expect(html).toContain("data-phone-figures");
+        // The desk's tiles and groups are the desk's alone.
+        expect(html).not.toContain("To pack or hand over");
+        expect(html).not.toContain("data-need-group");
         expect(html).toContain("Needs you");
-        // How it's going replaced This week on the phone too.
         expect(html).not.toContain("This week");
-        expect(html).toContain("How it&#x27;s going");
     });
 
     it("gives a role without money three tiles and no amounts (HAMemberD)", () => {

@@ -12,9 +12,8 @@ import {
     mayManageModules,
     onButNotOpen,
 } from "@/lib/home/first-run";
-import { formatList, nextLine } from "@/lib/home/needs";
+import { formatList } from "@/lib/home/needs";
 import type { HomeModel } from "@/lib/home/service";
-import { goingCards, goingIntro, showsGoing } from "@/lib/home/week";
 import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
@@ -24,10 +23,8 @@ import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
 import { FirstRunJobs } from "./first-run-jobs";
 import { HomeDesk } from "./home-desk";
 import type { HomeSetup } from "./home-setup";
-import { HowItsGoing } from "./how-its-going";
-import { NeedsYou } from "./needs-you";
+import { PhoneHome } from "./phone/phone-home";
 import { TakeMoneyChecklist } from "./take-money-checklist";
-import { Today } from "./today";
 
 export type { HomeSetup } from "./home-setup";
 
@@ -40,13 +37,15 @@ export type { HomeSetup } from "./home-setup";
  * - **From 640px, Home A** (`home-desk.tsx`, plan U6): the tiles, Needs
  *   you grouped by kind with Today beside it, How it's going, and setup in
  *   one line once most of it is done.
- * - **Below 640px, the phone's Home as it was** (`PhoneHome` below): Needs
- *   you as one ranked list, Today, setup, and How it's going in place of
- *   This week. U17 replaces it with the simplified phone Home (`HPHome`)
- *   from the same parts; nothing else here needs to change for that.
+ * - **Below 640px, the simplified phone Home** (`phone/phone-home.tsx`,
+ *   plan U17, `HPHome`): three figures, the Next line, Needs you as one
+ *   line per group, How it's going in a sentence, setup in one line; each
+ *   line opens its sheet.
  *
- * Above both, drawn once: what couldn't be read, and "Finish setup" while
- * it leads (fewer than half its steps done) or has just finished.
+ * Above both, drawn once: "Finish setup" when it has just finished, and
+ * while it leads (fewer than half its steps done) at a desk; the phone
+ * draws its own card for that. What couldn't be read is one notice at a
+ * desk; on a phone it is the first line of Needs you, with Try again.
  *
  * `now` is captured once and threaded down so every relative time on the page
  * ("3 days overdue", "Today") is measured from the same instant. Letting each
@@ -100,18 +99,22 @@ export function HomeDashboard({
                 "something went wrong" would not tell them whether the thing
                 they came to check is the thing that is missing. */}
             {home.unavailable.length > 0 ? (
-                <PartialRead
-                    things={formatList(
-                        home.unavailable.map((part) => part.label),
-                    )}
-                    so="Everything else is here, so there may be more to do."
-                />
+                <div className="hidden sm:block">
+                    <PartialRead
+                        things={formatList(
+                            home.unavailable.map((part) => part.label),
+                        )}
+                        so="Everything else is here, so there may be more to do."
+                    />
+                </div>
             ) : null}
 
             {/* "Finish setup" leads while fewer than half its steps are
                 done, and has its last word here once they all are (F8);
                 drawn once for both layouts. */}
-            {setup ? <TakeMoneyChecklist {...setup} slot="first" /> : null}
+            {setup ? (
+                <TakeMoneyChecklist {...setup} slot="first" phoneOwnCard />
+            ) : null}
 
             <div data-home-layout="desk" className="hidden sm:block">
                 <HomeDesk
@@ -129,59 +132,6 @@ export function HomeDashboard({
                     insights={insights}
                 />
             </div>
-        </div>
-    );
-}
-
-/**
- * The phone's Home, as it was before Home A (round 2): Needs you as one
- * ranked list, the day under it, setup at the foot, then How it's going.
- * U17 replaces this function with the simplified phone Home (`HPHome`).
- */
-function PhoneHome({
-    home,
-    setup,
-    now,
-    insights,
-}: {
-    home: HomeModel;
-    setup: HomeSetup | null;
-    now: Date;
-    insights: boolean;
-}) {
-    const fresh = home.lastDay?.fresh ?? false;
-    // A business with nothing sold, booked or paid yet gets no figures (F7).
-    const going = showsGoing(home.going, fresh) ? goingCards(home.going) : [];
-    return (
-        // `min-w-0` is required, not tidiness: a grid item defaults to
-        // `min-width: auto`, so the column refused to shrink below its
-        // content's min-content width and pushed the whole page into a
-        // horizontal scroll at 320px (#178, §18).
-        <div className="grid min-w-0 content-start gap-5">
-            <NeedsYou
-                needs={home.needs}
-                total={home.needsTotal}
-                inProgress={home.ordersInProgress}
-                unavailable={home.unavailable}
-                next={nextLine(home.upcoming, now)}
-            />
-            {/* Under Needs you, as the design stacks them: the work
-                first, then the day it happens in. The API sends no
-                block to someone who reads neither bookings nor
-                orders, so the column never advertises a module
-                that is off. */}
-            {home.today ? (
-                <Today today={home.today} now={now.toISOString()} />
-            ) : null}
-            {setup ? <TakeMoneyChecklist {...setup} slot="late" /> : null}
-            {going.length > 0 && home.going ? (
-                <HowItsGoing
-                    cards={going}
-                    intro={goingIntro(home.going)}
-                    insights={insights}
-                    layout="stack"
-                />
-            ) : null}
         </div>
     );
 }

@@ -24,7 +24,7 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  *
  * At a desk the rows are inside the bookings-awaiting-payment group. On a
  * phone, the same rows and actions are reached through the phone's Home
- * (the interim flat list until U17, then the group's sheet); a phone
+ * (the group's sheet, U17); a phone
  * whose list doesn't carry the row yet skips rather than invents it.
  */
 
@@ -83,14 +83,12 @@ async function tidy(
     await service.remove();
 }
 
-/** The test's own row, wherever this layout draws it. */
+/**
+ * The test's own row, wherever this layout draws it: at a desk inside its
+ * group, on a phone (U17) in the awaiting-payment group's sheet.
+ */
 async function ownRow(page: Page, who: string): Promise<Locator> {
-    const rows = await needRows(page);
-    // The phone's interim list opens past its first twelve.
-    const seeAll = needsYou(page)
-        .getByRole("button", { name: /^See all \d+$/ })
-        .filter({ visible: true });
-    if ((await seeAll.count()) > 0) await seeAll.first().click();
+    const rows = await needRows(page, "AWAITING_PAYMENT");
     return rows.filter({ visible: true }).filter({ hasText: who }).first();
 }
 
@@ -113,7 +111,7 @@ test.describe("Needs you groups: a booking awaiting payment (U7)", () => {
             const row = await ownRow(page, who);
             test.skip(
                 onPhone(page) && (await row.count()) === 0,
-                "the phone's list doesn't carry awaiting payment until U17",
+                "the phone's Home has no awaiting-payment line for it",
             );
             await expect(row).toBeVisible();
 
@@ -170,7 +168,7 @@ test.describe("Needs you groups: a booking awaiting payment (U7)", () => {
             const row = await ownRow(page, who);
             test.skip(
                 onPhone(page) && (await row.count()) === 0,
-                "the phone's list doesn't carry awaiting payment until U17",
+                "the phone's Home has no awaiting-payment line for it",
             );
             await row
                 .getByRole("button", { name: "Turn down", exact: true })
@@ -212,7 +210,7 @@ test.describe("Needs you groups: a booking awaiting payment (U7)", () => {
             const row = await ownRow(page, who);
             test.skip(
                 onPhone(page) && (await row.count()) === 0,
-                "the phone's list doesn't carry awaiting payment until U17",
+                "the phone's Home has no awaiting-payment line for it",
             );
             const send = row.getByRole("button", {
                 name: "Send payment link",

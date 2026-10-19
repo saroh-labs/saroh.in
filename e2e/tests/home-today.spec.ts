@@ -13,8 +13,9 @@ import { onPhone, openNorthwindAs } from "../fixtures/roles";
  * last 7 days against the 7 before) leading into Insights on 4 weeks. A
  * role without money sees three tiles and no amount anywhere.
  *
- * On a phone, Home keeps the layout it had until U17 draws the simplified
- * one: this only checks nothing there regressed, at 320 and 390.
+ * On a phone (below 640px) the simplified phone Home (U17) is drawn
+ * instead; `home-phone.spec.ts` checks it, and this only that nothing
+ * there scrolls sideways at 320 and 390.
  *
  * Everyone is on Northwind and only reads: no group's rows are acted on
  * here (`home.spec.ts` does that, `@serial`).
@@ -178,24 +179,33 @@ test.describe("Home A at a desk", () => {
     });
 });
 
-test.describe("Home on a phone, until U17", () => {
+test.describe("Home on a phone", () => {
     test.beforeEach(({ page }) => {
         test.skip(!onPhone(page), "The phone's Home");
     });
 
+    // The simplified phone Home itself is `home-phone.spec.ts` (U17).
     for (const size of [
         { width: 320, height: 640 },
         { width: 390, height: 844 },
     ]) {
-        test(`nothing scrolls sideways at ${size.width}, and Needs you still leads`, async ({
+        test(`nothing scrolls sideways at ${size.width}, and Needs you is there`, async ({
             page,
         }) => {
             await openNorthwindAs(page, "owner");
             await page.setViewportSize(size);
             await page.goto("/");
             await expect(needsYou(page)).toBeVisible();
-            // Home A's desk layout is not drawn on a phone.
-            await expect(tiles(page)).toHaveCount(0);
+            // Home A's desk tiles are not drawn below 640px: the phone's
+            // figures are one row of three links.
+            await expect(
+                tiles(page).filter({ visible: true }).getByRole("link"),
+            ).toHaveCount(3);
+            await expect(
+                page
+                    .getByText("To pack or hand over")
+                    .filter({ visible: true }),
+            ).toHaveCount(0);
             await noSideways(page);
             await expectNothingHiddenSideways(page);
         });

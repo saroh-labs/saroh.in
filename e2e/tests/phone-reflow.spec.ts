@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/customers app:/contacts app:/commerce/orders app:/commerce/orders/new app:/billing/invoices app:/billing/subscriptions app:/settings/people api:customer-workspace api:contacts api:customers api:orders api:payments api:invoices api:subscriptions api:organizations
+// @covers accounts:/login app:/open app:/customers app:/contacts app:/commerce/orders app:/commerce/orders/new app:/billing/invoices app:/billing/subscriptions app:/settings/people api:customer-workspace api:contacts api:customers api:orders api:payments api:invoices api:subscriptions api:organizations app:/ api:home
 import type { Locator, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -658,5 +658,33 @@ test.describe("phone reflow: Settings › Team", () => {
         // Nothing is sent.
         await dialog.getByRole("button", { name: "Cancel" }).click();
         await expect(dialog).toHaveCount(0);
+    });
+});
+
+test.describe("phone reflow: Home's sheets (U17)", () => {
+    test("a Needs you group's sheet keeps its rows and its foot on the screen", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.setViewportSize(WIDTHS[1]);
+        await page.goto("/");
+        const line = page
+            .locator('[data-home-layout="phone"] [data-phone-line]')
+            .first();
+        test.skip(
+            (await line.count()) === 0,
+            "Nothing needs Northwind's owner just now",
+        );
+        await line.click();
+        const sheet = page.getByRole("dialog");
+        await fitsAtPhoneWidths(
+            page,
+            sheet,
+            [sheet.getByRole("button", { name: "Close" })],
+            "Needs you sheet",
+        );
+        // Only looked at: closed, nothing done.
+        await sheet.getByRole("button", { name: "Close" }).click();
+        await expect(sheet).toHaveCount(0);
     });
 });

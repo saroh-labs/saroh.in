@@ -5,6 +5,7 @@ import type { ModuleView } from "@/lib/modules/schema";
 
 import { HomeDashboard } from "./home-dashboard";
 import { HomeHeader } from "./home-header";
+import { NewSpace } from "./new-sheet";
 
 /**
  * A staff member's Home, as the Home design draws it for Arjun, Sana and
@@ -47,6 +48,8 @@ export function StaffHome({
                 businessName={businessName}
                 only={storesOnly(home.staff)}
                 newMenu={newMenu}
+                // The phone Home says it in the day sheet (U17).
+                sinceOnPhone={!home.hasAnyModule}
             />
             <div className="mt-5">
                 <HomeDashboard
@@ -56,6 +59,7 @@ export function StaffHome({
                     setup={null}
                 />
             </div>
+            {newMenu && newMenu.items.length > 0 ? <NewSpace /> : null}
         </>
     );
 }

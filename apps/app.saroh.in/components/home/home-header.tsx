@@ -3,6 +3,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import type { HomeNew } from "@/components/shared/quick-actions";
 import { dateLine, greeting, sinceLinks } from "@/lib/home/last-day";
 import type { HomeLastDay } from "@/lib/home/service";
+import { cn } from "@saroh/ui/lib/utils";
 import { TextLink } from "@saroh/ui/text-link";
 
 import { NewMenu } from "./new-menu";
@@ -30,6 +31,7 @@ export function HomeHeader({
     kind,
     subject = null,
     newMenu = null,
+    sinceOnPhone = true,
 }: {
     lastDay: HomeLastDay | null;
     /** The viewer's own name, from their session. */
@@ -46,6 +48,12 @@ export function HomeHeader({
     subject?: "money" | "site" | "setup" | null;
     /** What New offers this person (`homeNewFor`); null draws no New. */
     newMenu?: HomeNew | null;
+    /**
+     * Whether Last 24 hours shows below 640px. The phone Home (U17) moves
+     * it into the day sheet as "Since yesterday", so its header leaves it
+     * out there.
+     */
+    sinceOnPhone?: boolean;
 }) {
     const links = sinceLinks(lastDay);
     const offersNew = newMenu !== null && newMenu.items.length > 0;
@@ -54,7 +62,10 @@ export function HomeHeader({
         <>
             <PageHeader
                 holdsData
-                className="mb-0"
+                // New is the + below the rail's width, so on a phone the
+                // header's side slot holds nothing; without this its 12px
+                // gap still stood under the date (U5's note).
+                className="mb-0 max-sm:[&_[data-slot=page-side]]:hidden"
                 breadcrumb={["Home"]}
                 title={greeting(lastDay, name)}
                 actions={offersNew ? <NewMenu {...newMenu} /> : undefined}
@@ -73,7 +84,10 @@ export function HomeHeader({
                             <div
                                 role="group"
                                 aria-labelledby="home-last-24-hours"
-                                className="mt-2 flex flex-wrap items-baseline gap-x-3.5 gap-y-1.5 text-[13px] text-foreground/80"
+                                className={cn(
+                                    "mt-2 flex flex-wrap items-baseline gap-x-3.5 gap-y-1.5 text-[13px] text-foreground/80",
+                                    !sinceOnPhone && "max-sm:hidden",
+                                )}
                             >
                                 <span id="home-last-24-hours" className="label">
                                     Last 24 hours

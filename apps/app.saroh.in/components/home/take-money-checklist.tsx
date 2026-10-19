@@ -46,6 +46,7 @@ export function TakeMoneyChecklist({
     businessId,
     slot,
     compact = false,
+    phoneOwnCard = false,
 }: {
     list: ReadyChecklist;
     businessId: string;
@@ -55,6 +56,11 @@ export function TakeMoneyChecklist({
      * desk, `HAPageD`): the next step, and the done ones folded.
      */
     compact?: boolean;
+    /**
+     * Below 640px the phone Home draws its own card while setup leads
+     * (U17, `HPStates`): this one is then the desk's alone.
+     */
+    phoneOwnCard?: boolean;
 }) {
     const hidden = useSetupHidden(businessId);
     // A step that is the way to another plan is a plan prompt.
@@ -82,6 +88,9 @@ export function TakeMoneyChecklist({
                 said: "Setup hidden. Show it again from the bottom of Home or Settings › Business.",
             }}
             compact={compact}
+            className={
+                phoneOwnCard && place === "first" ? "max-sm:hidden" : undefined
+            }
             // One line on the next visit, then Home is left to the work.
             fold="once"
             foldKey={`home:${businessId}`}

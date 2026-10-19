@@ -28,9 +28,6 @@ export function NewSheet({ items, roleLine }: HomeNew) {
 
     return (
         <Dialog.Root open={open} onOpenChange={setOpen}>
-            {/* The + leaves room under the page's last line, so it never
-                sits on something the merchant needs to press. */}
-            <div aria-hidden className="h-[72px] desk:hidden" />
             <Dialog.Trigger asChild>
                 <button
                     type="button"
@@ -112,5 +109,17 @@ export function NewSheet({ items, roleLine }: HomeNew) {
                 </Dialog.Content>
             </Dialog.Portal>
         </Dialog.Root>
+    );
+}
+
+/**
+ * The room the + needs under the page's last line, so it never sits on
+ * something the merchant needs to press: its 56px and its 16px gap. Drawn
+ * at the very end of the page by whoever draws the + (`HomeHeader`'s
+ * caller), never beside the header, where it was a gap above the work.
+ */
+export function NewSpace() {
+    return (
+        <div aria-hidden data-new-space="" className="h-[72px] desk:hidden" />
     );
 }

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import type { HomeSetup } from "@/components/home/home-dashboard";
 import { HomeDashboard } from "@/components/home/home-dashboard";
 import { HomeHeader } from "@/components/home/home-header";
+import { NewSpace } from "@/components/home/new-sheet";
 import { ReviewerHome } from "@/components/home/reviewer-home";
 import { StaffHome } from "@/components/home/staff-home";
 import { Moment } from "@/components/shared/moment";
@@ -148,6 +149,8 @@ export default async function Home() {
                 // The line under the greeting follows the checklist below.
                 subject={setup ? checklistSubject(setup.list) : null}
                 newMenu={newMenu}
+                // The phone Home says it in the day sheet (U17).
+                sinceOnPhone={!home.hasAnyModule}
             />
             {moment ? <Moment moment={moment} className="mt-5" /> : null}
             <div className="mt-5">
@@ -161,6 +164,7 @@ export default async function Home() {
                     insights={insights}
                 />
             </div>
+            {newMenu.items.length > 0 ? <NewSpace /> : null}
         </PageContainer>
     );
 }

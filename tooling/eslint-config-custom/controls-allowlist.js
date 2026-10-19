@@ -138,6 +138,14 @@ export const RAW_ALLOWED = {
     // button: Home's + on a phone, the 56px square floating over the tab bar
     // that opens the New sheet (DEC-171); no Button size is that shape
     "components/home/new-sheet.tsx": ["button"],
+    // button: the phone Home's Next line, a row that is one button (U17)
+    "components/home/phone/phone-next-line.tsx": ["button"],
+    // button: each Needs you group's line on a phone, a row that is one
+    // button, its Show N more, and the line naming what couldn't be checked
+    "components/home/phone/phone-needs-list.tsx": ["button"],
+    // button: the phone's setup line, a row that is one button, and See all
+    // steps, a link that opens the setup sheet
+    "components/home/phone/setup-sheet.tsx": ["button"],
     // button: Insights' period on a phone, the board's 40px white button
     // with the period's name that opens its sheet (DEC-171, IBPeriodP)
     "components/insights/period-control.tsx": ["button"],

@@ -7,6 +7,9 @@ import {
     groupsCountLabel,
     groupTag,
     onItsWayLabel,
+    phoneGroupName,
+    phoneGroupTag,
+    phoneGroupTitle,
 } from "./group-words";
 import type { HomeNeed, HomeNeedGroup } from "./service";
 
@@ -212,5 +215,102 @@ describe("the count beside Needs you", () => {
         expect(onItsWayLabel(1)).toBe("and 1 order on its way");
         expect(onItsWayLabel(3)).toBe("and 3 orders on their way");
         expect(onItsWayLabel(0)).toBe("");
+    });
+});
+
+describe("a group's line on a phone (U17, boards `HPHome`, `HPSheets`)", () => {
+    it("says each group as the thing to do", () => {
+        expect(phoneGroupTitle(group({ count: 7 }))).toBe(
+            "Pack or hand over 7 orders",
+        );
+        expect(
+            phoneGroupTitle(
+                group({
+                    kind: "BILLS",
+                    count: 10,
+                    all: 16,
+                    totals: [{ currency: "INR", amountMinor: 3_297_000 }],
+                }),
+            ),
+        ).toBe("₹32,970 unpaid · 16 bills");
+        expect(phoneGroupTitle(group({ kind: "ENQUIRIES", count: 3 }))).toBe(
+            "Answer 3 enquiries",
+        );
+        expect(phoneGroupTitle(group({ kind: "REVIEWS", count: 1 }))).toBe(
+            "Reply to 1 review",
+        );
+        expect(
+            phoneGroupTitle(group({ kind: "AWAITING_PAYMENT", count: 2 })),
+        ).toBe("2 bookings awaiting payment");
+        expect(
+            phoneGroupTitle(
+                group({
+                    kind: "STOCK",
+                    count: 2,
+                    codes: ["COMMERCE_STOCK_LOW"],
+                }),
+            ),
+        ).toBe("2 products running low");
+    });
+
+    it("says bills without money as a count, for a role without it", () => {
+        expect(
+            phoneGroupTitle(
+                group({ kind: "BILLS", count: 10, all: 16, totals: null }),
+            ),
+        ).toBe("16 unpaid bills");
+    });
+
+    it("says a payments group part by part when every row is here", () => {
+        expect(
+            phoneGroupTitle(
+                group({
+                    kind: "PAYMENTS",
+                    count: 2,
+                    rows: [
+                        row({ id: "a", code: "PAYMENTS_FAILED_RENEWALS" }),
+                        row({ id: "b", code: "PAYMENTS_REFUNDS_OWED" }),
+                    ],
+                }),
+            ),
+        ).toBe("1 payment failed · 1 refund to make");
+        expect(
+            phoneGroupTitle(group({ kind: "PAYMENTS", count: 4, more: 3 })),
+        ).toBe("4 payments to sort out");
+    });
+
+    it("tags late, due today and how long an enquiry has waited", () => {
+        expect(phoneGroupTag(group({ count: 7, late: 3 }), NOW)).toEqual({
+            label: "3 late",
+            tone: "bad",
+        });
+        expect(phoneGroupTag(group({ count: 12 }), NOW, 5)).toEqual({
+            label: "5 due today",
+            tone: "due",
+        });
+        const enquiry = (late: number) =>
+            group({
+                kind: "ENQUIRIES",
+                count: 3,
+                late,
+                oldest: {
+                    id: "e",
+                    title: "Wedding cake",
+                    who: "Rohan Kapoor",
+                    at: "2026-10-17T09:00:00.000Z",
+                    amountMinor: null,
+                    currency: null,
+                },
+            });
+        expect(phoneGroupTag(enquiry(1), NOW)?.label).toBe("1 waiting 2 days");
+        expect(phoneGroupTag(enquiry(2), NOW)?.label).toBe(
+            "2 waiting up to 2 days",
+        );
+        expect(phoneGroupTag(enquiry(0), NOW)).toBeNull();
+    });
+
+    it("names folded groups for Show N more", () => {
+        expect(phoneGroupName({ kind: "REVIEWS", count: 1 })).toBe("review");
+        expect(phoneGroupName({ kind: "STOCK", count: 3 })).toBe("low stock");
     });
 });

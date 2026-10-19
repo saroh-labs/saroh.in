@@ -2,6 +2,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import type { NeedKind } from "../fixtures/home";
 import { needRows, needsYou } from "../fixtures/home";
 import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
@@ -26,11 +27,11 @@ async function signIn(page: Page) {
 }
 
 /**
- * Every row: at a desk with every group of Home A open (DEC-171), on a
- * phone opened past the first twelve when there are more.
+ * Every row: at a desk with every group of Home A open (DEC-171); on a
+ * phone (U17), the rows in `kind`'s sheet.
  */
-async function allRows(page: Page) {
-    const rows = await needRows(page);
+async function allRows(page: Page, kind: NeedKind = "ORDERS") {
+    const rows = await needRows(page, kind);
     const seeAll = needsYou(page).getByRole("button", {
         name: /^See all \d+$/,
     });
@@ -114,7 +115,7 @@ test.describe("Home's inline actions (F4)", () => {
     }) => {
         await signIn(page);
         await page.goto("/");
-        const rows = await allRows(page);
+        const rows = await allRows(page, "BILLS");
         const row = rows
             .filter({
                 has: page.getByRole("button", {

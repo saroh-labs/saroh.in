@@ -223,3 +223,105 @@ export function onItsWayLabel(n: number): string {
         ? "and 1 order on its way"
         : `and ${count(n, "order")} on their way`;
 }
+
+/*
+ * The phone's words (DEC-171, plan U17, boards `HPHome`, `HPSheets`): one
+ * line per group, said as the thing to do, shorter than the desk's, with
+ * the money first where it is money. "Pack or hand over 7 orders",
+ * "₹32,970 unpaid · 16 bills", "Answer 3 enquiries", "Reply to 1 review".
+ * The line under it is the sheet's; the phone draws none.
+ */
+
+/** What a payments group holds, by source, on a phone: "1 payment failed". */
+const PHONE_PAYMENT_PARTS: [codes: string[], one: string, many: string][] = [
+    [["PAYMENTS_FAILED_RENEWALS"], "payment failed", "payments failed"],
+    [
+        ["PAYMENTS_REFUNDS_OWED", "COMMERCE_REFUNDS_FAILED"],
+        "refund to make",
+        "refunds to make",
+    ],
+    [["PAYMENTS_PAUSES_WAITING"], "pause to answer", "pauses to answer"],
+];
+
+function phonePaymentsTitle(group: HomeNeedGroup): string {
+    if (group.more === 0 && group.rows.length > 0) {
+        const parts = PHONE_PAYMENT_PARTS.map(([codes, one, many]) => {
+            const n = group.rows.filter((r) => codes.includes(r.code)).length;
+            return n > 0 ? count(n, one, many) : null;
+        }).filter((p): p is string => p !== null);
+        if (parts.length > 0) return parts.join(" · ");
+    }
+    return count(group.count, "payment to sort out", "payments to sort out");
+}
+
+/** The group's one line on a phone, and its sheet's title. */
+export function phoneGroupTitle(group: HomeNeedGroup): string {
+    switch (group.kind) {
+        case "ORDERS":
+            return `Pack or hand over ${count(group.count, "order")}`;
+        case "BILLS": {
+            const bills = group.all ?? group.count;
+            const amount = money(group);
+            return amount
+                ? `${amount} unpaid · ${count(bills, "bill")}`
+                : count(bills, "unpaid bill");
+        }
+        case "ENQUIRIES":
+            return `Answer ${count(group.count, "enquiry", "enquiries")}`;
+        case "REVIEWS":
+            return `Reply to ${count(group.count, "review")}`;
+        case "PAYMENTS":
+            return phonePaymentsTitle(group);
+        default:
+            return groupTitle(group);
+    }
+}
+
+/**
+ * The tag at the end of a phone line: "3 late", "10 overdue", "5 due
+ * today", "1 waiting 2 days". Enquiries say how long the oldest has
+ * waited, as the desk's line under it would.
+ */
+export function phoneGroupTag(
+    group: HomeNeedGroup,
+    now: Date,
+    dueToday = 0,
+): GroupLine["tag"] {
+    if (group.kind === "ENQUIRIES" && group.late > 0) {
+        const at = group.oldest?.at;
+        if (!at) return { label: `${group.late} waiting`, tone: "due" };
+        const days = count(daysSince(at, now), "day");
+        return {
+            label:
+                group.late === 1
+                    ? `1 waiting ${days}`
+                    : `${group.late} waiting up to ${days}`,
+            tone: "due",
+        };
+    }
+    return groupTag(group, dueToday);
+}
+
+/** What "Show 2 more · review, low stock" names, per group. */
+export function phoneGroupName(
+    group: Pick<HomeNeedGroup, "kind" | "count">,
+): string {
+    switch (group.kind) {
+        case "ORDERS":
+            return group.count === 1 ? "order" : "orders";
+        case "BILLS":
+            return group.count === 1 ? "bill" : "bills";
+        case "AWAITING_PAYMENT":
+            return "awaiting payment";
+        case "ENQUIRIES":
+            return group.count === 1 ? "enquiry" : "enquiries";
+        case "PAYMENTS":
+            return group.count === 1 ? "payment" : "payments";
+        case "REVIEWS":
+            return group.count === 1 ? "review" : "reviews";
+        case "STOCK":
+            return "low stock";
+        case "SETUP":
+            return "setup";
+    }
+}

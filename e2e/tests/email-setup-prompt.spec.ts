@@ -2,7 +2,12 @@
 import type { Locator, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { needRows, needsYou } from "../fixtures/home";
+import {
+    needRows,
+    needsYou,
+    openPhoneGroup,
+    phoneHome,
+} from "../fixtures/home";
 import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
 
@@ -96,10 +101,16 @@ async function noSideways(page: Page) {
         .toBeLessThanOrEqual(width);
 }
 
-/** Home's Needs you, every group open (Home A groups it at a desk). */
+/**
+ * Home's Needs you, every group open (Home A groups it at a desk); on a
+ * phone (U17), the setup group's sheet, where the prompt's row is.
+ */
 async function openHome(page: Page, org: string) {
     await page.goto(`/open/${org}`);
     await page.goto("/");
+    if (phoneHome(page)) {
+        return (await openPhoneGroup(page, "SETUP")) ?? needsYou(page);
+    }
     await needRows(page);
     return needsYou(page);
 }
