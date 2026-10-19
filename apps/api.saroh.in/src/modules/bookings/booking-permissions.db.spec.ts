@@ -9,6 +9,8 @@
  * | services, rules, availability, staff, closures, rules (GET) | `service:read`               |
  * | the same, changed; staff, their services, booking rules    | `service:write`               |
  * | a person's hours, extra hours and time off (DEC-170)       | `hours:write`                 |
+ * | a person's own booking rules: theirs (#1038)               | `hours:write`                 |
+ * | approve or turn down a request to change them (#1038)      | `service:write`               |
  * | the diary, a booking, a class's waitlist                   | `booking:read`                |
  * | book, move, outcome, cancel, a treatment's visit           | `booking:write`               |
  * | a booking's pay link                                       | `booking:write`, `invoice:write` |
@@ -31,6 +33,7 @@ import { InvoicesService } from "../invoices/invoices.service";
 import type { OrgAction } from "../organizations/organization-policy";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import { ClosuresService } from "../staff/closures.service";
+import { StaffRulesService } from "../staff/staff-rules.service";
 import { StaffService } from "../staff/staff.service";
 import { BookingsService } from "./bookings.service";
 import { WaitlistService } from "./waitlist.service";
@@ -38,6 +41,7 @@ import { WaitlistService } from "./waitlist.service";
 const tag = `${process.pid}-${Date.now()}`;
 const bookings = new BookingsService();
 const staff = new StaffService();
+const staffRules = new StaffRulesService();
 const closures = new ClosuresService();
 const waitlist = new WaitlistService();
 const packs = new ClassPacksService(new InvoicesService());
@@ -227,6 +231,44 @@ const ENDPOINTS: [
         "PUT booking-rules",
         ["service:write"],
         (c) => staff.updateBookingRules(c, {} as never),
+    ],
+    // — Each person's own booking rules, and requests (#1038) ——————
+    [
+        "GET staff/:id/booking-rules",
+        ["service:read"],
+        (c) => staffRules.read(c, MISSING),
+    ],
+    // One's own; anyone's with `service:write`, which implies it.
+    [
+        "PUT staff/:id/booking-rules",
+        ["hours:write"],
+        (c) => staffRules.update(c, MISSING, {}),
+    ],
+    [
+        "GET booking-rule-requests",
+        ["service:read"],
+        (c) => staffRules.waiting(c),
+    ],
+    [
+        "POST booking-rule-requests/:id/approve",
+        ["service:write"],
+        (c) => staffRules.approve(c, MISSING),
+    ],
+    [
+        "POST booking-rule-requests/:id/turn-down",
+        ["service:write"],
+        (c) => staffRules.turnDown(c, MISSING),
+    ],
+    // The person who asked, whatever their role: no power of its own.
+    [
+        "POST booking-rule-requests/:id/withdraw",
+        [],
+        (c) => staffRules.withdraw(c, MISSING),
+    ],
+    [
+        "POST booking-rule-requests/:id/dismiss",
+        [],
+        (c) => staffRules.dismiss(c, MISSING),
     ],
     ["POST closures", ["service:write"], (c) => closures.add(c, {} as never)],
     ["POST closures/remove", ["service:write"], (c) => closures.remove(c, [])],

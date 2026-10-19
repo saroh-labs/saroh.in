@@ -104,6 +104,12 @@ const WRITTEN: {
     },
     { type: "team.joined", kind: "team", id: null, href: "/settings/people" },
     {
+        type: "hours.rule-request",
+        kind: "hours",
+        id: null,
+        href: "/bookings/availability",
+    },
+    {
         type: "plan.limit",
         kind: "plan",
         id: null,

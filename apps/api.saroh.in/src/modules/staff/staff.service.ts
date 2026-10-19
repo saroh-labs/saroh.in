@@ -17,10 +17,16 @@ import { requireBookingPower } from "../bookings/booking-access";
 import type { BookingPaymentView } from "../bookings/booking-payment";
 import { bookingPaymentView } from "../bookings/booking-payment";
 import type { BookingRulesValue } from "../bookings/booking-rules";
-import { bookingPaymentOf, loadBookingRules } from "../bookings/booking-rules";
+import {
+    BOOKING_RULES_SELECT,
+    bookingRulesOf,
+    loadBookingRules,
+} from "../bookings/booking-rules";
 import { pausedDiaryIds } from "../bookings/diary-paused";
 import { loadOpeningHours } from "../bookings/opening-hours";
 import { ownDiaryOf } from "../bookings/own-diary";
+import type { PersonRules } from "../bookings/person-rules";
+import { personRulesOf } from "../bookings/person-rules";
 import { businessTimezone, dateOnly } from "../bookings/staff-availability";
 import type { ClosureView } from "./closures.service";
 import { closureViews } from "./closures.service";
@@ -45,6 +51,7 @@ import type { BookingBrief } from "./off-bookings";
 import { bookingsInSpans, MAX_LISTED, upcomingBookings } from "./off-bookings";
 import type { OffSpan } from "./off-range";
 import { offRangeRefusal, offSpans } from "./off-range";
+import { recordBusinessRulesInTx } from "./rules-history";
 import { diarySeatDelta } from "./staff-seats";
 
 const DAY = 86_400_000;
@@ -88,6 +95,12 @@ export interface StaffView {
      * takes no new bookings; theirs are kept. Absent when not paused.
      */
     paused?: true;
+    /**
+     * Their own booking rules (DEC-170, #1038); a null is "same as the
+     * business". The whole picture, with any request, is
+     * `GET staff/:id/booking-rules`.
+     */
+    rules: PersonRules;
 }
 
 /** Staff, and the zone their hours are wall-clock times in. */
@@ -166,6 +179,7 @@ function toView(
         serviceIds: row.services.map((s) => s.serviceId),
         hours: row.hours,
         weeklyMinutes: weeklyMinutes(row.hours),
+        rules: personRulesOf(row),
         extraHours: row.extraHours.map((e) => ({
             id: e.id,
             date: dateOnly(e.date),
@@ -693,7 +707,11 @@ export class StaffService {
         return bookingPaymentView(ctx.organizationId);
     }
 
-    /** Set the business's rules; an absent field is left, `null` clears it. */
+    /**
+     * Set the business's rules; an absent field is left, `null` clears it.
+     * Each change lands in the business's history (#1038): the fields as
+     * they were and became, in the same transaction.
+     */
     async updateBookingRules(
         ctx: OrganizationContext,
         dto: UpdateBookingRulesDto,
@@ -715,20 +733,28 @@ export class StaffService {
             ...(dto.bookingPayment !== undefined
                 ? { bookingPayment: dto.bookingPayment }
                 : {}),
+            ...(dto.gapMinutes !== undefined
+                ? { gapMinutes: dto.gapMinutes }
+                : {}),
+            ...(dto.memberRuleChangesNeedApproval !== undefined
+                ? {
+                      memberRuleChangesNeedApproval:
+                          dto.memberRuleChangesNeedApproval,
+                  }
+                : {}),
         };
-        const row = await prisma.bookingRules.upsert({
-            where: { organizationId: ctx.organizationId },
-            create: { organizationId: ctx.organizationId, ...data },
-            update: data,
-            select: {
-                bookAheadDays: true,
-                latestBookingMinutes: true,
-                freeCancelHours: true,
-                refundInTimeCancels: true,
-                bookingPayment: true,
-            },
+        return prisma.$transaction(async (tx) => {
+            const before = await loadBookingRules(tx, ctx.organizationId);
+            const row = await tx.bookingRules.upsert({
+                where: { organizationId: ctx.organizationId },
+                create: { organizationId: ctx.organizationId, ...data },
+                update: data,
+                select: BOOKING_RULES_SELECT,
+            });
+            const after = bookingRulesOf(row);
+            await recordBusinessRulesInTx(tx, ctx, before, after);
+            return after;
         });
-        return { ...row, bookingPayment: bookingPaymentOf(row.bookingPayment) };
     }
 
     // ── Internals ──────────────────────────────────────────────────────────

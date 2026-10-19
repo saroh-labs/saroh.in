@@ -17,6 +17,10 @@ import { allows } from "../organizations/organization-policy";
  * | POST/PATCH/PUT/DELETE services, rules, staff and their    | `service:write` |
  * | services, closures, booking-rules                         |                 |
  * | PUT staff/:id/hours, extra hours, time off (DEC-170)      | `hours:write`   |
+ * | GET staff/:id/booking-rules, booking-rule-requests (#1038) | `service:read`  |
+ * | PUT staff/:id/booking-rules: one's own (a request while    | `hours:write`   |
+ * | the approval switch is on); withdraw, dismiss one's own    |                 |
+ * | PUT staff/:id/booking-rules: anyone's; approve, turn down  | `service:write` |
  * | GET services/bookings, bookings/:id, :id/bookings,        | `booking:read`  |
  * | :id/waitlist                                              |                 |
  * | POST :id/bookings, PATCH/DELETE bookings/:id, outcome,    | `booking:write` |

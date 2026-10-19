@@ -58,6 +58,15 @@ export const VALUE_FIELDS = [
     // One of a person's own alerts on or off (F14); the alert and channel
     // it is for are named beside it.
     "alertOn",
+    // Booking rules, the business's and a person's own (DEC-170, #1038):
+    // numbers and switches about how the diary is booked, never a person.
+    "bookAheadDays",
+    "latestBookingMinutes",
+    "freeCancelHours",
+    "gapMinutes",
+    "refundInTimeCancels",
+    "bookingPayment",
+    "memberRuleChangesNeedApproval",
 ] as const;
 
 /**

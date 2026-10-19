@@ -24,9 +24,10 @@ import { guarded, guardMinutes } from "./availability";
 import { BookingEventType } from "./booking-event-type";
 import { holdsPlace, releaseHoldInTx } from "./booking-hold";
 import { bookingLocation, intakeNoteOf } from "./booking-intake";
-import { freeCancelDeadline, loadBookingRules } from "./booking-rules";
+import { freeCancelDeadline } from "./booking-rules";
 import type { AccountBookPay, BookingLocationType, PaidWith } from "./dto";
 import { seatsHeld } from "./held-seats";
+import { loadRulesFor } from "./person-rules";
 import { phoneContactInTx } from "./phone-booker";
 import { depositCents } from "./service-fields";
 import { bookedPriceOf, serviceCharge } from "./service-price";
@@ -471,9 +472,15 @@ export async function reserveInTx(
     }
     // The free-cancel deadline, fixed now from today's rule (E8, DEC-051):
     // no later move changes it.
+    // A one-to-one keeps its person's own rule, else the business's
+    // (DEC-170, #1038); a class, the business's.
     const freeCancelUntil = freeCancelDeadline(
         startAt,
-        await loadBookingRules(tx, organizationId),
+        await loadRulesFor(
+            tx,
+            organizationId,
+            person?.perPerson ? person.staffId : null,
+        ),
     );
 
     // A signed-in customer booking a session they hold themselves, unpaid
@@ -712,6 +719,8 @@ async function releaseOwnHoldInTx(
  * start) are not a clash — they are the class. `excludeBookingId` is a
  * booking being moved, which is not its own competitor. `padMinutes` is the
  * service's buffers either side (DEC-052): what the listing keeps clear too.
+ * A one-to-one also keeps the person's gap between bookings clear (DEC-170,
+ * #1038), read under the lock so a gap set meanwhile is kept.
  */
 export async function assertPersonFreeInTx(
     tx: Prisma.TransactionClient,
@@ -723,8 +732,13 @@ export async function assertPersonFreeInTx(
     padMinutes = 0,
 ): Promise<void> {
     if (!person.staffId) return;
-    const pad = padMinutes * 60_000;
-    await tx.$queryRaw`SELECT id FROM "StaffMember" WHERE id = ${person.staffId} FOR UPDATE`;
+    const locked = await tx.$queryRaw<
+        { organizationId: string; gapMinutes: number | null }[]
+    >`SELECT "organizationId", "gapMinutes" FROM "StaffMember" WHERE id = ${person.staffId} FOR UPDATE`;
+    const gap = person.perPerson
+        ? await personGapInTx(tx, Array.isArray(locked) ? locked[0] : undefined)
+        : { minutes: 0 };
+    const pad = (padMinutes + gap.minutes) * 60_000;
     const clashes = await tx.booking.count({
         where: {
             staffId: person.staffId,
@@ -736,11 +750,29 @@ export async function assertPersonFreeInTx(
         },
     });
     if (clashes > 0) {
+        const who = person.staffName ?? "That person";
         throw new ConflictException({
-            message: `${person.staffName ?? "That person"} is already booked then.`,
+            message:
+                gap.minutes > 0
+                    ? `${who} is already booked then, or needs ${gap.minutes} min between bookings.`
+                    : `${who} is already booked then.`,
             field: "staffId",
         });
     }
+}
+
+/** A person's gap between bookings: their own, else the business's. */
+async function personGapInTx(
+    tx: Prisma.TransactionClient,
+    person: { organizationId: string; gapMinutes: number | null } | undefined,
+): Promise<{ minutes: number }> {
+    if (!person) return { minutes: 0 };
+    if (person.gapMinutes !== null) return { minutes: person.gapMinutes };
+    const business = await tx.bookingRules.findUnique({
+        where: { organizationId: person.organizationId },
+        select: { gapMinutes: true },
+    });
+    return { minutes: business?.gapMinutes ?? 0 };
 }
 
 /**

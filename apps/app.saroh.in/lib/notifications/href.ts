@@ -28,6 +28,7 @@ export type NoticeKind =
     | "domain"
     | "providers"
     | "team"
+    | "hours"
     | "plan"
     | "products";
 
@@ -71,6 +72,8 @@ const HREF: Record<NoticeKind, (id: string | null, type: string) => string> = {
         id ? `/sites/${encodeURIComponent(id)}/settings` : "/sites",
     providers: () => "/settings/providers",
     team: () => "/settings/people",
+    // A request to change someone's booking rules (#1038): Hours and time off.
+    hours: () => "/bookings/availability",
     // Home while plans aren't shown (DEC-136): the page isn't there.
     plan: () => (plansShown() ? "/settings/billing/plans" : "/"),
     products: () => "/commerce/products",
@@ -89,6 +92,7 @@ const KIND_OF_PREFIX: Partial<Record<string, NoticeKind>> = {
     domain: "domain",
     provider: "providers",
     team: "team",
+    hours: "hours",
     plan: "plan",
     catalogue: "products",
 };

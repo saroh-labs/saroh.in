@@ -38,6 +38,9 @@ export const NOTICE_KINDS = {
     "provider.attention": "providers",
     "provider.back": "providers",
     "team.joined": "team",
+    // A Member asked to change their own booking rules (#1038): Hours and
+    // time off, where the request is reviewed.
+    "hours.rule-request": "hours",
     "plan.limit": "plan",
     "plan.changed": "plan",
     "plan.ending": "plan",
@@ -61,6 +64,7 @@ interface TargetColumns {
     domain: { siteId: string | null };
     providers: Record<never, never>;
     team: Record<never, never>;
+    hours: Record<never, never>;
     plan: Record<never, never>;
     products: Record<never, never>;
 }
@@ -185,6 +189,7 @@ const ID_OF: Record<NoticeKind, (n: StoredNotice) => string | null> = {
     domain: (n) => n.siteId ?? null,
     providers: () => null,
     team: () => null,
+    hours: () => null,
     plan: () => null,
     products: () => null,
 };

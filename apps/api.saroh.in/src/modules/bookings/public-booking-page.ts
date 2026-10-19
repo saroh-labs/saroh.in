@@ -36,6 +36,7 @@ import { businessClosedOn } from "./closed-days";
 import { nobodyTaking, pausedDiaryIds, splitPaused } from "./diary-paused";
 import type { BookingLocationType, LocationType } from "./dto";
 import { openingFor } from "./opening-hours";
+import { bookableStarts, furthestAhead, loadDiaryRules } from "./person-rules";
 import { loadBookableService } from "./reservation";
 import { depositCents } from "./service-fields";
 import { serviceCharge } from "./service-price";
@@ -218,11 +219,18 @@ export async function publicDays(
     const { service, rules } = await loadBookableService(serviceId, {
         bookingPage: true,
     });
-    const [bookingRules, zone, staffing] = await Promise.all([
-        loadBookingRules(prisma, service.organizationId),
+    const [zone, staffing] = await Promise.all([
         businessTimezone(prisma, service.organizationId),
         loadStaffing(service),
     ]);
+    // The business's rules, and each person's own for a one-to-one
+    // (DEC-170, #1038).
+    const diary = await loadDiaryRules(
+        prisma,
+        service.organizationId,
+        staffing.perPerson ? staffing.people.map((p) => p.id) : [],
+    );
+    const bookingRules = diary.business;
     const skip = Math.min(
         MAX_DAYS_SKIP,
         Math.max(0, Math.floor(ask.skip ?? 0)),
@@ -234,7 +242,8 @@ export async function publicDays(
     const to = first.plus({ days: span }).toJSDate();
     const names = new Map(staffing.people.map((p) => [p.id, p.name]));
     const availService = toAvailabilityService(service);
-    // Never a start that has begun; then the business's own rules.
+    // Never a start that has begun; then the business's own rules. A
+    // one-to-one keeps each person's own instead (DEC-170, #1038).
     const bookable = (startAt: Date) =>
         startAt > now && withinBookingWindow(startAt, now, bookingRules);
     const kind: PublicDays["kind"] = service.capacity > 1 ? "class" : "one";
@@ -285,28 +294,29 @@ export async function publicDays(
                 ),
                 closed,
             );
-            const starts = staffSlots(
-                availService,
-                rules,
-                people,
-                staffing.zone,
-                from,
-                to,
-                opening,
-            )
-                .filter((slot) => bookable(slot.startAt))
-                .map((slot) => {
-                    const staffId = slot.staffIds[0] ?? null;
-                    return {
-                        startAt: slot.startAt.toISOString(),
-                        endAt: slot.endAt.toISOString(),
-                        staffId,
-                        staffName: staffId
-                            ? (names.get(staffId) ?? null)
-                            : null,
-                        placesLeft: null,
-                    };
-                });
+            const starts = bookableStarts(
+                staffSlots(
+                    availService,
+                    rules,
+                    people,
+                    staffing.zone,
+                    from,
+                    to,
+                    opening,
+                ).filter((slot) => slot.startAt > now),
+                now,
+                diary,
+                true,
+            ).map((slot) => {
+                const staffId = slot.staffIds[0] ?? null;
+                return {
+                    startAt: slot.startAt.toISOString(),
+                    endAt: slot.endAt.toISOString(),
+                    staffId,
+                    staffName: staffId ? (names.get(staffId) ?? null) : null,
+                    placesLeft: null,
+                };
+            });
             return { hours, starts };
         }
         const hours = insideOpening(
@@ -348,10 +358,14 @@ export async function publicDays(
             ? eitherWay(offer(opening), offer(null))
             : offer(opening);
 
-    const aheadEnd =
-        bookingRules.bookAheadDays === null
-            ? null
-            : now.getTime() + bookingRules.bookAheadDays * 86_400_000;
+    // The furthest anyone asked about may be booked (DEC-170, #1038).
+    const ahead = ownTimes
+        ? furthestAhead(
+              diary,
+              people.map((p) => p.id),
+          )
+        : bookingRules.bookAheadDays;
+    const aheadEnd = ahead === null ? null : now.getTime() + ahead * 86_400_000;
     const days: PublicDay[] = [];
     for (let i = 0; i < span; i += 1) {
         const day = first.plus({ days: i });

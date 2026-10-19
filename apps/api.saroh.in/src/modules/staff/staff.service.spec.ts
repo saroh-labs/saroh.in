@@ -28,6 +28,8 @@ jest.mock("@saroh/database", () => {
             deleteMany: jest.fn(),
         },
         bookingRules: { findUnique: jest.fn(), upsert: jest.fn() },
+        // A change to the business's rules, in its history (#1038).
+        auditEvent: { create: jest.fn() },
         // Whether online payment can be taken (DEC-088).
         organizationModule: { findFirst: jest.fn() },
         merchantPaymentProvider: { findFirst: jest.fn() },
@@ -629,6 +631,47 @@ describe("StaffService — booking rules", () => {
             freeCancelHours: null,
             refundInTimeCancels: true,
             bookingPayment: "BOTH",
+            // No gap, and Members' rule changes need approval (#1038).
+            gapMinutes: 0,
+            memberRuleChangesNeedApproval: true,
+        });
+    });
+
+    it("writes the gap and the approval switch, and records the change (#1038)", async () => {
+        db.bookingRules!.findUnique!.mockResolvedValue(null);
+        db.bookingRules!.upsert!.mockResolvedValue({
+            bookAheadDays: null,
+            latestBookingMinutes: null,
+            freeCancelHours: null,
+            refundInTimeCancels: true,
+            bookingPayment: "BOTH",
+            gapMinutes: 15,
+            memberRuleChangesNeedApproval: false,
+        });
+        await expect(
+            service.updateBookingRules(ctx(), {
+                gapMinutes: 15,
+                memberRuleChangesNeedApproval: false,
+            }),
+        ).resolves.toMatchObject({
+            gapMinutes: 15,
+            memberRuleChangesNeedApproval: false,
+        });
+        expect(db.bookingRules!.upsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+                update: {
+                    gapMinutes: 15,
+                    memberRuleChangesNeedApproval: false,
+                },
+            }),
+        );
+        expect(db.auditEvent!.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                action: "booking-rules.update",
+                metadata: expect.objectContaining({
+                    fields: ["gapMinutes", "memberRuleChangesNeedApproval"],
+                }),
+            }),
         });
     });
 

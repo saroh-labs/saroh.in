@@ -88,7 +88,9 @@ export type OrgAction =
     | "service:read"
     | "service:write"
     // Weekly hours, extra hours and time off for anyone who takes bookings
-    // (DEC-170, Q13 of 19 Oct): what the front desk keeps up to date.
+    // (DEC-170, Q13 of 19 Oct): what the front desk keeps up to date. Also
+    // the holder's OWN booking rules (#1038), as a request while the
+    // business's "Members' rule changes need approval" is on.
     // Narrower than `service:write` — adding or removing people, the
     // services they take, the services themselves, closures and booking
     // rules stay there — and implied by it (`resolveCapabilities`), so

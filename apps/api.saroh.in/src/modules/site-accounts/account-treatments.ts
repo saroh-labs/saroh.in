@@ -4,6 +4,7 @@ import { prisma } from "@saroh/database";
 
 import type { BookingRulesValue } from "../bookings/booking-rules";
 import { loadBookingRules } from "../bookings/booking-rules";
+import { loadRulesFor } from "../bookings/person-rules";
 import type { Ctx } from "./account-booking-rules";
 import { businessName, first, ownBookingsWhere } from "./account-booking-rules";
 import type { AccountTreatment } from "./account-bookings-view";
@@ -145,7 +146,13 @@ export async function bookableTreatment(
               select: { staffId: true },
           })
         : null;
-    const rules = await loadBookingRules(prisma, ctx.organizationId);
+    // With the same person, their own window, else the business's
+    // (DEC-170, #1038).
+    const staffId = takes ? (last?.staffId ?? undefined) : undefined;
+    const rules =
+        service.capacity === 1 && staffId
+            ? await loadRulesFor(prisma, ctx.organizationId, staffId)
+            : await loadBookingRules(prisma, ctx.organizationId);
     return {
         orderId: treatment.ref,
         visit: treatment.bookNext,

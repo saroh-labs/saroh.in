@@ -133,6 +133,24 @@ what the API allows.
   A cancelled paid booking's refund or keep follows the business's policy
   whoever cancels (Q14); only the by-hand refund beyond the policy asks
   `payment:manage`. `book-by-hand.db.spec.ts` pins the front desk.
+- **Current** (DEC-170, #1038) — **Each person's own booking rules.** A
+  person's timing rules (notice, booking ahead, gap between bookings,
+  cancelling) live on `StaffMember`, null meaning "same as the business";
+  paying and refunds stay business-wide (`bookings/person-rules.ts`).
+  No new key: `hours:write` changes the holder's **own** rules (their
+  diary's `membership.userId` is the caller), `service:write` anyone's,
+  the business's rules, "Gap between bookings" and the switch "Members'
+  rule changes need approval" (on for every business). With the switch on,
+  a change made without `service:write` is a `StaffRuleRequest` (one
+  waiting per person; asking again replaces it) that changes nothing until
+  someone with `service:write` approves it; Turn down takes an optional
+  reason; only the person who asked withdraws it or clears the outcome.
+  Off, it applies at once and Undo is the same `PUT` with `previous`. A
+  Reviewer and Calendar only change nobody's; Calendar only reads its own.
+  A request tells the inbox (`hours.rule-request`, owners and admins), and
+  every change and move is in the history (`staff.booking-rules.*`,
+  `booking-rules.update`). `staff-rules.db.spec.ts` pins it, and
+  `booking-permissions.db.spec.ts` has a row per endpoint.
 - **Current** (DEC-098, 2026-10-07) — **Money follows permissions, never
   role names.** Seeing amounts, taking a desk payment, marking an invoice
   paid, recording an order's payment and refunding are asked of the role's
@@ -180,7 +198,8 @@ what the API allows.
 - **Adopted** — **Who writes the new settings** (ADR-008): staff and booking
   rules need `service:write`, their hours and time off `hours:write`
   (DEC-170); GST registration, state and rates need Owner/Admin. A Member
-  sets hours and time off, and is refused the rest.
+  sets hours and time off, and their own booking rules (#1038, waiting for
+  approval while the business asks for it), and is refused the rest.
 - **Current** — **Membership is assignable, and invitations are hashed.**
   `OrganizationInvitation` holds the role, a reviewer's sites, and a sha256 of
   the token; the plaintext exists only in the invitee's email. Seven-day expiry,

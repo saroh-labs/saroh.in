@@ -25,6 +25,7 @@ import {
     outsideClosures,
     staffSlots,
     weeklyIntervals,
+    widen,
     withinIntervals,
     workingIntervals,
 } from "./availability";
@@ -285,6 +286,20 @@ export async function resolvePerson(
             throw new BadRequestException({
                 message: `${named.name} isn't working then.`,
                 field: "staffId",
+            });
+        }
+        // Their gap between bookings (DEC-170, #1038).
+        const gap = person.gapMinutes ?? 0;
+        if (
+            gap > 0 &&
+            countOverlapping(
+                widen(guarded(slot, availService), gap),
+                person.busy,
+            ) > 0
+        ) {
+            throw new ConflictException({
+                message: `${named.name} needs ${gap} min between bookings. Pick another time.`,
+                field: "startAt",
             });
         }
     }
