@@ -1067,7 +1067,7 @@ test.describe("availability and services", () => {
         },
     );
 
-    test("a class under two places is refused, and leaving asks first (E2)", async ({
+    test("a class under two places is refused, and leaving asks first (E2, U16)", async ({
         page,
     }) => {
         await signIn(page);
@@ -1086,17 +1086,18 @@ test.describe("availability and services", () => {
         await expect(
             page.getByRole("heading", { level: 1, name: "New service" }),
         ).toBeVisible();
-        // A new service starts one-to-one, so it offers Visits (E10); a
-        // class has none. The deposit (E8) waits for a price.
-        await expect(page.getByLabel("Visits")).toHaveCount(1);
-        await expect(
-            page.getByRole("radiogroup", { name: "Deposit" }),
-        ).toHaveCount(0);
+        // Five questions; the rest under More details (U16). A new
+        // service starts one-to-one, so Visits in a package can be opened
+        // (E10); a class has none.
+        const visits = page.getByRole("button", {
+            name: /^Visits in a package/,
+        });
+        await expect(visits).toBeEnabled();
         await page.getByRole("radio", { name: "A group class" }).click();
-        await expect(page.getByLabel("Visits")).toHaveCount(0);
-        await page.getByLabel("Name").fill("E2E class");
+        await expect(visits).toBeDisabled();
+        await page.getByLabel("What is it called?").fill("E2E class");
         await page.getByRole("textbox", { name: /^Price/ }).fill("0");
-        const who = page.getByRole("group", { name: "Who does it" });
+        const who = page.getByRole("group", { name: "Who does it?" });
         if (await who.isVisible()) {
             // With one person on the diary they are ticked already.
             const first = who.getByRole("checkbox").first();
@@ -1106,8 +1107,8 @@ test.describe("availability and services", () => {
         }
         // A field says what is wrong once it is left, and the button stays
         // on: pressing it says the rest and goes to the first field.
-        await page.getByLabel("Places").fill("1");
-        await page.getByLabel("Places").blur();
+        await page.getByLabel("How many places?").fill("1");
+        await page.getByLabel("How many places?").blur();
         await expect(page.getByRole("alert").first()).toHaveText(
             "A class needs at least 2 places.",
         );
@@ -1117,9 +1118,11 @@ test.describe("availability and services", () => {
 
         // The app's one leave question, as every create and edit flow asks
         // it: Stay keeps what was typed, Leave goes where the link pointed.
+        // "‹ Services", over the title.
         const crumb = page
-            .getByRole("navigation", { name: "Breadcrumb" })
-            .getByRole("link", { name: "Services" });
+            .locator('main a[href="/services"]')
+            .filter({ hasText: /^Services$/ })
+            .first();
         const ask = page.getByRole("alertdialog", {
             name: "Leave without saving?",
         });
@@ -1131,7 +1134,9 @@ test.describe("availability and services", () => {
         await expect(ask.getByRole("button", { name: "Stay" })).toBeFocused();
         await ask.getByRole("button", { name: "Stay" }).click();
         await expect(ask).toBeHidden();
-        await expect(page.getByLabel("Name")).toHaveValue("E2E class");
+        await expect(page.getByLabel("What is it called?")).toHaveValue(
+            "E2E class",
+        );
 
         await crumb.click();
         await ask.getByRole("button", { name: "Leave", exact: true }).click();
@@ -1164,13 +1169,27 @@ test.describe("the Service Editor on Northwind (E2)", () => {
             .catch(() => false);
         test.skip(!opened, "Northwind doesn't take bookings");
         const name = `E2E either ${ownStamp(test.info())}`;
-        await page.getByLabel("Name").fill(name);
-        await page.getByRole("radio", { name: "Either, they choose" }).click();
-        await page
+        await page.getByLabel("What is it called?").fill(name);
+        // Where is under More details, in a panel of its own (U16); on a
+        // phone More details opens first.
+        const more = page.getByRole("button", { name: /^More details/ });
+        if (await more.isVisible()) await more.click();
+        await page.getByRole("button", { name: /^Where/ }).click();
+        const where = page.getByRole("dialog", { name: "Where" });
+        await where.getByRole("radio", { name: "Either, they choose" }).click();
+        await where
             .getByLabel("Link to join")
             .fill("https://meet.example.com/e2e-either");
+        await where.getByRole("button", { name: "Use this" }).click();
+        await expect(where).toBeHidden();
+        if (await more.isVisible()) {
+            // Back to the five questions.
+            await page
+                .getByRole("button", { name: "Edit", exact: true })
+                .click();
+        }
         await page.getByRole("textbox", { name: /^Price/ }).fill("500");
-        const who = page.getByRole("group", { name: "Who does it" });
+        const who = page.getByRole("group", { name: "Who does it?" });
         if (await who.isVisible()) {
             // With one person on the diary they are ticked already.
             const first = who.getByRole("checkbox").first();
@@ -1186,8 +1205,8 @@ test.describe("the Service Editor on Northwind (E2)", () => {
                 page.getByRole("heading", { level: 1, name }),
             ).toBeVisible();
             await expect(
-                // "Live", as every kind of thing says it.
-                page.getByText("Live", { exact: true }),
+                // Who can book it, in the Services list's words (U16).
+                page.getByText("Customers and team", { exact: true }),
             ).toBeVisible();
 
             await page.goto("/services");

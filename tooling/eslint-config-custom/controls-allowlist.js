@@ -149,6 +149,10 @@ export const RAW_ALLOWED = {
     "components/qr/qr-add-logo.tsx": ["button"],
     // button: a row or card that is one button
     "components/qr/qr-target-picker.tsx": ["button"],
+    // button: a row that is one button (a service's own hours, opening under itself)
+    "components/services/service-editor/hours-field.tsx": ["button"],
+    // button: a row that is one button (More details, a saved service's rows)
+    "components/services/service-editor/service-rows.tsx": ["button"],
     // button: a row or card that is one button
     "components/settings/activity-list.tsx": ["button"],
     // button: a control styled by its screen's own helper, an option in a list; input: a field its screen draws itself

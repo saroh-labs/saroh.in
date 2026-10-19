@@ -1,11 +1,11 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useId, useState } from "react";
 
-import { Eyebrow } from "@/components/bookings/calendar/parts";
 import { ChipGroup } from "@/components/shared/choice-group";
 
-import { NumberField } from "./fields";
+import { LABEL, NumberField } from "./fields";
 
 /** The lengths most services run to, in minutes. */
 export const LENGTHS = ["15", "30", "45", "60", "90"] as const;
@@ -14,24 +14,30 @@ const CUSTOM = "custom";
 
 const CHOICES: { value: string; label: string }[] = [
     ...LENGTHS.map((minutes) => ({ value: minutes, label: `${minutes} min` })),
-    { value: CUSTOM, label: "Custom" },
+    { value: CUSTOM, label: "Other" },
 ];
 
 /**
- * How long each visit is (Bookings audit, 12 Oct 2026): a chip for the
- * usual lengths, and Custom for any other, which shows the number field
- * the page had before. The value is the same string of minutes either
+ * How long it takes (Bookings audit, 12 Oct 2026; U16's "How long does it
+ * take?"): a chip for the usual lengths, and Other for any other, which
+ * shows a number field. The value is the same string of minutes either
  * way, so the page's rules and what Save sends are unchanged.
  *
- * A saved length that is none of the chips opens on Custom. Choosing
- * Custom keeps the minutes there were, so nothing is lost on the way.
+ * A saved length that is none of the chips opens on Other. Choosing Other
+ * keeps the minutes there were, so nothing is lost on the way.
  */
 export function LengthField({
     value,
     onChange,
     error,
     onLeave,
+    label = "How long does it take?",
+    note,
 }: {
+    /** The question over the chips. */
+    label?: string;
+    /** A line under the chips: what the length means for the day. */
+    note?: ReactNode;
     /** Minutes, as typed. */
     value: string;
     onChange: (minutes: string) => void;
@@ -45,7 +51,9 @@ export function LengthField({
     const custom = chosen || !preset;
     return (
         <div className="min-w-0">
-            <Eyebrow id={id}>Each visit</Eyebrow>
+            <div id={id} className={`${LABEL} mb-2`}>
+                {label}
+            </div>
             <ChipGroup
                 labelledBy={id}
                 value={custom ? CUSTOM : value}
@@ -58,7 +66,7 @@ export function LengthField({
             {custom ? (
                 <div className="mt-2.5">
                     <NumberField
-                        label="Custom length (min)"
+                        label="Other length (min)"
                         value={value}
                         onChange={onChange}
                         width="w-[120px]"
@@ -66,6 +74,11 @@ export function LengthField({
                         onLeave={onLeave}
                     />
                 </div>
+            ) : null}
+            {note ? (
+                <p className="mt-1.5 text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
+                    {note}
+                </p>
             ) : null}
         </div>
     );

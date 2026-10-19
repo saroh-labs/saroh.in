@@ -73,10 +73,10 @@ describe("the draft and what it sends", () => {
         expect(send("")).toBeNull();
     });
 
-    it("a change to it is a change to Price", () => {
+    it("a change to it is a change to Money", () => {
         const saved = draft();
         expect(changedSections(saved, { ...saved, gstPriceMode: "" })).toEqual([
-            "Price",
+            "Money",
         ]);
     });
 });

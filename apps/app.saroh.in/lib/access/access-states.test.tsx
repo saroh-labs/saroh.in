@@ -95,7 +95,7 @@ describe("BookingsLocked", () => {
 describe("the Service Editor's states", () => {
     it.each([
         ["forbidden", "You can't open Services", "Back to Home"],
-        ["cant-add", "You can't open New service", "Back to services"],
+        ["cant-add", "You can't add services", "Back to services"],
     ] as const)(
         "%s is a denial, not the red failed card",
         (state, title, back) => {

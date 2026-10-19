@@ -10,7 +10,6 @@
  */
 
 import { formatMoney } from "@/lib/format/money";
-import { count } from "@/lib/format/plural";
 import type { GstPriceMode, ItemModeValue } from "@/lib/gst/price-mode";
 import {
     effectiveMode,
@@ -75,10 +74,12 @@ export interface ServiceDraft {
     gstPriceMode: ItemModeValue;
     // Who does it
     staffIds: string[];
-    // The booking page, and taking bookings
+    // Who can book it (DEC-170, Q5): customers on the booking page, the
+    // team from Bookings. A new service is sent both; a saved one's ticks
+    // save as they are flipped, outside the draft.
     showOnBookingPage: boolean;
-    taking: boolean;
-    // More settings
+    bookableByTeam: boolean;
+    // More details
     timezone: string;
     bufferBefore: string;
     gstRate: string;
@@ -135,8 +136,9 @@ export function staffFor(
 
 /**
  * The draft a saved service opens with, or a new one's. A new service
- * starts at 30 minutes with a 10-minute gap, in person, on the booking page
- * and in the business's time zone.
+ * starts at 60 minutes with a 15-minute break after (the boards'), in
+ * person, bookable by customers and the team, and in the business's time
+ * zone.
  */
 export function draftOf(
     service: Service | null,
@@ -150,8 +152,8 @@ export function draftOf(
             name: "",
             description: "",
             kind: "one",
-            minutes: "30",
-            gap: "10",
+            minutes: "60",
+            gap: "15",
             visits: "1",
             places: "",
             where: "IN_PERSON",
@@ -162,7 +164,7 @@ export function draftOf(
             // The one person on the diary, when there is only one.
             staffIds: [...staffIds],
             showOnBookingPage: true,
-            taking: true,
+            bookableByTeam: true,
             timezone,
             bufferBefore: "0",
             gstRate: "",
@@ -186,7 +188,7 @@ export function draftOf(
         gstPriceMode: itemModeValue(service.gstPriceMode),
         staffIds: [...staffIds].sort(),
         showOnBookingPage: service.showOnBookingPage,
-        taking: service.status === "ACTIVE",
+        bookableByTeam: service.bookableByTeam,
         timezone: service.timezone,
         bufferBefore: String(service.bufferBeforeMinutes),
         gstRate: rateOption(service.gstRate),
@@ -312,7 +314,7 @@ export function serviceFieldProblems(
         );
     }
     const price = toMinor(draft.price);
-    if (price === null) say("price", "Add a price (0 if it's free).");
+    if (price === null) say("price", "Add a price, or 0 if it's free.");
     else if (Number.isNaN(price)) {
         say("price", "Write the price as a number, like 1200.");
     } else if (draft.deposit !== "NONE" && price === 0) {
@@ -324,10 +326,10 @@ export function serviceFieldProblems(
     }
     if (needsGstRate(draft, gstRegistered)) say("gstRate", GST_RATE_NEEDED);
     if (hasStaff && !onePerson && draft.staffIds.length === 0) {
-        say("staffIds", "Pick who takes it.");
+        say("staffIds", "Pick who does it.");
     }
     if (!(strictWhole(draft.bufferBefore) <= 1440)) {
-        say("bufferBefore", "The buffer before has to be a number of minutes.");
+        say("bufferBefore", "The break before has to be a number of minutes.");
     }
     if (!draft.timezone.trim()) say("timezone", "Pick a time zone.");
     const sac = draft.sacCode.replace(/\s+/g, "");
@@ -414,20 +416,27 @@ export function serviceInput(
         locationType: draft.where,
         meetingUrl: online ? draft.meetingUrl.trim() : null,
         showOnBookingPage: draft.showOnBookingPage,
+        bookableByTeam: draft.bookableByTeam,
         depositMode: draft.deposit,
         visits: draftVisits(draft),
     };
 }
 
-/** What saving a saved service sends: its fields, and whether it takes bookings. */
+/**
+ * What saving a saved service sends: its fields. Who can book it is not
+ * sent: its ticks save as they are flipped (DEC-170, U16), so a panel's
+ * Save never puts them back as they were.
+ */
 export function serviceUpdate(
     draft: ServiceDraft,
     currency: string,
 ): UpdateServiceInput {
-    return {
-        ...serviceInput(draft, currency),
-        status: draft.taking ? "ACTIVE" : "ARCHIVED",
-    };
+    const {
+        showOnBookingPage: _page,
+        bookableByTeam: _team,
+        ...rest
+    } = serviceInput(draft, currency);
+    return rest;
 }
 
 /**
@@ -436,16 +445,20 @@ export function serviceUpdate(
  */
 export const HOURS_SECTION = "When it can be booked";
 
-/** The editor's sections, as the leave dialog names them. */
+/** The editor's parts, as the leave dialog names them (U16). */
 const SECTIONS: [string, (keyof ServiceDraft)[]][] = [
-    ["What it is", ["name", "description", "kind"]],
-    ["Time", ["minutes", "gap", "visits", "places", "where", "meetingUrl"]],
+    ["What it is", ["name", "description", "kind", "places"]],
+    [
+        "Time and place",
+        ["minutes", "gap", "bufferBefore", "where", "meetingUrl", "timezone"],
+    ],
     [HOURS_SECTION, ["hours"]],
-    ["Price", ["price", "deposit", "gstPriceMode"]],
+    [
+        "Money",
+        ["price", "deposit", "gstPriceMode", "gstRate", "sacCode", "visits"],
+    ],
     ["Who does it", ["staffIds"]],
-    ["Booking page", ["showOnBookingPage"]],
-    ["Taking bookings", ["taking"]],
-    ["More settings", ["timezone", "bufferBefore", "gstRate", "sacCode"]],
+    ["Who can book it", ["showOnBookingPage", "bookableByTeam"]],
 ];
 
 function same(a: ServiceDraft, b: ServiceDraft, key: keyof ServiceDraft) {
@@ -478,73 +491,23 @@ export function changedParts(
     };
 }
 
-/** The GST fields: under More settings, or beside the price (`gstPlace`). */
-const GST_KEYS: (keyof ServiceDraft)[] = ["gstRate", "sacCode"];
-
-/**
- * The sections whose fields differ from the saved draft, in page order.
- * `gstWithPrice`: the GST rate and SAC code are drawn under Price (a
- * GST-registered business), so a change to them is named there.
- */
+/** The parts whose fields differ from the saved draft, in page order. */
 export function changedSections(
     saved: ServiceDraft,
     draft: ServiceDraft,
-    gstWithPrice = false,
 ): string[] {
-    return SECTIONS.map(([name, keys]): [string, (keyof ServiceDraft)[]] => {
-        if (!gstWithPrice) return [name, keys];
-        if (name === "Price") return [name, [...keys, ...GST_KEYS]];
-        return [name, keys.filter((k) => !GST_KEYS.includes(k))];
-    })
-        .filter(([, keys]) => keys.some((k) => !same(saved, draft, k)))
-        .map(([name]) => name);
+    return SECTIONS.filter(([, keys]) =>
+        keys.some((k) => !same(saved, draft, k)),
+    ).map(([name]) => name);
 }
 
-function bookingsCount(n: number): string {
-    return count(n, "booking");
-}
-
-/** The line under the title: unsaved, new, or what is still to come. */
 /**
- * What the Service Editor says in place of its buttons to someone without
- * `service:write` ("Change services, hours, time off and booking rules",
- * E26): its fields are disabled, and it says why in plain words.
+ * What the Service Editor says to someone without `service:write`
+ * ("Change services, hours, time off and booking rules", E26): it reads,
+ * and says why it can't be changed, in plain words.
  */
 export const VIEW_ONLY =
     "View only. Your role can't change services, hours or booking rules.";
-
-export function stateLine({
-    isNew,
-    dirty,
-    comingUp,
-}: {
-    isNew: boolean;
-    dirty: boolean;
-    /** Null when the bookings could not be counted. */
-    comingUp: number | null;
-}): string {
-    if (dirty) return "Unsaved changes";
-    if (isNew) return "Not saved yet";
-    if (comingUp === null) return "";
-    // The count is of what is still to come: with none, a service may
-    // well have been booked before, so it never says "nothing booked yet".
-    return comingUp
-        ? `${bookingsCount(comingUp)} still to come`
-        : "Nothing coming up";
-}
-
-/** The pill beside the title: new, or whether it takes bookings. */
-export function statePill(
-    isNew: boolean,
-    taking: boolean,
-): { label: string; tone: "neutral" | "success" | "warning"; hint?: string } {
-    if (isNew) return { label: "New", tone: "neutral" };
-    // "Live" and "Paused", as every kind of thing says it; the service's
-    // own sentence is the hint.
-    return taking
-        ? { label: "Live", tone: "success", hint: "Taking bookings." }
-        : { label: "Paused", tone: "warning", hint: "Not taking bookings." };
-}
 
 /**
  * What the Save toast says. A new service is bookable only once it has
@@ -577,7 +540,7 @@ export function savedMessage({
             return `${name} added. Give it weekly times so customers can book it.`;
         }
         return hasPerson
-            ? `${name} added. Customers can book it in the free time of who takes it.`
+            ? `${name} added. Customers can book it in the free time of who does it.`
             : `${name} added. Give it weekly hours so customers can book it.`;
     }
     if (!comingUp) {
@@ -793,27 +756,6 @@ export function whereNote(where: LocationType): string {
         return "They join by the link below. Everyone who books gets the same one.";
     }
     return "They pick when booking. Online visits join by the link below.";
-}
-
-/**
- * The note under "Show on the booking page". Null `hasPage` is "couldn't
- * tell", which says only what the switch does.
- */
-export function bookingPageNote(
-    hasPage: boolean | null,
-    on: boolean,
-    /** It has times to offer: its own weekly hours, or (one-to-one) someone to take it (UX-024). */
-    hasHours = true,
-): string {
-    if (hasPage === false) {
-        return "You don't have a booking page yet. Staff can still book it from the calendar.";
-    }
-    if (on && !hasHours) {
-        return "It goes on the booking page once it has weekly hours or someone to take it. Staff can book it from the calendar meanwhile.";
-    }
-    return on
-        ? "Customers can book it themselves."
-        : "Only staff can book it, from the calendar.";
 }
 
 /**

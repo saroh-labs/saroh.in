@@ -4,7 +4,10 @@ import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
-import { whoCanChange } from "@/components/shared/who-can-change";
+import {
+    WHO_CAN_CHANGE,
+    whoCanChange,
+} from "@/components/shared/who-can-change";
 import { backTo, couldntLoad } from "@saroh/ui/lib/state-copy";
 import { TextLink } from "@saroh/ui/text-link";
 
@@ -68,12 +71,17 @@ export function ServiceEditorState({
                         />
                     ) : (
                         <PermissionDeniedState
-                            {...whoCanChange({
-                                thing:
-                                    state === "cant-add"
-                                        ? "New service"
-                                        : "Services",
-                            })}
+                            {...(state === "cant-add"
+                                ? // The board's words (U16, BKMServiceNew
+                                  // "can't add"): what the role can do,
+                                  // and who can change it.
+                                  {
+                                      title: "You can't add services",
+                                      description:
+                                          "Your role can book and mark arrivals, but not add or change services.",
+                                      note: WHO_CAN_CHANGE,
+                                  }
+                                : whoCanChange({ thing: "Services" }))}
                             action={
                                 <Button asChild variant="outline">
                                     {state === "cant-add" ? (

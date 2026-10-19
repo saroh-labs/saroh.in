@@ -28,6 +28,7 @@ export default async function NewServicePage() {
         );
     }
     const {
+        services,
         staff,
         hasPage,
         hasStorefront,
@@ -61,6 +62,8 @@ export default async function NewServicePage() {
             payment={payment}
             gstRegistered={gstRegistered}
             businessPriceMode={businessPriceMode}
+            // A name another service already has says so, with the way to it.
+            others={services.map((s) => ({ id: s.id, name: s.name }))}
         />
     );
 }

@@ -22,27 +22,33 @@ save bar, the header's hint, the jump dots, Save all and the leave dialog.
 Section patches send only their own fields; the API judges the whole product
 after the patch.
 
-**Current** — **A short editor saves once** (E2): the Service Editor
-(`components/services/service-editor/`) has one Save in its sticky header,
-as its design draws. The page holds one draft; its rules, the problems
-strip, what Save sends and the leave dialog's section names are pure
-functions in `lib/services/service-editor.ts`, tested with vitest. It
-replaced the service dialog and the two react-hook-form service forms.
-What takes effect as it is flipped is not part of that Save: "Taking
-bookings" is a switch beside it (`use-taking-bookings.ts`, 12 Oct 2026)
-that saves at once with Undo and moves the saved state and the draft
-together, so the page is never "unsaved" because of it. A length people
-mostly pick from a few values is chips with Custom (`length-field.tsx`),
-over the same string the number field held.
+**Current** — **A short create saves once; a saved record is changed a
+part at a time** (E2, U16 #1032). New service
+(`components/services/service-editor/new-service.tsx`) asks five plain
+questions with a live line saying whether customers could book it, keeps
+everything else under More details (a row each, opening its own panel
+whose button puts the panel's draft back into the page's: "Use this"), and
+has one sticky Discard / Add service; Discard asks "Discard what you
+typed?" once something is typed. A saved service (`edit-service.tsx`) is
+read first: three cards, each opening a side panel (`detail-panel.tsx`, a
+`FormSheet bottomOnPhone`) with its own Save, so there is never a page of
+unsaved changes. What takes effect as it is pressed is not part of any
+Save: "Who can book it" (DEC-170, Q5) is two ticks that save at once with
+Undo (`use-taking-bookings.ts` `setBookers`), and More's Pause unticks
+both. The rules, the live line, the rows and what Save sends are pure, in
+`lib/services/service-editor.ts` and `lib/services/service-form.ts`. A
+length people mostly pick from a few values is chips with Other
+(`length-field.tsx`), over the same string the number field held.
 
 **Current** — **One Save may be several calls, and says so when one
 fails** (10 Oct). The Service Editor's Save sends the service, then who
 takes it, then its own weekly hours (`PUT …/rules`, which replaces the
 set). The hours are rows of the same draft
-(`lib/services/service-hours-draft.ts`, `hours-field.tsx`): there is no
-"Save availability". They sit in a card of their own, "When it can be
-booked" (`hours-card.tsx`), which says whose hours a one-to-one someone
-takes books in, with the way to Availability. A new service starts from the business's opening
+(`lib/services/service-hours-draft.ts`, `hours-field.tsx`, the 12-hour
+picker of Hours and time off): there is no "Save availability". They sit
+under "When it can be booked" (a More details row on a new service, the
+Time and place panel on a saved one), which says whose hours a one-to-one
+someone does books in, with the way to Hours and time off. A new service starts from the business's opening
 hours where its own hours are what gives it times (nobody on the diary
 takes it, or it is a class); a one-to-one someone takes starts with none,
 because its own hours only narrow that person's. When the service is saved

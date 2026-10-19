@@ -226,16 +226,6 @@ export function nobodyTakesLine(
 /** The switch on a row and in the editor's header. */
 export const TAKING_LABEL = "Taking bookings";
 
-/**
- * What the editor's switch (status only) says it did, with Undo beside
- * it. The list's switch says `pauseToast`.
- */
-export function takingToast(name: string, wasTaking: boolean): string {
-    return wasTaking
-        ? `${name} paused. It's off the booking page. Bookings already made still happen.`
-        : `${name} is bookable again.`;
-}
-
 /** What the list's switch says it did, with Undo beside it (BA-29). */
 export function pauseToast(name: string, taking: boolean): string {
     return taking

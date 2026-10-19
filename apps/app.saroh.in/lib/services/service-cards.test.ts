@@ -12,7 +12,6 @@ import {
     servicesCount,
     TAKING_LABEL,
     takingPatch,
-    takingToast,
     weekLine,
     whoCanBook,
     whoPatch,
@@ -230,8 +229,6 @@ describe("the Taking bookings switch", () => {
         expect(pauseToast("Physio assessment", true)).toBe(
             "Physio assessment is taking bookings again.",
         );
-        // The editor's switch, until U16.
-        expect(takingToast("Yoga", false)).toBe("Yoga is bookable again.");
     });
 
     it("offers a search past 8 services", () => {
