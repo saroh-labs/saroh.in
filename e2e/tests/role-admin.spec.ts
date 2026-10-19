@@ -56,7 +56,7 @@ const MENU: readonly MenuRow[] = [
         label: "Bookings",
         href: "/bookings",
         pages: [
-            { label: "Calendar", href: "/bookings" },
+            { label: "Bookings", href: "/bookings" },
             { label: "Services", href: "/services" },
             { label: "Hours and time off", href: "/bookings/availability" },
             { label: "Courses", href: "/courses" },

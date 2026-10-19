@@ -990,7 +990,7 @@ describe("Class packs (ADR-007), a page under Bookings", () => {
         );
     });
 
-    it("sits in the Bookings section beside Calendar and Services", () => {
+    it("sits in the Bookings section beside the diary and Services", () => {
         const bookings = navFor({
             role: "OWNER",
             moduleKeys: ["APPOINTMENTS", "CLASS_PACKS"],
@@ -1005,7 +1005,7 @@ describe("Class packs (ADR-007), a page under Bookings", () => {
         ]);
     });
 
-    it("lights Availability alone on its page, and Calendar on the rest", () => {
+    it("lights Hours and time off alone on its page, and the diary on the rest", () => {
         const kids = [
             { href: "/bookings" },
             { href: "/bookings/availability" },
@@ -1144,7 +1144,7 @@ describe("Bookings, a section across two modules", () => {
 
     it("tells Modules which rows Appointments, Courses, Class packs and Payments own", () => {
         expect(navRowsForModule("APPOINTMENTS")).toEqual([
-            "Calendar",
+            "Bookings",
             "Services",
             "Hours and time off",
         ]);

@@ -523,9 +523,12 @@ export const NAV_GROUPS: NavGroup[] = [
                 label: "Bookings",
                 icon: CalendarClock,
                 children: [
+                    // "Bookings", as the phone's tab bar says: "Calendar" is
+                    // Home's business calendar (owner, 19 Oct), so the
+                    // menu names each once.
                     {
                         href: "/bookings",
-                        label: "Calendar",
+                        label: "Bookings",
                         moduleKey: "APPOINTMENTS",
                     },
                     {
@@ -831,8 +834,14 @@ export function navRowsForModule(moduleKey: string): string[] {
             if (own === moduleKey) rows.push(item.label);
             for (const child of children) {
                 // A child that repeats its parent's destination AND name is
-                // the section landing page, not a second row.
-                if (child.href === item.href && child.label === item.label) {
+                // the section landing page, not a second row, when the
+                // section itself is already named. Bookings' diary row is
+                // named for its section, which spans modules and isn't.
+                if (
+                    own === moduleKey &&
+                    child.href === item.href &&
+                    child.label === item.label
+                ) {
                     continue;
                 }
                 rows.push(child.label);
@@ -925,7 +934,7 @@ export function filterNavGroupsByRole(
 /**
  * A section with its children narrowed, still landing somewhere real.
  *
- * Bookings lands on its Calendar, which is also its first child. A business
+ * Bookings lands on its diary, which is also its first child. A business
  * with Courses but not Appointments keeps the section for Courses — and a
  * section row that still pointed at `/bookings` would open a capability it
  * does not have. So when the child that WAS the landing page is gone, the

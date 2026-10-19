@@ -186,7 +186,7 @@ describe("the sheet", () => {
         const nav = buildMobileNav({ groups, pathname: "/" });
         const bookings = nav.groups.find((g) => g.label === "Bookings");
         expect(bookings?.rows.map((r) => r.label)).toEqual([
-            "Calendar",
+            "Bookings",
             "Services",
             "Hours and time off",
             "Courses",
@@ -251,7 +251,7 @@ describe("where you are", () => {
             pathname: "/bookings",
         });
         const rows = nav.groups.flatMap((g) => g.rows).filter((r) => r.current);
-        expect(rows.map((r) => r.label)).toEqual(["Calendar"]);
+        expect(rows.map((r) => r.label)).toEqual(["Bookings"]);
     });
 
     it("marks Home only on Home", () => {
