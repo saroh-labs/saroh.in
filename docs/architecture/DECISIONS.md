@@ -2106,3 +2106,11 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **Hours and time off save themselves** (owner: "we can save automatically"). Each change on the availability page saves when its control is done, with Undo; there is no Save bar there.
 - **A booking made by hand defaults to "Pays at the visit"**; a payment link or "Paid now" stays one choice away.
 - Consequences: the improved designs are drawn with these first; code follows once the owner signs off the boards. The word list in `docs/patterns/saroh-product.md` changes with the code.
+- **Owner answers on the phone plan (19 Oct, plan 2026-10-19-001):**
+    - A Member also moves and cancels bookings, and **sets hours and availability for other people** too (owner: "the team member should be able to add availability/create hours for others"). To revisit with feedback.
+    - Refund or keep on a cancelled paid booking follows **the business's own policy**; no role decides it (owner: "it should be controlled by the merchant… its there policy").
+    - Times follow **the business's time zone**, labelled (IST or the zone's own short name) as designed.
+    - "Book their next visit" fills the service and person and leaves **the date to the merchant** (Tomorrow, Next week, Pick a date); no fixed gap.
+    - After booking: WhatsApp, SMS and Copy message through the phone's own apps; Saroh sends nothing.
+    - The Overview tab is renamed **Calendar**; "Also use these hours on" and "Change several days" replace Copy Monday.
+    - Header C on every calendar screen; Hours and time off is the V2 weekly list under the Whose hours card.
