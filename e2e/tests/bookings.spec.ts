@@ -435,12 +435,16 @@ test.describe("bookings calendar", () => {
             let contactId: string | null = null;
             try {
                 await page.goto(`/bookings?date=${day}`);
-                // Closed time answers the keyboard too: it opens from the first
-                // closed half hour.
+                // Closed time says "Closed · click to open" (a phone: tap)
+                // and opens from the half hour pressed (U4).
                 await page
                     .getByRole("button", {
-                        name: new RegExp(`^Open hours for ${person.name}`),
+                        name: new RegExp(
+                            `^Closed .*\\. Open these hours for ${person.name}`,
+                        ),
                     })
+                    .filter({ visible: true })
+                    .first()
                     .click({ position: { x: 40, y: 300 } });
                 const dialog = page.getByRole("dialog");
                 await expect(dialog).toContainText(`Open ${person.name} from`);
@@ -468,8 +472,11 @@ test.describe("bookings calendar", () => {
                         Number(m)
                     );
                 };
+                // "Free 9:00 to 10:00 am with E2E Diary. Book or block" (U4).
                 const gaps = page.getByRole("button", {
-                    name: new RegExp(`^Book ${person.name} at`),
+                    name: new RegExp(
+                        `^Free .* with ${person.name}\\. Book or block$`,
+                    ),
                 });
                 // The toast can land before the diary redraws, so wait for the gap.
                 const holding = async () =>
@@ -478,10 +485,12 @@ test.describe("bookings calendar", () => {
                             els.map((e) => e.getAttribute("aria-label") ?? ""),
                         )
                     ).findIndex((l) => {
-                        const [, a = "", b = ""] =
-                            /at (\d{1,2}:\d\d [ap]m), free until (\d{1,2}:\d\d [ap]m)/.exec(
+                        const [, a0 = "", p0 = "", b0 = "", p1 = ""] =
+                            /^Free (\d{1,2}:\d\d)(?: ([ap]m))? to (\d{1,2}:\d\d) ([ap]m)/.exec(
                                 l,
                             ) ?? [];
+                        const a = `${a0} ${p0 === "" ? p1 : p0}`;
+                        const b = `${b0} ${p1}`;
                         return (
                             at !== undefined &&
                             mins(a) <= mins(at) &&

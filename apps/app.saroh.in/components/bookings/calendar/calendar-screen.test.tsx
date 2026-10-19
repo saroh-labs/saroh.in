@@ -277,17 +277,17 @@ describe("a free gap", () => {
         });
     };
 
-    it("shows nothing at rest, and the time it would book under the pointer", () => {
+    it("says Free and + Book at rest, and the time it would book under the pointer", () => {
         draw(calendarOf([]));
         const el = gap();
-        const label = el.querySelector("span");
-        expect(label?.className).toContain("hidden");
+        expect(el.textContent).toContain("Free · 9:00 am to 5:00 pm");
+        const book = el.querySelector("[data-free-book]");
+        expect(book?.textContent).toBe("Book");
         // 100 minutes into the gap: 10:40, so the quarter hour at 10:45.
         fire(el, "pointermove", { clientY: 100 });
-        expect(label?.textContent).toBe("Book 10:45 am");
-        expect(label?.className).not.toContain("hidden");
+        expect(book?.textContent).toBe("Book 10:45 am");
         fire(el, "pointerout", { relatedTarget: document.body });
-        expect(label?.className).toContain("hidden");
+        expect(book?.textContent).toBe("Book");
     });
 
     it("books at the nearest quarter hour to a click or a tap", () => {
@@ -504,23 +504,13 @@ describe("with nobody on the diary", () => {
         Parameters<typeof CalendarScreen>[0]["serviceHours"]
     >;
 
-    it("says how the column works once, and Got it puts it away for good", () => {
+    it("says how the column works above it, with Add who takes bookings", () => {
         draw(empty, { staff: [], serviceHours: own });
-        expect(host.textContent).toContain(
-            "Customers book each service in its own hours.",
+        const note = host.querySelector("[data-service-hours-note]");
+        expect(note?.textContent).toContain(
+            "Nobody takes bookings yet, so customers book each service in its own hours.",
         );
-        const gotIt = Array.from(host.querySelectorAll("button")).find(
-            (b) => b.textContent === "Got it",
-        );
-        act(() => gotIt?.click());
-        expect(host.textContent).not.toContain(
-            "Customers book each service in its own hours.",
-        );
-        expect(
-            window.localStorage.getItem("saroh:bookings:service-hours-hint"),
-        ).toBe("1");
-        // The action is still at the head of the column.
-        const add = Array.from(host.querySelectorAll("button")).find(
+        const add = Array.from(note?.querySelectorAll("button") ?? []).find(
             (b) => b.textContent === "Add who takes bookings",
         );
         expect(add).toBeTruthy();

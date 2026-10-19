@@ -215,7 +215,10 @@ export default async function BookingsPage({
                 people={people}
                 can={{
                     book: may("booking:write"),
-                    hours: may("service:write"),
+                    // Open or block time: a Member keeps anyone's hours
+                    // (DEC-170, Q13); adding people stays `service:write`.
+                    hours: may("hours:write"),
+                    addPeople: may("service:write"),
                     order: may("order:read"),
                     // "Take ₹X" (P2): the pair a payment link needs, and the
                     // link itself only where the plan and a provider take it.

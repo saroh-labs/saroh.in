@@ -3,8 +3,6 @@
 import { PartialRead } from "@/components/shared/failed-read";
 import { formatClock, formatDay, timeZoneName } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
-import { Button } from "@saroh/ui/button";
-import { EmptyState } from "@saroh/ui/data-state";
 import { showError, showInfo, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -33,6 +31,7 @@ import {
 import { summaryLine } from "@/lib/services/calendar-header";
 import type { CalendarLayout } from "@/lib/services/calendar-href";
 import { calendarHref } from "@/lib/services/calendar-href";
+import { firstDayName, isFirstDay } from "@/lib/services/day-view";
 import type {
     Block,
     Column,
@@ -61,15 +60,19 @@ import {
 } from "@/lib/services/diary-view";
 import type { Service, Slot } from "@/lib/services/service";
 import type { BookingRules, StaffView } from "@/lib/staff/types";
-import { Users } from "lucide-react";
 
 import { useHold } from "@/components/shared/use-hold";
 import { TextLink } from "@saroh/ui/text-link";
 import { AddPersonDialog } from "../availability/add-person-dialog";
 import { AgendaList, AgendaMonth } from "./agenda-month";
 import { BookingQuickLook } from "./booking-quick-look";
-import { ServiceHoursHint } from "./calendar-toolbar";
 import { DayByPerson } from "./day-by-person";
+import {
+    DayFoot,
+    FirstDayHelp,
+    NobodyTakesBookings,
+    ServiceHoursNote,
+} from "./day-states";
 import { CalendarHeader } from "./header/calendar-header";
 import { columnsFor, dayFactsOf, personChoices } from "./header/header-facts";
 import { useSwipe } from "./header/use-swipe";
@@ -168,7 +171,10 @@ export function CalendarScreen({
     people: BookingPeople;
     can: {
         book: boolean;
+        /** Open closed time, block time: hours and time off. */
         hours: boolean;
+        /** Add someone who takes bookings; else as `hours`. */
+        addPeople?: boolean;
         order?: boolean;
         /** Take payment at the desk, and send a pay link instead (P2). */
         desk?: {
@@ -390,10 +396,6 @@ export function CalendarScreen({
           week.flatMap((d) => d.every).find((b) => b.key === peek) ??
           null)
         : null;
-
-    // On a phone the day draws one column: the one picked, else the first
-    // (U4 draws Everyone's day as one list).
-    const phoneKey = columns[0]?.key ?? "";
 
     // ── What the desk does, held for Undo ──────────────────────────────────
 
@@ -705,7 +707,12 @@ export function CalendarScreen({
         !staff.some((p) => p.status === "ACTIVE") &&
         columns.length > 0;
     const ownHours = serviceHours !== null && serviceHours.hours.length > 0;
-    const addPerson = can.hours ? () => setAddingPerson(true) : undefined;
+    const canAddPeople = can.addPeople ?? can.hours;
+    const addPerson = canAddPeople ? () => setAddingPerson(true) : undefined;
+    // The first day's help (U4): nothing booked yet and time to book.
+    const firstDay =
+        layout === "day" && can.book && isFirstDay(calendar, columns);
+    const shownPerson = person === EVERYONE ? null : person;
     const peekFromDay = (b: Block) => setPeek(b.key);
 
     const agendaList = (
@@ -755,9 +762,12 @@ export function CalendarScreen({
                 ) : null}
 
                 {nobodyYet && ownHours ? (
-                    // How the one column works, said once; the action stays
-                    // at the head of the column.
-                    <ServiceHoursHint onAdd={addPerson} />
+                    // How the one column works, said once, with the action.
+                    <ServiceHoursNote onAdd={addPerson} />
+                ) : nobodyYet && layout === "day" ? (
+                    <div className="mb-3">
+                        <NobodyTakesBookings onAdd={addPerson} />
+                    </div>
                 ) : nobodyYet ? (
                     <p className="mb-3 text-[12.5px] text-muted-foreground">
                         Nobody is on the diary and no service has hours of its
@@ -774,6 +784,18 @@ export function CalendarScreen({
                 ) : null}
                 {layout === "day" ? (
                     <>
+                        {firstDay ? (
+                            <FirstDayHelp
+                                name={firstDayName(columns)}
+                                hoursHref={
+                                    can.hours
+                                        ? shownPerson
+                                            ? `/bookings/availability?person=${encodeURIComponent(shownPerson)}`
+                                            : "/bookings/availability"
+                                        : null
+                                }
+                            />
+                        ) : null}
                         {columns.length ? (
                             <DayByPerson
                                 columns={columns}
@@ -781,7 +803,7 @@ export function CalendarScreen({
                                 today={date === today}
                                 timezone={timezone}
                                 sightKey={`day:${date}`}
-                                phoneKey={phoneKey}
+                                everyone={person === EVERYONE}
                                 selected={peek}
                                 canBook={can.book}
                                 canOpenHours={can.hours}
@@ -792,14 +814,11 @@ export function CalendarScreen({
                                 onBlock={peekFromDay}
                                 onFree={bookGap}
                                 onClosed={openClosed}
-                                onAddPerson={addPerson}
                             />
                         ) : (
-                            <NoOneYet
-                                canHours={can.hours}
-                                onAdd={() => setAddingPerson(true)}
-                            />
+                            <NobodyTakesBookings onAdd={addPerson} />
                         )}
+                        {columns.length ? <DayFoot first={firstDay} /> : null}
                     </>
                 ) : null}
 
@@ -901,7 +920,7 @@ export function CalendarScreen({
                 here; the dialog refreshes the calendar, which gives them
                 their column. They start with the opening hours, and
                 Availability is where their week is changed. */}
-            {can.hours ? (
+            {canAddPeople ? (
                 <AddPersonDialog
                     open={addingPerson}
                     onOpenChange={setAddingPerson}
@@ -909,30 +928,5 @@ export function CalendarScreen({
                 />
             ) : null}
         </div>
-    );
-}
-
-function NoOneYet({
-    canHours,
-    onAdd,
-}: {
-    canHours: boolean;
-    onAdd: () => void;
-}) {
-    return (
-        <EmptyState
-            icon={<Users />}
-            title="No one on the diary yet"
-            description={
-                canHours
-                    ? "Add the people who take bookings and their hours, and each gets a column here."
-                    : "The people who take bookings each get a column here."
-            }
-            action={
-                canHours ? (
-                    <Button onClick={onAdd}>Add someone</Button>
-                ) : undefined
-            }
-        />
     );
 }
