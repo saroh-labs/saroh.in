@@ -184,6 +184,9 @@ describe("a page's title is the page header's", () => {
         // Setup, outside the workspace: each step's question is the
         // split screen's title, as `app/onboarding/page.tsx` drew it.
         "components/organizations/setup-step-frame.tsx",
+        // Bookings' calendar: header C's date is the page's title and the
+        // button that opens Go to a day (bookings U2, #1018).
+        "components/bookings/calendar/header/calendar-header.tsx",
     ]);
 
     it("has no hand-written <h1> under the shell or in components", () => {

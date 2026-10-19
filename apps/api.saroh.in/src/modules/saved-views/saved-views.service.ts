@@ -66,6 +66,38 @@ export class SavedViewsService {
         });
     }
 
+    /**
+     * Set the caller's one view by this resource and name, replacing any
+     * they had: a choice kept for one person, like where Bookings opens
+     * (DEC-170). The old one goes and the new one comes in one transaction,
+     * so there is never none and never two.
+     */
+    async put(
+        ctx: OrganizationContext,
+        input: SavedViewInput,
+    ): Promise<SavedViewRecord> {
+        const [, created] = await this.db.$transaction([
+            this.db.savedView.deleteMany({
+                where: {
+                    organizationId: ctx.organizationId,
+                    ownerUserId: ctx.userId,
+                    resource: input.resource,
+                    name: input.name,
+                },
+            }),
+            this.db.savedView.create({
+                data: {
+                    organizationId: ctx.organizationId,
+                    ownerUserId: ctx.userId,
+                    resource: input.resource,
+                    name: input.name,
+                    filters: input.filters as SavedViewFilters,
+                },
+            }),
+        ]);
+        return created;
+    }
+
     /** Delete only the caller's own view (org + owner scoped). */
     async remove(ctx: OrganizationContext, id: string): Promise<void> {
         await this.db.savedView.deleteMany({

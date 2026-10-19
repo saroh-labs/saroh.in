@@ -79,23 +79,7 @@ const WORKSPACE = "apps/app.saroh.in/";
  * phrase as RETIRED writes it, and why. An entry that no longer matches
  * fails the check, so it is taken out the day the file changes.
  */
-const ALLOWED = [
-    {
-        file: "apps/app.saroh.in/components/bookings/bookings-view-switch.tsx",
-        word: "Day by person",
-        why: "U2 (bookings plan) replaces the view switch with Show as: Day, Week, List",
-    },
-    {
-        file: "apps/app.saroh.in/components/bookings/calendar/calendar-screen.tsx",
-        word: "Check in",
-        why: "U2 owns calendar-screen.tsx: its toast says Came",
-    },
-    {
-        file: "apps/app.saroh.in/components/bookings/calendar/calendar-screen.tsx",
-        word: "No-show",
-        why: "U2 owns calendar-screen.tsx: its toast says Didn't come",
-    },
-];
+const ALLOWED = [];
 const usedAllowance = new Set();
 
 function retiredIn(text, file) {

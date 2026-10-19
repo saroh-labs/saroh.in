@@ -1,5 +1,6 @@
 import { FailedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
+import { cookies } from "next/headers";
 
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { BookingsViewSwitch } from "@/components/bookings/bookings-view-switch";
@@ -19,7 +20,12 @@ import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { canTakeDeskPayments } from "@/lib/services/booking-money";
-import type { CalendarLayout } from "@/lib/services/calendar-href";
+import {
+    LAST_VIEW_COOKIE,
+    openingLayout,
+    openingPerson,
+} from "@/lib/services/bookings-opens";
+import { readBookingsOpens } from "@/lib/services/bookings-opens-read";
 import { calendarHref } from "@/lib/services/calendar-href";
 import type { LocalDate } from "@/lib/services/diary";
 import {
@@ -57,10 +63,6 @@ export const metadata = { title: "Bookings" };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-function layoutOf(value: unknown): CalendarLayout {
-    return value === "week" || value === "agenda" ? value : "day";
-}
-
 /**
  * The people, with the business's closures as everyone's time off (E3), so
  * the calendar offers no free time while the business is closed.
@@ -79,17 +81,28 @@ export default async function BookingsPage({
 }: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    await requireSession();
-    const [params, organization, staffList, rules, services, notices] =
-        await Promise.all([
-            searchParams,
-            resolveActiveOrganization(),
-            readStaff(),
-            getBookingRules().catch(() => null),
-            listServices(),
-            // What a cancelled class tells everyone on it (A14).
-            readNoticeReach(),
-        ]);
+    const session = await requireSession();
+    const [
+        params,
+        organization,
+        staffList,
+        rules,
+        services,
+        notices,
+        opens,
+        jar,
+    ] = await Promise.all([
+        searchParams,
+        resolveActiveOrganization(),
+        readStaff(),
+        getBookingRules().catch(() => null),
+        listServices(),
+        // What a cancelled class tells everyone on it (A14).
+        readNoticeReach(),
+        // Where Bookings opens for this person (DEC-170).
+        readBookingsOpens(),
+        cookies(),
+    ]);
 
     const may = permitsFor(organization);
     // New booking finds the customer by search (E4, `contact:read`) and can
@@ -106,22 +119,38 @@ export default async function BookingsPage({
     const timezone = staffList?.timezone ?? "Asia/Kolkata";
     const now = readNow();
     const today = localDateOf(new Date(now), timezone);
-    const layout = layoutOf(params.layout);
+    // The view the address names; else the person's "Start Bookings on";
+    // else the one last used on this device (Q15, option C).
+    const layout = openingLayout({
+        asked: params.layout,
+        start: opens.start,
+        lastUsed: jar.get(LAST_VIEW_COOKIE)?.value,
+    });
+    // Whose bookings: the address's; else "Show bookings for" (DEC-170).
+    const active = (staffList?.staff ?? []).filter(
+        (p) => p.status === "ACTIVE",
+    );
+    const mine = active.find((p) => p.membership?.userId === session.user.id);
+    const person = openingPerson({
+        asked: params.person,
+        opens,
+        people: active.map((p) => p.id),
+        me: mine?.id ?? null,
+    });
     const date: LocalDate =
         typeof params.date === "string" && DATE.test(params.date)
             ? params.date
             : today;
 
-    // The range the layout shows: the day, its week, or its month.
-    const [first, last] =
-        layout === "week"
-            ? [weekStartOf(date), addDays(weekStartOf(date), 6)]
-            : layout === "agenda"
-              ? (() => {
-                    const { days } = monthDays(date);
-                    return [days[0] ?? date, days.at(-1) ?? date];
-                })()
-              : [date, date];
+    // The day's week and its month, whatever the layout: the view draws its
+    // day or week, and the date sheet counts each day of both (U2).
+    const { days } = monthDays(date);
+    const weekFirst = weekStartOf(date);
+    const weekLast = addDays(weekFirst, 6);
+    const monthFirst = days[0] ?? date;
+    const monthLast = days.at(-1) ?? date;
+    const first = weekFirst < monthFirst ? weekFirst : monthFirst;
+    const last = weekLast > monthLast ? weekLast : monthLast;
     const [calendar, serviceHours] = await Promise.all([
         readBookingsCalendar(
             dayBounds(first, timezone).from.toISOString(),
@@ -151,7 +180,7 @@ export default async function BookingsPage({
         );
     }
 
-    const active = services.filter((s) => s.status === "ACTIVE");
+    const bookable = services.filter((s) => s.status === "ACTIVE");
     // Opened from a person's page (#247, `?new=1&contactId=`): New booking
     // arrives open with them chosen, read only for someone who may book
     // and search. With no service to book it doesn't open; its button says
@@ -180,6 +209,9 @@ export default async function BookingsPage({
                 // Cancelled bookings stay off the diary unless the address
                 // asks for them, so a reload keeps the choice.
                 showCancelled={params.cancelled === "1"}
+                person={person}
+                opens={opens}
+                me={mine ? { id: mine.id, name: mine.name } : null}
                 people={people}
                 can={{
                     book: may("booking:write"),
@@ -198,8 +230,10 @@ export default async function BookingsPage({
                         <NewBookingDialog
                             // Keyed: it renders among the screen's own children.
                             key="new-booking"
-                            plainTrigger
-                            services={active.map((s) => ({
+                            // Beside "…" on the desk; on a phone it floats
+                            // over the calendar, above the tab bar (U2).
+                            triggerClassName="min-[760px]:h-11 min-[760px]:px-[18px] min-[760px]:text-[14.5px] max-[759px]:fixed max-[759px]:bottom-[calc(16px+var(--tab-bar-inset,0px))] max-[759px]:right-4 max-[759px]:z-30 max-[759px]:h-14 max-[759px]:rounded-full max-[759px]:pl-4 max-[759px]:pr-5 max-[759px]:text-[15px] max-[759px]:shadow-xl"
+                            services={bookable.map((s) => ({
                                 id: s.id,
                                 name: s.name,
                                 timezone: s.timezone,

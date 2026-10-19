@@ -139,58 +139,77 @@ async function diaries(request: APIRequestContext, from: string, to: string) {
 }
 
 test.describe("bookings calendar", () => {
-    test("day by person, week and agenda all draw the diary", async ({
+    test("header C: the date opens Go to a day, and Show as changes the view", async ({
         page,
     }) => {
         await signIn(page);
-        await page.goto("/bookings");
-        await expect(
-            page.getByRole("heading", { level: 1, name: /· today$/ }),
-        ).toBeVisible();
-        // One switch for every view of the bookings: the layouts and the
-        // list. Each is a link, and the open one says so.
-        const views = page.getByRole("navigation", { name: "Bookings view" });
-        await expect(views.getByRole("link", { name: /Day/ })).toHaveAttribute(
+        // The view named in the address: what this person starts on is
+        // theirs (DEC-170), and this spec never changes it.
+        await page.goto("/bookings?layout=day");
+        const title = page.getByRole("button", {
+            name: /^Today, .+\. Change the day or the view$/,
+        });
+        await expect(title).toBeVisible();
+        await title.click();
+        const sheet = page.getByRole("dialog", { name: "Go to a day" });
+        await expect(sheet).toBeVisible();
+        // Day, Week and List live under Show as, and nowhere else.
+        const views = sheet.getByRole("navigation", { name: "Bookings view" });
+        await expect(views.getByRole("link", { name: "Day" })).toHaveAttribute(
             "aria-current",
             "page",
         );
-        await expect(views.getByRole("link", { name: "List" })).toBeVisible();
-        await page.goto("/bookings?layout=agenda");
+        await views.getByRole("link", { name: "Week" }).click();
+        await expect(page).toHaveURL(/layout=week/);
         await expect(
-            page.getByRole("group", { name: "Pick a day" }),
+            page.getByRole("button", {
+                name: /^This week, .+\. Change the day or the view$/,
+            }),
         ).toBeVisible();
+        await page.goto("/bookings?layout=agenda");
+        await page
+            .getByRole("button", { name: /Change the day or the view$/ })
+            .click();
         await expect(
-            views.getByRole("link", { name: "Agenda" }),
+            page
+                .getByRole("dialog", { name: "Go to a day" })
+                .getByRole("navigation", { name: "Bookings view" })
+                .getByRole("link", { name: "List" }),
         ).toHaveAttribute("aria-current", "page");
         // The standing sentence under the diary is gone.
         await expect(page.getByText(/Customers can book/)).toHaveCount(0);
     });
 
-    test("the legend names only what is drawn: free time is the plain page", async ({
+    test("the … sheet holds cancelled, All bookings, hours and what the colours mean", async ({
         page,
     }) => {
         await signIn(page);
-        await page.goto("/bookings");
+        await page.goto("/bookings?layout=day");
+        // No colour key row over the diary any more: it is in the sheet.
+        await expect(page.getByRole("list", { name: "Key" })).toHaveCount(0);
+        await page.getByRole("button", { name: /^This day:/ }).click();
+        const sheet = page.getByRole("dialog", { name: "This day" });
         await expect(
-            page.getByRole("navigation", { name: "Bookings view" }),
+            sheet.getByRole("switch", { name: "Show cancelled bookings" }),
         ).toBeVisible();
-        // What it names depends on the day (`legendOf`, unit-tested): never
-        // free time, and nothing the diary does not draw.
-        const key = page.getByRole("list", { name: "Key" });
         await expect(
-            key.getByRole("listitem").filter({ hasText: /^Free$/ }),
-        ).toHaveCount(0);
-        for (const item of await key.getByRole("listitem").allInnerTexts()) {
-            expect([
-                "One-to-one",
-                "Class",
-                "Closed",
-                "Time off",
-                "Cancelled",
-            ]).toContain(item.trim());
-        }
+            sheet.getByRole("link", { name: "All bookings" }),
+        ).toBeVisible();
+        await expect(
+            sheet.getByRole("link", { name: /hours and time off$/ }),
+        ).toBeVisible();
+        await expect(sheet.getByText("What the colours mean")).toBeVisible();
+        await expect(
+            sheet.getByRole("radiogroup", { name: "Start Bookings on" }),
+        ).toBeVisible();
+        await page.keyboard.press("Escape");
         await page.goto("/bookings?layout=week");
-        await expect(page.getByText(/bookings? this week/)).toBeVisible();
+        await expect(
+            page
+                .getByRole("status")
+                .filter({ hasText: /booked/ })
+                .first(),
+        ).toBeVisible();
     });
 
     test("the peek shows Needs attention and opens the customer's page", async ({

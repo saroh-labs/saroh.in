@@ -170,6 +170,8 @@ describe("a list draws the one toolbar", () => {
                     "a picker inside a sheet: it searches the catalogue to add products, with its own results list",
                 "components/customers/customer-picker.tsx":
                     "a picker inside a form: it finds one customer to choose, not a list to browse",
+                "components/bookings/calendar/header/people-sheet.tsx":
+                    "Whose bookings, in header C's picker: it finds one person to show, not a list to browse",
             },
         );
     });

@@ -65,6 +65,16 @@ const NOT_FORMS: Record<string, string> = {
         "a picker: choosing a section adds it",
     "components/commerce/orders/order-filters-sheet.tsx":
         "filters, applied as they are chosen",
+    // Header C's three pickers (bookings U2): a sheet from the foot of a
+    // phone, a popover under its button on the desk; choosing goes there.
+    "components/bookings/calendar/header/header-overlay.tsx":
+        "header C's frame: a phone sheet or a desk popover, choosing goes there",
+    "components/bookings/calendar/header/date-sheet.tsx":
+        "a picker: a day or a view, in header C's frame",
+    "components/bookings/calendar/header/people-sheet.tsx":
+        "a picker: whose bookings, in header C's frame",
+    "components/bookings/calendar/header/options-sheet.tsx":
+        "the view's options, each kept as it is chosen, in header C's frame",
     // Notices and flows with their own states.
     "components/billing/plan-refusal.tsx":
         "a notice with the way up, not a form",

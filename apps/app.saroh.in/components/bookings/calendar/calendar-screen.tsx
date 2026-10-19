@@ -1,14 +1,14 @@
 "use client";
 
 import { PartialRead } from "@/components/shared/failed-read";
-import { formatClock, formatDay } from "@/lib/format/datetime";
+import { formatClock, formatDay, timeZoneName } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { showError, showInfo, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { diaryPausedWords } from "@/lib/billing/paused";
 import { formatMoney } from "@/lib/format/money";
@@ -23,9 +23,16 @@ import type {
     DiaryBooking,
 } from "@/lib/services/booking-calendar";
 import type { BookingPeople } from "@/lib/services/booking-pay";
+import { BOOKING_WORDS } from "@/lib/services/booking-words";
+import type { BookingsOpens } from "@/lib/services/bookings-opens";
+import {
+    EVERYONE,
+    OPENS_DEFAULT,
+    rememberLastView,
+} from "@/lib/services/bookings-opens";
+import { summaryLine } from "@/lib/services/calendar-header";
 import type { CalendarLayout } from "@/lib/services/calendar-href";
 import { calendarHref } from "@/lib/services/calendar-href";
-import { callName } from "@/lib/services/call-name";
 import type {
     Block,
     Column,
@@ -45,25 +52,21 @@ import {
     weekStartOf,
     whoFor,
 } from "@/lib/services/diary";
-import {
-    CANCELLED_LINE_MINUTES,
-    closedSpans,
-    hoursAcross,
-    legendOf,
-    offSpans,
-} from "@/lib/services/diary-view";
+import { CANCELLED_LINE_MINUTES, hoursAcross } from "@/lib/services/diary-view";
 import type { Service, Slot } from "@/lib/services/service";
 import type { BookingRules, StaffView } from "@/lib/staff/types";
 import { Users } from "lucide-react";
 
 import { useHold } from "@/components/shared/use-hold";
-import { Segmented } from "@saroh/ui/segmented";
 import { TextLink } from "@saroh/ui/text-link";
 import { AddPersonDialog } from "../availability/add-person-dialog";
 import { AgendaList, AgendaMonth } from "./agenda-month";
 import { BookingQuickLook } from "./booking-quick-look";
-import { CalendarToolbar, Legend, ServiceHoursHint } from "./calendar-toolbar";
+import { ServiceHoursHint } from "./calendar-toolbar";
 import { DayByPerson } from "./day-by-person";
+import { CalendarHeader } from "./header/calendar-header";
+import { columnsFor, dayFactsOf, personChoices } from "./header/header-facts";
+import { useSwipe } from "./header/use-swipe";
 import type { GapTarget } from "./new-booking-from-gap";
 import { NewBookingFromGap } from "./new-booking-from-gap";
 import type { HoursTarget } from "./open-hours-dialog";
@@ -140,6 +143,9 @@ export function CalendarScreen({
     limitNotice = null,
     serviceHours = null,
     showCancelled = false,
+    person: askedPerson = EVERYONE,
+    opens = OPENS_DEFAULT,
+    me = null,
 }: {
     layout: CalendarLayout;
     date: LocalDate;
@@ -178,6 +184,12 @@ export function CalendarScreen({
     serviceHours?: ServiceHours | null;
     /** The address asks for cancelled bookings to be drawn (`cancelled=1`). */
     showCancelled?: boolean;
+    /** Whose bookings are shown: a staff id, or `EVERYONE` (DEC-170). */
+    person?: string;
+    /** Where Bookings opens for this person, as kept (DEC-170). */
+    opens?: BookingsOpens;
+    /** The viewer on the diary, for "Just me"; null when they aren't on it. */
+    me?: { id: string; name: string } | null;
 }) {
     const router = useRouter();
     const { hold, undo, pending } = useHold();
@@ -194,7 +206,8 @@ export function CalendarScreen({
     const [gap, setGap] = useState<GapTarget | null>(null);
     const [hours, setHours] = useState<HoursTarget | null>(null);
     const [addingPerson, setAddingPerson] = useState(false);
-    const [phonePerson, setPhonePerson] = useState<string | null>(null);
+    // "Where I left it" (Q15): this device keeps the view it was left on.
+    useEffect(() => rememberLastView(layout), [layout]);
 
     const calendar = useMemo(
         () => withOverrides(read, overrides),
@@ -224,7 +237,7 @@ export function CalendarScreen({
             return theirs.length ? Math.min(...theirs) : 30;
         };
     }, [services]);
-    const columns = useMemo(
+    const allColumns = useMemo(
         () =>
             dayColumns(
                 calendar,
@@ -247,14 +260,31 @@ export function CalendarScreen({
             cancelledShown,
         ],
     );
+    // Whose bookings are shown (the chip): one person's column, or all.
+    const person =
+        askedPerson === EVERYONE ||
+        allColumns.some((c) => c.key === askedPerson)
+            ? askedPerson
+            : EVERYONE;
+    const columns = useMemo(
+        () => columnsFor(allColumns, person),
+        [allColumns, person],
+    );
     // What the day draws, and everything on it (cancelled too) for the
     // count and for a quick look that stays open over a cancel.
     const dayBlocks = columns
         .flatMap((c) => c.blocks)
         .sort((a, b) => a.start - b.start || a.key.localeCompare(b.key));
+    const shownOf = useMemo(
+        () => (byPerson: Map<string, Block[]>) =>
+            person === EVERYONE
+                ? Array.from(byPerson.values()).flat()
+                : (byPerson.get(person) ?? []),
+        [person],
+    );
     const everyDayBlock = useMemo(
-        () => Array.from(blocksOnDay(calendar, date, timezone).values()).flat(),
-        [calendar, date, timezone],
+        () => shownOf(blocksOnDay(calendar, date, timezone)),
+        [calendar, date, timezone, shownOf],
     );
     const weekStart = weekStartOf(date);
     const week = useMemo(() => {
@@ -262,7 +292,7 @@ export function CalendarScreen({
         return days.map((d) => {
             // The same columns the day draws, so the week agrees with it
             // about what is open, closed and off.
-            const cols = dayColumns(
+            const all = dayColumns(
                 calendar,
                 staff,
                 d,
@@ -272,15 +302,16 @@ export function CalendarScreen({
                 serviceHours,
                 cancelledShown,
             );
+            const cols = columnsFor(all, person);
             return {
+                all,
+                cols,
                 date: d,
                 label: formatDay(d, { weekday: "short", year: "never" }),
                 blocks: cols
                     .flatMap((c) => c.blocks)
                     .sort((a, b) => a.start - b.start),
-                every: Array.from(
-                    blocksOnDay(calendar, d, timezone).values(),
-                ).flat(),
+                every: shownOf(blocksOnDay(calendar, d, timezone)),
                 hours: hoursAcross(cols),
                 today: d === today,
                 selected: d === date,
@@ -297,6 +328,8 @@ export function CalendarScreen({
         weekStart,
         today,
         date,
+        person,
+        shownOf,
     ]);
 
     const inWeek = layout === "week";
@@ -306,19 +339,6 @@ export function CalendarScreen({
         ? week.flatMap((d) => d.hours?.windows ?? [])
         : columns.flatMap((c) => c.day?.windows ?? []);
     const span: Span = visibleHours(openHours, shownBlocks.map(drawnSpan));
-    const hatched = inWeek
-        ? week.flatMap((d) => (d.hours ? [d.hours] : []))
-        : columns.flatMap((c) => (c.day ? [c.day] : []));
-    // The agenda is a list: it has no hours to hatch.
-    const legend = legendOf({
-        blocks: shownBlocks,
-        closed:
-            layout !== "agenda" &&
-            hatched.some((h) => closedSpans(h, span).length > 0),
-        off:
-            layout !== "agenda" &&
-            hatched.some((h) => offSpans(h, span).length > 0),
-    });
     const live = everyBlock.filter(isLive);
     const cancelledCount = everyBlock.length - live.length;
     const value = bookedValue(everyBlock, money);
@@ -329,14 +349,23 @@ export function CalendarScreen({
               : first.session.service.currency) ?? null)
         : null;
     // The week's totals cover all seven days, even on a phone, where the list
-    // under them shows one day at a time.
-    const summary = `${count(live.length, "booking")}${
-        layout === "week" ? " this week" : ""
-    }${
-        value !== null && currencyCode
-            ? ` · ${formatMoney(value, currencyCode)} booked`
-            : ""
-    }`;
+    // under them shows one day at a time. Free times only with the hours.
+    const freeCount =
+        staff === null
+            ? null
+            : (inWeek ? week.flatMap((d) => d.cols) : columns).reduce(
+                  (n, c) => n + (c.day?.free.length ?? 0),
+                  0,
+              );
+    const summary = summaryLine({
+        booked: live.length,
+        free: freeCount,
+        money:
+            value !== null && currencyCode
+                ? formatMoney(value, currencyCode)
+                : null,
+        cancelledShown: cancelledShown ? cancelledCount : 0,
+    });
 
     // From everything on the view, drawn or not: a booking cancelled from
     // its quick look leaves the diary, and the quick look keeps its Undo.
@@ -347,10 +376,9 @@ export function CalendarScreen({
           null)
         : null;
 
-    const phoneKey =
-        phonePerson && columns.some((c) => c.key === phonePerson)
-            ? phonePerson
-            : (columns[0]?.key ?? "");
+    // On a phone the day draws one column: the one picked, else the first
+    // (U4 draws Everyone's day as one list).
+    const phoneKey = columns[0]?.key ?? "";
 
     // ── What the desk does, held for Undo ──────────────────────────────────
 
@@ -383,7 +411,7 @@ export function CalendarScreen({
                     : null;
             hold(
                 `outcome:${b.id}`,
-                `${firstName(b)} checked in.${price ? ` Take ${price} now.` : ""}`,
+                `${firstName(b)} ${BOOKING_WORDS.came.toLowerCase()}.${price ? ` Take ${price} now.` : ""}`,
                 async () => {
                     const res = await recordBookingOutcome(b.id, "ATTENDED");
                     if (!res.ok) {
@@ -400,7 +428,7 @@ export function CalendarScreen({
             setOverride(b.id, { outcome: "NO_SHOW" });
             hold(
                 `outcome:${b.id}`,
-                `Marked ${firstName(b)} a no-show.`,
+                `Marked ${firstName(b)} as ${BOOKING_WORDS.didntCome.toLowerCase()}.`,
                 async () => {
                     const res = await recordBookingOutcome(b.id, "NO_SHOW");
                     if (!res.ok) {
@@ -541,10 +569,15 @@ export function CalendarScreen({
         });
     }
 
+    const hrefFor = (l: CalendarLayout, d: LocalDate, who = person) =>
+        calendarHref(l, d, { cancelled: cancelledShown, person: who });
     const go = (l: CalendarLayout, d: LocalDate) =>
-        router.push(calendarHref(l, d, { cancelled: cancelledShown }), {
-            scroll: false,
-        });
+        router.push(hrefFor(l, d), { scroll: false });
+    const step = inWeek ? 7 : 1;
+    const swipe = useSwipe({
+        onPrevious: () => go(layout, addDays(date, -step)),
+        onNext: () => go(layout, addDays(date, step)),
+    });
     // Nothing is read again for it, so the address is written in place
     // (Next keeps `history.replaceState` in step with its router).
     const showCancelledBookings = (on: boolean) => {
@@ -552,7 +585,7 @@ export function CalendarScreen({
         window.history.replaceState(
             null,
             "",
-            calendarHref(layout, date, { cancelled: on }),
+            calendarHref(layout, date, { cancelled: on, person }),
         );
     };
 
@@ -578,6 +611,7 @@ export function CalendarScreen({
     const monthBusy = useMemo(() => {
         const days = new Set<LocalDate>();
         for (const d of calendar.diaries) {
+            if (person !== EVERYONE && d.person?.id !== person) continue;
             for (const b of d.bookings) {
                 if (b.status !== "CANCELLED")
                     days.add(localDateOf(b.startAt, timezone));
@@ -586,7 +620,46 @@ export function CalendarScreen({
                 days.add(localDateOf(s.startAt, timezone));
         }
         return days;
-    }, [calendar, timezone]);
+    }, [calendar, timezone, person]);
+
+    // ── Header C: whose bookings, and what each day holds ─────────────────
+    const readFirst = calendar.from
+        ? localDateOf(calendar.from, timezone)
+        : date;
+    const readLast = calendar.to
+        ? localDateOf(new Date(Date.parse(calendar.to) - 1), timezone)
+        : date;
+    const facts = useMemo(
+        () =>
+            dayFactsOf({
+                calendar,
+                staff,
+                timezone,
+                gapAfter,
+                minFree,
+                serviceHours,
+                person,
+                first: readFirst,
+                last: readLast,
+            }),
+        [
+            calendar,
+            staff,
+            timezone,
+            gapAfter,
+            minFree,
+            serviceHours,
+            person,
+            readFirst,
+            readLast,
+        ],
+    );
+    const periodColumns = inWeek ? week.flatMap((d) => d.all) : allColumns;
+    const choices = personChoices(staff, allColumns, (key) =>
+        periodColumns
+            .filter((c) => key === EVERYONE || c.key === key)
+            .reduce((n, c) => n + c.blocks.filter(isLive).length, 0),
+    );
 
     const nobodyYet =
         staff !== null &&
@@ -611,21 +684,29 @@ export function CalendarScreen({
 
     return (
         <div>
-            <CalendarToolbar
+            <CalendarHeader
                 layout={layout}
                 date={date}
                 today={today}
                 summary={summary}
+                zone={timeZoneName(timezone, "short", new Date(now), "en-IN")}
+                choices={choices}
+                picked={person}
+                facts={facts}
                 cancelled={{
                     count: cancelledCount,
                     shown: cancelledShown,
                     onChange: showCancelledBookings,
                 }}
+                opens={opens}
+                me={me}
+                hrefFor={hrefFor}
                 newBooking={newBooking}
+                calOnly={!can.book}
+                onAddPerson={addPerson}
             />
-            <div>
+            <div className="max-[759px]:touch-pan-y" {...swipe}>
                 {limitNotice ? <div className="mb-3">{limitNotice}</div> : null}
-                <Legend keys={legend} />
                 {staff === null ? (
                     <PartialRead
                         className="mb-3"
@@ -654,20 +735,6 @@ export function CalendarScreen({
                 ) : null}
                 {layout === "day" ? (
                     <>
-                        {columns.length > 1 ? (
-                            <Segmented
-                                label="Whose day"
-                                block
-                                className="mb-2.5 flex-nowrap overflow-x-auto min-[760px]:hidden"
-                                value={phoneKey}
-                                onValueChange={setPhonePerson}
-                                options={columns.map((c) => ({
-                                    value: c.key,
-                                    label: callName(c.name),
-                                    count: c.blocks.filter(isLive).length,
-                                }))}
-                            />
-                        ) : null}
                         {columns.length ? (
                             <DayByPerson
                                 columns={columns}
@@ -774,7 +841,7 @@ export function CalendarScreen({
                 <AddPersonDialog
                     open={addingPerson}
                     onOpenChange={setAddingPerson}
-                    hoursHint="Change their hours in Availability."
+                    hoursHint="Change their hours in Hours and time off."
                 />
             ) : null}
         </div>

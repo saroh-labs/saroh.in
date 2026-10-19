@@ -28,6 +28,12 @@ export const RAW_ALLOWED = {
     "components/bookings/availability/weekly-hours.tsx": ["button"],
     // button: a calendar cell, a row or card that is one button
     "components/bookings/calendar/agenda-month.tsx": ["button"],
+    // button: the date title and the person chip of header C, and "…"
+    "components/bookings/calendar/header/calendar-header.tsx": ["button"],
+    // button: a calendar cell (the week strip and the month), a step
+    "components/bookings/calendar/header/date-sheet.tsx": ["button"],
+    // button: a row that is one button (a person, picked to see theirs)
+    "components/bookings/calendar/header/people-sheet.tsx": ["button"],
     // button: a chip
     "components/bookings/calendar/booking-quick-look.tsx": ["button"],
     // button: a cell covered by its button, a row or card that is one button
