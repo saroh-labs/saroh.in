@@ -432,6 +432,12 @@ export { AccountLoading } from "./account/account-loading";
 export type { AccountLoadingShape } from "./account/account-loading";
 export { AccountBookingPage } from "./account/booking-page";
 export type { BookingLookup } from "./account/booking-page";
+export { DataRequestCard } from "./account/data-request";
+export type {
+    AccountDataRequest,
+    AskDataRequest,
+    DataRequestResult,
+} from "./account/data-request";
 export { DETAILS_OFFLINE } from "./account/details-api";
 export type {
     LeaveLine,

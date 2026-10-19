@@ -2,6 +2,7 @@ import type {
     AccountBlock,
     AccountChange,
     AccountCourse,
+    AccountDataRequest,
     AccountHomeData,
     AccountInvoiceDue,
     AccountNotices,
@@ -120,6 +121,40 @@ export const coursesResult = (v: unknown): AccountCourse[] | null =>
 
 export function noticesResult(v: unknown): AccountNotices | null {
     return isRecord(v) && isBoolean(v.email) ? { email: v.email } : null;
+}
+
+// ---- "Ask to remove my data" (DEC-172, #1107) -------------------------------
+
+const DATA_REQUEST_STATUS = ["open", "done", "closed"] as const;
+
+export function isDataRequest(v: unknown): v is AccountDataRequest {
+    return (
+        isRecord(v) &&
+        isString(v.ref) &&
+        (DATA_REQUEST_STATUS as readonly unknown[]).includes(v.status) &&
+        isInstant(v.askedAt) &&
+        isNullableInstant(v.handledAt)
+    );
+}
+
+/**
+ * `{ request }` from `me/data-request`: the request, `null` when they never
+ * asked, or `undefined` when the answer isn't a shape we know (a failed
+ * read, never "never asked").
+ */
+export function dataRequestResult(
+    v: unknown,
+): AccountDataRequest | null | undefined {
+    if (!isRecord(v)) return undefined;
+    if (v.request === null) return null;
+    return isDataRequest(v.request)
+        ? {
+              ref: v.request.ref,
+              status: v.request.status,
+              askedAt: v.request.askedAt,
+              handledAt: v.request.handledAt,
+          }
+        : undefined;
 }
 
 /**

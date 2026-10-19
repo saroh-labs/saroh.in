@@ -105,6 +105,7 @@ const WRITES: Record<string, () => Promise<unknown>> = {
     addHealthNote: () => me.addHealthNote("Sore knee"),
     payInvoiceNow: () => me.payInvoiceNow("inv_1"),
     saveEmailChoice: () => me.saveEmailChoice(false),
+    askDataRemoval: () => me.askDataRemoval(),
     sendMessage: () => messages.sendMessage("Hello"),
     pausePlan: () => plan.pausePlan("sub_1", 2),
     resumePlan: () => plan.resumePlan("sub_1"),

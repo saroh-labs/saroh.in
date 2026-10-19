@@ -1,5 +1,6 @@
 import type { TestReleaseRefusal } from "../test-release/words";
 import type { SignInApi } from "./api";
+import type { AskDataRequest } from "./data-request";
 import type { PayInvoice, SaveNotices } from "./details-api";
 import type { AccountNote, AccountView } from "./model";
 
@@ -32,4 +33,9 @@ export interface MeApi {
     payInvoice: PayInvoice;
     /** Whether the business may email them (DEC-142). */
     saveNotices: SaveNotices;
+    /**
+     * "Ask to remove my data" (DEC-172, #1107). Left out by an older
+     * caller: no Your data card is drawn.
+     */
+    askDataRemoval?: AskDataRequest;
 }
