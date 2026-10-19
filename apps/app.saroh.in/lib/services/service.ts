@@ -209,6 +209,11 @@ export interface BookingDetail extends Omit<Booking, "contact"> {
 export interface Slot {
     startAt: string;
     endAt: string;
+    /**
+     * Who is free at that start, for a service somebody takes (U3); a
+     * class's teacher. Absent for a service nobody takes.
+     */
+    staffIds?: string[];
 }
 
 /** A booking joined with a light snapshot of its owning Service. */

@@ -172,6 +172,8 @@ describe("a list draws the one toolbar", () => {
                     "a picker inside a form: it finds one customer to choose, not a list to browse",
                 "components/bookings/calendar/header/people-sheet.tsx":
                     "Whose bookings, in header C's picker: it finds one person to show, not a list to browse",
+                "components/bookings/sheets/customer-step.tsx":
+                    "the booking sheets' customer step (U3): it finds one customer to book, not a list to browse",
             },
         );
     });

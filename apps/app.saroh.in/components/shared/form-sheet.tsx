@@ -11,6 +11,8 @@ import {
 } from "@saroh/ui/sheet";
 import type { ReactElement, ReactNode } from "react";
 
+import { useNarrow } from "@/lib/hooks/use-narrow";
+
 import type { OverlayFootProps, OverlaySubmit } from "./overlay-form";
 import {
     OverlayBody,
@@ -32,6 +34,11 @@ import {
  * and one sentence under it stay put, the fields scroll, and the foot is
  * pinned with a rule above it: the way out, then the sheet's own button,
  * on the right (stacked on a phone, the button on top).
+ *
+ * `bottomOnPhone` (the booking sheets, U3): on a phone it rises from the
+ * foot of the screen as a bottom sheet instead, rounded on top with a
+ * grab handle and at most 92% of the screen tall; at a desk it is the
+ * same right-hand panel. A phone bottom sheet is a desk side panel.
  *
  * Pass `onSubmit` and the fields as children and it draws the rest. A
  * sheet whose draft is a component of its own (so each opening starts
@@ -61,6 +68,7 @@ export function FormSheet({
     children,
     saveLabel = "Save",
     doneOnly,
+    bottomOnPhone = false,
     ...foot
 }: {
     /** The form's id. */
@@ -98,6 +106,8 @@ export function FormSheet({
     onClose: () => void;
     /** Leave it out to draw `FormSheetBody` and `FormSheetFoot` inside. */
     onSubmit?: OverlaySubmit;
+    /** A bottom sheet on a phone, the right-hand panel at a desk (U3). */
+    bottomOnPhone?: boolean;
     children: ReactNode;
 } & Omit<OverlayFootProps, "note" | "onSubmit" | "pending" | "className">) {
     const composed = !onSubmit && !doneOnly;
@@ -112,19 +122,32 @@ export function FormSheet({
         onClose,
         onSubmit,
     });
+    const narrow = useNarrow();
+    const bottom = bottomOnPhone && narrow;
     return (
         <Sheet open={open} onOpenChange={frame.onOpenChange}>
             {trigger ? <SheetTrigger asChild>{trigger}</SheetTrigger> : null}
             <SheetContent
+                side={bottom ? "bottom" : "right"}
                 className={cn(
                     // Off the paper: a page printed with a sheet open
                     // prints the page.
                     "flex w-full flex-col gap-0 print:hidden",
-                    wide ? "sm:max-w-lg" : "sm:max-w-md",
+                    bottom
+                        ? "max-h-[92dvh] rounded-t-[18px] px-4 pb-4 pt-3"
+                        : wide
+                          ? "sm:max-w-lg"
+                          : "sm:max-w-md",
                     className,
                 )}
                 {...frame.contentProps}
             >
+                {bottom ? (
+                    <div
+                        aria-hidden
+                        className="mx-auto mb-3 h-[5px] w-10 shrink-0 rounded-full bg-border"
+                    />
+                ) : null}
                 <SheetHeader>
                     {eyebrow ? (
                         <p className="text-[11.5px] text-muted-foreground">

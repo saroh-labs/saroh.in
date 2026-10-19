@@ -181,6 +181,17 @@ export function BookingDetailView({
                                 )}
                                 <CancelBookingControl
                                     bookingId={booking.id}
+                                    who={bookerLabel(booking)}
+                                    when={[
+                                        formatDateTime(
+                                            booking.startAt,
+                                            timezone,
+                                            { weekday: "short" },
+                                        ),
+                                        paid,
+                                    ]
+                                        .filter(Boolean)
+                                        .join(" · ")}
                                     money={booking.money}
                                     freeCancelUntil={booking.freeCancelUntil}
                                     timezone={timezone}

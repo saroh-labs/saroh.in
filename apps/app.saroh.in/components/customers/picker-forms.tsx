@@ -13,6 +13,7 @@ import type {
 } from "@/lib/customers/picker";
 import {
     EMAIL,
+    newCustomerProblems,
     resultLabel,
     WALK_IN_PHONE_ERROR,
     walkInCopy,
@@ -30,25 +31,41 @@ import { Notice } from "@saroh/ui/notice";
 const FIELD = "mt-1";
 const BOX = "mb-3 grid gap-2 rounded-[10px] border border-border px-3 py-2.5";
 
-/** Name, phone and email for someone new; the email is needed. */
+/**
+ * Name, phone and email for someone new. An order needs the email; a
+ * booking (`emailOptional`, DEC-170) needs a name and a phone, and the
+ * email only when one is typed.
+ */
 export function NewCustomerForm({
     initial,
     onAdd,
     onCancel,
+    emailOptional = false,
+    initialError = null,
 }: {
     initial: NewCustomerDraft;
     onAdd: (draft: NewCustomerDraft) => Promise<void>;
     onCancel: () => void;
+    emailOptional?: boolean;
+    /** Said under the email as it opens ("add Zara's email to keep…"). */
+    initialError?: string | null;
 }) {
     const ids = { name: useId(), phone: useId(), email: useId() };
     const [draft, setDraft] = useState(initial);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(initialError);
     const [checking, setChecking] = useState(false);
     const set = (key: keyof NewCustomerDraft) => (value: string) =>
         setDraft((d) => ({ ...d, [key]: value }));
 
     async function submit() {
-        if (!EMAIL.test(draft.email.trim())) {
+        if (emailOptional) {
+            const wrong = newCustomerProblems(draft);
+            const said = wrong.name ?? wrong.phone ?? wrong.email ?? null;
+            if (said) {
+                setError(said);
+                return;
+            }
+        } else if (!EMAIL.test(draft.email.trim())) {
             setError("Add their email, like priya@example.com.");
             return;
         }
@@ -90,7 +107,15 @@ export function NewCustomerForm({
                     />
                 </div>
                 <div>
-                    <Label htmlFor={ids.email}>Email</Label>
+                    <Label htmlFor={ids.email}>
+                        Email
+                        {emailOptional ? (
+                            <span className="font-normal text-muted-foreground">
+                                {" "}
+                                (optional)
+                            </span>
+                        ) : null}
+                    </Label>
                     <Input
                         id={ids.email}
                         type="email"
@@ -113,7 +138,9 @@ export function NewCustomerForm({
                 }
             >
                 {error ??
-                    "Every customer is kept by their email, so it's needed to add them."}
+                    (emailOptional
+                        ? "A name and phone are enough. Add an email to email them their booking."
+                        : "Every customer is kept by their email, so it's needed to add them.")}
             </p>
             <div className="flex justify-end gap-2">
                 <Button

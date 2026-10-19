@@ -1,5 +1,6 @@
 "use server";
 
+import type { BookingMoney } from "./booking-money";
 import type { DeskPaymentInput } from "./desk-pay";
 import type { PeekPerson } from "./peek";
 import { readPeekPerson } from "./peek-person";
@@ -19,6 +20,7 @@ import {
     cancelBooking as cancelBookingApi,
     createBookingPayLink as createBookingPayLinkApi,
     createService as createServiceApi,
+    getBooking,
     listAvailability as listAvailabilityApi,
     readServices,
     recordBookingOutcome as recordBookingOutcomeApi,
@@ -89,6 +91,26 @@ export async function cancelBooking(
     options: { returnCredit?: boolean; closesClass?: boolean } = {},
 ) {
     return cancelBookingApi(bookingId, options);
+}
+
+/**
+ * What the cancel sheet needs to ask its money question (U3, BA-01), read
+ * when a screen that doesn't hold the booking's money (the list) asks to
+ * cancel it: the money, the free-cancel time fixed at booking and the
+ * business's zone. Null when it can't be read.
+ */
+export async function readBookingForCancel(bookingId: string): Promise<{
+    money: BookingMoney | null;
+    freeCancelUntil: string | null;
+    timezone: string;
+} | null> {
+    const booking = await getBooking(bookingId);
+    if (!booking) return null;
+    return {
+        money: booking.money ?? null,
+        freeCancelUntil: booking.freeCancelUntil ?? null,
+        timezone: booking.service.timezone || booking.timezone,
+    };
 }
 
 /** Move a booking to another slot (#121). */

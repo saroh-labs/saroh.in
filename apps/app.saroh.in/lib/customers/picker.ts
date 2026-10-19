@@ -36,7 +36,11 @@ export type CustomerPick =
           email: string | null;
           phone: string | null;
       }
-    /** Someone new: made a contact by whatever saves the booking or order. */
+    /**
+     * Someone new: made a contact by whatever saves the booking or order.
+     * A booking takes them by name and phone alone (DEC-170), so `email`
+     * can be ""; an order still needs it.
+     */
     | { kind: "new"; name: string; email: string; phone: string }
     /**
      * A walk-in (B13): a name, and a phone if given. A name alone makes no
@@ -97,6 +101,85 @@ export function offerAdd(
 
 export function addLabel(typed: string): string {
     return `+ Add “${typed.trim()}” as a new customer`;
+}
+
+/** The booking sheets' add row (DEC-170): no "+", the plus is drawn. */
+export function addAsNewLabel(typed: string): string {
+    return `Add “${typed.trim()}” as a new customer`;
+}
+
+/** The line under it: all a booking needs. */
+export const ADD_AS_NEW_NOTE = "Just a name and phone number";
+
+/** Over the list: recent people, what matched, or nobody by that name. */
+export function listLabel(typed: string, found: number): string {
+    const text = typed.trim();
+    if (!text) return "Recent customers";
+    return found > 0 ? "Matches" : `No one called “${text}” yet`;
+}
+
+/** "Kabir Singh" → "KS"; one letter for one word, "?" for none. */
+export function initialsOf(name: string | null): string {
+    const words = (name ?? "").trim().split(/\s+/).filter(Boolean);
+    if (words.length === 0) return "?";
+    return words
+        .slice(0, 2)
+        .map((w) => w.charAt(0).toUpperCase())
+        .join("");
+}
+
+/** What is wrong with a new customer's fields, by field. */
+export interface NewCustomerProblems {
+    name?: string;
+    phone?: string;
+    email?: string;
+}
+
+/**
+ * A new customer for a booking (DEC-170): a name and a phone are enough,
+ * and an email, when one is typed, must look like one. The API matches
+ * the phone by its digits (C2), so only the count is read here.
+ */
+export function newCustomerProblems(
+    draft: NewCustomerDraft,
+): NewCustomerProblems {
+    const problems: NewCustomerProblems = {};
+    if (!draft.name.trim()) problems.name = "Add their name.";
+    const phone = walkInPhone(draft.phone);
+    if (phone === "none") problems.phone = "Add their phone number.";
+    else if (phone === "short") problems.phone = WALK_IN_PHONE_ERROR;
+    const email = draft.email.trim();
+    if (email && !EMAIL.test(email)) {
+        problems.email =
+            "That doesn't look like an email, like priya@example.com.";
+    }
+    return problems;
+}
+
+/**
+ * The phone as saved: what was typed, with the business's dialling code
+ * in front when it was typed without one ("90000 54321" → "+91 90000
+ * 54321").
+ */
+export function withDialCode(phone: string, dialCode: string): string {
+    const text = phone.trim();
+    if (!text || text.startsWith("+") || !dialCode) return text;
+    const digits = dialCode.replace(/\D/g, "");
+    // Typed with the code but no "+": "919000054321".
+    if (text.replace(/\D/g, "").length > 10 && text.startsWith(digits)) {
+        return `+${text}`;
+    }
+    return `${dialCode} ${text}`;
+}
+
+/**
+ * "No, add Zara" when the phone is already Rohan's: a booking by phone
+ * alone would book Rohan (the API keeps one customer per phone), so Zara
+ * needs her email to be kept apart.
+ */
+export function apartByEmailMessage(match: string, name: string): string {
+    const first = name.trim().split(/\s+/)[0] || "them";
+    return `${match} has this number, so add ${first}'s email to keep them apart.`;
 }
 
 /** The first result that is exactly this email or phone, if any. */

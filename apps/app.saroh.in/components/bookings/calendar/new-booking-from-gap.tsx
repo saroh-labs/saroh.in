@@ -354,6 +354,7 @@ function Form({
                     value={pick}
                     onPick={setPick}
                     canSearch={people.canSearch}
+                    emailOptional
                     labelledBy={`${ids.who}-cust`}
                 />
 

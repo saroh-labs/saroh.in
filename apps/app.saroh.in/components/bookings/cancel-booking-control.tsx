@@ -1,38 +1,26 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { FormDialog } from "@/components/shared/form-dialog";
+import { CancelSheet } from "@/components/bookings/sheets/cancel-sheet";
 import { useHold } from "@/components/shared/use-hold";
-import { runAction } from "@/lib/api/run-action";
-import { cancelBooking } from "@/lib/services/actions";
-import type { BookingMoney, CancelPlan } from "@/lib/services/booking-money";
-import { cancelledMessage, cancelPlan } from "@/lib/services/booking-money";
-import { TextLink } from "@saroh/ui/text-link";
+import type { BookingMoney } from "@/lib/services/booking-money";
 
 /**
- * Cancel a single booking (S4-003). Calls the `cancelBooking` server action
- * (which frees the slot so it opens back up for other visitors) and
- * refreshes the server-rendered page on success. The api cancel is
- * idempotent, so a double click is harmless.
+ * Cancel a single booking (S4-003): the button, and the one cancel sheet
+ * (U3, `sheets/cancel-sheet.tsx`) it opens. Every cancel asks about the
+ * money when something was paid online (BA-01): the booking's page passes
+ * what it holds, and the list, which holds none, has the sheet read it.
  *
- * A cancel tells the customer and can't be taken back, so with no money in
- * it nothing is asked: it waits ten seconds with Undo (`useHold`), as the
- * calendar's cancel does, and nothing is written until then.
- *
- * With money paid online for it (E8), it first says what the cancel does
- * with it: refunded before the free-cancel time fixed at booking, if the
- * business's refund policy says so (E30, DEC-058), and kept otherwise.
- * Someone who may refund payments can hand kept money back anyway; anyone
- * else is told who can. That is a choice about money, so it is asked in a
- * dialog and then made at once. Afterwards the toast says what happened,
- * refund refused or still being confirmed included.
+ * The hold of a plain cancel (nothing paid: ten seconds with Undo, since
+ * it tells the customer) is kept here, beside the button, so the Undo
+ * outlives the sheet; the button says "Cancelling…" while it waits.
  */
 export function CancelBookingControl({
     bookingId,
+    who = "",
+    when,
     money,
     freeCancelUntil,
     timezone,
@@ -40,6 +28,11 @@ export function CancelBookingControl({
     canReadOrder = false,
 }: {
     bookingId: string;
+    /** Who it is for, for the sheet's title. */
+    who?: string;
+    /** The line under the title: the day and time, what was paid. */
+    when?: string;
+    /** Left out, the sheet reads it as it opens (the list). */
     money?: BookingMoney;
     freeCancelUntil?: string | null;
     timezone?: string;
@@ -48,67 +41,9 @@ export function CancelBookingControl({
     /** `order:read`: a treatment's visit links to its order (E9). */
     canReadOrder?: boolean;
 }) {
-    const router = useRouter();
-    const [busy, setBusy] = useState(false);
-    const [plan, setPlan] = useState<CancelPlan | null>(null);
+    const [open, setOpen] = useState(false);
     const { send, pending } = useHold();
-    const key = `cancel-booking:${bookingId}`;
-    const held = pending.includes(key);
-
-    /** Asked first, in the dialog: made at once, and said. */
-    async function cancel(returnCredit: boolean) {
-        const res = await runAction(
-            () =>
-                cancelBooking(bookingId, returnCredit ? { returnCredit } : {}),
-            { setBusy },
-        );
-        if (!res) return;
-        if (!res.ok) {
-            showError(res.error);
-            return;
-        }
-        setPlan(null);
-        const said = cancelledMessage(res.data.money);
-        if (said.tone === "error") showError(said.title, said.body);
-        else showSuccess(said.title);
-        router.refresh();
-    }
-
-    /** No money in it: held ten seconds with Undo, nothing asked. */
-    function cancelHeld() {
-        let sent = "Booking cancelled.";
-        send(key, {
-            soon: "Cancelling in 10 seconds",
-            description: "They're told once it is cancelled.",
-            run: async () => {
-                const res = await cancelBooking(bookingId, {});
-                if (!res.ok) return res;
-                const said = cancelledMessage(res.data.money);
-                router.refresh();
-                if (said.tone === "error") {
-                    showError(said.title, said.body);
-                    return { ok: false, error: "", said: true };
-                }
-                sent = said.title;
-                return { ok: true };
-            },
-            sent: () => sent,
-            failed: "The booking wasn't cancelled.",
-        });
-    }
-
-    function onCancel() {
-        // Read at the moment it is asked for: the deadline may just have gone.
-        const next = cancelPlan({
-            money,
-            freeCancelUntil,
-            timezone: timezone ?? "UTC",
-            now: Date.now(),
-            canRefund,
-        });
-        if (next) setPlan(next);
-        else cancelHeld();
-    }
+    const held = pending.includes(`cancel-booking:${bookingId}`);
 
     return (
         <>
@@ -116,65 +51,27 @@ export function CancelBookingControl({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={onCancel}
-                disabled={busy || held}
+                onClick={() => setOpen(true)}
+                disabled={held}
                 className="wk-press"
-                busy={busy}
-                busyLabel="Cancelling…"
             >
-                {busy || held ? "Cancelling…" : "Cancel"}
+                {held ? "Cancelling…" : "Cancel"}
             </Button>
-            <FormDialog
-                open={plan !== null}
-                size="sm"
-                title={
-                    plan?.treatmentOrderId ? "Cancel visit?" : "Cancel booking?"
-                }
-                description={
-                    <>
-                        {plan?.body} This cannot be undone.
-                        {plan?.treatmentOrderId && canReadOrder ? (
-                            <>
-                                {" "}
-                                <TextLink
-                                    href={`/commerce/orders/${encodeURIComponent(plan.treatmentOrderId)}`}
-                                >
-                                    Open the order
-                                </TextLink>
-                            </>
-                        ) : null}
-                    </>
-                }
-                pending={busy}
-                tone="destructive"
-                cancelLabel="Keep booking"
-                saveLabel={
-                    plan?.treatmentOrderId
-                        ? "Cancel visit"
-                        : plan?.keeps
-                          ? `Cancel, keep the ${plan.what}`
-                          : "Cancel booking"
-                }
-                savingLabel="Cancelling…"
-                fieldsClassName="hidden"
-                extra={
-                    plan?.canOverride ? (
-                        <Button
-                            data-ph-unmask=""
-                            type="button"
-                            variant="outline"
-                            disabled={busy}
-                            onClick={() => void cancel(true)}
-                        >
-                            Cancel and refund {plan.amount}
-                        </Button>
-                    ) : null
-                }
-                onClose={() => setPlan(null)}
-                onSubmit={() => cancel(false)}
-            >
-                {null}
-            </FormDialog>
+            <CancelSheet
+                open={open}
+                booking={{
+                    id: bookingId,
+                    who,
+                    when,
+                    ...(money !== undefined ? { money } : {}),
+                    freeCancelUntil: freeCancelUntil ?? null,
+                    timezone: timezone ?? "UTC",
+                }}
+                canRefund={canRefund}
+                canReadOrder={canReadOrder}
+                send={send}
+                onClose={() => setOpen(false)}
+            />
         </>
     );
 }

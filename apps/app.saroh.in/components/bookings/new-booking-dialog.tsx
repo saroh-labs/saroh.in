@@ -423,6 +423,7 @@ export function NewBookingDialog({
                                         value={who}
                                         onPick={setWho}
                                         canSearch={people.canSearch}
+                                        emailOptional
                                         labelledBy={ids.contact}
                                     />
                                 </div>

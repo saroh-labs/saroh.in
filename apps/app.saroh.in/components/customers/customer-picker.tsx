@@ -14,6 +14,7 @@ import type {
 } from "@/lib/customers/picker";
 import {
     addLabel,
+    apartByEmailMessage,
     draftFromTyped,
     exactly,
     offerAdd,
@@ -56,6 +57,7 @@ export function CustomerPicker({
     allowWalkIn = false,
     canSearch = true,
     showAttention = true,
+    emailOptional = false,
     labelledBy,
 }: {
     value: CustomerPick | null;
@@ -71,6 +73,11 @@ export function CustomerPicker({
     canSearch?: boolean;
     /** Show the picked customer's Needs attention. */
     showAttention?: boolean;
+    /**
+     * A booking (DEC-170): someone new needs a name and a phone, and the
+     * email only when typed. An order still needs it.
+     */
+    emailOptional?: boolean;
     /** The id of the label over the picker. */
     labelledBy?: string;
 }) {
@@ -87,6 +94,9 @@ export function CustomerPicker({
         match: CustomerSearchResult;
     } | null>(null);
     const [note, setNote] = useState<string | null>(null);
+    // "Add someone new" on a phone already someone's, with no email: by
+    // phone alone the API would book them, so the email is asked for.
+    const [apart, setApart] = useState<string | null>(null);
     const [attention, setAttention] = useState<{
         id: string;
         read: PeekAttention | null;
@@ -153,6 +163,7 @@ export function CustomerPicker({
     function pick(next: CustomerPick | null) {
         setNote(null);
         setDuplicate(null);
+        setApart(null);
         onPick(next);
     }
 
@@ -171,7 +182,9 @@ export function CustomerPicker({
                 forbidden: false,
             }));
         if (!forbidden) {
-            const byEmail = await lookUp(clean.email);
+            const byEmail = clean.email
+                ? await lookUp(clean.email)
+                : ({ ok: true, results: [] } as CustomerSearch);
             const same = byEmail.ok ? exactly(byEmail.results, "email") : null;
             if (same) {
                 pick(pickOf(same));
@@ -287,9 +300,15 @@ export function CustomerPicker({
             </div>
             {adding && !duplicate ? (
                 <NewCustomerForm
+                    key={apart ?? "new"}
                     initial={adding}
                     onAdd={add}
-                    onCancel={() => setAdding(null)}
+                    emailOptional={emailOptional}
+                    initialError={apart}
+                    onCancel={() => {
+                        setAdding(null);
+                        setApart(null);
+                    }}
                 />
             ) : null}
             {duplicate ? (
@@ -301,8 +320,20 @@ export function CustomerPicker({
                         setQuery("");
                     }}
                     onAddAnyway={() => {
+                        if (emailOptional && !duplicate.draft.email) {
+                            setAdding(duplicate.draft);
+                            setApart(
+                                apartByEmailMessage(
+                                    resultLabel(duplicate.match),
+                                    duplicate.draft.name,
+                                ),
+                            );
+                            setDuplicate(null);
+                            return;
+                        }
                         pick({ kind: "new", ...duplicate.draft });
                         setAdding(null);
+                        setApart(null);
                         setQuery("");
                     }}
                 />
