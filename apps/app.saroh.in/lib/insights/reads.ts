@@ -103,3 +103,70 @@ export interface SellsRead {
         enough: boolean;
     };
 }
+
+/**
+ * `GET organizations/:id/analytics/suggestions?period=` (#1087,
+ * `apps/api.saroh.in/src/modules/analytics/suggestions.ts`): facts only,
+ * ranked; the card (`suggestion-words.ts`) says them. Money rules only for
+ * `payment:read` (`money`).
+ */
+export interface FirstSaleSuggestion {
+    key: "first-sale";
+    rule: "FIRST_SALE";
+    dismissible: false;
+    action: { kind: "COPY_SHOP_LINK" };
+}
+
+export interface ClassFullSuggestion {
+    key: string;
+    rule: "CLASS_FULL";
+    dismissible: true;
+    service: { id: string; name: string };
+    days: number;
+    sessions: number;
+    seats: number;
+    booked: number;
+    fullPercent: number;
+    action: { kind: "ADD_CLASS_TIME"; href: string };
+}
+
+export interface LateBillSuggestion {
+    key: string;
+    rule: "LATE_BILL";
+    dismissible: true;
+    invoice: { id: string; number: string | null };
+    billedTo: string | null;
+    leftToPayMinor: number;
+    currency: string;
+    dueOn: string;
+    daysLate: number;
+    action:
+        | { kind: "REMIND"; invoiceId: string; href: string }
+        | { kind: "OPEN_BILL"; href: string };
+}
+
+export interface SellingLessSuggestion {
+    key: string;
+    rule: "SELLING_LESS";
+    dismissible: true;
+    product: { id: string; name: string };
+    sold: number;
+    soldBefore: number;
+    fewerPercent: number;
+    rankBefore: number;
+    action: { kind: "OPEN_PRODUCT"; href: string };
+}
+
+export type Suggestion =
+    | FirstSaleSuggestion
+    | ClassFullSuggestion
+    | LateBillSuggestion
+    | SellingLessSuggestion;
+
+export interface SuggestionsRead {
+    period: InsightsPeriod;
+    /** False without `payment:read`: the money rules were not looked at. */
+    money: boolean;
+    hasSales: boolean;
+    suggestions: Suggestion[];
+}

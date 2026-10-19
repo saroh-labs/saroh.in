@@ -15,10 +15,12 @@ import {
     PeriodSegments,
     PeriodSheet,
 } from "@/components/insights/period-control";
+import { SuggestionCard } from "@/components/insights/suggestion-card";
 import { PageContainer } from "@/components/shared/page-container";
 import {
     readMoney,
     readSells,
+    readSuggestions,
     readTakings,
     readTraffic,
     summarizeAnalytics,
@@ -39,6 +41,8 @@ import {
 } from "@/lib/insights/period";
 import { activeOrganizationOnce } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
+import { ORDERS_FIRST_RUN, shareLink } from "@/lib/sites/share-links";
+import { readWebAddressLinks } from "@/lib/sites/share-links-read";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
@@ -165,10 +169,11 @@ async function OverviewTab({
     address: InsightsAddress;
     window: PeriodWindow;
 }) {
-    const [money, sells, traffic] = await Promise.all([
+    const [money, sells, traffic, suggestions] = await Promise.all([
         readMoney(address.period),
         readSells(address.period),
         trafficFor(address, window),
+        readSuggestions(address.period),
     ]);
     // Without Insights' own reads the page is not theirs (#274). Outside
     // any try, so the interrupt lands.
@@ -189,12 +194,21 @@ async function OverviewTab({
         traffic.status === "ok"
             ? { status: "ok", data: summarizeAnalytics(traffic.data).summary }
             : { status: "failed" };
+    // Before the first sale the card copies the live shop (else website)
+    // link; only then is the web address read (`IBNoSalesD`).
+    const firstSale =
+        suggestions?.status === "ok" &&
+        suggestions.data.suggestions.some((s) => s.rule === "FIRST_SALE");
+    const share = firstSale
+        ? shareLink(await readWebAddressLinks(), ORDERS_FIRST_RUN)
+        : null;
     return (
         <Overview
             address={address}
             money={money}
             sells={sells}
             website={website}
+            suggestion={<SuggestionCard read={suggestions} share={share} />}
         />
     );
 }

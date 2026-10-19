@@ -1,7 +1,11 @@
 import { apiFetch, getActiveOrgId } from "@/lib/api/http";
 
 import type { InsightsPeriod } from "@/lib/insights/period";
-import type { MoneyRead, SellsRead } from "@/lib/insights/reads";
+import type {
+    MoneyRead,
+    SellsRead,
+    SuggestionsRead,
+} from "@/lib/insights/reads";
 
 import type { AnalyticsAggregateRow } from "./summary";
 import type { SourceRead, TakingsRead } from "./takings";
@@ -94,6 +98,21 @@ export async function readSells(
     if (!orgId) return null;
     return readSource<SellsRead>(
         `/organizations/${orgId}/analytics/sells?period=${period}`,
+    );
+}
+
+/**
+ * Insights' suggestions for the person asking (DEC-171, #1087): ranked,
+ * less what they put off with Not now. A failure is `failed`, said on the
+ * card by name; the rest of the Overview still shows.
+ */
+export async function readSuggestions(
+    period: InsightsPeriod,
+): Promise<SourceRead<SuggestionsRead> | null> {
+    const orgId = await getActiveOrgId();
+    if (!orgId) return null;
+    return readSource<SuggestionsRead>(
+        `/organizations/${orgId}/analytics/suggestions?period=${period}`,
     );
 }
 
