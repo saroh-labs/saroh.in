@@ -479,9 +479,20 @@ describe("OrganizationSettingsService", () => {
                 );
             });
 
-            it("refuses a number with no country code on the field, and writes nothing", async () => {
+            it("reads an Indian number typed without +91 as +91", async () => {
+                await service.update(ctx(), {
+                    profile: { phone: "98450 12345" },
+                });
+                expect(profileUpsert).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        update: { phone: "+919845012345" },
+                    }),
+                );
+            });
+
+            it("refuses a short number with no country code on the field, and writes nothing", async () => {
                 const refusal = await service
-                    .update(ctx(), { profile: { phone: "98450 12345" } })
+                    .update(ctx(), { profile: { phone: "1234 5678" } })
                     .catch((e: BadRequestException) => e.getResponse());
                 expect(refusal).toEqual(
                     expect.objectContaining({
