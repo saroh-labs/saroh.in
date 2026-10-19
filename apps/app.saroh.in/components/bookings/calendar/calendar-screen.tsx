@@ -6,7 +6,7 @@ import { count } from "@/lib/format/plural";
 import { showError, showInfo, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { diaryPausedWords } from "@/lib/billing/paused";
 import { formatMoney } from "@/lib/format/money";
@@ -23,11 +23,7 @@ import type {
 import type { BookingPeople } from "@/lib/services/booking-pay";
 import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import type { BookingsOpens } from "@/lib/services/bookings-opens";
-import {
-    EVERYONE,
-    OPENS_DEFAULT,
-    rememberLastView,
-} from "@/lib/services/bookings-opens";
+import { EVERYONE, OPENS_DEFAULT } from "@/lib/services/bookings-opens";
 import { summaryLine } from "@/lib/services/calendar-header";
 import type { CalendarLayout } from "@/lib/services/calendar-href";
 import { calendarHref } from "@/lib/services/calendar-href";
@@ -65,7 +61,6 @@ import { useHold } from "@/components/shared/use-hold";
 import { firstName as firstNameOf } from "@/lib/names";
 import { TextLink } from "@saroh/ui/text-link";
 import { AddPersonDialog } from "../availability/add-person-dialog";
-import { AgendaList, AgendaMonth } from "./agenda-month";
 import { BookingQuickLook } from "./booking-quick-look";
 import { DayByPerson } from "./day-by-person";
 import {
@@ -77,6 +72,8 @@ import {
 import { CalendarHeader } from "./header/calendar-header";
 import { columnsFor, dayFactsOf, personChoices } from "./header/header-facts";
 import { useSwipe } from "./header/use-swipe";
+import { ListView } from "./list/list-view";
+import { useOpeningView } from "./list/use-opening-view";
 import type { GapTarget } from "./new-booking-from-gap";
 import { NewBookingFromGap } from "./new-booking-from-gap";
 import type { HoursTarget } from "./open-hours-dialog";
@@ -157,6 +154,8 @@ export function CalendarScreen({
     person: askedPerson = EVERYONE,
     opens = OPENS_DEFAULT,
     me = null,
+    share = null,
+    listFirst = false,
 }: {
     layout: CalendarLayout;
     date: LocalDate;
@@ -204,6 +203,10 @@ export function CalendarScreen({
     opens?: BookingsOpens;
     /** The viewer on the diary, for "Just me"; null when they aren't on it. */
     me?: { id: string; name: string } | null;
+    /** "Share your booking page" on a quiet List day, while it is live. */
+    share?: ReactNode;
+    /** Nothing chose the view: a phone opens on List (Q4, U6). */
+    listFirst?: boolean;
 }) {
     const router = useRouter();
     const { hold, undo, pending } = useHold();
@@ -220,8 +223,21 @@ export function CalendarScreen({
     const [gap, setGap] = useState<GapTarget | null>(null);
     const [hours, setHours] = useState<HoursTarget | null>(null);
     const [addingPerson, setAddingPerson] = useState(false);
-    // "Where I left it" (Q15): this device keeps the view it was left on.
-    useEffect(() => rememberLastView(layout), [layout]);
+    // A phone that nothing has chosen a view for opens on List (Q4, U6);
+    // else "Where I left it" (Q15): this device keeps the view it was left on.
+    const replace = useCallback(
+        (href: string) => router.replace(href, { scroll: false }),
+        [router],
+    );
+    useOpeningView({
+        layout,
+        listFirst,
+        listHref: calendarHref("agenda", date, {
+            cancelled: showCancelled,
+            person: askedPerson,
+        }),
+        replace,
+    });
 
     const calendar = useMemo(
         () => withOverrides(read, overrides),
@@ -631,39 +647,6 @@ export function CalendarScreen({
         );
     };
 
-    const freeRows =
-        staff === null
-            ? null
-            : columns
-                  // The services' own hours have nobody to book with a tap,
-                  // and someone paused by the plan takes no new booking.
-                  .filter((c) => {
-                      const person = staffById.get(c.key);
-                      return person !== undefined && !person.paused;
-                  })
-                  .flatMap((c) =>
-                      (c.day?.free ?? []).map((f) => ({
-                          key: `${c.key}${f[0]}`,
-                          who: c.name,
-                          from: f[0],
-                          to: f[1],
-                          book: () => bookGap(c, f),
-                      })),
-                  );
-    const monthBusy = useMemo(() => {
-        const days = new Set<LocalDate>();
-        for (const d of calendar.diaries) {
-            if (person !== EVERYONE && d.person?.id !== person) continue;
-            for (const b of d.bookings) {
-                if (b.status !== "CANCELLED")
-                    days.add(localDateOf(b.startAt, timezone));
-            }
-            for (const s of d.classes)
-                days.add(localDateOf(s.startAt, timezone));
-        }
-        return days;
-    }, [calendar, timezone, person]);
-
     // ── Header C: whose bookings, and what each day holds ─────────────────
     const readFirst = calendar.from
         ? localDateOf(calendar.from, timezone)
@@ -715,19 +698,6 @@ export function CalendarScreen({
         layout === "day" && can.book && isFirstDay(calendar, columns);
     const shownPerson = person === EVERYONE ? null : person;
     const peekFromDay = (b: Block) => setPeek(b.key);
-
-    const agendaList = (
-        <AgendaList
-            blocks={dayBlocks}
-            selected={peek}
-            onBlock={peekFromDay}
-            empty={
-                date === today
-                    ? "Nothing booked today."
-                    : `Nothing booked on ${formatDay(date, { weekday: "short", year: "never" })}.`
-            }
-        />
-    );
 
     return (
         <div>
@@ -866,15 +836,27 @@ export function CalendarScreen({
                 ) : null}
 
                 {layout === "agenda" ? (
-                    <AgendaMonth
+                    <ListView
+                        blocks={dayBlocks}
+                        columns={columns}
+                        staff={staff}
+                        person={
+                            person === EVERYONE
+                                ? null
+                                : (columns[0]?.name ?? null)
+                        }
                         date={date}
                         today={today}
-                        busyDays={monthBusy}
-                        free={can.book ? freeRows : null}
-                        onDay={(d) => go("agenda", d)}
-                    >
-                        {agendaList}
-                    </AgendaMonth>
+                        now={now}
+                        timezone={timezone}
+                        selected={peek}
+                        canBook={can.book}
+                        canHours={can.hours}
+                        share={share}
+                        onBlock={peekFromDay}
+                        onFree={bookGap}
+                        onOpenDay={() => openDay(date)}
+                    />
                 ) : null}
             </div>
 

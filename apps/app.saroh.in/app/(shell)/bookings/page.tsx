@@ -8,6 +8,7 @@ import { CalendarScreen } from "@/components/bookings/calendar/calendar-screen";
 
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
 import { PageContainer } from "@/components/shared/page-container";
+import { ShareLinkButton } from "@/components/sites/share-link-button";
 import { takesOnlinePayment } from "@/lib/billing/access";
 import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packsOn } from "@/lib/class-packs/switched-on";
@@ -22,6 +23,7 @@ import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { canTakeDeskPayments } from "@/lib/services/booking-money";
 import {
     LAST_VIEW_COOKIE,
+    nothingChoseView,
     openingLayout,
     openingPerson,
 } from "@/lib/services/bookings-opens";
@@ -42,15 +44,17 @@ import {
 } from "@/lib/services/service";
 import { readServiceHours } from "@/lib/services/service-hours-read";
 import { requireSession } from "@/lib/session";
+import { BOOKINGS_FIRST_RUN, shareLink } from "@/lib/sites/share-links";
+import { readWebAddressLinks } from "@/lib/sites/share-links-read";
 import type { StaffList } from "@/lib/staff/service";
 import { getBookingRules, listStaff } from "@/lib/staff/service";
 import { withClosures } from "@/lib/staff/time-off";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
- * Bookings › Calendar (U15). The day by person by default, the week, or the
- * agenda with its month — each one read of the bookings (U4) over the range
- * it shows, with the staff read (U3) for hours, time off and free gaps.
+ * Bookings › Calendar (U15). The day by person, the week, or the List (U6,
+ * the first view on a phone) — each one read of the bookings (U4) over the
+ * range it shows, with the staff read (U3) for hours, time off and free gaps.
  *
  * The staff read degrades on its own: without it the bookings still show
  * and the screen says free times are missing. The bookings read failing is
@@ -121,11 +125,12 @@ export default async function BookingsPage({
     const today = localDateOf(new Date(now), timezone);
     // The view the address names; else the person's "Start Bookings on";
     // else the one last used on this device (Q15, option C).
-    const layout = openingLayout({
+    const chosen = {
         asked: params.layout,
         start: opens.start,
         lastUsed: jar.get(LAST_VIEW_COOKIE)?.value,
-    });
+    };
+    const layout = openingLayout(chosen);
     // Whose bookings: the address's; else "Show bookings for" (DEC-170).
     const active = (staffList?.staff ?? []).filter(
         (p) => p.status === "ACTIVE",
@@ -191,6 +196,13 @@ export default async function BookingsPage({
         forContact && people.canSearch
             ? await readCustomerPick(forContact)
             : null;
+    // A quiet day on List offers "Share your booking page" while it is
+    // live (DEC-069, L8). Read only for List, for someone who may book; a
+    // read that fails, or a role it isn't shown to, leaves it out.
+    const share =
+        layout === "agenda" && may("booking:write")
+            ? shareLink(await readWebAddressLinks(), BOOKINGS_FIRST_RUN)
+            : null;
     return (
         <PageContainer width="full">
             <CalendarScreen
@@ -212,6 +224,13 @@ export default async function BookingsPage({
                 person={person}
                 opens={opens}
                 me={mine ? { id: mine.id, name: mine.name } : null}
+                share={
+                    share ? (
+                        <ShareLinkButton link={share} className="mt-0" />
+                    ) : null
+                }
+                // Nothing chose the view: a phone moves to List (Q4, U6).
+                listFirst={nothingChoseView(chosen)}
                 people={people}
                 can={{
                     book: may("booking:write"),

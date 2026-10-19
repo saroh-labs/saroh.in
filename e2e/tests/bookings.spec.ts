@@ -434,7 +434,8 @@ test.describe("bookings calendar", () => {
             let bookingId: string | null = null;
             let contactId: string | null = null;
             try {
-                await page.goto(`/bookings?date=${day}`);
+                // Day, named: a phone with no view chosen opens on List (Q4).
+                await page.goto(`/bookings?date=${day}&layout=day`);
                 // Closed time says "Closed · click to open" (a phone: tap)
                 // and opens from the half hour pressed (U4).
                 await page
@@ -572,6 +573,130 @@ test.describe("bookings calendar", () => {
             }
         },
     );
+});
+
+test.describe("the List (U6)", () => {
+    test("a booked day: rows open a quick look, free times book, nothing scrolls sideways", async ({
+        page,
+    }) => {
+        await signIn(page);
+        // A day of Pulse's with a booking on it, read from the API.
+        const from = new Date(Date.now() - 86_400_000).toISOString();
+        const to = new Date(Date.now() + 14 * 86_400_000).toISOString();
+        const found = (await diaries(page.request, from, to))
+            .filter((d) => d.person)
+            .flatMap((d) => d.bookings)
+            .find((b) => b.status === "CONFIRMED" && b.bookerName);
+        test.skip(!found, "No one-to-one booking in the seed's fortnight");
+        if (!found) return;
+        const day = new Date(Date.parse(found.startAt) + IST_OFFSET_MS)
+            .toISOString()
+            .slice(0, 10);
+        await page.goto(`/bookings?date=${day}&layout=agenda`);
+
+        const booked = page.getByRole("region", { name: "Booked" });
+        await expect(booked).toBeVisible();
+        await booked
+            .getByRole("button", { name: new RegExp(found.bookerName ?? "") })
+            .first()
+            .click();
+        await expect(page.getByRole("dialog")).toBeVisible();
+        await page.keyboard.press("Escape");
+
+        const free = page.getByRole("region", { name: "Free times" });
+        await expect(free).toBeVisible();
+        const phone = test.info().project.name.startsWith("phone");
+        if (phone) {
+            // A card that opens; each time a 48px row.
+            const toggle = free.locator("button[aria-expanded]");
+            if ((await toggle.count()) > 0) {
+                await toggle.click();
+                await expect(toggle).toHaveAttribute("aria-expanded", "true");
+                const row = free
+                    .getByRole("button", { name: /^Book / })
+                    .first();
+                const box = await row.boundingBox();
+                expect(box?.height ?? 0).toBeGreaterThanOrEqual(48);
+            }
+        } else {
+            await expect(
+                free.getByRole("heading", { name: /free times?$/ }),
+            ).toBeVisible();
+        }
+        const rows = free.getByRole("button", { name: /^Book / });
+        if ((await rows.count()) > 0) {
+            // The free-time sheet opens on it; nothing is saved here.
+            await rows.first().click();
+            await expect(page.getByRole("dialog")).toBeVisible();
+            await page.keyboard.press("Escape");
+        }
+
+        const view = await page.evaluate(() => ({
+            vw: window.innerWidth,
+            scroll: document.documentElement.scrollWidth,
+        }));
+        expect(view.scroll).toBeLessThanOrEqual(view.vw);
+    });
+
+    test("a day with nothing booked says closed, or offers Book on this day", async ({
+        page,
+    }) => {
+        await signIn(page);
+        // Far ahead, so nothing is booked yet: a Sunday and a Wednesday.
+        const ahead = (weekday: number) => {
+            for (let d = 120; ; d++) {
+                const day = istDay(d);
+                if (new Date(`${day}T00:00:00Z`).getUTCDay() === weekday)
+                    return day;
+            }
+        };
+        for (const day of [ahead(0), ahead(3)]) {
+            await page.goto(`/bookings?date=${day}&layout=agenda`);
+            const closed = page.getByRole("heading", { name: /^Closed on / });
+            const quiet = page.getByRole("heading", {
+                name: /^Nothing booked on /,
+            });
+            await expect(closed.or(quiet)).toBeVisible();
+            if (await closed.isVisible()) {
+                await expect(
+                    page.getByRole("button", {
+                        name: "Open hours on this day",
+                    }),
+                ).toBeVisible();
+            } else {
+                const book = page.getByRole("button", {
+                    name: "Book on this day",
+                });
+                await expect(book).toBeVisible();
+                await book.click();
+                await expect(page.getByRole("dialog")).toContainText(
+                    day.slice(8, 10).replace(/^0/, ""),
+                );
+                await page.keyboard.press("Escape");
+            }
+        }
+    });
+
+    test("a phone with no view chosen opens on List", async ({
+        page,
+        context,
+    }) => {
+        test.skip(
+            !test.info().project.name.startsWith("phone"),
+            "The desk opens where it was left, Day at first.",
+        );
+        await signIn(page);
+        await context.clearCookies({ name: "saroh_bookings_view" });
+        await page.goto("/bookings");
+        await expect(page).toHaveURL(/layout=agenda/);
+        await expect(
+            page.getByRole("region", { name: "Free times" }).or(
+                page.getByRole("heading", {
+                    name: /^(Closed on|Nothing booked)/,
+                }),
+            ),
+        ).toBeVisible();
+    });
 });
 
 test.describe("New booking finds the customer (E4)", () => {

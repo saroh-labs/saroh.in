@@ -101,6 +101,27 @@ export function openingLayout({
 }
 
 /**
+ * Nothing chose the view: no view in the address, "Where I left it", and
+ * nothing left on this device yet. The server then draws Day, and a phone
+ * moves to List once drawn (Q4, U6), since only the browser knows its width.
+ */
+export function nothingChoseView({
+    asked,
+    start,
+    lastUsed,
+}: {
+    asked: unknown;
+    start: StartView;
+    lastUsed: unknown;
+}): boolean {
+    return (
+        layoutOf(asked) === null &&
+        start === "last" &&
+        layoutOf(lastUsed) === null
+    );
+}
+
+/**
  * Whose bookings it opens on, as the address's `person`: the one the
  * address names (when they are among `people`); else Everyone, the person
  * themselves (Just me, when they take bookings) or their last pick (when

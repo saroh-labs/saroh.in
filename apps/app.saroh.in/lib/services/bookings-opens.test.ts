@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
     EVERYONE,
-    OPENS_DEFAULT,
+    nothingChoseView,
     openingLayout,
     openingPerson,
+    OPENS_DEFAULT,
     readOpens,
 } from "./bookings-opens";
 
@@ -147,5 +148,45 @@ describe("what the API kept", () => {
         expect(
             readOpens({ start: "month", showFor: 3, lastPerson: "" }),
         ).toEqual(OPENS_DEFAULT);
+    });
+});
+
+describe("nothing chose the view (Q4, U6)", () => {
+    it("is true only with no view asked, Where I left it, and nothing left", () => {
+        expect(
+            nothingChoseView({
+                asked: undefined,
+                start: "last",
+                lastUsed: undefined,
+            }),
+        ).toBe(true);
+        expect(
+            nothingChoseView({
+                asked: "nonsense",
+                start: "last",
+                lastUsed: "x",
+            }),
+        ).toBe(true);
+        expect(
+            nothingChoseView({
+                asked: "day",
+                start: "last",
+                lastUsed: undefined,
+            }),
+        ).toBe(false);
+        expect(
+            nothingChoseView({
+                asked: undefined,
+                start: "day",
+                lastUsed: undefined,
+            }),
+        ).toBe(false);
+        expect(
+            nothingChoseView({
+                asked: undefined,
+                start: "last",
+                lastUsed: "week",
+            }),
+        ).toBe(false);
     });
 });

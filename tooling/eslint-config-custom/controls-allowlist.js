@@ -26,8 +26,10 @@ export const RAW_ALLOWED = {
     "components/bookings/availability/time-off-card.tsx": ["button"],
     // button: a chip, a row or card that is one button
     "components/bookings/availability/weekly-hours.tsx": ["button"],
-    // button: a calendar cell, a row or card that is one button
-    "components/bookings/calendar/agenda-month.tsx": ["button"],
+    // button: the List's free times card that opens, and each free time a row
+    "components/bookings/calendar/list/list-free-times.tsx": ["button"],
+    // button: each booked row of the List, one button
+    "components/bookings/calendar/list/list-view.tsx": ["button"],
     // button: the date title and the person chip of header C, and "…"
     "components/bookings/calendar/header/calendar-header.tsx": ["button"],
     // button: a calendar cell (the week strip and the month), a step
