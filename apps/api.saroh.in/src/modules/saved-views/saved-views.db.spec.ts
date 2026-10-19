@@ -47,6 +47,19 @@ describe("a person's one kept view (PUT saved-views)", () => {
         expect(kept[0]?.filters).toEqual({ start: "day", showFor: "all" });
     });
 
+    it("two saves at once leave one row, the one saved last", async () => {
+        const ctx = await business();
+        await Promise.all(
+            ["day", "week", "list", "day", "week"].map((start) =>
+                asIn(ctx, () => service.put(ctx, opensOn({ start }))),
+            ),
+        );
+        const kept = await asIn(ctx, () =>
+            service.list(ctx, "bookings.calendar"),
+        );
+        expect(kept).toHaveLength(1);
+    });
+
     it("is the caller's own: someone else's choice in the business stays", async () => {
         const ctx = await business();
         const other = await prisma.user.create({
