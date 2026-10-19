@@ -555,7 +555,7 @@ test.describe("bookings calendar", () => {
                     // textContent: the eyebrow is drawn in capitals.
                     (await dialog
                         .getByText(/^How long, from /)
-                        .textContent()) || "",
+                        .textContent()) ?? "",
                 )?.[1];
                 // Two hours: room for the service to start in it (an hour
                 // left only a 45-minute gap from 2:15, too short).
@@ -1130,7 +1130,7 @@ test.describe("availability and services", () => {
         // card's Edit goes back to them.
         const more = page.getByRole("button", { name: /^More details/ });
         const inDetails = async (check: () => Promise<void>) => {
-            const phone = await more.isVisible();
+            const phone = test.info().project.name.startsWith("phone");
             if (phone) await more.click();
             await check();
             if (phone) {
