@@ -6,6 +6,7 @@ import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { Span } from "@/lib/services/diary";
 import { localMinuteOf } from "@/lib/services/diary";
 
+import { firstName } from "@/lib/names";
 import { at, tall } from "./geometry";
 
 // The clock is an external thing, so it is read as a store: the server and
@@ -80,7 +81,7 @@ export function NowTime({
         >
             <span className="absolute -top-2 right-1 whitespace-nowrap rounded-[4px] bg-destructive px-1 text-[11px] font-semibold tabular-nums leading-4 text-destructive-foreground">
                 <span className="sr-only">Now, {full}</span>
-                <span aria-hidden>{full.split(" ")[0]}</span>
+                <span aria-hidden>{firstName(full)}</span>
             </span>
         </div>
     );

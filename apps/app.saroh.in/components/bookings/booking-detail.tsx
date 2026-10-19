@@ -23,6 +23,7 @@ import {
 } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
 import { bookingStatus } from "@/lib/format/status";
+import { firstName } from "@/lib/names";
 import { phoneLabel } from "@/lib/organizations/business-phone";
 import {
     deadlineText,
@@ -479,11 +480,6 @@ function eventTitle(event: BookingEvent, timeZone: string): string {
         ? formatDateTime(event.toStartAt, timeZone, { weekday: "short" })
         : null;
     return from && to ? `Moved from ${from} to ${to}` : "Moved";
-}
-
-/** "Asha" from "Asha Rao"; an email stays whole. */
-function firstName(label: string): string {
-    return label.includes("@") ? label : (label.split(" ")[0] ?? label);
 }
 
 /** The contact's name if the CRM knows them, else whatever was typed in. */

@@ -7,6 +7,7 @@ import type { CSSProperties } from "react";
 import type { Block, Column, Span } from "@/lib/services/diary";
 import { blockTitle } from "@/lib/services/diary";
 
+import { firstName } from "@/lib/names";
 import { blockColour } from "./diary-block";
 import { at, tall } from "./geometry";
 
@@ -91,7 +92,7 @@ export function LaneBlock({
     onOpen: () => void;
 }) {
     const title = blockTitle(block);
-    const name = block.kind === "one" ? (title.split(" ")[0] ?? title) : title;
+    const name = block.kind === "one" ? firstName(title) : title;
     return (
         <button
             type="button"

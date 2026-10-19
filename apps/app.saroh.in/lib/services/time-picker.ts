@@ -158,10 +158,8 @@ export function slotPerson(
     return null;
 }
 
-/** The first word of a name: "Meera Iyer" → "Meera". */
-export function firstName(name: string): string {
-    return name.trim().split(/\s+/)[0] ?? name;
-}
+/** What someone is called by ("Meera Iyer" → "Meera", past a "Dr."). */
+export { firstName } from "@/lib/names";
 
 /**
  * The zone as people know it, for "times in IST" (Q10): "IST", "BST",

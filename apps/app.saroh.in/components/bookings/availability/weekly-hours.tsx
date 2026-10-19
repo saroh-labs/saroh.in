@@ -22,6 +22,7 @@ import { openingNote, whollyOutside } from "@/lib/services/in-person-hours";
 import { startingDay } from "@/lib/staff/starting-week";
 import type { WeeklyRange } from "@/lib/staff/types";
 
+import { firstName } from "@/lib/names";
 import { ClockSelect } from "./clock-select";
 
 /** The same range, whichever object holds it. */
@@ -506,7 +507,7 @@ export function WeeklyHours({
                                     {out
                                         .map(
                                             (b) =>
-                                                `${b.who.split(" ")[0]} ${formatClock(b.start)}`,
+                                                `${firstName(b.who)} ${formatClock(b.start)}`,
                                         )
                                         .join(", ")}
                                     . They stay booked. Move them if you need

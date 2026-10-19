@@ -11,6 +11,7 @@ import { useRef, useState } from "react";
 import type { Block, Column, LocalDate, Span } from "@/lib/services/diary";
 import { dayFullness } from "@/lib/services/diary-view";
 
+import { firstName } from "@/lib/names";
 import { CLOSED_HATCH } from "./geometry";
 import { BookingRow, FreeRow } from "./week-day-rows";
 import type { WeekDay } from "./week-view";
@@ -29,8 +30,6 @@ type Row =
           column: Column;
           free: Span;
       };
-
-const firstName = (name: string) => name.split(" ")[0] ?? name;
 
 /**
  * The week on a phone (U5, BKMBookingsWeek): Monday to Sunday as a strip,

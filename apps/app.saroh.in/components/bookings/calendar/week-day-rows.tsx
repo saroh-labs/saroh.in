@@ -14,14 +14,13 @@ import {
     STATE_LABEL,
 } from "@/lib/services/diary";
 
+import { firstName } from "@/lib/names";
 import { STATE_TONE } from "./parts";
 
 /**
  * The rows of a day's list on the phone's week (U5, BKMBookingsWeek): a
  * free time to book, and a booking to open.
  */
-
-const firstName = (name: string) => name.split(" ")[0] ?? name;
 
 const ROW =
     "flex w-full gap-2.5 border-b border-border/60 px-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";

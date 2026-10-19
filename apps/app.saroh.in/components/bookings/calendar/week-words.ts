@@ -1,5 +1,6 @@
 import { formatDay, formatWeekday } from "@/lib/format/datetime";
 
+import { firstName } from "@/lib/names";
 import type { LocalDate } from "@/lib/services/diary";
 
 /**
@@ -52,9 +53,8 @@ export function weekHelp({
     if (phone) {
         return `The bar on each day shows how full it is. Tap a day to see its bookings${free ? " and free times" : ""}. Swipe left or right for the week before or after.`;
     }
-    const first = (n: string) => n.split(" ")[0] ?? n;
     const each = lanes.length
-        ? `Each day has a lane per person: ${lanes.map(first).join(", ")}. `
+        ? `Each day has a lane per person: ${lanes.map(firstName).join(", ")}. `
         : "";
     return `${each}The bar under each day shows how full it is. Click a day to open it${canBook ? ", a free time to book or block it" : ""}.`;
 }
