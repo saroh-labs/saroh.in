@@ -156,6 +156,7 @@ export function CalendarScreen({
     me = null,
     share = null,
     listFirst = false,
+    business = null,
 }: {
     layout: CalendarLayout;
     date: LocalDate;
@@ -209,6 +210,8 @@ export function CalendarScreen({
     share?: ReactNode;
     /** Nothing chose the view: a phone opens on List (Q4, U6). */
     listFirst?: boolean;
+    /** The business, as its customers know it, for a booked message (U9). */
+    business?: string | null;
 }) {
     const router = useRouter();
     const { hold, undo, pending } = useHold();
@@ -615,20 +618,6 @@ export function CalendarScreen({
         });
     }
 
-    function blockGap(target: GapTarget) {
-        const column = columns.find((c) => c.key === target.staff.id);
-        setGap(null);
-        setHours({
-            staff: target.staff,
-            date: target.date,
-            from: target.free[0],
-            mode: "block",
-            room: target.free[1] - target.free[0],
-            windows: column?.day?.windows ?? [],
-            blocks: column?.blocks ?? [],
-        });
-    }
-
     const hrefFor = (l: CalendarLayout, d: LocalDate, who = person) =>
         calendarHref(l, d, { cancelled: cancelledShown, person: who });
     const go = (l: CalendarLayout, d: LocalDate) =>
@@ -894,9 +883,11 @@ export function CalendarScreen({
                 services={services}
                 people={people}
                 timezone={timezone}
+                today={today}
                 money={money}
+                canHours={can.hours}
+                business={business}
                 onClose={() => setGap(null)}
-                onBlock={blockGap}
             />
             <OpenHoursDialog
                 target={hours}

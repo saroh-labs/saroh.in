@@ -599,46 +599,69 @@ test.describe("bookings calendar", () => {
                 await expect.poll(holding).toBeGreaterThanOrEqual(0);
                 const index = await holding();
                 await gaps.nth(index).click();
+                // The free-time sheet (U9): Book someone · Block this time
+                // at the top; in extra hours, Close these extra hours at
+                // the foot (Q11). Neither is saved here.
                 const book = page.getByRole("dialog");
+                await expect(book).toContainText("Free until");
+                await book
+                    .getByRole("radio", { name: "Block this time" })
+                    .click();
+                await expect(
+                    book.getByRole("button", { name: /^Block \d/ }),
+                ).toBeVisible();
+                await expect(
+                    book.getByRole("button", {
+                        name: "Close these extra hours",
+                    }),
+                ).toBeVisible();
+                await book.getByRole("radio", { name: "Book someone" }).click();
                 await expect(
                     book.getByText("Finding when each can start…"),
                 ).toBeHidden();
+                // Step 1: a service that fits.
                 const chip = book
                     .getByRole("radiogroup", { name: "Service" })
                     .locator("button[role=radio]:not([disabled])")
                     .first();
                 await expect(chip).toBeVisible();
                 await chip.click();
-                // The shared customer picker (E4): type, then add them new.
+                const next = book.locator(
+                    '[data-overlay-foot] button[type="submit"]',
+                );
+                await expect(next).toHaveText("Next: who it’s for");
+                await next.click();
+                // Step 2: the shared customer step, a name and a phone.
                 await book.getByLabel("Find the customer").fill(customer);
                 await book
                     .getByRole("button", {
-                        name: `+ Add \u201c${customer}\u201d as a new customer`,
+                        name: new RegExp(
+                            `^Add \u201c${customer}\u201d as a new customer`,
+                        ),
                     })
                     .click();
                 await expect(book.getByLabel("Name")).toHaveValue(customer);
                 await book
-                    .getByLabel("Email")
-                    .fill(
-                        `${customer.replace(/\W+/g, ".").toLowerCase()}@example.test`,
-                    );
-                await book
-                    .getByRole("button", { name: "Add customer" })
-                    .click();
+                    .getByLabel("Phone")
+                    .fill(`90${String(Date.now()).slice(-8)}`);
+                await book.getByRole("button", { name: "Add and use" }).click();
+                // Step 3: check, Pays at the visit by default, Book.
                 await expect(
-                    book.getByRole("radio", { name: `${customer} · new` }),
+                    book.getByRole("radio", { name: /^Pays at the visit/ }),
                 ).toBeChecked();
-                await book
-                    .getByRole("radio", { name: "Pays at the visit" })
-                    .click();
-                await book
-                    .getByRole("button", { name: "Book", exact: true })
-                    .click();
+                await next.click();
                 await expect(
-                    page
-                        .getByText(new RegExp(`^Booked ${customer} with`))
-                        .first(),
+                    book.getByRole("heading", {
+                        name: `${customer} is booked`,
+                    }),
                 ).toBeVisible();
+                await expect(
+                    book.getByRole("link", { name: "WhatsApp" }),
+                ).toHaveAttribute("href", /^https:\/\/wa\.me\//);
+                await expect(
+                    book.getByRole("button", { name: "Copy message" }),
+                ).toBeVisible();
+                await book.getByRole("button", { name: "Done" }).click();
 
                 // The whole of the booked day, in India.
                 const from = new Date(`${day}T00:00:00+05:30`).toISOString();

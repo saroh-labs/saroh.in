@@ -43,25 +43,20 @@ vi.mock("../booking-quick-look", () => ({
     BookingQuickLook: ({ block }: { block: { key: string } | null }) =>
         block ? <div role="dialog">Quick look {block.key}</div> : null,
 }));
-// The free-time sheet: books, or blocks the time instead (U9's switch).
+// The free-time sheet (U9): books, or blocks the time with its own switch.
 vi.mock("../new-booking-from-gap", () => ({
     NewBookingFromGap: ({
         target,
-        onBlock,
     }: {
         target: {
             staff: { name: string };
             date: string;
             free: readonly [number, number];
         } | null;
-        onBlock: (t: unknown) => void;
     }) =>
         target ? (
             <div role="dialog">
                 Book {target.staff.name} from {target.free[0]} on {target.date}
-                <button type="button" onClick={() => onBlock(target)}>
-                    Block this time
-                </button>
             </div>
         ) : null,
 }));
@@ -426,13 +421,6 @@ describe("the free times", () => {
         expect(first.textContent).toContain("Book");
         act(() => first.click());
         expect(text()).toContain("Book Meera Iyer from 585 on 2026-09-29");
-    });
-
-    it("Block, from that sheet, opens Block on the same time", () => {
-        draw(today);
-        act(() => freeButtons()[0]?.click());
-        act(() => button("Block this time")?.click());
-        expect(text()).toContain("block Meera Iyer from 585 on 2026-09-29");
     });
 
     it("name the one person shown", () => {

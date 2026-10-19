@@ -239,6 +239,8 @@ export default async function BookingsPage({
             }
             // Nothing chose the view: a phone moves to List (Q4, U6).
             listFirst={nothingChoseView(chosen)}
+            // A booked message names the business (U9, Q12).
+            business={organization?.name ?? null}
             people={people}
             can={{
                 book: may("booking:write"),
