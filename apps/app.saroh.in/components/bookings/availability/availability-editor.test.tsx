@@ -144,8 +144,8 @@ describe.each([
         expect(mayNavigate("/bookings")).toBe(true);
     });
 
-    it("holds time off and More, with the slot for each person's rules between", () => {
-        draw({ personRules: <p>Booking rules for Meera</p> });
+    it("holds time off and More, with each person's rules between", () => {
+        draw();
         const sections = Array.from(
             host.querySelectorAll("section[aria-labelledby], [data-slot]"),
         ).map(
@@ -157,6 +157,7 @@ describe.each([
             "weekly-hours",
             "time-off",
             "person-rules",
+            "person-rules-title",
             "hours-more",
         ]);
         expect(said(host)).toContain("Meera · 27 to 29 Oct");

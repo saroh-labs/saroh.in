@@ -14,6 +14,8 @@ const reads = vi.hoisted(() => ({
     listStaff: vi.fn(),
     getBookingRules: vi.fn(),
     readBookingPayment: vi.fn(),
+    readPersonRules: vi.fn(),
+    readRuleRequests: vi.fn(),
     listServices: vi.fn(),
     readBookingsCalendar: vi.fn(),
     readNow: vi.fn(),
@@ -33,6 +35,8 @@ vi.mock("@/lib/staff/service", () => ({
     listStaff: reads.listStaff,
     getBookingRules: reads.getBookingRules,
     readBookingPayment: reads.readBookingPayment,
+    readPersonRules: reads.readPersonRules,
+    readRuleRequests: reads.readRuleRequests,
 }));
 vi.mock("@/lib/services/service", () => ({
     listServices: reads.listServices,
@@ -74,7 +78,11 @@ const OWNER = {
 
 beforeEach(() => {
     for (const m of Object.values(reads)) m.mockReset();
-    reads.requireSession.mockResolvedValue({ user: { name: "Mohit Mehta" } });
+    reads.requireSession.mockResolvedValue({
+        user: { id: "u_mohit", name: "Mohit Mehta" },
+    });
+    reads.readPersonRules.mockResolvedValue(null);
+    reads.readRuleRequests.mockResolvedValue(null);
     reads.resolveActiveOrganization.mockResolvedValue(OWNER);
     reads.getBookingRules.mockResolvedValue(null);
     reads.readBookingPayment.mockResolvedValue(null);
@@ -147,6 +155,53 @@ describe("Hours and time off's page", () => {
         await page();
         expect(reads.editor).toHaveBeenCalledWith(
             expect.objectContaining({ canEdit: false, canManage: false }),
+        );
+    });
+
+    it("reads the requests waiting for an owner, and no one diary's (#1038)", async () => {
+        const waiting = [{ id: "rq_1", staffId: "st_meera" }];
+        reads.readRuleRequests.mockResolvedValue(waiting);
+        await page();
+        expect(reads.readRuleRequests).toHaveBeenCalled();
+        expect(reads.readPersonRules).not.toHaveBeenCalled();
+        expect(reads.editor).toHaveBeenCalledWith(
+            expect.objectContaining({
+                personRules: { meId: "u_mohit", requests: waiting, mine: null },
+            }),
+        );
+    });
+
+    it("reads a Member's own diary's rules and request, not everyone's (#1038)", async () => {
+        reads.resolveActiveOrganization.mockResolvedValue({
+            ...OWNER,
+            role: "MEMBER",
+            actions: ["booking:read", "service:read", "hours:write"],
+        });
+        reads.listStaff.mockResolvedValue({
+            timezone: "Asia/Kolkata",
+            staff: [
+                {
+                    ...MEERA,
+                    membership: {
+                        id: "m_1",
+                        userId: "u_mohit",
+                        name: "Mohit Mehta",
+                        email: "mohit@example.com",
+                    },
+                },
+            ],
+            closures: [],
+            openingHours: null,
+        });
+        const mine = { staffId: "st_meera", request: null };
+        reads.readPersonRules.mockResolvedValue(mine);
+        await page();
+        expect(reads.readPersonRules).toHaveBeenCalledWith("st_meera");
+        expect(reads.readRuleRequests).not.toHaveBeenCalled();
+        expect(reads.editor).toHaveBeenCalledWith(
+            expect.objectContaining({
+                personRules: { meId: "u_mohit", requests: null, mine },
+            }),
         );
     });
 

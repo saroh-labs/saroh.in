@@ -27,7 +27,7 @@ import type {
 
 import { BookablePreview, WhyNotOffered } from "./bookable-preview";
 import type { useBookingRules } from "./booking-rules-card";
-import { RuleChoices, RulesList } from "./booking-rules-card";
+import { ApprovalSwitch, RuleChoices, RulesList } from "./booking-rules-card";
 import type { SaveWeek } from "./day-editor";
 import { DayEditor } from "./day-editor";
 import { EveryoneDay } from "./everyone-day";
@@ -74,6 +74,7 @@ export function HoursPanels({
     services,
     closures,
     rulesState,
+    ownName = null,
     onlineBlocker,
     onPickWho,
     onAddPerson,
@@ -99,6 +100,8 @@ export function HoursPanels({
     services: { id: string; name: string }[];
     closures: Closure[];
     rulesState: ReturnType<typeof useBookingRules>;
+    /** A Member's own first name, when they take bookings (U20). */
+    ownName?: string | null;
     onlineBlocker?: OnlineBlocker | null;
     onPickWho: (id: string) => void;
     onAddPerson: () => void;
@@ -183,8 +186,18 @@ export function HoursPanels({
                     rules={rulesState.shown}
                     canEdit={canManage}
                     onlineBlocker={onlineBlocker}
+                    ownName={canEdit ? ownName : null}
                     onOpen={(key) => setPanel({ kind: "rule", key })}
                 />
+                {/* "Members' rule changes need approval" (U20, #1038). */}
+                {canManage &&
+                rulesState.shown?.memberRuleChangesNeedApproval !==
+                    undefined ? (
+                    <ApprovalSwitch
+                        on={rulesState.shown.memberRuleChangesNeedApproval}
+                        onChange={(on) => void rulesState.needApproval(on)}
+                    />
+                ) : null}
             </HoursPanel>
         );
     })();

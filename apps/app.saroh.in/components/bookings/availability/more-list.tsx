@@ -110,3 +110,58 @@ export function MoreSection({
         </section>
     );
 }
+
+/** Where the keyboard goes back to once a person's rules are answered. */
+export const PERSON_RULES_ROW_ID = "person-rules-row";
+
+/**
+ * "Booking rules for ‹person›" as one row (U20, BKMHoursRules): how many
+ * of their rules are their own, how the rest stand, and "Change" — or
+ * "See them" for someone who may only read them.
+ */
+export function PersonRulesRow({
+    title,
+    sub,
+    action,
+    onOpen,
+}: {
+    /** "Same as the business", or "1 rule just for Meera". */
+    title: string;
+    sub: string;
+    /** "Change", or "See them". */
+    action: string;
+    onOpen: () => void;
+}) {
+    return (
+        <ul className="overflow-hidden rounded-[14px] border border-border bg-card min-[760px]:rounded-[12px]">
+            <li>
+                <button
+                    id={PERSON_RULES_ROW_ID}
+                    type="button"
+                    aria-haspopup="dialog"
+                    aria-label={`${title}. ${sub}. ${action}`}
+                    data-ph-mask=""
+                    onClick={onOpen}
+                    className="flex min-h-[60px] w-full cursor-pointer items-center gap-3 bg-card py-2 pl-3.5 pr-3 text-left text-foreground hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring min-[760px]:min-h-[58px] min-[760px]:px-[18px]"
+                >
+                    <Face icon={RULES_ICON} />
+                    <span className="min-w-0 flex-1">
+                        <span className="block text-[15px] font-medium min-[760px]:text-[14.5px] min-[760px]:font-semibold">
+                            {title}
+                        </span>
+                        <span className="mt-0.5 block text-[12.5px] text-muted-foreground">
+                            {sub}
+                        </span>
+                    </span>
+                    <span className="whitespace-nowrap text-[13.5px] text-muted-foreground min-[760px]:text-[12.5px]">
+                        {action}
+                    </span>
+                    <ChevronRight
+                        aria-hidden
+                        className="size-4 shrink-0 text-muted-foreground"
+                    />
+                </button>
+            </li>
+        </ul>
+    );
+}

@@ -31,6 +31,8 @@ import {
     getBookingRules,
     listStaff,
     readBookingPayment,
+    readPersonRules,
+    readRuleRequests,
 } from "@/lib/staff/service";
 import { tidyWeek } from "@/lib/staff/starting-week";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
@@ -46,7 +48,12 @@ import { couldntLoad } from "@saroh/ui/lib/state-copy";
  * own hours, as the calendar's "Service hours" column does
  * (`readServiceHours`), to say the week customers can book today.
  * `?person=` opens on someone (the calendar's ⋯ "Arjun's hours and time
- * off"), or `all` on everyone.
+ * off", a rule request's alert), or `all` on everyone.
+ *
+ * Each person's own booking rules (U20, #1038) come with the staff; on
+ * top, an owner or admin reads the requests waiting, and a Member their
+ * own diary's request (waiting, or its outcome until they say OK). Either
+ * read failing leaves the rules on the page, without the request.
  */
 export const metadata = { title: "Hours and time off" };
 
@@ -99,15 +106,26 @@ export default async function AvailabilityPage({
         organization?.actions
             ? organization.actions.includes(action)
             : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const decides = may("service:write");
+    const myDiary = staffList.staff.find(
+        (p) =>
+            p.status === "ACTIVE" &&
+            Boolean(session.user.id) &&
+            p.membership?.userId === session.user.id,
+    );
     const timezone = staffList.timezone;
     const today = localDateOf(new Date(readNow()), timezone);
-    const [calendar, serviceHours] = await Promise.all([
+    const [calendar, serviceHours, requests, mine] = await Promise.all([
         readBookingsCalendar(
             dayBounds(today, timezone).from.toISOString(),
             dayBounds(addDays(today, 21), timezone).to.toISOString(),
         ),
         // Only read while nobody is on the diary; null otherwise.
         readServiceHours(services, staffList),
+        decides ? readRuleRequests() : Promise.resolve(null),
+        !decides && myDiary
+            ? readPersonRules(myDiary.id)
+            : Promise.resolve(null),
     ]);
 
     // The live bookings with a person: this week's for "outside these
@@ -202,6 +220,11 @@ export default async function AvailabilityPage({
                     canEdit={may("hours:write")}
                     canManage={may("service:write")}
                     onlineBlocker={payment?.onlineBlocker}
+                    personRules={{
+                        meId: session.user.id,
+                        requests,
+                        mine,
+                    }}
                 />
             </div>
         </PageContainer>

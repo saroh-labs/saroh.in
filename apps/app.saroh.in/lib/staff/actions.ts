@@ -8,6 +8,7 @@ import type {
     BookingRules,
     OfferedRead,
     OffRangeInput,
+    RuleChanges,
     WeeklyRange,
 } from "./service";
 import * as staff from "./service";
@@ -122,4 +123,24 @@ export async function previewOff(input: OffRangeInput & { staffId?: string }) {
 
 export async function updateBookingRules(input: Partial<BookingRules>) {
     return staff.updateBookingRules(input);
+}
+
+export async function updatePersonRules(staffId: string, input: RuleChanges) {
+    return staff.updatePersonRules(staffId, input);
+}
+
+export async function approveRuleRequest(requestId: string) {
+    return staff.moveRuleRequest(requestId, "approve");
+}
+
+export async function turnDownRuleRequest(requestId: string, reason?: string) {
+    return staff.moveRuleRequest(requestId, "turn-down", reason);
+}
+
+export async function withdrawRuleRequest(requestId: string) {
+    return staff.moveRuleRequest(requestId, "withdraw");
+}
+
+export async function dismissRuleRequest(requestId: string) {
+    return staff.moveRuleRequest(requestId, "dismiss");
 }

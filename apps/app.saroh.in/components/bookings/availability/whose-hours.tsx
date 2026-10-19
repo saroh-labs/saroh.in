@@ -120,7 +120,7 @@ export function WhosePicker({
 
 /** What a Member is told, once, beside whose hours (DEC-170, Q13). */
 export const MEMBER_LINE =
-    "As front desk you can change anyone's hours, time off and extra hours. Adding or removing people, closing the whole business and the business's booking rules stay with owners and admins.";
+    "As front desk you can change anyone's hours, time off and extra hours, and your own booking rules. Adding or removing people, closing the whole business and the business's booking rules stay with owners and admins.";
 
 /**
  * The row under the page's header: the Whose hours card and, for a Member,

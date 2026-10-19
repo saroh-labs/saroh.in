@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { count } from "@/lib/format/plural";
@@ -41,9 +40,13 @@ import type { Panel } from "./hours-panels";
 import { HoursPanels } from "./hours-panels";
 import { MoreSection, RulesRow } from "./more-list";
 import { OutsideNote } from "./outside-note";
+import { PersonRulesSection, RuleRequestLine } from "./person-rules";
+import { PersonRulesPanels } from "./person-rules-panels";
 import { SeveralDaysSheet } from "./several-days-sheet";
 import { TimeOffCard } from "./time-off-card";
 import { useHours } from "./use-hours";
+import type { PersonRulesData } from "./use-person-rules";
+import { usePersonRules } from "./use-person-rules";
 import { WeeklyHours } from "./weekly-hours";
 import { EVERYONE, WhoseRow } from "./whose-hours";
 
@@ -67,8 +70,9 @@ import { EVERYONE, WhoseRow } from "./whose-hours";
  * With nobody on the diary it asks "When can customers book Meera?" with
  * the week they would start with (`FirstHours`).
  *
- * `personRules` is where "Booking rules for ‹person›" (U20, #1038) goes:
- * under Whose hours, between Time off and More.
+ * Each person's own booking rules (U20, #1038) sit between Time off and
+ * More, and the requests waiting in one line under Whose hours
+ * (`usePersonRules`); `personRules` is what the page read for them.
  */
 export function AvailabilityEditor({
     staff,
@@ -120,8 +124,8 @@ export function AvailabilityEditor({
     /** May add or remove people, close the business, set its rules. */
     canManage: boolean;
     onlineBlocker?: OnlineBlocker | null;
-    /** U20's "Booking rules for ‹person›", when it is built. */
-    personRules?: ReactNode;
+    /** Each person's own rules: who you are, and the requests (U20). */
+    personRules?: PersonRulesData | null;
 }) {
     const router = useRouter();
     const phone = useNarrow();
@@ -158,6 +162,16 @@ export function AvailabilityEditor({
     const firstWeek = startingWeek(openingHours);
     const theirs = people.filter((p) => everyone || p.id === shown?.id);
     const extraItems = comingExtra(theirs, bookedOn, today);
+    const pr = usePersonRules({
+        staff,
+        people,
+        shown,
+        everyone,
+        canEdit,
+        canManage,
+        business: rulesState.shown,
+        data: personRules,
+    });
 
     function pickWho(id: string) {
         setWho(id);
@@ -200,10 +214,12 @@ export function AvailabilityEditor({
                 services={services}
                 closures={closures}
                 rulesState={rulesState}
+                ownName={pr.ownName}
                 onlineBlocker={onlineBlocker}
                 onPickWho={pickWho}
                 onAddPerson={() => setAdding(true)}
             />
+            <PersonRulesPanels pr={pr} timezone={timezone} />
             {several ? (
                 <SeveralDaysSheet
                     key={several.opened}
@@ -312,6 +328,7 @@ export function AvailabilityEditor({
                 member={canEdit && !canManage}
                 onOpen={() => setPanel({ kind: "whose" })}
             />
+            <RuleRequestLine pr={pr} />
 
             <div className="min-[760px]:grid min-[760px]:grid-cols-[minmax(0,1fr)_400px] min-[760px]:items-start min-[760px]:gap-5">
                 <div className="min-w-0">
@@ -378,10 +395,9 @@ export function AvailabilityEditor({
                             }))
                         }
                     />
-                    {/* U20: "Booking rules for ‹person›" goes here. */}
-                    {personRules ? (
+                    {pr.subject ? (
                         <div data-slot="person-rules" className="min-w-0">
-                            {personRules}
+                            <PersonRulesSection pr={pr} />
                         </div>
                     ) : null}
                     <MoreSection
