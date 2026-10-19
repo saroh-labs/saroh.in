@@ -6,7 +6,8 @@ describe("the shell's loader names the page being opened", () => {
     it("says Home only on Home", () => {
         expect(shellLoadingWords("/")).toMatchObject({
             breadcrumb: ["Home"],
-            shape: "dashboard",
+            // Home A's own shape (DEC-171, `HALoadingD`).
+            shape: "home",
         });
     });
 

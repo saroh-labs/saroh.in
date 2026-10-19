@@ -373,3 +373,61 @@ describe("Hide for now", () => {
         expect(button("Hide for now")).toBeUndefined();
     });
 });
+
+describe("as one line (Home A, `HAPageD`, `HASetupD`)", () => {
+    const button = (name: string) =>
+        Array.from(host.querySelectorAll("button")).find(
+            (b) => b.textContent === name,
+        );
+    const steps = () =>
+        Array.from(host.querySelectorAll("[data-step]")).map(
+            (li) => (li as HTMLElement).dataset.step,
+        );
+
+    it("shows the count, the bar and only the next step", () => {
+        draw({ compact: true });
+        expect(state()).toBe("line");
+        expect(text()).toContain("Finish setup");
+        expect(text()).toContain("2 of 4 done");
+        expect(host.querySelector('[role="progressbar"]')).not.toBeNull();
+        // The next step left, with its one button; no ticked rows.
+        expect(steps()).toEqual(["address"]);
+        expect(
+            host.querySelector('a[href="/settings/organization?edit=address"]'),
+        ).not.toBeNull();
+    });
+
+    it("opens every step, and folds them again", () => {
+        draw({ compact: true });
+        const more = button("Show the 2 done steps");
+        expect(more?.getAttribute("aria-expanded")).toBe("false");
+        act(() => more?.click());
+        expect(steps()).toEqual(["site", "catalogue", "address", "tax"]);
+        const fewer = button("Show fewer");
+        expect(fewer?.getAttribute("aria-expanded")).toBe("true");
+        act(() => fewer?.click());
+        expect(steps()).toEqual(["address"]);
+    });
+
+    it("keeps Hide for now, with Undo", () => {
+        const h = {
+            hidden: false,
+            onHide: vi.fn(),
+            onShow: vi.fn(),
+            said: "Setup hidden.",
+        };
+        draw({ compact: true, hide: h });
+        act(() => button("Hide for now")?.click());
+        expect(h.onHide).toHaveBeenCalledTimes(1);
+        expect(showUndo).toHaveBeenCalledWith(
+            "Setup hidden.",
+            expect.any(Function),
+        );
+    });
+
+    it("is still the one card once every step is done", () => {
+        draw({ compact: true, rows: allDone });
+        expect(state()).not.toBe("line");
+        expect(text()).toContain("You're ready to take money.");
+    });
+});

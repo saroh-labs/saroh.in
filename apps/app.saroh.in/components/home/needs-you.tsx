@@ -151,7 +151,11 @@ export function NeedsYou({
     );
 }
 
-function NeedRow({
+/**
+ * One row of Needs you with its inline action. Home A's groups draw their
+ * rows with it too (`need-groups.tsx`) until U7's group body replaces it.
+ */
+export function NeedRow({
     need,
     first,
     actions,
@@ -176,6 +180,7 @@ function NeedRow({
     return (
         <li
             {...arrival}
+            data-need-row=""
             className={cn(
                 "px-4 py-[13px] transition-colors duration-fast",
                 done ? "bg-muted" : "bg-card",

@@ -10,7 +10,7 @@ export type PageWidth = "form" | "default" | "wide" | "full";
 
 /** What the page is made of, so the grey stands where the content will. */
 export type PageShape =
-    "list" | "detail" | "form" | "editor" | "dashboard" | "settings";
+    "list" | "detail" | "form" | "editor" | "dashboard" | "settings" | "home";
 
 export interface PageLoadingProps {
     shape: PageShape;
@@ -276,6 +276,56 @@ function DashboardBody(rows = 3) {
     );
 }
 
+/**
+ * Home A (DEC-171, `HALoadingD`): the tiles, then Needs you's groups with
+ * Today beside them from a wide desk. Below 640px it stands for the
+ * phone's Home until U17 draws that shape.
+ */
+function HomeBody(groups = 5) {
+    const group = (i: number) => (
+        <div
+            key={i}
+            className="grid gap-2 border-b border-border/70 p-4 last:border-b-0"
+        >
+            <Skeleton className="h-3.5 w-3/5" />
+            <Skeleton className="h-3 w-2/5" />
+        </div>
+    );
+    return (
+        <div className="grid gap-[22px]">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                {Array.from({ length: 4 }, (_, i) => (
+                    <div
+                        key={i}
+                        className={cn(
+                            CARD,
+                            "grid min-h-[104px] content-center gap-2.5 px-4 py-3.5",
+                        )}
+                    >
+                        <Skeleton className="h-3 w-[110px] max-w-full" />
+                        <Skeleton className="h-6 w-[70px]" />
+                        <Skeleton className="h-[11px] w-[150px] max-w-full" />
+                    </div>
+                ))}
+            </div>
+            <div className="grid items-start gap-[22px] min-[1100px]:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
+                <div className="grid gap-2.5">
+                    <Skeleton className="h-[18px] w-[140px]" />
+                    <div className={CARD}>
+                        {Array.from({ length: groups }, (_, i) => group(i))}
+                    </div>
+                </div>
+                <div className="grid gap-2.5">
+                    <Skeleton className="h-[18px] w-[140px]" />
+                    <div className={CARD}>
+                        {Array.from({ length: 4 }, (_, i) => group(i))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 /** A Settings section: rows of a label, what is saved, and Edit. */
 function SettingsBody(rows = 5) {
     return (
@@ -301,4 +351,5 @@ const BODY: Record<PageShape, (rows?: number) => ReactNode> = {
     editor: EditorBody,
     dashboard: DashboardBody,
     settings: SettingsBody,
+    home: HomeBody,
 };

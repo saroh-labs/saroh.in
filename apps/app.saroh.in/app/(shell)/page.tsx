@@ -18,6 +18,7 @@ import { listModules } from "@/lib/modules/service";
 import { homeMoment } from "@/lib/moments/read";
 import type { OrganizationKind } from "@/lib/organizations/kind";
 import { firstRunOrder, INVOICE_JOB, kindOf } from "@/lib/organizations/kind";
+import { permits } from "@/lib/organizations/permits";
 import type { Organization } from "@/lib/organizations/service";
 import {
     organizationsOnce,
@@ -120,6 +121,15 @@ export default async function Home() {
     const invoicing = home.hasAnyModule
         ? undefined
         : await loadInvoicing(business, kind);
+    // "See how the month went" (DEC-171): for someone Insights is open to,
+    // while the business has it on (a failed module read leaves that to
+    // the permission).
+    const insights =
+        permits(business, "analytics:read") &&
+        (allModules === null ||
+            allModules.some(
+                (m) => m.key === "INSIGHTS" && m.readiness !== "DISABLED",
+            ));
     // The first order or booking, in its first day (wave G), said once.
     const moment = home.hasAnyModule ? await homeMoment(home, business) : null;
 
@@ -148,6 +158,7 @@ export default async function Home() {
                     setup={setup}
                     kind={kind}
                     invoicing={invoicing}
+                    insights={insights}
                 />
             </div>
         </PageContainer>

@@ -481,7 +481,11 @@
   server. The checklist on Home and Settings is named **Finish setup**
   wherever it is referred to (`FINISH_SETUP`, `checklistWords` in
   `lib/settings/ready.ts`), with a line saying what its steps are for.
-  Never draw a fifth checklist by hand.
+  Never draw a fifth checklist by hand. On Home A at a desk, once most of
+  it is done, it is ONE line (`compact`, `setup-line.tsx`, DEC-171): the
+  count, the bar, the next step and its button, and "Show the 5 done
+  steps"; hidden, Settings › Business offers "Show setup on Home"
+  (`ShowSetupOnHome`, A4).
 - **Current** — **`desk:` is 760px**, where the rail appears and the phone
   layouts end, and `max-desk:` is its exact complement. New code uses them.
   The older `min-[760px]:` and `max-[759px]:` mean the same and are not yet

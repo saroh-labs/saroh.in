@@ -13,7 +13,7 @@ import { useId, useMemo, useState } from "react";
 import { useHold } from "@/components/shared/use-hold";
 import type { HomeToday, HomeTodayItem } from "@/lib/home/service";
 import type { TodayRow } from "@/lib/home/today";
-import { todayView } from "@/lib/home/today";
+import { laterTodayLabel, todayView } from "@/lib/home/today";
 import { recordBookingOutcome } from "@/lib/services/actions";
 import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import { EmptyState } from "@saroh/ui/data-state";
@@ -35,7 +35,24 @@ type Marked = Pick<HomeTodayItem, "outcome" | "outcomeTime">;
  * show and nothing can be marked. A refusal (a booking cancelled meanwhile)
  * puts the row back and says why.
  */
-export function Today({ today, now }: { today: HomeToday; now: string }) {
+export function Today({
+    today,
+    now,
+    layout = "stack",
+    emptyNext = null,
+}: {
+    today: HomeToday;
+    now: string;
+    /**
+     * `desk`: Home A's column beside Needs you (DEC-171, `HAPageD`), with
+     * its heading, the day's count ("6 bookings, 3 pick-ups") and "3 more
+     * later today". `stack`: the phone's, as before, until U17.
+     */
+    layout?: "stack" | "desk";
+    /** Under "Nothing booked today." on the desk: the next booking. */
+    emptyNext?: string | null;
+}) {
+    const desk = layout === "desk";
     const headingId = useId();
     const router = useRouter();
     const { hold } = useHold();
@@ -86,19 +103,35 @@ export function Today({ today, now }: { today: HomeToday; now: string }) {
         );
     };
 
+    const allHref = today.bookings ? "/bookings" : "/commerce/orders";
+    const later = desk ? laterTodayLabel(view.laterToday) : "";
+
     return (
-        <section aria-labelledby={headingId} className="grid min-w-0 gap-[9px]">
-            <div className="flex flex-wrap items-baseline gap-[9px]">
-                <h2 id={headingId} className="label">
+        <section
+            aria-labelledby={headingId}
+            className={cn("grid min-w-0", desk ? "gap-2.5" : "gap-[9px]")}
+        >
+            <div
+                className={cn(
+                    "flex flex-wrap items-baseline",
+                    desk ? "gap-x-2.5 gap-y-1" : "gap-[9px]",
+                )}
+            >
+                <h2
+                    id={headingId}
+                    data-ph-unmask=""
+                    className={
+                        desk
+                            ? "font-display text-[19px] font-semibold leading-[1.25] tracking-[-0.02em]"
+                            : "label"
+                    }
+                >
                     Today
                 </h2>
                 <span className="text-[12.5px] text-muted-foreground">
-                    {view.count}
+                    {desk ? view.dayCount : view.count}
                 </span>
-                <TextLink
-                    href={today.bookings ? "/bookings" : "/commerce/orders"}
-                    className="ml-auto text-[12.5px]"
-                >
+                <TextLink href={allHref} className="ml-auto text-[12.5px]">
                     {today.bookings ? "Open the calendar" : "All orders"}
                 </TextLink>
             </div>
@@ -109,6 +142,7 @@ export function Today({ today, now }: { today: HomeToday; now: string }) {
                         <EmptyState
                             size="inline"
                             title="Nothing booked today."
+                            description={desk ? emptyNext : null}
                         />
                     </li>
                 ) : null}
@@ -120,6 +154,16 @@ export function Today({ today, now }: { today: HomeToday; now: string }) {
                         onMark={(outcome) => mark(row, outcome)}
                     />
                 ))}
+                {later ? (
+                    <li className="flex min-h-11 items-center border-t border-border px-4 py-2">
+                        <TextLink
+                            href={allHref}
+                            className="text-[12.5px] coarse:min-h-11"
+                        >
+                            {later}
+                        </TextLink>
+                    </li>
+                ) : null}
             </ul>
         </section>
     );

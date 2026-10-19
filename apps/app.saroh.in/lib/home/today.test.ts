@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import type { HomeToday, HomeTodayItem } from "./service";
-import { arrivedLabel, todayView } from "./today";
+import {
+    arrivedLabel,
+    dayCountLabel,
+    laterTodayLabel,
+    todayView,
+} from "./today";
 
 // 09:30 in Mumbai on 18 Sep 2026.
 const NOW = new Date("2026-09-18T09:30:00+05:30");
@@ -156,7 +161,47 @@ describe("todayView", () => {
             count: "",
             visible: false,
             empty: false,
+            laterToday: 0,
+            dayCount: "",
         });
+    });
+
+    it('leaves the rest of the day to the calendar: "3 more later today" (Home A)', () => {
+        const view = todayView(
+            day(
+                [
+                    "10:00",
+                    "11:00",
+                    "12:00",
+                    "13:00",
+                    "14:00",
+                    "15:00",
+                    "16:00",
+                    "17:00",
+                ].map((t) => item(t)),
+            ),
+            NOW,
+        );
+        expect(view.rows).toHaveLength(5);
+        expect(view.laterToday).toBe(3);
+        expect(laterTodayLabel(view.laterToday)).toBe("3 more later today");
+        expect(laterTodayLabel(0)).toBe("");
+    });
+
+    it("counts the whole day for Home A's heading", () => {
+        const view = todayView(
+            day([
+                item("09:00"),
+                item("10:00", { kind: "CLASS" }),
+                item("11:00", { kind: "PICKUP" }),
+            ]),
+            NOW,
+        );
+        expect(view.dayCount).toBe("2 bookings, 1 pick-up");
+        expect(dayCountLabel([])).toBe("");
+        expect(dayCountLabel([item("09:00", { kind: "PICKUP" })])).toBe(
+            "1 pick-up",
+        );
     });
 
     it("says nothing is left when the day is over", () => {
