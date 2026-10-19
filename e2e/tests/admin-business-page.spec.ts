@@ -54,7 +54,11 @@ test.describe("a business's page", () => {
         });
 
         for (const [label, path] of TABS) {
-            const tab = tabs.getByRole("link", { name: label, exact: true });
+            // A tab's name can carry its count ("Modules 0", "Billing 1 needs
+            // you"), so match the label at the start.
+            const tab = tabs.getByRole("link", {
+                name: new RegExp(`^${escape(label)}(\\s|$)`),
+            });
             await tab.click();
             await expect(page).toHaveURL(
                 new RegExp(`^${escape(PAGE)}/${path}$`),

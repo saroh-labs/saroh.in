@@ -109,7 +109,10 @@ test.describe("adding a teammate by invite (U24)", () => {
             await expect(
                 invitee.getByText(/On the console you'll be Account manager/),
             ).toBeVisible();
-            const cookies = await theirs.cookies(urls.ACCOUNTS_URL);
+            // The cookie is scoped to the invite page's path on purpose.
+            const cookies = await theirs.cookies(
+                `${urls.ACCOUNTS_URL}/staff-invite`,
+            );
             expect(
                 cookies.find((c) => c.name === "saroh_staff_invite"),
             ).toMatchObject({ httpOnly: true });

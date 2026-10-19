@@ -40,7 +40,7 @@ test.describe("Team on the operator console", () => {
 
         const summary = page.getByRole("group", { name: "Team in numbers" });
         await expect(summary.getByText("People")).toBeVisible();
-        await expect(summary.getByText("Account managers")).toBeVisible();
+        await expect(summary.getByText("Account manager role")).toBeVisible();
 
         const list = page.getByRole("list", { name: "People on the team" });
         await expect(
@@ -113,13 +113,21 @@ test.describe("Team on the operator console", () => {
         ).toHaveAttribute("aria-current", "page");
         const roles = page.getByRole("list", { name: "Roles" });
         await expect(roles.getByText("Platform owner")).toBeVisible();
+        // A phone shows one role's column at a time, so look at what is
+        // on screen.
         await expect(
-            page.getByText("Who has access to this console").first(),
+            page
+                .getByText("Who has access to this console")
+                .filter({ visible: true })
+                .first(),
         ).toBeVisible();
         await expect(page.getByText("staff:grant")).toHaveCount(0);
         await page.getByLabel("Show permission codes").click();
         await expect(
-            page.getByText(/staff:read · staff:grant/).first(),
+            page
+                .getByText(/staff:read · staff:grant/)
+                .filter({ visible: true })
+                .first(),
         ).toBeVisible();
 
         if (test.info().project.name.startsWith("phone")) {
