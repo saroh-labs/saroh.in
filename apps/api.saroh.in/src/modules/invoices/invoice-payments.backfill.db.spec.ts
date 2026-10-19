@@ -11,6 +11,8 @@
  */
 import { backfillInvoicePayments, prisma } from "@saroh/database";
 
+import { backendPid, waitUntilBlockedBy } from "../../../test/lock-wait";
+
 const tag = `${process.pid}-${Date.now()}`;
 let seq = 0;
 const uniq = (p: string) => `${p}-${tag}-${++seq}`;
@@ -382,12 +384,12 @@ describe("backfillInvoicePayments", () => {
         // the backfill waits on that lock, then sees the row and skips it.
         let release!: () => void;
         const held = new Promise<void>((resolve) => (release = resolve));
-        let locked!: () => void;
-        const isLocked = new Promise<void>((resolve) => (locked = resolve));
+        let locked!: (pid: number) => void;
+        const isLocked = new Promise<number>((resolve) => (locked = resolve));
         const writer = prisma.$transaction(
             async (tx) => {
                 await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${paid.id} FOR NO KEY UPDATE`;
-                locked();
+                locked(await backendPid(tx));
                 await held;
                 await tx.invoicePayment.create({
                     data: {
@@ -406,12 +408,12 @@ describe("backfillInvoicePayments", () => {
             },
             { timeout: 20_000 },
         );
-        await isLocked;
+        const holder = await isLocked;
         const backfill = backfillInvoicePayments(prisma, {
             organizationIds: [desk],
         });
-        // Give the backfill time to reach the lock before the writer commits.
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        // The backfill must be waiting on the writer's lock before it commits.
+        await waitUntilBlockedBy(holder, "Invoice");
         release();
         await writer;
 
