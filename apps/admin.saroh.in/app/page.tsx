@@ -11,7 +11,9 @@ import { getHome } from "@/lib/home";
 import type { ConsoleHome } from "@/lib/home-words";
 import { greeting, homeSummary } from "@/lib/home-words";
 
-export const metadata = { title: "Home" };
+// Absolute: a layout's title template reaches its child segments, not the
+// page beside it at the root.
+export const metadata = { title: { absolute: "Home · Saroh console" } };
 
 /**
  * Home (admin console redesign U10, R14): where every staff member lands.

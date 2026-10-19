@@ -171,7 +171,7 @@ export function ConsoleSearch({
                     onFocus={() => setOpen(true)}
                     onBlur={() => setOpen(false)}
                     onKeyDown={onKeyDown}
-                    className="min-w-0 flex-1 bg-transparent text-[14px] text-foreground outline-none placeholder:text-muted-foreground"
+                    className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[14px] text-foreground outline-none placeholder:text-muted-foreground focus:ring-0"
                 />
                 <kbd className="hidden shrink-0 font-mono text-[11.5px] md:inline">
                     ⌘K
