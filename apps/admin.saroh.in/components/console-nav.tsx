@@ -18,6 +18,7 @@ import {
     Tags,
     Target,
     UserPlus,
+    UserRound,
     Users,
     Webhook,
 } from "lucide-react";
@@ -105,6 +106,15 @@ const GROUPS: ConsoleNavGroup[] = [
                 href: "/leads",
                 label: "Leads",
                 icon: Target,
+                permission: "saroh-leads:read",
+            },
+            {
+                // A teammate's own page (U22): their businesses, leads,
+                // calls and manager link. The Account manager can't open
+                // the Team list, so this is how they reach it.
+                href: "/team/me",
+                label: "Your page",
+                icon: UserRound,
                 permission: "saroh-leads:read",
             },
         ],

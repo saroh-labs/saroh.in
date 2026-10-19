@@ -52,6 +52,7 @@ describe("navFor", () => {
                     "Messages",
                     "Waitlist",
                     "Leads",
+                    "Your page",
                 ],
             ],
             [
@@ -133,10 +134,11 @@ describe("navFor", () => {
             ["Product", ["Releases", "Usage"]],
             ["Keep it running", ["Health"]],
         ]);
-        // An Account manager reaches Home and their own leads board.
+        // An Account manager reaches Home, their own leads board and their
+        // own page on the Team (U22).
         expect(labels(["accounts:read", "saroh-leads:read"])).toEqual([
             ["Home", ["Home"]],
-            ["Help customers", ["Leads"]],
+            ["Help customers", ["Leads", "Your page"]],
         ]);
     });
 });

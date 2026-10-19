@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 
 import { AdminAuditService } from "../admin/admin-audit.service";
+import { SarohBusinessContactsService } from "./business-contacts.service";
 import { SarohLeadWritesService } from "./saroh-lead-writes.service";
 import { SarohLeadsService } from "./saroh-leads.service";
 
@@ -13,7 +14,16 @@ import { SarohLeadsService } from "./saroh-leads.service";
  * functions, so those public modules import nothing of the console's.
  */
 @Module({
-    providers: [SarohLeadsService, SarohLeadWritesService, AdminAuditService],
-    exports: [SarohLeadsService, SarohLeadWritesService],
+    providers: [
+        SarohLeadsService,
+        SarohLeadWritesService,
+        SarohBusinessContactsService,
+        AdminAuditService,
+    ],
+    exports: [
+        SarohLeadsService,
+        SarohLeadWritesService,
+        SarohBusinessContactsService,
+    ],
 })
 export class SarohLeadsModule {}

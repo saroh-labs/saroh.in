@@ -64,7 +64,7 @@ recorded grant (the API refuses it otherwise).
 - **Server-only modules stay server-only.** `lib/control-plane.ts` and the
   modules that read through it (`businesses`, `staff`, `people`, `machinery`,
   `waitlist`, `deployments`, `usage`, `business-reports`, `contact-messages`,
-  `billing`, `commission`) import `next/headers`; a client component takes types from them,
+  `billing`, `commission`, `team-member`) import `next/headers`; a client component takes types from them,
   never values. Client-safe words live in `lib/roles.ts`, `lib/modules.ts`,
   `lib/format.ts`, `lib/deployment-words.ts`, `lib/usage-words.ts`,
   `lib/deletion-words.ts`, `lib/billing-words.ts`,
@@ -73,7 +73,8 @@ recorded grant (the API refuses it otherwise).
   `lib/overview-words.ts`, `lib/module-fix.ts`, `lib/subscription-sheet.ts`,
   `lib/business-words.ts`, `lib/offer-words.ts`, `lib/saroh-lead-words.ts`,
   `lib/home-words.ts`, `lib/search-words.ts`, `lib/team-words.ts`,
-  `lib/roles-matrix.ts`, `lib/commission-words.ts`.
+  `lib/roles-matrix.ts`, `lib/commission-words.ts`,
+  `lib/team-member-words.ts`.
 - **Messages (`/messages`, DEC-137)** lists what people wrote from
   saroh.in/contact, newest first, by topic on asking. Read-only: the reply
   goes from the team's mailbox. Every row is personal data, so the screen
@@ -204,6 +205,43 @@ recorded grant (the API refuses it otherwise).
   Earnings tab. All need `team:pay` (rates `commission:rates`); writes
   go through `lib/commission-actions.ts`. No rate or default is ever
   written in the console.
+- **A teammate's page (`/team/[platformAdminId]`, DEC-169, admin plan
+  U22, R33)** opens from a name on the Team list (table or card; an invite
+  has no page) and, for anyone with a team record, from **Your page**
+  (`/team/me`, in the menu with `saroh-leads:read`, which redirects to
+  one's own; break-glass access has none). It reads
+  `GET /admin/team/members/:id` once per request (`getTeamMember`,
+  cached): the route admits `accounts:read` and the API opens anyone's
+  page to `team:read` and only one's own to everyone else, so an Account
+  manager on another's page gets the no-access panel and nothing else
+  (`MemberBody`). The layout draws the header (job, roles, city, joined,
+  reports to), the counts (businesses and how many brought in, open leads
+  and overdue follow-ups, won this month, and earnings due for
+  `team:pay`), the **Manager link** card (the `?am=` link to
+  `MARKETING_SITE_URL`, else the instance's website, and the code, each
+  with Copy, which says Copied on the button and in a toast) and the tabs,
+  each an address: **Profile** (every detail, each missing one marked and
+  counted; the tax id row only for `team:pay`, never whole; Edit details…
+  for `team:write`, an `OperatorDialog` that saves every field with a
+  reason, an empty field clearing it and the tax id only when typed; then
+  their console roles), **Businesses** (each open manager link with how it
+  came in, their link, their code, their lead's email or assigned, and
+  since when; linked to the business only for `organization:read`),
+  **Leads** (their open leads, soonest follow-up first; only for the
+  teammate themself and Support and Platform owner, the API sends none to
+  Billing or Auditor), **Earnings** (U21's `EarningsCard`, only with
+  `team:pay`) and **Activity** (their calls and visits, roles given and
+  ended, businesses started and stopped, newest first; Billing and
+  Auditor see when and with whom, never a lead's name or a call's words).
+  **Log a call is on one's own page only** (a call is logged under the
+  logger's name, so on someone else's page it would never reach their
+  Activity): on a business row, a lead row, and on Activity with "Who it
+  was with", where the call is at the top as soon as it is saved. A
+  business's call goes to `POST /admin/organizations/:id/contact-log`
+  (`saroh-leads:write`, scoped: an Account manager only with a business
+  whose open link names them) through `lib/team-member-actions.ts`; the
+  sheet is U20's `LogCallSheet` with a `business` target, which keeps no
+  follow-up. No price, rate or amount is written on the page.
 - **A business's Overview needs no support session** (admin plan U3):
   `GET /admin/organizations/:id/overview` (`organization:read`, scoped by
   `scopeForStaff`) returns the cards and the tab badges with no personal

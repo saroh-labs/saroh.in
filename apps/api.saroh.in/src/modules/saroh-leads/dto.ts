@@ -193,3 +193,33 @@ export class LogContactDto extends LeadWriteDto {
     @Matches(DAY, { message: DAY_MESSAGE })
     followUpOn?: string | null;
 }
+
+/**
+ * A call, visit or message with a business (admin console U22). As
+ * {@link LogContactDto}, without a follow-up: a business keeps none.
+ */
+export class LogBusinessContactDto extends LeadWriteDto {
+    @IsIn(CONTACT_KINDS)
+    kind!: ContactKind;
+
+    @Transform(trim)
+    @IsString()
+    @MinLength(1, { message: "Say what was said" })
+    @MaxLength(4000)
+    summary!: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(4000)
+    feedback?: string | null;
+
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(600)
+    minutes?: number | null;
+
+    @IsOptional()
+    @IsISO8601()
+    happenedAt?: string | null;
+}

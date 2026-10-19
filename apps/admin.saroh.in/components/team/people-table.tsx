@@ -21,7 +21,12 @@ import {
 
 import { LoadBar } from "./load-bar";
 import type { Person } from "./person-card";
-import { PersonActions, PersonCard, personFacts } from "./person-card";
+import {
+    PersonActions,
+    PersonCard,
+    personFacts,
+    PersonName,
+} from "./person-card";
 
 type View = "table" | "cards";
 
@@ -240,7 +245,10 @@ export function PeopleTable({
                             <div className="grid min-w-0 gap-0.5">
                                 <span className="flex flex-wrap items-center gap-2">
                                     <span className="truncate font-medium">
-                                        {facts.name}
+                                        <PersonName
+                                            person={person}
+                                            name={facts.name}
+                                        />
                                     </span>
                                     {facts.status && (
                                         <Badge variant={facts.status.tone}>

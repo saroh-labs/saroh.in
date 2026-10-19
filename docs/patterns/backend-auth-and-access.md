@@ -603,6 +603,21 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   with the unit that wires them (since U21 only `accounts:read`);
   `admin.controller.permissions.spec.ts` fails on any other unused
   permission.
+- **Current** (DEC-169, admin console U22) — **A teammate's page**
+  (`GET admin/team/members/:id`, `admin-team-member.ts`) is admitted by
+  `accounts:read` (every role holding `team:read` holds it, and so does
+  the Account manager) and decided by `memberAccess` before anything is
+  read: `team:read` opens anyone's, anyone else only their own, else 403
+  (so an id that names nobody says nothing). The profile is
+  `getProfile`'s, with its tax id rule. Leads, a lead's name and what a
+  call said go only to the teammate themself and to staff for whom
+  `saroh-leads:read` is unscoped (`seesLeadWork`); Billing and Auditor get
+  counts and when. A call with a business
+  (`POST admin/organizations/:id/contact-log`, `saroh-leads:write`) is a
+  `SarohContactLog` row on the business, scoped by `scopeForStaff` and
+  `assertMaySeeOrganization`, on the ledger as `business.contact-logged`
+  against it with no words of the call. `GET admin/me` carries the
+  caller's own `platformAdminId` (null for break-glass), for Your page.
 - **Current** (DEC-169, admin console U19) — **Who brought a business in**
   is decided once, in its create transaction, by `recordManagerInTx`
   (`modules/organizations/account-manager.ts`) under a savepoint: anything

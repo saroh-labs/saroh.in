@@ -1,8 +1,10 @@
 import { Badge } from "@saroh/ui/badge";
+import Link from "next/link";
 
 import { formatDate } from "@/lib/format";
 import { ROLE_LABEL } from "@/lib/roles";
 import type { StaffInvite, StaffMember } from "@/lib/staff";
+import { memberBase } from "@/lib/team-member-words";
 import { accessEnds, JOB_LABEL, looksAfterBusinesses } from "@/lib/team-words";
 
 import { LoadBar } from "./load-bar";
@@ -85,6 +87,22 @@ export function personFacts(person: Person) {
     };
 }
 
+/**
+ * A teammate's name, linking to their page (U22); an invite's, plain:
+ * there is no page until they accept.
+ */
+export function PersonName({ person, name }: { person: Person; name: string }) {
+    if (person.kind === "invite") return <>{name}</>;
+    return (
+        <Link
+            href={memberBase(person.member.platformAdminId)}
+            className="underline-offset-4 hover:underline"
+        >
+            {name}
+        </Link>
+    );
+}
+
 /** Change and Revoke for a teammate; Resend and Withdraw for an invite. */
 export function PersonActions({
     person,
@@ -126,7 +144,9 @@ export function PersonCard({
         >
             <div className="flex items-start justify-between gap-3">
                 <div className="grid min-w-0 gap-0.5">
-                    <h3 className="truncate font-medium">{facts.name}</h3>
+                    <h3 className="truncate font-medium">
+                        <PersonName person={person} name={facts.name} />
+                    </h3>
                     {facts.email !== facts.name && (
                         <p className="break-all text-[13px] text-muted-foreground">
                             {facts.email}

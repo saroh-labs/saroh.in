@@ -69,6 +69,21 @@ export class AdminStaffController {
         return roleDefinitions();
     }
 
+    /**
+     * A teammate's page (DEC-169, admin console U22). The route admits
+     * `accounts:read`, which every role that holds `team:read` also holds,
+     * and the Account manager too; the service then opens anyone's page to
+     * `team:read` and only one's own to everyone else (403 otherwise).
+     */
+    @Get("team/members/:platformAdminId")
+    @RequireAdminPermission(AdminPermission.AccountsRead)
+    member(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("platformAdminId") platformAdminId: string,
+    ) {
+        return this.staffService.member({ staff, platformAdminId });
+    }
+
     @Post("staff")
     @RequireAdminPermission(AdminPermission.StaffGrant)
     grant(

@@ -18,6 +18,8 @@ import {
     isAdminRole,
     permissionsFor,
 } from "./admin-permissions";
+import type { TeamMemberRead } from "./admin-team-member";
+import { memberAccess, readTeamMember } from "./admin-team-member";
 import { endManagerLinksInTx } from "./manager-links";
 import type { StaffEngagement, StaffJob } from "./staff-profile";
 import {
@@ -578,6 +580,36 @@ export class AdminStaffService {
             });
             return { ...view, taxIdLast4: last4 };
         });
+    }
+
+    /**
+     * A teammate's page (DEC-169, admin console U22, R33): their profile
+     * (as {@link getProfile} gives it, so the tax id rule is one rule), the
+     * businesses they look after and how each came in, their open leads,
+     * the counts and their recent activity. `team:read` opens anyone's;
+     * without it, only one's own (an Account manager's), else 403.
+     */
+    async member(input: {
+        staff: PlatformAdminInfo;
+        platformAdminId: string;
+    }): Promise<
+        TeamMemberRead & {
+            self: boolean;
+            profile: StaffProfileView;
+        }
+    > {
+        memberAccess(input.staff, input.platformAdminId);
+        const profile = await this.getProfile(input);
+        const read = await readTeamMember({
+            staff: input.staff,
+            platformAdminId: input.platformAdminId,
+            reportsToPlatformAdminId: profile.reportsToPlatformAdminId,
+        });
+        return {
+            ...read,
+            self: input.staff.platformAdminId === input.platformAdminId,
+            profile,
+        };
     }
 
     /**

@@ -6,10 +6,12 @@ import { RequireAdminPermission } from "../../common/decorators/require-admin-pe
 import { IdempotencyService } from "../../common/idempotency/idempotency.service";
 import { AdminPermission } from "../admin/admin-permissions";
 import { AdminRoutes } from "../admin/admin-routes.decorator";
+import { SarohBusinessContactsService } from "./business-contacts.service";
 import {
     AddLeadDto,
     AssignLeadDto,
     LeadsBoardQueryDto,
+    LogBusinessContactDto,
     LogContactDto,
     MoveLeadStageDto,
     UpdateLeadDto,
@@ -33,6 +35,7 @@ export class SarohLeadsController {
     constructor(
         private readonly leads: SarohLeadsService,
         private readonly writes: SarohLeadWritesService,
+        private readonly businessContacts: SarohBusinessContactsService,
         private readonly idempotency: IdempotencyService,
     ) {}
 
@@ -170,6 +173,30 @@ export class SarohLeadsController {
             },
             { leadId, ...input },
             () => this.writes.logContact(staff, leadId, input),
+        );
+    }
+
+    /**
+     * Log a call, visit or message with a business one looks after (admin
+     * console U22): the member page's Log a call. An Account manager only
+     * with their own businesses.
+     */
+    @Post("organizations/:organizationId/contact-log")
+    @RequireAdminPermission(AdminPermission.SarohLeadsWrite)
+    logBusinessContact(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+        @Body() dto: LogBusinessContactDto,
+    ) {
+        const { idempotencyKey, ...input } = dto;
+        return this.idempotency.run(
+            {
+                scope: "admin.business.contact-log",
+                key: idempotencyKey,
+                actorUserId: staff.userId,
+            },
+            { organizationId, ...input },
+            () => this.businessContacts.log(staff, organizationId, input),
         );
     }
 }

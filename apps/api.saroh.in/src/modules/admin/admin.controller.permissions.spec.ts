@@ -410,6 +410,12 @@ describe("Team permissions (DEC-169)", () => {
         ["moveLeadStage", AdminPermission.SarohLeadsWrite],
         ["assignLead", AdminPermission.SarohLeadsWrite],
         ["logLeadContact", AdminPermission.SarohLeadsWrite],
+        // A member page's Log a call with a business (U22), scoped the same.
+        ["logBusinessContact", AdminPermission.SarohLeadsWrite],
+        // A member page (U22): the route admits accounts:read (the Account
+        // manager too); the service opens anyone's to team:read, one's own
+        // to the rest (admin-team-member.db.spec.ts).
+        ["member", AdminPermission.AccountsRead],
         // Account managers (U25): Support and Platform owner only.
         ["managerCandidates", AdminPermission.AccountsAssign],
         ["assignManager", AdminPermission.AccountsAssign],
@@ -461,6 +467,8 @@ describe("AdminController staff identity", () => {
             ),
         ).toEqual({
             userId: "user_1",
+            // Their own team record, for the console's Your page (U22).
+            platformAdminId: "platform_admin_1",
             email: "staff@example.test",
             roles: ["AUDITOR"],
             permissions: [AdminPermission.AuditRead],

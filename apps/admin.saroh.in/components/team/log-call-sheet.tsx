@@ -21,24 +21,40 @@ import { todayIso } from "@/lib/format";
 import { logLeadContactAction } from "@/lib/saroh-lead-actions";
 import type { ContactKind, LeadContact } from "@/lib/saroh-lead-words";
 import { CONTACT_KINDS, CONTACT_LABEL } from "@/lib/saroh-lead-words";
+import { logBusinessContactAction } from "@/lib/team-member-actions";
+
+/** Who the call was with: one of Saroh's leads, or a business (U22). */
+type Target =
+    | {
+          leadId: string;
+          /** The lead's follow-up now, so the field starts from it. */
+          followUpOn: string | null;
+          business?: undefined;
+      }
+    | {
+          /** A business the teammate looks after; it keeps no follow-up. */
+          business: { organizationId: string; platformAdminId: string };
+          leadId?: undefined;
+          followUpOn?: undefined;
+      };
 
 /**
  * Log a call, visit or message on one of Saroh's own leads (DEC-169, U20):
  * what was said, what they said about Saroh itself, how long, and the next
- * follow-up. Mounted only while open, so each opening is one attempt with
- * its own idempotency key.
+ * follow-up. Or, from a teammate's own page (U22), with one of the
+ * businesses they look after, which keeps no follow-up. Mounted only while
+ * open, so each opening is one attempt with its own idempotency key.
  */
 export function LogCallSheet({
     leadId,
     leadName,
     followUpOn,
+    business,
     onOpenChange,
     onLogged,
-}: {
-    leadId: string;
+}: Target & {
+    /** Who it was with, by name: the lead's or the business's. */
     leadName: string;
-    /** The lead's follow-up now, so the field starts from it. */
-    followUpOn: string | null;
     onOpenChange: (open: boolean) => void;
     onLogged: (entry: LeadContact) => void;
 }) {
@@ -69,18 +85,23 @@ export function LogCallSheet({
         setErrors(found);
         if (found.summary || found.minutes) return;
         startTransition(async () => {
-            const result = await logLeadContactAction({
-                id: leadId,
+            const said = {
                 kind,
                 summary: summary.trim(),
                 feedback: feedback.trim() || null,
                 minutes: mins,
-                // Only sent when changed: an untouched field keeps the lead's.
-                ...(next !== (followUpOn ?? "")
-                    ? { followUpOn: next || null }
-                    : {}),
                 idempotencyKey: key,
-            });
+            };
+            const result = business
+                ? await logBusinessContactAction({ ...business, ...said })
+                : await logLeadContactAction({
+                      id: leadId,
+                      ...said,
+                      // Only sent when changed: an untouched field keeps the lead's.
+                      ...(next !== (followUpOn ?? "")
+                          ? { followUpOn: next || null }
+                          : {}),
+                  });
             if (!result.ok) {
                 setErrors({ form: result.error });
                 return;
@@ -97,7 +118,9 @@ export function LogCallSheet({
                     <SheetHeader>
                         <SheetTitle>Log a call</SheetTitle>
                         <SheetDescription>
-                            With {leadName}. Kept on the lead, with your name.
+                            {business
+                                ? `With ${leadName}. Kept on your page and on the business's history, with your name.`
+                                : `With ${leadName}. Kept on the lead, with your name.`}
                         </SheetDescription>
                     </SheetHeader>
                     <div className="grid gap-1.5">
@@ -133,7 +156,13 @@ export function LogCallSheet({
                             onChange={(e) => setFeedback(e.target.value)}
                         />
                     </Field>
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div
+                        className={
+                            business
+                                ? "grid gap-4"
+                                : "grid gap-4 sm:grid-cols-2"
+                        }
+                    >
                         <Field label="Minutes" optional error={errors.minutes}>
                             <Input
                                 name="minutes"
@@ -142,17 +171,19 @@ export function LogCallSheet({
                                 onChange={(e) => setMinutes(e.target.value)}
                             />
                         </Field>
-                        <Field label="Next follow-up" optional>
-                            <DateInput
-                                name="followUpOn"
-                                min={todayIso()}
-                                className="w-full"
-                                value={next}
-                                onValueChange={setNext}
-                                clearable
-                                placeholder="No follow-up"
-                            />
-                        </Field>
+                        {business ? null : (
+                            <Field label="Next follow-up" optional>
+                                <DateInput
+                                    name="followUpOn"
+                                    min={todayIso()}
+                                    className="w-full"
+                                    value={next}
+                                    onValueChange={setNext}
+                                    clearable
+                                    placeholder="No follow-up"
+                                />
+                            </Field>
+                        )}
                     </div>
                     {errors.form ? (
                         <p role="alert" className="text-sm text-destructive">

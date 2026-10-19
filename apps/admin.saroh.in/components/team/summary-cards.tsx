@@ -1,4 +1,5 @@
 import { StatCard } from "@saroh/ui/stat-card";
+import Link from "next/link";
 
 import { formatPaise } from "@/lib/billing-words";
 import type { PayoutStatement } from "@/lib/commission-words";
@@ -78,9 +79,9 @@ export function SummaryCards({
                     value={commission ? formatPaise(commission.duePaise) : "—"}
                     hint={
                         commission ? (
-                            <a href="/team/payouts" className="underline">
+                            <Link href="/team/payouts" className="underline">
                                 {`${formatPaise(commission.waitingPaise)} not payable yet`}
-                            </a>
+                            </Link>
                         ) : (
                             "Couldn't read this month's payouts."
                         )

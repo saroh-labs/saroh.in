@@ -100,6 +100,11 @@ export interface AdminAuditQuery {
 
 export interface StaffIdentity {
     userId: string;
+    /**
+     * Their team record (admin console U22), for Your page. Null for
+     * break-glass access; older API builds leave it out.
+     */
+    platformAdminId?: string | null;
     email: string;
     roles: AdminRole[];
     permissions: AdminPermission[];
