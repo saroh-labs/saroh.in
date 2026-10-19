@@ -4932,9 +4932,14 @@ model Service {
   // What is paid at booking: NONE | PERCENT_25 | PERCENT_50 | FULL, of
   // `priceCents`, worked out on the server. Only a priced service has one.
   depositMode       String  @default("NONE")
-  // Whether the business's booking page and services lists offer it. A
-  // hidden service is still booked by staff.
+  // Whether the business's booking page and services lists offer it: the
+  // "Customers" tick of Who can book it. A hidden service is still booked
+  // by staff unless `bookableByTeam` says otherwise.
   showOnBookingPage Boolean @default(true)
+  // Whether the team books it by hand, from Bookings: the "Your team" tick
+  // of Who can book it (DEC-170, Q5 of 19 Oct). Neither tick reads as
+  // paused in the app; bookings already made stay.
+  bookableByTeam    Boolean @default(true)
 
   // The order lines that bill it: a treatment sold as an order (E9).
   orderItems OrderItem[]

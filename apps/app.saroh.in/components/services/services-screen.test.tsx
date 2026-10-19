@@ -89,6 +89,7 @@ const service = (over: Partial<Service> = {}): Service => ({
     depositMode: "NONE",
     depositCents: 0,
     showOnBookingPage: true,
+    bookableByTeam: true,
     ...over,
 });
 

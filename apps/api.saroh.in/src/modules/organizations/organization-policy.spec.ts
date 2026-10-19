@@ -53,6 +53,10 @@ const EXPECTED: Record<OrgRole, OrgAction[]> = {
         "contact:read",
         // DEC-024: the kitchen — move an order's stage, see no money.
         "order:stage",
+        // DEC-170: the front desk — book, mark who came, move and cancel,
+        // and keep anyone's hours and time off. Still no money.
+        "booking:write",
+        "hours:write",
     ],
     /*
      * REVIEWER is website-only (#193) and is NOT a narrower MEMBER: it holds
@@ -146,7 +150,7 @@ describe("organization-policy: can()", () => {
         }
     });
 
-    it("MEMBER is read-only", () => {
+    it("MEMBER holds the floor and its few writes, and nothing else", () => {
         const writeActions = ORG_ACTIONS.filter(
             (a) => !EXPECTED.MEMBER.includes(a),
         );
@@ -696,9 +700,16 @@ describe("the booking and class-pack capabilities (DEC-039, E26)", () => {
             "service:read",
             { OWNER: true, ADMIN: true, MEMBER: true, REVIEWER: false },
         ],
+        // The front desk (DEC-170): a Member books, marks who came, moves,
+        // cancels and keeps hours; setting up services stays with
+        // service:write.
         [
             "booking:write",
-            { OWNER: true, ADMIN: true, MEMBER: false, REVIEWER: false },
+            { OWNER: true, ADMIN: true, MEMBER: true, REVIEWER: false },
+        ],
+        [
+            "hours:write",
+            { OWNER: true, ADMIN: true, MEMBER: true, REVIEWER: false },
         ],
         [
             "service:write",
@@ -761,9 +772,40 @@ describe("the booking and class-pack capabilities (DEC-039, E26)", () => {
         expect(
             [...resolveCapabilities("desk", ["booking:write"])].sort(),
         ).toEqual(["booking:read", "booking:write"]);
+        // service:write always covered hours and time off (DEC-170).
         expect(
             [...resolveCapabilities("setup", ["service:write"])].sort(),
-        ).toEqual(["service:read", "service:write"]);
+        ).toEqual(["hours:write", "service:read", "service:write"]);
+    });
+
+    it("hours:write alone sets hours and time off, and sets nothing up (DEC-170)", () => {
+        const hours = role("hours", ["hours:write"]);
+        expect(
+            [...resolveCapabilities("hours", ["hours:write"])].sort(),
+        ).toEqual(["hours:write", "service:read"]);
+        expect(() => authorize(hours, "hours:write")).not.toThrow();
+        expect(() => authorize(hours, "service:write")).toThrow(
+            ForbiddenException,
+        );
+        expect(() => authorize(hours, "booking:write")).toThrow(
+            ForbiddenException,
+        );
+    });
+
+    it("a Member works the front desk and takes no money (DEC-170, DEC-098)", () => {
+        for (const action of ["booking:write", "hours:write"] as const) {
+            expect(can("MEMBER", action)).toBe(true);
+        }
+        for (const action of [
+            "service:write",
+            "invoice:write",
+            "payment:manage",
+            "pack:sell",
+        ] as const) {
+            expect(can("MEMBER", action)).toBe(false);
+        }
+        expect(can("REVIEWER", "booking:write")).toBe(false);
+        expect(can("REVIEWER", "hours:write")).toBe(false);
     });
 
     it("no booking power implies a pack power, nor the other way round", () => {

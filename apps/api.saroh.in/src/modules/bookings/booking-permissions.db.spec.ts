@@ -7,7 +7,8 @@
  * | Endpoint                                                   | Asks                          |
  * | ---------------------------------------------------------- | ----------------------------- |
  * | services, rules, availability, staff, closures, rules (GET) | `service:read`               |
- * | the same, changed; hours, time off, booking rules          | `service:write`               |
+ * | the same, changed; staff, their services, booking rules    | `service:write`               |
+ * | a person's hours, extra hours and time off (DEC-170)       | `hours:write`                 |
  * | the diary, a booking, a class's waitlist                   | `booking:read`                |
  * | book, move, outcome, cancel, a treatment's visit           | `booking:write`               |
  * | a booking's pay link                                       | `booking:write`, `invoice:write` |
@@ -53,6 +54,8 @@ const ROLES: Record<string, OrgAction[]> = {
     "pack-reader-e26": ["pack:read"],
     // Sets up services, hours and rules; saved without the read.
     "setup-e26": ["service:write"],
+    // Keeps people's hours and time off, and nothing else (DEC-170).
+    "hours-e170": ["hours:write"],
     // A practitioner: sees the diary.
     "diary-e26": ["booking:read", "service:read"],
     // Can send a booking's pay link.
@@ -74,7 +77,8 @@ const HOLDS: Record<RoleKey, OrgAction[]> = {
     "seller-e26": ["pack:sell", "pack:read"],
     "packs-lead-e26": ["pack:write", "pack:sell", "pack:read"],
     "pack-reader-e26": ["pack:read"],
-    "setup-e26": ["service:write", "service:read"],
+    "setup-e26": ["service:write", "service:read", "hours:write"],
+    "hours-e170": ["hours:write", "service:read"],
     "diary-e26": ["booking:read", "service:read"],
     "cashier-e26": ["booking:write", "booking:read", "invoice:write"],
     "site-e26": ["site:read"],
@@ -191,32 +195,32 @@ const ENDPOINTS: [
     ],
     [
         "PUT staff/:id/hours",
-        ["service:write"],
+        ["hours:write"],
         (c) => staff.replaceHours(c, MISSING, []),
     ],
     [
         "POST staff/:id/extra-hours",
-        ["service:write"],
+        ["hours:write"],
         (c) => staff.addExtraHours(c, MISSING, {} as never),
     ],
     [
         "DELETE staff/:id/extra-hours/:id",
-        ["service:write"],
+        ["hours:write"],
         (c) => staff.removeExtraHours(c, MISSING, MISSING),
     ],
     [
         "POST staff/:id/time-off",
-        ["service:write"],
+        ["hours:write"],
         (c) => staff.addTimeOff(c, MISSING, {} as never),
     ],
     [
         "POST staff/:id/time-off/remove",
-        ["service:write"],
+        ["hours:write"],
         (c) => staff.removeTimeOffMany(c, MISSING, []),
     ],
     [
         "DELETE staff/:id/time-off/:id",
-        ["service:write"],
+        ["hours:write"],
         (c) => staff.removeTimeOff(c, MISSING, MISSING),
     ],
     [

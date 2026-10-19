@@ -35,7 +35,8 @@ import { StaffService } from "./staff.service";
 
 /**
  * The people who take bookings, their hours, time off and extra hours (U3).
- * Part of Appointments. Reads need `service:read`, writes `service:write` —
+ * Part of Appointments. Reads need `service:read`; hours, extra hours and
+ * time off `hours:write` (DEC-170); every other write `service:write` —
  * decided in {@link StaffService}.
  */
 @Controller("organizations/:organizationId/staff")

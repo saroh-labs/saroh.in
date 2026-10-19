@@ -168,7 +168,9 @@ describe("a role the business made, through invite and accept (UX-004)", () => {
         expect(held.has("invoice:write")).toBe(false);
     });
 
-    it("books, moves and cancels where a Member is refused", async () => {
+    // A Member books, moves and cancels too since DEC-170 (the front
+    // desk); the order edit below is where the two still differ.
+    it("books, moves and cancels, as a Member now does too", async () => {
         for (const run of [
             (c: OrganizationContext) =>
                 bookings.bookByHand(c, MISSING, {
@@ -181,7 +183,7 @@ describe("a role the business made, through invite and accept (UX-004)", () => {
             (c: OrganizationContext) => bookings.cancelBooking(c, MISSING),
         ]) {
             expect(await gate(() => run(desk))).toBe("allowed");
-            expect(await gate(() => run(member))).toBe("refused");
+            expect(await gate(() => run(member))).toBe("allowed");
         }
     });
 

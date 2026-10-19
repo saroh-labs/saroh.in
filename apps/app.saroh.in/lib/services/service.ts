@@ -87,8 +87,13 @@ export interface Service {
      * of the amount to pay; null for none.
      */
     depositCents: number | null;
-    /** Whether the booking page offers it; staff book it either way. */
+    /** Whether the booking page offers it: Who can book it's "Customers". */
     showOnBookingPage: boolean;
+    /**
+     * Whether the team books it by hand (DEC-170): Who can book it's "Your
+     * team". Neither ticked reads as paused; bookings already made stay.
+     */
+    bookableByTeam: boolean;
 }
 
 /** One recurring weekly availability window (in the Service's timezone). */
@@ -246,6 +251,7 @@ export interface CreateServiceInput {
     visits?: number;
     depositMode?: DepositMode;
     showOnBookingPage?: boolean;
+    bookableByTeam?: boolean;
 }
 
 /** Update a Service (PATCH semantics — every field optional). */
@@ -270,6 +276,7 @@ export interface UpdateServiceInput {
     visits?: number;
     depositMode?: DepositMode;
     showOnBookingPage?: boolean;
+    bookableByTeam?: boolean;
 }
 
 /** One availability window to persist (no id — position is not meaningful). */
@@ -592,9 +599,17 @@ export type BookByHandInput = {
     staffId?: string;
     /** How it is paid (U3). Left out for a pay link (E4): unpaid until paid. */
     paidWith?: "PAID" | "DESK";
+    /**
+     * How "Paid now" was paid at the desk (DEC-170), saved with the booking.
+     * Only with `paidWith: "PAID"`; needs payment permission.
+     */
+    paidBy?: "CASH" | "UPI" | "CARD";
 } & (
     | { contactId: string }
     | { bookerEmail: string; bookerName?: string; bookerPhone?: string }
+    // A caller who gave just a name and phone (DEC-170): the customer with
+    // that phone, else a new one kept by it.
+    | { bookerPhone: string; bookerName: string }
 );
 
 /**

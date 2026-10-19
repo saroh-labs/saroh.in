@@ -87,6 +87,13 @@ export type OrgAction =
     | "notification:write"
     | "service:read"
     | "service:write"
+    // Weekly hours, extra hours and time off for anyone who takes bookings
+    // (DEC-170, Q13 of 19 Oct): what the front desk keeps up to date.
+    // Narrower than `service:write` — adding or removing people, the
+    // services they take, the services themselves, closures and booking
+    // rules stay there — and implied by it (`resolveCapabilities`), so
+    // whoever sets up services still sets hours.
+    | "hours:write"
     | "booking:read"
     | "booking:write"
     | "order:read"
@@ -203,6 +210,7 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "notification:write",
     "service:read",
     "service:write",
+    "hours:write",
     "booking:read",
     "booking:write",
     "order:read",

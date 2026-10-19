@@ -136,29 +136,8 @@ describe("StaffService — who may (U3)", () => {
 
     it.each([
         ["create", () => service.create(member, { name: "Ben" })],
-        [
-            "hours",
-            () =>
-                service.replaceHours(member, "staff_1", [
-                    { dayOfWeek: 1, startMinute: 360, endMinute: 720 },
-                ]),
-        ],
-        [
-            "time off",
-            () =>
-                service.addTimeOff(member, "staff_1", {
-                    fromDate: "2026-10-05",
-                }),
-        ],
-        [
-            "extra hours",
-            () =>
-                service.addExtraHours(member, "staff_1", {
-                    date: "2026-10-06",
-                    startMinute: 600,
-                    endMinute: 720,
-                }),
-        ],
+        ["a person's details", () => service.update(member, "staff_1", {})],
+        ["removing a person", () => service.archive(member, "staff_1")],
         [
             "booking rules",
             () => service.updateBookingRules(member, { freeCancelHours: 12 }),
@@ -170,6 +149,47 @@ describe("StaffService — who may (U3)", () => {
         expect(db.staffHours!.deleteMany).not.toHaveBeenCalled();
         expect(db.staffTimeOff!.createMany).not.toHaveBeenCalled();
         expect(db.bookingRules!.upsert).not.toHaveBeenCalled();
+    });
+
+    // The front desk keeps anyone's hours (DEC-170, Q13): `hours:write`,
+    // which a Member holds and `service:write` implies.
+    it("lets a Member set a person's weekly hours", async () => {
+        await service.replaceHours(member, "staff_1", [
+            { dayOfWeek: 1, startMinute: 360, endMinute: 720 },
+        ]);
+        expect(db.staffHours!.deleteMany).toHaveBeenCalled();
+    });
+
+    it("lets a Member add time off and extra hours", async () => {
+        await service.addTimeOff(member, "staff_1", { fromDate: "2026-10-05" });
+        expect(db.staffTimeOff!.createMany).toHaveBeenCalled();
+        await service.addExtraHours(member, "staff_1", {
+            date: "2026-10-06",
+            startMinute: 600,
+            endMinute: 720,
+        });
+        expect(db.staffExtraHours!.create).toHaveBeenCalled();
+    });
+
+    it.each([
+        [
+            "hours",
+            (c: OrganizationContext) =>
+                service.replaceHours(c, "staff_1", [
+                    { dayOfWeek: 1, startMinute: 360, endMinute: 720 },
+                ]),
+        ],
+        [
+            "time off",
+            (c: OrganizationContext) =>
+                service.addTimeOff(c, "staff_1", { fromDate: "2026-10-05" }),
+        ],
+    ])("refuses a Reviewer writing %s, in words", async (_, write) => {
+        await expect(write(ctx({ role: "REVIEWER" }))).rejects.toThrow(
+            "Your role can't change hours or time off.",
+        );
+        expect(db.staffHours!.deleteMany).not.toHaveBeenCalled();
+        expect(db.staffTimeOff!.createMany).not.toHaveBeenCalled();
     });
 
     it("404s another business's person", async () => {

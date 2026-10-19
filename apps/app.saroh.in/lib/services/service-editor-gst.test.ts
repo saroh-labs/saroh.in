@@ -40,6 +40,7 @@ const service = (over: Partial<Service> = {}): Service => ({
     depositMode: "PERCENT_50",
     depositCents: 59_000,
     showOnBookingPage: true,
+    bookableByTeam: true,
     gstPriceMode: "ADDED",
     payCents: 118_000,
     gst: {

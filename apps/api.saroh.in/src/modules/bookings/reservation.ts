@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     ConflictException,
     GoneException,
     NotFoundException,
@@ -10,6 +11,7 @@ import { prismaErrorCode } from "../../common/prisma-errors";
 import type { ActivationEvents } from "../analytics/activation-events";
 import { planMeter } from "../billing/metering.service";
 import { bookingsPaused } from "../billing/plan-limit-errors";
+import { isReservedContactEmail } from "../contacts/contact-email";
 import { phoneToFill } from "../customer-workspace/contact-phone-fill";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import type { PriceTerms } from "../invoices/gst-price";
@@ -25,6 +27,7 @@ import { bookingLocation, intakeNoteOf } from "./booking-intake";
 import { freeCancelDeadline, loadBookingRules } from "./booking-rules";
 import type { AccountBookPay, BookingLocationType, PaidWith } from "./dto";
 import { seatsHeld } from "./held-seats";
+import { phoneContactInTx } from "./phone-booker";
 import { depositCents } from "./service-fields";
 import { bookedPriceOf, serviceCharge } from "./service-price";
 import { acceptWaitlistInTx } from "./waitlist-queue";
@@ -39,8 +42,19 @@ import { acceptWaitlistInTx } from "./waitlist-queue";
 export interface BookInput {
     startAt: string;
     bookerName?: string;
-    bookerEmail: string;
+    /**
+     * Who books, by email: the contact with it, or someone new. Absent only
+     * for a booking made by hand for someone known by their phone alone
+     * (DEC-170), when `phoneKey` says how to find them.
+     */
+    bookerEmail?: string;
     bookerPhone?: string;
+    /**
+     * A booking made by hand with a name and phone and no email (DEC-170):
+     * the phone as matched (`normalisePhone`). The contact with it is
+     * booked, else one is made kept by it (`phone-booker.ts`).
+     */
+    phoneKey?: string;
     idempotencyKey?: string;
     /** The person asked for (U3); absent means whoever is free. */
     staffId?: string;
@@ -426,7 +440,13 @@ export async function reserveInTx(
 ): Promise<Booking> {
     const serviceId = service.id;
     const organizationId = service.organizationId;
-    const email = input.bookerEmail.trim().toLowerCase();
+    const email = input.bookerEmail?.trim().toLowerCase() ?? "";
+    if (!email && !input.phoneKey && !by.account) {
+        throw new BadRequestException({
+            message: "Give an email or a phone number.",
+            field: "bookerEmail",
+        });
+    }
     // The price is fixed here, as the business charges it today
     // (`service-price.ts`): the amount to pay, the typed price and the
     // mode, read in the booking's own transaction.
@@ -534,20 +554,31 @@ export async function reserveInTx(
 
     const contact = by.account
         ? await accountContactInTx(tx, organizationId, by.account, input)
-        : await tx.contact.upsert({
-              where: {
-                  organizationId_email: { organizationId, email },
-              },
-              update: contactUpdate(input),
-              create: {
-                  organizationId,
-                  email,
-                  firstName: splitName(input.bookerName).first ?? null,
-                  lastName: splitName(input.bookerName).last ?? null,
-                  phone: input.bookerPhone ?? null,
-                  source: by.source,
-              },
-          });
+        : !email && input.phoneKey
+          ? await phoneContactInTx(
+                tx,
+                organizationId,
+                {
+                    name: input.bookerName,
+                    phone: input.bookerPhone,
+                    key: input.phoneKey,
+                },
+                by.source,
+            )
+          : await tx.contact.upsert({
+                where: {
+                    organizationId_email: { organizationId, email },
+                },
+                update: contactUpdate(input),
+                create: {
+                    organizationId,
+                    email,
+                    firstName: splitName(input.bookerName).first ?? null,
+                    lastName: splitName(input.bookerName).last ?? null,
+                    phone: input.bookerPhone ?? null,
+                    source: by.source,
+                },
+            });
 
     const booking = await tx.booking.create({
         data: {
@@ -562,7 +593,9 @@ export async function reserveInTx(
             holdExpiresAt: person?.holdUntil ?? null,
             snapshot: snapshot as Prisma.InputJsonValue,
             bookerName: input.bookerName ?? null,
-            bookerEmail: email,
+            // A placeholder (someone known by their phone, DEC-049) is no
+            // email: the booking says none.
+            bookerEmail: bookerEmailOf(email),
             bookerPhone: input.bookerPhone ?? null,
             idempotencyKey: input.idempotencyKey ?? null,
             courseEnrollmentId: course?.enrollmentId ?? null,
@@ -769,7 +802,7 @@ export function buildSnapshot(
         },
         booker: {
             name: input.bookerName ?? null,
-            email: input.bookerEmail.trim().toLowerCase(),
+            email: bookerEmailOf(input.bookerEmail),
             phone: input.bookerPhone ?? null,
         },
     };
@@ -817,6 +850,17 @@ async function accountContactInTx(
         });
     }
     return { id: contact.id };
+}
+
+/**
+ * The email a booking keeps of its booker: none for none, or for a reserved
+ * placeholder (a contact known by their phone alone, DEC-049), which every
+ * reader treats as no email.
+ */
+export function bookerEmailOf(email: string | undefined): string | null {
+    const value = email?.trim().toLowerCase();
+    if (!value || isReservedContactEmail(value)) return null;
+    return value;
 }
 
 /** Contact fields to update on a repeat booking (only supplied values). */

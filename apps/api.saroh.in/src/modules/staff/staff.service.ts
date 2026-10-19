@@ -191,8 +191,11 @@ function refuse(message: string, field: string): never {
  *
  * Reads need `service:read` — the diary's floor, so a Member sees who works
  * when (and why someone is off: the reason is team-only, not Member-proof).
- * Every write needs `service:write`; a Member is refused. Every id is the
- * organization's own or a 404.
+ * Adding, changing and removing people and the services they take need
+ * `service:write`. Weekly hours, extra hours and time off need only
+ * `hours:write` (DEC-170): the front desk — a Member — keeps anyone's
+ * hours, and `service:write` implies it. Every id is the organization's
+ * own or a 404.
  */
 @Injectable()
 export class StaffService {
@@ -470,7 +473,7 @@ export class StaffService {
         hours: StaffHoursDto[],
         now = new Date(),
     ): Promise<{ staff: StaffView; outside: BookingBrief[] }> {
-        requireBookingPower(ctx, "service:write");
+        requireBookingPower(ctx, "hours:write");
         const person = await this.requireStaff(ctx, staffId);
         const refusal = weeklyHoursRefusal(hours);
         if (refusal) refuse(refusal.message, refusal.field);
@@ -499,7 +502,7 @@ export class StaffService {
         staffId: string,
         dto: AddExtraHoursDto,
     ): Promise<StaffView> {
-        requireBookingPower(ctx, "service:write");
+        requireBookingPower(ctx, "hours:write");
         const person = await this.requireStaff(ctx, staffId);
         if (!isCalendarDate(dto.date)) refuse("That is not a date.", "date");
         const range = rangeRefusal(dto, dto.date, "endMinute");
@@ -537,7 +540,7 @@ export class StaffService {
         extraHoursId: string,
         now = new Date(),
     ): Promise<{ staff: StaffView; outside: BookingBrief[] }> {
-        requireBookingPower(ctx, "service:write");
+        requireBookingPower(ctx, "hours:write");
         const person = await this.requireStaff(ctx, staffId);
         const { count } = await prisma.staffExtraHours.deleteMany({
             where: {
@@ -566,7 +569,7 @@ export class StaffService {
         dto: AddTimeOffDto,
         now = new Date(),
     ): Promise<{ staff: StaffView; affected: BookingBrief[] }> {
-        requireBookingPower(ctx, "service:write");
+        requireBookingPower(ctx, "hours:write");
         const person = await this.requireStaff(ctx, staffId);
 
         let spans: OffSpan[];
@@ -636,7 +639,7 @@ export class StaffService {
         staffId: string,
         ids: string[],
     ): Promise<StaffView> {
-        requireBookingPower(ctx, "service:write");
+        requireBookingPower(ctx, "hours:write");
         const person = await this.requireStaff(ctx, staffId);
         const unique = [...new Set(ids)];
         await prisma.$transaction(async (tx) => {
@@ -660,7 +663,7 @@ export class StaffService {
         staffId: string,
         timeOffId: string,
     ): Promise<StaffView> {
-        requireBookingPower(ctx, "service:write");
+        requireBookingPower(ctx, "hours:write");
         const person = await this.requireStaff(ctx, staffId);
         const { count } = await prisma.staffTimeOff.deleteMany({
             where: {

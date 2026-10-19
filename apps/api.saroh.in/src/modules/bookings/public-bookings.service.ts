@@ -821,7 +821,7 @@ export class PublicBookingsService {
                     : undefined;
         if (
             (existing.bookerEmail ?? "").toLowerCase() !==
-                input.bookerEmail.trim().toLowerCase() ||
+                (input.bookerEmail ?? "").trim().toLowerCase() ||
             existing.startAt.getTime() !== new Date(input.startAt).getTime() ||
             (input.staffId !== undefined &&
                 existing.staffId !== input.staffId) ||

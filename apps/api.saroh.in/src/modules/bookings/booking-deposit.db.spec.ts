@@ -342,6 +342,51 @@ describe("cancelling a booking with a deposit (E8, DEC-051, real database)", () 
         ).toBe(0);
     });
 
+    // Q14 (owner, 19 Oct): the business's own policy decides refund or
+    // keep, the same whoever cancels. A Member is the built-in role, with
+    // its shipped permissions (DEC-170).
+    it("a Member cancelling late: the business's policy keeps the deposit, as for an owner", async () => {
+        const member: OrganizationContext = { ...owner, role: "MEMBER" };
+        const mine = await depositPaid("member-late@example.in");
+        const theirs = await depositPaid("owner-late@example.in");
+        const calls = fake.refundCalls.length;
+
+        const byMember = await bookings.cancelBooking(
+            member,
+            mine.booking.id,
+            new Date(mine.startAt.getTime() - 2 * HOUR),
+        );
+        const byOwner = await bookings.cancelBooking(
+            owner,
+            theirs.booking.id,
+            new Date(theirs.startAt.getTime() - 2 * HOUR),
+        );
+        const kept = {
+            refund: null,
+            kept: { amountCents: 40_000, currency: "INR" },
+        };
+        expect(byMember.money).toEqual(kept);
+        expect(byOwner.money).toEqual(kept);
+        expect(byMember.cancelledLate).toBe(true);
+        expect(fake.refundCalls.length).toBe(calls);
+    });
+
+    it("a Member cancelling in time: the policy refunds the deposit, as for an owner", async () => {
+        const member: OrganizationContext = { ...owner, role: "MEMBER" };
+        const { booking, startAt } = await depositPaid(
+            "member-in-time@example.in",
+        );
+        const out = await bookings.cancelBooking(
+            member,
+            booking.id,
+            new Date(startAt.getTime() - 48 * HOUR),
+        );
+        expect(out.money).toEqual({
+            refund: { amountCents: 40_000, currency: "INR", status: "SENT" },
+            kept: null,
+        });
+    });
+
     it("made 3 days out with a 24-hour window, moved a week later, cancelled after the first deadline: late, the deposit kept", async () => {
         const { booking, startAt } = await depositPaid("moved@example.in");
         const deadline = new Date(startAt.getTime() - 24 * HOUR);

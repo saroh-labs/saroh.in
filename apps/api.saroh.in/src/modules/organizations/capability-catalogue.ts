@@ -297,6 +297,12 @@ export const CAPABILITIES: readonly Capability[] = [
         label: "Change services, hours, time off and booking rules",
         note: "Setting up how the business takes bookings, not the day's bookings. Whoever can change services also sees them.",
     },
+    {
+        action: "hours:write",
+        group: "schedule",
+        label: "Set hours and time off",
+        note: "Weekly hours, extra hours and time off for anyone who takes bookings. Adding people or changing services still needs Change services, hours, time off and booking rules.",
+    },
     { action: "course:read", group: "schedule", label: "See courses" },
     {
         action: "course:write",

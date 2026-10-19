@@ -69,6 +69,7 @@ const service = (over: Partial<Service> = {}): Service => ({
     depositMode: "PERCENT_50",
     depositCents: 60_000,
     showOnBookingPage: true,
+    bookableByTeam: true,
     ...over,
 });
 

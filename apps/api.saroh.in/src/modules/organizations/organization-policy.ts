@@ -105,17 +105,29 @@ const READ_ONLY_ACTIONS: readonly OrgAction[] = [
 
 /**
  * What a MEMBER holds beyond the read-only floor (DEC-024, amends DEC-020):
- * the kitchen. Someone at the counter reads an order's kitchen view — items,
- * stage, notes, who it is for, never money — and moves its stage. Taking,
- * changing, refunding and exporting orders are `order:create`, `order:edit`,
- * `order:refund` and `order:export` (B16), which a Member does not hold; nor
- * does a Member hold `booking:write`, `pack:read` or `pack:sell` (E26). The
- * Member default bundle is F18's to change (matrix Q1).
+ * the kitchen and the front desk. Someone at the counter reads an order's
+ * kitchen view — items, stage, notes, who it is for, never money — and
+ * moves its stage. Taking, changing, refunding and exporting orders are
+ * `order:create`, `order:edit`, `order:refund` and `order:export` (B16),
+ * which a Member does not hold; nor `pack:read` or `pack:sell` (E26).
  *
- * Kept apart from the floor because it is a write: the floor is what every
- * reading role shares, and this is one narrow thing a Member may DO.
+ * The front desk (DEC-170, owner 19 Oct): a Member books a caller, marks
+ * Came / Didn't come, moves and cancels (`booking:write`), and keeps
+ * anyone's weekly hours, extra hours and time off (`hours:write`). Money
+ * stays with payment permission (DEC-098): "Paid now", a desk payment and
+ * a pay link also ask `invoice:write`, which a Member does not hold, and a
+ * cancelled paid booking's refund follows the business's own policy, not
+ * the role (Q14). Adding people, their services and the services
+ * themselves stay `service:write`.
+ *
+ * Kept apart from the floor because these are writes: the floor is what
+ * every reading role shares, and these are the narrow things a Member may DO.
  */
-const MEMBER_ACTIONS: readonly OrgAction[] = ["order:stage"];
+const MEMBER_ACTIONS: readonly OrgAction[] = [
+    "order:stage",
+    "booking:write",
+    "hours:write",
+];
 
 /**
  * Role → allowed actions.
@@ -133,10 +145,11 @@ const MEMBER_ACTIONS: readonly OrgAction[] = ["order:stage"];
  *             role→action capability. It IS enforced now: `assertNotLastOwner`
  *             in `organization-members.service.ts` (#276), inside a
  *             serializable transaction.)
- *  - MEMBER — read-only: can see the org, its roster, its stores, and the
- *             diary (bookings, services, contacts), and sees no money. The
- *             one thing it may change is an order's kitchen stage
- *             (`order:stage`, DEC-024).
+ *  - MEMBER — mostly read-only: can see the org, its roster, its stores,
+ *             and the diary (bookings, services, contacts), and sees no
+ *             money. It may change an order's kitchen stage (`order:stage`,
+ *             DEC-024), and work the front desk: bookings and people's
+ *             hours (`booking:write`, `hours:write`, DEC-170).
  *  - REVIEWER — website only, and narrower than MEMBER rather than beneath it.
  *             Its three actions are enumerated in CAPABILITIES below, and
  *             `SiteReviewer` narrows them to named sites (#276).
@@ -444,7 +457,10 @@ const ORDER_POWERS: readonly OrgAction[] = [
  *
  * Bookings and class packs (E26, matrix §2): `booking:write` →
  * `booking:read` and `service:write` → `service:read`, since changing the
- * diary or a service means seeing it. `pack:write` → `pack:sell`, since
+ * diary or a service means seeing it. `service:write` → `hours:write`
+ * (DEC-170): it always covered hours and time off, so a role saved before
+ * the split keeps setting them; and `hours:write` → `service:read`, since
+ * setting someone's hours means seeing who takes bookings. `pack:write` → `pack:sell`, since
  * selling a pack was always its, and `pack:sell` → `pack:read`, since a
  * sale shows the pack it sells; applied in that order, so `pack:write`
  * reaches `pack:read` through `pack:sell`.
@@ -460,6 +476,8 @@ function withImplied(set: Set<OrgAction>): ReadonlySet<OrgAction> {
     if (set.has("contact:write")) set.add("contact:read");
     if (set.has("booking:write")) set.add("booking:read");
     if (set.has("service:write")) set.add("service:read");
+    if (set.has("service:write")) set.add("hours:write");
+    if (set.has("hours:write")) set.add("service:read");
     if (set.has("pack:write")) set.add("pack:sell");
     if (set.has("pack:sell")) set.add("pack:read");
     if (set.has("order:write")) {

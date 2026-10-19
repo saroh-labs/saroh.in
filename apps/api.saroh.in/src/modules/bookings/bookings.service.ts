@@ -43,7 +43,7 @@ import { isExpiredHold } from "./booking-hold";
 import type { WithoutIntakeNote } from "./booking-intake";
 import { intakeNoteFor } from "./booking-intake";
 import type { BookingMoney } from "./booking-money";
-import { bookingMoney } from "./booking-money";
+import { bookingMoney, bookingPrice } from "./booking-money";
 import { moveFoundBooking } from "./booking-move";
 import { lockVisitOrderInTx, writeOutcomeInTx } from "./booking-outcome";
 import { bookingPayLinkInTx } from "./booking-pay-link";
@@ -59,6 +59,7 @@ import {
 } from "./booking-slots";
 import { assertDepositOnPlan } from "./deposit-plan";
 import type { TakeDeskPaymentDto } from "./desk-pay.dto";
+import type { DeskMethod } from "./desk-take";
 import {
     BOOKING_PAPER,
     BOOKING_PAPER_PAYMENTS,
@@ -72,6 +73,11 @@ import type {
     PaidWith,
     UpdateServiceDto,
 } from "./dto";
+import {
+    assertBookableByTeam,
+    assertHandPayment,
+    handBooker,
+} from "./hand-booker";
 import { openingFor, refuseOutsideOpening } from "./opening-hours";
 import {
     assertOwnBooking,
@@ -334,6 +340,7 @@ export class BookingsService {
                     visits: dto.visits ?? 1,
                     depositMode,
                     showOnBookingPage: dto.showOnBookingPage ?? true,
+                    bookableByTeam: dto.bookableByTeam ?? true,
                 },
             });
             await recordPrices(
@@ -476,6 +483,9 @@ export class BookingsService {
         if (dto.visits !== undefined) data.visits = dto.visits;
         if (dto.showOnBookingPage !== undefined) {
             data.showOnBookingPage = dto.showOnBookingPage;
+        }
+        if (dto.bookableByTeam !== undefined) {
+            data.bookableByTeam = dto.bookableByTeam;
         }
         if (dto.depositMode !== undefined || dto.priceCents !== undefined) {
             // Checked as the service will be: a price cleared under a deposit
@@ -1032,9 +1042,14 @@ export class BookingsService {
      * records the person who made it.
      *
      * The booker is someone already in the contacts (`contactId`, whose name
-     * and email are used as they stand) or someone new (`bookerEmail`, and
-     * optionally a name and phone), who becomes a contact the way a booking
-     * page booker does.
+     * and email are used as they stand), someone by their email
+     * (`bookerEmail`, and optionally a name and phone), or a caller who gave
+     * only a name and phone (DEC-170), kept by that phone as a walk-in is
+     * for orders (`hand-booker.ts`). A service the team can't book (its
+     * "Your team" tick, Q5) is refused here and still offered on the
+     * booking page. "Paid now" needs payment permission (DEC-098); with how
+     * it was paid (`paidBy`), the booking and its desk payment are written
+     * in one transaction, so a refused payment leaves no booking.
      */
     async bookByHand(
         ctx: OrganizationContext,
@@ -1050,10 +1065,13 @@ export class BookingsService {
             packPurchaseId?: string;
             staffId?: string;
             paidWith?: PaidWith;
+            paidBy?: DeskMethod;
             subscriptionId?: string;
         },
     ): Promise<Booking> {
         requireBookingPower(ctx, "booking:write");
+        // Money stays with payment permission (DEC-098).
+        assertHandPayment(ctx, dto);
         const withPack =
             dto.useClassPack === true ||
             !!dto.packPurchaseId ||
@@ -1088,10 +1106,13 @@ export class BookingsService {
         if (service.organizationId !== ctx.organizationId) {
             throw new NotFoundException("Service not found");
         }
+        // Who can book it: "Your team" (Q5). The booking page reads only
+        // its own tick.
+        assertBookableByTeam(service);
         // A treatment is sold as one order (E9, DEC-050), paid on it: never
         // with a pack or a membership, and never without a storefront.
         const treatment = isTreatment(service);
-        if (treatment && (withPack || withMembership)) {
+        if (treatment && (withPack || withMembership || dto.paidBy)) {
             throw new BadRequestException({
                 message:
                     "A treatment is paid for on its order, not with a pack or a membership.",
@@ -1129,76 +1150,8 @@ export class BookingsService {
             );
         }
 
-        let booker: BookInput;
-        if (dto.contactId) {
-            let contact = await prisma.contact.findUnique({
-                where: { id: dto.contactId },
-            });
-            // A page loaded before a merge can still name the merged-away
-            // contact (C9): book the survivor it points at. The booking is
-            // then made by the survivor's email, never the tombstone's
-            // placeholder.
-            if (
-                contact?.mergedIntoId &&
-                contact.organizationId === ctx.organizationId
-            ) {
-                contact = await prisma.contact.findUnique({
-                    where: { id: contact.mergedIntoId },
-                });
-            }
-            if (contact?.organizationId !== ctx.organizationId) {
-                throw new NotFoundException("Contact not found");
-            }
-            const name = [contact.firstName, contact.lastName]
-                .filter(Boolean)
-                .join(" ")
-                .trim();
-            booker = {
-                startAt: dto.startAt,
-                bookerEmail: contact.email,
-                bookerName: name || undefined,
-                bookerPhone: contact.phone ?? undefined,
-            };
-        } else if (dto.bookerEmail) {
-            // An email that is already someone's picks that someone (E4),
-            // as they stand: booking them never renames them or forks a
-            // second contact.
-            const known = await prisma.contact.findUnique({
-                where: {
-                    organizationId_email: {
-                        organizationId: ctx.organizationId,
-                        email: dto.bookerEmail.trim().toLowerCase(),
-                    },
-                },
-            });
-            booker = known
-                ? {
-                      startAt: dto.startAt,
-                      bookerEmail: known.email,
-                      bookerName:
-                          [known.firstName, known.lastName]
-                              .filter(Boolean)
-                              .join(" ")
-                              .trim() || undefined,
-                      bookerPhone: known.phone ?? undefined,
-                  }
-                : {
-                      startAt: dto.startAt,
-                      bookerEmail: dto.bookerEmail,
-                      // A field left blank is not given, rather than "".
-                      bookerName: dto.bookerName?.trim()
-                          ? dto.bookerName
-                          : undefined,
-                      bookerPhone: dto.bookerPhone?.trim()
-                          ? dto.bookerPhone
-                          : undefined,
-                  };
-        } else {
-            throw new BadRequestException({
-                message: "Choose someone from your contacts, or give an email.",
-                field: "bookerEmail",
-            });
-        }
+        // A customer, an email, or a name and phone (DEC-170).
+        const booker = await handBooker(ctx, dto);
 
         // Its bill goes to an email (DEC-050): a contact with none is asked
         // for one.
@@ -1228,9 +1181,14 @@ export class BookingsService {
             undefined,
             opening,
         );
+        // Paid now with how (DEC-170): written unpaid, then paid at the
+        // desk on the same transaction, which marks it paid.
+        const paidBy = dto.paidBy ?? null;
         const paidWith: PaidWith | null = withPack
             ? "PACK"
-            : (dto.paidWith ?? null);
+            : paidBy
+              ? null
+              : (dto.paidWith ?? null);
 
         if (treatmentStore) {
             // The treatment's order, with this booking its visit 1.
@@ -1262,16 +1220,41 @@ export class BookingsService {
             });
         }
 
-        return reserve(
+        // Someone new kept by their phone is made under the phone's lock:
+        // a race lost there is retried, so a second booking for the same
+        // new number books the first one's customer.
+        const byNewPhone = !booker.bookerEmail && !!booker.phoneKey;
+        const booked = await reserve(
             this.activation,
             service,
             startAt,
             endAt,
             booker,
             { source: "manual", actorUserId: ctx.userId },
-            withPack || withMembership
+            withPack || withMembership || paidBy || byNewPhone
                 ? {
                       inTx: async (tx, booking) => {
+                          if (paidBy) {
+                              await takeDeskPaymentInTx(tx, {
+                                  organizationId: ctx.organizationId,
+                                  bookingId: booking.id,
+                                  actorUserId: ctx.userId,
+                                  method: paidBy,
+                                  // The whole price, as it was just fixed
+                                  // on the booking.
+                                  amountCents:
+                                      bookingPrice(booking.snapshot)
+                                          .priceCents ?? 0,
+                                  now: new Date(),
+                              });
+                              await tx.booking.update({
+                                  where: { id: booking.id },
+                                  data: { paidWith: "PAID" },
+                                  select: { id: true },
+                              });
+                              return;
+                          }
+                          if (!withPack && !withMembership) return;
                           if (withMembership) {
                               await useMembershipInTx(tx, {
                                   organizationId: ctx.organizationId,
@@ -1294,9 +1277,11 @@ export class BookingsService {
                           });
                       },
                       // It may have been the pack's (or the month's) last
-                      // class rather than the slot, so this says only that
-                      // something changed.
+                      // class, the invoice's number or the phone's new
+                      // customer rather than the slot, so this says only
+                      // that something changed.
                       onRace: "That changed while you were booking. Try again.",
+                      retryOnce: byNewPhone || !!paidBy,
                   }
                 : undefined,
             {
@@ -1307,6 +1292,10 @@ export class BookingsService {
                     : null,
             },
         );
+        // Paid at the desk on the way in: read again, paid.
+        return paidBy
+            ? prisma.booking.findUniqueOrThrow({ where: { id: booked.id } })
+            : booked;
     }
 
     /**

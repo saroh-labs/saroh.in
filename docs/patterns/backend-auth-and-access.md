@@ -31,12 +31,12 @@ what the API allows.
 `OrgRole` has four values (`common/types/organization-context.ts`), and
 `organization-policy.ts` maps each to a closed set of actions.
 
-| Role       | What it may do                                                                                                                                                                                                                                                                                                          |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `OWNER`    | Everything, including `org:delete`.                                                                                                                                                                                                                                                                                     |
-| `ADMIN`    | Everything except the owner-only powers: `org:delete`, `org:address:update` and `billing:manage` (it reads Plan and billing with `billing:read`).                                                                                                                                                                       |
-| `MEMBER`   | The read-only floor: `org:read`, `member:read`, `store:read`, `site:read`, `media:read`, `module:read`, and the diary — `booking:read`, `service:read`, `contact:read` (DEC-020) — plus `order:stage` (DEC-024, adopted): an order's kitchen view without money, and moving its stage. No leads, no pipeline, no money. |
-| `REVIEWER` | `site:read`, `site:comment`, `site:approve` — and nothing else, not even the floor.                                                                                                                                                                                                                                     |
+| Role       | What it may do                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OWNER`    | Everything, including `org:delete`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `ADMIN`    | Everything except the owner-only powers: `org:delete`, `org:address:update` and `billing:manage` (it reads Plan and billing with `billing:read`).                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `MEMBER`   | The read-only floor: `org:read`, `member:read`, `store:read`, `site:read`, `media:read`, `module:read`, and the diary — `booking:read`, `service:read`, `contact:read` (DEC-020) — plus `order:stage` (DEC-024, adopted): an order's kitchen view without money, and moving its stage; and the front desk (DEC-170): `booking:write` (book, mark Came / Didn't come, move, cancel) and `hours:write` (anyone's weekly hours, extra hours and time off). No leads, no pipeline, no money: "Paid now", desk payments and pay links also ask `invoice:write`. |
+| `REVIEWER` | `site:read`, `site:comment`, `site:approve` — and nothing else, not even the floor.                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 - **Current** — **REVIEWER is enumerated, never derived** (#276). The read-only
   floor includes the roster, the stores and the media library; a reviewer is an
@@ -122,6 +122,17 @@ what the API allows.
   "Your role can't …" (`bookings/booking-access.ts`).
   `booking-permissions.db.spec.ts` pins one row per endpoint; a new booking,
   service or pack endpoint adds its row there.
+- **Current** (DEC-170, owner 19 Oct) — **Hours are their own power.**
+  `hours:write` ("Set hours and time off") covers a person's weekly hours,
+  extra hours and time off; adding or removing people, their services, the
+  services, closures and booking rules stay `service:write`, which implies
+  `hours:write` (a role saved before the split keeps setting hours), and
+  `hours:write` implies `service:read`. A Member holds it. "Paid now" on a
+  booking made by hand asks `mayTakeDeskPayment` like a desk payment, and
+  with `paidBy` writes the booking and its desk payment in one transaction.
+  A cancelled paid booking's refund or keep follows the business's policy
+  whoever cancels (Q14); only the by-hand refund beyond the policy asks
+  `payment:manage`. `book-by-hand.db.spec.ts` pins the front desk.
 - **Current** (DEC-098, 2026-10-07) — **Money follows permissions, never
   role names.** Seeing amounts, taking a desk payment, marking an invoice
   paid, recording an order's payment and refunding are asked of the role's
@@ -166,9 +177,10 @@ what the API allows.
   (`payment:read`, `invoice:read`, `subscription:read`); the API omits them,
   it does not send them for the screen to hide. `billing:read` is Saroh's own
   billing (DEC-014), not the merchant's.
-- **Adopted** — **Who writes the new settings** (ADR-008): staff, their hours,
-  time off and booking rules need `service:write`; GST registration, state and
-  rates need Owner/Admin. A Member is refused both.
+- **Adopted** — **Who writes the new settings** (ADR-008): staff and booking
+  rules need `service:write`, their hours and time off `hours:write`
+  (DEC-170); GST registration, state and rates need Owner/Admin. A Member
+  sets hours and time off, and is refused the rest.
 - **Current** — **Membership is assignable, and invitations are hashed.**
   `OrganizationInvitation` holds the role, a reviewer's sites, and a sha256 of
   the token; the plaintext exists only in the invitee's email. Seven-day expiry,
