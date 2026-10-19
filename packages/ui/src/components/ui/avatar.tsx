@@ -153,6 +153,18 @@ function RoleDot({
     );
 }
 
+/** Titles that come before a name (lower case, without the full stop). */
+const AVATAR_TITLES = new Set([
+    "dr",
+    "mr",
+    "mrs",
+    "ms",
+    "miss",
+    "prof",
+    "shri",
+    "smt",
+]);
+
 /** Two letters from a name, or the first of an email when there is no name. */
 function avatarInitials(name: string | null | undefined, email?: string) {
     // Words that start with a letter: "Priya (reviewer)" is "PR", not "P(".
@@ -160,6 +172,13 @@ function avatarInitials(name: string | null | undefined, email?: string) {
         .trim()
         .split(/[\s&]+/)
         .filter((w) => /^[A-Za-zÀ-ÿ]/.test(w));
+    // A title isn't what anyone is called by: "Dr. Arun Pillai" is "AP".
+    const named = words.filter(
+        (w) => !AVATAR_TITLES.has(w.replace(/\.$/, "").toLowerCase()),
+    );
+    if (named.length > 0 && named.length < words.length) {
+        words.splice(0, words.length, ...named);
+    }
     const first = words.at(0) ?? "";
     const last = words.at(-1) ?? "";
     if (words.length >= 2) return `${first[0]}${last[0]}`.toUpperCase();
