@@ -2146,3 +2146,21 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **Suggestions follow three rules**: a class nearly always full; a bill more than 3 weeks late; something selling less than before. One at a time; **"Not now" hides one for 7 days**.
 - **Nothing is taken away**: every control today's Home and Insights have keeps a place on the new screens (the plan lists each one and where it goes). Money still follows permissions (DEC-098).
 - **The full designs come first** (owner, 19 Oct): every screen of Home A and Insights B is drawn for desktop and phone and confirmed by the owner before issues are opened or code starts.
+
+## DEC-173 Invoices: part payments in a ledger, cheques with a bank status, share and remind by WhatsApp link, three invoice styles
+
+**Status: Accepted — 2026-10-20, to build** · owner, answering the Payments audit (INVAudit) and the round-2 boards on the design canvas, page "Invoices: current and improved". Plan: `docs/plans/2026-10-20-001-feat-invoices-rebuild-plan.md`. Subscriptions are not part of this decision.
+
+- **Every capability stays.** The rebuild changes the look and adds what is listed here. No control is removed or merged (`00-universal.md` §15).
+- **List (A+C):** search by name, invoice number and amount; one money strip (Owed / Overdue / Paid this month, plus Drafts as drawn) whose figures are filters; the GST notice is one status line. A row opens the invoice's details in a side sheet, and the action finishes there, never on another page.
+- **Invoice details (A):** one main button per state, then Share, then More (which holds Cancel and every other action). "Record payment" is the one name.
+- **New invoice (A)** plus "edit on the paper", with three styles (Classic, Band, Compact) in the business's colour with its logo. The Rule 46 GST fields are locked: no style drops one. A style is frozen on issued paper; the logo stays live (DEC-082).
+- **Share (A and B) and bulk reminders by channel:** email through the business's own provider (DEC-086/091); WhatsApp as click-to-chat (`wa.me` with the message filled in, so Saroh sends nothing); copy link, PDF and print. A WhatsApp reminder counts towards one reminder a day. Automatic WhatsApp sending is later.
+- **Part payments:** "Partly paid ₹1,000 of ₹2,500". Payments on an invoice are a ledger (one row per payment, in integer paise, the ledger's exception to "never Int for currency", as `PaymentIntent` already is). The invoice's status is derived from the ledger in the same transaction. Partly paid is derived, like Overdue, never stored. An order's invoice keeps the order as its ledger (ADR-008).
+- **Cheques** are recorded as received, with a bank status: Mark as in the bank, or Bounced (owed again; no bounce charge). A waiting cheque counts as received.
+- **"Cheques not in the bank"** is one line, shown only while a cheque waits: under the money strip and on Home. The API serves it as `chequesWaiting` on `GET organizations/:id/home` (`week.chequesWaiting`) and on `GET organizations/:id/invoices/summary`. The Home plan (DEC-171) draws it.
+- **A payment recorded by mistake can be removed.** It is a soft remove with a reason, kept in the history. An online payment is refunded, not removed.
+- **Cancel or correct (A) now.** The credit note page (B: GST s.34, Rule 53, GSTR-1), "Take some off" and the 30 Nov deadline block are Phase 2.
+- **Defaults while open:** an overpayment is blocked (no advances yet); styles, colour and logo are in; a credit note on a paid invoice is a later decision (refund or credit), so today's Refund… stays and a partly paid invoice can't be cancelled until its payments are removed; corrections after 30 Nov aren't touched.
+- Consequences: owed figures everywhere read what is left to pay; the pay link charges what is left; every path that pays an invoice writes the ledger through one helper.
+- Rules: added when built.
