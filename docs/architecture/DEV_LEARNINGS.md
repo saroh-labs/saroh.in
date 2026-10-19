@@ -5290,3 +5290,13 @@ rule stands for the profile's own fields.
 **Fix.** All three go through `serializable()` in `admin-staff-invites.service.ts`, which runs again on `isSerializationFailure`; the checks inside run again, so a real conflict is still refused.
 
 **Rule.** Every `isolationLevel: "Serializable"` transaction retries a serialization failure a few times (`isSerializationFailure`), or says why it must not.
+
+### A seed test passed locally and failed in CI on DATABASE_URL (19 Oct 2026)
+
+**Symptom.** PR #1037's Unit tests job failed on `seed/staff.test.ts` ("grants no console access on a database that isn't on this machine"): `Cannot read properties of undefined (reading 'upsert')`. `pnpm prepush --all` had passed.
+
+**Cause.** The test called `seedStaff(prisma, undefined)` to mean "no URL", but an `undefined` argument takes the default, `process.env.DATABASE_URL`. CI's unit job sets that to a localhost name, so the seed ran against the stub; the local gate had no DATABASE_URL, so it returned null.
+
+**Fix.** The test stubs `DATABASE_URL` (`vi.stubEnv`) instead of passing `undefined`, and `scripts/prepush.sh` runs the vitest and seed steps with CI's unit `DATABASE_URL`, so the two read the same environment.
+
+**Rule.** Passing `undefined` never tests "not set" for a parameter with a default. A test that depends on an environment variable sets it itself; the local gate runs unit tests with CI's environment.

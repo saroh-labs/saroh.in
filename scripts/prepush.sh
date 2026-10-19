@@ -927,18 +927,23 @@ else
     bg_step "$API_UNIT" env SKIP_ENV_VALIDATION=1 $TURBO test:unit --only \
         --filter=@saroh/api $JEST_ARGS
 fi
+# CI's unit job runs with this DATABASE_URL (a local name nothing connects
+# to); run the same here, or a test that reads it passes locally and fails in
+# CI (seed/staff.test.ts, 19 Oct 2026).
+CI_UNIT_DB=postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
 # Every other package with a `test` script, as CI's unit job runs them, but
 # the database package: its demo-seed tests build 70 days of a business and
 # take most of a minute alone, so they run after this burst, not inside it.
 # shellcheck disable=SC2086
-bg_step "$VITEST" $GATE_TURBO test --only --filter="...[$MB]" --filter='!@saroh/api' \
+bg_step "$VITEST" env DATABASE_URL="$CI_UNIT_DB" $GATE_TURBO test --only --filter="...[$MB]" --filter='!@saroh/api' \
     --filter='!@saroh/database' $VITEST_ARGS
 bg_report
 if cached "$SEEDS" seeds; then
     say "$SEEDS" "PASS (cached)"
 elif affected @saroh/database; then
     # shellcheck disable=SC2086
-    step "$SEEDS" $TURBO test --only --filter=@saroh/database $SEED_ARGS
+    step "$SEEDS" env DATABASE_URL="$CI_UNIT_DB" $TURBO test --only \
+        --filter=@saroh/database $SEED_ARGS
 fi
 
 # A new migration must replay onto an empty database and match schema.prisma.
