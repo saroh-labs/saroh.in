@@ -269,6 +269,10 @@ describe("ReleaseTable", () => {
             ),
         );
         await waitFor(() => expect(toast.showUndo).toHaveBeenCalled());
+        // The dialog's submit is an async transition that closes it after
+        // the toast: a refresh drawn before it ends can wait on it, and the
+        // row then still reads Off (a gate under load, 19 Oct 2026).
+        await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 
         // The refresh: Shop is now on for some, which Off would hide.
         const shopOn = {
