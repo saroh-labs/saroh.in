@@ -2,7 +2,8 @@
 /**
  * The calendar's held actions: a refused or unreached write puts back only
  * its own mark, the Came toast asks for what is still to take, and a
- * cancel is late by the person's own free-cancel rule.
+ * cancel is late by the business's free-cancel rule, whoever takes it
+ * (free cancelling follows the business's refund policy; DEC-170).
  */
 import { act, useEffect } from "react";
 import type { Root } from "react-dom/client";
@@ -12,7 +13,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { UNREACHED } from "@/lib/api/unreached";
 import { HOLD_UNDO_MS } from "@/lib/hold-undo";
 import type { DiaryBooking } from "@/lib/services/booking-calendar";
-import type { StaffView } from "@/lib/staff/types";
 
 import { useCalendarActions } from "./use-calendar-actions";
 
@@ -60,17 +60,6 @@ const booking = (extra: Partial<DiaryBooking> = {}): DiaryBooking =>
         ...extra,
     }) as unknown as DiaryBooking;
 
-const asha = {
-    id: "asha",
-    name: "Asha Rao",
-    rules: {
-        bookAheadDays: null,
-        latestBookingMinutes: null,
-        freeCancelHours: 2,
-        gapMinutes: null,
-    },
-} as unknown as StaffView;
-
 type Api = ReturnType<typeof useCalendarActions>;
 const seen: { api: Api | null } = { api: null };
 const api = () => {
@@ -88,7 +77,6 @@ function Probe({ now, money }: { now: number; money: boolean }) {
             latestBookingMinutes: null,
             freeCancelHours: 24,
         },
-        staffById: new Map([["asha", asha]]),
     });
     useEffect(() => {
         seen.api = actions;
@@ -184,9 +172,18 @@ describe("the Came toast", () => {
 });
 
 describe("cancel", () => {
-    it("is late by the person's own rule, not the business's", () => {
-        // Five hours before: inside the business's 24, outside Asha's 2.
+    it("is late by the business's rule, whoever takes it", () => {
+        // Five hours before Asha's booking: inside the business's 24.
         draw(Date.parse(START) - 5 * 3_600_000);
+        act(() => api().act.cancel(booking()));
+        expect(api().overrides.b1).toEqual({
+            status: "CANCELLED",
+            cancelledLate: true,
+        });
+    });
+
+    it("is free outside the business's rule", () => {
+        draw(Date.parse(START) - 25 * 3_600_000);
         act(() => api().act.cancel(booking()));
         expect(api().overrides.b1).toEqual({
             status: "CANCELLED",

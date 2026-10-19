@@ -63,7 +63,7 @@ export function ClassSeats({
 }) {
     if (session.bookings.length === 0) return null;
     const start = Date.parse(session.startAt);
-    const rule = freeCancelOf(ctx, session.staff?.id);
+    const rule = freeCancelOf(ctx);
     let note = "";
     if (rule !== null && ctx.now < start) {
         const mark = new Date(start - rule * HOUR);

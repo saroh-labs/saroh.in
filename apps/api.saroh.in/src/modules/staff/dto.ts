@@ -2,6 +2,7 @@ import { Transform, Type } from "class-transformer";
 import {
     ArrayMaxSize,
     ArrayMinSize,
+    Equals,
     IsArray,
     IsBoolean,
     IsIn,
@@ -20,6 +21,7 @@ import {
 
 import type { BookingPayment } from "../bookings/booking-rules";
 import { BOOKING_PAYMENTS } from "../bookings/booking-rules";
+import { PERSON_FREE_CANCEL_REFUSAL } from "../bookings/person-rules";
 
 /** A person on the diary takes new bookings while ACTIVE (U3). */
 /** The longest gap between bookings a business or a person may keep. */
@@ -332,7 +334,8 @@ export class UpdateBookingRulesDto {
 /**
  * A person's own booking rules (DEC-170, #1038). Each is optional in the
  * body (absent: left as it is); `null` is "same as the business". The
- * ranges are the business rules' own.
+ * ranges are the business rules' own. Free cancelling is not one of them:
+ * it follows the business's refund policy (owner, 20 Oct 2026).
  */
 export class UpdatePersonRulesDto {
     /** How far ahead a customer may book them, in days. */
@@ -351,13 +354,14 @@ export class UpdatePersonRulesDto {
     @Max(10080)
     latestBookingMinutes?: number | null;
 
-    /** Free to cancel up to this many hours before; 0 is any time before. */
-    @IsOptional()
-    @ValidateIf((_, value) => value !== null)
-    @IsInt()
-    @Min(0)
-    @Max(720)
-    freeCancelHours?: number | null;
+    /**
+     * Refused whatever it holds, null included, with words saying why
+     * (DEC-170, owner 20 Oct 2026): declared only so the refusal is that
+     * rather than "property freeCancelHours should not exist".
+     */
+    @ValidateIf((_, value) => value !== undefined)
+    @Equals(undefined, { message: PERSON_FREE_CANCEL_REFUSAL })
+    freeCancelHours?: never;
 
     /** Minutes kept clear between their bookings; 0 is no gap. */
     @IsOptional()

@@ -142,8 +142,9 @@ export function PersonRulesPanels({
                             }
                         />
                         <p className={`mt-2.5 ${HELP}`}>
-                            How customers pay and refunds are the same for
-                            everyone · set in the business&apos;s Booking rules.
+                            How customers pay, refunds and free cancelling are
+                            the same for everyone · set in the business&apos;s
+                            Booking rules.
                         </p>
                         <p className={`mt-1.5 ${HELP}`}>
                             {changeHelp(pr, person)}

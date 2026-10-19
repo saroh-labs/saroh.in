@@ -168,7 +168,7 @@ export function OneLook({
     const rawPhone =
         [b.bookerPhone, read?.phone].map((p) => p?.trim()).find(Boolean) ??
         null;
-    const rule = freeCancelOf(ctx, b.staff?.id);
+    const rule = freeCancelOf(ctx);
     const help =
         state === "cancelled"
             ? `Cancelled${b.cancelledLate ? " late" : ""}.`

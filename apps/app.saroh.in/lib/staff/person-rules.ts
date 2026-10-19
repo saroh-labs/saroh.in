@@ -1,7 +1,6 @@
 import { count } from "@/lib/format/plural";
 import {
     aheadLabel,
-    cancelLabel,
     gapLabel,
     latestLabel,
     ruleRows,
@@ -16,30 +15,30 @@ import type {
 
 /**
  * Each person's own booking rules as Hours and time off says them (U20,
- * DEC-170, #1038): the four timing rules in the boards' order, the
+ * DEC-170, #1038): the three timing rules in the boards' order, the
  * sentence for a value, the choices a rule's sheet offers ("Same as the
  * business" first), and the lines the waiting, turned-down and request
- * states read. Paying and refunds stay business-wide and are never here.
+ * states read. Paying, refunds and free cancelling stay business-wide and
+ * are never here: free cancelling follows the business's refund policy
+ * (owner, 20 Oct 2026).
  *
  * A null is "same as the business". A person's 0 is a rule of its own:
- * up to the start, no gap, free to cancel any time before.
+ * up to the start, or no gap.
  */
 
 export type PersonRuleKey = keyof PersonRules;
 
-/** The four, in the order the boards list them. */
+/** The three, in the order the boards list them. */
 export const PERSON_RULE_KEYS: readonly PersonRuleKey[] = [
     "latestBookingMinutes",
     "bookAheadDays",
     "gapMinutes",
-    "freeCancelHours",
 ];
 
 const LABEL: Record<PersonRuleKey, string> = {
     latestBookingMinutes: "Booking late",
     bookAheadDays: "Booking ahead",
     gapMinutes: "Gap between bookings",
-    freeCancelHours: "Cancelling",
 };
 
 /** The choices a person's rule offers, besides "Same as the business". */
@@ -47,13 +46,11 @@ const CHOICES: Record<PersonRuleKey, readonly number[]> = {
     latestBookingMinutes: [60, 120, 720, 1440],
     bookAheadDays: [14, 28, 56, 90],
     gapMinutes: [0, 10, 15, 30],
-    freeCancelHours: [2, 12, 24, 0],
 };
 
 export const SAME_AS_BUSINESS: PersonRules = {
     bookAheadDays: null,
     latestBookingMinutes: null,
-    freeCancelHours: null,
     gapMinutes: null,
 };
 
@@ -79,10 +76,6 @@ export function personSentence(key: PersonRuleKey, value: number): string {
             return `Up to ${aheadWords(value)} ahead`;
         case "gapMinutes":
             return gapLabel(value);
-        case "freeCancelHours":
-            return value === 0
-                ? "Free to cancel any time before"
-                : `Free to cancel up to ${cancelLabel(value)}`;
     }
 }
 
@@ -129,14 +122,14 @@ export function rulesSummary(
     if (!n) {
         return {
             title: "Same as the business",
-            sub: "Notice, booking ahead, gaps and cancelling",
+            sub: "Notice, booking ahead and gaps",
         };
     }
     return {
         title: `${count(n, "rule", "rules")} just for ${name}`,
         sub:
             n === PERSON_RULE_KEYS.length
-                ? "Notice, booking ahead, gaps and cancelling"
+                ? "Notice, booking ahead and gaps"
                 : "The rest are the same as the business",
     };
 }
@@ -314,6 +307,19 @@ export function turnedDownLine(changes: RuleChanges, own: PersonRules): string {
     return `${asked.charAt(0).toUpperCase()}${asked.slice(1)}. ${stays}`;
 }
 
+/**
+ * The line of a request closed by a newer change (owner, 20 Oct 2026):
+ * "Booking late up to 12 hours before the start wasn't applied. The rules
+ * below are the ones in force."
+ */
+export function replacedLine(changes: RuleChanges): string {
+    const asked = askedWords(changes);
+    const what = asked
+        ? `${asked.charAt(0).toUpperCase()}${asked.slice(1)} wasn't applied.`
+        : "Nothing in it was applied.";
+    return `${what} The rules below are the ones in force.`;
+}
+
 /** What an approval does, said of the person: "Arjun's bookings now need 12 hours' notice". */
 export function nowWords(
     key: PersonRuleKey,
@@ -334,10 +340,6 @@ export function nowWords(
             return value === 0
                 ? `${name}'s bookings now need no gap between them`
                 : `${name}'s bookings now keep ${value} min between them`;
-        case "freeCancelHours":
-            return value === 0
-                ? `${name}'s bookings are now free to cancel any time before`
-                : `${name}'s bookings are now free to cancel up to ${cancelLabel(value)}`;
     }
 }
 
@@ -372,9 +374,5 @@ export function ifApproved(changes: RuleChanges, name: string): string {
             return value === 0
                 ? `If you approve, ${name}'s bookings need no gap between them.`
                 : `If you approve, ${name}'s bookings keep ${value} min between them.`;
-        case "freeCancelHours":
-            return value === 0
-                ? `If you approve, ${name}'s customers can cancel free any time before.`
-                : `If you approve, ${name}'s customers can cancel free up to ${cancelLabel(value)}.`;
     }
 }

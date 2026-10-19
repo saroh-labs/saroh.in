@@ -168,12 +168,11 @@ export function CalendarScreen({
         [staff],
     );
     // What the desk does, each held for its Undo, shown over the read.
-    const { overrides, act, heldFor, freeCancelFor } = useCalendarActions({
+    const { overrides, act, heldFor } = useCalendarActions({
         now,
         timezone,
         money: read.money,
         rules,
-        staffById,
     });
     const calendar = useMemo(
         () => withOverrides(read, overrides),
@@ -431,7 +430,6 @@ export function CalendarScreen({
                     now,
                     money,
                     rules,
-                    freeCancelFor,
                     canBook: can.book,
                     canRefund: can.refund ?? false,
                     canEditService: can.addPeople ?? false,

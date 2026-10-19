@@ -13,6 +13,7 @@ import {
     furthestAhead,
     hasChanges,
     nextRequestStatus,
+    PERSON_RULE_FIELDS,
     ruleChangeRoute,
     ruleFor,
     rulesForPerson,
@@ -66,16 +67,26 @@ describe("a person's rules fall back to the business's, field by field", () => {
         });
     });
 
-    it("keeps a 0 as theirs: no notice, no gap, cancel any time", () => {
+    it("keeps a 0 as theirs: no notice, no gap", () => {
         const rules = rulesForPerson(
             business,
-            own({ latestBookingMinutes: 0, freeCancelHours: 0, gapMinutes: 0 }),
+            own({ latestBookingMinutes: 0, gapMinutes: 0 }),
         );
         expect(rules).toMatchObject({
             latestBookingMinutes: 0,
-            freeCancelHours: 0,
             gapMinutes: 0,
         });
+    });
+
+    it("always keeps the business's free-cancel window (DEC-170, 20 Oct)", () => {
+        expect(PERSON_RULE_FIELDS).not.toContain("freeCancelHours");
+        expect(SAME_AS_BUSINESS).not.toHaveProperty("freeCancelHours");
+        // Even a stray value on a row is not theirs.
+        const rules = rulesForPerson(business, {
+            ...own({ latestBookingMinutes: 0 }),
+            freeCancelHours: 0,
+        } as PersonRules);
+        expect(rules.freeCancelHours).toBe(24);
     });
 
     it("never changes how people pay or the refund policy", () => {
@@ -236,7 +247,8 @@ describe("changes", () => {
                 gapMinutes: null,
                 refundInTimeCancels: false,
                 bookAheadDays: "14",
-                freeCancelHours: 1.5,
+                // Asked before 20 Oct: no longer a person's rule.
+                freeCancelHours: 2,
             }),
         ).toEqual({ latestBookingMinutes: 720, gapMinutes: null });
         expect(storedRuleChanges(null)).toEqual({});
@@ -246,7 +258,6 @@ describe("changes", () => {
     it("words a change as the boards do", () => {
         expect(
             changesWords({
-                freeCancelHours: 0,
                 gapMinutes: 15,
                 latestBookingMinutes: 720,
                 bookAheadDays: null,
@@ -255,7 +266,6 @@ describe("changes", () => {
             "Booking late: up to 12 hours before the start",
             "Booking ahead: same as the business",
             "15 min between bookings",
-            "Free to cancel any time before",
         ]);
     });
 });
@@ -266,11 +276,12 @@ describe("a request's moves", () => {
         ["turn-down", "TURNED_DOWN"],
         ["withdraw", "WITHDRAWN"],
         ["replace", "WITHDRAWN"],
+        ["supersede", "REPLACED"],
     ] as const)("a waiting request on %s is %s", (move, to) => {
         expect(nextRequestStatus("WAITING", move)).toBe(to);
     });
 
-    it.each(["APPROVED", "TURNED_DOWN", "WITHDRAWN"])(
+    it.each(["APPROVED", "TURNED_DOWN", "WITHDRAWN", "REPLACED"])(
         "a %s request moves no more",
         (status) => {
             for (const move of [
@@ -278,6 +289,7 @@ describe("a request's moves", () => {
                 "turn-down",
                 "withdraw",
                 "replace",
+                "supersede",
             ] as const) {
                 expect(nextRequestStatus(status, move)).toBeNull();
             }

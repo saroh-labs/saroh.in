@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     ConflictException,
     ForbiddenException,
     Injectable,
@@ -24,6 +25,7 @@ import {
     changesWords,
     hasChanges,
     nextRequestStatus,
+    PERSON_FREE_CANCEL_REFUSAL,
     personRulesOf,
     requestStatusOf,
     ruleChangeRoute,
@@ -31,15 +33,18 @@ import {
     storedRuleChanges,
 } from "../bookings/person-rules";
 import {
-    answerTitle,
     cleanReason,
-    RULE_ANSWER_NOTIFICATION_TYPE,
     RULE_REQUEST_NOTIFICATION_TYPE,
 } from "../notifications/ask-alerts";
 import { noticeOf } from "../notifications/notice-target";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { allows } from "../organizations/organization-policy";
 import type { UpdatePersonRulesDto } from "./dto";
+import {
+    lockWaitingInTx,
+    replaceWaitingInTx,
+    tellAskerInTx,
+} from "./rule-request-close";
 import { personRuleChanges, recordPersonRulesInTx } from "./rules-history";
 import type {
     PersonRulesSaved,
@@ -53,7 +58,6 @@ const PERSON_SELECT = {
     name: true,
     bookAheadDays: true,
     latestBookingMinutes: true,
-    freeCancelHours: true,
     gapMinutes: true,
     membership: { select: { userId: true } },
 } as const;
@@ -81,7 +85,12 @@ const DECIDES_REFUSAL =
  * - A Reviewer, and Calendar only, change nobody's.
  *
  * One request waits per person: asking again replaces it (the old one
- * reads as withdrawn). Every change and every move lands in the
+ * reads as withdrawn). A newer change closes it as "Replaced by a newer
+ * change" (owner, 20 Oct 2026): their rules changed directly by someone
+ * allowed to (here), or the business switching approval off
+ * (`StaffService.updateBookingRules`); the person is told as of an
+ * approval (`rule-request-close.ts`). A person's own free-cancel window is
+ * refused: it follows the business's refund policy. Every change and every move lands in the
  * business's history (`rules-history.ts`). A new request tells owners and
  * admins in the inbox and by email; an approval or a turn-down tells the
  * person who asked, in their own alerts and by email, with the reason
@@ -113,6 +122,12 @@ export class StaffRulesService {
             "hours:write",
             "Your role can't change booking rules.",
         );
+        // The DTO refuses it too; this holds for a caller that skips it.
+        if (
+            (dto as { freeCancelHours?: unknown }).freeCancelHours !== undefined
+        ) {
+            throw new BadRequestException(PERSON_FREE_CANCEL_REFUSAL);
+        }
         const person = await this.requirePerson(ctx, staffId);
         const business = await loadBookingRules(prisma, ctx.organizationId);
         const route = ruleChangeRoute({
@@ -125,10 +140,27 @@ export class StaffRulesService {
         if (route === "apply") {
             // Read and written under the person's row lock, and only the
             // fields this save changes: two people saving different rules
-            // of one person at once both keep theirs.
-            const previous = await prisma.$transaction((tx) =>
-                this.applyInTx(tx, ctx, person.id, dto, "direct"),
-            );
+            // of one person at once both keep theirs. A request of theirs
+            // still waiting is closed by it, its lock taken first, as an
+            // approval takes it.
+            const previous = await prisma.$transaction(async (tx) => {
+                const waiting = await lockWaitingInTx(
+                    tx,
+                    ctx.organizationId,
+                    person.id,
+                );
+                const before = await this.applyInTx(
+                    tx,
+                    ctx,
+                    person.id,
+                    dto,
+                    "direct",
+                );
+                if (hasChanges(before)) {
+                    await replaceWaitingInTx(tx, ctx, waiting, "rules-changed");
+                }
+                return before;
+            });
             return {
                 applied: true,
                 previous,
@@ -442,30 +474,17 @@ export class StaffRulesService {
         reason: string | null,
     ): Promise<void> {
         const asked = changesWords(storedRuleChanges(row.changes)).join(" · ");
-        const notice = await tx.notification.create({
-            data: {
-                organizationId: ctx.organizationId,
-                userId: row.requestedByUserId,
-                ...noticeOf(RULE_ANSWER_NOTIFICATION_TYPE, {
-                    staffId: row.staffId,
-                }),
-                title: answerTitle(outcome),
-                body:
-                    outcome === "APPROVED"
-                        ? asked
-                        : cleanReason(reason)
-                          ? `${asked}. Reason: ${cleanReason(reason)}`
-                          : `${asked}. No reason was given.`,
-            },
-            select: { id: true },
-        });
-        await enqueueTeamAlert(tx, ctx.organizationId, {
-            event: "ask",
-            about: "rules",
-            requestId: row.id,
-            step: "answered",
-            notificationId: notice.id,
-        });
+        await tellAskerInTx(
+            tx,
+            ctx.organizationId,
+            row,
+            outcome,
+            outcome === "APPROVED"
+                ? asked
+                : cleanReason(reason)
+                  ? `${asked}. Reason: ${cleanReason(reason)}`
+                  : `${asked}. No reason was given.`,
+        );
     }
 
     private async view(
@@ -480,7 +499,9 @@ export class StaffRulesService {
                     OR: [
                         { status: "WAITING" },
                         {
-                            status: { in: ["APPROVED", "TURNED_DOWN"] },
+                            status: {
+                                in: ["APPROVED", "TURNED_DOWN", "REPLACED"],
+                            },
                             dismissedAt: null,
                         },
                     ],

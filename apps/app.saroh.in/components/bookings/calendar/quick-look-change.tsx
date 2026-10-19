@@ -273,7 +273,7 @@ export function MoveStep({
                     Only times{" "}
                     {b.staff ? firstName(b.staff.name) : "the service"}{" "}
                     {b.staff ? "is" : "has"} free and nobody has taken.
-                    {freeCancelOf(ctx, b.staff?.id) !== null
+                    {freeCancelOf(ctx) !== null
                         ? " Moving keeps the free-cancel time from when it was booked."
                         : ""}
                 </p>

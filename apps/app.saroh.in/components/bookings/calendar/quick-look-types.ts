@@ -24,11 +24,6 @@ export interface QuickLookContext {
     now: number;
     money: boolean;
     rules: BookingRules | null;
-    /**
-     * The free-cancel hours for a booking with this person: their own rule,
-     * else the business's (`freeCancelHoursFor`). Absent: the business's.
-     */
-    freeCancelFor?: (staffId: string | null | undefined) => number | null;
     canBook: boolean;
     /**
      * `payment:manage`: may change what the business's policy does with
@@ -56,12 +51,12 @@ export interface QuickLookContext {
     notices?: NoticeChannels | null;
 }
 
-/** The free-cancel hours that apply to a booking with `staffId`. */
+/**
+ * The free-cancel hours that apply to a booking: the business's, whoever
+ * takes it (free cancelling follows its refund policy; DEC-170, 20 Oct).
+ */
 export function freeCancelOf(
-    ctx: Pick<QuickLookContext, "rules" | "freeCancelFor">,
-    staffId: string | null | undefined,
+    ctx: Pick<QuickLookContext, "rules">,
 ): number | null {
-    return ctx.freeCancelFor
-        ? ctx.freeCancelFor(staffId)
-        : (ctx.rules?.freeCancelHours ?? null);
+    return ctx.rules?.freeCancelHours ?? null;
 }

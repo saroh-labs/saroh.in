@@ -51,6 +51,7 @@ import type { BookingBrief } from "./off-bookings";
 import { bookingsInSpans, MAX_LISTED, upcomingBookings } from "./off-bookings";
 import type { OffSpan } from "./off-range";
 import { offRangeRefusal, offSpans } from "./off-range";
+import { lockWaitingInTx, replaceWaitingInTx } from "./rule-request-close";
 import { recordBusinessRulesInTx } from "./rules-history";
 import { diarySeatDelta } from "./staff-seats";
 
@@ -710,7 +711,10 @@ export class StaffService {
     /**
      * Set the business's rules; an absent field is left, `null` clears it.
      * Each change lands in the business's history (#1038): the fields as
-     * they were and became, in the same transaction.
+     * they were and became, in the same transaction. Switching "Members'
+     * rule changes need approval" off closes every request still waiting
+     * as "Replaced by a newer change", and tells each person (owner, 20
+     * Oct 2026; `rule-request-close.ts`).
      */
     async updateBookingRules(
         ctx: OrganizationContext,
@@ -753,6 +757,17 @@ export class StaffService {
             });
             const after = bookingRulesOf(row);
             await recordBusinessRulesInTx(tx, ctx, before, after);
+            if (
+                before.memberRuleChangesNeedApproval &&
+                !after.memberRuleChangesNeedApproval
+            ) {
+                await replaceWaitingInTx(
+                    tx,
+                    ctx,
+                    await lockWaitingInTx(tx, ctx.organizationId),
+                    "approval-off",
+                );
+            }
             return after;
         });
     }

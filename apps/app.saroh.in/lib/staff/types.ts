@@ -120,13 +120,13 @@ export interface BookingRules {
 
 /**
  * A person's own booking rules (DEC-170, #1038): their timing rules, each
- * null when it is the same as the business's. Paying and refunds stay
- * business-wide.
+ * null when it is the same as the business's. Paying, refunds and the
+ * free-cancel window stay business-wide: free cancelling follows the
+ * business's refund policy (owner, 20 Oct 2026).
  */
 export interface PersonRules {
     bookAheadDays: number | null;
     latestBookingMinutes: number | null;
-    freeCancelHours: number | null;
     gapMinutes: number | null;
 }
 
@@ -137,12 +137,15 @@ export type RuleChanges = Partial<PersonRules>;
 export interface TimingRules {
     bookAheadDays: number | null;
     latestBookingMinutes: number | null;
-    freeCancelHours: number | null;
     gapMinutes: number;
 }
 
+/**
+ * REPLACED: "Replaced by a newer change" — closed while it waited, by the
+ * person's rules being changed directly or approval being switched off.
+ */
 export type RuleRequestStatus =
-    "WAITING" | "APPROVED" | "TURNED_DOWN" | "WITHDRAWN";
+    "WAITING" | "APPROVED" | "TURNED_DOWN" | "WITHDRAWN" | "REPLACED";
 
 /** Someone a request names, as they are now. */
 export interface RulePerson {

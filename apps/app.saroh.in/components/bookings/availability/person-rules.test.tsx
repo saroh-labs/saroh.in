@@ -78,7 +78,6 @@ import { MEMBER_LINE } from "./whose-hours";
 const SAME: PersonRules = {
     bookAheadDays: null,
     latestBookingMinutes: null,
-    freeCancelHours: null,
     gapMinutes: null,
 };
 const APPROVAL: BookingRules = {
@@ -123,13 +122,11 @@ const view = (
     business: {
         bookAheadDays: 28,
         latestBookingMinutes: 120,
-        freeCancelHours: 24,
         gapMinutes: 0,
     },
     effective: {
         bookAheadDays: own.bookAheadDays ?? 28,
         latestBookingMinutes: own.latestBookingMinutes ?? 120,
-        freeCancelHours: own.freeCancelHours ?? 24,
         gapMinutes: own.gapMinutes ?? 0,
     },
     canChange: true,
@@ -208,7 +205,9 @@ describe.each([
         const s = said(section());
         expect(s).toContain("Booking rules for Meera");
         expect(s).toContain("Same as the business");
-        expect(s).toContain("Notice, booking ahead, gaps and cancelling");
+        expect(s).toContain("Notice, booking ahead and gaps");
+        // Free cancelling is the business's (DEC-170, 20 Oct).
+        expect(s).not.toContain("cancelling");
         expect(s).toContain("Change");
     });
 
@@ -225,7 +224,7 @@ describe.each([
         expect(s).toContain("The rest are the same as the business");
     });
 
-    it("lists the four timing rules, whose each is, and leaves paying and refunds to the business", async () => {
+    it("lists the three timing rules, whose each is, and leaves paying, refunds and cancelling to the business", async () => {
         owner({
             staff: [
                 { ...MEERA, rules: { ...SAME, gapMinutes: 15 } },
@@ -246,11 +245,13 @@ describe.each([
             ["latestBookingMinutes", "Up to 2 hours before the start"],
             ["bookAheadDays", "Up to 4 weeks ahead"],
             ["gapMinutes", "15 min between bookings"],
-            ["freeCancelHours", "Free to cancel up to 24 hours before"],
         ]);
+        // No cancel window of their own: it follows the refund policy.
+        expect(d).not.toContain("Cancelling");
+        expect(d).not.toContain("Free to cancel");
         expect(d).toContain("Just for Meera");
         expect(d).toContain(
-            "How customers pay and refunds are the same for everyone · set in the business's Booking rules.",
+            "How customers pay, refunds and free cancelling are the same for everyone · set in the business's Booking rules.",
         );
         expect(d).not.toContain("Paying");
         expect(d).toContain("Saves as soon as you pick, with Undo.");
@@ -622,6 +623,29 @@ describe.each([
         await settle();
         expect(actions.dismissRuleRequest).toHaveBeenCalledWith("rq_1");
         expect(said(section())).not.toContain("Turned down");
+    });
+
+    it("shows a Member their request replaced by a newer change; OK clears it", async () => {
+        const replaced = request({
+            staffId: "st_meera",
+            staffName: "Meera Iyer",
+            status: "REPLACED",
+            decidedBy: { userId: "u_owner", name: "Mohit Mehta" },
+        });
+        member(view(SAME, replaced));
+        const s = said(section());
+        expect(s).toContain(
+            "Replaced by a newer change · Booking late up to 12 hours before the start wasn't applied. The rules below are the ones in force.",
+        );
+        expect(s).not.toContain("Waiting for approval");
+        actions.dismissRuleRequest.mockResolvedValue({
+            ok: true,
+            data: replaced,
+        });
+        await press(button("OK"));
+        await settle();
+        expect(actions.dismissRuleRequest).toHaveBeenCalledWith("rq_1");
+        expect(said(section())).not.toContain("Replaced by a newer change");
     });
 
     it("Change it again clears the turn-down and opens the rule it was about", async () => {

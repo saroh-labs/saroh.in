@@ -5,10 +5,12 @@ import {
     choiceValue,
     ifApproved,
     nowWords,
+    PERSON_RULE_KEYS,
     personChoices,
     personRuleRows,
     personRuleSaved,
     personSentence,
+    replacedLine,
     requestLine,
     rulesSummary,
     SAME,
@@ -38,12 +40,9 @@ describe("each person's own booking rules, in words (#1038)", () => {
             "Up to 3 months ahead",
         );
         expect(personSentence("gapMinutes", 0)).toBe("No gap needed");
-        expect(personSentence("freeCancelHours", 0)).toBe(
-            "Free to cancel any time before",
-        );
     });
 
-    it("lists the four timing rules, theirs else the business's", () => {
+    it("lists the three timing rules, theirs else the business's, and no cancelling", () => {
         const rows = personRuleRows(
             { ...SAME_AS_BUSINESS, gapMinutes: 15 },
             BUSINESS,
@@ -52,14 +51,16 @@ describe("each person's own booking rules, in words (#1038)", () => {
             ["Booking late", "Up to 2 hours before the start", false],
             ["Booking ahead", "Up to 4 weeks ahead", false],
             ["Gap between bookings", "15 min between bookings", true],
-            ["Cancelling", "Free to cancel up to 24 hours before", false],
         ]);
+        // Free cancelling follows the business's refund policy (DEC-170,
+        // 20 Oct): never a person's own.
+        expect(PERSON_RULE_KEYS).not.toContain("freeCancelHours");
     });
 
     it("sums them up for the row", () => {
         expect(rulesSummary(SAME_AS_BUSINESS, "Meera")).toEqual({
             title: "Same as the business",
-            sub: "Notice, booking ahead, gaps and cancelling",
+            sub: "Notice, booking ahead and gaps",
         });
         expect(
             rulesSummary(
@@ -125,6 +126,12 @@ describe("each person's own booking rules, in words (#1038)", () => {
         );
         expect(ifApproved(changes, "Arjun")).toBe(
             "If you approve, customers can't book Arjun with less than 12 hours' notice.",
+        );
+        expect(replacedLine(changes)).toBe(
+            "Booking late up to 12 hours before the start wasn't applied. The rules below are the ones in force.",
+        );
+        expect(replacedLine({})).toBe(
+            "Nothing in it was applied. The rules below are the ones in force.",
         );
     });
 });

@@ -140,14 +140,18 @@ export const AuditAction = {
     // staff member as the target and their name in `staff`: applied at
     // once (`via: "direct"`) or by an approval (`via: "approved"`), with
     // `changes`; and a request's moves — asked (`asked`, the values),
-    // approved, turned down (with `reason` when given) and withdrawn
-    // (`replaced` when a new ask took its place).
+    // approved, turned down (with `reason` when given), withdrawn
+    // (`replaced` when a new ask took its place), and replaced by a newer
+    // change (`because`: "rules-changed" when the person's rules were
+    // changed directly, "approval-off" when the switch went off; owner,
+    // 20 Oct 2026).
     BookingRulesUpdate: "booking-rules.update",
     StaffRulesUpdate: "staff.booking-rules.update",
     StaffRulesRequested: "staff.booking-rules.requested",
     StaffRulesApproved: "staff.booking-rules.approved",
     StaffRulesTurnedDown: "staff.booking-rules.turned-down",
     StaffRulesWithdrawn: "staff.booking-rules.withdrawn",
+    StaffRulesReplaced: "staff.booking-rules.replaced",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

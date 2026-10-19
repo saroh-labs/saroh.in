@@ -11,7 +11,11 @@
  *   Reviewer and Calendar only change nobody's;
  * - the business's gap between bookings, and a person's own, keep the time
  *   either side of a booking clear, by hand and on the booking page;
- * - a person's own cancelling rule fixes a booking's free-cancel deadline;
+ * - a person's own cancelling rule is refused with a 400, and every
+ *   booking's free-cancel deadline is the business's (owner, 20 Oct 2026);
+ * - a waiting request closes as "Replaced by a newer change" when that
+ *   person's rules are changed directly, and when approval is switched
+ *   off, and the person is told in their own alerts and by email;
  * - the switch is on for a business with no rules row, and the column's
  *   default puts it on for every existing row;
  * - owners and admins are told of a request, and every change and move is
@@ -20,13 +24,19 @@
  * Runs in the integration project (TEST_DATABASE_URL), plain and with
  * TEST_RLS=on.
  */
-import { ForbiddenException, NotFoundException } from "@nestjs/common";
+import {
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+} from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { giveBusinessDetails } from "../../../test/business-details";
 import { backendPid, waitUntilBlockedBy } from "../../../test/lock-wait";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { BookingsService } from "../bookings/bookings.service";
+import { PERSON_FREE_CANCEL_REFUSAL } from "../bookings/person-rules";
 import { PublicBookingsService } from "../bookings/public-bookings.service";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import {
@@ -34,6 +44,7 @@ import {
     CALENDAR_ONLY_ROLE_KEY,
 } from "../organizations/calendar-only-role";
 import { resolveCapabilities } from "../organizations/organization-policy";
+import type { UpdatePersonRulesDto } from "./dto";
 import { StaffRulesService } from "./staff-rules.service";
 import { StaffService } from "./staff.service";
 
@@ -254,9 +265,11 @@ afterEach(async () => {
         data: {
             bookAheadDays: null,
             latestBookingMinutes: null,
-            freeCancelHours: null,
             gapMinutes: null,
         },
+    });
+    await prisma.job.deleteMany({
+        where: { organizationId: orgId, type: "team.alert" },
     });
 });
 
@@ -531,13 +544,13 @@ describe("whose rules who changes", () => {
     it("lets owners and admins change anyone's at once, switch or not", async () => {
         const saved = await rules.update(admin, meera, {
             bookAheadDays: 7,
-            freeCancelHours: 0,
+            gapMinutes: 0,
         });
         expect(saved.applied).toBe(true);
         expect(saved.rules.needsApproval).toBe(false);
         expect(saved.rules.own).toMatchObject({
             bookAheadDays: 7,
-            freeCancelHours: 0,
+            gapMinutes: 0,
         });
         await expect(
             rules.update(owner, meera, { bookAheadDays: null }),
@@ -646,10 +659,36 @@ describe("the gap between bookings", () => {
     });
 });
 
-describe("a person's own cancelling rule", () => {
-    it("fixes a booking's free-cancel deadline from theirs, else the business's", async () => {
+describe("free cancelling follows the business's refund policy (20 Oct)", () => {
+    it("refuses a person's own cancelling rule with a 400 that says why, and changes nothing", async () => {
+        for (const who of [owner, arjunCtx]) {
+            for (const freeCancelHours of [2, 0, null]) {
+                const refused = rules.update(who, arjun, {
+                    gapMinutes: 10,
+                    freeCancelHours,
+                } as unknown as UpdatePersonRulesDto);
+                await expect(refused).rejects.toBeInstanceOf(
+                    BadRequestException,
+                );
+                await expect(refused).rejects.toMatchObject({
+                    status: 400,
+                    message: PERSON_FREE_CANCEL_REFUSAL,
+                });
+            }
+        }
+        expect((await rules.read(owner, arjun)).own).toEqual({
+            bookAheadDays: null,
+            latestBookingMinutes: null,
+            gapMinutes: null,
+        });
+        await expect(
+            prisma.staffRuleRequest.count({ where: { staffId: arjun } }),
+        ).resolves.toBe(0);
+    });
+
+    it("gives every booking the business's free-cancel deadline, whoever takes it", async () => {
         await staff.updateBookingRules(owner, { freeCancelHours: 24 });
-        await rules.update(owner, arjun, { freeCancelHours: 2 });
+        await rules.update(owner, arjun, { gapMinutes: 5 });
         const withArjun = await bookings.bookByHand(owner, ptId, {
             startAt: at(10).toISOString(),
             contactId,
@@ -664,10 +703,9 @@ describe("a person's own cancelling rule", () => {
             prisma.booking.findUniqueOrThrow({ where: { id: withArjun.id } }),
             prisma.booking.findUniqueOrThrow({ where: { id: withMeera.id } }),
         ]);
-        expect(a.freeCancelUntil?.toISOString()).toBe(at(8).toISOString());
-        expect(m.freeCancelUntil?.toISOString()).toBe(
-            new Date(at(10).getTime() - 24 * HOUR).toISOString(),
-        );
+        const deadline = new Date(at(10).getTime() - 24 * HOUR).toISOString();
+        expect(a.freeCancelUntil?.toISOString()).toBe(deadline);
+        expect(m.freeCancelUntil?.toISOString()).toBe(deadline);
     });
 });
 
@@ -678,7 +716,6 @@ describe("the people list", () => {
         expect(list.staff.find((p) => p.id === arjun)?.rules).toEqual({
             bookAheadDays: null,
             latestBookingMinutes: null,
-            freeCancelHours: null,
             gapMinutes: 15,
         });
     });
@@ -843,5 +880,172 @@ describe("who reads a request", () => {
         });
         expect(notice.body).not.toContain("evil.example");
         expect(notice.body).toContain("Reason: See now");
+    });
+});
+
+/** The notices in someone's own alerts (`userId`), newest last. */
+async function ownNotices(userId: string) {
+    return prisma.notification.findMany({
+        where: { organizationId: orgId, userId },
+        orderBy: { createdAt: "asc" },
+    });
+}
+
+describe("a waiting request replaced by a newer change (20 Oct)", () => {
+    it("closes when an owner changes that person's rules directly, and tells them", async () => {
+        const asked = await rules.update(arjunCtx, arjun, {
+            latestBookingMinutes: 12 * 60,
+        });
+        const id = asked.rules.request!.id;
+        // Meera's request is hers: a change to Arjun's leaves it.
+        const hers = await rules.update(meeraCtx, meera, { gapMinutes: 10 });
+
+        const saved = await rules.update(owner, arjun, { bookAheadDays: 14 });
+        expect(saved.applied).toBe(true);
+        expect(saved.rules.own).toMatchObject({
+            bookAheadDays: 14,
+            latestBookingMinutes: null,
+        });
+        const row = await prisma.staffRuleRequest.findUniqueOrThrow({
+            where: { id },
+        });
+        expect(row).toMatchObject({
+            status: "REPLACED",
+            decidedByUserId: owner.userId,
+            reason: null,
+        });
+        expect(row.decidedAt).not.toBeNull();
+        await expect(
+            prisma.staffRuleRequest.findUniqueOrThrow({
+                where: { id: hers.rules.request!.id },
+            }),
+        ).resolves.toMatchObject({ status: "WAITING" });
+
+        // Told in their own alerts, and an email queued with it.
+        const [notice] = await ownNotices(arjunCtx.userId);
+        expect(notice).toMatchObject({
+            type: "hours.rule-answer",
+            title: "Your booking rules change was replaced by a newer change",
+            body: "Booking late: up to 12 hours before the start. Your booking rules were changed directly, so nothing in it was applied.",
+        });
+        await expect(answerJobs(id)).resolves.toHaveLength(1);
+        expect(
+            (await history("staff.booking-rules.replaced"))[0]?.metadata,
+        ).toMatchObject({
+            staff: "Arjun",
+            requestId: id,
+            because: "rules-changed",
+        });
+
+        // Arjun sees it until he says OK; nobody can decide it any more.
+        const seen = await rules.read(arjunCtx, arjun);
+        expect(seen.request).toMatchObject({ id, status: "REPLACED" });
+        await expect(rules.approve(owner, id)).rejects.toMatchObject({
+            response: expect.objectContaining({
+                message: "This request was already replaced by a newer change.",
+            }),
+        });
+        await expect(rules.withdraw(arjunCtx, id)).rejects.toBeInstanceOf(
+            ConflictException,
+        );
+        await rules.dismiss(arjunCtx, id);
+        expect((await rules.read(arjunCtx, arjun)).request).toBeNull();
+    });
+
+    it("stays waiting when a direct save changes nothing", async () => {
+        await rules.update(owner, arjun, { bookAheadDays: 14 });
+        const asked = await rules.update(arjunCtx, arjun, { gapMinutes: 10 });
+        await rules.update(owner, arjun, { bookAheadDays: 14 });
+        await expect(
+            prisma.staffRuleRequest.findUniqueOrThrow({
+                where: { id: asked.rules.request!.id },
+            }),
+        ).resolves.toMatchObject({ status: "WAITING" });
+        await expect(ownNotices(arjunCtx.userId)).resolves.toEqual([]);
+    });
+
+    it("closes every request waiting when the business switches approval off", async () => {
+        const a = await rules.update(arjunCtx, arjun, { bookAheadDays: 7 });
+        const m = await rules.update(meeraCtx, meera, { gapMinutes: 10 });
+        // One already decided stays as it was.
+        const decided = a.rules.request!.id;
+        await rules.turnDown(owner, decided, "Not now.");
+        const again = await rules.update(arjunCtx, arjun, { bookAheadDays: 5 });
+
+        await setSwitch(false);
+        const rows = await prisma.staffRuleRequest.findMany({
+            where: { organizationId: orgId },
+            orderBy: { createdAt: "asc" },
+        });
+        expect(rows.map((r) => [r.id, r.status, r.decidedByUserId])).toEqual([
+            [decided, "TURNED_DOWN", owner.userId],
+            [m.rules.request!.id, "REPLACED", owner.userId],
+            [again.rules.request!.id, "REPLACED", owner.userId],
+        ]);
+        // Nothing they asked for applied.
+        expect((await rules.read(owner, arjun)).own.bookAheadDays).toBeNull();
+        expect((await rules.read(owner, meera)).own.gapMinutes).toBeNull();
+
+        for (const [who, id] of [
+            [meeraCtx.userId, m.rules.request!.id],
+            [arjunCtx.userId, again.rules.request!.id],
+        ] as const) {
+            const notices = await ownNotices(who);
+            expect(notices.at(-1)).toMatchObject({
+                type: "hours.rule-answer",
+                title: "Your booking rules change was replaced by a newer change",
+                body: expect.stringMatching(
+                    /Changes to your own rules no longer need approval, so nothing in it was applied\. You can change them yourself now\.$/,
+                ),
+            });
+            await expect(answerJobs(id)).resolves.toHaveLength(1);
+        }
+        const replaced = await history("staff.booking-rules.replaced");
+        expect(replaced.map((e) => e.metadata)).toEqual([
+            expect.objectContaining({ because: "approval-off" }),
+            expect.objectContaining({ because: "approval-off" }),
+        ]);
+
+        // Off again, or on: nothing more is closed or told.
+        await setSwitch(false);
+        await setSwitch(true);
+        await expect(
+            history("staff.booking-rules.replaced"),
+        ).resolves.toHaveLength(2);
+    });
+
+    it("leaves requests alone when other business rules change", async () => {
+        const asked = await rules.update(arjunCtx, arjun, { gapMinutes: 10 });
+        await staff.updateBookingRules(owner, { bookAheadDays: 30 });
+        await expect(
+            prisma.staffRuleRequest.findUniqueOrThrow({
+                where: { id: asked.rules.request!.id },
+            }),
+        ).resolves.toMatchObject({ status: "WAITING" });
+    });
+
+    it("a direct change and an approval at once: one wins, never both", async () => {
+        const asked = await rules.update(arjunCtx, arjun, { gapMinutes: 10 });
+        const id = asked.rules.request!.id;
+        const [direct, approve] = await Promise.allSettled([
+            rules.update(owner, arjun, { bookAheadDays: 14 }),
+            rules.approve(admin, id),
+        ]);
+        expect(direct.status).toBe("fulfilled");
+        const row = await prisma.staffRuleRequest.findUniqueOrThrow({
+            where: { id },
+        });
+        const own = (await rules.read(owner, arjun)).own;
+        expect(own.bookAheadDays).toBe(14);
+        if (approve.status === "fulfilled") {
+            // Approved first: applied, and the direct change came after.
+            expect(row.status).toBe("APPROVED");
+            expect(own.gapMinutes).toBe(10);
+        } else {
+            expect(approve.reason).toMatchObject({ status: 409 });
+            expect(row.status).toBe("REPLACED");
+            expect(own.gapMinutes).toBeNull();
+        }
+        await expect(answerJobs(id)).resolves.toHaveLength(1);
     });
 });

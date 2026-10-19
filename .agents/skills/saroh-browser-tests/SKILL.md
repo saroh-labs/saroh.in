@@ -70,6 +70,13 @@ screen, `expect.poll` on the API or on a measurement that must settle, and
 for a timer in the page (a ten-second hold, an Undo toast) install
 `page.clock` before the page loads and `runFor` past it.
 
+**The first press on a page after a `goto` or `reload` goes through
+`pressUntil(button, answer)`** (`e2e/fixtures/press.ts`). A server-drawn
+button pressed before React hydrates does nothing, and on CI a page's own
+content can hydrate well after the shell. It presses until `answer` (a
+Locator that shows, or a check such as `aria-pressed`) holds, and never
+presses again once it does (DEV_LEARNINGS, 19 Oct 2026).
+
 Never read the page once with `page.evaluate` and assert on the result: CI's
 runners are slower than this Mac, and a single look can land between two
 pages (a redirect) or before a list has drawn. Put the measurement inside

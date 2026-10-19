@@ -5201,11 +5201,11 @@ model StaffMember {
 
   // Their own timing rules for their diary (DEC-170, #1038), each one
   // falling back to the business's (`BookingRules`) when null — "same as
-  // the business". Paying and refunds stay business-wide. CHECKed to the
-  // business rules' own ranges.
+  // the business". Paying, refunds and the free-cancel window stay
+  // business-wide: free cancelling follows the business's refund policy
+  // (owner, 20 Oct 2026). CHECKed to the business rules' own ranges.
   bookAheadDays        Int? // how far ahead a customer may book them, in days
   latestBookingMinutes Int? // the notice they need before a start
-  freeCancelHours      Int? // free to cancel up to this long before
   gapMinutes           Int? // kept clear between their bookings
   ruleRequests         StaffRuleRequest[]
 
@@ -5359,7 +5359,10 @@ model BookingRules {
 /// A change someone asked for to their own booking rules while "Members'
 /// rule changes need approval" is on (DEC-170, #1038). It changes nothing
 /// until an owner or admin approves it. WAITING → APPROVED | TURNED_DOWN |
-/// WITHDRAWN, CHECKed; one WAITING per person (a new ask replaces it).
+/// WITHDRAWN | REPLACED, CHECKed; one WAITING per person (a new ask
+/// replaces it, as WITHDRAWN). REPLACED is "Replaced by a newer change":
+/// the person's rules changed directly, or approval switched off (owner,
+/// 20 Oct 2026); `decidedByUserId` is who made that change.
 model StaffRuleRequest {
   id             String       @id @default(cuid())
   organizationId String
@@ -5373,7 +5376,7 @@ model StaffRuleRequest {
   // "same as the business" (`bookings/person-rules.ts`).
   changes           Json
 
-  status String @default("WAITING") // WAITING | APPROVED | TURNED_DOWN | WITHDRAWN
+  status String @default("WAITING") // WAITING | APPROVED | TURNED_DOWN | WITHDRAWN | REPLACED
 
   // Turned down: the optional words the person reads.
   reason          String?
