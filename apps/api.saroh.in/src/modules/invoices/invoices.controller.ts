@@ -39,6 +39,7 @@ import {
 import { InvoicePaymentsService } from "./invoice-payments.service";
 import { InvoicePdfService } from "./invoice-pdf.service";
 import { InvoiceSendService } from "./invoice-send.service";
+import { InvoiceSummaryService } from "./invoice-summary.service";
 import { InvoicesService } from "./invoices.service";
 import { payLinkUrlFor } from "./pay-link-url";
 
@@ -61,6 +62,7 @@ export class InvoicesController {
         private readonly sending: InvoiceSendService,
         private readonly pdfs: InvoicePdfService,
         private readonly payments: InvoicePaymentsService,
+        private readonly summaries: InvoiceSummaryService,
     ) {}
 
     @Get()
@@ -69,6 +71,16 @@ export class InvoicesController {
         @Query() query: ListInvoicesQueryDto,
     ) {
         return this.invoices.list(ctx, query);
+    }
+
+    /**
+     * The money strip (DEC-173, U4): owed, overdue, paid this month,
+     * drafts and cheques not in the bank, each with the filter it applies.
+     * Counts only without `payment:read`. Before `:invoiceId`, as `owed`.
+     */
+    @Get("summary")
+    summary(@OrgContext() ctx: OrganizationContext) {
+        return this.summaries.summary(ctx);
     }
 
     /** Declared before `:invoiceId`, or "owed" would be read as an id. */

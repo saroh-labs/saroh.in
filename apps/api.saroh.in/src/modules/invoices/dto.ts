@@ -18,6 +18,7 @@ import {
 
 import type { InvoiceSource, InvoiceView } from "./invoice-state";
 import { INVOICE_SOURCES, INVOICE_VIEWS } from "./invoice-state";
+import { SEARCH_MAX } from "./list-filter";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -156,9 +157,31 @@ export {
 } from "./invoice-payments.dto";
 
 export class ListInvoicesQueryDto {
+    /**
+     * Search (DEC-173, U4): a name, part of a number, or an amount ("₹8,400",
+     * "8400", "8,400.00") that is the total or what is left to pay. Trimmed;
+     * a blank search is none.
+     */
+    @IsOptional()
+    @Transform(trimOrOmit)
+    @IsString()
+    @MaxLength(SEARCH_MAX, { message: "Search with fewer words" })
+    q?: string;
+
+    /** `owed` and `cheques` are the money strip's (DEC-173, U4). */
     @IsOptional()
     @IsIn(INVOICE_VIEWS)
     view?: InvoiceView;
+
+    /**
+     * Money received from this day on, in the business's zone
+     * (`2026-10-01`): the money strip's "Paid this month" (DEC-173, U4).
+     * Part payments count; an order's paper counts when it was paid.
+     */
+    @IsOptional()
+    @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: "A date like 2026-10-01" })
+    @IsISO8601({ strict: true })
+    paidFrom?: string;
 
     @IsOptional()
     @IsString()

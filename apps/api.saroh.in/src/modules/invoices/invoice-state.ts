@@ -42,6 +42,10 @@ export const INVOICE_VIEWS = [
     "overdue",
     "paid",
     "void",
+    // DEC-173 (U4): due and overdue together, as the money strip's Owed
+    // counts them; and invoices with a cheque not in the bank yet.
+    "owed",
+    "cheques",
 ] as const;
 export type InvoiceView = (typeof INVOICE_VIEWS)[number];
 
@@ -206,16 +210,40 @@ export const OWED_WHERE = {
     kind: { not: "CREDIT_NOTE" },
 } as const;
 
+/**
+ * A payment that counts (DEC-173): not removed, and not a bounced cheque.
+ * A cheque still waiting for the bank counts as received. The where-form
+ * of `isLive` (`invoice-ledger.ts`); `bankStatus` is null on anything but
+ * a cheque, and SQL's `<>` would drop those, hence the OR.
+ */
+export const LIVE_PAYMENT_WHERE = {
+    removedAt: null,
+    OR: [{ bankStatus: null }, { bankStatus: { not: "BOUNCED" } }],
+} satisfies Prisma.InvoicePaymentWhereInput;
+
+/**
+ * A cheque received and not in the bank yet (DEC-173): waiting, and not
+ * removed. "Cheques not in the bank" on the list and on Home counts these.
+ */
+export const WAITING_CHEQUE_WHERE = {
+    removedAt: null,
+    bankStatus: "WAITING",
+} satisfies Prisma.InvoicePaymentWhereInput;
+
+/**
+ * Owed, as the money strip and Home count it: issued, not an order's own
+ * paper and not a credit note (`OWED_WHERE`), overdue ones included.
+ */
+export const OWED_VIEW_WHERE = {
+    status: "ISSUED",
+    ...OWED_WHERE,
+} satisfies Prisma.InvoiceWhereInput;
+
 /** The `where` for one list view. `now` splits Issued from Overdue. */
 export function viewWhere(
     view: InvoiceView,
     now: Date,
-): {
-    status: InvoiceStatus;
-    OR?: object[];
-    dueAt?: object;
-    kind?: object;
-} {
+): Prisma.InvoiceWhereInput {
     switch (view) {
         case "draft":
             return { status: "DRAFT" };
@@ -232,6 +260,10 @@ export function viewWhere(
             return { status: "PAID" };
         case "void":
             return { status: "VOID" };
+        case "owed":
+            return { ...OWED_VIEW_WHERE };
+        case "cheques":
+            return { payments: { some: WAITING_CHEQUE_WHERE } };
     }
 }
 

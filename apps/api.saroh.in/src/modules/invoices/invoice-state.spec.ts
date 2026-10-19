@@ -48,6 +48,20 @@ describe("viewWhere", () => {
             dueAt: { lt: now },
         });
     });
+
+    it("reads Owed as issued, overdue included, never an order's or a credit note (DEC-173)", () => {
+        expect(viewWhere("owed", now)).toEqual({
+            status: "ISSUED",
+            orderId: null,
+            kind: { not: "CREDIT_NOTE" },
+        });
+    });
+
+    it("reads Cheques as an invoice with a cheque waiting, not removed (DEC-173)", () => {
+        expect(viewWhere("cheques", now)).toEqual({
+            payments: { some: { removedAt: null, bankStatus: "WAITING" } },
+        });
+    });
 });
 
 describe("the ledger's helpers (DEC-173)", () => {

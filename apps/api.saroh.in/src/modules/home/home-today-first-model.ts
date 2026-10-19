@@ -222,9 +222,9 @@ export interface HomeGoing {
 }
 
 /**
- * "Cheques not in the bank" (DEC-173): the invoices rebuild fills it from
- * `home/home-cheques.ts` (invoices plan U4; Home plan U18 draws it). Until
- * then it is always null. Amounts in minor units, as every Home total.
+ * "Cheques not in the bank" (DEC-173): filled from `home/home-cheques.ts`
+ * (invoices plan U4; Home plan U18 draws it). Null while no cheque waits.
+ * Amounts in minor units, as every Home total.
  */
 export interface HomeChequesWaiting {
     count: number;

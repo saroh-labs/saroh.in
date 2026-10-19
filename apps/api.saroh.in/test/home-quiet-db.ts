@@ -21,6 +21,8 @@ const QUIET: Record<string, Table> = {
     // Home A (DEC-171): no shelf running low, nothing sold from one.
     stockLevel: { findMany: [] },
     orderItem: { groupBy: [] },
+    // DEC-173: no cheque waiting for the bank (`home-cheques.ts`).
+    invoicePayment: { groupBy: [] },
 };
 
 type Rows = (

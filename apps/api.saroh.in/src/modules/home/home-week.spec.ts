@@ -205,6 +205,7 @@ describe("weekScope", () => {
             bookings: true,
             orders: true,
             owed: true,
+            cheques: true,
         });
     });
 
@@ -214,6 +215,8 @@ describe("weekScope", () => {
             bookings: true,
             orders: true,
             owed: false,
+            // No money, so no cheques line (DEC-098).
+            cheques: false,
         });
     });
 
@@ -226,6 +229,7 @@ describe("weekScope", () => {
             bookings: false,
             orders: false,
             owed: false,
+            cheques: true,
             takingsIn: "calendar",
         });
         expect(
@@ -235,6 +239,7 @@ describe("weekScope", () => {
             bookings: false,
             orders: false,
             owed: true,
+            cheques: true,
         });
     });
 
@@ -244,7 +249,16 @@ describe("weekScope", () => {
             bookings: true,
             orders: false,
             owed: false,
+            // Cheques are recorded by hand on an invoice, which needs no
+            // module (DEC-070): the line doesn't wait for Payments.
+            cheques: true,
         });
+    });
+
+    it("never makes a week for the cheques line alone", () => {
+        // payment:read with Payments off: no figure but the cheques, and a
+        // "This week" with only that line in it is not one.
+        expect(weekScope(holding(["payment:read"]), new Set())).toBeNull();
     });
 
     it("gives no block to a Reviewer, or to someone who reads none of it", () => {
@@ -267,6 +281,12 @@ function db(
         /** The unpaid bills, each read with what is paid on it (DEC-173). */
         owed?: Bill[];
         billed?: boolean;
+        /** Cheques waiting for the bank, grouped per currency (DEC-173). */
+        cheques?: {
+            currency: string;
+            _sum: { amountCents: number | null };
+            _count: { _all: number };
+        }[];
     } = {},
 ) {
     const paid = [...(over.paid ?? [[], []])];
@@ -295,6 +315,9 @@ function db(
             ),
         },
         order: { count: jest.fn().mockResolvedValue(over.orders ?? 0) },
+        invoicePayment: {
+            groupBy: jest.fn().mockResolvedValue(over.cheques ?? []),
+        },
     };
 }
 
@@ -350,9 +373,73 @@ describe("readWeek", () => {
                 overdue: 1,
                 href: "/billing/invoices?view=overdue",
             },
-            // Filled by the invoices rebuild (DEC-173); none until then.
+            // Not asked for in this scope (DEC-173): null.
             chequesWaiting: null,
         });
+    });
+
+    it("sends the cheques not in the bank, in minor units, linked to the list", async () => {
+        const client = db({
+            cheques: [
+                {
+                    currency: "INR",
+                    _sum: { amountCents: 1_400_000 },
+                    _count: { _all: 2 },
+                },
+            ],
+        });
+        const week = await readWeek(
+            client as never,
+            "org_1",
+            { ...EVERY, cheques: true },
+            clock,
+        );
+        expect(week.chequesWaiting).toEqual({
+            count: 2,
+            totals: [{ currency: "INR", amountMinor: 1_400_000 }],
+            href: "/billing/invoices?view=cheques",
+        });
+        // Waiting and not removed: a cleared or bounced cheque isn't.
+        expect(client.invoicePayment.groupBy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId: "org_1",
+                    removedAt: null,
+                    bankStatus: "WAITING",
+                },
+            }),
+        );
+    });
+
+    it("sends no cheques line while none waits", async () => {
+        const client = db();
+        const week = await readWeek(
+            client as never,
+            "org_1",
+            { ...EVERY, cheques: true },
+            clock,
+        );
+        expect(week.chequesWaiting).toBeNull();
+    });
+
+    it("never reads the cheques for a scope without money", async () => {
+        const client = db({
+            cheques: [
+                {
+                    currency: "INR",
+                    _sum: { amountCents: 840_000 },
+                    _count: { _all: 1 },
+                },
+            ],
+        });
+        const week = await readWeek(
+            client as never,
+            "org_1",
+            { ...EVERY, cheques: false },
+            clock,
+        );
+        expect(week.chequesWaiting).toBeNull();
+        expect(client.invoicePayment.groupBy).not.toHaveBeenCalled();
     });
 
     it("lowers takings by a refund made this week", async () => {
@@ -516,6 +603,7 @@ describe("HomeService: This week", () => {
             activity: empty,
             paymentIntent: empty,
             site: empty,
+            invoicePayment: { ...empty, ...client.invoicePayment },
             $queryRaw: jest.fn().mockResolvedValue([]),
             businessProfile: {
                 findUnique: jest.fn().mockResolvedValue({ timezone: ZONE }),
@@ -547,6 +635,28 @@ describe("HomeService: This week", () => {
             bookings: { count: 3, lastWeek: 2 },
             orders: { count: 5 },
         });
+    });
+
+    it("sends an owner the cheques waiting, and a Member none (DEC-098)", async () => {
+        const waiting = {
+            cheques: [
+                {
+                    currency: "INR",
+                    _sum: { amountCents: 1_400_000 },
+                    _count: { _all: 2 },
+                },
+            ],
+        };
+        const forOwner = await home(db(waiting)).build(owner);
+        expect(forOwner.week?.chequesWaiting).toEqual({
+            count: 2,
+            totals: [{ currency: "INR", amountMinor: 1_400_000 }],
+            href: "/billing/invoices?view=cheques",
+        });
+        const forMember = await home(
+            db({ ...waiting, bookings: [3, 2] }),
+        ).build(member);
+        expect(forMember.week?.chequesWaiting).toBeNull();
     });
 
     it("sends a Member no takings figure at all, and their bookings still", async () => {

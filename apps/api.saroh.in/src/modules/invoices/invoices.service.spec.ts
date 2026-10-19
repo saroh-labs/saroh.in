@@ -726,6 +726,38 @@ describe("lists and what is owed", () => {
         });
     });
 
+    it("searches on the server, finding what is left to pay through leftToPayCents (DEC-173)", async () => {
+        // First the partly paid invoices (for the amount), then the list.
+        db.invoice
+            .findMany!.mockResolvedValueOnce([
+                { id: "inv_left", total: "10000.00", paidCents: 160_000 },
+                { id: "inv_other", total: "10000.00", paidCents: 100_000 },
+            ])
+            .mockResolvedValueOnce([]);
+        await service.list(owner, { q: "₹8,400", view: "owed" });
+        const partly = db.invoice.findMany!.mock.calls[0]![0].where;
+        expect(partly).toEqual({
+            organizationId: "org_1",
+            status: "ISSUED",
+            paidCents: { gt: 0 },
+        });
+        const where = db.invoice.findMany!.mock.calls[1]![0].where;
+        expect(where).toMatchObject({
+            organizationId: "org_1",
+            status: "ISSUED",
+            orderId: null,
+        });
+        const [search] = where.AND;
+        expect(search.OR).toContainEqual({ total: "8400.00" });
+        expect(search.OR).toContainEqual({ id: { in: ["inv_left"] } });
+    });
+
+    it("reads no partly paid invoices for a search that isn't an amount", async () => {
+        db.invoice.findMany!.mockResolvedValue([]);
+        await service.list(owner, { q: "vivek" });
+        expect(db.invoice.findMany).toHaveBeenCalledTimes(1);
+    });
+
     it("says what each listed invoice is for, without sending every line", async () => {
         db.invoice.findMany!.mockResolvedValue([
             row({

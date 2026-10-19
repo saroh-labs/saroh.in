@@ -9,6 +9,7 @@ import {
     refundedBetweenWhere,
 } from "../invoices/invoice-state";
 import { realOrderWhere } from "../orders/open-orders";
+import { readHomeCheques } from "./home-cheques";
 import { MONEY_ON_THE_CALENDAR, sinceHref } from "./home-last-day";
 import type {
     HomeInput,
@@ -36,6 +37,8 @@ import { onOneStore, seesBusinessBookings, storeWhere } from "./home-staff";
  *   placed since Monday.
  * - **Owed to you** (`invoice:read`): issued, unpaid invoices that aren't an
  *   order's own (`OWED_WHERE`), with how many are overdue.
+ * - **Cheques not in the bank** (`payment:read`, DEC-173): `chequesWaiting`,
+ *   null while none waits (`home-cheques.ts`).
  *
  * No payout figure (default 52). The week is the business's (DEC-033): it
  * starts Monday at midnight in the business's zone. The words are the
@@ -65,6 +68,13 @@ export interface WeekScope {
     orders: boolean;
     owed: boolean;
     /**
+     * Cheques not in the bank (DEC-173): `payment:read`'s alone, as every
+     * amount (DEC-098). Hand-recorded, so not behind Payments (DEC-070).
+     * It never makes a week on its own: a viewer with no other figure has
+     * no "This week" to put the line in.
+     */
+    cheques?: boolean;
+    /**
      * Takings read by someone who may not open the invoices behind them:
      * the figure links to the Calendar's money instead (F11).
      */
@@ -91,7 +101,8 @@ export function weekScope(
             ? { takingsIn: "calendar" as const }
             : {}),
     };
-    return Object.values(scope).some(Boolean) ? scope : null;
+    if (!Object.values(scope).some(Boolean)) return null;
+    return { ...scope, cheques: holds(input, "payment:read") };
 }
 
 /** The instants the week's figures are measured between. */
@@ -343,28 +354,36 @@ export async function readWeek(
             },
         });
 
-    const [thisMoney, lastMoney, bookings, lastBookings, orders, owed] =
-        await Promise.all([
-            scope.takings
-                ? readMoney(db, organizationId, w.start, clock.now)
-                : null,
-            scope.takings
-                ? readMoney(db, organizationId, w.lastStart, w.lastSoFar)
-                : null,
-            scope.bookings ? booked(w.start, w.end) : null,
-            scope.bookings ? booked(w.lastStart, w.start) : null,
-            scope.orders
-                ? db.order.count({
-                      where: {
-                          organizationId,
-                          ...storeWhere(storeIds),
-                          createdAt: { gte: w.start },
-                          ...realOrderWhere(),
-                      },
-                  })
-                : null,
-            scope.owed ? readOwed(db, organizationId, clock.now) : null,
-        ]);
+    const [
+        thisMoney,
+        lastMoney,
+        bookings,
+        lastBookings,
+        orders,
+        owed,
+        cheques,
+    ] = await Promise.all([
+        scope.takings
+            ? readMoney(db, organizationId, w.start, clock.now)
+            : null,
+        scope.takings
+            ? readMoney(db, organizationId, w.lastStart, w.lastSoFar)
+            : null,
+        scope.bookings ? booked(w.start, w.end) : null,
+        scope.bookings ? booked(w.lastStart, w.start) : null,
+        scope.orders
+            ? db.order.count({
+                  where: {
+                      organizationId,
+                      ...storeWhere(storeIds),
+                      createdAt: { gte: w.start },
+                      ...realOrderWhere(),
+                  },
+              })
+            : null,
+        scope.owed ? readOwed(db, organizationId, clock.now) : null,
+        scope.cheques ? readHomeCheques(db, organizationId) : null,
+    ]);
 
     const week: HomeWeek = { zone: clock.zone, startDate: w.startDate };
     if (thisMoney && lastMoney) {
@@ -390,8 +409,8 @@ export async function readWeek(
         };
     }
     if (owed) week.owed = owed;
-    // "Cheques not in the bank" (DEC-173): the invoices rebuild fills it
-    // from `home-cheques.ts`; until then there is never one to show.
-    week.chequesWaiting = null;
+    // "Cheques not in the bank" (DEC-173): null while none waits, and for
+    // a viewer without `payment:read`.
+    week.chequesWaiting = cheques;
     return week;
 }

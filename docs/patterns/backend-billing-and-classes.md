@@ -122,6 +122,33 @@ requireProvider: false })`), the email says "view it and download a copy",
   `invoice-payments.db.spec.ts` (every refusal, repeats, two payments
   racing on the row lock, one business never reaching another's), plain
   and under `TEST_RLS=on`.
+- **The list's search, views and money strip** (U4, #1116). `GET /`
+  takes `q` (trimmed, at most 80 characters): a name (bill-to, or the
+  contact's first and last name, so a draft is found too), part of a
+  number, or an amount (`money-query.ts`: "₹8,400", "8400", "8,400.00";
+  "8,40" is not one) matching the total or what is left to pay. What is
+  left is found by folding the partly paid invoices through
+  `leftToPayCents`, never worked out again in SQL. Searched on the server,
+  so the 500 cap never hides an older invoice. New views: `owed`
+  (`OWED_VIEW_WHERE`: issued, overdue included, not an order's paper or a
+  credit note) and `cheques` (`WAITING_CHEQUE_WHERE`); `paidFrom`
+  (`YYYY-MM-DD` in the business's zone) is money received since that day,
+  part payments included (`LIVE_PAYMENT_WHERE`), or an order's paper paid
+  since. New parts are ANDed on, so no part's `OR` overwrites another's.
+- **`GET invoices/summary`** (`InvoiceSummaryService`, `invoice:read`):
+  Owed and Overdue (left to pay, `isPastDue`), Paid this month (ledger
+  payments that count from the 1st in the business's zone, plus an order's
+  paper paid this month, each rupee once), Drafts, and `chequesWaiting`
+  (null while none waits). Each figure is `{ count, totals?, filter }`,
+  totals per currency in minor units (`amountMinor`, as Home's), and
+  `filter` is the list query it stands for. Without `payment:read` there
+  are no `totals` (DEC-098). Home's `week.chequesWaiting`
+  (`home/home-cheques.ts`, `{ count, totals, href }`, href
+  `/billing/invoices?view=cheques`) reads the same `readChequesWaiting`,
+  and is null without `payment:read` or while none waits.
+- **Search speed:** a business's invoices are filtered after the
+  `organizationId` index; 5,000 invoices (among 55,000) search in about
+  4 ms, so there is no trigram index. `list-filter.db.spec.ts` times 1,500.
 
 ## Saroh's own invoices — **Current** (pricing catalogue U17)
 

@@ -341,6 +341,8 @@ module.exports = {
         // D18: what narrows the list by source, pack, course or order, and
         // its query (list-filter.db.spec.ts runs in integration).
         "<rootDir>/src/modules/invoices/list-filter.spec.ts",
+        // DEC-173 (U4): what in the search box reads as an amount.
+        "<rootDir>/src/modules/invoices/money-query.spec.ts",
         // D16: the invoice's paper and its PDF, read back as text — pure
         // (invoice-pdf.db.spec.ts runs in integration).
         "<rootDir>/src/modules/invoices/invoice-pdf.spec.ts",

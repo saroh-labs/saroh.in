@@ -289,9 +289,10 @@ export interface HomeWeek {
     /** Absent too for a business that has never billed outside an order. */
     owed?: HomeWeekOwed;
     /**
-     * Cheques received and not in the bank yet (DEC-173). The invoices
-     * rebuild fills it (`home/home-cheques.ts`); until then always null,
-     * and null for a viewer without `payment:read`.
+     * Cheques received and not in the bank yet (DEC-173, invoices U4),
+     * from `home/home-cheques.ts`. Null while none waits, and null for a
+     * viewer without `payment:read`. `href` is
+     * `/billing/invoices?view=cheques`.
      */
     chequesWaiting?: HomeChequesWaiting | null;
 }

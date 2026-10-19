@@ -12,6 +12,7 @@ import { GstRatesService } from "./gst-rates.service";
 import { InvoicePaymentsService } from "./invoice-payments.service";
 import { InvoicePdfService } from "./invoice-pdf.service";
 import { InvoiceSendService } from "./invoice-send.service";
+import { InvoiceSummaryService } from "./invoice-summary.service";
 import { InvoicesController } from "./invoices.controller";
 import { InvoicesService } from "./invoices.service";
 
@@ -37,6 +38,8 @@ import { InvoicesService } from "./invoices.service";
         GstRatesService,
         InvoiceSendService,
         InvoicePdfService,
+        // The money strip's one read (DEC-173, U4).
+        InvoiceSummaryService,
         OrganizationGuard,
         // The account thread's poster (A13). Still offered only while the
         // ACCOUNT_THREAD flag is on, which it is not by default.

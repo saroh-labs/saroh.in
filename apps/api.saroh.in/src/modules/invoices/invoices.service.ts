@@ -48,7 +48,9 @@ import {
     paidSinceFilter,
     viewWhere,
 } from "./invoice-state";
-import { listFilterWhere } from "./list-filter";
+import { invoiceZoneOf, startOfDayIn } from "./invoice-summary.service";
+import { listFilterWhere, paidFromWhere, searchWhere } from "./list-filter";
+import { moneyQueryCents } from "./money-query";
 import type { BuiltDocument, TaxProfile } from "./order-invoice";
 import { buildManualInvoice } from "./order-invoice";
 import {
@@ -183,9 +185,29 @@ export class InvoicesService {
     ): Promise<InvoiceViewModel[]> {
         authorize(ctx, "invoice:read");
         const now = new Date();
+        const organizationId = ctx.organizationId;
+        const { q, paidFrom: paidFromDay } = query;
+        const [search, paidFrom] = await Promise.all([
+            q ? this.searchFor(organizationId, q) : null,
+            paidFromDay
+                ? invoiceZoneOf(prisma, organizationId).then((zone) =>
+                      startOfDayIn(paidFromDay, zone),
+                  )
+                : null,
+        ]);
+        // What it was for (D18), then search and Paid this month (DEC-173,
+        // U4), all ANDed on: each brings its own OR, and hidden drafts stay
+        // hidden. Searched on the server, so an invoice older than the
+        // newest page is found.
+        const narrowed = listFilterWhere(query);
+        const and = [
+            ...((narrowed.AND as Prisma.InvoiceWhereInput[] | undefined) ?? []),
+            ...(search ? [search] : []),
+            ...(paidFrom ? [paidFromWhere(paidFrom)] : []),
+        ];
         const rows = await prisma.invoice.findMany({
             where: {
-                organizationId: ctx.organizationId,
+                organizationId,
                 ...NOT_A_BOOKING_HOLD,
                 ...(query.view ? viewWhere(query.view, now) : {}),
                 ...(query.contactId ? { contactId: query.contactId } : {}),
@@ -195,19 +217,45 @@ export class InvoicesService {
                 ...(query.paidSince
                     ? paidSinceFilter(new Date(query.paidSince))
                     : {}),
-                // What it was for (D18); ANDed on, so hidden drafts stay hidden.
-                ...listFilterWhere(query),
+                ...(and.length > 0 ? { AND: and } : {}),
             },
             orderBy: { createdAt: "desc" },
             take: LIST_LIMIT,
             select: INVOICE_LIST_SELECT,
         });
-        const exempt = await exemptInvoiceIds(prisma, ctx.organizationId, rows);
+        const exempt = await exemptInvoiceIds(prisma, organizationId, rows);
         return rows.map((r) =>
             serializeInvoice(r as InvoiceRow, now, {
                 exempt: exempt.has(r.id),
             }),
         );
+    }
+
+    /**
+     * The search's where (DEC-173, U4). When `q` reads as an amount, the
+     * partly paid invoices whose left to pay is that amount are found
+     * here, through `leftToPayCents`, the one place it is worked out:
+     * there are few of them, so they are read and folded rather than
+     * worked out again in SQL.
+     */
+    private async searchFor(
+        organizationId: string,
+        q: string,
+    ): Promise<Prisma.InvoiceWhereInput> {
+        const cents = moneyQueryCents(q);
+        if (cents === null) return searchWhere(q, null);
+        const partlyPaid = await prisma.invoice.findMany({
+            where: {
+                organizationId,
+                status: "ISSUED",
+                paidCents: { gt: 0 },
+            },
+            select: { id: true, total: true, paidCents: true },
+        });
+        const leftIds = partlyPaid
+            .filter((inv) => leftToPayCents(inv) === cents)
+            .map((inv) => inv.id);
+        return searchWhere(q, cents, leftIds);
     }
 
     /**
