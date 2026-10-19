@@ -2115,3 +2115,5 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - The Overview tab is renamed **Calendar**; "Also use these hours on" and "Change several days" replace Copy Monday.
     - Header C on every calendar screen; Hours and time off is the V2 weekly list under the Whose hours card.
     - A service's **Who can book it** is two tick boxes, Customers (on the booking page) and Your team (from Bookings), so any of the four combinations works; neither ticked pauses it, and bookings already made stay.
+    - Tapping a free time opens one sheet with **Book someone · Block this time** at its top; "Close these extra hours" is a quiet link at its foot, only on extra opening hours.
+    - Bookings **remembers the last view** (Day, Week or List) on each device, and a person can pin **Start Bookings on** in the "…" sheet.
