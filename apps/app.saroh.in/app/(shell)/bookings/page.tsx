@@ -5,8 +5,14 @@ import { cookies } from "next/headers";
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { BookingsViewSwitch } from "@/components/bookings/bookings-view-switch";
 import { CalendarScreen } from "@/components/bookings/calendar/calendar-screen";
-
-import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
+import {
+    NewBookingButton,
+    NewBookingHost,
+} from "@/components/bookings/new-booking/new-booking-host";
+import {
+    flowServices,
+    flowStaff,
+} from "@/components/bookings/new-booking/setup";
 import { PageContainer } from "@/components/shared/page-container";
 import { ShareLinkButton } from "@/components/sites/share-link-button";
 import { takesOnlinePayment } from "@/lib/billing/access";
@@ -113,12 +119,14 @@ export default async function BookingsPage({
     // send a payment link when the viewer may issue the invoice, the plan takes
     // online payment and a provider is connected to take the money. On a
     // plan without online payments it starts on "Pays at the visit" (R33).
+    // Someone who can't take payment (the front desk) sees Paid now and the
+    // link locked, saying why (U8).
+    const online = await onlinePayReady();
     const people = {
         canSearch: may("contact:read"),
-        payLink:
-            may("booking:write") &&
-            may("invoice:write") &&
-            (await onlinePayReady()),
+        payLink: may("booking:write") && may("invoice:write") && online,
+        canTakePayment: canTakeDeskPayments(organization),
+        onlinePay: online,
     };
     const timezone = staffList?.timezone ?? "Asia/Kolkata";
     const now = readNow();
@@ -185,11 +193,10 @@ export default async function BookingsPage({
         );
     }
 
-    const bookable = services.filter((s) => s.status === "ACTIVE");
     // Opened from a person's page (#247, `?new=1&contactId=`): New booking
     // arrives open with them chosen, read only for someone who may book
-    // and search. With no service to book it doesn't open; its button says
-    // why, as before.
+    // and search. From the Calendar's "Book on this day" (`?date=…&new=1`)
+    // it opens on that day (U8). With no service yet it says how to add one.
     const arriving = params.new === "1" && may("booking:write");
     const forContact = arriving ? arrivalContactId(params) : null;
     const initialWho =
@@ -203,82 +210,102 @@ export default async function BookingsPage({
         layout === "agenda" && may("booking:write")
             ? shareLink(await readWebAddressLinks(), BOOKINGS_FIRST_RUN)
             : null;
+    const canUsePacks =
+        canReadPacks(organization) &&
+        canUsePacksOnBookings(organization) &&
+        packsOn(await modulesOrUnknown());
+    const screen = (
+        <CalendarScreen
+            layout={layout}
+            date={date}
+            today={today}
+            now={now}
+            timezone={calendar.timezone || timezone}
+            calendar={calendar}
+            staff={staffList?.staff ?? null}
+            services={services}
+            rules={rules}
+            notices={notices}
+            limitNotice={<PlanLimitNotice moduleId="bookings" />}
+            serviceHours={serviceHours}
+            // Cancelled bookings stay off the diary unless the address
+            // asks for them, so a reload keeps the choice.
+            showCancelled={params.cancelled === "1"}
+            person={person}
+            opens={opens}
+            me={mine ? { id: mine.id, name: mine.name } : null}
+            share={
+                share ? <ShareLinkButton link={share} className="mt-0" /> : null
+            }
+            // Nothing chose the view: a phone moves to List (Q4, U6).
+            listFirst={nothingChoseView(chosen)}
+            people={people}
+            can={{
+                book: may("booking:write"),
+                // Open or block time: a Member keeps anyone's hours
+                // (DEC-170, Q13); adding people stays `service:write`.
+                hours: may("hours:write"),
+                addPeople: may("service:write"),
+                order: may("order:read"),
+                // Refund what a late cancel keeps, or keep what the
+                // policy returns (DEC-170, Q14).
+                refund: may("payment:manage"),
+                // "Take ₹X" (P2): the pair a payment link needs, and the
+                // link itself only where the plan and a provider take it.
+                desk: {
+                    canTake: canTakeDeskPayments(organization),
+                    canLink: people.payLink,
+                    online: takesOnlinePayment(await billingAccessOrNull()),
+                },
+            }}
+            newBooking={
+                may("booking:write") ? (
+                    <NewBookingButton
+                        // Keyed: it renders among the screen's own children.
+                        key="new-booking"
+                        // Beside "…" on the desk; on a phone it floats
+                        // over the calendar, above the tab bar (U2).
+                        className="max-[759px]:fixed max-[759px]:bottom-[calc(16px+var(--tab-bar-inset,0px))] max-[759px]:right-4 max-[759px]:z-30 max-[759px]:h-14 max-[759px]:rounded-full max-[759px]:pl-4 max-[759px]:pr-5 max-[759px]:text-[15px] max-[759px]:shadow-xl min-[760px]:h-11 min-[760px]:px-[18px] min-[760px]:text-[14.5px]"
+                        date={params.date === undefined ? null : date}
+                    />
+                ) : null
+            }
+        />
+    );
     return (
         <PageContainer width="full">
-            <CalendarScreen
-                layout={layout}
-                date={date}
-                today={today}
-                now={now}
-                timezone={calendar.timezone || timezone}
-                calendar={calendar}
-                staff={staffList?.staff ?? null}
-                services={services}
-                rules={rules}
-                notices={notices}
-                limitNotice={<PlanLimitNotice moduleId="bookings" />}
-                serviceHours={serviceHours}
-                // Cancelled bookings stay off the diary unless the address
-                // asks for them, so a reload keeps the choice.
-                showCancelled={params.cancelled === "1"}
-                person={person}
-                opens={opens}
-                me={mine ? { id: mine.id, name: mine.name } : null}
-                share={
-                    share ? (
-                        <ShareLinkButton link={share} className="mt-0" />
-                    ) : null
-                }
-                // Nothing chose the view: a phone moves to List (Q4, U6).
-                listFirst={nothingChoseView(chosen)}
-                people={people}
-                can={{
-                    book: may("booking:write"),
-                    // Open or block time: a Member keeps anyone's hours
-                    // (DEC-170, Q13); adding people stays `service:write`.
-                    hours: may("hours:write"),
-                    addPeople: may("service:write"),
-                    order: may("order:read"),
-                    // Refund what a late cancel keeps, or keep what the
-                    // policy returns (DEC-170, Q14).
-                    refund: may("payment:manage"),
-                    // "Take ₹X" (P2): the pair a payment link needs, and the
-                    // link itself only where the plan and a provider take it.
-                    desk: {
-                        canTake: canTakeDeskPayments(organization),
-                        canLink: people.payLink,
-                        online: takesOnlinePayment(await billingAccessOrNull()),
-                    },
-                }}
-                newBooking={
-                    may("booking:write") ? (
-                        <NewBookingDialog
-                            // Keyed: it renders among the screen's own children.
-                            key="new-booking"
-                            // Beside "…" on the desk; on a phone it floats
-                            // over the calendar, above the tab bar (U2).
-                            triggerClassName="min-[760px]:h-11 min-[760px]:px-[18px] min-[760px]:text-[14.5px] max-[759px]:fixed max-[759px]:bottom-[calc(16px+var(--tab-bar-inset,0px))] max-[759px]:right-4 max-[759px]:z-30 max-[759px]:h-14 max-[759px]:rounded-full max-[759px]:pl-4 max-[759px]:pr-5 max-[759px]:text-[15px] max-[759px]:shadow-xl"
-                            services={bookable.map((s) => ({
-                                id: s.id,
-                                name: s.name,
-                                timezone: s.timezone,
-                                minutes: s.durationMinutes,
-                                priceCents: s.priceCents,
-                            }))}
-                            people={people}
-                            openOnArrival={arriving}
-                            initialWho={initialWho}
-                            // Paying with a class pack spends one (ADR-007),
-                            // while Class packs is on (E12).
-                            canUsePacks={
-                                canReadPacks(organization) &&
-                                canUsePacksOnBookings(organization) &&
-                                packsOn(await modulesOrUnknown())
-                            }
-                        />
-                    ) : null
-                }
-            />
+            {may("booking:write") ? (
+                <NewBookingHost
+                    setup={{
+                        services: flowServices(services),
+                        staff: flowStaff(staffList?.staff ?? null),
+                        people,
+                        // Paying with a class pack spends one (ADR-007),
+                        // while Class packs is on (E12).
+                        canUsePacks,
+                        timezone: calendar.timezone || timezone,
+                        showMoney: calendar.money,
+                        business: organization?.name ?? null,
+                        now,
+                    }}
+                    arrival={
+                        arriving
+                            ? {
+                                  who: initialWho,
+                                  date:
+                                      typeof params.date === "string" &&
+                                      DATE.test(params.date)
+                                          ? params.date
+                                          : null,
+                              }
+                            : null
+                    }
+                >
+                    {screen}
+                </NewBookingHost>
+            ) : (
+                screen
+            )}
         </PageContainer>
     );
 }

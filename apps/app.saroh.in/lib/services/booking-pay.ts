@@ -21,6 +21,28 @@ export interface BookingPeople {
      * before DEC-170; the API refuses it either way.
      */
     canTakePayment?: boolean;
+    /**
+     * The plan takes payment online and a provider is connected, whoever
+     * is looking: a role that can't take payment then sees "Send a
+     * payment link" locked, saying why, rather than missing (U8).
+     */
+    onlinePay?: boolean;
+}
+
+/**
+ * Whether "Send a payment link" is drawn for a booking at `priceCents`:
+ * offered to someone who may make one, and shown locked to someone who
+ * can't take payment where the business takes it online (U8).
+ */
+export function linkShown(
+    people: BookingPeople,
+    priceCents: number | null | undefined,
+): boolean {
+    if ((priceCents ?? 0) <= 0) return false;
+    return (
+        people.payLink ||
+        (people.canTakePayment === false && people.onlinePay === true)
+    );
 }
 
 /** Pays at the visit, send a payment link, or paid now. */

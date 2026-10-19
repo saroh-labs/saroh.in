@@ -56,6 +56,7 @@ import {
     refuseIfClosed,
     resolvePerson,
     toAvailabilityService,
+    withPlacesLeft,
 } from "./booking-slots";
 import { assertDepositOnPlan } from "./deposit-plan";
 import type { TakeDeskPaymentDto } from "./desk-pay.dto";
@@ -658,7 +659,11 @@ export class BookingsService {
         const rules = await prisma.availabilityRule.findMany({
             where: { serviceId },
         });
-        return openSlots(service, rules, from, to, staffId);
+        // A class says how many places each start has left (U8).
+        return withPlacesLeft(
+            service,
+            await openSlots(service, rules, from, to, staffId),
+        );
     }
 
     // ── Bookings (management) ──────────────────────────────────────────────

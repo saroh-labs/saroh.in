@@ -379,6 +379,27 @@ export interface OverlayFootProps {
 }
 
 /**
+ * For a foot drawn by the overlay's own content rather than `OverlayFoot`
+ * (New booking's Back and Next, U8): its submit is the form's, so Enter
+ * and Cmd/Ctrl+Enter run it, and while it saves nothing closes the frame.
+ */
+export function useOverlaySubmit(onSubmit: OverlaySubmit, pending = false) {
+    const { register, setPending } = useOverlay();
+    useEffect(() => {
+        setPending(pending);
+        return () => setPending(false);
+    }, [pending, setPending]);
+    const handler = useRef(onSubmit);
+    useLayoutEffect(() => {
+        handler.current = onSubmit;
+    });
+    useEffect(() => {
+        register((event) => handler.current(event));
+        return () => register(null);
+    }, [register]);
+}
+
+/**
  * Pinned under the fields with a rule above it: the way out (outline),
  * then the overlay's own button (ink), on the right. On a phone they
  * stack full width with the overlay's button on top. While it saves the
@@ -479,7 +500,7 @@ export const FOOT_INSET = "--overlay-foot-inset";
  * the sheet is open — "10:00 am was just booked", an Undo — lands above
  * its buttons rather than over them (BA-23). Cleared when the foot goes.
  */
-function useToastsAboveFoot(foot: RefObject<HTMLDivElement | null>) {
+export function useToastsAboveFoot(foot: RefObject<HTMLDivElement | null>) {
     useEffect(() => {
         const el = foot.current;
         if (

@@ -582,3 +582,47 @@ describe("Who can book it (Q5)", () => {
         ).rejects.toBeInstanceOf(ForbiddenException);
     });
 });
+
+describe("New booking's times, the API (U8)", () => {
+    it("a class says how many places each start has left; a one-to-one doesn't", async () => {
+        const classId = (
+            await prisma.service.create({
+                data: {
+                    organizationId: orgId,
+                    name: `Mat Pilates ${tag}`,
+                    durationMinutes: 60,
+                    capacity: 3,
+                    timezone: "UTC",
+                    status: "ACTIVE",
+                    availabilityRules: {
+                        create: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
+                            organizationId: orgId,
+                            dayOfWeek,
+                            startMinute: 7 * 60,
+                            endMinute: 8 * 60,
+                        })),
+                    },
+                },
+            })
+        ).id;
+        const start = nextStart(7);
+        await bookings.bookByHand(owner, classId, {
+            startAt: start,
+            bookerName: "Farah Khan",
+            bookerPhone: "+91 98450 77777",
+        });
+        const from = new Date(Date.parse(start) - DAY).toISOString();
+        const to = new Date(Date.parse(start) + DAY).toISOString();
+        const slots = await bookings.availability(owner, classId, from, to);
+        const booked = slots.find((s) => s.startAt.toISOString() === start);
+        expect(booked?.placesLeft).toBe(2);
+        expect(
+            slots
+                .filter((s) => s.startAt.toISOString() !== start)
+                .every((s) => s.placesLeft === 3),
+        ).toBe(true);
+
+        const one = await bookings.availability(owner, facialId, from, to);
+        expect(one.every((s) => s.placesLeft === undefined)).toBe(true);
+    });
+});

@@ -20,6 +20,8 @@ export interface PickerSlot {
     endAt: string;
     /** Everyone free at that start (U3); a class's teacher. */
     staffIds?: string[];
+    /** A class's places still open at that start (U8); absent otherwise. */
+    placesLeft?: number;
 }
 
 /** How many days the strip shows, and the read covers. */

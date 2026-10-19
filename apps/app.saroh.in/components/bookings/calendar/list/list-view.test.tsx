@@ -29,6 +29,13 @@ vi.mock("@/lib/services/bookings-opens-actions", () => ({
         Promise.resolve({ ok: true, data: change }),
     ),
 }));
+// New booking (U8): under its host, "Book on this day" opens it on the day.
+const launcher: { current: { open: ReturnType<typeof vi.fn> } | null } = {
+    current: null,
+};
+vi.mock("@/components/bookings/new-booking/launcher", () => ({
+    useNewBookingLauncher: () => launcher.current,
+}));
 vi.mock("../../availability/add-person-dialog", () => ({
     AddPersonDialog: () => null,
 }));
@@ -508,6 +515,18 @@ describe("a day with nothing booked", () => {
         expect(text()).toContain("Book Meera Iyer from 540 on 2026-10-01");
         // Its free times stay beside it on the desk.
         expect(freeSection()?.className).not.toContain("min-[760px]:hidden");
+    });
+
+    it("quiet and open: under New booking's host, Book on this day opens it on the day (U8)", () => {
+        const open = vi.fn();
+        launcher.current = { open };
+        try {
+            draw(calendarOf([]), { date: THU, share: null });
+            act(() => button("Book on this day")?.click());
+            expect(open).toHaveBeenCalledWith({ date: THU });
+        } finally {
+            launcher.current = null;
+        }
     });
 
     it("quiet and open: offers the booking page while it is live", () => {

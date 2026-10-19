@@ -85,6 +85,8 @@ export function TimePicker({
     slotNote,
     initialDay,
     hoursHref = "/bookings/availability",
+    withChips,
+    strip = true,
     now: nowProp,
     className,
 }: {
@@ -115,6 +117,18 @@ export function TimePicker({
     initialDay?: LocalDate;
     /** Where "Why isn't a time offered?" points for more. */
     hoursHref?: string;
+    /**
+     * Draw the With chips. Left out: when there is more than one person,
+     * or `onWithChange` is given. New booking asks who they'll see on a
+     * step of its own (U8), so it passes false.
+     */
+    withChips?: boolean;
+    /**
+     * Draw the day strip and Pick a date. False shows only the times of
+     * `initialDay`, for a flow that chose the day itself (Book their next
+     * visit's Tomorrow / Next week / Pick a date, Q16).
+     */
+    strip?: boolean;
     /** For tests: what "now" is. */
     now?: number;
     className?: string;
@@ -180,7 +194,8 @@ export function TimePicker({
     const next = loading ? null : nextFreeDay(days, day);
     const person = withId ? people.find((p) => p.id === withId) : null;
     const zone = zoneShortName(timezone, now);
-    const showWith = people.length > 1 || onWithChange !== undefined;
+    const showWith =
+        withChips ?? (people.length > 1 || onWithChange !== undefined);
 
     function pickDay(date: LocalDate) {
         setDay(date);
@@ -254,7 +269,7 @@ export function TimePicker({
                 </div>
             ) : null}
 
-            <div className="grid min-w-0 gap-1.5">
+            <div className={cn("grid min-w-0 gap-1.5", !strip && "hidden")}>
                 <span id={ids.day} className="label">
                     Day
                 </span>

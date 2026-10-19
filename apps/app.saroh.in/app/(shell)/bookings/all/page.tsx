@@ -6,7 +6,14 @@ import {
     BookingsCouldntLoad,
     BookingsView,
 } from "@/components/bookings/bookings-view";
-import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
+import {
+    NewBookingButton,
+    NewBookingHost,
+} from "@/components/bookings/new-booking/new-booking-host";
+import {
+    flowServices,
+    flowStaff,
+} from "@/components/bookings/new-booking/setup";
 import { Moment } from "@/components/shared/moment";
 import { PageContainer } from "@/components/shared/page-container";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
@@ -32,6 +39,7 @@ import { zoneShortName } from "@/lib/services/time-picker";
 import { requireSession } from "@/lib/session";
 import { BOOKINGS_FIRST_RUN, shareLink } from "@/lib/sites/share-links";
 import { readWebAddressLinks } from "@/lib/sites/share-links-read";
+import { listStaff } from "@/lib/staff/service";
 import { viewParam } from "@/lib/views/search-params";
 import { isSince, sinceParam, withoutSince } from "@/lib/views/since";
 
@@ -69,12 +77,15 @@ export default async function BookingsPage({
 }) {
     await requireSession();
 
-    const [calendar, params, services, organization] = await Promise.all([
-        readBookingsRegister(),
-        searchParams,
-        listServices().catch(() => []),
-        resolveActiveOrganization(),
-    ]);
+    const [calendar, params, services, organization, staffList] =
+        await Promise.all([
+            readBookingsRegister(),
+            searchParams,
+            listServices().catch(() => []),
+            resolveActiveOrganization(),
+            // Who they'll see, in New booking (U8); without it, anyone.
+            listStaff().catch(() => null),
+        ]);
     const may = permitsFor(organization);
 
     if (!calendar) {
@@ -88,13 +99,14 @@ export default async function BookingsPage({
     }
 
     const every = flattenCalendar(calendar);
-    // New booking finds the customer by search (E4) and can send a payment link.
+    // New booking finds the customer by search (E4) and can send a payment
+    // link; someone who can't take payment sees it locked, saying why (U8).
+    const online = await onlinePayReady();
     const people = {
         canSearch: may("contact:read"),
-        payLink:
-            may("booking:write") &&
-            may("invoice:write") &&
-            (await onlinePayReady()),
+        payLink: may("booking:write") && may("invoice:write") && online,
+        canTakePayment: canTakeDeskPayments(organization),
+        onlinePay: online,
     };
 
     // From Home's "Last 24 hours" (F6): the confirmed bookings made since
@@ -120,7 +132,7 @@ export default async function BookingsPage({
     const canBook = may("booking:write");
     const timezone = calendar.timezone || "Asia/Kolkata";
 
-    return (
+    const page = (
         <PageContainer width="full">
             {BACK}
             <PageHeader
@@ -133,26 +145,7 @@ export default async function BookingsPage({
                     // otherwise, as the diary already asks. On a phone it
                     // floats above the tab bar (BKMAllBookings).
                     canBook ? (
-                        <NewBookingDialog
-                            triggerClassName="min-[760px]:h-11 min-[760px]:px-[18px] min-[760px]:text-[14.5px] max-[759px]:fixed max-[759px]:bottom-[calc(16px+var(--tab-bar-inset,0px))] max-[759px]:right-4 max-[759px]:z-30 max-[759px]:h-14 max-[759px]:rounded-full max-[759px]:pl-4 max-[759px]:pr-5 max-[759px]:text-[15px] max-[759px]:shadow-xl"
-                            services={services
-                                .filter((s) => s.status === "ACTIVE")
-                                .map((s) => ({
-                                    id: s.id,
-                                    name: s.name,
-                                    timezone: s.timezone,
-                                    minutes: s.durationMinutes,
-                                    priceCents: s.priceCents,
-                                }))}
-                            people={people}
-                            // Paying with a class pack spends one (ADR-007),
-                            // while Class packs is on (E12).
-                            canUsePacks={
-                                canReadPacks(organization) &&
-                                canUsePacksOnBookings(organization) &&
-                                packsOn(await modulesOrUnknown())
-                            }
-                        />
+                        <NewBookingButton className="max-[759px]:fixed max-[759px]:bottom-[calc(16px+var(--tab-bar-inset,0px))] max-[759px]:right-4 max-[759px]:z-30 max-[759px]:h-14 max-[759px]:rounded-full max-[759px]:pl-4 max-[759px]:pr-5 max-[759px]:text-[15px] max-[759px]:shadow-xl min-[760px]:h-11 min-[760px]:px-[18px] min-[760px]:text-[14.5px]" />
                     ) : null
                 }
             />
@@ -190,6 +183,30 @@ export default async function BookingsPage({
                 />
             </div>
         </PageContainer>
+    );
+    if (!canBook) return page;
+    return (
+        <NewBookingHost
+            setup={{
+                services: flowServices(services),
+                staff: flowStaff(staffList?.staff ?? null),
+                people,
+                // Paying with a class pack spends one (ADR-007), while Class
+                // packs is on (E12).
+                canUsePacks:
+                    canReadPacks(organization) &&
+                    canUsePacksOnBookings(organization) &&
+                    packsOn(await modulesOrUnknown()),
+                timezone,
+                // Prices as the API shows them (DEC-020, DEC-098).
+                showMoney:
+                    may("payment:read") || canTakeDeskPayments(organization),
+                business: organization?.name ?? null,
+                now: readNow(),
+            }}
+        >
+            {page}
+        </NewBookingHost>
     );
 }
 

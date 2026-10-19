@@ -36,7 +36,8 @@ export interface PackOffer {
  *
  * Someone whose role can't take payment (a Member at the front desk,
  * DEC-098: `booking:write` and `invoice:write`, never a role's name) sees
- * "Paid now" locked, saying why; they book it to be paid at the visit.
+ * "Paid now", and "Send a payment link" where it is shown, locked, saying
+ * why; they book it to be paid at the visit.
  *
  * Controlled: the flow holds the choice and sends it with `payInput`
  * (`lib/services/booking-pay.ts`); `payProblem` names what is missing
@@ -108,7 +109,7 @@ export function PayChoice({
                         onChange={onChange}
                         rowClassName="min-h-14 rounded-[12px] px-3.5 py-2.5 text-[14.5px] font-semibold"
                         options={choices.map((c) => {
-                            const locked = c.key === "PAID" && !canTakePayment;
+                            const locked = c.key !== "DESK" && !canTakePayment;
                             return {
                                 value: c.key,
                                 label: c.label,

@@ -46,6 +46,11 @@ export const RAW_ALLOWED = {
     "components/bookings/availability/weekly-hours.tsx": ["button"],
     // button: a card that is one button (whose hours, opened to pick)
     "components/bookings/availability/whose-hours.tsx": ["button"],
+    // button: New booking's What next? rows, each a row that is one button
+    "components/bookings/new-booking/done-step.tsx": ["button"],
+    // button: New booking's chips of what is picked, and its step list's
+    // steps, each a row that goes back to its step
+    "components/bookings/new-booking/flow-frame.tsx": ["button"],
     // button: the List's free times card that opens, and each free time a row
     "components/bookings/calendar/list/list-free-times.tsx": ["button"],
     // button: each booked row of the List, one button

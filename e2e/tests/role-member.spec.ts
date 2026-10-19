@@ -310,13 +310,29 @@ test.describe("a Member", () => {
         }
     });
 
-    test("is not offered New booking on All bookings", async ({ page }) => {
+    test("books as the front desk from All bookings, money out of reach (DEC-170)", async ({
+        page,
+    }) => {
         await openNorthwindAs(page, "northwindMember");
         await page.goto("/bookings/all");
         await expect(
             page.getByRole("heading", { name: "All bookings" }),
         ).toBeVisible();
-        await expectNotOffered(page, "New booking");
+        await page
+            .getByRole("button", { name: "New booking", exact: true })
+            .filter({ visible: true })
+            .first()
+            .click();
+        const sheet = page.getByRole("dialog", { name: "New booking" });
+        await expect(
+            sheet
+                .getByText("You're booking as front desk.", { exact: false })
+                .filter({ visible: true })
+                .first(),
+        ).toBeVisible();
+        // Opened and read only: nothing is booked.
+        await page.keyboard.press("Escape");
+        await expect(sheet).toBeHidden();
     });
 
     test("has no way to the plans, and reads who has", async ({ page }) => {

@@ -834,17 +834,31 @@ test.describe("New booking finds the customer (E4)", () => {
         expect(await ids(`+91 ${digits}`)).toContain(withPhone.id);
         expect(await ids(digits)).toContain(withPhone.id);
 
-        // And in the dialog: typing the last 4 finds and picks them.
+        // And in New booking (U8): typing the last 4 finds them, and
+        // picking them moves on to what they are booking.
         await page.goto("/bookings");
-        await page.getByRole("button", { name: "New booking" }).first().click();
-        const book = page.getByRole("dialog");
+        await page
+            .getByRole("button", { name: "New booking", exact: true })
+            .filter({ visible: true })
+            .first()
+            .click();
+        const book = page.getByRole("dialog", { name: "New booking" });
         await book.getByLabel("Find the customer").fill(digits.slice(-4));
-        const chip = book.getByRole("radio", { name, exact: true });
-        await expect(chip).toBeVisible();
-        await chip.click();
-        await expect(chip).toBeChecked();
-        // Nothing is written until "Book": Cancel drops it.
-        await book.getByRole("button", { name: "Cancel" }).click();
+        const row = book
+            .getByRole("list")
+            .getByRole("button", { name: new RegExp(name) })
+            .first();
+        await expect(row).toBeVisible();
+        await row.click();
+        await expect(
+            book.getByText("Step 2 of 5 · Service").first(),
+        ).toBeVisible();
+        // Nothing is written until Book: closing asks, and Discard drops it.
+        await page.keyboard.press("Escape");
+        await page
+            .getByRole("alertdialog", { name: "Discard what you typed?" })
+            .getByRole("button", { name: "Discard" })
+            .click();
         await expect(book).toBeHidden();
     });
 });

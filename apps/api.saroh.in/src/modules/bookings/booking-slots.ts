@@ -54,7 +54,38 @@ import {
  * one-to-one it is everyone free for that start; for a class, its
  * instructor, shown beside it.
  */
-export type AvailableSlot = Slot & { staffIds?: string[] };
+export type AvailableSlot = Slot & {
+    staffIds?: string[];
+    /** A class's places still open at that start (U8); absent otherwise. */
+    placesLeft?: number;
+};
+
+/**
+ * A class's open starts with how many places each still has (U8, New
+ * booking's "4 places left"), counted as the capacity check counts them:
+ * confirmed bookings, course seats and waitlist holds overlapping the
+ * start's guarded span. Anything else is returned as it is.
+ */
+export async function withPlacesLeft(
+    service: Service,
+    slots: AvailableSlot[],
+): Promise<AvailableSlot[]> {
+    if (service.capacity <= 1 || slots.length === 0) return slots;
+    const availService = toAvailabilityService(service);
+    const spans = slots.map((slot) => guarded(slot, availService));
+    const from = new Date(
+        Math.min(...spans.map((span) => span.startAt.getTime())),
+    );
+    const to = new Date(Math.max(...spans.map((span) => span.endAt.getTime())));
+    const busy = await busyOverlapping(service.id, from, to);
+    return slots.map((slot, i) => ({
+        ...slot,
+        placesLeft: Math.max(
+            0,
+            service.capacity - countOverlapping(spans[i] ?? slot, busy),
+        ),
+    }));
+}
 
 /**
  * How a service is staffed (U3). `perPerson` is a one-to-one somebody takes:

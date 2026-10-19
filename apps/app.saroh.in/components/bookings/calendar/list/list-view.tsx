@@ -4,6 +4,7 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
 
+import { useNewBookingLauncher } from "@/components/bookings/new-booking/launcher";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { formatClock, formatDay } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
@@ -81,6 +82,7 @@ export function ListView({
     /** Open hours on this day, as Week does: whoever is picked, else you. */
     onOpenDay: () => void;
 }) {
+    const launcher = useNewBookingLauncher();
     const staffById = new Map((staff ?? []).map((p) => [p.id, p]));
     const isToday = date === today;
     const past = date < today;
@@ -133,7 +135,17 @@ export function ListView({
                 past={past}
                 canBook={canBook}
                 onOpenHours={canHours ? onOpenDay : undefined}
-                onBookDay={firstFree?.book ?? undefined}
+                // New booking on this day (U8); without its host, the
+                // day's first free time.
+                onBookDay={
+                    launcher && canBook
+                        ? () =>
+                              launcher.open({
+                                  date,
+                                  ...(person ? { staffId: person } : {}),
+                              })
+                        : (firstFree?.book ?? undefined)
+                }
                 share={share}
             />
         );

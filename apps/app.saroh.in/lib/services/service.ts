@@ -214,6 +214,8 @@ export interface Slot {
      * class's teacher. Absent for a service nobody takes.
      */
     staffIds?: string[];
+    /** A class's places still open at that start (U8); absent otherwise. */
+    placesLeft?: number;
 }
 
 /** A booking joined with a light snapshot of its owning Service. */

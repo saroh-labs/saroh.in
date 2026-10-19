@@ -1,5 +1,6 @@
 "use client";
 
+import { phoneLabel } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
 import { Field } from "@saroh/ui/field";
@@ -10,6 +11,7 @@ import { Notice } from "@saroh/ui/notice";
 import { Check, Plus, Search } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
+import { BusinessPhoneInput } from "@/components/shared/business-phone-input";
 import { findCustomers, readCustomerAttention } from "@/lib/customers/actions";
 import type {
     CustomerPick,
@@ -33,9 +35,9 @@ import {
     resultLabel,
     withDialCode,
 } from "@/lib/customers/picker";
+import { firstName } from "@/lib/names";
 import type { PeekAttention } from "@/lib/services/peek";
 import { attentionText } from "@/lib/services/peek";
-import { firstName } from "@/lib/services/time-picker";
 
 /** How long typing settles before the search runs. */
 const SETTLE_MS = 200;
@@ -150,9 +152,11 @@ export function useCustomerFinder({
      */
     async function add(): Promise<boolean> {
         if (!adding || checking) return false;
+        // As people read it, "+91 90000 54321", whether the field gave
+        // E.164 (#1036) or a number typed before it was touched.
         const draft = {
             name: adding.name.trim(),
-            phone: withDialCode(adding.phone, dialCode),
+            phone: phoneLabel(withDialCode(adding.phone, dialCode)),
             email: adding.email.trim(),
         };
         const wrong = newCustomerProblems(draft);
@@ -251,11 +255,9 @@ export function useCustomerFinder({
             if (!dup) return;
             if (!dup.draft.email) {
                 setDeclined(dup.match.id);
-                // Back in the card as typed, without the code drawn there.
-                const typed = dup.draft.phone.startsWith(dialCode)
-                    ? dup.draft.phone.slice(dialCode.length).trim()
-                    : dup.draft.phone;
-                setAdding({ ...dup.draft, phone: typed });
+                // Back in the card as it was: the phone field splits the
+                // code from the number itself (#1036).
+                setAdding({ ...dup.draft });
                 setProblems({
                     email: apartByEmailMessage(
                         resultLabel(dup.match),
@@ -304,7 +306,6 @@ export function CustomerStep({
     const ids = {
         list: useId(),
         name: useId(),
-        phone: useId(),
         email: useId(),
         dup: useId(),
     };
@@ -477,36 +478,12 @@ export function CustomerStep({
                             className="h-12 text-[16px]"
                         />
                     </Field>
-                    <Field
-                        label="Phone"
-                        htmlFor={ids.phone}
-                        error={f.problems.phone}
-                        holdsData
-                    >
-                        {/* #1036: the shared PhoneInput drops in here. */}
-                        <div className="relative">
-                            <span
-                                aria-hidden
-                                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[16px] text-muted-foreground"
-                            >
-                                {f.dialCode}
-                            </span>
-                            <Input
-                                id={ids.phone}
-                                type="tel"
-                                inputMode="tel"
-                                autoComplete="tel"
-                                value={f.adding.phone}
-                                onChange={(e) =>
-                                    f.setField("phone", e.target.value)
-                                }
-                                aria-invalid={
-                                    f.problems.phone ? true : undefined
-                                }
-                                aria-describedby={`${ids.phone}-note`}
-                                className="h-12 pl-12 text-[16px]"
-                            />
-                        </div>
+                    <Field label="Phone" error={f.problems.phone} holdsData>
+                        <BusinessPhoneInput
+                            value={f.adding.phone}
+                            onValueChange={(next) => f.setField("phone", next)}
+                            boxClassName="h-12 text-[16px]"
+                        />
                     </Field>
                     <Field
                         label="Email"
