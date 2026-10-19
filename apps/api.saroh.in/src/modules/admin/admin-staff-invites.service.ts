@@ -13,7 +13,10 @@ import { prisma } from "@saroh/database";
 import { emailVerifiedBySelf } from "../../common/auth/email-verification";
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { isBootstrapAdmin } from "../../common/guards/platform-admin.guard";
-import { prismaErrorCode } from "../../common/prisma-errors";
+import {
+    isSerializationFailure,
+    prismaErrorCode,
+} from "../../common/prisma-errors";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import type { AdminRole } from "./admin-permissions";
 import {
@@ -45,6 +48,28 @@ type Tx = Prisma.TransactionClient;
 
 /** Tries at an accept that clashed with another write (a manager code, two clicks at once). */
 const ACCEPT_TRIES = 5;
+
+/**
+ * Run a Serializable write, again when the database refuses it for another
+ * write at the same moment (any staff or ledger row it read changed under
+ * it). The checks inside run again, so the second try still refuses what it
+ * should.
+ */
+async function serializable<T>(
+    run: (tx: Tx) => Promise<T>,
+    tries = ACCEPT_TRIES,
+): Promise<T> {
+    for (let attempt = 1; ; attempt++) {
+        try {
+            return await prisma.$transaction(run, {
+                isolationLevel: "Serializable",
+            });
+        } catch (error) {
+            if (isSerializationFailure(error) && attempt < tries) continue;
+            throw error;
+        }
+    }
+}
 
 /** How an accept that can't go ahead is told apart: `details.code`. */
 export const StaffInviteRefusal = {
@@ -188,71 +213,68 @@ export class AdminStaffInvitesService {
         const token = newStaffInviteToken();
         const now = new Date();
 
-        const invite = await prisma.$transaction(
-            async (tx) => {
-                if (await onTheTeam(tx, email, now)) {
-                    throw new ConflictException({
-                        message: ALREADY_ON_TEAM_MESSAGE,
-                        details: { code: StaffInviteRefusal.AlreadyOnTeam },
-                    });
-                }
-                const open = await tx.staffInvite.findMany({
-                    where: { email, acceptedAt: null, withdrawnAt: null },
-                    select: { id: true, expiresAt: true },
+        const invite = await serializable(async (tx) => {
+            if (await onTheTeam(tx, email, now)) {
+                throw new ConflictException({
+                    message: ALREADY_ON_TEAM_MESSAGE,
+                    details: { code: StaffInviteRefusal.AlreadyOnTeam },
                 });
-                if (open.some((row) => row.expiresAt > now)) {
-                    throw new ConflictException({
-                        message:
-                            "An invite to this address is already waiting. Resend it instead.",
-                        details: { code: "INVITE_WAITING" },
-                    });
-                }
-                // An expired invite to the same address is replaced, so the
-                // list keeps one row per person.
-                if (open.length > 0) {
-                    await tx.staffInvite.updateMany({
-                        where: { id: { in: open.map((row) => row.id) } },
-                        data: {
-                            withdrawnAt: now,
-                            withdrawnByUserId: input.staff.userId,
-                        },
-                    });
-                }
-                const created = await tx.staffInvite.create({
+            }
+            const open = await tx.staffInvite.findMany({
+                where: { email, acceptedAt: null, withdrawnAt: null },
+                select: { id: true, expiresAt: true },
+            });
+            if (open.some((row) => row.expiresAt > now)) {
+                throw new ConflictException({
+                    message:
+                        "An invite to this address is already waiting. Resend it instead.",
+                    details: { code: "INVITE_WAITING" },
+                });
+            }
+            // An expired invite to the same address is replaced, so the
+            // list keeps one row per person.
+            if (open.length > 0) {
+                await tx.staffInvite.updateMany({
+                    where: { id: { in: open.map((row) => row.id) } },
                     data: {
-                        email,
-                        name,
-                        roles,
-                        worksAs: input.worksAs,
-                        onCommission: input.onCommission ?? false,
-                        reason,
-                        tokenHash: hashStaffInviteToken(token),
-                        expiresAt: staffInviteExpiry(now),
-                        invitedByUserId: input.staff.userId,
-                        sentAt: now,
+                        withdrawnAt: now,
+                        withdrawnByUserId: input.staff.userId,
                     },
-                    select: { id: true, expiresAt: true },
                 });
-                await this.audit.write(tx, {
-                    actorUserId: input.staff.userId,
-                    permission: AdminPermission.StaffGrant,
-                    action: "staff.invite.created",
-                    targetType: "staff_invite",
-                    targetId: created.id,
+            }
+            const created = await tx.staffInvite.create({
+                data: {
+                    email,
+                    name,
+                    roles,
+                    worksAs: input.worksAs,
+                    onCommission: input.onCommission ?? false,
                     reason,
-                    outcome: AdminAuditOutcome.Success,
-                    metadata: {
-                        roles,
-                        worksAs: input.worksAs,
-                        onCommission: input.onCommission ?? false,
-                        replacedExpired: open.length,
-                        expiresAt: created.expiresAt.toISOString(),
-                    },
-                });
-                return created;
-            },
-            { isolationLevel: "Serializable" },
-        );
+                    tokenHash: hashStaffInviteToken(token),
+                    expiresAt: staffInviteExpiry(now),
+                    invitedByUserId: input.staff.userId,
+                    sentAt: now,
+                },
+                select: { id: true, expiresAt: true },
+            });
+            await this.audit.write(tx, {
+                actorUserId: input.staff.userId,
+                permission: AdminPermission.StaffGrant,
+                action: "staff.invite.created",
+                targetType: "staff_invite",
+                targetId: created.id,
+                reason,
+                outcome: AdminAuditOutcome.Success,
+                metadata: {
+                    roles,
+                    worksAs: input.worksAs,
+                    onCommission: input.onCommission ?? false,
+                    replacedExpired: open.length,
+                    expiresAt: created.expiresAt.toISOString(),
+                },
+            });
+            return created;
+        });
 
         const emailed = await this.send(email, {
             base,
@@ -288,52 +310,49 @@ export class AdminStaffInvitesService {
         const token = newStaffInviteToken();
         const now = new Date();
 
-        const invite = await prisma.$transaction(
-            async (tx) => {
-                const row = await tx.staffInvite.findUnique({
-                    where: { id: input.inviteId },
-                    select: INVITE_SELECT,
-                });
-                if (!row) throw new NotFoundException("Invite not found");
-                if (row.acceptedAt) {
-                    throw new ConflictException(
-                        "They already accepted this invite.",
-                    );
-                }
-                if (row.withdrawnAt) {
-                    throw new ConflictException(
-                        "This invite was withdrawn. Send a new one.",
-                    );
-                }
-                const updated = await tx.staffInvite.update({
-                    where: { id: row.id },
-                    data: {
-                        tokenHash: hashStaffInviteToken(token),
-                        expiresAt: staffInviteExpiry(now),
-                        sentAt: now,
-                        sendCount: { increment: 1 },
-                        invitedByUserId: input.staff.userId,
-                    },
-                    select: INVITE_SELECT,
-                });
-                await this.audit.write(tx, {
-                    actorUserId: input.staff.userId,
-                    permission: AdminPermission.StaffGrant,
-                    action: "staff.invite.resent",
-                    targetType: "staff_invite",
-                    targetId: row.id,
-                    reason,
-                    outcome: AdminAuditOutcome.Success,
-                    metadata: {
-                        sendCount: updated.sendCount,
-                        wasExpired: row.expiresAt <= now,
-                        expiresAt: updated.expiresAt.toISOString(),
-                    },
-                });
-                return updated;
-            },
-            { isolationLevel: "Serializable" },
-        );
+        const invite = await serializable(async (tx) => {
+            const row = await tx.staffInvite.findUnique({
+                where: { id: input.inviteId },
+                select: INVITE_SELECT,
+            });
+            if (!row) throw new NotFoundException("Invite not found");
+            if (row.acceptedAt) {
+                throw new ConflictException(
+                    "They already accepted this invite.",
+                );
+            }
+            if (row.withdrawnAt) {
+                throw new ConflictException(
+                    "This invite was withdrawn. Send a new one.",
+                );
+            }
+            const updated = await tx.staffInvite.update({
+                where: { id: row.id },
+                data: {
+                    tokenHash: hashStaffInviteToken(token),
+                    expiresAt: staffInviteExpiry(now),
+                    sentAt: now,
+                    sendCount: { increment: 1 },
+                    invitedByUserId: input.staff.userId,
+                },
+                select: INVITE_SELECT,
+            });
+            await this.audit.write(tx, {
+                actorUserId: input.staff.userId,
+                permission: AdminPermission.StaffGrant,
+                action: "staff.invite.resent",
+                targetType: "staff_invite",
+                targetId: row.id,
+                reason,
+                outcome: AdminAuditOutcome.Success,
+                metadata: {
+                    sendCount: updated.sendCount,
+                    wasExpired: row.expiresAt <= now,
+                    expiresAt: updated.expiresAt.toISOString(),
+                },
+            });
+            return updated;
+        });
 
         const emailed = await this.send(invite.email, {
             base,
@@ -352,41 +371,37 @@ export class AdminStaffInvitesService {
     }): Promise<{ inviteId: string; changed: boolean }> {
         const reason = requireReason(input.reason);
         assertGrants(input.staff);
-        return prisma.$transaction(
-            async (tx) => {
-                const row = await tx.staffInvite.findUnique({
-                    where: { id: input.inviteId },
-                    select: INVITE_SELECT,
-                });
-                if (!row) throw new NotFoundException("Invite not found");
-                if (row.acceptedAt) {
-                    throw new ConflictException(
-                        "They already accepted this invite. Take their access away from their page instead.",
-                    );
-                }
-                if (row.withdrawnAt)
-                    return { inviteId: row.id, changed: false };
-                await tx.staffInvite.update({
-                    where: { id: row.id },
-                    data: {
-                        withdrawnAt: new Date(),
-                        withdrawnByUserId: input.staff.userId,
-                    },
-                });
-                await this.audit.write(tx, {
-                    actorUserId: input.staff.userId,
-                    permission: AdminPermission.StaffGrant,
-                    action: "staff.invite.withdrawn",
-                    targetType: "staff_invite",
-                    targetId: row.id,
-                    reason,
-                    outcome: AdminAuditOutcome.Success,
-                    metadata: { roles: row.roles },
-                });
-                return { inviteId: row.id, changed: true };
-            },
-            { isolationLevel: "Serializable" },
-        );
+        return serializable(async (tx) => {
+            const row = await tx.staffInvite.findUnique({
+                where: { id: input.inviteId },
+                select: INVITE_SELECT,
+            });
+            if (!row) throw new NotFoundException("Invite not found");
+            if (row.acceptedAt) {
+                throw new ConflictException(
+                    "They already accepted this invite. Take their access away from their page instead.",
+                );
+            }
+            if (row.withdrawnAt) return { inviteId: row.id, changed: false };
+            await tx.staffInvite.update({
+                where: { id: row.id },
+                data: {
+                    withdrawnAt: new Date(),
+                    withdrawnByUserId: input.staff.userId,
+                },
+            });
+            await this.audit.write(tx, {
+                actorUserId: input.staff.userId,
+                permission: AdminPermission.StaffGrant,
+                action: "staff.invite.withdrawn",
+                targetType: "staff_invite",
+                targetId: row.id,
+                reason,
+                outcome: AdminAuditOutcome.Success,
+                metadata: { roles: row.roles },
+            });
+            return { inviteId: row.id, changed: true };
+        });
     }
 
     /**

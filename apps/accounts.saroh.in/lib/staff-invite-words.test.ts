@@ -4,6 +4,8 @@ import { refusalOf } from "./api";
 import { staffInviteReadStatus } from "./staff-invite";
 import {
     acceptResult,
+    doneAfterAccept,
+    doneWords,
     rolesInWords,
     STAFF_INVITE_TOKEN_PATTERN,
     staffInviteScreen,
@@ -123,6 +125,33 @@ describe("acceptResult", () => {
         ).toMatchObject({
             description: "Nothing has changed. Try again in a moment.",
         });
+    });
+});
+
+describe("how the invite ended, kept past the reload", () => {
+    it("keeps joined and the final refusals, and nothing that can be fixed here", () => {
+        expect(doneAfterAccept({ ok: true })).toBe("joined");
+        expect(doneAfterAccept({ ok: false, code: "ALREADY_ON_TEAM" })).toBe(
+            "ALREADY_ON_TEAM",
+        );
+        expect(
+            doneAfterAccept({ ok: false, code: "INVITE_SENDER_CANNOT_GRANT" }),
+        ).toBe("INVITE_SENDER_CANNOT_GRANT");
+        expect(
+            doneAfterAccept({ ok: false, code: "INVITE_WRONG_ACCOUNT" }),
+        ).toBeNull();
+        expect(doneAfterAccept({ ok: false })).toBeNull();
+        // A code can't pass itself off as joined.
+        expect(doneAfterAccept({ ok: false, code: "joined" })).toBeNull();
+    });
+
+    it("says each final refusal as the accept did", () => {
+        expect(doneWords("ALREADY_ON_TEAM").title).toBe(
+            "You're already on the team",
+        );
+        expect(doneWords("INVITE_SENDER_CANNOT_GRANT").description).toMatch(
+            /can't add teammates any more/,
+        );
     });
 });
 

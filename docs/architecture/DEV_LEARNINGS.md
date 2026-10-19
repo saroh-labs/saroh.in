@@ -5270,3 +5270,23 @@ rule stands for the profile's own fields.
 **Fix.** `ScrollX`'s scroller is `relative` (`packages/ui/src/components/ui/scroll-x.tsx`). That fixes every tab strip and wide table built on it. Found by loading every admin route at 390px and checking `scrollWidth`; the cause was found by hiding one section at a time.
 
 **Rule.** An element that clips with `overflow` must also be the positioning parent (`relative`) if anything inside it can be absolutely positioned, including `sr-only` text. A phone check measures `documentElement.scrollWidth`, not only what looks cut off.
+
+### "You're on the team" turned into "can't be used" the moment someone joined (19 Oct 2026)
+
+**Symptom.** The browser test for a staff invite reached Join the team, the API accepted (200), and the page then showed no "You're on the team". A real invitee would have read that their invite can no longer be used, right after joining.
+
+**Cause.** `acceptStaffInviteAction` deleted the invite's cookie once the invite was over. In Next, a server action that sets or deletes a cookie re-renders the page, so the server page ran again: with no token, and an invite now used, it drew "gone" over the client's answer. Final refusals ("You're already on the team") were lost the same way. Unit tests mocked the action, so none saw the re-render.
+
+**Fix.** The action leaves a ten-minute `saroh_staff_invite_done` cookie (joined or the final refusal's code) in place of the token, and the page draws that outcome before anything else (`app/staff-invite/page.tsx`, `doneAfterAccept` / `doneWords`).
+
+**Rule.** A server action that changes a cookie re-renders its page. Whatever answer the client is showing must survive that render: let the page draw it from the server state, not only from the client's `useState`.
+
+### Staff invites failed with a 500 when two were sent at once (19 Oct 2026)
+
+**Symptom.** Under the parallel browser run, `POST /admin/staff/invites` answered 500 `TransactionWriteConflict`.
+
+**Cause.** Invite, resend and withdraw run Serializable transactions with no retry; another staff write at the same moment (any test granting access) failed the snapshot. Accept already retried.
+
+**Fix.** All three go through `serializable()` in `admin-staff-invites.service.ts`, which runs again on `isSerializationFailure`; the checks inside run again, so a real conflict is still refused.
+
+**Rule.** Every `isolationLevel: "Serializable"` transaction retries a serialization failure a few times (`isSerializationFailure`), or says why it must not.

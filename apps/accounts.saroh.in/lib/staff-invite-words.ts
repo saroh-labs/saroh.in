@@ -15,6 +15,58 @@ export const STAFF_INVITE_COOKIE = "saroh_staff_invite";
 export const STAFF_INVITE_PATH = "/staff-invite";
 export const STAFF_INVITE_COOKIE_MAX_AGE_SECONDS = 60 * 60;
 
+/**
+ * How the invite ended for this browser, kept for a few minutes in place of
+ * the spent token. Changing a cookie in a server action reloads the page,
+ * and the page can no longer read an invite that was just used, so without
+ * this the "You're on the team" answer would turn into "can't be used".
+ */
+export const STAFF_INVITE_DONE_COOKIE = "saroh_staff_invite_done";
+export const STAFF_INVITE_DONE_MAX_AGE_SECONDS = 10 * 60;
+
+const DONE_OUTCOMES = [
+    "joined",
+    "ALREADY_ON_TEAM",
+    "INVITE_GONE",
+    "INVITE_SENDER_CANNOT_GRANT",
+] as const;
+export type StaffInviteDone = (typeof DONE_OUTCOMES)[number];
+
+/** A cookie's value as an outcome, or null for anything else. */
+export function staffInviteDoneOf(
+    value: string | undefined,
+): StaffInviteDone | null {
+    return DONE_OUTCOMES.find((outcome) => outcome === value) ?? null;
+}
+
+/** The outcome to keep after an accept, or null when the invite isn't over. */
+export function doneAfterAccept(
+    answer: { ok: true } | { ok: false; code?: string },
+): StaffInviteDone | null {
+    if (answer.ok) return "joined";
+    const done = staffInviteDoneOf(answer.code);
+    return done === "joined" ? null : done;
+}
+
+/** What the page says once the invite is over, from its outcome. */
+export function doneWords(done: Exclude<StaffInviteDone, "joined">): {
+    title: string;
+    description: string;
+} {
+    const result = acceptResult({
+        ok: false,
+        status: 409,
+        error: SENDER_CANNOT_GRANT,
+        code: done,
+    });
+    return result.ok
+        ? STAFF_INVITE_COPY.gone
+        : { title: result.title, description: result.description };
+}
+
+const SENDER_CANNOT_GRANT =
+    "Whoever sent this invite can't add teammates any more. Ask someone on the team for a new one.";
+
 /** What a token from the API looks like (32 random bytes, base64url). */
 export const STAFF_INVITE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 

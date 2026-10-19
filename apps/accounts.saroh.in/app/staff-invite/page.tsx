@@ -2,7 +2,7 @@ import { resolveServerSession } from "@saroh/auth/next";
 import { Button } from "@saroh/ui/button";
 import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
 import type { Metadata } from "next";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import Link from "next/link";
 
 import { STAFF_INVITE_PANEL } from "@/components/auth/panel-copy";
@@ -14,9 +14,12 @@ import { consoleUrl } from "@/lib/businesses";
 import { readStaffInvite, staffInviteToken } from "@/lib/staff-invite";
 import type { StaffInvitePreview } from "@/lib/staff-invite-words";
 import {
+    doneWords,
     rolesInWords,
     STAFF_INVITE_COPY,
+    STAFF_INVITE_DONE_COOKIE,
     STAFF_INVITE_PATH,
+    staffInviteDoneOf,
     staffInviteScreen,
     WORKS_AS_LABEL,
 } from "@/lib/staff-invite-words";
@@ -48,6 +51,25 @@ const LINK =
  */
 export default async function StaffInvitePage() {
     const token = await staffInviteToken();
+    // Just used here: say how it ended (`actions.ts`), not "can't be used".
+    const done = token
+        ? null
+        : staffInviteDoneOf(
+              (await cookies()).get(STAFF_INVITE_DONE_COOKIE)?.value,
+          );
+    if (done === "joined") {
+        return (
+            <Notice {...STAFF_INVITE_COPY.joined}>
+                <Button
+                    asChild
+                    className="sa-cta h-10 w-full rounded-[9px] text-[13.5px] font-semibold"
+                >
+                    <a href={consoleUrl()}>Open the console</a>
+                </Button>
+            </Notice>
+        );
+    }
+    if (done) return <Notice {...doneWords(done)} />;
     const [read, session] = await Promise.all([
         token ? readStaffInvite(token) : Promise.resolve(null),
         resolveServerSession(await headers()),

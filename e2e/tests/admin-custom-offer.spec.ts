@@ -48,7 +48,8 @@ test.describe("a custom offer", () => {
     }) => {
         await useSession(page, "staff");
         await page.goto(`${PAGE}/billing`);
-        const offers = page.locator('[data-billing-row="offers"]');
+        // A support session open from another test repeats the rows below.
+        const offers = page.locator('[data-billing-row="offers"]').first();
         await expect(offers).toBeVisible();
         const before = await offers.innerText();
 
