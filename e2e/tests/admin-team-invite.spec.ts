@@ -162,7 +162,7 @@ test.describe("adding a teammate by invite (U24)", () => {
         expect(await profile.json()).toMatchObject({
             exists: true,
             worksAs: "ACCOUNT_MANAGER_JOB",
-            workEmail: email,
+            workEmail: null,
             onCommission: true,
         });
     });

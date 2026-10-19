@@ -927,22 +927,32 @@ else
     bg_step "$API_UNIT" env SKIP_ENV_VALIDATION=1 $TURBO test:unit --only \
         --filter=@saroh/api $JEST_ARGS
 fi
-# CI's unit job runs with this DATABASE_URL (a local name nothing connects
-# to); run the same here, or a test that reads it passes locally and fails in
-# CI (seed/staff.test.ts, 19 Oct 2026).
-CI_UNIT_DB=postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
+# CI's unit job sets these (.github/workflows/ci.yml, job "unit"); run the
+# same here, or a test that reads one passes locally and fails in CI
+# (seed/staff.test.ts and user-menu.test.tsx, 19 Oct 2026). Keep in step
+# with the job's env; its placeholder auth secret is left out on purpose.
+CI_UNIT_ENV=(
+    DATABASE_URL=postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
+    BETTER_AUTH_URL=http://localhost:3333
+    APP_URL=http://localhost:3003
+    CORS_ORIGIN=http://localhost:3000
+    NEXT_PUBLIC_ACCOUNTS_URL=http://localhost:3000
+    NEXT_PUBLIC_API_URL=http://localhost:3333
+    NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3333
+    NEXT_PUBLIC_ROOT_DOMAIN=saroh.app
+)
 # Every other package with a `test` script, as CI's unit job runs them, but
 # the database package: its demo-seed tests build 70 days of a business and
 # take most of a minute alone, so they run after this burst, not inside it.
 # shellcheck disable=SC2086
-bg_step "$VITEST" env DATABASE_URL="$CI_UNIT_DB" $GATE_TURBO test --only --filter="...[$MB]" --filter='!@saroh/api' \
+bg_step "$VITEST" env "${CI_UNIT_ENV[@]}" $GATE_TURBO test --only --filter="...[$MB]" --filter='!@saroh/api' \
     --filter='!@saroh/database' $VITEST_ARGS
 bg_report
 if cached "$SEEDS" seeds; then
     say "$SEEDS" "PASS (cached)"
 elif affected @saroh/database; then
     # shellcheck disable=SC2086
-    step "$SEEDS" env DATABASE_URL="$CI_UNIT_DB" $TURBO test --only \
+    step "$SEEDS" env "${CI_UNIT_ENV[@]}" $TURBO test --only \
         --filter=@saroh/database $SEED_ARGS
 fi
 

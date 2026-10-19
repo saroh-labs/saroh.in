@@ -564,9 +564,11 @@ export class AdminStaffInvitesService {
                 expiresAt: null,
             })),
         });
+        // No work email: the one businesses see is set by Saroh's team on
+        // the teammate's page, never the address they sign in with (owner,
+        // 19 Oct).
         const profile = {
             worksAs: row.worksAs,
-            workEmail: row.email,
             onCommission: row.onCommission,
         };
         const hadProfile = await tx.staffProfile.findUnique({

@@ -15,6 +15,7 @@ import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { billingProfilesUrl } from "@/lib/accounts";
 import type { AccountManager, Organization } from "@/lib/organizations/service";
 
 import { AppHeader } from "./app-header";
@@ -99,9 +100,10 @@ describe("Billing profiles in the account menu", () => {
         );
         expect(link?.textContent).toContain("Billing profiles ↗");
         expect(link?.textContent).toContain("New");
-        expect(link?.getAttribute("href")).toBe(
-            "https://accounts.saroh.in/account/billing-profiles",
-        );
+        // accounts.saroh.in's address comes from the environment (CI sets
+        // a local one), so compare with the one the menu is built from.
+        expect(billingProfilesUrl).toMatch(/\/account\/billing-profiles$/);
+        expect(link?.getAttribute("href")).toBe(billingProfilesUrl);
         expect(link?.hasAttribute("target")).toBe(false);
         expect(menu?.textContent).toContain(
             "Your profile and billing profiles are yours, not Pulse Fitness Gurugram's.",
