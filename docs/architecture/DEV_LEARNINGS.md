@@ -5297,6 +5297,6 @@ rule stands for the profile's own fields.
 
 **Cause.** The test called `seedStaff(prisma, undefined)` to mean "no URL", but an `undefined` argument takes the default, `process.env.DATABASE_URL`. CI's unit job sets that to a localhost name, so the seed ran against the stub; the local gate had no DATABASE_URL, so it returned null.
 
-**Fix.** The test stubs `DATABASE_URL` (`vi.stubEnv`) instead of passing `undefined`, and `scripts/prepush.sh` runs the vitest and seed steps with CI's unit `DATABASE_URL`, so the two read the same environment.
+**Fix.** The test stubs `DATABASE_URL` (`vi.stubEnv`) instead of passing `undefined`. The next CI run then failed `user-menu.test.tsx`, which expected `https://accounts.saroh.in/…` while CI sets `NEXT_PUBLIC_ACCOUNTS_URL` to a local address; it now compares with `billingProfilesUrl`. `scripts/prepush.sh` runs the vitest and seed steps with CI's unit job environment (`CI_UNIT_ENV`), so both read the same values.
 
 **Rule.** Passing `undefined` never tests "not set" for a parameter with a default. A test that depends on an environment variable sets it itself; the local gate runs unit tests with CI's environment.
