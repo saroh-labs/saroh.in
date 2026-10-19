@@ -638,7 +638,7 @@ export class AdminStaffInvitesService {
         const base = this.mailer.accountsBase();
         if (!base) {
             throw new ServiceUnavailableException(
-                "This instance doesn't know where accounts is, so the invite would have no link. Set ACCOUNTS_URL on the API.",
+                "Saroh doesn't know where its sign-in site is, so the invite would have no link. Set ACCOUNTS_URL on the API.",
             );
         }
         return base;

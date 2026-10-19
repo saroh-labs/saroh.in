@@ -34,12 +34,14 @@ import { AdminBillingService } from "./admin-billing.service";
 import { AdminBusinessModulesService } from "./admin-business-modules.service";
 import { AdminBusinessReportsController } from "./admin-business-reports.controller";
 import { AdminBusinessReportsService } from "./admin-business-reports.service";
+import { AdminConsoleController } from "./admin-console.controller";
 import { AdminContactMessagesController } from "./admin-contact-messages.controller";
 import { AdminContactMessagesService } from "./admin-contact-messages.service";
 import { AdminDeploymentsController } from "./admin-deployments.controller";
 import { AdminDeploymentsService } from "./admin-deployments.service";
 import { AdminFlagsService } from "./admin-flags.service";
 import { AdminHealthService } from "./admin-health.service";
+import { AdminHomeService } from "./admin-home.service";
 import { AdminLifecycleService } from "./admin-lifecycle.service";
 import { AdminMachineryController } from "./admin-machinery.controller";
 import { AdminMachineryService } from "./admin-machinery.service";
@@ -53,6 +55,7 @@ import { AdminOrganizationsService } from "./admin-organizations.service";
 import { AdminOverridesService } from "./admin-overrides.service";
 import { AdminPeopleController } from "./admin-people.controller";
 import { AdminPeopleService } from "./admin-people.service";
+import { AdminSearchService } from "./admin-search.service";
 import {
     AdminSignInHelpService,
     SIGN_IN_EMAIL_RELEASE_TYPE,
@@ -129,6 +132,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AdminBillingController,
         AdminBillingControlsController,
         SarohLeadsController,
+        // Home and the header search (admin console redesign U10).
+        AdminConsoleController,
     ],
     providers: [
         IdempotencyService,
@@ -136,6 +141,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AdminAccessService,
         AdminAuditService,
         AdminMetricsService,
+        AdminHomeService,
+        AdminSearchService,
         AdminOrganizationViewService,
         AdminOrganizationOverviewService,
         AdminBusinessModulesService,

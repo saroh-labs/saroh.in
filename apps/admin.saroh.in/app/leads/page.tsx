@@ -35,7 +35,7 @@ export default async function LeadsPage({
         <AdminShell staff={staff}>
             <PageContainer>
                 <PageHeader
-                    breadcrumb={["Team", "Leads"]}
+                    breadcrumb={["Help customers", "Leads"]}
                     title="Leads"
                     description={
                         board?.scope === "own"

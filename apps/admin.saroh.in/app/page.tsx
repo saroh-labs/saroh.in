@@ -1,184 +1,69 @@
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@saroh/ui/card";
 import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
-import { StatCard } from "@saroh/ui/stat-card";
+import { Suspense } from "react";
 
 import { AdminShell } from "@/components/admin-shell";
-import { NotAuthorized } from "@/components/not-authorized";
-import { HealthBoard } from "@/components/operations/health-board";
-import { getMetrics, getStaffIdentity } from "@/lib/control-plane";
-import { formatDateTime } from "@/lib/format";
-import { getHealth } from "@/lib/machinery";
-import { requireSession } from "@/lib/session";
+import { HomeCounts, NeedsYou } from "@/components/home/needs-you";
+import { FailedPanel } from "@/components/states/failed-panel";
+import { PanelSkeleton } from "@/components/states/panel-skeleton";
+import { requireStaff } from "@/lib/console";
+import { getHome } from "@/lib/home";
+import type { ConsoleHome } from "@/lib/home-words";
+import { greeting, homeSummary } from "@/lib/home-words";
 
-// What the menu and the page's own heading call it.
-export const metadata = { title: "Health" };
+export const metadata = { title: "Home" };
 
 /**
- * The console's front door: the health board (plan U9), then how the
- * instance is doing in aggregate.
+ * Home (admin console redesign U10, R14): where every staff member lands.
+ * "Needs you" lists what is waiting on someone, each row with the link to
+ * its fix, and a few counts across Saroh sit under it. Health, which was
+ * here, is `/health` under Keep it running.
  *
- * Aggregates only, by design: the API's metrics endpoint returns counts and
- * group-bys, never a tenant's records. Per-tenant inspection stays a separate,
- * explicitly-audited surface rather than something this quietly grows into.
+ * Every staff member may open it. Someone who may not read Saroh's counts
+ * (an Account manager) gets the greeting and the way on: the menu and the
+ * search.
  */
-/** `COMMERCE` → "Commerce", `page_view` → "Page view": say it in words. */
-function asWords(key: string): string {
-    const words = key.toLowerCase().replace(/[_.]/g, " ");
-    return words.charAt(0).toUpperCase() + words.slice(1);
-}
-
-export default async function DashboardPage() {
-    const session = await requireSession();
-
-    // The API is the authority on who is staff, not this app's env — see
-    // lib/control-plane.ts.
-    const staff = await getStaffIdentity();
-    if (!staff) return <NotAuthorized email={session.user.email} />;
-
-    const [metrics, health] = await Promise.all([
-        getMetrics(),
-        getHealth().catch(() => null),
-    ]);
-    if (!metrics) {
-        return <NotAuthorized email={session.user.email} staff={staff} />;
-    }
+export default async function HomePage() {
+    const gate = await requireStaff();
+    if (!gate.ok) return gate.screen;
 
     return (
-        <AdminShell staff={staff}>
+        <AdminShell staff={gate.staff}>
             <PageContainer width="wide">
-                <PageHeader
-                    breadcrumb={["Saroh", "Health"]}
-                    title="Health"
-                    description={
-                        health
-                            ? `Checked ${formatDateTime(health.checkedAt)}. Each check keeps its place whether it is working or not.`
-                            : "Whether the machinery behind Saroh is working."
-                    }
-                />
-
-                <HealthBoard board={health} />
-
-                <h2 className="pt-2 font-display text-[20px] font-semibold tracking-[-0.02em]">
-                    Across Saroh
-                </h2>
-                <p className="-mt-4 text-[13.5px] text-muted-foreground">
-                    Totals across every business. No business&rsquo;s own
-                    records are shown here.
-                </p>
-
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <StatCard
-                        label="Businesses"
-                        value={metrics.organizations.total}
-                        hint={`${metrics.organizations.createdLast30Days} new in 30 days`}
-                    />
-                    <StatCard
-                        label="Users"
-                        value={metrics.users.total}
-                        hint={`${metrics.users.verified} verified · ${metrics.users.createdLast30Days} new in 30 days`}
-                    />
-                    <StatCard
-                        label="Orders"
-                        value={metrics.commerce.orders}
-                        hint={`${metrics.commerce.openOrders} open`}
-                    />
-                    <StatCard
-                        label="Sites"
-                        value={metrics.content.sites}
-                        hint={`${metrics.content.publishedSites} published`}
-                    />
-                </div>
-
-                <section className="grid gap-6 lg:grid-cols-2">
-                    <Panel
-                        title="Module adoption"
-                        description="Businesses with each module on."
-                        empty="No module has been enabled yet."
-                        rows={metrics.moduleAdoption.map((row) => ({
-                            key: row.moduleKey,
-                            label: asWords(row.moduleKey),
-                            value: row.organizations,
-                        }))}
-                    />
-                    <Panel
-                        title="Activity (30 days)"
-                        description="Analytics events captured, by type."
-                        empty="No events captured in the last 30 days."
-                        rows={metrics.activity.map((row) => ({
-                            key: row.type,
-                            label: asWords(row.type),
-                            value: row.events,
-                        }))}
-                    />
-                </section>
+                <PageHeader title={greeting()} />
+                <Suspense
+                    fallback={<PanelSkeleton label="Loading what needs you" />}
+                >
+                    <HomeBody />
+                </Suspense>
             </PageContainer>
         </AdminShell>
     );
 }
 
-function Panel({
-    title,
-    description,
-    empty,
-    rows,
-}: {
-    title: string;
-    description: string;
-    empty: string;
-    rows: { key: string; label: string; value: number }[];
-}) {
-    // A bar per row, scaled to the largest value: the shape of adoption is the
-    // thing an operator reads here, and a bare number column hides it.
-    const max = Math.max(1, ...rows.map((row) => row.value));
-
+async function HomeBody() {
+    let home: ConsoleHome | null;
+    try {
+        home = await getHome();
+    } catch {
+        return (
+            <FailedPanel
+                things="what needs you"
+                reassurance="Every screen in the menu still opens."
+            />
+        );
+    }
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>{title}</CardTitle>
-                <CardDescription>{description}</CardDescription>
-            </CardHeader>
-            <CardContent>
-                {rows.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{empty}</p>
-                ) : (
-                    <ul className="grid gap-2.5">
-                        {rows.map((row) => (
-                            <li key={row.key} className="grid gap-1">
-                                <div className="flex items-center justify-between gap-4 text-sm">
-                                    <span className="truncate">
-                                        {row.label}
-                                    </span>
-                                    <span className="tabular-nums">
-                                        {row.value}
-                                    </span>
-                                </div>
-                                <div
-                                    className="h-1 overflow-hidden rounded-full bg-muted"
-                                    aria-hidden
-                                >
-                                    <div
-                                        // Ink, not Saffron: a set of bars is
-                                        // a scale (the brand's W2 ramp), and
-                                        // Saffron is saved for the one value
-                                        // that matters on a screen.
-                                        className="h-full rounded-full bg-primary"
-                                        style={{
-                                            width: `${(row.value / max) * 100}%`,
-                                        }}
-                                    />
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </CardContent>
-        </Card>
+        <>
+            <p className="-mt-4 text-[14px] text-muted-foreground">
+                {homeSummary(home)}
+            </p>
+            {home && (
+                <>
+                    <NeedsYou needs={home.needs} />
+                    <HomeCounts counts={home.counts} />
+                </>
+            )}
+        </>
     );
 }

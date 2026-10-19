@@ -28,7 +28,7 @@ export default async function BillingLayout({
         <AdminShell staff={gate.staff}>
             <PageContainer width="wide">
                 <PageHeader
-                    breadcrumb={["Billing"]}
+                    breadcrumb={["Money", "Billing"]}
                     title="Billing"
                     description="Saroh's own plans, invoices and payments, across every business. Dates are in India time."
                 />

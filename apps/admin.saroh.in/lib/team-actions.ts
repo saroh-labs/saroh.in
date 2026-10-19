@@ -59,3 +59,23 @@ export async function revokeStaffAction(
         ),
     );
 }
+
+/**
+ * Make me Platform owner (admin console redesign U10): the break-glass
+ * banner's one action. The API records the grant only while the caller has
+ * none on record, and refuses otherwise.
+ */
+export async function claimPlatformOwnerAction(input: {
+    reason: string;
+    idempotencyKey: string;
+}) {
+    const result = await adminWrite(
+        "/staff/me/platform-owner",
+        "POST",
+        input,
+        "Couldn't record your access. Try again.",
+    );
+    // The banner and the shell read who you are on every screen.
+    if (result.ok) revalidatePath("/", "layout");
+    return result;
+}

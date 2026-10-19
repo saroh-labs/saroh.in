@@ -40,7 +40,7 @@ export default async function DeploymentsPage() {
         <AdminShell staff={staff}>
             <PageContainer>
                 <PageHeader
-                    breadcrumb={["Operations", "Deployments"]}
+                    breadcrumb={["Keep it running", "Deployments"]}
                     title="Deployments"
                     description="Deploy the web apps on Cloudflare. A deploy from here always builds, even if nothing changed; merges still deploy only what changed."
                 />

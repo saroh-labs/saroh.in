@@ -50,7 +50,7 @@ export default async function UsagePage({
         <AdminShell staff={staff}>
             <PageContainer width="wide">
                 <PageHeader
-                    breadcrumb={["Instance", "Usage"]}
+                    breadcrumb={["Product", "Usage"]}
                     title="Usage"
                     description="Storage each business's photos and videos take, as its plan counts it. A row opens that business."
                 />

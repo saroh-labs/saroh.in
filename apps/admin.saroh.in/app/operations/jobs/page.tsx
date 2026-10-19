@@ -48,7 +48,7 @@ export default async function JobsPage({
         <AdminShell staff={staff}>
             <PageContainer width="wide">
                 <PageHeader
-                    breadcrumb={["Operations", "Jobs"]}
+                    breadcrumb={["Keep it running", "Jobs"]}
                     title="Jobs"
                     description="The work Saroh does in the background: notifications, renewals, messages and more."
                     actions={

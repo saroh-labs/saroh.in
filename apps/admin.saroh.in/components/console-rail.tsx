@@ -57,7 +57,7 @@ export function ConsoleRail({
         >
             {groups.map((group) => (
                 <div key={group.label} className="flex flex-col gap-1">
-                    {icons ? (
+                    {group.plain ? null : icons ? (
                         // Announced, not drawn: the heading still names the
                         // group for anyone listening, and the icons below it
                         // keep their grouping in the accessibility tree.

@@ -30,7 +30,7 @@ export default async function ReleasesPage() {
         <AdminShell staff={staff}>
             <PageContainer>
                 <PageHeader
-                    breadcrumb={["Instance", "Releases"]}
+                    breadcrumb={["Product", "Releases"]}
                     title="Releases"
                     description="Turn a feature on for the right businesses, see who has it, and undo it if you're wrong. Turning it on or off for one business wins over the default for everyone. Every change records who made it and why."
                 />

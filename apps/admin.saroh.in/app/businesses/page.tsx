@@ -65,7 +65,7 @@ export default async function BusinessesPage({
         <AdminShell staff={staff}>
             <PageContainer width="wide">
                 <PageHeader
-                    breadcrumb={["Instance", "Businesses"]}
+                    breadcrumb={["Help customers", "Businesses"]}
                     title="Businesses"
                     description="Every business on Saroh. A row opens everything about that one."
                 />

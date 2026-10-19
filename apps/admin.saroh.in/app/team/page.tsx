@@ -39,7 +39,7 @@ export default async function TeamPage() {
         <AdminShell staff={staff}>
             <PageContainer>
                 <PageHeader
-                    breadcrumb={["Instance", "Team"]}
+                    breadcrumb={["Keep it running", "Team"]}
                     title="Team"
                     description="Who can use this console, and what each of them may do."
                     actions={canGrant ? <GrantStaff /> : undefined}

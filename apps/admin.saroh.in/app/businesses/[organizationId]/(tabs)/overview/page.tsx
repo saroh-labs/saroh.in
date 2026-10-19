@@ -197,7 +197,7 @@ function StatePanel({ view }: { view: BusinessView }) {
                             : []),
                         ["Time zone", facts.timezone ?? "Not set"],
                         [
-                            "Holds",
+                            "What they have",
                             `${plural(facts.counts.sites, "site")}, ${plural(facts.counts.orders, "order")} (${facts.counts.openOrders} open), ${plural(facts.counts.bookings, "booking")}, ${plural(facts.counts.contacts, "contact")}`,
                         ],
                     ]}

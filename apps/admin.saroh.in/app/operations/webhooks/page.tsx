@@ -49,7 +49,7 @@ export default async function WebhooksPage({
         <AdminShell staff={staff}>
             <PageContainer width="wide">
                 <PageHeader
-                    breadcrumb={["Operations", "Webhooks"]}
+                    breadcrumb={["Keep it running", "Webhooks"]}
                     title="Webhooks"
                     description="What payment providers told Saroh, and what it did about it."
                     actions={

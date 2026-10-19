@@ -124,7 +124,7 @@ export class AdminHealthService {
                 ? {
                       state: "unmeasured" as const,
                       summary:
-                          "No recurring memberships on this instance yet, so no renewal run exists.",
+                          "No business has a recurring membership yet, so no renewal run exists.",
                   }
                 : {
                       state: "failed" as const,
@@ -340,7 +340,7 @@ export class AdminHealthService {
         return {
             state: "unmeasured" as const,
             summary:
-                "Nothing on this instance records a failed sign-in yet, so this cannot be counted.",
+                "Saroh doesn't record failed sign-ins yet, so they can't be counted.",
         };
     }
 }

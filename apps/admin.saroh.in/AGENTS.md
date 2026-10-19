@@ -13,8 +13,11 @@ pnpm --filter admin dev        # under portless: https://admin.saroh.localhost
 ```
 
 Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
-(break-glass). A break-glass operator should grant themselves Platform owner on
-`/team` so their own access is on the record.
+(break-glass). A break-glass operator sees one line at the top of every
+screen with **Make me Platform owner** (`components/break-glass-banner.tsx`,
+`POST /admin/staff/me/platform-owner`, `staff:grant`): an `OperatorDialog`
+that records the grant on the audit trail, offered only while they have no
+recorded grant (the API refuses it otherwise).
 
 ## Rules that bite here
 
@@ -68,7 +71,8 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   `lib/billing-action-words.ts`, `lib/billing-event-words.ts`, `lib/user-filters.ts`,
   `lib/sign-in-words.ts`, `lib/user-tabs.ts`, `lib/user-agent.ts`,
   `lib/overview-words.ts`, `lib/module-fix.ts`, `lib/subscription-sheet.ts`,
-  `lib/business-words.ts`, `lib/offer-words.ts`, `lib/saroh-lead-words.ts`.
+  `lib/business-words.ts`, `lib/offer-words.ts`, `lib/saroh-lead-words.ts`,
+  `lib/home-words.ts`, `lib/search-words.ts`.
 - **Messages (`/messages`, DEC-137)** lists what people wrote from
   saroh.in/contact, newest first, by topic on asking. Read-only: the reply
   goes from the team's mailbox. Every row is personal data, so the screen
@@ -208,7 +212,21 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
 - **Nav rows appear only for screens that exist** (`components/console-nav.tsx`),
   filtered by permission. The rail and drawer build it themselves from the
   permissions: a nav item carries its icon, which cannot cross to a client
-  component.
+  component. The menu is Home, then grouped by job (admin plan U10, R15):
+  Help customers · Money · Product · Keep it running. A page's breadcrumb
+  starts with its group's name, never "Instance" or "Saroh".
+  `console-nav.test.ts` pins every address the menu reached before the
+  redesign: a redesign never drops one.
+- **Home (`/`, admin plan U10, R14)** is "Needs you" and a few counts,
+  from `GET /admin/home` (`platform:read`; counts and dates only, each kind
+  only for staff whose permissions reach its fix, `lib/home-words.ts` says
+  each one and links to it). Nothing waiting is one all-clear line. Health,
+  which was the front door, is `/health`.
+- **The header search** (`components/console-search.tsx`,
+  `GET /admin/search`, identity only: the API gates each part, businesses
+  through `scopeForStaff`, users by `organization:pii:read`, Razorpay ids by
+  `saroh-billing:read`) is a combobox: arrows, Enter, Esc, "Searching…",
+  ⌘K. Never a "/" shortcut: that is each page's own list search.
 
 ## Read first
 

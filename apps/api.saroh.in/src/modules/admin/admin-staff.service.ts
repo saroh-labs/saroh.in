@@ -288,6 +288,38 @@ export class AdminStaffService {
     }
 
     /**
+     * Make me Platform owner (admin console redesign U10, R16): someone in
+     * through the break-glass `ADMIN_ALLOWLIST`, with no recorded grant,
+     * records one for themselves, so their access can be revoked and is
+     * attributable. Refused to anyone who already has a recorded grant: the
+     * banner that offers it shows only while there is none. The grant and
+     * its ledger row (`staff.granted`) are the ordinary grant's.
+     */
+    async claimPlatformOwner(input: {
+        staff: PlatformAdminInfo;
+        reason: string;
+    }) {
+        if (!input.staff.viaBootstrap) {
+            throw new ConflictException(
+                "You already have a recorded grant. Change your roles in Team.",
+            );
+        }
+        const user = await prisma.user.findUnique({
+            where: { id: input.staff.userId },
+            select: { email: true },
+        });
+        if (!user) {
+            throw new NotFoundException("Your account wasn't found.");
+        }
+        return this.grant({
+            staff: input.staff,
+            email: user.email,
+            roles: [Roles.PlatformOwner],
+            reason: input.reason,
+        });
+    }
+
+    /**
      * Set exactly which roles someone holds, and until when. Roles that go
      * are revoked; roles that come are written new; a role whose expiry
      * changes is revoked and written again with the new one.

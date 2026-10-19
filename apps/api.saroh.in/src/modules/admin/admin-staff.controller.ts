@@ -81,6 +81,32 @@ export class AdminStaffController {
     }
 
     /**
+     * Make me Platform owner: the break-glass banner's one action (admin
+     * console redesign U10). Records a Platform owner grant for the caller,
+     * with a reason, and only while they have none on record.
+     */
+    @Post("staff/me/platform-owner")
+    @RequireAdminPermission(AdminPermission.StaffGrant)
+    claimPlatformOwner(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Body() dto: OperatorReasonDto,
+    ) {
+        return this.idempotency.run(
+            {
+                scope: "admin.staff.claim-owner",
+                key: dto.idempotencyKey,
+                actorUserId: staff.userId,
+            },
+            { reason: dto.reason },
+            () =>
+                this.staffService.claimPlatformOwner({
+                    staff,
+                    reason: dto.reason,
+                }),
+        );
+    }
+
+    /**
      * Invites not yet accepted or withdrawn (admin console U24), each with
      * its state: waiting, or expired and ready for Resend. Never a token.
      */

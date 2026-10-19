@@ -67,7 +67,7 @@ export default async function WaitlistPage({
         <AdminShell staff={staff}>
             <PageContainer>
                 <PageHeader
-                    breadcrumb={["Instance", "Waitlist"]}
+                    breadcrumb={["Help customers", "Waitlist"]}
                     title="Waitlist"
                     description="People who asked to hear when Saroh was ready for them. Inviting them is what opens signup."
                     actions={

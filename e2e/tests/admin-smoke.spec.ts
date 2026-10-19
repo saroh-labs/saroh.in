@@ -29,7 +29,16 @@ test.describe("the operator console", () => {
         await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
         await expect(page.getByText("Not authorized")).toHaveCount(0);
         // A recorded grant, not the break-glass allowlist.
-        await expect(page.getByText("Break-glass")).toHaveCount(0);
+        await expect(
+            page.getByRole("button", { name: "Make me Platform owner" }),
+        ).toHaveCount(0);
+        // Home (U10): what needs you, or the all-clear.
+        await expect(
+            page.getByRole("region", { name: "Needs you" }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("combobox", { name: "Search the console" }),
+        ).toBeVisible();
         // The console's bar says who is signed in, on a wide screen.
         if (testInfo.project.name.startsWith("desk")) {
             await expect(

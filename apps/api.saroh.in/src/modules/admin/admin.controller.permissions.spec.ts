@@ -102,7 +102,12 @@ describe("Admin console authorization contract", () => {
         // `/admin/me` returns the caller's own identity and permissions, which
         // the console needs before it can render anything. Any addition here is
         // a decision worth arguing for in review.
-        expect(identityOnly).toEqual(["me"]);
+        //
+        // `/admin/search` (U10): the header search answers each part under
+        // that part's own permission inside the service, and an Account
+        // manager, who holds no platform-wide read, must still find the
+        // businesses they look after. `admin-search.db.spec.ts` pins it.
+        expect(identityOnly.sort()).toEqual(["consoleSearch", "me"]);
     });
 });
 
@@ -114,6 +119,10 @@ describe("AdminController permission assignments", () => {
 
     it("protects aggregate metrics with platform read", () => {
         expect(perms("getMetrics")).toEqual([AdminPermission.PlatformRead]);
+    });
+
+    it("protects Home's counts with platform read, like the metrics", () => {
+        expect(perms("home")).toEqual([AdminPermission.PlatformRead]);
     });
 
     it("protects Organization targets with Organization read", () => {
@@ -208,6 +217,7 @@ describe("Admin console permission assignments", () => {
 
     it.each([
         "grant",
+        "claimPlatformOwner",
         "amend",
         "revoke",
         "inviteTeammate",
