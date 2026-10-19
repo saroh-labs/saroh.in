@@ -66,15 +66,13 @@ vi.mock("../open-hours-dialog", () => ({
     }: {
         target: {
             staff: { name: string };
-            mode: string;
             from: number;
             date: string;
         } | null;
     }) =>
         target ? (
             <div role="dialog">
-                {target.mode} {target.staff.name} from {target.from} on{" "}
-                {target.date}
+                open {target.staff.name} from {target.from} on {target.date}
             </div>
         ) : null,
 }));

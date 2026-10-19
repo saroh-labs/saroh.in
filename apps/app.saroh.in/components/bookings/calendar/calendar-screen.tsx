@@ -595,7 +595,6 @@ export function CalendarScreen({
             staff: who,
             date: on,
             from: starts.length ? Math.min(...starts) : 540,
-            mode: "open",
             windows: [],
             blocks: [],
         });
@@ -612,7 +611,6 @@ export function CalendarScreen({
             staff: person,
             date,
             from: minute,
-            mode: "open",
             windows: column.day?.windows ?? [],
             blocks: column.blocks,
         });
@@ -891,7 +889,7 @@ export function CalendarScreen({
             />
             <OpenHoursDialog
                 target={hours}
-                timezone={timezone}
+                today={today}
                 onClose={() => setHours(null)}
             />
             {/* Adding someone is a name and what they do, so it is done

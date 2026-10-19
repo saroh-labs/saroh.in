@@ -58,11 +58,11 @@ vi.mock("./open-hours-dialog", () => ({
     OpenHoursDialog: ({
         target,
     }: {
-        target: { staff: { name: string }; from: number; mode: string } | null;
+        target: { staff: { name: string }; from: number } | null;
     }) =>
         target ? (
             <div role="dialog">
-                Open {target.staff.name} from {target.from} ({target.mode})
+                Open {target.staff.name} from {target.from}
             </div>
         ) : null,
 }));
@@ -348,9 +348,9 @@ describe("a Member at the front desk (DEC-170)", () => {
             HTMLButtonElement,
         ];
         press(morning, { detail: 0 });
-        expect(host.textContent).toContain("Open Meera Iyer from 480 (open)");
+        expect(host.textContent).toContain("Open Meera Iyer from 480");
         press(evening, { detail: 0 });
-        expect(host.textContent).toContain("Open Meera Iyer from 1020 (open)");
+        expect(host.textContent).toContain("Open Meera Iyer from 1020");
     });
 
     it("opens closed time at the half hour under a pointer", () => {
@@ -360,7 +360,7 @@ describe("a Member at the front desk (DEC-170)", () => {
         evening.getBoundingClientRect = () =>
             ({ top: 0, height: 60 }) as unknown as DOMRect;
         press(evening, { detail: 1, clientY: 40 });
-        expect(host.textContent).toContain("Open Meera Iyer from 1050 (open)");
+        expect(host.textContent).toContain("Open Meera Iyer from 1050");
     });
 });
 
