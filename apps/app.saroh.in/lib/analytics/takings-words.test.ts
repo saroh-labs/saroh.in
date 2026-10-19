@@ -140,7 +140,7 @@ describe("takingsAnswers", () => {
         expect(answer(answers, "watch")).not.toMatch(/best/);
     });
 
-    it("says down, and level for a change that rounds to nothing", () => {
+    it("says down, and about the same for a change of 2% or less", () => {
         const down = answersFor([
             ...STEADY.slice(0, 8),
             8_000,
@@ -159,7 +159,71 @@ describe("takingsAnswers", () => {
             10_020,
         ]);
         expect(answer(level, "month")).toBe(
-            "You took ₹40,020 in the last four weeks (31 Aug to 27 Sep), level with the four weeks before.",
+            "You took ₹40,020 in the last four weeks (31 Aug to 27 Sep), about the same as the four weeks before.",
+        );
+        // 2% up is about the same too: ₹40,800 against ₹40,000.
+        const small = answersFor([
+            ...STEADY.slice(0, 4),
+            10_000,
+            10_000,
+            10_000,
+            10_000,
+            10_200,
+            10_200,
+            10_200,
+            10_200,
+        ]);
+        expect(answer(small, "month")).toBe(
+            "You took ₹40,800 in the last four weeks (31 Aug to 27 Sep), about the same as the four weeks before.",
+        );
+    });
+
+    it("says nothing in words, never 100% below (#1081)", () => {
+        // Last week took nothing: a dip, said as nothing.
+        const empty = answersFor([...STEADY.slice(0, 11), 0]);
+        expect(answer(empty, "watch")).toBe(
+            "Nothing came in last week, against about ₹10,000 in your usual week.",
+        );
+        expect(answer(empty, "watch")).not.toMatch(/100%/);
+        // The last four weeks took nothing at all.
+        const stopped = takingsTiles(
+            takingsFigures(takingsRead([...STEADY.slice(0, 8), 0, 0, 0, 0])),
+        );
+        expect(stopped[0].note).toBe(
+            "Nothing came in. ₹40,000 in the four before.",
+        );
+        // A place that took nothing.
+        const place = answersFor(
+            STEADY.map(() => 10_000),
+            {
+                split: STEADY.map((_, i): Record<string, number> =>
+                    i >= 8
+                        ? { "location:hill": 10_000 }
+                        : { "location:hill": 6_000, online: 4_000 },
+                ),
+            },
+        );
+        expect(answer(place, "watch")).toBe(
+            "Online orders took nothing in the last four weeks, after taking money in the four weeks before.",
+        );
+    });
+
+    it("leaves out a place under 1%, never 0% online (#1081)", () => {
+        const tiny = { "location:hill": 9_990, online: 10 };
+        const answers = answersFor(
+            STEADY.map(() => 10_000),
+            { split: STEADY.map(() => tiny) },
+        );
+        expect(answer(answers, "where")).toBeUndefined();
+        const figures = takingsFigures(
+            takingsRead(
+                STEADY.map(() => 10_000),
+                { split: STEADY.map(() => tiny) },
+            ),
+        );
+        expect(splitLabel(figures.places)).toBe("Hill Road 100 per cent.");
+        expect(takingsTiles(figures)[1].note).toBe(
+            "All of the sales at Hill Road.",
         );
     });
 

@@ -1,6 +1,7 @@
 import { formatDay } from "@/lib/format/datetime";
 import { formatMoney, formatNumber } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import { ABOUT_SAME_PERCENT, shownShares } from "@/lib/insights/compare-words";
 import { absentText } from "@saroh/ui/lib/absent";
 
 import type {
@@ -23,8 +24,11 @@ import type {
  *   27 Sep)", "the week of 14 Sep".
  * - A change needs a baseline: without one the sentence says why ("your
  *   first weeks on record", "too little came in … to compare") and the
- *   figure reads "N/A", never 0%. A change that rounds to nothing is
- *   "level".
+ *   figure reads "N/A", never 0%. A change of 2% or less is "about the
+ *   same" (`lib/insights/compare-words.ts`, the rules both Insights and
+ *   Home follow).
+ * - Zero is said in words: a week or a place that took nothing "took
+ *   nothing", never "100% below". A place under 1% isn't named.
  * - A business that has never taken money, or only this week, gets one
  *   honest sentence instead of four about ₹0.
  * - Money from only one place has no "where is it coming from".
@@ -102,15 +106,28 @@ function list(items: readonly string[]): string {
     return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
+/** A change small enough to read "about the same". */
+function aboutSame(change: TakingsChange): boolean {
+    return (
+        change.kind === "LEVEL" ||
+        ((change.kind === "UP" || change.kind === "DOWN") &&
+            change.percent <= ABOUT_SAME_PERCENT)
+    );
+}
+
+/** Down, but never all of it while something came in. */
+const below = (percent: number) => Math.min(percent, 99);
+
 /** The change, as the end of the first answer's sentence. */
 function changeClause(change: TakingsChange): string {
+    if (aboutSame(change)) return ", about the same as the four weeks before";
     switch (change.kind) {
         case "UP":
             return `, up ${change.percent}% on the four weeks before`;
         case "DOWN":
-            return `, down ${change.percent}% on the four weeks before`;
+            return `, down ${below(change.percent)}% on the four weeks before`;
         case "LEVEL":
-            return ", level with the four weeks before";
+            return ", about the same as the four weeks before";
         case "FIRST_WEEKS":
             return ". These are your first weeks on record, so there's nothing earlier to compare";
         case "THIN":
@@ -120,13 +137,14 @@ function changeClause(change: TakingsChange): string {
 
 /** The change, as the note under "Sales, 4 weeks". */
 export function changeNote(change: TakingsChange): string {
+    if (aboutSame(change)) return "About the same as the four before.";
     switch (change.kind) {
         case "UP":
             return `Up ${change.percent}% on the four before.`;
         case "DOWN":
-            return `Down ${change.percent}% on the four before.`;
+            return `Down ${below(change.percent)}% on the four before.`;
         case "LEVEL":
-            return "Level with the four before.";
+            return "About the same as the four before.";
         case "FIRST_WEEKS":
             return "N/A: your first weeks on record.";
         case "THIN":
@@ -158,7 +176,7 @@ function bestAnswer(f: TakingsFigures): string | null {
     const above = f.bestAboveUsual ?? 0;
     return above > 0
         ? `${lead}, about ${above}% above ${usual}.`
-        : `${lead}, level with ${usual}.`;
+        : `${lead}, about the same as ${usual}.`;
 }
 
 /** "since Monday 28 Sep", or "today (Monday 28 Sep)" on the Monday itself. */
@@ -181,11 +199,17 @@ function soFarAnswer(f: TakingsFigures): string {
     const lead = `You've taken ${money(so.takingsMinor, f.currency)} ${window}, from ${count(so.payments, "payment", "payments")}`;
     switch (so.change.kind) {
         case "AHEAD":
+            if (so.change.percent <= ABOUT_SAME_PERCENT) {
+                return `${lead}. That is about the same as the same days last week.`;
+            }
             return `${lead}. That is ${so.change.percent}% ahead of the same days last week.`;
         case "BEHIND":
+            if (so.change.percent <= ABOUT_SAME_PERCENT) {
+                return `${lead}. That is about the same as the same days last week.`;
+            }
             return `${lead}. That is ${so.change.percent}% behind the same days last week.`;
         case "LEVEL":
-            return `${lead}. That is level with the same days last week.`;
+            return `${lead}. That is about the same as the same days last week.`;
         case "THIN":
             return `${lead}.`;
     }
@@ -210,7 +234,10 @@ function signalAnswer(
     switch (signal.kind) {
         case "SLIDE":
             return {
-                answer: `Sales have fallen three weeks running, from ${money(signal.from.takingsMinor, f.currency)} in ${weekOf(signal.from.start)} to ${money(signal.to.takingsMinor, f.currency)} last week, down ${signal.percent}%.`,
+                answer:
+                    signal.to.takingsMinor <= 0
+                        ? `Sales have fallen three weeks running, from ${money(signal.from.takingsMinor, f.currency)} in ${weekOf(signal.from.start)} to nothing last week.`
+                        : `Sales have fallen three weeks running, from ${money(signal.from.takingsMinor, f.currency)} in ${weekOf(signal.from.start)} to ${money(signal.to.takingsMinor, f.currency)} last week, down ${below(signal.percent)}%.`,
                 link: {
                     href: ordersHref(signal.to.start, signal.to.end),
                     label: "See last week's orders",
@@ -218,8 +245,15 @@ function signalAnswer(
             };
         case "DIP": {
             const which = weekOrLast(f, signal.week.start);
+            const usual =
+                f.usualMinor && f.usualMinor > 0
+                    ? `, against about ${money(f.usualMinor, f.currency)} in your usual week`
+                    : "";
             return {
-                answer: `${capitalise(which)} took ${money(signal.week.takingsMinor, f.currency)}, about ${signal.percent}% below your usual week.`,
+                answer:
+                    signal.week.takingsMinor <= 0
+                        ? `Nothing came in ${which}${usual}.`
+                        : `${capitalise(which)} took ${money(signal.week.takingsMinor, f.currency)}, about ${below(signal.percent)}% below your usual week.`,
                 link: {
                     href: ordersHref(signal.week.start, signal.week.end),
                     label: `See the orders placed ${which === "last week" ? "last week" : "that week"}`,
@@ -228,14 +262,18 @@ function signalAnswer(
         }
         case "PLACE_DROP":
             return {
-                answer: `${placeSubject(signal.placeKind, signal.name)} took ${signal.percent}% less than in the four weeks before.`,
+                answer:
+                    signal.percent >= 100
+                        ? `${placeSubject(signal.placeKind, signal.name)} took nothing in the last four weeks, after taking money in the four weeks before.`
+                        : `${placeSubject(signal.placeKind, signal.name)} took ${signal.percent}% less than in the four weeks before.`,
             };
     }
 }
 
 function whereAnswer(f: TakingsFigures): string | null {
-    if (f.places.length < 2) return null;
-    const parts = f.places.map((p) => `${p.percent}% ${where(p)}`);
+    const places = shownShares(f.places);
+    if (places.length < 2) return null;
+    const parts = places.map((p) => `${p.percent}% ${where(p)}`);
     return `Over the last four weeks, ${list(parts)}.`;
 }
 
@@ -317,13 +355,14 @@ export function takingsAnswers(f: TakingsFigures): TakingsAnswer[] {
 /** The four figures under the answers (1b), each with its window. */
 export function takingsTiles(f: TakingsFigures): TakingsTile[] {
     // Where the orders were sold: locations and online, not invoices.
-    const orderPlaces = f.places.filter((p) => p.kind !== "INVOICES").length;
-    const top = f.places.at(0);
+    const shown = shownShares(f.places);
+    const orderPlaces = shown.filter((p) => p.kind !== "INVOICES").length;
+    const top = shown.at(0);
     const last4Orders = ordersHref(f.last4.from, f.last4.to);
     const ordersNote =
         f.last4.orders === 0
             ? "No paid orders in these four weeks."
-            : top && f.places.length > 1
+            : top && shown.length > 1
               ? `${top.percent}% of sales ${where(top)}.`
               : top
                 ? `All of the sales ${where(top)}.`
@@ -333,7 +372,10 @@ export function takingsTiles(f: TakingsFigures): TakingsTile[] {
             key: "takings",
             label: "Sales, 4 weeks",
             value: money(f.last4.takingsMinor, f.currency),
-            note: changeNote(f.change),
+            note:
+                f.last4.takingsMinor <= 0 && f.prior4.takingsMinor > 0
+                    ? `Nothing came in. ${money(f.prior4.takingsMinor, f.currency)} in the four before.`
+                    : changeNote(f.change),
             href: last4Orders,
         },
         {
@@ -419,7 +461,7 @@ export function placeName(p: PlaceShare): string {
 
 /** The split bar, said: "Hill Road 66 per cent, online 34 per cent." */
 export function splitLabel(places: readonly PlaceShare[]): string {
-    const parts = places.map((p, i) => {
+    const parts = shownShares(places).map((p, i) => {
         const name = placeName(p);
         const said =
             i === 0 || p.kind === "LOCATION" ? name : name.toLowerCase();

@@ -29,6 +29,7 @@ import {
     takingsTiles,
     weekReadout,
 } from "@/lib/analytics/takings-words";
+import { shownShares } from "@/lib/insights/compare-words";
 import { newOrderHref } from "@/lib/orders/links";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
@@ -159,7 +160,7 @@ function Answers({ figures }: { figures: TakingsFigures }) {
                         />
                     ) : a.key === "where" ? (
                         <PlaceSplit
-                            places={figures.places}
+                            places={shownShares(figures.places)}
                             label={splitLabel(figures.places)}
                             name={placeName}
                         />
