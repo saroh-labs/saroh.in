@@ -24,6 +24,7 @@ import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { giveBusinessDetails } from "../../../test/business-details";
+import { backendPid, waitUntilBlockedBy } from "../../../test/lock-wait";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { BookingsService } from "../bookings/bookings.service";
 import { PublicBookingsService } from "../bookings/public-bookings.service";
@@ -694,8 +695,6 @@ async function answerJobs(requestId: string) {
     });
 }
 
-const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 describe("requests decided and asked at the same time", () => {
     it("asking again while a turn-down commits leaves it turned down, with its reason", async () => {
         const first = await rules.update(arjunCtx, arjun, { bookAheadDays: 7 });
@@ -704,8 +703,10 @@ describe("requests decided and asked at the same time", () => {
         // The turn-down holds the row, as `move` does, while Arjun asks again.
         await prisma.$transaction(async (tx) => {
             await tx.$queryRaw`SELECT id FROM "StaffRuleRequest" WHERE id = ${id} FOR UPDATE`;
+            const holder = await backendPid(tx);
             ask = rules.update(arjunCtx, arjun, { bookAheadDays: 14 });
-            await pause(300);
+            // Arjun's ask is waiting on the row the turn-down holds.
+            await waitUntilBlockedBy(holder, "StaffRuleRequest");
             await tx.staffRuleRequest.update({
                 where: { id },
                 data: {

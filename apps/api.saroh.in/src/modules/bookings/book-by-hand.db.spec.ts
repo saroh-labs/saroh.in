@@ -22,6 +22,10 @@ import {
 import { prisma } from "@saroh/database";
 
 import { giveBusinessDetails } from "../../../test/business-details";
+import {
+    backendPid,
+    waitUntilAdvisoryBlockedBy,
+} from "../../../test/lock-wait";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { isReservedContactEmail } from "../contacts/contact-email";
 import { lockWalkInPhone } from "../orders/walk-in-customer";
@@ -327,12 +331,15 @@ describe("booking a caller with a name and phone (DEC-170)", () => {
         // booking starts; it makes the customer and commits.
         await prisma.$transaction(async (tx) => {
             await lockWalkInPhone(tx, orgId, key);
+            const holder = await backendPid(tx);
             booking = bookings.bookByHand(owner, facialId, {
                 startAt: nextStart(),
                 bookerName: "Walk In",
                 bookerPhone: "+91 98450 12121",
             });
-            await new Promise((r) => setTimeout(r, 500));
+            // The booking's transaction has its snapshot and now waits on
+            // the phone's lock.
+            await waitUntilAdvisoryBlockedBy(holder);
             made = (
                 await tx.contact.create({
                     data: {
