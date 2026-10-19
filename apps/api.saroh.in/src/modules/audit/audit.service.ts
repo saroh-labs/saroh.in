@@ -152,6 +152,17 @@ export const AuditAction = {
     StaffRulesTurnedDown: "staff.booking-rules.turned-down",
     StaffRulesWithdrawn: "staff.booking-rules.withdrawn",
     StaffRulesReplaced: "staff.booking-rules.replaced",
+    // The invoice ledger (DEC-173, #1114), each written in the ledger
+    // write's own transaction (`invoices/invoice-payment-events.ts`) with
+    // the invoice as the target: a payment recorded (the event U5's receipt
+    // hangs from), removed by mistake, a cheque in the bank, or bounced.
+    // Metadata: the payment's id, amount, currency and method, and whether
+    // the invoice is paid in full after it; never a reference, a note or a
+    // cheque's number or bank.
+    InvoicePaymentRecorded: "invoice.payment.recorded",
+    InvoicePaymentRemoved: "invoice.payment.removed",
+    InvoiceChequeCleared: "invoice.payment.cheque_cleared",
+    InvoiceChequeBounced: "invoice.payment.cheque_bounced",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

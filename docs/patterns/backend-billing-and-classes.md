@@ -13,6 +13,10 @@
   Overdue is derived — `isPastDue` in `modules/invoices/invoice-state.ts` is the
   one rule, used by the invoice's standing, the owed sums and subscriptions.
   Never store it.
+  ISSUED and PAID are worked out from the invoice's payment ledger (below),
+  never set by hand: a removed payment or a bounced cheque takes a PAID
+  invoice back to ISSUED. "Partly paid" is derived like Overdue (ISSUED
+  with `paidCents > 0`, `isPartlyPaid`), never a status.
 - **Numbers** come from `InvoiceSequence` inside the caller's transaction
   (`nextInvoiceNumber`), so a rolled-back caller leaves no gap. Another module
   issues through `InvoicesService.issueInTx(tx, organizationId, input)`, never
@@ -55,6 +59,52 @@ requireProvider: false })`), the email says "view it and download a copy",
   and the pay page's payment-intent and autopay answer 409 "This business
   doesn't take payment online." Automatic invoicing (renewals, packs,
   courses, subscribe) still stops with Payments off (`payments-on.ts`).
+
+## Payments on an invoice are a ledger — **Current** (DEC-173, #1113, #1114)
+
+- **One row per payment** (`InvoicePayment`, integer paise): cash, UPI, a
+  bank transfer, a card, other, a cheque, or ONLINE (the webhook's alone).
+  An order's invoice has none: the order is its ledger (ADR-008).
+- **One write path:** `modules/invoices/invoice-ledger.ts`. Lock the
+  invoice with `lockInvoiceForLedger` (FOR NO KEY UPDATE: no key column
+  changes), then write with `recordLedgerPaymentInTx`, or change a row and
+  call `settleFromLedger`. Settling, in the same transaction, sets
+  `paidCents` to the live sum (not removed, not bounced; a waiting cheque
+  counts), the status to PAID when it reaches the total and ISSUED
+  otherwise, and the legacy `paidAt` / `paymentMethod` /
+  `paymentReference` / `paymentNote` from the last live payment while
+  PAID (null while owed, so their readers keep meaning "paid, and how").
+  Nothing else writes `paidCents` or sets a non-order invoice PAID.
+- **Refused by the ledger, whoever calls it:** an order's invoice or a
+  credit note (409), an invoice not ISSUED (409; PAID takes nothing more),
+  an amount of 0 (400), more than is left (422 with `details.leftToPay`;
+  no advances yet), one payment over the `Int` range (400).
+- **The hand routes** (`InvoicePaymentsService`, `invoice:write` on each,
+  DEC-098): `POST :invoiceId/payments` (`amount` defaults to what is left;
+  answers `recorded.paymentId` for Undo), `DELETE
+:invoiceId/payments/:paymentId` (soft: `removedAt`, who, a reason,
+  "Recorded by mistake" by default; an ONLINE payment is refunded, never
+  removed), `POST …/cleared` and `POST …/bounced` (a WAITING cheque only;
+  a bounce reopens what it paid, with no charge). A repeat of the same
+  record (method, reference, cheque number, amount) within ten minutes
+  answers with the first payment (`recorded.replayed`), the desk-take rule.
+- **Every write is an event** on the invoice's history: an audit row in
+  the same transaction (`invoice.payment.recorded`, `.removed`,
+  `.cheque_cleared`, `.cheque_bounced`; `invoice-payment-events.ts`),
+  ids, amounts and the method only. The automatic receipt (owner, 20 Oct)
+  hangs from `paymentRecordedInTx`: a delayed job past the Undo window
+  (`RECEIPT_HOLD_MS`), added with its handler by U5 (#1117).
+- **A partly paid invoice isn't voided or credited** until its payments
+  are removed (409); the void is fenced on `paidCents = 0` and the credit
+  checks again under the ledger lock.
+- **The read** serves `paidSoFar`, `leftToPay`, `partlyPaid` and
+  `chequeWaiting` on every invoice, and `payments[]` (each with
+  `bankStatus`, `removed` and `canRemove`) on the detail. A PAID invoice
+  reads its total as paid, so an order's invoice reads right with no rows.
+- **Tests:** `invoice-ledger.spec.ts` (the settle rules) and
+  `invoice-payments.db.spec.ts` (every refusal, repeats, two payments
+  racing on the row lock, one business never reaching another's), plain
+  and under `TEST_RLS=on`.
 
 ## Saroh's own invoices — **Current** (pricing catalogue U17)
 

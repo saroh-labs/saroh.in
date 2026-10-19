@@ -313,6 +313,8 @@ module.exports = {
         "<rootDir>/src/modules/invoices/totals.spec.ts",
         "<rootDir>/src/modules/invoices/numbering.spec.ts",
         "<rootDir>/src/modules/invoices/invoice-state.spec.ts",
+        // DEC-173: the ledger's settle rules, pure.
+        "<rootDir>/src/modules/invoices/invoice-ledger.spec.ts",
         "<rootDir>/src/modules/invoices/invoices.service.spec.ts",
         // U13: the invoice pay link (make, replace, revoke, read).
         "<rootDir>/src/modules/invoices/pay-link.spec.ts",

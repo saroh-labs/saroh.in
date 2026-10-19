@@ -28,9 +28,15 @@ import {
     InvoiceInputDto,
     ListInvoicesQueryDto,
     OwedQueryDto,
-    RecordPaymentDto,
     VoidInvoiceDto,
 } from "./dto";
+import {
+    ChequeBouncedDto,
+    ChequeClearedDto,
+    RecordPaymentDto,
+    RemovePaymentDto,
+} from "./invoice-payments.dto";
+import { InvoicePaymentsService } from "./invoice-payments.service";
 import { InvoicePdfService } from "./invoice-pdf.service";
 import { InvoiceSendService } from "./invoice-send.service";
 import { InvoicesService } from "./invoices.service";
@@ -54,6 +60,7 @@ export class InvoicesController {
         private readonly invoices: InvoicesService,
         private readonly sending: InvoiceSendService,
         private readonly pdfs: InvoicePdfService,
+        private readonly payments: InvoicePaymentsService,
     ) {}
 
     @Get()
@@ -250,6 +257,12 @@ export class InvoicesController {
         return this.sending.remind(ctx, id);
     }
 
+    /**
+     * Record a payment taken by hand (DEC-173): all that is left, or part
+     * of it (`amount`), or a cheque, which counts as received while it
+     * waits for the bank. More than is left is a 422 with `leftToPay`.
+     * Answers with the invoice and `recorded.paymentId`, what Undo removes.
+     */
     @Post(":invoiceId/payments")
     @LifecycleWrite("wind-down")
     @HttpCode(200)
@@ -258,6 +271,49 @@ export class InvoicesController {
         @Param("invoiceId") id: string,
         @Body() dto: RecordPaymentDto,
     ) {
-        return this.invoices.recordPayment(ctx, id, dto);
+        return this.payments.record(ctx, id, dto);
+    }
+
+    /**
+     * Remove a payment recorded by mistake: soft, with a reason, kept in
+     * the history; the invoice is owed again by what it paid. An online
+     * payment is refunded instead (409).
+     */
+    @Delete(":invoiceId/payments/:paymentId")
+    @LifecycleWrite("wind-down")
+    @HttpCode(200)
+    removePayment(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+        @Param("paymentId") paymentId: string,
+        @Body() dto: RemovePaymentDto,
+    ) {
+        return this.payments.remove(ctx, id, paymentId, dto);
+    }
+
+    /** A waiting cheque is in the bank. */
+    @Post(":invoiceId/payments/:paymentId/cleared")
+    @LifecycleWrite("wind-down")
+    @HttpCode(200)
+    chequeCleared(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+        @Param("paymentId") paymentId: string,
+        @Body() dto: ChequeClearedDto,
+    ) {
+        return this.payments.cleared(ctx, id, paymentId, dto);
+    }
+
+    /** A waiting cheque bounced: what it paid is owed again, no charge. */
+    @Post(":invoiceId/payments/:paymentId/bounced")
+    @LifecycleWrite("wind-down")
+    @HttpCode(200)
+    chequeBounced(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+        @Param("paymentId") paymentId: string,
+        @Body() dto: ChequeBouncedDto,
+    ) {
+        return this.payments.bounced(ctx, id, paymentId, dto);
     }
 }

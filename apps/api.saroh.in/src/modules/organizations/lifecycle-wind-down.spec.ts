@@ -195,6 +195,11 @@ const CASES = [
             "send",
             "remind",
             "recordPayment",
+            // The ledger (DEC-173): a closing business still puts its
+            // money records right.
+            "removePayment",
+            "chequeCleared",
+            "chequeBounced",
         ],
         refused: ["create", "update", "remove", "issue", "reissue"],
     },

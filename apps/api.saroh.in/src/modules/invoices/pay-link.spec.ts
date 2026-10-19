@@ -517,7 +517,12 @@ describe("revoking a pay link", () => {
         await service.voidInvoice(owner, "inv_1", { reason: "Wrong amount" });
 
         expect(tx.invoice?.updateMany).toHaveBeenCalledWith({
-            where: { id: "inv_1", organizationId: "org_1", status: "ISSUED" },
+            where: {
+                id: "inv_1",
+                organizationId: "org_1",
+                status: "ISSUED",
+                paidCents: 0,
+            },
             data: expect.objectContaining({
                 status: "VOID",
                 payTokenHash: null,

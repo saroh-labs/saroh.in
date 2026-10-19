@@ -16,16 +16,8 @@ import {
     ValidateNested,
 } from "class-validator";
 
-import type {
-    HandPaymentMethod,
-    InvoiceSource,
-    InvoiceView,
-} from "./invoice-state";
-import {
-    HAND_PAYMENT_METHODS,
-    INVOICE_SOURCES,
-    INVOICE_VIEWS,
-} from "./invoice-state";
+import type { InvoiceSource, InvoiceView } from "./invoice-state";
+import { INVOICE_SOURCES, INVOICE_VIEWS } from "./invoice-state";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -155,29 +147,13 @@ export class VoidInvoiceDto {
     reason!: string;
 }
 
-export class RecordPaymentDto {
-    // A cheque (DEC-173) needs its number, bank and bank status, which the
-    // ledger API (U2) takes; until then the hand methods only.
-    @IsIn(HAND_PAYMENT_METHODS)
-    method!: HandPaymentMethod;
-
-    @IsOptional()
-    @Transform(trimOrOmit)
-    @IsString()
-    @MaxLength(120)
-    reference?: string;
-
-    @IsOptional()
-    @Transform(trimOrOmit)
-    @IsString()
-    @MaxLength(500)
-    note?: string;
-
-    /** When the money came in; defaults to now. */
-    @IsOptional()
-    @IsISO8601()
-    paidAt?: string;
-}
+/** The ledger's DTOs live with the ledger (`invoice-payments.dto.ts`). */
+export {
+    ChequeBouncedDto,
+    ChequeClearedDto,
+    RecordPaymentDto,
+    RemovePaymentDto,
+} from "./invoice-payments.dto";
 
 export class ListInvoicesQueryDto {
     @IsOptional()

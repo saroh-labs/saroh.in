@@ -34,6 +34,9 @@ import { exemptInvoiceIds } from "./exempt-invoices";
 import { isGstRate, rateToBps } from "./gst";
 import { assertRatesSet } from "./gst-rate-required";
 import { gstinProblem, stateCode } from "./gst-states";
+import { lockInvoiceForLedger } from "./invoice-ledger";
+import type { RecordedPaymentView } from "./invoice-payments.service";
+import { InvoicePaymentsService } from "./invoice-payments.service";
 import type { InvoiceSource } from "./invoice-state";
 import {
     CAPTURED_NEEDS_REFUND,
@@ -101,6 +104,10 @@ const VIEW_LINK: LinkOptions = { requireProvider: false, allowPaid: true };
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LIST_LIMIT = 500;
 
+/** Why a partly paid invoice isn't voided or credited (DEC-173). */
+const PAID_IN_PART =
+    "Part of this invoice is paid. Remove its payments before cancelling it.";
+
 /** A refusal the form can put on the field it is about. */
 function fieldError(message: string, field: string): never {
     throw new BadRequestException({ message, details: { field } });
@@ -162,6 +169,13 @@ interface BillToGst {
  */
 @Injectable()
 export class InvoicesService {
+    // The ledger (DEC-173). Defaulted so a spec or another module's own
+    // `new InvoicesService()` records through the same path; it holds no
+    // state.
+    constructor(
+        private readonly payments: InvoicePaymentsService = new InvoicePaymentsService(),
+    ) {}
+
     async list(
         ctx: OrganizationContext,
         query: ListInvoicesQueryDto,
@@ -702,7 +716,18 @@ export class InvoicesService {
                       : "A void invoice cannot be credited.",
             );
         }
+        this.assertNothingPaid(current);
         const noteId = await prisma.$transaction(async (tx) => {
+            // Again under the ledger's lock: a payment recorded since the
+            // read above holds the cancel back.
+            const locked = await lockInvoiceForLedger(
+                tx,
+                ctx.organizationId,
+                id,
+            );
+            if (locked?.status === "ISSUED" && locked.paidCents > 0) {
+                throw new ConflictException(PAID_IN_PART);
+            }
             const note = await issueCreditNote(tx, {
                 invoiceId: id,
                 amountCents: MAX_CENTS,
@@ -806,34 +831,16 @@ export class InvoicesService {
 
     /**
      * Money taken outside Saroh — cash, UPI, a bank transfer, a card at the
-     * counter — written down. Nothing is charged. An order's invoice is paid
-     * on the order.
+     * counter, a cheque — written down, in full or in part. Nothing is
+     * charged. It goes on the invoice's ledger (DEC-173), which settles the
+     * status; an order's invoice is paid on the order.
      */
-    async recordPayment(
+    recordPayment(
         ctx: OrganizationContext,
         id: string,
         dto: RecordPaymentDto,
-    ): Promise<InvoiceViewModel> {
-        authorize(ctx, "invoice:write");
-        const current = await this.read(ctx.organizationId, id);
-        this.assertOwnPaper(current, "paid here");
-        if (current.status !== "ISSUED") {
-            throw new ConflictException(this.notIssued(current.status, "paid"));
-        }
-        const { count } = await prisma.invoice.updateMany({
-            where: { id, organizationId: ctx.organizationId, status: "ISSUED" },
-            data: {
-                status: "PAID",
-                paidAt: dto.paidAt ? new Date(dto.paidAt) : new Date(),
-                paymentMethod: dto.method,
-                paymentReference: dto.reference ?? null,
-                paymentNote: dto.note ?? null,
-            },
-        });
-        if (count === 0) {
-            throw new ConflictException("This invoice changed. Reload it.");
-        }
-        return this.read(ctx.organizationId, id);
+    ): Promise<RecordedPaymentView> {
+        return this.payments.record(ctx, id, dto);
     }
 
     /**
@@ -1006,6 +1013,7 @@ export class InvoicesService {
                 orderId: true,
                 bookingId: true,
                 sellerGstin: true,
+                paidCents: true,
             },
         });
         if (!row) notFound();
@@ -1024,6 +1032,7 @@ export class InvoicesService {
         if (row.status !== "ISSUED") {
             throw new ConflictException(this.notIssued(row.status, "voided"));
         }
+        if (row.paidCents > 0) throw new ConflictException(PAID_IN_PART);
         // A GST-registered business never voids an issued invoice: a void
         // leaves a hole in the series. It credits it instead (ADR-008).
         const profile = await loadTaxProfile(tx, organizationId);
@@ -1033,8 +1042,9 @@ export class InvoicesService {
             );
         }
         // A void invoice is not to be paid, so its pay link stops working.
+        // Fenced on nothing paid, too: a payment recorded meanwhile wins.
         const { count } = await tx.invoice.updateMany({
-            where: { id, organizationId, status: "ISSUED" },
+            where: { id, organizationId, status: "ISSUED", paidCents: 0 },
             data: {
                 status: "VOID",
                 voidedAt: new Date(),
@@ -1166,6 +1176,18 @@ export class InvoicesService {
         }
         if (invoice.kind === "CREDIT_NOTE") {
             throw new ConflictException(`A credit note is not ${verb}.`);
+        }
+    }
+
+    /**
+     * A partly paid invoice isn't cancelled while money stands on it
+     * (DEC-173): its payments are removed first. What a credit note does to
+     * money paid is the owner's decision still to come; a PAID invoice keeps
+     * today's Refund….
+     */
+    private assertNothingPaid(invoice: InvoiceViewModel): void {
+        if (invoice.status === "ISSUED" && invoice.partlyPaid) {
+            throw new ConflictException(PAID_IN_PART);
         }
     }
 

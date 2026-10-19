@@ -9,6 +9,7 @@ import { OrganizationsModule } from "../organizations/organizations.module";
 import { AccountThreadPosterService } from "../site-accounts/thread-poster";
 import { GstRatesController } from "./gst-rates.controller";
 import { GstRatesService } from "./gst-rates.service";
+import { InvoicePaymentsService } from "./invoice-payments.service";
 import { InvoicePdfService } from "./invoice-pdf.service";
 import { InvoiceSendService } from "./invoice-send.service";
 import { InvoicesController } from "./invoices.controller";
@@ -30,6 +31,8 @@ import { InvoicesService } from "./invoices.service";
     controllers: [InvoicesController, GstRatesController],
     providers: [
         InvoicesService,
+        // The ledger: part payments, cheques, remove (DEC-173).
+        InvoicePaymentsService,
         // The GST rates still to choose, and the save that chooses them.
         GstRatesService,
         InvoiceSendService,
