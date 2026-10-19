@@ -79,8 +79,8 @@ export function statusLine(input: {
         );
         parts.push(
             live.businesses === 1
-                ? "1 business on it"
-                : `${formatCount(live.businesses)} businesses on it`,
+                ? `1 business on version ${live.version}`
+                : `${formatCount(live.businesses)} businesses on version ${live.version}`,
         );
     } else {
         parts.push("Nothing is published yet");

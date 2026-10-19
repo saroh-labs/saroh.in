@@ -85,7 +85,9 @@ function DraftBar() {
         <section
             aria-label="Draft"
             className={cn(
-                "fixed inset-x-0 bottom-4 z-[60] mx-auto flex w-[min(820px,calc(100%-32px))] flex-wrap items-center gap-x-3 gap-y-2.5 rounded-[14px] border px-4 py-3 text-[13.5px] shadow-lg",
+                // On a phone it docks to the bottom edge, full width, so the
+                // table above keeps most of the screen.
+                "fixed inset-x-0 bottom-0 z-[60] mx-auto flex w-full flex-wrap items-center gap-x-3 gap-y-2 rounded-t-[14px] border px-3 py-2.5 text-[13.5px] shadow-lg sm:bottom-4 sm:w-[min(820px,calc(100%-32px))] sm:gap-y-2.5 sm:rounded-[14px] sm:px-4 sm:py-3",
                 problem
                     ? "border-warning/40 bg-warning-subtle text-warning-subtle-foreground"
                     : "border-transparent bg-foreground text-background",
@@ -170,7 +172,9 @@ function Message({ notice }: { notice: Notice }) {
         ? "Not ready to publish."
         : first
           ? "The first version, not live yet."
-          : `${changeCount(draft.check.changes.length)}, not live yet.`;
+          : draft.check.changes.length === 0
+            ? "No changes in this draft yet."
+            : `${changeCount(draft.check.changes.length)}, not live yet.`;
     const second = !draft.check.valid
         ? notReady(draft.check.errors)
         : first
@@ -183,7 +187,11 @@ function Message({ notice }: { notice: Notice }) {
     return (
         <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <strong className="font-semibold">{head}</strong>
-            <span>{second}</span>
+            {/* Who would move is on Review and publish too; a phone keeps
+                the bar to one line of words. */}
+            <span className={cn(draft.check.valid && "max-sm:hidden")}>
+                {second}
+            </span>
             <SaveState />
         </p>
     );

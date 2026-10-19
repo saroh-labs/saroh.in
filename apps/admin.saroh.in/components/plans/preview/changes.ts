@@ -491,7 +491,7 @@ function offerChanges(live: Catalog, draft: Catalog): DraftChange[] {
         };
         const { plans: wasPlans, max: wasMax, ...was } = o;
         const { plans: nowPlans, max: nowMax, ...now } = x;
-        if (JSON.stringify(was) !== JSON.stringify(now)) {
+        if (!sameValue(was, now)) {
             out.push({
                 key: `addon:${x.id}`,
                 plan: null,
@@ -578,6 +578,31 @@ export function draftChanges(
 
 function businessesOn(counts: readonly AdminPlanCount[], planId: string) {
     return counts.find((c) => c.planId === planId)?.businesses ?? 0;
+}
+
+/**
+ * Two values say the same thing: key order doesn't count, and a field that
+ * is missing equals one that is null or undefined. A draft read back from
+ * the API reorders keys and fills empty fields, so a plain
+ * `JSON.stringify` compare listed untouched add-ons as changed.
+ */
+export function sameValue(a: unknown, b: unknown): boolean {
+    if (a === b) return true;
+    if (a == null || b == null) return a == null && b == null;
+    if (Array.isArray(a) || Array.isArray(b)) {
+        return (
+            Array.isArray(a) &&
+            Array.isArray(b) &&
+            a.length === b.length &&
+            a.every((x, i) => sameValue(x, b[i]))
+        );
+    }
+    if (typeof a !== "object" || typeof b !== "object") return false;
+    const ra = a as Record<string, unknown>;
+    const rb = b as Record<string, unknown>;
+    const keys = new Set([...Object.keys(ra), ...Object.keys(rb)]);
+    for (const k of keys) if (!sameValue(ra[k], rb[k])) return false;
+    return true;
 }
 
 const businessWord = (n: number) =>

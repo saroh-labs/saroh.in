@@ -5250,3 +5250,13 @@ rule stands for the profile's own fields.
 **Fix.** `normalisePublicPhone` (API) and `phoneProblem` (app) read a number typed without + as Indian (10 digits, a trunk 0, or 91 / 0091 in front); accounts shows phones grouped (`phoneLabel`); the Move dialog's link carries `&bill=<business>` so the new profile bills it; "pays for nothing yet"; states by name.
 
 **Rule.** A unit with a form that writes is not done until one save of each kind has been made in a browser on the local stack (`docs/patterns/frontend-verification.md`); a phone field takes the number as an owner says it.
+
+### A saved plans draft listed add-ons nobody touched (19 Oct 2026)
+
+**Symptom.** On the admin Plans screen, after one price edit was undone, the draft bar said "0 changes, not live yet" and then "14 businesses on Grow and Pro would move at their renewal"; "Changes in this draft" listed eight "Add-on changed" rows.
+
+**Cause.** `draftChanges` (`components/plans/preview/changes.ts`) compared add-ons with `JSON.stringify(was) !== JSON.stringify(now)`. A draft read back from the API has its keys in another order and empty fields filled in, so equal add-ons looked different. The bar's count came from the API check, which compares field by field, so the two halves of one sentence disagreed.
+
+**Fix.** `sameValue` compares by what a value says: key order doesn't count, and a missing field equals null or undefined. `preview.test.tsx` has an add-on read back in another order. The empty draft now says "No changes in this draft yet."
+
+**Rule.** Never compare objects with `JSON.stringify`; a value that made a round trip through the API changes key order. Use a field-by-field or order-blind compare (`sameValue`, `sameCell`, `samePlan`).

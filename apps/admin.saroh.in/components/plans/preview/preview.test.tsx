@@ -18,7 +18,7 @@ import { AUTOSAVE_MS } from "../draft-store";
 import { PlansShell } from "../plans-shell";
 import { tabCatalog, tabData, tabPricing } from "../plans/tab-test-kit";
 import { changedOnCard } from "../sheets/card-preview";
-import { draftChanges, moversLine, reachOf } from "./changes";
+import { draftChanges, moversLine, reachOf, sameValue } from "./changes";
 import { PREVIEW_HIDDEN_KEY } from "./preview-state";
 
 const actions = vi.hoisted(() => ({
@@ -133,6 +133,51 @@ describe("the change list's model", () => {
         expect(draft.plans.filter((p) => p.featured).map((p) => p.id)).toEqual([
             "b",
         ]);
+    });
+
+    it("doesn't list an add-on read back with its keys in another order", () => {
+        const live = tabCatalog();
+        const addon = {
+            id: "more-products",
+            kind: "pack",
+            name: "100 more products",
+            pricePaise: 100,
+            mode: "pack",
+            qty: 100,
+            plans: ["b"],
+        } as unknown as Catalog["addons"][number];
+        live.addons = [addon];
+        const draft = structuredClone(live);
+        // How the API hands a saved draft back: other key order, empty
+        // fields filled in.
+        draft.addons = [
+            {
+                qty: 100,
+                mode: "pack",
+                pricePaise: 100,
+                name: "100 more products",
+                kind: "pack",
+                id: "more-products",
+                module: undefined,
+                plans: ["b"],
+            } as unknown as Catalog["addons"][number],
+        ];
+        expect(draftChanges(live, draft)).toEqual([]);
+        draft.addons = draft.addons.map((a) => ({ ...a, pricePaise: 200 }));
+        expect(draftChanges(live, draft).map((c) => c.what)).toEqual([
+            "Add-on changed: 100 more products",
+        ]);
+    });
+
+    it("compares values by what they say, not by key order", () => {
+        expect(
+            sameValue({ a: 1, b: [1, { c: 2 }] }, { b: [1, { c: 2 }], a: 1 }),
+        ).toBe(true);
+        expect(sameValue({ a: 1 }, { a: 1, b: undefined })).toBe(true);
+        expect(sameValue({ a: 1 }, { a: 1, b: null })).toBe(true);
+        expect(sameValue({ a: 1 }, { a: 2 })).toBe(false);
+        expect(sameValue([1, 2], [2, 1])).toBe(false);
+        expect(sameValue({ a: 0 }, { a: undefined })).toBe(false);
     });
 
     it("has nothing to list for a first version", () => {
