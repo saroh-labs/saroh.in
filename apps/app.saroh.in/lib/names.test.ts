@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { firstName } from "./names";
+import { firstName, withoutTitle } from "./names";
 
 describe("firstName", () => {
     it("is what someone is called by, past any title", () => {
@@ -14,5 +14,14 @@ describe("firstName", () => {
         expect(firstName("Dr.")).toBe("Dr.");
         expect(firstName("  ")).toBe("");
         expect(firstName(null)).toBe("");
+    });
+});
+
+describe("withoutTitle", () => {
+    it("drops the titles in front of a name, and keeps a lone title", () => {
+        expect(withoutTitle("Dr. Arun Pillai")).toBe("Arun Pillai");
+        expect(withoutTitle("Meera Iyer")).toBe("Meera Iyer");
+        expect(withoutTitle("Dr.")).toBe("Dr.");
+        expect(withoutTitle(null)).toBe("");
     });
 });

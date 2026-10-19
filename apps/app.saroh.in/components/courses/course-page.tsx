@@ -48,6 +48,7 @@ import { useHold } from "@/components/shared/use-hold";
 
 import { runAction } from "@/lib/api/run-action";
 import type { GstAsk } from "@/lib/gst/item-words";
+import { withoutTitle } from "@/lib/names";
 import { AddSessionDialog } from "./add-session-dialog";
 import { EnrolDialog } from "./enrol-dialog";
 
@@ -61,7 +62,7 @@ const STANDING_WORD = {
 } as const;
 
 const initials = (name: string) =>
-    name
+    withoutTitle(name)
         .split(/\s+/)
         .filter(Boolean)
         .slice(0, 2)

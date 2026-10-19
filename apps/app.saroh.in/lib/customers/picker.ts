@@ -5,6 +5,7 @@
  * What is here only reads what was typed into the fields it belongs in.
  */
 
+import { withoutTitle } from "@/lib/names";
 import { phoneNumberProblem } from "@saroh/block-contract";
 
 /** Why a search result is exactly what was typed (C2's rules, on the API). */
@@ -120,7 +121,7 @@ export function listLabel(typed: string, found: number): string {
 
 /** "Kabir Singh" → "KS"; one letter for one word, "?" for none. */
 export function initialsOf(name: string | null): string {
-    const words = (name ?? "").trim().split(/\s+/).filter(Boolean);
+    const words = withoutTitle(name).split(/\s+/).filter(Boolean);
     if (words.length === 0) return "?";
     return words
         .slice(0, 2)

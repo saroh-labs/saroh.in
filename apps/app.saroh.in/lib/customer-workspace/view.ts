@@ -8,6 +8,7 @@ import { outcomeWord } from "@/lib/services/booking-words";
 import { recurringPrice, subscriptionPay } from "@/lib/subscriptions/view";
 import { absentText } from "@saroh/ui/lib/absent";
 
+import { withoutTitle } from "@/lib/names";
 import { addedLine } from "./added";
 import type {
     CustomerDetail,
@@ -173,7 +174,7 @@ export function tabFromQuery(value: string | undefined, tabs: Tab[]): TabKey {
 }
 
 export function initials(name: string): string {
-    return name
+    return withoutTitle(name)
         .split(/\s+/)
         .filter(Boolean)
         .map((w) => w[0].toUpperCase())

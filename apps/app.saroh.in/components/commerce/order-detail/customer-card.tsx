@@ -7,12 +7,13 @@ import { cardAttention } from "@/lib/orders/attention";
 import type { Shipment } from "@/lib/orders/courier";
 import type { AllergyNote, OrderAttention, OrderRead } from "@/lib/orders/read";
 
+import { withoutTitle } from "@/lib/names";
 import { phoneLabel } from "@/lib/organizations/business-phone";
 import { Notice } from "@saroh/ui/notice";
 import { FOCUS, Panel } from "./parts";
 
 export function initials(name: string): string {
-    const letters = name
+    const letters = withoutTitle(name)
         .split(/[\s&@.]+/)
         .filter((w) => /^[A-Za-zÀ-ÿ0-9]/.test(w))
         .slice(0, 2)

@@ -11,6 +11,18 @@ const TITLES = new Set([
 ]);
 
 /**
+ * A name past the titles in front of it: "Arun Pillai" from "Dr. Arun
+ * Pillai". A name that is only a title stays as it is.
+ */
+export function withoutTitle(name: string | null | undefined): string {
+    const words = (name ?? "").trim().split(/\s+/).filter(Boolean);
+    const at = words.findIndex(
+        (w) => !TITLES.has(w.replace(/\.$/, "").toLowerCase()),
+    );
+    return at <= 0 ? words.join(" ") : words.slice(at).join(" ");
+}
+
+/**
  * What someone is called by: "Meenakshi" from "Dr. Meenakshi Rao", "Meera"
  * from "Meera Iyer". An email stays whole; a name that is only a title
  * keeps it ("Dr."). Empty in, empty out.
