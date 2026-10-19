@@ -25,11 +25,21 @@ import { AdminAccountManagersService } from "../admin/admin-account-managers.ser
 import { AdminAuditService } from "../admin/admin-audit.service";
 import { AdminRole, permissionsFor } from "../admin/admin-permissions";
 import { CommissionLineHandler } from "./commission-line.job";
-import { commissionPaise, monthBounds, monthOf } from "./commission-rules";
+import { commissionPaise, monthOf } from "./commission-rules";
+import * as settleModule from "./commission-settle";
 import { CommissionSweepJob } from "./commission-sweep.job";
 
 const tag = `${process.pid}-${Date.now()}`;
 const ist = (local: string) => new Date(`${local}+05:30`);
+
+const SUPPORT = {
+    userId: "user-support",
+    platformAdminId: "pa-support",
+    roles: [AdminRole.Support],
+    permissions: permissionsFor([AdminRole.Support]),
+    viaBootstrap: false,
+};
+const managers = () => new AdminAccountManagersService(new AdminAuditService());
 
 let lines: CommissionLineHandler;
 let sweep: CommissionSweepJob;
@@ -204,44 +214,183 @@ describe("the month counts", () => {
         ]);
     });
 
-    it("assigning a manager writes the lines of this month's payments made with no manager, once", async () => {
-        const bps = randomRate();
-        await setRate("ASSIGNED", bps, new Date(Date.now() - 400 * 86_400_000));
+    it("the month starts at 00:00:00.000 on the 1st in India: that payment counts, 23:59:59.999 the day before doesn't", async () => {
         const m = await manager();
         const org = await business();
-        const now = new Date();
-        const start = monthBounds(monthOf(now)).from;
-        // Earlier this month (halfway from its start), and last month.
-        const thisMonth = await paid(
+        const first = await paid(org, ist("2026-01-01T00:00:00.000"));
+        const before = await paid(org, ist("2025-12-31T23:59:59.999"));
+        await linkTo(
             org,
-            new Date(start.getTime() + (now.getTime() - start.getTime()) / 2),
+            m.platformAdminId,
+            "ASSIGNED",
+            ist("2026-01-15T10:00:00"),
         );
-        const lastMonth = await paid(
+        expect((await lines.settle(first.id)).written).toBe(1);
+        expect((await lines.settle(before.id)).written).toBe(0);
+        expect(await linesOf(before.id)).toEqual([]);
+    });
+
+    it("a manager taken on and let go in the same month still earns its earlier payment", async () => {
+        const m = await manager();
+        const org = await business();
+        const jan = await paid(org, ist("2026-01-03T10:00:00"));
+        await linkTo(
             org,
-            new Date(start.getTime() - 3_600_000),
+            m.platformAdminId,
+            "ASSIGNED",
+            ist("2026-01-10T10:00:00"),
         );
+        await endLink(org, ist("2026-01-20T10:00:00"));
+        await sweep.sweep(ist("2026-01-25T12:00:00"));
+        expect((await linesOf(jan.id)).map((l) => l.platformAdminId)).toEqual([
+            m.platformAdminId,
+        ]);
+    });
+
+    it("a refunded payment in the counted month earns nothing", async () => {
+        await setRate("ASSIGNED", randomRate(), ist("2025-01-01T00:00:00"));
+        const m = await manager();
+        const org = await business();
+        const jan = await paid(org, ist("2026-01-03T10:00:00"));
+        await prisma.billingRefund.create({
+            data: {
+                organizationId: org,
+                provider: "RAZORPAY",
+                kind: "REFUND",
+                providerRefundId: `rfnd_mon_${tag}`,
+                providerPaymentId: jan.providerPaymentId!,
+                invoiceId: jan.id,
+                status: "PROCESSED",
+                source: "PROVIDER",
+            },
+        });
+        await linkTo(
+            org,
+            m.platformAdminId,
+            "ASSIGNED",
+            ist("2026-01-10T10:00:00"),
+        );
+        await sweep.sweep(ist("2026-01-25T12:00:00"));
+        const got = await linesOf(jan.id);
+        expect(got.filter((l) => l.status !== "CANCELLED")).toEqual([]);
+    });
+
+    it("the first manager later that month decides it: off commission, nobody earns it, and the sweep leaves it be", async () => {
+        await setRate("ASSIGNED", randomRate(), ist("2025-01-01T00:00:00"));
+        const off = await manager({ onCommission: false });
+        const on = await manager();
+        const org = await business();
+        const jan = await paid(org, ist("2026-01-03T10:00:00"));
+        await linkTo(
+            org,
+            off.platformAdminId,
+            "ASSIGNED",
+            ist("2026-01-10T10:00:00"),
+        );
+        await endLink(org, ist("2026-01-15T10:00:00"));
+        await linkTo(
+            org,
+            on.platformAdminId,
+            "ASSIGNED",
+            ist("2026-01-15T10:00:00"),
+        );
+        expect((await lines.settle(jan.id)).written).toBe(0);
+        const settle = jest.spyOn(lines, "settle");
+        for (const day of ["2026-01-25", "2026-01-26"]) {
+            await sweep.sweep(ist(`${day}T12:00:00`));
+            // Never picked up again: it would re-settle on every run.
+            expect(settle).not.toHaveBeenCalledWith(jan.id, expect.anything());
+        }
+        expect(await linesOf(jan.id)).toEqual([]);
+    });
+
+    it("assigning a manager writes the lines of this month's payments made with no manager, once", async () => {
+        const bps = randomRate();
+        await setRate("ASSIGNED", bps, ist("2025-01-01T00:00:00"));
+        const m = await manager();
+        const org = await business();
+        const now = ist("2026-01-20T12:00:00");
+        const thisMonth = await paid(org, ist("2026-01-01T00:00:00.000"));
+        const lastMonth = await paid(org, ist("2025-12-31T23:59:59.999"));
         expect(await linesOf(thisMonth.id)).toEqual([]);
 
-        const service = new AdminAccountManagersService(
-            new AdminAuditService(),
-        );
-        await service.assign(
-            {
-                userId: "user-support",
-                platformAdminId: "pa-support",
-                roles: [AdminRole.Support],
-                permissions: permissionsFor([AdminRole.Support]),
-                viaBootstrap: false,
-            },
+        await managers().assign(
+            SUPPORT,
             org,
-            { platformAdminId: m.platformAdminId, reason: "taking it on" },
+            {
+                platformAdminId: m.platformAdminId,
+                reason: "taking it on",
+            },
+            now,
         );
         const got = await linesOf(thisMonth.id);
         expect(got.map((l) => [l.platformAdminId, l.amountPaise])).toEqual([
             [m.platformAdminId, commissionPaise(thisMonth.taxablePaise, bps)],
         ]);
         expect(await linesOf(lastMonth.id)).toEqual([]);
-        expect((await lines.settle(thisMonth.id)).written).toBe(0);
+        expect((await lines.settle(thisMonth.id, now)).written).toBe(0);
         expect(await prisma.commissionLine.count()).toBe(1);
+    });
+
+    it("assigning while the sweep runs writes the line once", async () => {
+        const bps = randomRate();
+        await setRate("ASSIGNED", bps, ist("2025-01-01T00:00:00"));
+        const m = await manager();
+        const org = await business();
+        const now = ist("2026-01-20T12:00:00");
+        const jan = await paid(org, ist("2026-01-05T10:00:00"));
+        await Promise.all([
+            managers().assign(
+                SUPPORT,
+                org,
+                { platformAdminId: m.platformAdminId, reason: "taking it on" },
+                now,
+            ),
+            sweep.sweep(now),
+            sweep.sweep(now),
+        ]);
+        await sweep.sweep(now);
+        expect((await linesOf(jan.id)).map((l) => l.platformAdminId)).toEqual([
+            m.platformAdminId,
+        ]);
+    });
+
+    it("a settle that fails after assigning leaves the assignment in place; the sweep writes the line", async () => {
+        const bps = randomRate();
+        await setRate("ASSIGNED", bps, ist("2025-01-01T00:00:00"));
+        const m = await manager();
+        const org = await business();
+        const now = ist("2026-01-20T12:00:00");
+        const jan = await paid(org, ist("2026-01-05T10:00:00"));
+        const failing = jest
+            .spyOn(settleModule, "settleMonthBeforeLinkInTx")
+            .mockRejectedValueOnce(new Error("settle broke"));
+        try {
+            await expect(
+                managers().assign(
+                    SUPPORT,
+                    org,
+                    {
+                        platformAdminId: m.platformAdminId,
+                        reason: "taking it on",
+                    },
+                    now,
+                ),
+            ).resolves.toMatchObject({
+                manager: { platformAdminId: m.platformAdminId },
+            });
+        } finally {
+            failing.mockRestore();
+        }
+        expect(
+            await prisma.accountManagerLink.count({
+                where: { organizationId: org, endedAt: null },
+            }),
+        ).toBe(1);
+        expect(await linesOf(jan.id)).toEqual([]);
+        expect((await sweep.sweep(now)).written).toBe(1);
+        expect((await linesOf(jan.id)).map((l) => l.platformAdminId)).toEqual([
+            m.platformAdminId,
+        ]);
     });
 });

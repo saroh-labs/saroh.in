@@ -22,6 +22,8 @@ import {
 import {
     dayOf,
     dayStart,
+    endedOwnRateInTheWay,
+    endedOwnRateWords,
     isEmptyWindow,
     nextDay,
     ownRateEndAt,
@@ -162,6 +164,7 @@ export class AdminOwnRateService {
                 now,
             );
             const existing = await ownRatesInTx(tx, organizationId);
+            refuseOverEnded(existing, w.from, w.until);
             const ends = new Set(
                 ownRateOverlap(existing, w.from).map((e) => e.id),
             );
@@ -197,19 +200,26 @@ export class AdminOwnRateService {
             await lockKeyInTx(tx, businessRateLockKey(organizationId));
             const w = await windowInTx(tx, organizationId, input);
 
-            const ended = ownRateOverlap(
-                await ownRatesInTx(tx, organizationId),
-                w.from,
-            );
+            const existing = await ownRatesInTx(tx, organizationId);
+            refuseOverEnded(existing, w.from, w.until);
+            const ended = ownRateOverlap(existing, w.from);
             for (const end of ended) {
+                // Cut back to where the new one starts. One that still runs
+                // until a day to come is only cut, not ended: an ended row
+                // is written for good, so End could no longer stop it
+                // sooner; it reads as a rate with a last day, and the
+                // audit row names it as replaced.
+                const over = end.until.getTime() <= now.getTime();
                 await tx.businessCommissionRate.update({
                     where: { id: end.id },
-                    data: {
-                        until: end.until,
-                        endedAt: now,
-                        endedByUserId: staff.userId,
-                        endedReason: `Replaced by the own rate from ${input.earnsFrom}: ${reason}`,
-                    },
+                    data: over
+                        ? {
+                              until: end.until,
+                              endedAt: now,
+                              endedByUserId: staff.userId,
+                              endedReason: `Replaced by the own rate from ${input.earnsFrom}: ${reason}`,
+                          }
+                        : { until: end.until },
                 });
             }
             const rate = await tx.businessCommissionRate.create({
@@ -269,6 +279,8 @@ export class AdminOwnRateService {
             await lockKeyInTx(tx, businessRateLockKey(organizationId));
             const running = (await ownRatesInTx(tx, organizationId)).flatMap(
                 (rate) => {
+                    // An ended one is written for good: nothing to stop.
+                    if (rate.endedAt) return [];
                     const at = ownRateEndAt(rate, now);
                     return at && !isEmptyWindow(rate) ? [{ rate, at }] : [];
                 },
@@ -302,6 +314,19 @@ export class AdminOwnRateService {
             return summaryOf(tx, organizationId, now);
         });
     }
+}
+
+/**
+ * An ended rate can't be moved (the table's trigger refuses it), so a new
+ * one over its days is a 409 that names them, never the trigger's error.
+ */
+function refuseOverEnded(
+    existing: OwnRateRow[],
+    from: Date,
+    until: Date | null,
+): void {
+    const inTheWay = endedOwnRateInTheWay(existing, from, until);
+    if (inTheWay) throw new ConflictException(endedOwnRateWords(inTheWay));
 }
 
 function assertRates(staff: PlatformAdminInfo): void {

@@ -42,6 +42,12 @@ import { AdminOwnRateService } from "./admin-own-rate.service";
 import { AdminRole, permissionsFor } from "./admin-permissions";
 
 const DAY = 24 * 60 * 60 * 1000;
+/**
+ * A fixed "now", mid-month in India, so no case lands on a month's first
+ * minutes: only Date is faked (and moves on from here in real time);
+ * timers stay real for Prisma.
+ */
+const NOW = new Date("2026-06-15T12:00:00+05:30");
 const itRls = isRlsTestMode() ? it : it.skip;
 const tag = `${process.pid}-${Date.now()}`;
 
@@ -60,6 +66,29 @@ function staff(role: AdminRole): PlatformAdminInfo {
     };
 }
 const OWNER = () => staff(AdminRole.PlatformOwner);
+
+beforeAll(() => {
+    jest.useFakeTimers({
+        now: NOW,
+        advanceTimers: true,
+        doNotFake: [
+            "hrtime",
+            "nextTick",
+            "performance",
+            "queueMicrotask",
+            "setImmediate",
+            "clearImmediate",
+            "setInterval",
+            "clearInterval",
+            "setTimeout",
+            "clearTimeout",
+        ],
+    });
+});
+
+afterAll(() => {
+    jest.useRealTimers();
+});
 
 beforeEach(async () => {
     const audit = new AdminAuditService();
@@ -690,6 +719,7 @@ describe("precedence and End", () => {
             await ownRates.set(OWNER(), org, {
                 basisPoints: randomRate(),
                 earnsFrom: dayOf(a.issuedAt),
+                lastDay: dayOf(ago(-60)),
                 reason: "agreed with them",
             });
             const row = await prisma.businessCommissionRate.findFirstOrThrow();
@@ -698,13 +728,140 @@ describe("precedence and End", () => {
                     where: { id: row.id },
                     data: { basisPoints: randomRate() + 1 },
                 }),
-            ).rejects.toThrow();
+            ).rejects.toThrow(/only ever ends earlier/);
             await expect(
                 prisma.businessCommissionRate.update({
                     where: { id: row.id },
                     data: { earnsFrom: ago(400) },
                 }),
-            ).rejects.toThrow();
+            ).rejects.toThrow(/only ever ends earlier/);
+            // Later, or open again: refused.
+            await expect(
+                prisma.businessCommissionRate.update({
+                    where: { id: row.id },
+                    data: { until: ago(-90) },
+                }),
+            ).rejects.toThrow(/only ever ends earlier/);
+            await expect(
+                prisma.businessCommissionRate.update({
+                    where: { id: row.id },
+                    data: { until: null },
+                }),
+            ).rejects.toThrow(/only ever ends earlier/);
+            // Earlier, and ended: allowed.
+            await expect(
+                prisma.businessCommissionRate.update({
+                    where: { id: row.id },
+                    data: {
+                        until: ago(-10),
+                        endedAt: NOW,
+                        endedByUserId: OWNER().userId,
+                        endedReason: "deal over",
+                    },
+                }),
+            ).resolves.toMatchObject({ until: ago(-10) });
+            // Once ended, written for good: not even earlier.
+            await expect(
+                prisma.businessCommissionRate.update({
+                    where: { id: row.id },
+                    data: { until: ago(-5) },
+                }),
+            ).rejects.toThrow(/only ever ends earlier/);
         },
     );
+});
+
+describe("a rate over an ended one's days", () => {
+    it("is refused with the days, never the database's error, and changes nothing", async () => {
+        const { org } = await looked();
+        await paid(org, 60);
+        const a = {
+            basisPoints: randomRate(),
+            earnsFrom: dayOf(ago(50)),
+            reason: "agreed with them",
+        };
+        await ownRates.set(OWNER(), org, a);
+        // B replaces A from 20 days ago: A now ends there, for good.
+        await ownRates.set(OWNER(), org, {
+            basisPoints: randomRate(),
+            earnsFrom: dayOf(ago(20)),
+            reason: "a better deal",
+        });
+        const rows = await prisma.businessCommissionRate.findMany({
+            orderBy: { createdAt: "asc" },
+        });
+        // C from 30 days ago would move A's end, which nothing can.
+        const c = {
+            basisPoints: randomRate(),
+            earnsFrom: dayOf(ago(30)),
+        };
+        await expect(ownRates.preview(OWNER(), org, c)).rejects.toThrow(
+            ConflictException,
+        );
+        await expect(
+            ownRates.set(OWNER(), org, { ...c, reason: "correcting it" }),
+        ).rejects.toThrow(
+            /^An ended own rate still prices .* to .*\. Start the new one on or after .*, or end it before .*\.$/,
+        );
+        expect(
+            await prisma.businessCommissionRate.findMany({
+                orderBy: { createdAt: "asc" },
+            }),
+        ).toEqual(rows);
+        // From A's end on, it saves: B is the one it replaces.
+        await expect(
+            ownRates.set(OWNER(), org, {
+                ...c,
+                earnsFrom: dayOf(ago(20)),
+                reason: "correcting it",
+            }),
+        ).resolves.toMatchObject({ current: { basisPoints: c.basisPoints } });
+    });
+
+    it("End leaves a replaced rate alone and stops only the running one", async () => {
+        const { org } = await looked();
+        await paid(org, 60);
+        await ownRates.set(OWNER(), org, {
+            basisPoints: randomRate(),
+            earnsFrom: dayOf(ago(50)),
+            reason: "agreed with them",
+        });
+        // Replaced from a day to come: the first now ends then, for good.
+        await ownRates.set(OWNER(), org, {
+            basisPoints: randomRate(),
+            earnsFrom: dayOf(ago(-10)),
+            reason: "from next week",
+        });
+        await expect(
+            ownRates.end(OWNER(), org, { reason: "deal over" }, NOW),
+        ).resolves.toMatchObject({ current: null });
+    });
+});
+
+describe("two saves at once", () => {
+    it("leave one rate open and back-pay a payment once", async () => {
+        const { org } = await looked();
+        const a = await paid(org, 40);
+        const input = (basisPoints: number) => ({
+            basisPoints,
+            earnsFrom: dayOf(a.issuedAt),
+            reason: "agreed with them",
+        });
+        const results = await Promise.allSettled([
+            ownRates.set(OWNER(), org, input(randomRate())),
+            ownRates.set(OWNER(), org, input(randomRate())),
+        ]);
+        const saved = results.flatMap((r) =>
+            r.status === "fulfilled" ? [r.value] : [],
+        );
+        expect(saved.length).toBeGreaterThan(0);
+        expect(saved.reduce((n, s) => n + s.backPaid.payments, 0)).toBe(1);
+        const open = (await prisma.businessCommissionRate.findMany()).filter(
+            (r) => r.endedAt === null,
+        );
+        expect(open).toHaveLength(1);
+        const priced = await linesOf(a.id);
+        expect(priced).toHaveLength(1);
+        expect(priced[0]!.status).not.toBe("NO_RATE");
+    });
 });

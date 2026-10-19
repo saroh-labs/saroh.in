@@ -165,8 +165,9 @@ export async function linkForPaymentInTx(
  * that month's earlier payments that have none, now theirs ("the month
  * counts"). Each through `settleInvoiceInTx`, so under the business's and
  * the invoice's locks and once: a payment with lines is left as it is.
- * The caller holds the business's manager lock, in the link's own
- * transaction. Returns the lines written.
+ * Run in a short transaction of its own after the link committed (so the
+ * link is what `linkForPaymentInTx` finds, and a failure here never undoes
+ * the assignment; the sweep repairs it). Returns the lines written.
  */
 export async function settleMonthBeforeLinkInTx(
     tx: Tx,

@@ -129,6 +129,8 @@ export interface OwnRateWindow {
     platformAdminId: string;
     earnsFrom: Date;
     until: Date | null;
+    /** Set once it was ended or replaced: written for good from then on. */
+    endedAt?: Date | null;
 }
 
 /** It earns for no moment at all: ended on the day it would have started. */
@@ -158,19 +160,55 @@ export function ownRateCovers(
  * in force at a time: one that runs past `from` ends there, and one that
  * starts on or after it is ended before it began (its `until` its own
  * start). Either keeps every line it already priced: priced lines are
- * never priced again. Ended ones and empty ones are left alone.
+ * never priced again. Ended ones and empty ones are left alone: an ended
+ * rate is written for good (the table's trigger refuses any change), so
+ * one still covering the new days is refused first
+ * ({@link endedOwnRateInTheWay}).
  */
 export function ownRateOverlap(
     existing: readonly OwnRateWindow[],
     from: Date,
 ): { id: string; until: Date }[] {
     return existing
+        .filter((r) => !r.endedAt)
         .filter((r) => !isEmptyWindow(r))
         .filter((r) => r.until === null || r.until.getTime() > from.getTime())
         .map((r) => ({
             id: r.id,
             until: r.earnsFrom.getTime() >= from.getTime() ? r.earnsFrom : from,
         }));
+}
+
+/**
+ * An ended (or replaced) own rate that still earns over some of the new
+ * window `[from, until)`, or null. It can't be moved, so the new rate must
+ * start after it or stop before it.
+ */
+export function endedOwnRateInTheWay(
+    existing: readonly OwnRateWindow[],
+    from: Date,
+    until: Date | null,
+): (OwnRateWindow & { until: Date | null }) | null {
+    return (
+        existing.find(
+            (r) =>
+                !!r.endedAt &&
+                !isEmptyWindow(r) &&
+                (r.until === null || r.until.getTime() > from.getTime()) &&
+                (until === null || r.earnsFrom.getTime() < until.getTime()),
+        ) ?? null
+    );
+}
+
+/** The refusal for a new rate over an ended one's days. */
+export function endedOwnRateWords(rate: OwnRateWindow): string {
+    const first = dayWords(dayOf(rate.earnsFrom));
+    if (rate.until === null) {
+        return `An ended own rate still prices the days from ${first}. Pick days before it.`;
+    }
+    const last = dayWords(dayOf(new Date(rate.until.getTime() - 1)));
+    const after = dayWords(dayOf(rate.until));
+    return `An ended own rate still prices ${first} to ${last}. Start the new one on or after ${after}, or end it before ${first}.`;
 }
 
 /**

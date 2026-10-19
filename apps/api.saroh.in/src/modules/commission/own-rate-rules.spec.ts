@@ -9,6 +9,8 @@ import {
     backPayStatus,
     dayOf,
     dayStart,
+    endedOwnRateInTheWay,
+    endedOwnRateWords,
     isDay,
     isEmptyWindow,
     isLegalBackPay,
@@ -308,5 +310,55 @@ describe("the one way out of NO_RATE", () => {
         expect(
             backPayStatus({ refund: "cancel", held: false, periodEnded: true }),
         ).toBeNull();
+    });
+});
+
+describe("an ended rate is written for good", () => {
+    const ended = (over: Parameters<typeof rate>[0] = {}) =>
+        rate({
+            id: "ended",
+            until: dayStart("2026-10-01"),
+            endedAt: dayStart("2026-10-19"),
+            ...over,
+        });
+
+    it("is never ended again by a new rate over its days", () => {
+        expect(ownRateOverlap([ended()], dayStart("2026-09-15"))).toEqual([]);
+    });
+
+    it("is in the way of a new rate over its days, and only then", () => {
+        const a = ended();
+        expect(
+            endedOwnRateInTheWay([a], dayStart("2026-09-15"), null)?.id,
+        ).toBe("ended");
+        // From its end on, or stopping before it began: clear.
+        expect(endedOwnRateInTheWay([a], dayStart("2026-10-01"), null)).toBe(
+            null,
+        );
+        expect(
+            endedOwnRateInTheWay([a], dayStart("2026-08-01"), a.earnsFrom),
+        ).toBe(null);
+        // An open one, or an empty ended one, is never in the way.
+        expect(
+            endedOwnRateInTheWay([rate()], dayStart("2026-09-15"), null),
+        ).toBe(null);
+        expect(
+            endedOwnRateInTheWay(
+                [
+                    ended({
+                        until: dayStart("2026-09-01"),
+                        earnsFrom: dayStart("2026-09-01"),
+                    }),
+                ],
+                dayStart("2026-08-15"),
+                null,
+            ),
+        ).toBe(null);
+    });
+
+    it("names its days in the refusal", () => {
+        expect(endedOwnRateWords(ended())).toMatch(
+            /still prices .* to 30 Sept? 2026\. Start the new one on or after 1 Oct 2026, or end it before /,
+        );
     });
 });
