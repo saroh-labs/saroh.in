@@ -152,14 +152,15 @@ async function statementMonthInTx(
 const NOTES: Partial<Record<LineStatus, string>> = {
     HELD: "The billing provider took a different amount from the invoice. Paid once the mismatch is resolved in Billing › Needs action.",
     NO_RATE:
-        "No commission rate was set for this kind of business when it paid. Worked out once one is.",
+        "No commission rate was set for this kind of business when it paid, so it earns nothing. A rate set later starts from its own date.",
     CANCELLED: "The payment was refunded, or a dispute on it was lost.",
 };
 
 /**
  * Write a cleared Saroh payment's commission lines if it has none, then
  * bring every line of it up to date (DEC-169, admin console U21): money
- * gone back cancels it, no rate leaves it NO_RATE, a mismatch HELD, an
+ * gone back cancels it, no rate makes it NO_RATE for good (no back-pay), a
+ * mismatch HELD, an
  * open refund or dispute PENDING, and a period that ended without them
  * makes it PAYABLE in its month. A line already PAID is never changed: a
  * refund after payout raises a Needs action for the owner, once.
@@ -222,46 +223,13 @@ export async function settleInvoiceInTx(
         written = plan.lines.length;
     }
 
-    // A rate for lines written before there was one, worked out for the
-    // whole payment at once so the twelfths still add up.
-    const unrated = lines.filter(
-        (l) => l.status === "NO_RATE" && l.basisPoints === null,
-    );
-    let rated = new Map<
-        string,
-        { rateId: string; bps: number; amount: number }
-    >();
-    if (unrated.length > 0) {
-        const rate = await rateForInTx(
-            tx,
-            lines[0].kind as RateKind,
-            invoice.issuedAt,
-        );
-        if (rate) {
-            const amounts = splitEvenly(
-                commissionPaise(invoice.taxablePaise, rate.basisPoints),
-                lines[0].installments,
-            );
-            rated = new Map(
-                unrated.map((l) => [
-                    l.id,
-                    {
-                        rateId: rate.id,
-                        bps: rate.basisPoints,
-                        amount: amounts[l.installment - 1],
-                    },
-                ]),
-            );
-        }
-    }
-
     let moved = 0;
     for (const line of lines) {
         const status = line.status as LineStatus;
         const facts = {
             status,
             refund,
-            rated: line.basisPoints !== null || rated.has(line.id),
+            rated: line.basisPoints !== null,
             held,
             periodEnded: line.periodEnd.getTime() <= now.getTime(),
         };
@@ -289,8 +257,7 @@ export async function settleInvoiceInTx(
         if (!OPEN_STATUSES.includes(status)) continue;
 
         const to = nextStatus(facts);
-        const rate = rated.get(line.id);
-        if (to === status && !rate) continue;
+        if (to === status) continue;
         if (!isLegalLineMove(status, to)) {
             logger.warn(
                 `commission_line_move_refused line=${line.id} from=${status} to=${to}`,
@@ -313,13 +280,6 @@ export async function settleInvoiceInTx(
                 status: to,
                 statementMonth,
                 note: NOTES[to] ?? null,
-                ...(rate
-                    ? {
-                          rateId: rate.rateId,
-                          basisPoints: rate.bps,
-                          amountPaise: rate.amount,
-                      }
-                    : {}),
             },
         });
         moved += count;

@@ -2982,7 +2982,8 @@ model CommissionRate {
 //   or dispute; then PAYABLE in `statementMonth` (the month the period
 //   ended in India, or the next month not yet paid).
 // - HELD while the provider took a different amount from the invoice.
-// - NO_RATE while no rate was set for the link's kind; worked out once one is.
+// - NO_RATE when no rate was set for the link's kind as it paid: it earns
+//   nothing, for good (no back-pay, owner 19 Oct).
 // - CANCELLED by a refund, or a dispute lost, before it was paid.
 // - PAID with its month's payout; a refund after that is a Needs action
 //   for the owner, and the line stays as it was.

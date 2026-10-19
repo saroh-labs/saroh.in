@@ -23,11 +23,14 @@ export type RateKind = (typeof RATE_KINDS)[number];
 /** The most a rate can be: all of it, in basis points. */
 export const MAX_BASIS_POINTS = 10_000;
 
-/** Lines the job and the sweep still move; the other two never change. */
+/**
+ * Lines the job and the sweep still move; CANCELLED, PAID and NO_RATE never
+ * change. No back-pay (owner, 19 Oct): a payment made while no rate was set
+ * earns nothing, and a rate set later starts from its own date.
+ */
 export const OPEN_STATUSES: readonly LineStatus[] = [
     "PENDING",
     "HELD",
-    "NO_RATE",
     "PAYABLE",
 ];
 
@@ -189,14 +192,19 @@ export interface LineFacts {
 }
 
 /**
- * Where a line goes next. CANCELLED and PAID never move: a refund after
- * payout is the owner's to raise (`refundAfterPayout`), nothing is taken
- * back. Otherwise, in this order: money went back → CANCELLED; no rate →
- * NO_RATE; the amount doesn't match → HELD; a refund or dispute open →
- * PENDING; the period ended → PAYABLE; else PENDING.
+ * Where a line goes next. CANCELLED, PAID and NO_RATE never move: a refund
+ * after payout is the owner's to raise (`refundAfterPayout`), nothing is
+ * taken back, and no rate is never back-paid. Otherwise, in this order:
+ * money went back → CANCELLED; no rate → NO_RATE; the amount doesn't match
+ * → HELD; a refund or dispute open → PENDING; the period ended → PAYABLE;
+ * else PENDING.
  */
 export function nextStatus(facts: LineFacts): LineStatus {
-    if (facts.status === "CANCELLED" || facts.status === "PAID") {
+    if (
+        facts.status === "CANCELLED" ||
+        facts.status === "PAID" ||
+        facts.status === "NO_RATE"
+    ) {
         return facts.status;
     }
     if (facts.refund === "cancel") return "CANCELLED";
@@ -213,11 +221,13 @@ export function refundAfterPayout(facts: LineFacts): boolean {
 
 /**
  * The moves a line can make. PAYABLE → PAID is Mark paid's alone; the job
- * and the sweep move the rest. Nothing leaves CANCELLED or PAID.
+ * and the sweep move the rest. Nothing leaves CANCELLED, PAID or NO_RATE.
  */
 export function isLegalLineMove(from: LineStatus, to: LineStatus): boolean {
     if (from === to) return true;
-    if (from === "CANCELLED" || from === "PAID") return false;
+    if (from === "CANCELLED" || from === "PAID" || from === "NO_RATE") {
+        return false;
+    }
     if (to === "PAID") return from === "PAYABLE";
     return true;
 }

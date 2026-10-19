@@ -456,7 +456,7 @@ describe("statements and Mark paid", () => {
 });
 
 describe("rates", () => {
-    it("a Platform owner sets a rate from now; lines waiting for one are worked out at once", async () => {
+    it("a Platform owner sets a rate from now; a payment made before it earns nothing (no back-pay)", async () => {
         const m = await manager();
         const org = await business();
         await linkTo(org, m.platformAdminId);
@@ -481,9 +481,9 @@ describe("rates", () => {
                 where: { sarohInvoiceId: inv.id },
             }),
         ).toMatchObject({
-            status: "PENDING",
-            basisPoints: rate,
-            amountPaise: commissionPaise(inv.taxablePaise, rate),
+            status: "NO_RATE",
+            basisPoints: null,
+            amountPaise: null,
         });
         expect(
             await prisma.adminAuditEvent.findFirst({

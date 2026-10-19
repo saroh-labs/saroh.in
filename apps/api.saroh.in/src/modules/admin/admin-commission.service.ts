@@ -3,7 +3,6 @@ import {
     ConflictException,
     ForbiddenException,
     Injectable,
-    Logger,
     NotFoundException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
@@ -15,11 +14,7 @@ import {
     MAX_BASIS_POINTS,
     monthOf,
 } from "../commission/commission-rules";
-import {
-    lockKeyInTx,
-    payoutLockKey,
-    settleInvoiceInTx,
-} from "../commission/commission-settle";
+import { lockKeyInTx, payoutLockKey } from "../commission/commission-settle";
 import type {
     EarningsSummary,
     PayoutStatement,
@@ -41,7 +36,6 @@ import { requireReason } from "./admin-staff.service";
 const RATE_START_GRACE_MS = 10 * 60 * 1000;
 
 /** Unrated lines worked out at once when a rate is set; the sweep does the rest. */
-const RATE_SETTLE_MAX = 200;
 
 /**
  * Commission in the console (DEC-169, admin console U21): the month's
@@ -59,8 +53,6 @@ const RATE_SETTLE_MAX = 200;
  */
 @Injectable()
 export class AdminCommissionService {
-    private readonly logger = new Logger(AdminCommissionService.name);
-
     constructor(private readonly audit: AdminAuditService) {}
 
     async statement(
@@ -248,8 +240,8 @@ export class AdminCommissionService {
 
     /**
      * Set the rate for one kind of link from now (or a later date). A line
-     * already written keeps the rate it copied; lines waiting for a rate
-     * are worked out now, the rest by the hourly sweep.
+     * already written keeps the rate it copied, and a payment made while
+     * there was none earns nothing: no back-pay (owner, 19 Oct).
      */
     async setRate(
         staff: PlatformAdminInfo,
@@ -303,31 +295,7 @@ export class AdminCommissionService {
                 },
             });
         });
-        await this.settleUnrated(input.kind, now);
         return readRates(now);
-    }
-
-    /** Lines of `kind` waiting for a rate, worked out now. Never throws. */
-    private async settleUnrated(kind: RateKind, now: Date): Promise<void> {
-        try {
-            const waiting = await prisma.commissionLine.findMany({
-                where: { kind, status: "NO_RATE" },
-                select: { sarohInvoiceId: true },
-                distinct: ["sarohInvoiceId"],
-                take: RATE_SETTLE_MAX,
-            });
-            for (const { sarohInvoiceId } of waiting) {
-                await prisma.$transaction((tx) =>
-                    settleInvoiceInTx(tx, this.logger, sarohInvoiceId, now),
-                );
-            }
-        } catch (error) {
-            this.logger.error(
-                `commission_rate_settle_failed kind=${kind}: ${
-                    error instanceof Error ? error.name : "unknown error"
-                }. The hourly sweep works them out.`,
-            );
-        }
     }
 
     private read(

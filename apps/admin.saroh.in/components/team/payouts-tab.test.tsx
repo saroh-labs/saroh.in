@@ -455,7 +455,7 @@ describe("EarningsCard", () => {
         expect(screen.getByText("₹30.00", { selector: "dd" })).toBeTruthy();
         expect(screen.getByText(/1 held/)).toBeTruthy();
         expect(
-            screen.getByText(/2 waiting for a commission rate/),
+            screen.getByText(/2 earned nothing: no commission rate was set/),
         ).toBeTruthy();
         expect(screen.getByText("December 2026")).toBeTruthy();
         expect(screen.getByText("UTR-77")).toBeTruthy();

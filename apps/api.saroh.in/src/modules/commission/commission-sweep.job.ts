@@ -44,9 +44,9 @@ export interface SweepResult {
  *    business had a manager on commission when it cleared: the line the
  *    job didn't write (its enqueue was lost, or it gave up).
  * 2. **Payable**: every open line whose period has ended, and every one
- *    HELD, NO_RATE or PAYABLE: a period that ended clean becomes payable
- *    in its month, a mismatch resolved or a rate set moves it on, a
- *    refund cancels it.
+ *    HELD or PAYABLE: a period that ended clean becomes payable in its
+ *    month, a mismatch resolved moves it on, a refund cancels it. A
+ *    NO_RATE line is never back-paid, so it is not looked at again.
  * 3. **Refunds**: every payment whose refund or dispute changed in the
  *    last 3 days (the console's hand refunds and the automatic one
  *    included), so a refund after payout is raised.
@@ -158,7 +158,7 @@ export class CommissionSweepJob {
                         status: { in: [...OPEN_STATUSES] },
                         periodEnd: { lte: now },
                     },
-                    { status: { in: ["HELD", "NO_RATE", "PAYABLE"] } },
+                    { status: { in: ["HELD", "PAYABLE"] } },
                 ],
             },
             select: { sarohInvoiceId: true },

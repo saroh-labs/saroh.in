@@ -216,13 +216,18 @@ describe("where a line goes next", () => {
         expect(nextStatus(facts({ status: "HELD", periodEnded: true }))).toBe(
             "PAYABLE",
         );
-        expect(nextStatus(facts({ status: "NO_RATE" }))).toBe("PENDING");
+        // No back-pay: a rate set later never prices it.
+        expect(nextStatus(facts({ status: "NO_RATE" }))).toBe("NO_RATE");
+        expect(
+            nextStatus(facts({ status: "NO_RATE", periodEnded: true })),
+        ).toBe("NO_RATE");
     });
 
     it("nothing leaves CANCELLED or PAID, and only PAYABLE becomes PAID", () => {
         for (const to of LINE_STATUSES) {
             expect(isLegalLineMove("CANCELLED", to)).toBe(to === "CANCELLED");
             expect(isLegalLineMove("PAID", to)).toBe(to === "PAID");
+            expect(isLegalLineMove("NO_RATE", to)).toBe(to === "NO_RATE");
         }
         expect(isLegalLineMove("PAYABLE", "PAID")).toBe(true);
         expect(isLegalLineMove("PENDING", "PAID")).toBe(false);

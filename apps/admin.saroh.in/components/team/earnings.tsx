@@ -31,7 +31,7 @@ export function EarningsCard({ earnings }: EarningsCardProps) {
             ? `${totals.held} held until the billing provider's amount is checked`
             : null,
         totals.noRate > 0
-            ? `${totals.noRate} waiting for a commission rate to be set`
+            ? `${totals.noRate} earned nothing: no commission rate was set when ${totals.noRate === 1 ? "it" : "they"} paid`
             : null,
     ].filter((n): n is string => n !== null);
 

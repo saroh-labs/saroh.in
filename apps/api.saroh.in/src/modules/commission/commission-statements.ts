@@ -65,7 +65,11 @@ export interface PayoutRow {
     /** DUE: payable lines, not marked paid. PAID: marked. NONE: nothing. */
     status: "DUE" | "PAID" | "NONE";
     payout: PayoutView | null;
-    /** Earned but not yet payable, whatever the month: PENDING, HELD, NO_RATE. */
+    /**
+     * Earned but not yet payable, whatever the month: PENDING and HELD
+     * (`lines`, `held`). `noRate` counts apart the payments that earned
+     * nothing because no rate was set when they paid (no back-pay).
+     */
     waiting: {
         amountPaise: number;
         lines: number;
@@ -258,7 +262,7 @@ export async function readStatement(
                 : null,
             waiting: {
                 amountPaise: sum(waits),
-                lines: waits.length,
+                lines: waits.filter((w) => w.status !== "NO_RATE").length,
                 held: waits.filter((w) => w.status === "HELD").length,
                 noRate: waits.filter((w) => w.status === "NO_RATE").length,
             },

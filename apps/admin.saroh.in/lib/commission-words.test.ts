@@ -62,6 +62,11 @@ describe("commission words", () => {
         ).toBeNull();
         expect(
             waitingWords({ amountPaise: 9, lines: 3, held: 1, noRate: 2 }),
-        ).toBe("3 payments (1 held, 2 without a rate)");
+        ).toBe(
+            "3 payments (1 held) · 2 earned nothing: no rate was set when they paid",
+        );
+        expect(
+            waitingWords({ amountPaise: 0, lines: 0, held: 0, noRate: 1 }),
+        ).toBe("1 earned nothing: no rate was set when it paid");
     });
 });

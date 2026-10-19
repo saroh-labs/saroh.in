@@ -130,7 +130,7 @@ export const KIND_HINT: Record<RateKind, string> = {
 export const LINE_STATUS_LABEL: Record<LineStatus, string> = {
     PENDING: "Not yet payable",
     HELD: "Held",
-    NO_RATE: "No rate set",
+    NO_RATE: "No rate: earns nothing",
     PAYABLE: "Due",
     CANCELLED: "Cancelled",
     PAID: "Paid",
@@ -250,10 +250,18 @@ export function markPaidProblem(
 
 /** What is waiting for a person, in one line; null when nothing is. */
 export function waitingWords(waiting: PayoutRow["waiting"]): string | null {
-    if (waiting.lines === 0) return null;
-    const notes: string[] = [];
-    if (waiting.held > 0) notes.push(`${waiting.held} held`);
-    if (waiting.noRate > 0) notes.push(`${waiting.noRate} without a rate`);
-    const count = `${waiting.lines} ${waiting.lines === 1 ? "payment" : "payments"}`;
-    return notes.length > 0 ? `${count} (${notes.join(", ")})` : count;
+    const parts: string[] = [];
+    if (waiting.lines > 0) {
+        const count = `${waiting.lines} ${waiting.lines === 1 ? "payment" : "payments"}`;
+        parts.push(
+            waiting.held > 0 ? `${count} (${waiting.held} held)` : count,
+        );
+    }
+    // No back-pay (owner, 19 Oct): these never become due.
+    if (waiting.noRate > 0) {
+        parts.push(
+            `${waiting.noRate} earned nothing: no rate was set when ${waiting.noRate === 1 ? "it" : "they"} paid`,
+        );
+    }
+    return parts.length > 0 ? parts.join(" · ") : null;
 }

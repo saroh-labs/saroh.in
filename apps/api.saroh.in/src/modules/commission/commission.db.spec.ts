@@ -728,7 +728,7 @@ describe("a line for each cleared payment", () => {
         expect(await prisma.commissionLine.count()).toBe(0);
     });
 
-    it("no rate set: NO_RATE with nothing worked out, then the rate once one is set", async () => {
+    it("no rate set: NO_RATE, and a rate set later never back-pays it", async () => {
         const m = await manager();
         const ctx = await business();
         await linkTo(ctx.organizationId, m.platformAdminId);
@@ -746,14 +746,15 @@ describe("a line for each cleared payment", () => {
             }),
         ]);
 
-        const rate = randomRate();
-        await setRate("BROUGHT_IN", rate, new Date());
+        await setRate("BROUGHT_IN", randomRate(), new Date());
         await sweep.sweep(new Date());
+        await sweep.sweep(new Date(periodEnd.getTime() + 40 * DAY));
         expect(await linesOf(renewal.id)).toEqual([
             expect.objectContaining({
-                status: "PENDING",
-                basisPoints: rate,
-                amountPaise: commissionPaise(renewal.taxablePaise, rate),
+                status: "NO_RATE",
+                basisPoints: null,
+                amountPaise: null,
+                rateId: null,
             }),
         ]);
     });
