@@ -10,7 +10,14 @@ export type PageWidth = "form" | "default" | "wide" | "full";
 
 /** What the page is made of, so the grey stands where the content will. */
 export type PageShape =
-    "list" | "detail" | "form" | "editor" | "dashboard" | "settings" | "home";
+    | "list"
+    | "detail"
+    | "form"
+    | "editor"
+    | "dashboard"
+    | "answers"
+    | "settings"
+    | "home";
 
 export interface PageLoadingProps {
     shape: PageShape;
@@ -326,6 +333,33 @@ function HomeBody(groups = 5) {
     );
 }
 
+/**
+ * Insights' Overview (`IBLoadingD`, `IBLoadingP`): the suggestion's band,
+ * then three answers, each a question, its sentence and a picture.
+ */
+function AnswersBody(cards = 3) {
+    return (
+        <div className="max-w-[1160px] space-y-5">
+            <div className="space-y-3 rounded-[14px] bg-muted px-5 py-[18px]">
+                <Skeleton className="h-3.5 w-3/5" />
+                <Skeleton className="h-3 w-2/5" />
+            </div>
+            <div className="grid items-start gap-4 lg:grid-cols-3">
+                {Array.from({ length: cards }, (_, i) => (
+                    <div
+                        key={i}
+                        className="space-y-3 rounded-[14px] border border-border bg-card px-5 py-[18px]"
+                    >
+                        <Skeleton className="h-3.5 w-3/5" />
+                        <Skeleton className="h-3 w-2/5" />
+                        <Skeleton className="h-[120px] w-full" />
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 /** A Settings section: rows of a label, what is saved, and Edit. */
 function SettingsBody(rows = 5) {
     return (
@@ -350,6 +384,7 @@ const BODY: Record<PageShape, (rows?: number) => ReactNode> = {
     form: FormBody,
     editor: EditorBody,
     dashboard: DashboardBody,
+    answers: AnswersBody,
     settings: SettingsBody,
     home: HomeBody,
 };

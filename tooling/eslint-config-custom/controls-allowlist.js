@@ -138,6 +138,9 @@ export const RAW_ALLOWED = {
     // button: Home's + on a phone, the 56px square floating over the tab bar
     // that opens the New sheet (DEC-171); no Button size is that shape
     "components/home/new-sheet.tsx": ["button"],
+    // button: Insights' period on a phone, the board's 40px white button
+    // with the period's name that opens its sheet (DEC-171, IBPeriodP)
+    "components/insights/period-control.tsx": ["button"],
     // button: a control styled by its screen's own helper
     "components/invoices/invoice-form.tsx": ["button"],
     // button: a row or card that is one button

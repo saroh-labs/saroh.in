@@ -449,7 +449,7 @@ export const HOW_TAKINGS_ARE_COUNTED: readonly string[] = [
     "Sales are money actually taken: paid orders, and paid invoices that aren't an order's own, less refunds and credit notes. Each rupee is counted once.",
     "A sale counts in the week it was paid, Monday to Sunday in your business's time zone.",
     "This week joins the twelve once it ends on Sunday. Until then it's shown on its own, against the same days of last week.",
-    "The website's 7, 30 and 90 days below don't change these figures.",
+    "These are whole weeks, whichever period is chosen at the top of Insights.",
 ];
 
 /** A place's name on its own: "Hill Road", "Online", "By invoice". */

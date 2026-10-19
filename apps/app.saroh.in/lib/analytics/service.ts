@@ -1,5 +1,8 @@
 import { apiFetch, getActiveOrgId } from "@/lib/api/http";
 
+import type { InsightsPeriod } from "@/lib/insights/period";
+import type { MoneyRead, SellsRead } from "@/lib/insights/reads";
+
 import type { AnalyticsAggregateRow } from "./summary";
 import type { SourceRead, TakingsRead } from "./takings";
 
@@ -62,6 +65,36 @@ export async function readTakings(): Promise<SourceRead<TakingsRead> | null> {
     const orgId = await getActiveOrgId();
     if (!orgId) return null;
     return readSource<TakingsRead>(`/organizations/${orgId}/analytics/takings`);
+}
+
+/**
+ * Insights' Money for one period (DEC-171, #1079): money in against the
+ * same number of days before, the twelve weeks marked by window, and each
+ * day of the period. `payment:read`: a role without it reads `denied`.
+ */
+export async function readMoney(
+    period: InsightsPeriod,
+): Promise<SourceRead<MoneyRead> | null> {
+    const orgId = await getActiveOrgId();
+    if (!orgId) return null;
+    return readSource<MoneyRead>(
+        `/organizations/${orgId}/analytics/money?period=${period}`,
+    );
+}
+
+/**
+ * Insights' What sells for one period (DEC-171, #1080): best sellers and
+ * what is booked most, counts for anyone with Insights, amounts only with
+ * `payment:read` (`money` says which).
+ */
+export async function readSells(
+    period: InsightsPeriod,
+): Promise<SourceRead<SellsRead> | null> {
+    const orgId = await getActiveOrgId();
+    if (!orgId) return null;
+    return readSource<SellsRead>(
+        `/organizations/${orgId}/analytics/sells?period=${period}`,
+    );
 }
 
 /**

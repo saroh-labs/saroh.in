@@ -282,6 +282,19 @@ describe("Insights money (DB)", () => {
             // Two payments the 7 days before: too few to say a percent.
             change: { kind: "THIN" },
         });
+        // A bar a day, a day with nothing at zero, adding up to money in.
+        expect(read.days.map((d) => d.date)).toEqual([
+            "2026-10-13",
+            "2026-10-14",
+            "2026-10-15",
+            "2026-10-16",
+            "2026-10-17",
+            "2026-10-18",
+            "2026-10-19",
+        ]);
+        expect(read.days.reduce((sum, d) => sum + d.amountMinor, 0)).toBe(
+            400_000,
+        );
     });
 
     it("lists where the money came from, leaving out a place at nothing", async () => {

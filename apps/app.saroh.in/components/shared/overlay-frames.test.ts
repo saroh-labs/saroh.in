@@ -64,6 +64,8 @@ const NOT_FORMS: Record<string, string> = {
     "components/qr/qr-button.tsx": "a code to scan, download and copy",
     // Navigation and pickers.
     "components/shared/tab-bar-sheet.tsx": "the phone's menu",
+    "components/insights/period-control.tsx":
+        "a picker: choosing Insights' period goes there",
     "components/home/new-sheet.tsx":
         "Home's New on a phone: a menu of starts, each going to its flow",
     "components/sites/editor/editor-sheet.tsx": "the site editor's panels",

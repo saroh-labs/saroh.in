@@ -7,8 +7,9 @@ import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
 
 /**
- * Insights' takings (DEC-075): the answers in words on top, the figures
- * under them, then the website.
+ * Insights' takings (DEC-075) on the Money tab, and the website's figures
+ * on Where customers come from (DEC-171, #1089: one period for the page,
+ * tabs in the address).
  *
  * Read only. Northwind Supply has twelve weeks of paid orders behind the
  * seed; how much each week took depends on the day the seed was made, so
@@ -21,10 +22,10 @@ import { urls } from "../playwright.config";
 const NORTHWIND = "seed_org";
 const WHITEFIELD = "seed_org_whitefield";
 
-async function openInsights(page: Page, org: string) {
+async function openInsights(page: Page, org: string, query = "") {
     await useSession(page);
     await page.goto(`${urls.APP_URL}/open/${org}`);
-    await page.goto(`${urls.APP_URL}/analytics`);
+    await page.goto(`${urls.APP_URL}/analytics${query}`);
     await expect(
         page.getByRole("heading", { level: 1, name: "Insights" }),
     ).toBeVisible();
@@ -50,7 +51,12 @@ async function expectNoSidewaysScroll(page: Page) {
 test("a business that has sold reads its answers, then the figures behind them", async ({
     page,
 }) => {
-    await openInsights(page, NORTHWIND);
+    await openInsights(page, NORTHWIND, "?tab=money");
+    await expect(
+        page
+            .getByRole("navigation", { name: "Insights" })
+            .getByRole("link", { name: "Money" }),
+    ).toHaveAttribute("aria-current", "page");
 
     const answers = page.getByTestId("takings-answers");
     await expect(answers).toBeVisible();
@@ -117,8 +123,15 @@ test("a business that has sold reads its answers, then the figures behind them",
 
     // Merchants read "location", never "storefront" (DEC-069).
     await expect(page.locator("main")).not.toContainText(/storefront/i);
-    // The website's figures stay, under the takings, in the same language:
-    // days written "4 Sep", read by tapping, enquiries opening Leads.
+    await expectNoSidewaysScroll(page);
+
+    // The website's figures, on their own tab, in the same language: days
+    // written "4 Sep", read by tapping, enquiries opening Leads.
+    await page
+        .getByRole("navigation", { name: "Insights" })
+        .getByRole("link", { name: /^Where customers come from/ })
+        .click();
+    await expect(page).toHaveURL(/[?&]tab=from/);
     await expect(
         page.getByRole("heading", { level: 2, name: "Your website" }),
     ).toBeVisible();
@@ -150,9 +163,19 @@ test("a business that has sold reads its answers, then the figures behind them",
 test("a business that has never taken money is told so, not shown ₹0", async ({
     page,
 }) => {
+    // The Overview says it once, with the two ways to take money.
     await openInsights(page, WHITEFIELD);
+    await expect(
+        page.getByRole("heading", {
+            name: "Your first sale shows here the week it's paid",
+        }),
+    ).toBeVisible();
+    await expect(page.getByTestId("answer-money")).toHaveCount(0);
+    await expect(page.locator("main")).not.toContainText("₹0");
+    await expectNoSidewaysScroll(page);
 
-    // Said once, with what to do.
+    // So does the Money tab.
+    await openInsights(page, WHITEFIELD, "?tab=money");
     await expect(
         page.getByRole("heading", { name: "No takings yet" }),
     ).toBeVisible();
@@ -168,13 +191,15 @@ test("a business that has never taken money is told so, not shown ₹0", async (
     await expect(
         page.getByRole("img", { name: /^Sales for the twelve weeks/ }),
     ).toHaveCount(0);
-    // The website's Orders says none were paid, never just a bare 0 (#919).
+    // The website's Orders says none were paid, never just a bare 0 (#919),
+    // for the page's period.
+    await openInsights(page, WHITEFIELD, "?tab=from");
     const website = page.getByRole("region", { name: "Your website" });
     await expect(
         website.getByRole("link", { name: /^Orders\s*0$/ }),
     ).toBeVisible();
     await expect(website.getByTestId("website-orders-note")).toContainText(
-        /^No paid orders (recorded )?in the last 30 days\./,
+        /^No paid orders (recorded )?in the last 4 weeks\./,
     );
     await expectNoSidewaysScroll(page);
 });

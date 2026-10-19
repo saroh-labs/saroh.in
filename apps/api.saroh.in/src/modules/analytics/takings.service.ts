@@ -11,6 +11,7 @@ import {
     bestWeek,
     foldPeriod,
     markWeeks,
+    moneyDays,
     moneyIn,
     moneyPlaces,
     moneyToday,
@@ -214,6 +215,7 @@ export class TakingsService {
             usualOrder: usualOrder(usual, currency),
             bestWeek: bestWeek(weeks),
             weeks: markWeeks(weeks, w),
+            days: moneyDays(rows, currency, w),
             thisWeek: foldSoFar(
                 rows,
                 currency,

@@ -7,6 +7,7 @@ import {
     bestWeek,
     foldPeriod,
     markWeeks,
+    moneyDays,
     moneyIn,
     moneyPlaces,
     moneyToday,
@@ -204,5 +205,28 @@ describe("Insights money folds", () => {
             sameWeekdayLastWeekPayments: 1,
             change: { kind: "THIN" },
         });
+    });
+
+    it("draws every day of the period, a day with nothing at zero", () => {
+        const days = moneyDays(ROWS, "INR", W);
+        expect(days.map((d) => d.date)).toEqual([
+            "2026-10-13",
+            "2026-10-14",
+            "2026-10-15",
+            "2026-10-16",
+            "2026-10-17",
+            "2026-10-18",
+            "2026-10-19",
+        ]);
+        expect(days.map((d) => d.amountMinor)).toEqual([
+            100_000, 0, 50_000, 0, 0, 0, 300_000,
+        ]);
+        // The dollars on the 14th are left out; the days before aren't drawn.
+        expect(days[1]).toEqual({
+            date: "2026-10-14",
+            amountMinor: 0,
+            payments: 0,
+        });
+        expect(days[2]?.payments).toBe(2);
     });
 });

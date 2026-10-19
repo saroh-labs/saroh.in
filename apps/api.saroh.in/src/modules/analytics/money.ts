@@ -1,3 +1,5 @@
+import { DateTime } from "luxon";
+
 import { toMinor } from "../../common/money";
 import type { HomeWeekChange } from "../home/home-need-model";
 import { compareTakings } from "../home/home-week";
@@ -83,6 +85,14 @@ export interface MoneyToday {
     change: HomeWeekChange;
 }
 
+/** One day of the period: what came in, every day drawn, none left out. */
+export interface MoneyDay {
+    /** The business's date, `2026-10-13`. */
+    date: string;
+    amountMinor: number;
+    payments: number;
+}
+
 /** `GET organizations/:organizationId/analytics/money?period=`. */
 export interface MoneyRead {
     period: InsightsPeriod;
@@ -114,6 +124,11 @@ export interface MoneyRead {
     bestWeek: { start: string; end: string; takingsMinor: number } | null;
     /** Twelve whole weeks, oldest first, each marked by window. */
     weeks: MoneyWeek[];
+    /**
+     * Each day of the period, oldest first, a day with nothing at zero:
+     * the overview's last 7 days are drawn a bar a day (`IBPeriodD`).
+     */
+    days: MoneyDay[];
     /** The week in progress so far, beside the same days of last week. */
     thisWeek: TakingsSoFar;
     today: MoneyToday;
@@ -235,6 +250,32 @@ export function moneyPlaces(
             (a, b) =>
                 b.amountMinor - a.amountMinor || a.key.localeCompare(b.key),
         );
+}
+
+/**
+ * Each day of the period, oldest first, in `currency` only, a day that took
+ * nothing kept at zero so the bars stay one a day.
+ */
+export function moneyDays(
+    rows: readonly TakingsDayRow[],
+    currency: string | null,
+    w: Pick<PeriodWindows, "fromDate" | "toDate">,
+): MoneyDay[] {
+    const byDay = new Map<string, MoneyDay>();
+    const start = DateTime.fromISO(w.fromDate, { zone: "utc" });
+    const end = DateTime.fromISO(w.toDate, { zone: "utc" });
+    for (let at = start; at <= end; at = at.plus({ days: 1 })) {
+        const date = at.toISODate() ?? "";
+        byDay.set(date, { date, amountMinor: 0, payments: 0 });
+    }
+    for (const row of rows) {
+        if (row.currency !== currency) continue;
+        const day = byDay.get(row.day);
+        if (!day) continue;
+        day.amountMinor += toMinor(row.amount);
+        day.payments += Number(row.payments);
+    }
+    return [...byDay.values()];
 }
 
 /** The twelve weeks, each marked by the window it mostly falls in. */
