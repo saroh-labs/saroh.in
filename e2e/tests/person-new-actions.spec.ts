@@ -91,7 +91,9 @@ test.describe("new order and new booking from the person", () => {
         );
         const dialog = page.getByRole("dialog", { name: "New booking" });
         await expect(dialog).toBeVisible();
-        await expect(dialog.getByText(who.name).first()).toBeVisible();
+        await expect(
+            dialog.getByText(who.name).filter({ visible: true }).first(),
+        ).toBeVisible();
 
         await page.keyboard.press("Escape");
         await expect(dialog).toBeHidden();

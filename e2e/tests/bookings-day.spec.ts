@@ -107,8 +107,12 @@ test.describe("the Day calendar (U4)", () => {
             onPhone() ? "Closed · tap to open" : "Closed · click to open",
         );
         await closed.press("Enter");
-        const sheet = page.getByRole("dialog");
-        await expect(sheet).toContainText(`Open ${person.name} from`);
+        // Open closed time (U10): whose, which day, how long from here.
+        const sheet = page.getByRole("dialog", {
+            name: /^Open .+'s closed time$/,
+        });
+        await expect(sheet).toContainText(person.name);
+        await expect(sheet.getByText(/^How long, from /)).toBeVisible();
         await page.keyboard.press("Escape");
         await expect(sheet).toBeHidden();
     });

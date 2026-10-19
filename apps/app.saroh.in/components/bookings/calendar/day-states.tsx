@@ -254,7 +254,9 @@ export function ServiceHoursNote({ onAdd }: { onAdd?: () => void }) {
                             {" "}
                             <TextLink
                                 onClick={onAdd}
-                                className="font-semibold text-foreground underline"
+                                // A finger's 44px on a touch screen, as
+                                // every control on the calendar.
+                                className="font-semibold text-foreground underline coarse:min-h-11"
                             >
                                 Add who takes bookings
                             </TextLink>{" "}

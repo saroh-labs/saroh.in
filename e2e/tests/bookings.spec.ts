@@ -241,8 +241,10 @@ test.describe("bookings calendar", () => {
         await expect(
             sheet.getByRole("link", { name: "All bookings" }),
         ).toBeVisible();
+        // "Hours and time off" for Everyone, "Meera's hours and time off"
+        // for one person.
         await expect(
-            sheet.getByRole("link", { name: /hours and time off$/ }),
+            sheet.getByRole("link", { name: /hours and time off$/i }),
         ).toBeVisible();
         await expect(sheet.getByText("What the colours mean")).toBeVisible();
         await expect(
@@ -540,19 +542,31 @@ test.describe("bookings calendar", () => {
                     .filter({ visible: true })
                     .first()
                     .click({ position: { x: 40, y: 300 } });
-                const dialog = page.getByRole("dialog");
-                await expect(dialog).toContainText(`Open ${person.name} from`);
+                // Open closed time (U10): how long from the half hour
+                // pressed, just this day by default, one Open button.
+                const dialog = page.getByRole("dialog", {
+                    name: `Open ${person.name.split(" ")[0]}'s closed time`,
+                });
+                await expect(dialog).toBeVisible();
+                const lengths = dialog.getByRole("radiogroup", {
+                    name: /^How long, from /,
+                });
                 const at = /from (\d{1,2}:\d\d [ap]m)/.exec(
-                    (await dialog.getByRole("heading").first().innerText()) ||
+                    (await dialog.getByText(/^How long, from /).innerText()) ||
                         "",
                 )?.[1];
+                await lengths.getByRole("radio").first().click();
+                await expect(
+                    dialog.getByRole("radio", { name: /^Just / }),
+                ).toBeChecked();
                 const open = dialog.getByRole("button", {
-                    name: "Open time",
+                    name: /^Open \d{1,2}:\d\d/,
                 });
                 await expect(open).toBeEnabled();
                 await open.click();
+                await expect(dialog).toBeHidden();
                 await expect(
-                    page.getByText(/^Opened .* only\.$/).first(),
+                    page.getByText(/^Opened .* for /).first(),
                 ).toBeVisible();
 
                 // The new hours may join hours next to them: find the free gap
@@ -866,7 +880,10 @@ test.describe("New booking finds the customer (E4)", () => {
             await expect(row).toBeVisible();
             await row.click();
             await expect(
-                book.getByText("Step 2 of 5 · Service").first(),
+                book
+                    .getByText("Step 2 of 5 · Service")
+                    .filter({ visible: true })
+                    .first(),
             ).toBeVisible();
             // Nothing is written until Book: closing asks, and Discard drops it.
             await page.keyboard.press("Escape");
@@ -981,11 +998,26 @@ test.describe("availability and services", () => {
                     await expectNothingHiddenSideways(page);
                 }
 
-                // Leaving never asks: there is no draft to lose.
-                await page
-                    .getByRole("navigation", { name: "Breadcrumb" })
-                    .getByRole("link", { name: "Bookings" })
-                    .click();
+                // Leaving never asks: there is no draft to lose. The page
+                // header has no breadcrumb (U17), so leave by the menu: the
+                // rail at a desk, the More sheet's Bookings group on a phone.
+                if (test.info().project.name.startsWith("phone")) {
+                    await page
+                        .getByRole("navigation", { name: "Main" })
+                        .getByRole("button", { name: /^More/ })
+                        .click();
+                    await page
+                        .getByRole("dialog", { name: "Everything else" })
+                        .getByRole("group", { name: "Bookings", exact: true })
+                        .locator('a[href="/bookings"]')
+                        .click();
+                } else {
+                    await page
+                        .getByRole("navigation", { name: "Primary" })
+                        .locator('a[href="/bookings"]')
+                        .last()
+                        .click();
+                }
                 await expect(page).toHaveURL(/\/bookings(\?|$)/);
                 await expect(
                     page.getByRole("alertdialog", {
@@ -1087,9 +1119,22 @@ test.describe("availability and services", () => {
         const visits = page.getByRole("button", {
             name: /^Visits in a package/,
         });
-        await expect(visits).toBeEnabled();
+        // On a phone More details opens in the questions' place, and its
+        // card's Edit goes back to them.
+        const more = page.getByRole("button", { name: /^More details/ });
+        const inDetails = async (check: () => Promise<void>) => {
+            const phone = await more.isVisible();
+            if (phone) await more.click();
+            await check();
+            if (phone) {
+                await page
+                    .getByRole("button", { name: "Edit", exact: true })
+                    .click();
+            }
+        };
+        await inDetails(() => expect(visits).toBeEnabled());
         await page.getByRole("radio", { name: "A group class" }).click();
-        await expect(visits).toBeDisabled();
+        await inDetails(() => expect(visits).toBeDisabled());
         await page.getByLabel("What is it called?").fill("E2E class");
         await page.getByRole("textbox", { name: /^Price/ }).fill("0");
         const who = page.getByRole("group", { name: "Who does it?" });
@@ -1251,7 +1296,18 @@ test.describe("All bookings (U11)", () => {
             page.getByText(/Times in \w+, your business's time zone\./),
         ).toBeVisible();
 
-        // A view is kept in the address.
+        // A view is kept in the address. On a phone the chips scroll
+        // sideways and All is the last: swipe the strip to its end first,
+        // as a person would (the strip keeps Upcoming in view until then,
+        // and its "Swipe for more" line goes at the first scroll).
+        await page
+            .locator("[data-scroll-x]")
+            .filter({ has: views })
+            .evaluate((el) => {
+                el.dispatchEvent(new Event("touchstart"));
+                el.scrollLeft = el.scrollWidth;
+            });
+        await expect(page.locator("[data-scroll-x-hint]")).toHaveCount(0);
         await views.getByRole("radio", { name: /^All\s*\d+$/ }).click();
         await expect(page).toHaveURL(/view=all/);
 
@@ -1271,7 +1327,14 @@ test.describe("All bookings (U11)", () => {
         await expect(
             page.getByText("No bookings match “zzzz-nobody”"),
         ).toBeVisible();
-        await page.getByRole("button", { name: "Clear search" }).click();
+        // The toolbar's Clear search, and the empty panel's beside it.
+        await page
+            .getByRole("button", { name: "Clear search" })
+            .first()
+            .click();
+        await expect(
+            page.getByText("No bookings match “zzzz-nobody”"),
+        ).toBeHidden();
 
         if (test.info().project.name.startsWith("phone")) {
             await expectNothingHiddenSideways(page);

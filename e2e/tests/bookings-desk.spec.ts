@@ -119,7 +119,10 @@ test.describe("the desk's money and attendance (#1016)", () => {
 
             // What: this test's own service.
             await expect(
-                sheet.getByText("Step 2 of 5 · Service").first(),
+                sheet
+                    .getByText("Step 2 of 5 · Service")
+                    .filter({ visible: true })
+                    .first(),
             ).toBeVisible();
             await sheet
                 .getByRole("radiogroup", { name: "Service" })
@@ -128,8 +131,14 @@ test.describe("the desk's money and attendance (#1016)", () => {
             await next(sheet).click();
 
             // With, where it is asked: nobody takes it, so it isn't.
-            const when = sheet.getByText("Step 4 of 5 · Day and time").first();
-            const withWho = sheet.getByText(/^Step 3 of 5/).first();
+            const when = sheet
+                .getByText("Step 4 of 5 · Day and time")
+                .filter({ visible: true })
+                .first();
+            const withWho = sheet
+                .getByText(/^Step 3 of 5/)
+                .filter({ visible: true })
+                .first();
             await expect(when.or(withWho)).toBeVisible();
             if (await withWho.isVisible()) await next(sheet).click();
             await expect(when).toBeVisible();
@@ -152,7 +161,10 @@ test.describe("the desk's money and attendance (#1016)", () => {
 
             // Check and book: Paid now asks how, then UPI.
             await expect(
-                sheet.getByText("Step 5 of 5 · Check and book").first(),
+                sheet
+                    .getByText("Step 5 of 5 · Check and book")
+                    .filter({ visible: true })
+                    .first(),
             ).toBeVisible();
             await sheet.getByRole("radio", { name: /^Paid now/ }).click();
             await sheet

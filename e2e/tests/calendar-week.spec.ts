@@ -50,6 +50,9 @@ function crossingDay(): string {
 
 test.describe("calendar week", () => {
     test.beforeEach(async ({ page }) => {
+        // The columns are the desk's; a phone gets the strip (its own
+        // describe below), never #calendar-week.
+        await page.setViewportSize({ width: 1440, height: 900 });
         await signIn(page);
     });
 
@@ -159,6 +162,8 @@ test.describe("calendar week", () => {
 
 test.describe("calendar week, hour grid", () => {
     test.beforeEach(async ({ page }) => {
+        // The hour grid is the desk's; a phone gets the strip.
+        await page.setViewportSize({ width: 1440, height: 900 });
         await signIn(page, PULSE);
     });
 
@@ -185,7 +190,6 @@ test.describe("calendar week, hour grid", () => {
     test("each day's head offers Book, or says the day is closed", async ({
         page,
     }) => {
-        await page.setViewportSize({ width: 1440, height: 900 });
         await page.goto("/calendar?view=week");
         await expect(page.locator("[data-week-totals=desk]")).toHaveText(
             /^This week · |^Nothing/,
@@ -275,9 +279,11 @@ test.describe("calendar orders for the kitchen (E20)", () => {
         }
 
         await page.goto("/calendar");
-        // The month's What to show names the layers on (bookings U13).
+        // The month's What to show names the layers on (bookings U13). Rye
+        // has no team, so the label starts with the first layer, from a
+        // capital: "Orders, bookings and …".
         await expect(
-            page.getByRole("button", { name: /^What to show: .*orders/ }),
+            page.getByRole("button", { name: /^What to show: .*\borders\b/i }),
         ).toBeVisible();
         await expect(
             page.getByRole("group", { name: "This month's money" }),

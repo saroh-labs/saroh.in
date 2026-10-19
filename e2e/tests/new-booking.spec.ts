@@ -52,7 +52,10 @@ test.describe("New booking, step by step (U8)", () => {
             const sheet = page.getByRole("dialog", { name: "New booking" });
             await expect(sheet).toBeVisible();
             await expect(
-                sheet.getByText("Step 1 of 5 · Customer").first(),
+                sheet
+                    .getByText("Step 1 of 5 · Customer")
+                    .filter({ visible: true })
+                    .first(),
             ).toBeVisible();
 
             // Who: a caller by name and phone alone.
@@ -66,7 +69,10 @@ test.describe("New booking, step by step (U8)", () => {
 
             // What: this test's own service.
             await expect(
-                sheet.getByText("Step 2 of 5 · Service").first(),
+                sheet
+                    .getByText("Step 2 of 5 · Service")
+                    .filter({ visible: true })
+                    .first(),
             ).toBeVisible();
             await sheet
                 .getByRole("radiogroup", { name: "Service" })
@@ -79,8 +85,14 @@ test.describe("New booking, step by step (U8)", () => {
             await next(sheet).click();
 
             // With, where it is asked: nobody takes this service, so it isn't.
-            const when = sheet.getByText("Step 4 of 5 · Day and time").first();
-            const withWho = sheet.getByText(/^Step 3 of 5/).first();
+            const when = sheet
+                .getByText("Step 4 of 5 · Day and time")
+                .filter({ visible: true })
+                .first();
+            const withWho = sheet
+                .getByText(/^Step 3 of 5/)
+                .filter({ visible: true })
+                .first();
             await expect(when.or(withWho)).toBeVisible();
             if (await withWho.isVisible()) await next(sheet).click();
             await expect(when).toBeVisible();
@@ -103,7 +115,10 @@ test.describe("New booking, step by step (U8)", () => {
 
             // Check and book: Pays at the visit is picked (DEC-170).
             await expect(
-                sheet.getByText("Step 5 of 5 · Check and book").first(),
+                sheet
+                    .getByText("Step 5 of 5 · Check and book")
+                    .filter({ visible: true })
+                    .first(),
             ).toBeVisible();
             await expect(
                 sheet.getByRole("radio", { name: /Pays at the visit/ }),
@@ -156,7 +171,9 @@ test.describe("New booking, step by step (U8)", () => {
         await page.goto(`/bookings?date=${day}&new=1`);
         const sheet = page.getByRole("dialog", { name: "New booking" });
         await expect(sheet).toBeVisible();
-        await expect(sheet.getByText("Who is it for?").first()).toBeVisible();
+        await expect(
+            sheet.getByText("Who is it for?").filter({ visible: true }).first(),
+        ).toBeVisible();
         // Nothing chosen: Escape just closes, and a reload won't reopen it.
         await page.keyboard.press("Escape");
         await expect(sheet).toBeHidden();
@@ -171,7 +188,10 @@ test.describe("New booking, step by step (U8)", () => {
         // Someone picked from the recent customers: work to lose.
         await sheet.getByRole("list").getByRole("button").first().click();
         await expect(
-            sheet.getByText("Step 2 of 5 · Service").first(),
+            sheet
+                .getByText("Step 2 of 5 · Service")
+                .filter({ visible: true })
+                .first(),
         ).toBeVisible();
         await page.keyboard.press("Escape");
         const ask = page.getByRole("alertdialog", {

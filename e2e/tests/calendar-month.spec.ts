@@ -59,9 +59,11 @@ test.describe("calendar month on the desk", () => {
             (await first.locator("span.block").first().textContent()) ?? "";
         await first.click();
         await expect(first).toHaveAttribute("aria-checked", "false");
-        await expect(filter).not.toHaveText(new RegExp(name.toLowerCase()));
         await box.getByRole("button", { name: /^Show / }).click();
         await expect(box).toHaveCount(0);
+        // Read once it is shut: the open popover is modal, so the page
+        // behind it, the button too, is hidden from the accessibility tree.
+        await expect(filter).not.toHaveText(new RegExp(name.toLowerCase()));
     });
 
     test("the picked day sits beside the month with Book on this day", async ({
