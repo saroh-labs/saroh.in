@@ -572,21 +572,25 @@ organizations/:org/customers`: everyone who has paid (an order through a
   (`onboarding.completed`, `first.*.created`) are instrumented, but there is no
   usage history to cite yet. Nothing tracks a merchant's own customers, and
   nothing should.
-- **Current** (DEC-075) — **Insights answers questions about the takings
-  first**: twelve whole weeks (Monday to Sunday in the business's zone) of
-  money actually taken, written as sentences (`lib/analytics/takings-words.ts`)
-  from the same figures the bars draw (`takings-figures.ts`), then the
-  website's views. **Takings** are paid orders (net of refunds that have
+- **Current** (DEC-075, DEC-171) — **Insights answers questions about the
+  money first**: on the Money tab (#1093), money actually taken for the
+  page's period against the same length before, written as sentences
+  (`lib/insights/money-words.ts`) from the same figures the bars draw. The
+  weekly bars are **rolling weeks ending today** (`moneyBuckets`,
+  `modules/analytics/period.ts`), so a period's bars hold exactly its days
+  and add up to its money in; never a calendar week straddling the period's
+  first day. **Takings** are paid orders (net of refunds that have
   not failed, an edit's money back not taken twice, a REFUNDED order not at
   all) plus paid invoices that are not an order's own (net of their credit
   notes) — ADR-008's each-rupee-once and Customers' Spent rule
   (`analytics/takings.ts`, `takings.sql.ts` reuses `spent.sql.ts`). A sale
-  falls in the week it was paid, and a refund lowers that week. Where it was
+  falls on the day it was paid, and a refund lowers that day. Where it was
   sold is the Orders list's notion: `placedOnline` is online, otherwise the
   order's location; other invoices are "by invoice". Every figure states its
-  window; a change needs the four weeks before to be on record with three
-  payments, else it says why ("N/A"); a change of 2% or less is "about the
-  same" (Comparisons, below). The read needs
+  window; a change needs the period before to be on record with three
+  payments, else it says why; a change of 2% or less is "about the same"
+  (Comparisons, below). The read (`GET analytics/money`; the old
+  `analytics/takings` is retired) needs
   `analytics:read` and `payment:read`, and answers before Insights' setup
   is done (`@IgnoreModuleReadiness`).
 - **Current** — Insights' website figures reflect real events. The hourly
@@ -712,8 +716,9 @@ empty states, and every sentence a `lib/` function returns):
 
 **Current** (DEC-171, Home and Insights plan U4, #1081) — how Home and
 Insights say one figure against another. Every comparison sentence comes
-from `apps/app.saroh.in/lib/insights/compare-words.ts`; Insights' takings
-answers (`lib/analytics/takings-words.ts`) follow the same rules.
+from `apps/app.saroh.in/lib/insights/compare-words.ts`; Insights' Money
+answers (`lib/insights/money-words.ts`, `overview-words.ts`) follow the same
+rules.
 
 - **The last 7 days against the 7 days before**, never a week that just
   started against a whole one. Insights' longer periods say theirs: "the

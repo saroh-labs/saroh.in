@@ -8,7 +8,7 @@ import type {
 } from "@/lib/insights/reads";
 
 import type { AnalyticsAggregateRow } from "./summary";
-import type { SourceRead, TakingsRead } from "./takings";
+import type { SourceRead } from "./takings";
 
 /**
  * Analytics dashboard data access for app.saroh.in (S7-003). Backed by the
@@ -59,16 +59,6 @@ async function readSource<T>(path: string): Promise<SourceRead<T>> {
         // The API could not be reached: this source failed, not the page.
         return { status: "failed" };
     }
-}
-
-/**
- * Twelve whole weeks of takings for the active organization (DEC-075),
- * read by the Insights page beside the website's figures.
- */
-export async function readTakings(): Promise<SourceRead<TakingsRead> | null> {
-    const orgId = await getActiveOrgId();
-    if (!orgId) return null;
-    return readSource<TakingsRead>(`/organizations/${orgId}/analytics/takings`);
 }
 
 /**

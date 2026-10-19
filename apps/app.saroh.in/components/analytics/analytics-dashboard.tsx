@@ -7,7 +7,6 @@ import type {
     DailyPoint,
     TopPage,
 } from "@/lib/analytics/service";
-import { ordersHref } from "@/lib/analytics/takings-words";
 import {
     dayReadout,
     dayTick,
@@ -15,6 +14,7 @@ import {
     pageTitle,
     tickEvery,
 } from "@/lib/analytics/website-words";
+import { ordersHref } from "@/lib/insights/links";
 import { EmptyState } from "@saroh/ui/data-state";
 
 import type { ReadoutBar } from "./readout-bars";

@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import { DateTime } from "luxon";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { businessTimezone } from "../bookings/staff-availability";
@@ -9,8 +10,8 @@ import { businessCurrency } from "../stores/currency";
 import type { MoneyRead, UsualOrderRow } from "./money";
 import {
     bestWeek,
+    foldBuckets,
     foldPeriod,
-    markWeeks,
     moneyDays,
     moneyIn,
     moneyPlaces,
@@ -19,15 +20,13 @@ import {
 } from "./money";
 import { readOwedByAge } from "./owed-by-age";
 import type { InsightsPeriod } from "./period";
-import { daysBetween, periodWindows } from "./period";
-import type { TakingsDayRow, TakingsPlace, TakingsRead } from "./takings";
+import { daysBetween, moneyBuckets, periodWindows } from "./period";
+import type { TakingsDayRow } from "./takings";
 import {
     foldSoFar,
-    foldTakings,
     pickCurrency,
     placeKind,
     placeStoreId,
-    takingsWeeks,
     todayIn,
     weekInProgress,
 } from "./takings";
@@ -46,10 +45,11 @@ function namer(stores: readonly { id: string; name: string }[]) {
 }
 
 /**
- * Insights' takings read (DEC-075): twelve whole weeks of money taken, and
- * the week in progress so far, for the active organization only. The rule is in `takings.ts`; the words the
- * page says are the app's (`lib/analytics/takings-words.ts`), written from
- * these numbers alone.
+ * Insights' Money read (DEC-171): money taken, by the takings rule in
+ * `takings.ts` (DEC-075), for one period against the one before. The words
+ * the page says are the app's (`lib/insights/*-words.ts`), written from
+ * these numbers alone. The old twelve-week `GET analytics/takings` is
+ * retired: Money (U12, #1093) reads this.
  *
  * Who may read it: Insights' own `analytics:read`, and `payment:read`,
  * since these are the business's takings — the same read Home's "Takings
@@ -58,70 +58,11 @@ function namer(stores: readonly { id: string; name: string }[]) {
  */
 @Injectable()
 export class TakingsService {
-    async read(
-        ctx: OrganizationContext,
-        now: Date = new Date(),
-    ): Promise<TakingsRead> {
-        authorize(ctx, "analytics:read");
-        authorize(ctx, "payment:read");
-        const organizationId = ctx.organizationId;
-
-        const zone = await businessTimezone(prisma, organizationId);
-        const windows = takingsWeeks(now, zone);
-        const from = windows[0].start;
-        // Through now: the twelve whole weeks and the one in progress.
-        const to = now;
-
-        const [rows, first, businessMoney, stores] = await Promise.all([
-            prisma.$queryRaw<TakingsDayRow[]>(
-                takingsByDaySql(organizationId, zone, from, to),
-            ),
-            prisma.$queryRaw<{ day: string | null }[]>(
-                firstSaleSql(organizationId, zone),
-            ),
-            businessCurrency(prisma, organizationId),
-            prisma.store.findMany({
-                where: { organizationId },
-                select: { id: true, name: true, deletedAt: true },
-            }),
-        ]);
-
-        const { currency, others } = pickCurrency(businessMoney, rows);
-        const weeks = foldTakings(windows, rows, currency);
-        const thisWeekStart = weekInProgress(now, zone);
-        const thisWeek = foldSoFar(
-            rows,
-            currency,
-            thisWeekStart,
-            todayIn(now, zone),
-        );
-
-        const named = namer(stores);
-        const keys = new Set(
-            weeks.flatMap((week) => week.places.map((p) => p.key)),
-        );
-        const places: TakingsPlace[] = [...keys]
-            .sort()
-            .map((key) => ({ key, ...named(key) }));
-
-        return {
-            zone,
-            currency,
-            otherCurrencies: others,
-            firstSaleOn: first[0]?.day ?? null,
-            thisWeekStart,
-            thisWeek,
-            locations: stores.filter((s) => s.deletedAt === null).length,
-            places,
-            weeks,
-        };
-    }
-
     /**
      * Insights' Money for one period (DEC-171, `money.ts`): money in against
-     * the same number of days before, the usual order, the twelve weekly
-     * bars marked by window, this week and today so far, where the money
-     * came from, and who owes by how late. The same reads as `read`:
+     * the same number of days before, the usual order, the rolling weekly
+     * bars ending today (`moneyBuckets`), this week and today so far, where the money
+     * came from, and who owes by how late. It needs
      * `analytics:read` and `payment:read`. Owed needs `invoice:read` too,
      * as Home's does; without it `owed` is null.
      */
@@ -136,9 +77,12 @@ export class TakingsService {
 
         const zone = await businessTimezone(prisma, organizationId);
         const w = periodWindows(period, now, zone);
-        const windows = takingsWeeks(now, zone);
-        const from =
-            windows[0].start < w.beforeFrom ? windows[0].start : w.beforeFrom;
+        const buckets = moneyBuckets(w);
+        // The oldest bar's first day, or the period before's, if earlier.
+        const oldest = DateTime.fromISO(buckets[0].startDate, {
+            zone,
+        }).toJSDate();
+        const from = oldest < w.beforeFrom ? oldest : w.beforeFrom;
         const day = moneyTodayWindows(now, zone);
         const clock = { now, zone };
 
@@ -193,7 +137,7 @@ export class TakingsService {
         const thin = startedOn > w.beforeFromDate;
 
         const fold = foldPeriod(rows, currency, w);
-        const weeks = foldTakings(windows, rows, currency);
+        const weeks = foldBuckets(buckets, rows, currency, zone);
         return {
             period,
             zone,
@@ -214,7 +158,7 @@ export class TakingsService {
             moneyIn: moneyIn(fold, thin),
             usualOrder: usualOrder(usual, currency),
             bestWeek: bestWeek(weeks),
-            weeks: markWeeks(weeks, w),
+            weeks,
             days: moneyDays(rows, currency, w),
             thisWeek: foldSoFar(
                 rows,

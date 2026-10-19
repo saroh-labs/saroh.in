@@ -3,8 +3,8 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { forbidden } from "next/navigation";
 
 import { AnalyticsDashboard } from "@/components/analytics/analytics-dashboard";
-import { TakingsSection } from "@/components/analytics/takings-section";
 import { InsightsTabs } from "@/components/insights/insights-tabs";
+import { MoneyTab } from "@/components/insights/money-tab";
 import {
     HowCounted,
     Overview,
@@ -21,7 +21,6 @@ import {
     readMoney,
     readSells,
     readSuggestions,
-    readTakings,
     readTraffic,
     summarizeAnalytics,
 } from "@/lib/analytics/service";
@@ -39,6 +38,7 @@ import {
     periodWindow,
     readAddress,
 } from "@/lib/insights/period";
+import { permits } from "@/lib/organizations/permits";
 import { activeOrganizationOnce } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { ORDERS_FIRST_RUN, shareLink } from "@/lib/sites/share-links";
@@ -64,10 +64,11 @@ export const metadata = { title: "Insights" };
  * page (`forbidden()`, the shell's denied page); a role with Insights and
  * without payments sees counts and is told who can show them money.
  *
- * Until their own units land, Money is today's takings (U12, #1093), What
- * sells is the Overview's answer at full width (U13, #1095) and Where
- * customers come from is today's website figures for the chosen period
- * (U14, #1097): nothing that Insights showed before is out of reach.
+ * Money reads the period (U12, #1093, `money-tab.tsx`). Until their own
+ * units land, What sells is the Overview's answer at full width (U13,
+ * #1095) and Where customers come from is today's website figures for the
+ * chosen period (U14, #1097): nothing that Insights showed before is out
+ * of reach.
  */
 export default async function AnalyticsPage({
     searchParams,
@@ -99,7 +100,9 @@ export default async function AnalyticsPage({
         line: periodChoiceLine(period, periodWindow(period, today)),
     }));
 
-    const body = tabBody(address, window);
+    const body = tabBody(address, window, {
+        canRemind: permits(organization, "invoice:write"),
+    });
 
     return (
         <PageContainer width="full">
@@ -141,10 +144,14 @@ export default async function AnalyticsPage({
 }
 
 /** The open tab, read for the period. */
-function tabBody(address: InsightsAddress, window: PeriodWindow) {
+function tabBody(
+    address: InsightsAddress,
+    window: PeriodWindow,
+    can: { canRemind: boolean },
+) {
     switch (address.tab) {
         case "money":
-            return <MoneyTab />;
+            return <MoneyPart address={address} canRemind={can.canRemind} />;
         case "sells":
             return <SellsTab address={address} />;
         case "from":
@@ -213,13 +220,21 @@ async function OverviewTab({
     );
 }
 
-/** Money: today's takings until the Money tab (U12) reads the period. */
-async function MoneyTab() {
-    const takings = await readTakings();
+/** Money for the period (U12, #1093). */
+async function MoneyPart({
+    address,
+    canRemind,
+}: {
+    address: InsightsAddress;
+    canRemind: boolean;
+}) {
+    const money = await readMoney(address.period);
     return (
-        <div className="flex flex-col gap-5">
-            {takings ? <TakingsSection read={takings} /> : null}
-        </div>
+        <MoneyTab
+            money={money}
+            retryHref={insightsHref(address)}
+            canRemind={canRemind}
+        />
     );
 }
 

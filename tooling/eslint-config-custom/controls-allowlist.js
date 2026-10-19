@@ -148,6 +148,10 @@ export const RAW_ALLOWED = {
     "components/home/phone/setup-sheet.tsx": ["button"],
     // button: Insights' period on a phone, the board's 40px white button
     // with the period's name that opens its sheet (DEC-171, IBPeriodP)
+    // button: a week's bar of Money's chart, pressed to read and open it (U12)
+    "components/insights/money-chart.tsx": ["button"],
+    // button: an age of "Who owes me?", a row that is one button (U12)
+    "components/insights/owed-by-age.tsx": ["button"],
     "components/insights/period-control.tsx": ["button"],
     // button: a control styled by its screen's own helper
     "components/invoices/invoice-form.tsx": ["button"],

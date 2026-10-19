@@ -32,7 +32,6 @@ import { SellsService } from "./sells.service";
 import type { SuggestionsRead } from "./suggestions";
 import type { NotNowResult } from "./suggestions.service";
 import { SuggestionsService } from "./suggestions.service";
-import type { TakingsRead } from "./takings";
 import { TakingsService } from "./takings.service";
 
 /**
@@ -98,16 +97,6 @@ export class AnalyticsController {
         private readonly sells: SellsService,
         private readonly suggestions: SuggestionsService,
     ) {}
-
-    /**
-     * Twelve whole weeks of takings (DEC-075, `takings.ts`): money taken,
-     * where it was sold and the orders, per week in the business's zone.
-     * Needs `payment:read` beside `analytics:read`.
-     */
-    @Get("takings")
-    getTakings(@OrgContext() ctx: OrganizationContext): Promise<TakingsRead> {
-        return this.takings.read(ctx);
-    }
 
     /**
      * Insights' Money for one period (DEC-171, `money.ts`): money in against

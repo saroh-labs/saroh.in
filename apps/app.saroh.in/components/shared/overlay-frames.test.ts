@@ -57,6 +57,8 @@ const NOT_FORMS: Record<string, string> = {
     "components/commerce/product-page/variant-drawer.tsx":
         "a read-only quick look",
     "components/calendar/day-sheet.tsx": "a read-only list of a day",
+    "components/insights/week-sheet.tsx":
+        "a read-only quick look of a week's orders, opening the list",
     // Hours and time off's sheets (U17, DEC-170): what they hold saves as
     // it is changed, with Undo, so there is no Save or Cancel, only Done.
     "components/bookings/availability/hours-panel.tsx":

@@ -5350,3 +5350,23 @@ rule stands for the profile's own fields.
 - **Cause:** (1) #846's lost click again. In both traces the press landed on the server-drawn button before the page's own client components had hydrated: the shell's links prefetched before the click, the page's own (`/bookings/all`, `/calendar?month=…`) only after it. On a slow runner, a page's own content can hydrate well after the shell. (2) The refund spec read the first showcase business, by name, with an upcoming booking paid online. That day it was CarePoint Clinic, where the demo user is a Member (front desk), not the owner whose refund choice the spec reads.
 - **Fix:** `e2e/fixtures/press.ts` `pressUntil(button, answer)` presses until a Locator shows or a check holds, and never presses again once it has (a toggle or a late sheet isn't pressed shut). Both specs use it for every first press after a load: More, New booking, Came, What to show, a day. The refund spec reads only businesses where the demo user holds `payment:manage` and `booking:write`. `calendar-month.spec.ts`'s sideways check polls, and measures against the width set, not `innerWidth`.
 - **Rule:** the first press on a page after `goto` or `reload` goes through `pressUntil` (`saroh-browser-tests` → Waiting). A spec that reads a showcase business it doesn't name picks it by what the session may do there, never by list order. No lint catches a bare first click, because a click after an awaited state change is fine. The older specs' inline `toPass` loops do the same job; new code uses the helper.
+
+### Insights drew money from before the period as the period (20 Oct 2026)
+
+**Symptom**: Northwind, Insights › Overview, Last 4 weeks (22 Sep to 19 Oct):
+the sentence said "₹5,48,284 came in over the last 4 weeks", and the chart's
+"Last 4 weeks" bar for the week of 21 Sep read ₹8.3L, more than the whole
+period.
+**Cause**: the twelve bars were calendar weeks (Monday to Sunday), each marked
+PERIOD when four of its days fell inside the window. The 21 Sep week held one
+day from before the period and all of its money was drawn as "now"; the dark
+bars never added up to the sentence.
+**Fix**: the bars are rolling weeks ending today (`moneyBuckets`,
+`apps/api.saroh.in/src/modules/analytics/period.ts`): each window's bars hold
+exactly its days (a 3-month window's oldest bar holds the days over whole
+weeks, and is never "best week"), so the PERIOD bars add up to money in and
+the BEFORE bars to the period before.
+**Rule**: a picture of a window is cut on that window's own days.
+`money.db.spec.ts` asserts the PERIOD and BEFORE bars sum to `moneyIn` for
+7 days, 4 weeks and 3 months, and that the day before the period sits in a
+BEFORE bar; `period.spec.ts` checks the bars cover each window exactly.

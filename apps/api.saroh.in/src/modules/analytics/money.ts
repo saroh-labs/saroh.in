@@ -4,14 +4,15 @@ import { toMinor } from "../../common/money";
 import type { HomeWeekChange } from "../home/home-need-model";
 import { compareTakings } from "../home/home-week";
 import type { OwedByAge } from "./owed-by-age";
-import type { InsightsPeriod, PeriodWindows } from "./period";
-import { dayIn, weekIn } from "./period";
+import type { InsightsPeriod, MoneyBucket, PeriodWindows } from "./period";
+import { dayIn } from "./period";
 import type {
     PlaceKind,
     TakingsDayRow,
     TakingsSoFar,
     TakingsWeek,
 } from "./takings";
+import { foldTakings } from "./takings";
 
 /**
  * Insights' Money (DEC-171, `GET analytics/money?period=`): the overview's
@@ -69,10 +70,15 @@ export interface MoneyPlace {
     change: HomeWeekChange;
 }
 
-/** One of the twelve weekly bars, and which window it mostly falls in. */
+/**
+ * One of the weekly bars: a rolling run of days ending on today's weekday
+ * (`period.ts` `moneyBuckets`), and the window it is wholly inside.
+ */
 export interface MoneyWeek extends TakingsWeek {
     /** PERIOD (drawn dark), BEFORE (light) or neither. */
     in: "PERIOD" | "BEFORE" | null;
+    /** 7, or the leftover days of a 3-month window's oldest bar. */
+    days: number;
 }
 
 /** Today so far, against the same weekday last week to the same time. */
@@ -120,9 +126,14 @@ export interface MoneyRead {
     firstSaleOn: string | null;
     moneyIn: MoneyIn;
     usualOrder: MoneyUsualOrder;
-    /** The best of the twelve weeks; null when none took anything. */
+    /** The best seven-day bar; null when none took anything. */
     bestWeek: { start: string; end: string; takingsMinor: number } | null;
-    /** Twelve whole weeks, oldest first, each marked by window. */
+    /**
+     * The weekly bars, oldest first: rolling weeks ending today, so the
+     * PERIOD bars add up to `moneyIn.amountMinor` exactly and the BEFORE
+     * bars to `moneyIn.beforeMinor`. Twelve for 7 days and 4 weeks; the two
+     * windows' (about 26) for 3 months.
+     */
     weeks: MoneyWeek[];
     /**
      * Each day of the period, oldest first, a day with nothing at zero:
@@ -278,18 +289,48 @@ export function moneyDays(
     return [...byDay.values()];
 }
 
-/** The twelve weeks, each marked by the window it mostly falls in. */
-export function markWeeks(
-    weeks: readonly TakingsWeek[],
-    w: PeriodWindows,
+/**
+ * The bars, folded from the day rows in `currency` only: each bar's money,
+ * orders, payments and places, a bar with nothing at zero.
+ */
+export function foldBuckets(
+    buckets: readonly MoneyBucket[],
+    rows: readonly TakingsDayRow[],
+    currency: string | null,
+    zone: string,
 ): MoneyWeek[] {
-    return weeks.map((week) => ({ ...week, in: weekIn(w, week.start) }));
+    const at = (date: string) =>
+        DateTime.fromISO(date, { zone }).startOf("day").toJSDate();
+    const weeks = foldTakings(
+        buckets.map((b) => ({
+            start: at(b.startDate),
+            end: DateTime.fromISO(b.endDate, { zone })
+                .plus({ days: 1 })
+                .startOf("day")
+                .toJSDate(),
+            startDate: b.startDate,
+            endDate: b.endDate,
+        })),
+        rows,
+        currency,
+    );
+    return weeks.map((week, i) => ({
+        ...week,
+        in: buckets[i].in,
+        days: buckets[i].days,
+    }));
 }
 
-/** The week that took most; the earlier on a tie; null when none took any. */
-export function bestWeek(weeks: readonly TakingsWeek[]): MoneyRead["bestWeek"] {
+/**
+ * The seven-day bar that took most; the earlier on a tie; null when none
+ * took any. A 3-month window's longer or shorter oldest bar is never "best".
+ */
+export function bestWeek(
+    weeks: readonly (TakingsWeek & { days?: number })[],
+): MoneyRead["bestWeek"] {
     let best: TakingsWeek | null = null;
     for (const week of weeks) {
+        if (week.days !== undefined && week.days !== 7) continue;
         if (
             week.takingsMinor > 0 &&
             (!best || week.takingsMinor > best.takingsMinor)

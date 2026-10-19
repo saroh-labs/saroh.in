@@ -346,11 +346,11 @@ describe("Insights money (DB)", () => {
             ...Array(4).fill("BEFORE"),
             ...Array(4).fill("PERIOD"),
         ]);
-        // 12 – 18 Oct: 400 + 999 + 1000.
+        // Rolling weeks ending today: 13 – 19 Oct took 1000 + 3000 by bill.
         expect(read.bestWeek).toEqual({
-            start: "2026-10-12",
-            end: "2026-10-18",
-            takingsMinor: 239_900,
+            start: "2026-10-13",
+            end: "2026-10-19",
+            takingsMinor: 400_000,
         });
         expect(read.thisWeek).toMatchObject({
             start: "2026-10-19",
@@ -364,6 +364,40 @@ describe("Insights money (DB)", () => {
             payments: 1,
             sameWeekdayLastWeekMinor: 40_000,
             sameWeekdayLastWeekPayments: 1,
+        });
+    });
+
+    it("draws bars whose period adds up to money in, never a day from before it", async () => {
+        for (const period of ["7d", "4w", "3m"] as const) {
+            const read = await service.money(ctx(loom.id), period, NOW);
+            const sum = (window: "PERIOD" | "BEFORE") =>
+                read.weeks
+                    .filter((w) => w.in === window)
+                    .reduce((total, w) => total + w.takingsMinor, 0);
+            expect(sum("PERIOD")).toBe(read.moneyIn.amountMinor);
+            expect(sum("BEFORE")).toBe(read.moneyIn.beforeMinor);
+            const now = read.weeks.filter((w) => w.in === "PERIOD");
+            expect(now[0].start).toBe(read.window.from);
+            expect(now.at(-1)?.end).toBe(read.window.to);
+            expect(now.reduce((days, w) => days + w.days, 0)).toBe(
+                read.window.days,
+            );
+        }
+        // The ₹1,500 paid at 23:30 on 21 Sep, the day before the 4 weeks,
+        // is in the 4 before's last bar, not drawn as the last 4 weeks.
+        const read = await service.money(ctx(loom.id), "4w", NOW);
+        expect(read.weeks[7]).toMatchObject({
+            start: "2026-09-15",
+            end: "2026-09-21",
+            takingsMinor: 150_000,
+            in: "BEFORE",
+        });
+        expect(read.weeks[8]).toMatchObject({
+            start: "2026-09-22",
+            end: "2026-09-28",
+            // (500 − 200) on 22 Sep.
+            takingsMinor: 30_000,
+            in: "PERIOD",
         });
     });
 

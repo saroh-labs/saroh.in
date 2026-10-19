@@ -14,10 +14,11 @@ import { DateTime } from "luxon";
  * and the period before it is the same number of days, so the two are
  * always the same length even across months of 30 and 31 days.
  *
- * The twelve weekly bars stay whole Monday-to-Sunday weeks (they are a
- * picture, not a comparison); `weekIn` says which of them the period and
- * the one before mostly cover, so the screen can draw "now" dark and
- * "before" light.
+ * The weekly bars are rolling too (`moneyBuckets`): seven days at a time
+ * back from today, so the period's bars hold exactly the period's days and
+ * add up to its money in, and the period before's likewise. A calendar
+ * week straddling the period's first day would draw money from before it
+ * as "now" (Northwind, 19 Oct).
  */
 
 export const INSIGHTS_PERIODS = ["7d", "4w", "3m"] as const;
@@ -106,31 +107,6 @@ export function dayIn(
     return null;
 }
 
-/**
- * Which window a whole week (Monday `start`) mostly falls in: four of its
- * seven days or more. A week split three and four goes with the four; a
- * week mostly outside both is neither.
- */
-export function weekIn(
-    w: Pick<
-        PeriodWindows,
-        "fromDate" | "toDate" | "beforeFromDate" | "beforeToDate"
-    >,
-    start: string,
-): "PERIOD" | "BEFORE" | null {
-    let period = 0;
-    let before = 0;
-    const monday = DateTime.fromISO(start, { zone: "utc" });
-    for (let i = 0; i < 7; i += 1) {
-        const at = dayIn(w, monday.plus({ days: i }).toISODate() ?? "");
-        if (at === "PERIOD") period += 1;
-        else if (at === "BEFORE") before += 1;
-    }
-    if (period >= 4) return "PERIOD";
-    if (before >= 4) return "BEFORE";
-    return null;
-}
-
 /** Whole days from `from` to `to` (both `YYYY-MM-DD`), by the calendar. */
 export function daysBetween(from: string, to: string): number {
     return Math.round(
@@ -139,4 +115,77 @@ export function daysBetween(from: string, to: string): number {
             "days",
         ).days,
     );
+}
+
+/** One bar of Money's chart: a run of days, and the window it is part of. */
+export interface MoneyBucket {
+    /** Its first and last days, `2026-10-13` to `2026-10-19`. */
+    startDate: string;
+    endDate: string;
+    /** 7, but the oldest bar of a 3-month window holds what's left over. */
+    days: number;
+    in: "PERIOD" | "BEFORE" | null;
+}
+
+/** The fewest bars Money's chart draws. */
+export const MONEY_BARS = 12;
+
+function utcDay(date: string): DateTime {
+    return DateTime.fromISO(date, { zone: "utc" });
+}
+
+/**
+ * `count` bars ending on `last`, oldest first, covering `days` days
+ * exactly: every bar is seven days but the oldest, which holds the rest.
+ */
+function barsEnding(
+    last: string,
+    days: number,
+    count: number,
+    window: MoneyBucket["in"],
+): MoneyBucket[] {
+    const out: MoneyBucket[] = [];
+    let end = utcDay(last);
+    for (let i = 0; i < count; i += 1) {
+        const length = i === count - 1 ? days - 7 * (count - 1) : 7;
+        const start = end.minus({ days: length - 1 });
+        out.unshift({
+            startDate: start.toISODate() ?? "",
+            endDate: end.toISODate() ?? "",
+            days: length,
+            in: window,
+        });
+        end = start.minus({ days: 1 });
+    }
+    return out;
+}
+
+/**
+ * Money's weekly bars (DEC-171), oldest first: rolling weeks ending today,
+ * the period's bars covering exactly its days, then the period before's
+ * covering exactly its days, then earlier whole weeks until there are
+ * {@link MONEY_BARS}. 7 days is one bar against one; 4 weeks four against
+ * four; 3 months about thirteen against thirteen, the oldest of each
+ * holding the days over whole weeks (89 to 92 days: 5 to 8 days).
+ */
+export function moneyBuckets(
+    w: Pick<
+        PeriodWindows,
+        "days" | "fromDate" | "toDate" | "beforeFromDate" | "beforeToDate"
+    >,
+): MoneyBucket[] {
+    const perWindow = Math.max(1, Math.round(w.days / 7));
+    const period = barsEnding(w.toDate, w.days, perWindow, "PERIOD");
+    const before = barsEnding(w.beforeToDate, w.days, perWindow, "BEFORE");
+    const earlierCount = Math.max(0, MONEY_BARS - 2 * perWindow);
+    const earlier =
+        earlierCount > 0
+            ? barsEnding(
+                  utcDay(w.beforeFromDate).minus({ days: 1 }).toISODate() ?? "",
+                  7 * earlierCount,
+                  earlierCount,
+                  null,
+              )
+            : [];
+    return [...earlier, ...before, ...period];
 }

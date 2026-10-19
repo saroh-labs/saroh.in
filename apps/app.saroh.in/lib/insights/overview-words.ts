@@ -1,4 +1,3 @@
-import { ordersHref } from "@/lib/analytics/takings-words";
 import { ORDERS_RECORDED_FROM } from "@/lib/analytics/website-words";
 import { formatDay } from "@/lib/format/datetime";
 import {
@@ -8,12 +7,14 @@ import {
     moneySign,
 } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import { ordersHref } from "@/lib/insights/links";
 
 import type { AnalyticsSummary } from "@/lib/analytics/summary";
 
 import {
     ABOUT_SAME_PERCENT,
     capitalise,
+    daysLabel,
     lastPeriod,
     TIMES_FROM_PERCENT,
 } from "./compare-words";
@@ -70,7 +71,14 @@ export interface Answer {
  * too young for the period before says what came in and when comparing
  * starts (`IBThinD`).
  */
-export function moneyAnswer(read: MoneyRead): Answer {
+export function moneyAnswer(
+    read: MoneyRead,
+    /**
+     * The Money tab leaves the percentage to its Money in figure, which
+     * says it right under the sentence (`IBMoneyD`).
+     */
+    { percent = true }: { percent?: boolean } = {},
+): Answer {
     const { amountMinor: now, beforeMinor: before, change } = read.moneyIn;
     const cur = read.currency;
     const last = lastPeriod(read.period);
@@ -126,13 +134,13 @@ export function moneyAnswer(read: MoneyRead): Answer {
                 : `up ${change.percent}%`;
         return {
             lead: "Yes.",
-            text: `${took}, ${rupees(now - before, cur)} more than ${was} (${how}).`,
+            text: `${took}, ${rupees(now - before, cur)} more than ${was}${percent ? ` (${how})` : ""}.`,
         };
     }
     // Something came in, so it is never all gone.
     return {
         lead: "No.",
-        text: `${took}, ${rupees(before - now, cur)} less than ${was} (down ${Math.min(change.percent, 99)}%).`,
+        text: `${took}, ${rupees(before - now, cur)} less than ${was}${percent ? ` (down ${Math.min(change.percent, 99)}%)` : ""}.`,
     };
 }
 
@@ -191,6 +199,23 @@ function scaleOf(values: readonly number[]): number {
 const height = (minor: number, top: number) =>
     top > 0 ? Math.max(0, Math.min(100, (minor / top) * 100)) : 0;
 
+/**
+ * A weekly bar's name: "Week of 13 Oct" for seven days ending on today's
+ * weekday; the days themselves, "20 to 27 Jul", for a 3-month window's
+ * first bar, which holds the days over whole weeks.
+ */
+export function barName(w: Pick<MoneyWeekRead, "start" | "end" | "days">) {
+    return w.days !== undefined && w.days !== 7
+        ? daysLabel(w.start, w.end)
+        : `Week of ${formatDay(w.start, { year: "never" })}`;
+}
+
+/** Four dates under a row of `n` bars: the first, two between, the last. */
+export function tickIndexes(n: number): Set<number> {
+    if (n <= 0) return new Set();
+    return new Set([0, Math.round(n / 3), Math.round((2 * n) / 3), n - 1]);
+}
+
 /** The weeks a young business has had, oldest first (`IBThinD`). */
 export function weeksSoFar(read: MoneyRead): MoneyWeekRead[] {
     return read.weeks.filter((w) => w.end >= read.startedOn);
@@ -225,16 +250,26 @@ export function moneyChart(read: MoneyRead): MoneyChart {
             legend: [],
         };
     }
+    return weeksChart(read);
+}
+
+/**
+ * The weekly bars (`IBOverviewD`, `IBMoneyD`): the period dark, the one
+ * before light, earlier faint, the best week in Clay with its amount over
+ * it. The Money tab draws these whatever the period.
+ */
+export function weeksChart(read: MoneyRead): MoneyChart {
+    const cur = read.currency;
     const weeks = read.weeks;
     const top = scaleOf(weeks.map((w) => w.takingsMinor));
     const best = read.bestWeek?.start ?? null;
-    const ticks = new Set([0, 4, 8, weeks.length - 1]);
+    const ticks = tickIndexes(weeks.length);
     const bars: MoneyBar[] = weeks.map((w, i) => ({
         key: w.start,
         heightPercent: height(w.takingsMinor, top),
         tone: w.in === "PERIOD" ? "now" : w.in === "BEFORE" ? "before" : "old",
         best: w.start === best,
-        label: `Week of ${formatDay(w.start, { year: "never" })}, ${w.takingsMinor > 0 ? rupees(w.takingsMinor, cur) : "nothing"}`,
+        label: `${barName(w)}, ${w.takingsMinor > 0 ? rupees(w.takingsMinor, cur) : "nothing"}`,
         short: gridMoney(w.takingsMinor, cur),
         tick: ticks.has(i) ? formatDay(w.start, { year: "never" }) : null,
     }));
@@ -408,6 +443,7 @@ export function sourceLine(read: MoneyRead): string {
 export const HOW_INSIGHTS_ARE_COUNTED: readonly string[] = [
     "Money in is money actually taken: paid orders, and paid invoices that aren't an order's own, less refunds and credit notes. Each rupee is counted once.",
     "A period ends today in your business's time zone, and is compared with as many days just before it.",
+    "The weekly bars are seven days at a time, back from today, so a period's bars add up to its money in.",
     "What sells counts what was paid for, and bookings that weren't cancelled.",
     "Your website's visits, enquiries and online orders are updated every hour.",
 ];

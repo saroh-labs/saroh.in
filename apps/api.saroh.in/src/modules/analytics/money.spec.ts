@@ -5,15 +5,15 @@
  */
 import {
     bestWeek,
+    foldBuckets,
     foldPeriod,
-    markWeeks,
     moneyDays,
     moneyIn,
     moneyPlaces,
     moneyToday,
     usualOrder,
 } from "./money";
-import { periodWindows } from "./period";
+import { moneyBuckets, periodWindows } from "./period";
 import type { TakingsDayRow, TakingsWeek } from "./takings";
 import {
     INVOICES_PLACE,
@@ -127,7 +127,7 @@ describe("Insights money folds", () => {
         expect(moneyPlaces(quiet, named, false)).toEqual([]);
     });
 
-    it("marks the weeks and finds the best, the earlier on a tie", () => {
+    it("finds the best week, the earlier on a tie, never an odd-length bar", () => {
         const week = (
             start: string,
             end: string,
@@ -146,17 +146,47 @@ describe("Insights money folds", () => {
             week("2026-10-05", "2026-10-11", 9_000),
             week("2026-10-12", "2026-10-18", 9_000),
         ];
-        expect(markWeeks(weeks, W).map((w) => w.in)).toEqual([
-            null,
-            "BEFORE",
-            "PERIOD",
-        ]);
         expect(bestWeek(weeks)).toEqual({
             start: "2026-10-05",
             end: "2026-10-11",
             takingsMinor: 9_000,
         });
         expect(bestWeek([week("2026-10-05", "2026-10-11", 0)])).toBeNull();
+        // A 3-month window's 8-day first bar is never "best week".
+        expect(
+            bestWeek([
+                { ...week("2026-07-20", "2026-07-27", 20_000), days: 8 },
+                { ...week("2026-07-28", "2026-08-03", 10_000), days: 7 },
+            ]),
+        ).toMatchObject({ start: "2026-07-28" });
+    });
+
+    it("folds the rolling bars so each window's bars add up to its money", () => {
+        const w4 = periodWindows("4w", MONDAY, ZONE);
+        const rows = [
+            // 21 Sep is the day before the period: a BEFORE bar's, never
+            // drawn as now (Northwind, 19 Oct).
+            row("2026-09-21", HILL, "8000"),
+            row("2026-09-22", HILL, "100"),
+            row("2026-10-19", ONLINE_PLACE, "250", { orders: 1 }),
+            row("2026-10-12", HILL, "40", { currency: "USD" }),
+        ];
+        const bars = foldBuckets(moneyBuckets(w4), rows, "INR", ZONE);
+        const fold = foldPeriod(rows, "INR", w4);
+        const sum = (window: "PERIOD" | "BEFORE") =>
+            bars
+                .filter((b) => b.in === window)
+                .reduce((total, b) => total + b.takingsMinor, 0);
+        expect(sum("PERIOD")).toBe(fold.period.minor);
+        expect(sum("BEFORE")).toBe(fold.before.minor);
+        expect(sum("PERIOD")).toBe(35_000);
+        expect(bars.at(-1)).toMatchObject({
+            start: "2026-10-13",
+            end: "2026-10-19",
+            takingsMinor: 25_000,
+            days: 7,
+            in: "PERIOD",
+        });
     });
 
     it("reads the usual order for the period and the one before", () => {

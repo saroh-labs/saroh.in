@@ -1,7 +1,8 @@
 /**
  * Insights' one period (DEC-171): 7 days, 4 weeks and 3 months, each
  * ending today in the business's zone and compared with the same number of
- * days before; the weekly bars marked by the window they mostly fall in.
+ * days before; the weekly bars rolling back from today, each window's bars
+ * holding exactly its days.
  */
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
@@ -13,8 +14,9 @@ import {
     daysBetween,
     DEFAULT_PERIOD,
     isInsightsPeriod,
+    MONEY_BARS,
+    moneyBuckets,
     periodWindows,
-    weekIn,
 } from "./period";
 
 const ZONE = "Asia/Kolkata";
@@ -135,22 +137,75 @@ describe("Insights period", () => {
         expect(dayIn(w, "2026-10-05")).toBeNull();
     });
 
-    it("marks a whole week by the window holding four of its days or more", () => {
+    it("draws 4 weeks as rolling weeks ending today, four against four", () => {
         const w = periodWindows("4w", MONDAY, ZONE);
-        // 22 Sep – 19 Oct now; 25 Aug – 21 Sep before.
-        expect(weekIn(w, "2026-10-12")).toBe("PERIOD");
-        // Six of 21–27 Sep are now (the 21st is before).
-        expect(weekIn(w, "2026-09-21")).toBe("PERIOD");
-        expect(weekIn(w, "2026-09-14")).toBe("BEFORE");
-        // Six of 24–30 Aug are before.
-        expect(weekIn(w, "2026-08-24")).toBe("BEFORE");
-        expect(weekIn(w, "2026-08-17")).toBeNull();
+        const bars = moneyBuckets(w);
+        expect(bars).toHaveLength(MONEY_BARS);
+        expect(bars.map((b) => b.in)).toEqual([
+            ...Array(4).fill(null),
+            ...Array(4).fill("BEFORE"),
+            ...Array(4).fill("PERIOD"),
+        ]);
+        // Tuesday to Monday, never a calendar week reaching before 22 Sep.
+        expect(bars.slice(8).map((b) => [b.startDate, b.endDate])).toEqual([
+            ["2026-09-22", "2026-09-28"],
+            ["2026-09-29", "2026-10-05"],
+            ["2026-10-06", "2026-10-12"],
+            ["2026-10-13", "2026-10-19"],
+        ]);
+        expect(bars[4].startDate).toBe(w.beforeFromDate);
+        expect(bars[7].endDate).toBe(w.beforeToDate);
+        expect(bars.every((b) => b.days === 7)).toBe(true);
+    });
 
-        // 7 days on a Monday: no whole week is mostly now.
-        const seven = periodWindows("7d", MONDAY, ZONE);
-        expect(weekIn(seven, "2026-10-12")).toBe("PERIOD");
-        expect(weekIn(seven, "2026-10-05")).toBe("BEFORE");
-        expect(weekIn(seven, "2026-09-28")).toBeNull();
+    it("draws 7 days as one bar against one, ten earlier weeks before them", () => {
+        const w = periodWindows("7d", MONDAY, ZONE);
+        const bars = moneyBuckets(w);
+        expect(bars).toHaveLength(MONEY_BARS);
+        expect(bars.at(-1)).toEqual({
+            startDate: "2026-10-13",
+            endDate: "2026-10-19",
+            days: 7,
+            in: "PERIOD",
+        });
+        expect(bars.at(-2)).toMatchObject({
+            startDate: "2026-10-06",
+            endDate: "2026-10-12",
+            in: "BEFORE",
+        });
+        expect(bars.slice(0, 10).every((b) => b.in === null)).toBe(true);
+    });
+
+    it("draws 3 months as bars holding exactly each window's days", () => {
+        for (const now of [MONDAY, SUNDAY, new Date("2026-03-01T06:00:00Z")]) {
+            const w = periodWindows("3m", now, ZONE);
+            const bars = moneyBuckets(w);
+            for (const window of ["PERIOD", "BEFORE"] as const) {
+                const mine = bars.filter((b) => b.in === window);
+                const total = mine.reduce((sum, b) => sum + b.days, 0);
+                expect(total).toBe(w.days);
+                // Back to back, no day twice and none left out.
+                for (let i = 1; i < mine.length; i += 1) {
+                    expect(
+                        daysBetween(mine[i - 1].endDate, mine[i].startDate),
+                    ).toBe(1);
+                }
+                // Only the oldest bar is longer or shorter than a week.
+                expect(mine.slice(1).every((b) => b.days === 7)).toBe(true);
+            }
+            const period = bars.filter((b) => b.in === "PERIOD");
+            expect(period[0].startDate).toBe(w.fromDate);
+            expect(period.at(-1)?.endDate).toBe(w.toDate);
+            expect(bars.filter((b) => b.in === null)).toHaveLength(0);
+        }
+        // 20 Jul – 19 Oct is 92 days: twelve weeks and an 8-day first bar.
+        const w = periodWindows("3m", MONDAY, ZONE);
+        const first = moneyBuckets(w).find((b) => b.in === "PERIOD");
+        expect(first).toMatchObject({
+            startDate: "2026-07-20",
+            endDate: "2026-07-27",
+            days: 8,
+        });
     });
 });
 

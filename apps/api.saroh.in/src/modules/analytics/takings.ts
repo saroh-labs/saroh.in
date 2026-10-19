@@ -149,39 +149,6 @@ export interface TakingsWeek {
     places: TakingsPlaceWeek[];
 }
 
-/** A place money came from, named. */
-export interface TakingsPlace {
-    key: string;
-    kind: PlaceKind;
-    /** The location's name; null for online and invoices. */
-    name: string | null;
-}
-
-/** `GET organizations/:organizationId/analytics/takings`. */
-export interface TakingsRead {
-    /** The business's zone the weeks are drawn in. */
-    zone: string;
-    /** The currency every figure is in; null before the business has one. */
-    currency: string | null;
-    /**
-     * Currencies money was also taken in during the twelve weeks, which the
-     * figures leave out (a business sells in one, DEC-030; older rows may not).
-     */
-    otherCurrencies: string[];
-    /** The business's date of the first money it ever took; null for none. */
-    firstSaleOn: string | null;
-    /** Monday of the week in progress, which the weeks stop short of. */
-    thisWeekStart: string;
-    /** The week in progress so far, beside the same days of last week. */
-    thisWeek: TakingsSoFar;
-    /** Open locations (storefronts) the business has. */
-    locations: number;
-    /** Every place named in `weeks`. */
-    places: TakingsPlace[];
-    /** The twelve whole weeks, oldest first. */
-    weeks: TakingsWeek[];
-}
-
 /**
  * The week in progress, Monday to today in the business's zone. Not a
  * week yet, so it is never compared with whole weeks — only with the same

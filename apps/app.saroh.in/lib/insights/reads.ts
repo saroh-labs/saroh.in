@@ -15,16 +15,64 @@ import type { InsightsPeriod, PeriodWindow } from "./period";
  * are minor units (paise).
  */
 
+/**
+ * One weekly bar: a rolling run of days ending on today's weekday, wholly
+ * inside the period, the one before, or earlier, so the period's bars add
+ * up to its money in (`moneyBuckets`, #1093).
+ */
 export interface MoneyWeekRead {
-    /** Monday, `2026-09-14`. */
+    /** Its first day, `2026-10-13`. */
     start: string;
-    /** Sunday. */
+    /** Its last day, `2026-10-19`. */
     end: string;
     takingsMinor: number;
     orders: number;
     payments: number;
     /** PERIOD (drawn dark), BEFORE (light) or neither (faint). */
     in: "PERIOD" | "BEFORE" | null;
+    /** 7; a 3-month window's oldest bar holds the days left over. */
+    days?: number;
+}
+
+/** Where money came from: a location, the website's checkout, or invoices. */
+export type MoneyPlaceKind = "LOCATION" | "ONLINE" | "INVOICES";
+
+/** A place money came from in the period, with its change. */
+export interface MoneyPlaceRead {
+    /** `location:<storeId>`, `online` or `invoices`. */
+    key: string;
+    kind: MoneyPlaceKind;
+    /** The location's name; null for online and invoices. */
+    name: string | null;
+    amountMinor: number;
+    beforeMinor: number;
+    change: CompareChange;
+}
+
+/** Money in one currency. */
+export interface MoneyTotalRead {
+    currency: string;
+    amountMinor: number;
+}
+
+/** One age of what is owed. */
+export interface OwedBucketRead {
+    count: number;
+    /** Per currency; null without `payment:read`. */
+    totals: MoneyTotalRead[] | null;
+    /** The bills list it opens. */
+    href: string;
+}
+
+export type OwedAge = "notDue" | "late1to30" | "lateOver30";
+
+/** Who owes the business now, by how late (DEC-171). */
+export interface OwedRead {
+    totals: MoneyTotalRead[] | null;
+    bills: number;
+    overdue: number;
+    byAge: Record<OwedAge, OwedBucketRead>;
+    href: string;
 }
 
 export interface MoneyDayRead {
@@ -57,11 +105,22 @@ export interface MoneyRead {
         bills: number;
         billsBefore: number;
     };
+    /** What an order usually comes to; absent from an older API. */
+    usualOrder?: {
+        amountMinor: number | null;
+        beforeMinor: number | null;
+        orders: number;
+        ordersBefore: number;
+    };
     bestWeek: { start: string; end: string; takingsMinor: number } | null;
-    /** Twelve whole weeks, oldest first. */
+    /** The weekly bars, oldest first (twelve; about 26 for 3 months). */
     weeks: MoneyWeekRead[];
     /** Each day of the period, oldest first; absent from an older API. */
     days?: MoneyDayRead[];
+    /** Where the period's money came from, largest first. */
+    places?: MoneyPlaceRead[];
+    /** Who owes by how late; null without `invoice:read` or never billed. */
+    owed?: OwedRead | null;
 }
 
 export interface BestSellerRead {
