@@ -7,6 +7,8 @@ import { InvoicePdfModule } from "../invoices/invoice-pdf.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { AccountAreaGuard } from "./account-area";
+import { AccountDataRequestController } from "./account-data-request.controller";
+import { AccountDataRequestService } from "./account-data-request.service";
 import { AccountDetailsController } from "./account-details.controller";
 import {
     AccountHomeService,
@@ -28,6 +30,10 @@ import {
     CustomerNotifyService,
 } from "./customer-notify.handler";
 import { CustomerSessionGuard } from "./customer-session.guard";
+import {
+    DATA_REQUEST_EMAIL_TYPE,
+    DataRequestEmailHandler,
+} from "./data-request-email.handler";
 import {
     EMAIL_CHANGED_SENDER,
     EmailChangeService,
@@ -59,7 +65,9 @@ import { ThreadsService } from "./threads.service";
  * rest of what a customer may see (`AccountDetailsController`: a class's
  * line, courses, email choices; Home's "since you were last here"); their
  * open invoices are served by `SubscriptionsModule`, which holds the
- * invoices service (`AccountInvoicesController`).
+ * invoices service (`AccountInvoicesController`). DEC-172 adds "Ask to
+ * remove my data" (`AccountDataRequestController`) and Saroh's two emails
+ * about it (`customer.data-request.email`).
  */
 @Module({
     // The notices' job is registered at boot.
@@ -76,6 +84,8 @@ import { ThreadsService } from "./threads.service";
         AccountMessagesController,
         // A class's line, courses and email choices (DEC-142).
         AccountDetailsController,
+        // "Ask to remove my data" (DEC-172).
+        AccountDataRequestController,
     ],
     providers: [
         AccountOrdersService,
@@ -86,6 +96,8 @@ import { ThreadsService } from "./threads.service";
         AccountHomeService,
         ReceiptPdfService,
         EmailChangeService,
+        AccountDataRequestService,
+        DataRequestEmailHandler,
         // Health notes: open since A13 worded C12's staff card per source.
         { provide: CUSTOMER_NOTES_OPEN, useValue: CUSTOMER_NOTES_OPEN_DEFAULT },
         { provide: EMAIL_CHANGED_SENDER, useValue: sendSiteEmailChangedEmail },
@@ -121,6 +133,7 @@ export class SiteAccountsModule implements OnModuleInit {
     constructor(
         private readonly registry: JobHandlerRegistry,
         private readonly customerNotify: CustomerNotifyHandler,
+        private readonly dataRequestEmail: DataRequestEmailHandler,
     ) {}
 
     /** Wire the customer notice consumer into the job worker (A14). */
@@ -128,6 +141,11 @@ export class SiteAccountsModule implements OnModuleInit {
         this.registry.register(
             CUSTOMER_NOTIFY_TYPE,
             this.customerNotify.handle,
+        );
+        // Saroh's emails about a data removal request (DEC-172).
+        this.registry.register(
+            DATA_REQUEST_EMAIL_TYPE,
+            this.dataRequestEmail.handle,
         );
     }
 }

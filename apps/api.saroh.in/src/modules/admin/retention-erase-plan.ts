@@ -41,6 +41,10 @@ export const RETENTION_ERASED: readonly ErasedThing[] = [
         how: "deleted",
     },
     {
+        what: "Customers' “Ask to remove my data” requests, with the name and email each was asked with (DEC-172)",
+        how: "deleted",
+    },
+    {
         what: "Every customer (Contact): name, email (a placeholder), phone, company, address; with their notes, needs-attention entries, consents, message thread, site account, sessions and sign-in codes, and their autopay's UPI handle or card digits — the privacy removal's own rules, for every contact",
         how: "cleared",
     },
@@ -181,6 +185,15 @@ export const KEPT_FIELD_DECISIONS: Readonly<Record<string, KeptDecision>> = {
     "Activity.body": {
         at180Days: "erased",
         why: "Free text about a lead; no business is left to keep its CRM.",
+    },
+    // DEC-172: the record of a customer's "Ask to remove my data".
+    "CustomerDataRequest.requesterEmail": {
+        at180Days: "erased",
+        why: "The request goes with the business's customers: no business is left to answer it or keep its record.",
+    },
+    "CustomerDataRequest.requesterName": {
+        at180Days: "erased",
+        why: "The request goes with the business's customers: no business is left to answer it or keep its record.",
     },
 };
 

@@ -153,6 +153,19 @@ const WRITTEN: {
         id: null,
         href: "/commerce/products",
     },
+    // DEC-172: a customer asked to remove their data.
+    {
+        type: "customer.data-request",
+        kind: "customer-request",
+        id: "con_1",
+        href: "/contacts/con_1",
+    },
+    {
+        type: "customer.data-request",
+        kind: "customer-request",
+        id: null,
+        href: "/commerce/customers?tab=requests",
+    },
 ];
 
 describe("where a notification opens", () => {

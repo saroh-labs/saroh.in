@@ -68,6 +68,13 @@ export const ALERTS = [
         label: "Your website",
         note: "A reviewer's verdict or notes, a scheduled go-live, and your own domain going down",
     },
+    // Not in the design: a customer asking to remove their data (DEC-172).
+    // The API offers it only to who can remove a customer's details.
+    {
+        key: "request",
+        label: "Data removal requests",
+        note: "When a customer asks you to remove their details",
+    },
 ] as const;
 export type AlertKey = (typeof ALERTS)[number]["key"];
 
@@ -152,20 +159,21 @@ export function alertGrid(read: AlertPreferencesRead): AlertGrid {
         return {
             columns: [...ALERT_CHANNELS],
             // The design's rows only: the Website row is offered by the API
-            // alone, to who can publish with test releases on (DEC-057).
-            rows: ALERTS.filter((alert) => alert.key !== "site").map(
-                (alert) => ({
-                    key: alert.key,
-                    label: alert.label,
-                    note: alert.note,
-                    cells: ALERT_CHANNELS.map((channel) => ({
-                        channel,
-                        on: false,
-                        disabled: true,
-                        label: `${alert.label} by ${ALERT_CHANNEL_LABELS[channel]}, can't be chosen yet`,
-                    })),
-                }),
-            ),
+            // alone, to who can publish with test releases on (DEC-057), and
+            // the data removal row to who can remove a customer's details.
+            rows: ALERTS.filter(
+                (alert) => alert.key !== "site" && alert.key !== "request",
+            ).map((alert) => ({
+                key: alert.key,
+                label: alert.label,
+                note: alert.note,
+                cells: ALERT_CHANNELS.map((channel) => ({
+                    channel,
+                    on: false,
+                    disabled: true,
+                    label: `${alert.label} by ${ALERT_CHANNEL_LABELS[channel]}, can't be chosen yet`,
+                })),
+            })),
             notes: [
                 {
                     id: "not-available",

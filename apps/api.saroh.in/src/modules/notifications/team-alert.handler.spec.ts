@@ -103,6 +103,7 @@ function makeTx() {
             create: jest.fn().mockResolvedValue({ id: "ntf_1" }),
             findFirst: jest.fn(),
         },
+        customerDataRequest: { findFirst: jest.fn() },
         merchantPaymentProvider: { findFirst: jest.fn() },
         communicationProvider: { findFirst: jest.fn() },
         $executeRaw: jest.fn().mockResolvedValue(0),
@@ -1220,5 +1221,105 @@ describe("the website's review (UX-043)", () => {
             url: "https://app.saroh.localhost/sites/site_1/releases/rel_1",
             cta: "Open the test release",
         });
+    });
+});
+
+/**
+ * A customer asked to remove their data (DEC-172, #1106): the bell names
+ * them, Saroh's email names nobody, and it reaches whoever can run a
+ * customer removal, email on by default.
+ */
+describe("a customer asks to remove their data", () => {
+    const openRequest = {
+        id: "dr_1",
+        status: "OPEN",
+        contactId: "con_1",
+        requesterName: "Asha R",
+        contact: { firstName: "Asha", lastName: "Rao", removedAt: null },
+    };
+
+    it("rings the bell on the customer, and emails the owner and admin", async () => {
+        const tx = makeTx();
+        tx.customerDataRequest.findFirst.mockResolvedValue(openRequest);
+        const out = await tellTeam(asTx(tx), ORG, {
+            event: "request",
+            requestId: "dr_1",
+        });
+        expect(tx.customerDataRequest.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: "dr_1", organizationId: ORG },
+            }),
+        );
+        expect(tx.customerNotice.createMany).toHaveBeenCalledWith({
+            data: [
+                expect.objectContaining({
+                    eventKey: "team:request:dr_1",
+                    kind: "TEAM_TOLD",
+                }),
+            ],
+            skipDuplicates: true,
+        });
+        expect(tx.notification.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                organizationId: ORG,
+                type: "customer.data-request",
+                contactId: "con_1",
+                title: "Asha Rao asked to remove their data",
+            }),
+            select: { id: true },
+        });
+        // Only the roles that hold customer:remove; email on by default.
+        expect(recipients(out)).toEqual(["u_owner", "u_admin"]);
+        const mail = out.emails[0].mail;
+        expect(mail.subject).toBe(
+            "Rye & Co: A customer asked to remove their data",
+        );
+        expect(mail.body).not.toContain("Asha");
+        expect(mail.body).toContain(
+            "Receipts and invoices are kept as the law requires.",
+        );
+        expect(mail.url).toBe("https://app.saroh.localhost/contacts/con_1");
+        expect(mail.footer).toContain("“Data removal requests”");
+    });
+
+    it("with no customer linked, names them as they asked and opens the requests", async () => {
+        const tx = makeTx();
+        tx.customerDataRequest.findFirst.mockResolvedValue({
+            ...openRequest,
+            contactId: null,
+            contact: null,
+        });
+        const out = await tellTeam(asTx(tx), ORG, {
+            event: "request",
+            requestId: "dr_1",
+        });
+        expect(tx.notification.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                title: "Asha R asked to remove their data",
+            }),
+            select: { id: true },
+        });
+        expect(
+            tx.notification.create.mock.calls[0][0].data.contactId,
+        ).toBeUndefined();
+        expect(out.emails[0].mail.url).toBe(
+            "https://app.saroh.localhost/commerce/customers?tab=requests",
+        );
+    });
+
+    it("is not announced once done or closed", async () => {
+        for (const status of ["DONE", "CLOSED_WITHOUT_REMOVAL"]) {
+            const tx = makeTx();
+            tx.customerDataRequest.findFirst.mockResolvedValue({
+                ...openRequest,
+                status,
+            });
+            const out = await tellTeam(asTx(tx), ORG, {
+                event: "request",
+                requestId: "dr_1",
+            });
+            expect(out).toEqual({ told: false, emails: [] });
+            expect(tx.notification.create).not.toHaveBeenCalled();
+        }
     });
 });

@@ -136,6 +136,10 @@ const NEVER: Record<string, string> = {
         "spans every dated module, and drops a layer whose module is off itself",
     "customer-workspace/customer-workspace.controller.ts":
         "spans CRM, Commerce and Appointments at once",
+    // DEC-172: a customer's "Ask to remove my data", acted on with the
+    // customer removal, which is no module's.
+    "customer-workspace/data-requests.controller.ts":
+        "a customer's data removal request: the law's, whichever modules are on",
     "contacts/contact-search.controller.ts":
         "the customer picker in New booking and New order (B13) works whichever of CRM, Appointments and Commerce is on",
     "notifications/notifications.controller.ts": "cross-cutting",
@@ -224,6 +228,9 @@ const NEVER: Record<string, string> = {
         "a signed-in customer booking on a published site — Appointments checked per service",
     // A12: joining a full class's waitlist from the booking page, checked
     // per service like booking (`loadBookableService`).
+    // DEC-172: "Ask to remove my data" in the account's Your details.
+    "site-accounts/account-data-request.controller.ts":
+        "a signed-in customer asking to remove their own data — no module may hide it",
     "site-accounts/account-waitlist.controller.ts":
         "a signed-in customer joining a class's waitlist on a published site — Appointments checked per service",
     // A5: the customer's account area. It lists only the modules the

@@ -179,6 +179,17 @@ export const PERSONAL_FIELDS: Readonly<Record<string, PersonalField>> = {
         rule: "kept",
         why: "A lead's activity: leads are CRM records, left as they are (DEC-041).",
     },
+
+    // Their "Ask to remove my data" request (DEC-172): the record that they
+    // asked and that it was done, and where the done email goes.
+    "CustomerDataRequest.requesterEmail": {
+        rule: "kept",
+        why: "The record of their request: where Saroh tells them it's done (DEC-172). The business's list stops showing it once done.",
+    },
+    "CustomerDataRequest.requesterName": {
+        rule: "kept",
+        why: "The record of their request, as they were when they asked (DEC-172).",
+    },
 };
 
 /**

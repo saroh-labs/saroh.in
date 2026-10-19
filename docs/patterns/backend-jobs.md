@@ -450,6 +450,19 @@ the Privacy Policy states both.
   queued — one after the team last answered or opened the thread
   (`notifications/customer-message-notify.ts`); follow-ups land in the
   thread the team is already pointed at.
+- **`customer.data-request.email`** (DEC-172, #1106) is Saroh's email to a
+  customer about their "Ask to remove my data" request, from the sign-in
+  code sender in the business's name (`site-accounts/data-request-email.handler.ts`,
+  words in `data-request-emails.ts`): "received", queued with the request;
+  "done", queued inside the privacy removal's last transaction
+  (`markRequestsDoneInTx`); "closed", queued with a close without removal
+  (never the business's reason). The run re-reads the request (its kept
+  email outlives the deleted account), sends, then records
+  `data-request:<id>:<step>` as a `CustomerNotice`; a run that finds the
+  record says nothing, and a failed send throws to be retried (at least
+  once). The request itself raises `team.alert` `{ event: "request" }`
+  (`notifications/data-request-alerts.ts`) on the "Data removal requests"
+  row, offered to `customer:remove`.
 - **Once per event.** Both claim a `CustomerNotice` row keyed to the event
   (`booking:<BookingEvent id>`, `order:<OrderEvent id>`) with
   `createMany({ skipDuplicates })` before writing anything: a Postgres

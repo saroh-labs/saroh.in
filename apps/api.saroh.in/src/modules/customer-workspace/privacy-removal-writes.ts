@@ -1,8 +1,10 @@
 import type { Prisma } from "@saroh/database";
 
+import { AuditAction } from "../audit/audit.service";
 import { removeWaitlistInTx } from "../bookings/waitlist-merge";
 import { reservedRemovedEmail } from "../contacts/contact-email";
 import { anonymiseStoreCustomersInTx } from "../customers/anonymise-customer";
+import { enqueueDataRequestEmail } from "../site-accounts/data-request-email.handler";
 import { destinationHashFor } from "../site-accounts/sign-in-codes.service";
 import type { RemovalGoes } from "./privacy-removal-plan";
 import {
@@ -212,6 +214,10 @@ export async function removeDetailsInTx(
         where: { organizationId, contactId },
     });
 
+    // Their "Ask to remove my data" requests read done, before the account
+    // they were asked from goes (DEC-172).
+    await markRequestsDoneInTx(tx, scope, accountIds);
+
     // The site account, with its sessions (cascade) and pending codes.
     if (accounts.length > 0) {
         await tx.customerSignInCode.deleteMany({
@@ -280,4 +286,64 @@ export async function removeDetailsInTx(
         account: accounts.length > 0,
         autopay: 0,
     };
+}
+
+/**
+ * Every open "Ask to remove my data" request of theirs reads DONE, in the
+ * removal's own transaction (DEC-172, #1106): asked from one of their
+ * accounts, or naming the contact. Each keeps its row as the record; its
+ * account link is cleared here, before the account is deleted (the key's
+ * SET NULL is the backstop), and the contact link stays on the anonymised
+ * contact. Each queues the customer's "done" email, which reads the email
+ * kept on the request, and writes `customer.data_request.done`, ids only.
+ */
+export async function markRequestsDoneInTx(
+    tx: Tx,
+    scope: RemovalScope,
+    accountIds: readonly string[],
+): Promise<number> {
+    const { organizationId, contactId, userId, now } = scope;
+    const open = await tx.customerDataRequest.findMany({
+        where: {
+            organizationId,
+            status: "OPEN",
+            OR: [
+                { contactId },
+                ...(accountIds.length
+                    ? [{ customerAccountId: { in: [...accountIds] } }]
+                    : []),
+            ],
+        },
+        select: { id: true },
+        orderBy: { id: "asc" },
+    });
+    if (open.length === 0) return 0;
+    const ids = open.map((r) => r.id);
+    await tx.customerDataRequest.updateMany({
+        where: { id: { in: ids }, organizationId },
+        data: {
+            status: "DONE",
+            handledByUserId: userId,
+            handledAt: now,
+            customerAccountId: null,
+        },
+    });
+    for (const requestId of ids) {
+        await enqueueDataRequestEmail(tx, organizationId, {
+            requestId,
+            step: "done",
+        });
+        await tx.auditEvent.create({
+            data: {
+                action: AuditAction.CustomerDataRequestDone,
+                actorUserId: userId,
+                organizationId,
+                targetType: "customer_data_request",
+                targetId: requestId,
+                outcome: "SUCCESS",
+                metadata: { contactId },
+            },
+        });
+    }
+    return ids.length;
 }
