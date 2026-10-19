@@ -300,7 +300,7 @@ describe("staff invites (DB, U24)", () => {
         ]);
         expect(admin.staffProfile).toMatchObject({
             worksAs: "ACCOUNT_MANAGER_JOB",
-            workEmail: sent.email,
+            workEmail: null,
             onCommission: true,
         });
         expect(admin.staffProfile?.managerCode).toMatch(MANAGER_CODE_PATTERN);

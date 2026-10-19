@@ -327,7 +327,6 @@ export class AdminStaffService {
                 await keepJob(tx, admin.id, {
                     worksAs: input.worksAs,
                     onCommission: input.onCommission,
-                    email,
                 });
             }
 
@@ -804,15 +803,12 @@ export class AdminStaffService {
  * Keep what a teammate works as on their profile, with their grant (Add a
  * teammate, U17): a first profile gets its manager code; one already on
  * file changes only the job and, when sent, the commission flag. The
- * grant's own ledger row names both. A profile with no work email gets the
- * address they were added with, as an accepted invite does: it is what a
- * business sees on "Your Saroh contact" (owner, 19 Oct). One already set
- * is kept.
+ * grant's own ledger row names both.
  */
 async function keepJob(
     tx: Tx,
     platformAdminId: string,
-    job: { worksAs: StaffJob; onCommission?: boolean; email: string },
+    job: { worksAs: StaffJob; onCommission?: boolean },
 ): Promise<void> {
     const data = {
         worksAs: job.worksAs,
@@ -822,25 +818,14 @@ async function keepJob(
     };
     const had = await tx.staffProfile.findUnique({
         where: { platformAdminId },
-        select: { id: true, workEmail: true },
+        select: { id: true },
     });
     if (had) {
-        await tx.staffProfile.update({
-            where: { platformAdminId },
-            data: {
-                ...data,
-                ...(had.workEmail?.trim() ? {} : { workEmail: job.email }),
-            },
-        });
+        await tx.staffProfile.update({ where: { platformAdminId }, data });
         return;
     }
     await tx.staffProfile.create({
-        data: {
-            platformAdminId,
-            managerCode: generateManagerCode(),
-            workEmail: job.email,
-            ...data,
-        },
+        data: { platformAdminId, managerCode: generateManagerCode(), ...data },
     });
 }
 
