@@ -214,12 +214,13 @@ describe("cells and the day", () => {
         ).toEqual({
             in: "₹1,000",
             out: "₹225",
+            hasOut: true,
             due: null,
             why: "Out is a refund and fees.",
         });
         expect(
             dayMoney([entry({ kind: "booking_due", due: 50_000 })], "INR"),
-        ).toMatchObject({ out: "₹0", due: "₹500", why: "" });
+        ).toMatchObject({ out: "₹0", hasOut: false, due: "₹500", why: "" });
     });
 
     it("a day with no money has no money line", () => {

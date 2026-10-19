@@ -70,7 +70,11 @@ export function SitePhoneInput({
     const [own, setOwn] = useState(value);
     if (value !== seen) {
         setSeen(value);
-        if (value !== own) setParts(splitPhone(value, parts.country));
+        if (value !== own) {
+            setParts(splitPhone(value, parts.country));
+            // Adopted: the same value sent again later is read again too.
+            setOwn(value);
+        }
     }
 
     function change(next: PhoneParts) {

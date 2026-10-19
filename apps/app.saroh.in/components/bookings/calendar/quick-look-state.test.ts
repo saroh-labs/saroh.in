@@ -119,6 +119,19 @@ describe("words", () => {
         expect(movedToldText("ACCOUNT", "Kabir")).toBeNull();
     });
 
+    it("agree with They when the customer has no first name", () => {
+        expect(changeToldText("EMAIL", "")).toBe(
+            "They are emailed either way.",
+        );
+        expect(changeToldText("EMAIL_AND_ACCOUNT", "")).toBe(
+            "They are emailed either way and see the change in their account on your site.",
+        );
+        expect(changeToldText("ON_SIGN_IN", "")).toBe(
+            "They see it when they sign in on your site. Tell them yourself if it's soon.",
+        );
+        expect(movedToldText("EMAIL", "")).toBe("They are emailed.");
+    });
+
     it("know a time taken meanwhile from any other refusal", () => {
         expect(isTakenRefusal("Meera Iyer is already booked then.")).toBe(true);
         expect(isTakenRefusal("That time is fully booked.")).toBe(true);

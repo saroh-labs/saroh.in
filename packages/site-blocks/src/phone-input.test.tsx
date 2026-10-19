@@ -72,4 +72,32 @@ describe("SitePhoneInput (#1036)", () => {
         expect(code()).toHaveValue("GB");
         expect(box()).toHaveValue("207 946 0958");
     });
+    it("reads a value again after a reset, even one it last sent", () => {
+        function Reset() {
+            const [v, setV] = useState("");
+            return (
+                <>
+                    <label htmlFor="r">Phone</label>
+                    <SitePhoneInput
+                        id="r"
+                        box="border-site-border h-11 text-base"
+                        value={v}
+                        onValueChange={setV}
+                    />
+                    <button type="button" onClick={() => setV("")}>
+                        Clear
+                    </button>
+                    <button type="button" onClick={() => setV("+919876543210")}>
+                        Restore
+                    </button>
+                </>
+            );
+        }
+        render(<Reset />);
+        fireEvent.change(box(), { target: { value: "98765 43210" } });
+        fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+        expect(box()).toHaveValue("");
+        fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+        expect(box()).toHaveValue("98765 43210");
+    });
 });

@@ -8,7 +8,7 @@ import { outcomeWord } from "@/lib/services/booking-words";
 import { recurringPrice, subscriptionPay } from "@/lib/subscriptions/view";
 import { absentText } from "@saroh/ui/lib/absent";
 
-import { withoutTitle } from "@/lib/names";
+import { initials } from "@/lib/names";
 import { addedLine } from "./added";
 import type {
     CustomerDetail,
@@ -173,14 +173,8 @@ export function tabFromQuery(value: string | undefined, tabs: Tab[]): TabKey {
     return tabs.find((t) => t.key === value)?.key ?? "over";
 }
 
-export function initials(name: string): string {
-    return withoutTitle(name)
-        .split(/\s+/)
-        .filter(Boolean)
-        .map((w) => w[0].toUpperCase())
-        .join("")
-        .slice(0, 2);
-}
+/** The one rule for initials (`lib/names.ts`), for the header's avatar. */
+export { initials };
 
 /** Money per currency, joined: "₹5,370" or "₹5,370 + $40". */
 export function totals(list: MoneyTotal[]): string {

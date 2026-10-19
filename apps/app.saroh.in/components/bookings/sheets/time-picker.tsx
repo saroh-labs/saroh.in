@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { Calendar } from "@saroh/ui/calendar";
+import { FailedState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
@@ -148,14 +149,18 @@ export function TimePicker({
             : today,
     );
     const [day, setDay] = useState<LocalDate>(initialDay ?? today);
-    const [read, setRead] = useState<{
-        key: string;
-        slots: PickerSlot[];
-    } | null>(null);
+    // A read that failed is said as one, with Try again, never as a day
+    // with no free times.
+    const [read, setRead] = useState<
+        | { key: string; slots: PickerSlot[] }
+        | { key: string; failed: true }
+        | null
+    >(null);
+    const [retry, setRetry] = useState(0);
     const [askedWhy, setAskedWhy] = useState(false);
     const [pickOpen, setPickOpen] = useState(false);
 
-    const readKey = `${serviceId}|${withId ?? ""}|${windowStart}|${reloadKey}|${taken ?? ""}`;
+    const readKey = `${serviceId}|${withId ?? ""}|${windowStart}|${reloadKey}|${taken ?? ""}|${retry}`;
     useEffect(() => {
         let live = true;
         const start = zonedInstant(windowStart, 0, timezone).getTime();
@@ -165,19 +170,23 @@ export function TimePicker({
             0,
             timezone,
         ).toISOString();
-        void listAvailability(serviceId, from, to, withId ?? undefined)
-            .catch((): PickerSlot[] => [])
-            .then((slots) => {
+        listAvailability(serviceId, from, to, withId ?? undefined).then(
+            (slots) => {
                 if (live) setRead({ key: readKey, slots });
-            });
+            },
+            () => {
+                if (live) setRead({ key: readKey, failed: true });
+            },
+        );
         return () => {
             live = false;
         };
     }, [readKey, serviceId, withId, windowStart, timezone, now]);
 
     const loading = read?.key !== readKey;
+    const failed = read?.key === readKey && "failed" in read;
     const slots = useMemo(
-        () => (read && !loading ? read.slots : []),
+        () => (read && !loading && "slots" in read ? read.slots : []),
         [read, loading],
     );
     const byDay = useMemo(() => slotsByDay(slots, timezone), [slots, timezone]);
@@ -191,7 +200,7 @@ export function TimePicker({
     const dayShown = days.find((d) => d.date === day);
     const daySlots = byDay.get(day) ?? [];
     const { morning, later } = partsOfDay(daySlots, timezone);
-    const next = loading ? null : nextFreeDay(days, day);
+    const next = loading || failed ? null : nextFreeDay(days, day);
     const person = withId ? people.find((p) => p.id === withId) : null;
     const zone = zoneShortName(timezone, now);
     const showWith =
@@ -291,7 +300,7 @@ export function TimePicker({
                                         {d.day}
                                     </span>
                                     <span className="text-[10.5px] font-semibold tabular-nums opacity-80">
-                                        {loading ? "…" : d.count}
+                                        {loading || failed ? "…" : d.count}
                                     </span>
                                 </>
                             ),
@@ -383,6 +392,13 @@ export function TimePicker({
                             Finding free times…
                         </p>
                     </div>
+                ) : failed ? (
+                    <FailedState
+                        size="inline"
+                        title="Couldn't load times"
+                        description="Nothing has changed. Try again in a moment."
+                        onRetry={() => setRetry((n) => n + 1)}
+                    />
                 ) : daySlots.length > 0 ? (
                     <ChoiceGroup
                         labelledBy={ids.times}

@@ -17,6 +17,7 @@ import { formatMoney } from "@/lib/format/money";
 import type { BookingMoney } from "@/lib/services/booking-money";
 import {
     deadlineText,
+    refundable,
     TREATMENT_REFUNDED_FROM_ORDER,
 } from "@/lib/services/booking-money";
 
@@ -54,11 +55,6 @@ export type CancelChoice =
           refund: MoneyOption;
           keep: MoneyOption;
       };
-
-/** What a cancel could hand back: never more than was received. */
-function refundable(m: BookingMoney): number {
-    return m.refundableCents ?? m.paidOnlineCents;
-}
 
 export function cancelChoice(input: {
     money: BookingMoney | undefined;

@@ -133,8 +133,10 @@ export function CalendarHeader({
     const showChip = others.length > 1;
     const everyone = picked === EVERYONE || person === undefined;
     const whoName = everyone ? "Everyone" : person.name;
+    // Only when the person shown is the one kept: a link (Hours ›
+    // Bookings, an alert) may show someone else.
     const remembered =
-        !everyone && opens.showFor === "last"
+        !everyone && opens.showFor === "last" && picked === opens.lastPerson
             ? `Showing ${callName(whoName)}, your last pick`
             : null;
     const hoursLabel = everyone

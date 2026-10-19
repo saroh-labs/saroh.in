@@ -1,8 +1,9 @@
 "use client";
 
-import { showError, showUndo } from "@saroh/ui/toast";
+import type { ToastId } from "@saroh/ui/toast";
+import { dismissToast, showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
@@ -16,6 +17,9 @@ import {
 import type { Bookers } from "@/lib/services/service-form";
 import { bookersPatch, bookersToast } from "@/lib/services/service-form";
 
+/** How a caller draws a write: a change to the fields it shows now. */
+export type OnSet = (change: (now: WhoFields) => WhoFields) => void;
+
 /**
  * "Who can book it" as it is changed (Bookings audit, 12 Oct 2026;
  * DEC-170 Q5): from a service's row and from its own page, it acts at
@@ -27,19 +31,22 @@ import { bookersPatch, bookersToast } from "@/lib/services/service-form";
  * stay; on ticks both back. `setBookers` is a tick on the service's own
  * page (U16): any of the four mixes, neither being paused.
  *
- * `onSet` is how the caller draws it: called with the new state at once,
- * with the old one again if the save didn't go through, and with the old
- * one when Undo puts it back.
+ * `onSet` is how the caller draws it: handed a change to make to what it
+ * shows now. At once it sets the fields this write changed; if the save
+ * didn't go through, or Undo puts it back, it sets those same fields back,
+ * leaving any other tick made since as it is. Only the latest write keeps
+ * its Undo.
  */
 export function useTakingBookings() {
     const router = useRouter();
     const [busy, setBusy] = useState<string | null>(null);
+    const lastUndo = useRef<ToastId | null>(null);
 
     async function write(
         service: { id: string } & WhoFields,
         patch: Partial<WhoFields>,
         said: string,
-        onSet: (who: WhoFields) => void,
+        onSet: OnSet,
     ) {
         const was: WhoFields = {
             status: service.status,
@@ -47,35 +54,38 @@ export function useTakingBookings() {
             bookableByTeam: service.bookableByTeam,
         };
         const next: WhoFields = { ...was, ...patch };
-        onSet(next);
+        // Only the fields this write changes, and what they were.
+        const back = whoPatch(next, was);
+        onSet((now) => ({ ...now, ...whoPatch(was, next) }));
         const res = await runAction(() => updateService(service.id, patch), {
             setBusy: (on) => setBusy(on ? service.id : null),
         });
         if (!res?.ok) {
             // Drawn before its save: put it back.
-            onSet(was);
+            onSet((now) => ({ ...now, ...back }));
             if (res) showError(res.error);
             return;
         }
         router.refresh();
-        showUndo(said, async () => {
-            const back = await runAction(
-                () => updateService(service.id, whoPatch(next, was)),
+        if (lastUndo.current !== null) dismissToast(lastUndo.current);
+        lastUndo.current = showUndo(said, async () => {
+            const undone = await runAction(
+                () => updateService(service.id, back),
                 { quiet: true },
             );
-            if (!back) return { ok: false, error: UNREACHED };
-            if (back.ok) {
-                onSet(was);
+            if (!undone) return { ok: false, error: UNREACHED };
+            if (undone.ok) {
+                onSet((now) => ({ ...now, ...back }));
                 router.refresh();
             }
-            return back;
+            return undone;
         });
     }
 
     function setTakingWho(
         service: { id: string; name: string } & WhoFields,
         taking: boolean,
-        onSet: (who: WhoFields) => void,
+        onSet: OnSet,
     ) {
         return write(
             service,
@@ -88,7 +98,7 @@ export function useTakingBookings() {
     function setBookers(
         service: { id: string; name: string } & WhoFields,
         next: Bookers,
-        onSet: (who: WhoFields) => void,
+        onSet: OnSet,
     ) {
         return write(
             service,

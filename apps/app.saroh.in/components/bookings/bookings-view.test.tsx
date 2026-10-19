@@ -18,6 +18,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AllBookingsCan } from "@/components/bookings/bookings-view";
+import { UNREACHED } from "@/lib/api/unreached";
 import type { DiaryBooking } from "@/lib/services/booking-calendar";
 import type { BookingMoney } from "@/lib/services/booking-money";
 import { BOOKINGS_FIRST_RUN, shareLink } from "@/lib/sites/share-links";
@@ -405,6 +406,29 @@ describe.each([
         press(byText("[data-booking-row] button", "Undo"));
         expect(rowOf("Ananya")?.textContent).toContain("Didn't come");
         expect(rowOf("Ananya")?.textContent).not.toContain("Undo");
+    });
+
+    it("puts the row back, and says so, when Came never got there", async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(NOW);
+        recordBookingOutcome.mockRejectedValue(new Error("offline"));
+        draw({ initialView: "outcome" });
+        press(byText("[data-booking-row] button", "Came"));
+        expect(
+            rowOf("Ananya")?.querySelector(
+                '[aria-label="Did Ananya Singh come?"]',
+            ),
+        ).toBeNull();
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(10_000);
+        });
+        expect(recordBookingOutcome).toHaveBeenCalledTimes(1);
+        expect(showError).toHaveBeenCalledWith(UNREACHED);
+        expect(
+            rowOf("Ananya")?.querySelector(
+                '[aria-label="Did Ananya Singh come?"]',
+            ),
+        ).not.toBeNull();
     });
 
     it("offers the boards' row menu, in order", async () => {

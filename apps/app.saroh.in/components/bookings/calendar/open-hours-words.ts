@@ -6,6 +6,7 @@ import {
 import { count } from "@/lib/format/plural";
 import type { Block, LocalDate, Span } from "@/lib/services/diary";
 import { blockTitle, isLive } from "@/lib/services/diary";
+import type { WeeklyRange } from "@/lib/staff/types";
 
 /**
  * What "Open closed time" says and offers (U10, #1026; BKMOpenHours on a
@@ -133,4 +134,29 @@ export function bookingsIn(
     return `${count(hit.length, "booking")} are already in this time: ${hit
         .map((b) => `${blockTitle(b)} at ${formatClock(b.start)}`)
         .join(", ")}.`;
+}
+
+/**
+ * A week with one weekday's range taken out: what Undo of "Every
+ * Tuesday" sends, built on the week as saved, so it takes back only the
+ * range it added (even where the API joined it to a range beside it) and
+ * keeps every other day as it is.
+ */
+export function withoutRange(
+    hours: readonly WeeklyRange[],
+    dayOfWeek: number,
+    from: number,
+    to: number,
+): WeeklyRange[] {
+    return hours.flatMap((h) => {
+        if (
+            h.dayOfWeek !== dayOfWeek ||
+            h.endMinute <= from ||
+            to <= h.startMinute
+        )
+            return [h];
+        const left = h.startMinute < from ? [{ ...h, endMinute: from }] : [];
+        const right = to < h.endMinute ? [{ ...h, startMinute: to }] : [];
+        return [...left, ...right];
+    });
 }

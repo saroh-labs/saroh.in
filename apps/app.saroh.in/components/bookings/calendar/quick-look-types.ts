@@ -1,6 +1,5 @@
 import type { NoticeChannels } from "@/lib/messages/notice-reach";
 import type { DiaryBooking } from "@/lib/services/booking-calendar";
-import type { Slot } from "@/lib/services/service";
 import type { BookingRules } from "@/lib/staff/types";
 
 /**
@@ -13,7 +12,6 @@ export interface QuickLookActions {
     checkIn: (b: DiaryBooking) => void;
     noShow: (b: DiaryBooking) => void;
     cancel: (b: DiaryBooking) => void;
-    move: (b: DiaryBooking, slot: Slot) => void;
     cancelClass: (seats: DiaryBooking[], title: string) => void;
 }
 
@@ -26,6 +24,11 @@ export interface QuickLookContext {
     now: number;
     money: boolean;
     rules: BookingRules | null;
+    /**
+     * The free-cancel hours for a booking with this person: their own rule,
+     * else the business's (`freeCancelHoursFor`). Absent: the business's.
+     */
+    freeCancelFor?: (staffId: string | null | undefined) => number | null;
     canBook: boolean;
     /**
      * `payment:manage`: may change what the business's policy does with
@@ -51,4 +54,14 @@ export interface QuickLookContext {
      * couldn't be read.
      */
     notices?: NoticeChannels | null;
+}
+
+/** The free-cancel hours that apply to a booking with `staffId`. */
+export function freeCancelOf(
+    ctx: Pick<QuickLookContext, "rules" | "freeCancelFor">,
+    staffId: string | null | undefined,
+): number | null {
+    return ctx.freeCancelFor
+        ? ctx.freeCancelFor(staffId)
+        : (ctx.rules?.freeCancelHours ?? null);
 }

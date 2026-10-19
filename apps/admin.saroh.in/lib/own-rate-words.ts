@@ -182,7 +182,7 @@ export function earnsFromProblem(
     return null;
 }
 
-/** "Own rate 4% from 10 Sep", "… until 30 Sep", "Own rate 4% starts 1 Nov". */
+/** "Own rate N% from 10 Sep", "… until 30 Sep", "Own rate N% starts 1 Nov". */
 export function ownRateLine(rate: OwnRateView, rateText: string): string {
     const now = todayInIndia();
     const from =

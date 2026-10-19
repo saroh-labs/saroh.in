@@ -284,7 +284,7 @@ describe.each([
         ).toBe("Booking late for Meera");
     });
 
-    it("an owner's change applies at once, with Undo sending the old rules back", async () => {
+    it("an owner's change applies at once, with Undo sending back only that rule", async () => {
         owner();
         actions.updatePersonRules.mockResolvedValue({
             ok: true,
@@ -314,10 +314,31 @@ describe.each([
         await act(async () => {
             await lastUndo().undo();
         });
-        expect(actions.updatePersonRules).toHaveBeenLastCalledWith(
-            "st_meera",
-            SAME,
-        );
+        // Only the rule it changed: a later change to another stays.
+        expect(actions.updatePersonRules).toHaveBeenLastCalledWith("st_meera", {
+            latestBookingMinutes: SAME.latestBookingMinutes,
+        });
+    });
+
+    it("a second change takes the first one's Undo away", async () => {
+        owner();
+        actions.updatePersonRules.mockResolvedValue({
+            ok: true,
+            data: {
+                applied: true,
+                previous: SAME,
+                rules: view({ ...SAME, latestBookingMinutes: 720 }),
+            },
+        });
+        await press(button(/^Same as the business\. /));
+        await press(button(/^Booking late:/));
+        await press(radio("Up to 12 hours before the start"));
+        await settle();
+        expect(toast.dismissToast).not.toHaveBeenCalled();
+        await press(button(/^Booking late:/));
+        await press(radio("Up to 1 hour before the start"));
+        await settle();
+        expect(toast.dismissToast).toHaveBeenCalledWith("toast");
     });
 
     it("a Member's own change applies at once with Undo while approval is off", async () => {

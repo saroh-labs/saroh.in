@@ -79,11 +79,17 @@ vi.mock("@/lib/staff/actions", () => ({
         api.setStaffServices(...a) as unknown,
 }));
 
-const toast = { showError: vi.fn(), showSuccess: vi.fn(), showUndo: vi.fn() };
+const toast = {
+    showError: vi.fn(),
+    showSuccess: vi.fn(),
+    showUndo: vi.fn(),
+    dismissToast: vi.fn(),
+};
 vi.mock("@saroh/ui/toast", () => ({
     showError: (...a: unknown[]) => toast.showError(...a) as unknown,
     showSuccess: (...a: unknown[]) => toast.showSuccess(...a) as unknown,
     showUndo: (...a: unknown[]) => toast.showUndo(...a) as unknown,
+    dismissToast: (...a: unknown[]) => toast.dismissToast(...a) as unknown,
 }));
 
 const OPENING = [
@@ -625,6 +631,39 @@ describe.each([
         );
         expect(text()).toContain("Your team can't book it from Bookings.");
         expect(text()).toContain("Customers only");
+    });
+
+    it("Undo of an earlier tick puts back only that tick, and the later Undo goes", async () => {
+        toast.showUndo.mockReturnValueOnce("toast_a");
+        open({ saved, staff });
+        await press(tick("Your team, from Bookings"));
+        await press(tick("Customers, on your booking page"));
+        expect(toast.dismissToast).toHaveBeenCalledWith("toast_a");
+        expect(
+            tick("Your team, from Bookings").getAttribute("aria-checked"),
+        ).toBe("false");
+        expect(
+            tick("Customers, on your booking page").getAttribute(
+                "aria-checked",
+            ),
+        ).toBe("false");
+        // The first toast's Undo, pressed late.
+        const undoTeam = toast.showUndo.mock
+            .calls[0]?.[1] as () => Promise<unknown>;
+        await act(async () => {
+            await undoTeam();
+        });
+        expect(api.updateService).toHaveBeenLastCalledWith("sv_1", {
+            bookableByTeam: true,
+        });
+        expect(
+            tick("Your team, from Bookings").getAttribute("aria-checked"),
+        ).toBe("true");
+        expect(
+            tick("Customers, on your booking page").getAttribute(
+                "aria-checked",
+            ),
+        ).toBe("false");
     });
 
     it("reads as three cards, each opening its own panel", async () => {

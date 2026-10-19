@@ -25,6 +25,7 @@ import {
     movedToldText,
 } from "./quick-look-state";
 import type { QuickLookContext } from "./quick-look-types";
+import { freeCancelOf } from "./quick-look-types";
 
 /** "Today, 11:30 am" or "Tue 20 Oct, 10:00 am", in the business's zone. */
 export function whenWords(startAt: string, ctx: QuickLookContext): string {
@@ -272,7 +273,7 @@ export function MoveStep({
                     Only times{" "}
                     {b.staff ? firstName(b.staff.name) : "the service"}{" "}
                     {b.staff ? "is" : "has"} free and nobody has taken.
-                    {ctx.rules?.freeCancelHours != null
+                    {freeCancelOf(ctx, b.staff?.id) !== null
                         ? " Moving keeps the free-cancel time from when it was booked."
                         : ""}
                 </p>

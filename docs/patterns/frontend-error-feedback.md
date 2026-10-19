@@ -99,7 +99,10 @@
   for anything that tells a customer ("Sending in 10 seconds", then "Sent
   to {name}."), and `undo(key)` is the screen's own Undo beside the thing.
   The bookings calendar, Home's Today, invites, sends and held cancels all
-  use it. `showUndo` returns the toast's id, and `dismissToast(id)` takes
+  use it. A commit that throws or answers `{ ok: false }` is said by
+  `useHold` (`UNREACHED`, or the API's reason) and its `onUndo` runs, so
+  return the action's result from the commit, and make `onUndo` take back
+  only this hold's change (a newer mark on the same thing stays). `showUndo` returns the toast's id, and `dismissToast(id)` takes
   that one Undo away when its window closes early.
 - **Current** — **Undo or confirm, never both, never neither.** Reversible:
   do it and offer Undo, no dialog. Irreversible: the one `ConfirmDialog`,

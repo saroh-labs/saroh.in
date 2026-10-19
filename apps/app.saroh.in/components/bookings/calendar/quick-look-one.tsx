@@ -53,6 +53,7 @@ import type {
 } from "./quick-look-state";
 import { moreItems, primaryAction } from "./quick-look-state";
 import type { QuickLookActions, QuickLookContext } from "./quick-look-types";
+import { freeCancelOf } from "./quick-look-types";
 
 /** The person's read for the quick look: their phone and Needs attention. */
 export type PersonRead =
@@ -167,12 +168,12 @@ export function OneLook({
     const rawPhone =
         [b.bookerPhone, read?.phone].map((p) => p?.trim()).find(Boolean) ??
         null;
-    const rule = ctx.rules?.freeCancelHours;
+    const rule = freeCancelOf(ctx, b.staff?.id);
     const help =
         state === "cancelled"
             ? `Cancelled${b.cancelledLate ? " late" : ""}.`
             : open
-              ? `${rule !== null && rule !== undefined ? `Free to cancel until ${count(rule, "hour")} before. ` : ""}${bookingChangeText(read?.reach, first || "they")}`
+              ? `${rule !== null ? `Free to cancel until ${count(rule, "hour")} before. ` : ""}${bookingChangeText(read?.reach, first || "they")}`
               : null;
 
     const rows: MoreRow[] = moreItems(facts, { first, amount }).map((item) => ({

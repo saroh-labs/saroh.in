@@ -293,6 +293,44 @@ with why it stops there:
   and `lib/domains/bare-view.ts`, leaving only the call and "Add ‹domain›"
   from a row. A domain's card is the next seam.
 
+Added or grown past 400 by the Bookings rebuild (#1016, #1035, #1038),
+each with why it stops there:
+
+- `app.saroh.in/components/bookings/calendar/calendar-screen.tsx` (474;
+  908 before the review fixes) — the screen's own state (the peek, the
+  cancelled switch, Add someone) and the layout switch. Its held actions
+  went to `use-calendar-actions.ts`, its free and closed time to
+  `use-gap-targets.ts`, and what each day and week draws, with Header C's
+  facts, to `use-calendar-days.ts`. The three layouts' JSX (day, week,
+  list) is the next seam.
+- `app.saroh.in/components/bookings/new-booking/new-booking-flow.tsx`
+  (690) — the five steps share one draft (who, service, with, when, pay)
+  and `book()`, whose refusals send the flow back to the step they name.
+  The steps' drawing is already `steps.tsx`, `check-step.tsx` and
+  `done-step.tsx`, the reads `use-flow-reads.ts` and the rules
+  `lib/services/new-booking.ts`. `book()` and its refusals, as a hook,
+  are the next cut.
+- `app.saroh.in/components/bookings/sheets/customer-step.tsx` (587) —
+  `useCustomerFinder` (search, the new customer's card, the duplicate
+  check) and the step that draws it, which New booking and the free-time
+  sheet share. The hook is the seam: its own file.
+- `app.saroh.in/components/bookings/sheets/time-picker.tsx` (505) — one
+  picker for New booking, Move and Book their next visit: the read and
+  its retry, the day strip with Pick a date, and the times by part of the
+  day share its day and window. The day strip is the next seam.
+- API, not cut in this batch: `notifications/team-alert.handler.ts` (756;
+  689 before) — every alert's wording (`wordOrder`, `wordFailed`,
+  `wordJoined`, `wordBooking`, `wordSite`) and who it is emailed to,
+  beside the handler; the rule-request 'ask' branch grew it, and the
+  wording functions, one file per kind as `team-alerts.ts` started, are
+  the seam. `staff/staff-rules.service.ts` (560) — read, apply, ask,
+  approve, turn down, withdraw and dismiss share one row lock and one
+  view; the request transitions (`move`, `askInTx`, `answerInTx`) are the
+  next cut. `admin/admin-own-rate.service.ts` (465) — read, preview, set
+  and end a business's own rate around one window rule; the
+  module-level helpers (`windowInTx`, `viewsOf`, `summaryOf`) can move
+  to their own file.
+
 Split rather than listed: `organizations/organization-settings-form.tsx`
 (1,321 before; 219 now) when Settings › Business became rows with a sheet
 each (10 Oct): the page only composes. Its schema, draft and the patch a

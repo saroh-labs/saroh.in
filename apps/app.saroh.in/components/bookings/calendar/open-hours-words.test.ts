@@ -9,6 +9,7 @@ import {
     onTheDay,
     openLengths,
     openStart,
+    withoutRange,
 } from "./open-hours-words";
 
 /** Meera's Monday: 9 to 1, lunch, 3 to 7. */
@@ -107,5 +108,29 @@ describe("the toast's day", () => {
     it("says today, or the day", () => {
         expect(onTheDay("2026-10-19", "2026-10-19")).toBe(", today.");
         expect(onTheDay("2026-10-20", "2026-10-19")).toBe(" on Tue 20 Oct.");
+    });
+});
+
+describe("withoutRange", () => {
+    const r = (d: number, a: number, b: number) => ({
+        dayOfWeek: d,
+        startMinute: a,
+        endMinute: b,
+    });
+    it("takes out only the range added, on its weekday", () => {
+        expect(
+            withoutRange(
+                [r(1, 540, 720), r(2, 540, 720), r(2, 900, 1020)],
+                2,
+                900,
+                1020,
+            ),
+        ).toEqual([r(1, 540, 720), r(2, 540, 720)]);
+    });
+    it("cuts it out of a range the API joined it to", () => {
+        expect(withoutRange([r(2, 540, 1020)], 2, 720, 840)).toEqual([
+            r(2, 540, 720),
+            r(2, 840, 1020),
+        ]);
     });
 });

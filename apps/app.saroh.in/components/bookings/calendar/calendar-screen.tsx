@@ -1,64 +1,24 @@
 "use client";
 
 import { PartialRead } from "@/components/shared/failed-read";
-import { formatClock, formatDay, timeZoneName } from "@/lib/format/datetime";
-import { count } from "@/lib/format/plural";
-import { showError, showInfo, showUndo } from "@saroh/ui/toast";
+import { formatDay, timeZoneName } from "@/lib/format/datetime";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useMemo, useState } from "react";
 
-import { diaryPausedWords } from "@/lib/billing/paused";
-import { formatMoney } from "@/lib/format/money";
 import type { NoticeChannels } from "@/lib/messages/notice-reach";
-import {
-    cancelBooking,
-    recordBookingOutcome,
-    rescheduleBooking,
-} from "@/lib/services/actions";
-import type {
-    BookingsCalendar,
-    DiaryBooking,
-} from "@/lib/services/booking-calendar";
+import type { BookingsCalendar } from "@/lib/services/booking-calendar";
 import type { BookingPeople } from "@/lib/services/booking-pay";
-import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import type { BookingsOpens } from "@/lib/services/bookings-opens";
 import { EVERYONE, OPENS_DEFAULT } from "@/lib/services/bookings-opens";
-import { summaryLine } from "@/lib/services/calendar-header";
 import type { CalendarLayout } from "@/lib/services/calendar-href";
 import { calendarHref } from "@/lib/services/calendar-href";
 import { firstDayName, isFirstDay } from "@/lib/services/day-view";
-import type {
-    Block,
-    Column,
-    LocalDate,
-    ServiceHours,
-    Span,
-} from "@/lib/services/diary";
-import {
-    addDays,
-    blocksOnDay,
-    bookedValue,
-    dayColumns,
-    isLive,
-    localDateOf,
-    localMinuteOf,
-    UNASSIGNED,
-    visibleHours,
-    weekdayOf,
-    weekStartOf,
-    whoFor,
-} from "@/lib/services/diary";
-import {
-    CANCELLED_LINE_MINUTES,
-    closedKind,
-    hoursAcross,
-} from "@/lib/services/diary-view";
-import type { Service, Slot } from "@/lib/services/service";
+import type { Block, LocalDate, ServiceHours } from "@/lib/services/diary";
+import { addDays } from "@/lib/services/diary";
+import type { Service } from "@/lib/services/service";
 import type { BookingRules, StaffView } from "@/lib/staff/types";
 
-import { useHold } from "@/components/shared/use-hold";
-import { firstName as firstNameOf } from "@/lib/names";
 import { TextLink } from "@saroh/ui/text-link";
 import { AddPersonDialog } from "../availability/add-person-dialog";
 import { BookingQuickLook } from "./booking-quick-look";
@@ -70,57 +30,20 @@ import {
     ServiceHoursNote,
 } from "./day-states";
 import { CalendarHeader } from "./header/calendar-header";
-import { columnsFor, dayFactsOf, personChoices } from "./header/header-facts";
 import { useSwipe } from "./header/use-swipe";
 import { ListView } from "./list/list-view";
 import { useOpeningView } from "./list/use-opening-view";
-import type { GapTarget } from "./new-booking-from-gap";
 import { NewBookingFromGap } from "./new-booking-from-gap";
-import type { HoursTarget } from "./open-hours-dialog";
 import { OpenHoursDialog } from "./open-hours-dialog";
-import type { QuickLookActions } from "./quick-look-types";
+import { useCalendarActions, withOverrides } from "./use-calendar-actions";
+import { useCalendarDays } from "./use-calendar-days";
+import { useGapTargets } from "./use-gap-targets";
 import { WeekPhone } from "./week-phone";
 import { WeekView } from "./week-view";
 
 // The calendar's address lives in a plain module so the server page can
 // build it too; a server component can't call into this client file.
 export { calendarHref, type CalendarLayout };
-
-type Override = Partial<
-    Pick<DiaryBooking, "status" | "outcome" | "cancelledLate">
->;
-
-/** The calendar with this screen's held changes applied on top. */
-function withOverrides(
-    calendar: BookingsCalendar,
-    overrides: Record<string, Override>,
-): BookingsCalendar {
-    if (Object.keys(overrides).length === 0) return calendar;
-    const apply = (b: DiaryBooking) => {
-        const o = overrides[b.id] as Override | undefined;
-        return o ? { ...b, ...o } : b;
-    };
-    return {
-        ...calendar,
-        diaries: calendar.diaries.map((d) => ({
-            ...d,
-            bookings: d.bookings.map(apply),
-            classes: d.classes.map((s) => {
-                const bookings = s.bookings.map(apply);
-                return {
-                    ...s,
-                    bookings,
-                    taken: bookings.filter((b) => b.status !== "CANCELLED")
-                        .length,
-                };
-            }),
-        })),
-    };
-}
-
-/** A block's place on the diary's hours: a cancelled one is a thin line. */
-const drawnSpan = (b: Block): Span =>
-    isLive(b) ? [b.start, b.end] : [b.start, b.start + CANCELLED_LINE_MINUTES];
 
 /**
  * Bookings › Calendar (U15, the "Saroh Bookings" design): the day by person
@@ -214,7 +137,6 @@ export function CalendarScreen({
     business?: string | null;
 }) {
     const router = useRouter();
-    const { hold, undo, pending } = useHold();
     // Flipped here and written to the address without a round trip; a
     // navigation that changes what the address says wins.
     const [cancelledShown, setCancelledShown] = useState(showCancelled);
@@ -223,10 +145,7 @@ export function CalendarScreen({
         setAsked(showCancelled);
         setCancelledShown(showCancelled);
     }
-    const [overrides, setOverrides] = useState<Record<string, Override>>({});
     const [peek, setPeek] = useState<string | null>(null);
-    const [gap, setGap] = useState<GapTarget | null>(null);
-    const [hours, setHours] = useState<HoursTarget | null>(null);
     const [addingPerson, setAddingPerson] = useState(false);
     // A phone that nothing has chosen a view for opens on List (Q4, U6);
     // else "Where I left it" (Q15): this device keeps the view it was left on.
@@ -244,170 +163,49 @@ export function CalendarScreen({
         replace,
     });
 
+    const staffById = useMemo(
+        () => new Map((staff ?? []).map((p) => [p.id, p])),
+        [staff],
+    );
+    // What the desk does, each held for its Undo, shown over the read.
+    const { overrides, act, heldFor, freeCancelFor } = useCalendarActions({
+        now,
+        timezone,
+        money: read.money,
+        rules,
+        staffById,
+    });
     const calendar = useMemo(
         () => withOverrides(read, overrides),
         [read, overrides],
     );
     const money = calendar.money;
-    const gapAfter = useMemo(() => {
-        const after = new Map(
-            services.map((s) => [s.id, s.bufferAfterMinutes]),
-        );
-        return (id: string) => after.get(id) ?? 0;
-    }, [services]);
-    const staffById = useMemo(
-        () => new Map((staff ?? []).map((p) => [p.id, p])),
-        [staff],
-    );
-
-    // A gap is offered only when something this person takes fits in it.
-    const minFree = useMemo(() => {
-        const oneToOne = services.filter(
-            (s) => s.status === "ACTIVE" && s.capacity <= 1,
-        );
-        return (person: StaffView) => {
-            const theirs = oneToOne
-                .filter((s) => person.serviceIds.includes(s.id))
-                .map((s) => s.durationMinutes);
-            return theirs.length ? Math.min(...theirs) : 30;
-        };
-    }, [services]);
-    const allColumns = useMemo(
-        () =>
-            dayColumns(
-                calendar,
-                staff,
-                date,
-                timezone,
-                gapAfter,
-                minFree,
-                serviceHours,
-                cancelledShown,
-            ),
-        [
-            calendar,
-            staff,
-            date,
-            timezone,
-            gapAfter,
-            minFree,
-            serviceHours,
-            cancelledShown,
-        ],
-    );
-    // Whose bookings are shown (the chip): one person's column, or all.
-    const person =
-        askedPerson === EVERYONE ||
-        allColumns.some((c) => c.key === askedPerson)
-            ? askedPerson
-            : EVERYONE;
-    const columns = useMemo(
-        () => columnsFor(allColumns, person),
-        [allColumns, person],
-    );
-    // What the day draws, and everything on it (cancelled too) for the
-    // count and for a quick look that stays open over a cancel.
-    const dayBlocks = columns
-        .flatMap((c) => c.blocks)
-        .sort((a, b) => a.start - b.start || a.key.localeCompare(b.key));
-    const shownOf = useMemo(
-        () => (byPerson: Map<string, Block[]>) =>
-            person === EVERYONE
-                ? Array.from(byPerson.values()).flat()
-                : (byPerson.get(person) ?? []),
-        [person],
-    );
-    const everyDayBlock = useMemo(
-        () => shownOf(blocksOnDay(calendar, date, timezone)),
-        [calendar, date, timezone, shownOf],
-    );
-    const weekStart = weekStartOf(date);
-    const week = useMemo(() => {
-        const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-        return days.map((d) => {
-            // The same columns the day draws, so the week agrees with it
-            // about what is open, closed and off.
-            const all = dayColumns(
-                calendar,
-                staff,
-                d,
-                timezone,
-                gapAfter,
-                minFree,
-                serviceHours,
-                cancelledShown,
-            );
-            const cols = columnsFor(all, person);
-            return {
-                all,
-                cols,
-                date: d,
-                label: formatDay(d, { weekday: "short", year: "never" }),
-                blocks: cols
-                    .flatMap((c) => c.blocks)
-                    .sort((a, b) => a.start - b.start),
-                every: shownOf(blocksOnDay(calendar, d, timezone)),
-                hours: hoursAcross(cols),
-                today: d === today,
-                selected: d === date,
-                // "Closed on Sundays" only when nobody shown works that
-                // weekday at all (U5).
-                closed: closedKind(cols, (key) =>
-                    (staffById.get(key)?.hours ?? []).some(
-                        (h) => h.dayOfWeek === weekdayOf(d),
-                    ),
-                ),
-            };
-        });
-    }, [
-        staffById,
+    // What the day or week draws, its totals, and the header's facts.
+    const {
+        person,
+        columns,
+        dayBlocks,
+        week,
+        weekStart,
+        inWeek,
+        span,
+        summary,
+        cancelledCount,
+        everyBlock,
+        facts,
+        choices,
+    } = useCalendarDays({
         calendar,
         staff,
+        staffById,
+        services,
+        layout,
+        date,
+        today,
         timezone,
-        gapAfter,
-        minFree,
         serviceHours,
         cancelledShown,
-        weekStart,
-        today,
-        date,
-        person,
-        shownOf,
-    ]);
-
-    const inWeek = layout === "week";
-    const shownBlocks = inWeek ? week.flatMap((d) => d.blocks) : dayBlocks;
-    const everyBlock = inWeek ? week.flatMap((d) => d.every) : everyDayBlock;
-    const openHours = inWeek
-        ? week.flatMap((d) => d.hours?.windows ?? [])
-        : columns.flatMap((c) => c.day?.windows ?? []);
-    const span: Span = visibleHours(openHours, shownBlocks.map(drawnSpan));
-    const live = everyBlock.filter(isLive);
-    const cancelledCount = everyBlock.length - live.length;
-    const value = bookedValue(everyBlock, money);
-    const first = everyBlock.at(0);
-    const currencyCode = first
-        ? ((first.kind === "one"
-              ? first.booking.service.currency
-              : first.session.service.currency) ?? null)
-        : null;
-    // The week's totals cover all seven days, even on a phone, where the list
-    // under them shows one day at a time. Free times only with the hours.
-    const freeCount =
-        staff === null
-            ? null
-            : (inWeek ? week.flatMap((d) => d.cols) : columns).reduce(
-                  (n, c) => n + (c.day?.free.length ?? 0),
-                  0,
-              );
-    const summary = summaryLine({
-        booked: live.length,
-        free: freeCount,
-        money:
-            value !== null && currencyCode
-                ? formatMoney(value, currencyCode)
-                : null,
-        cancelledShown: cancelledShown ? cancelledCount : 0,
+        askedPerson,
     });
 
     // From everything on the view, drawn or not: a booking cancelled from
@@ -419,202 +217,17 @@ export function CalendarScreen({
           null)
         : null;
 
-    // ── What the desk does, held for Undo ──────────────────────────────────
-
-    const setOverride = (id: string, o: Override | null) =>
-        setOverrides((all) => {
-            const next = { ...all };
-            // Replaced, not merged: Undo puts back exactly what was there.
-            if (o) next[id] = { ...o };
-            else delete next[id];
-            return next;
-        });
-
-    const firstName = (b: DiaryBooking) => firstNameOf(whoFor(b));
-    const isClassSeat = (b: DiaryBooking) => b.service.capacity > 1;
-    const lateNow = (b: DiaryBooking) =>
-        rules?.freeCancelHours !== null &&
-        rules?.freeCancelHours !== undefined &&
-        now > Date.parse(b.startAt) - rules.freeCancelHours * 3_600_000;
-
-    const act: QuickLookActions = {
-        checkIn(b) {
-            const was = overrides[b.id] ?? null;
-            setOverride(b.id, { outcome: "ATTENDED" });
-            const price =
-                money && b.paidWith === "DESK"
-                    ? formatMoney(
-                          b.service.priceCents ?? null,
-                          b.service.currency ?? null,
-                      )
-                    : null;
-            hold(
-                `outcome:${b.id}`,
-                `${firstName(b)} ${BOOKING_WORDS.came.toLowerCase()}.${price ? ` Take ${price} now.` : ""}`,
-                async () => {
-                    const res = await recordBookingOutcome(b.id, "ATTENDED");
-                    if (!res.ok) {
-                        showError(res.error);
-                        setOverride(b.id, was);
-                    }
-                    router.refresh();
-                },
-                () => setOverride(b.id, was),
-            );
-        },
-        noShow(b) {
-            const was = overrides[b.id] ?? null;
-            setOverride(b.id, { outcome: "NO_SHOW" });
-            hold(
-                `outcome:${b.id}`,
-                `Marked ${firstName(b)} as ${BOOKING_WORDS.didntCome.toLowerCase()}.`,
-                async () => {
-                    const res = await recordBookingOutcome(b.id, "NO_SHOW");
-                    if (!res.ok) {
-                        showError(res.error);
-                        setOverride(b.id, was);
-                    }
-                    router.refresh();
-                },
-                () => setOverride(b.id, was),
-            );
-        },
-        cancel(b) {
-            const was = overrides[b.id] ?? null;
-            const late = lateNow(b);
-            const prepaid =
-                b.paidWith === "PACK" || b.paidWith === "MEMBERSHIP";
-            setOverride(b.id, { status: "CANCELLED", cancelledLate: late });
-            const who = firstName(b);
-            const message = isClassSeat(b)
-                ? prepaid
-                    ? late
-                        ? `${who}'s place cancelled. Within ${rules?.freeCancelHours} hours, so the class is used.`
-                        : `${who}'s place cancelled. The class goes back to the ${b.paidWith === "PACK" ? "pack" : "membership"}.`
-                    : `${who}'s place cancelled.`
-                : `Cancelled ${who}'s ${formatClock(localMinuteOf(b.startAt, timezone))}.`;
-            hold(
-                `cancel:${b.id}`,
-                message,
-                async () => {
-                    const res = await cancelBooking(b.id);
-                    if (!res.ok) {
-                        showError(res.error);
-                        setOverride(b.id, was);
-                    }
-                    router.refresh();
-                },
-                () => setOverride(b.id, was),
-            );
-        },
-        cancelClass(seats, title) {
-            const was = Object.fromEntries(
-                seats.map((b) => [b.id, overrides[b.id] ?? null]),
-            );
-            for (const b of seats) {
-                setOverride(b.id, {
-                    status: "CANCELLED",
-                    cancelledLate: false,
-                });
-            }
-            const back = seats.filter(
-                (b) => b.paidWith === "PACK" || b.paidWith === "MEMBERSHIP",
-            ).length;
-            hold(
-                `class:${seats.map((b) => b.id).join(",")}`,
-                `${title} cancelled.${back ? ` ${count(back, "class", "classes")} given back.` : ""}`,
-                async () => {
-                    let failed = 0;
-                    for (const b of seats) {
-                        const res = await cancelBooking(b.id, {
-                            returnCredit: true,
-                            closesClass: true,
-                        });
-                        if (!res.ok) {
-                            failed += 1;
-                            setOverride(b.id, was[b.id] ?? null);
-                        }
-                    }
-                    if (failed) {
-                        showError(
-                            `${count(failed, "place")} could not be cancelled.`,
-                            "The rest are. Open the class to try those again.",
-                        );
-                    }
-                    router.refresh();
-                },
-                () => {
-                    for (const b of seats) setOverride(b.id, was[b.id] ?? null);
-                },
-            );
-        },
-        move(b, slot: Slot) {
-            void rescheduleBooking(b.id, slot.startAt).then((res) => {
-                if (!res.ok) {
-                    showError(res.error);
-                    router.refresh();
-                    return;
-                }
-                setPeek(null);
-                router.refresh();
-                const to = `${formatDay(localDateOf(slot.startAt, timezone), { weekday: "short", year: "never" })} at ${formatClock(localMinuteOf(slot.startAt, timezone))}`;
-                showUndo(`Moved ${firstName(b)} to ${to}.`, async () => {
-                    const back = await rescheduleBooking(b.id, b.startAt);
-                    router.refresh();
-                    return back;
-                });
-            });
-        },
-    };
-
-    // ── Free gaps and closed time ──────────────────────────────────────────
-
-    function bookGap(column: Column, free: Span, on: LocalDate = date) {
-        const person = staffById.get(column.key);
-        if (!person) return;
-        // Past the plan's team limit (#800): no new bookings with them, and
-        // why, rather than a form the API would refuse.
-        if (person.paused) {
-            showInfo(diaryPausedWords([person.name]));
-            return;
-        }
-        setGap({ staff: person, date: on, free });
-    }
-
-    // A day nobody works, from the week (U5): open hours for whoever is
-    // picked, else the viewer when they take bookings, else the first
-    // person on the diary, from when they usually start.
-    function openDay(on: LocalDate) {
-        const who =
-            staffById.get(person) ??
-            (me ? staffById.get(me.id) : undefined) ??
-            (staff ?? []).find((p) => p.status === "ACTIVE");
-        if (!who) return;
-        const starts = who.hours.map((h) => h.startMinute);
-        setHours({
-            staff: who,
-            date: on,
-            from: starts.length ? Math.min(...starts) : 540,
-            windows: [],
-            blocks: [],
-        });
-    }
-    const offersFree = (c: Column) => {
-        const p = staffById.get(c.key);
-        return c.key !== UNASSIGNED && p !== undefined && !p.paused;
-    };
-
-    function openClosed(column: Column, minute: number) {
-        const person = staffById.get(column.key);
-        if (!person) return;
-        setHours({
-            staff: person,
-            date,
-            from: minute,
-            windows: column.day?.windows ?? [],
-            blocks: column.blocks,
-        });
-    }
+    // Free gaps and closed time: the sheets they open.
+    const {
+        gap,
+        hours,
+        closeGap,
+        closeHours,
+        bookGap,
+        openDay,
+        offersFree,
+        openClosed,
+    } = useGapTargets({ date, person, me, staff, staffById });
 
     const hrefFor = (l: CalendarLayout, d: LocalDate, who = person) =>
         calendarHref(l, d, { cancelled: cancelledShown, person: who });
@@ -635,45 +248,6 @@ export function CalendarScreen({
             calendarHref(layout, date, { cancelled: on, person }),
         );
     };
-
-    // ── Header C: whose bookings, and what each day holds ─────────────────
-    const readFirst = calendar.from
-        ? localDateOf(calendar.from, timezone)
-        : date;
-    const readLast = calendar.to
-        ? localDateOf(new Date(Date.parse(calendar.to) - 1), timezone)
-        : date;
-    const facts = useMemo(
-        () =>
-            dayFactsOf({
-                calendar,
-                staff,
-                timezone,
-                gapAfter,
-                minFree,
-                serviceHours,
-                person,
-                first: readFirst,
-                last: readLast,
-            }),
-        [
-            calendar,
-            staff,
-            timezone,
-            gapAfter,
-            minFree,
-            serviceHours,
-            person,
-            readFirst,
-            readLast,
-        ],
-    );
-    const periodColumns = inWeek ? week.flatMap((d) => d.all) : allColumns;
-    const choices = personChoices(staff, allColumns, (key) =>
-        periodColumns
-            .filter((c) => key === EVERYONE || c.key === key)
-            .reduce((n, c) => n + c.blocks.filter(isLive).length, 0),
-    );
 
     const nobodyYet =
         staff !== null &&
@@ -857,6 +431,7 @@ export function CalendarScreen({
                     now,
                     money,
                     rules,
+                    freeCancelFor,
                     canBook: can.book,
                     canRefund: can.refund ?? false,
                     canEditService: can.addPeople ?? false,
@@ -865,16 +440,7 @@ export function CalendarScreen({
                     notices,
                 }}
                 act={act}
-                heldFor={(id) => {
-                    const key = pending.find(
-                        (k) =>
-                            k === `outcome:${id}` ||
-                            k === `cancel:${id}` ||
-                            (k.startsWith("class:") &&
-                                k.slice(6).split(",").includes(id)),
-                    );
-                    return key ? () => undo(key) : null;
-                }}
+                heldFor={heldFor}
             />
             <NewBookingFromGap
                 target={gap}
@@ -885,12 +451,12 @@ export function CalendarScreen({
                 money={money}
                 canHours={can.hours}
                 business={business}
-                onClose={() => setGap(null)}
+                onClose={closeGap}
             />
             <OpenHoursDialog
                 target={hours}
                 today={today}
-                onClose={() => setHours(null)}
+                onClose={closeHours}
             />
             {/* Adding someone is a name and what they do, so it is done
                 here; the dialog refreshes the calendar, which gives them

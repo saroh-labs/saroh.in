@@ -4,6 +4,7 @@ import * as AvatarPrimitive from "@radix-ui/react-avatar";
 import type { VariantProps } from "class-variance-authority";
 import { cva } from "class-variance-authority";
 import * as React from "react";
+import { nameInitials } from "../../lib/names";
 import { cn } from "../../lib/utils";
 
 /*
@@ -153,38 +154,8 @@ function RoleDot({
     );
 }
 
-/** Titles that come before a name (lower case, without the full stop). */
-const AVATAR_TITLES = new Set([
-    "dr",
-    "mr",
-    "mrs",
-    "ms",
-    "miss",
-    "prof",
-    "shri",
-    "smt",
-]);
-
 /** Two letters from a name, or the first of an email when there is no name. */
-function avatarInitials(name: string | null | undefined, email?: string) {
-    // Words that start with a letter: "Priya (reviewer)" is "PR", not "P(".
-    const words = (name ?? "")
-        .trim()
-        .split(/[\s&]+/)
-        .filter((w) => /^[A-Za-zÀ-ÿ]/.test(w));
-    // A title isn't what anyone is called by: "Dr. Arun Pillai" is "AP".
-    const named = words.filter(
-        (w) => !AVATAR_TITLES.has(w.replace(/\.$/, "").toLowerCase()),
-    );
-    if (named.length > 0 && named.length < words.length) {
-        words.splice(0, words.length, ...named);
-    }
-    const first = words.at(0) ?? "";
-    const last = words.at(-1) ?? "";
-    if (words.length >= 2) return `${first[0]}${last[0]}`.toUpperCase();
-    if (first) return first.slice(0, 2).toUpperCase();
-    return (email ?? "?").slice(0, 1).toUpperCase();
-}
+const avatarInitials = nameInitials;
 
 const Avatar = React.forwardRef<
     React.ElementRef<typeof AvatarPrimitive.Root>,

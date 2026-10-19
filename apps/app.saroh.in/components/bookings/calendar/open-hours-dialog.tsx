@@ -32,6 +32,7 @@ import {
     openLengths,
     openStart,
     rangeOf,
+    withoutRange,
 } from "./open-hours-words";
 import { Eyebrow } from "./parts";
 
@@ -166,12 +167,19 @@ function Form({
             );
             if (!res) return;
             if (!res.ok) return setRefusal(res.error);
+            // The week as saved, without the range just added: Undo takes
+            // back only that, never a change made to the week since the
+            // sheet opened.
+            const saved = res.data.staff.hours;
             onClose();
             router.refresh();
             showUndo(
                 `Opened ${range} for ${who}, every ${weekday}.`,
                 async () => {
-                    const back = await replaceStaffHours(staff.id, before);
+                    const back = await replaceStaffHours(
+                        staff.id,
+                        withoutRange(saved, weekdayOf(date), from, to),
+                    );
                     router.refresh();
                     return back;
                 },

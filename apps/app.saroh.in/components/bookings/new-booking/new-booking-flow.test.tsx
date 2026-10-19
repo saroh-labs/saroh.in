@@ -735,6 +735,28 @@ describe("New booking, each state", () => {
         expect(text()).toContain("From Farah's class pack");
     });
 
+    it("says when the customer's class packs couldn't be read, and reads again", async () => {
+        packsFor.mockRejectedValueOnce(new Error("offline"));
+        await open();
+        typeInto(search(), "Farah");
+        await settle();
+        await press(customer("Farah Khan"));
+        await press(choice("Mat Pilates"));
+        await press(foot());
+        await press(choice(/^Tue 20 Oct/));
+        await press(choice(/^7:00 am/));
+        await press(foot());
+        await settle();
+        expect(text()).toContain("Couldn't check Farah's class packs.");
+        const again = Array.from(document.querySelectorAll("button")).find(
+            (b) => b.textContent === "Try again",
+        );
+        await press(again ?? null);
+        await settle();
+        expect(packsFor).toHaveBeenCalledTimes(2);
+        expect(text()).not.toContain("Couldn't check Farah's class packs.");
+    });
+
     it("leaves off a service only customers book, and says so when that is all", async () => {
         await open({ services: [ONLINE_ONLY] });
         await press(customer("Kabir Singh"));
@@ -817,6 +839,23 @@ describe("New booking, each state", () => {
         await settle();
         expect(choice(/^Thu 22 Oct/).getAttribute("aria-checked")).toBe("true");
         expect(choice(/^9:30 am/)).toBeTruthy();
+    });
+
+    it("someone it can't be booked for is said at Book, never a Book that does nothing", async () => {
+        await open({}, { who: { kind: "walk-in", name: "Ravi", phone: "" } });
+        await press(choice("Physio assessment"));
+        await press(foot());
+        await press(foot());
+        await settle();
+        await press(choice(/^Tue 20 Oct/));
+        await settle();
+        await press(choice(/^9:00 am/));
+        await press(foot());
+        await settle();
+        await press(foot());
+        await settle();
+        expect(bookByHand).not.toHaveBeenCalled();
+        expect(text()).toContain("Pick who it's for, or add them.");
     });
 
     it("from a customer's page, starts at what they are booking", async () => {

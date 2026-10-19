@@ -26,6 +26,7 @@ import type {
     QuickLookActions,
     QuickLookContext,
 } from "./quick-look-types";
+import { freeCancelOf } from "./quick-look-types";
 
 const HOUR = 3_600_000;
 
@@ -62,7 +63,7 @@ export function ClassSeats({
 }) {
     if (session.bookings.length === 0) return null;
     const start = Date.parse(session.startAt);
-    const rule = ctx.rules?.freeCancelHours ?? null;
+    const rule = freeCancelOf(ctx, session.staff?.id);
     let note = "";
     if (rule !== null && ctx.now < start) {
         const mark = new Date(start - rule * HOUR);

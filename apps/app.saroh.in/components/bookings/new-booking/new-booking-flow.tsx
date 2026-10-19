@@ -185,7 +185,10 @@ export function NewBookingFlow({
         setup.canUsePacks && contactId && serviceId
             ? `${contactId}:${serviceId}`
             : null;
-    const heldPacks = useHeldPacks(packKey, reload);
+    const { packs: heldPacks, failed: packsFailed } = useHeldPacks(
+        packKey,
+        reload,
+    );
     const usable = startAt ? usablePacks(heldPacks, startAt) : [];
     const pack = usable.find((p) => p.id === packId) ?? usable.at(0);
     const paying = usePack && pack !== undefined;
@@ -224,7 +227,10 @@ export function NewBookingFlow({
     useToastsAboveFoot(foot);
 
     const draft = {
-        who: who !== null,
+        // Someone the booking can be made for: a customer, or a new one
+        // with a phone and name or an email. Anything less is said at Who,
+        // never a Book that does nothing.
+        who: bookerFor(who) !== null,
         hasServices: services.length > 0,
         serviceId,
         startAt,
@@ -247,7 +253,11 @@ export function NewBookingFlow({
         setTried(true);
         if (saving || missing || payGap || !service || !startAt) return;
         const booker = bookerFor(who);
-        if (!booker) return;
+        if (!booker) {
+            go(1);
+            setTried(true);
+            return;
+        }
         setSaving(true);
         setRefusal(null);
         setPackRefusal(null);
@@ -608,6 +618,15 @@ export function NewBookingFlow({
                                     : null
                             }
                             packRefusal={packRefusal}
+                            packsFailed={
+                                packsFailed
+                                    ? {
+                                          first,
+                                          onRetry: () =>
+                                              setReload((n) => n + 1),
+                                      }
+                                    : null
+                            }
                             refusal={refusal}
                         />
                     ) : null}

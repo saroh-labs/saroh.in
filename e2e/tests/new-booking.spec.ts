@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 
 import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
 import { northwind, phone, stamp } from "../fixtures/own-data";
+import { ownService } from "../fixtures/own-service";
 import { useSession } from "../fixtures/sessions";
 
 /**
@@ -12,7 +13,9 @@ import { useSession } from "../fixtures/sessions";
  * screen on a phone, a wide side panel with a step list at a desk.
  *
  * Writes go to Northwind only: the caller is made by the test with a name
- * and phone of its own (DEC-170), and the booking it makes is cancelled
+ * and phone of its own (DEC-170), on a service the test makes for itself
+ * (`fixtures/own-service.ts`), so the time it books is its own and no test
+ * beside it can take it. The booking is cancelled and the service archived
  * before it ends. The day it opens on is read, never written.
  */
 
@@ -41,91 +44,106 @@ test.describe("New booking, step by step (U8)", () => {
         await signIn(page);
         const s = stamp(testInfo);
         const name = `Zara ${s}`;
-        await page.goto("/bookings");
-        await newBooking(page).click();
-        const sheet = page.getByRole("dialog", { name: "New booking" });
-        await expect(sheet).toBeVisible();
-        await expect(
-            sheet.getByText("Step 1 of 5 · Customer").first(),
-        ).toBeVisible();
-
-        // Who: a caller by name and phone alone.
-        await sheet.getByLabel("Find the customer").fill(name);
-        await sheet
-            .getByRole("button", { name: new RegExp(`Add “${name}”`) })
-            .click();
-        await sheet.getByLabel("Phone").fill(phone().replace("+91 ", ""));
-        await expect(next(sheet)).toHaveText("Add and use");
-        await next(sheet).click();
-
-        // What: the first service the team books.
-        await expect(
-            sheet.getByText("Step 2 of 5 · Service").first(),
-        ).toBeVisible();
-        await sheet
-            .getByRole("radiogroup", { name: "Service" })
-            .getByRole("radio")
-            .first()
-            .click();
-        await next(sheet).click();
-
-        // With, where it is asked: Anyone free is already picked.
-        const when = sheet.getByText("Step 4 of 5 · Day and time").first();
-        if (!(await when.isVisible())) {
+        const service = await ownService(page.request, testInfo, "Steps");
+        let bookingId: string | null = null;
+        try {
+            await page.goto("/bookings");
+            await newBooking(page).click();
+            const sheet = page.getByRole("dialog", { name: "New booking" });
+            await expect(sheet).toBeVisible();
             await expect(
-                sheet.getByRole("radio", { name: /Anyone free/ }),
-            ).toBeChecked();
+                sheet.getByText("Step 1 of 5 · Customer").first(),
+            ).toBeVisible();
+
+            // Who: a caller by name and phone alone.
+            await sheet.getByLabel("Find the customer").fill(name);
+            await sheet
+                .getByRole("button", { name: new RegExp(`Add “${name}”`) })
+                .click();
+            await sheet.getByLabel("Phone").fill(phone().replace("+91 ", ""));
+            await expect(next(sheet)).toHaveText("Add and use");
             await next(sheet).click();
+
+            // What: this test's own service.
+            await expect(
+                sheet.getByText("Step 2 of 5 · Service").first(),
+            ).toBeVisible();
+            await sheet
+                .getByRole("radiogroup", { name: "Service" })
+                .getByRole("radio", {
+                    name: new RegExp(
+                        service.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+                    ),
+                })
+                .click();
+            await next(sheet).click();
+
+            // With, where it is asked: nobody takes this service, so it isn't.
+            const when = sheet.getByText("Step 4 of 5 · Day and time").first();
+            const withWho = sheet.getByText(/^Step 3 of 5/).first();
+            await expect(when.or(withWho)).toBeVisible();
+            if (await withWho.isVisible()) await next(sheet).click();
+            await expect(when).toBeVisible();
+
+            // When: a free time today, else the next free day's; the service
+            // is open all day and only this test books it.
+            const time = sheet
+                .getByRole("radio", { name: /^\d{1,2}:\d\d [ap]m/ })
+                .first();
+            await expect(
+                time.or(sheet.getByRole("button", { name: /^Next free day/ })),
+            ).toBeVisible();
+            if (!(await time.isVisible())) {
+                await sheet
+                    .getByRole("button", { name: /^Next free day/ })
+                    .click();
+            }
+            await time.click();
+            await next(sheet).click();
+
+            // Check and book: Pays at the visit is picked (DEC-170).
+            await expect(
+                sheet.getByText("Step 5 of 5 · Check and book").first(),
+            ).toBeVisible();
+            await expect(
+                sheet.getByRole("radio", { name: /Pays at the visit/ }),
+            ).toBeChecked();
+            await expect(next(sheet)).toHaveText(/^Book Zara · /);
+            await next(sheet).click();
+
+            // Booked: what next, through the phone's own apps (Q12).
+            await expect(
+                sheet.getByRole("heading", { name: "Zara is booked" }),
+            ).toBeVisible();
+            await expect(
+                sheet.getByRole("link", {
+                    name: /Send confirmation on WhatsApp/,
+                }),
+            ).toHaveAttribute(
+                "href",
+                /^https:\/\/wa\.me\/91\d{10}\?text=Hi%20Zara/,
+            );
+            await expect(
+                sheet.getByRole("link", { name: /Send it by SMS/ }),
+            ).toHaveAttribute("href", /^sms:\+91\d{10}\?&body=/);
+            await expectNothingHiddenSideways(page);
+
+            // Its own booking goes: cancelled through the API.
+            const view = await sheet
+                .getByRole("link", { name: "View booking" })
+                .filter({ visible: true })
+                .first()
+                .getAttribute("href");
+            bookingId = view?.split("/").at(-1) ?? null;
+            expect(bookingId).toBeTruthy();
+        } finally {
+            if (bookingId) {
+                await northwind(page.request).delete(
+                    `/services/bookings/${bookingId}`,
+                );
+            }
+            await service.remove();
         }
-        await expect(when).toBeVisible();
-
-        // When: a free time today, else the next free day's.
-        const time = sheet
-            .getByRole("radio", { name: /^\d{1,2}:\d\d [ap]m/ })
-            .first();
-        await expect(
-            time.or(sheet.getByRole("button", { name: /^Next free day/ })),
-        ).toBeVisible();
-        if (!(await time.isVisible())) {
-            await sheet.getByRole("button", { name: /^Next free day/ }).click();
-        }
-        await time.click();
-        await next(sheet).click();
-
-        // Check and book: Pays at the visit is picked (DEC-170).
-        await expect(
-            sheet.getByText("Step 5 of 5 · Check and book").first(),
-        ).toBeVisible();
-        await expect(
-            sheet.getByRole("radio", { name: /Pays at the visit/ }),
-        ).toBeChecked();
-        await expect(next(sheet)).toHaveText(/^Book Zara · /);
-        await next(sheet).click();
-
-        // Booked: what next, through the phone's own apps (Q12).
-        await expect(
-            sheet.getByRole("heading", { name: "Zara is booked" }),
-        ).toBeVisible();
-        await expect(
-            sheet.getByRole("link", { name: /Send confirmation on WhatsApp/ }),
-        ).toHaveAttribute(
-            "href",
-            /^https:\/\/wa\.me\/91\d{10}\?text=Hi%20Zara/,
-        );
-        await expect(
-            sheet.getByRole("link", { name: /Send it by SMS/ }),
-        ).toHaveAttribute("href", /^sms:\+91\d{10}\?&body=/);
-        await expectNothingHiddenSideways(page);
-
-        // Its own booking goes: cancelled through the API.
-        const view = await sheet
-            .getByRole("link", { name: "View booking" })
-            .filter({ visible: true })
-            .first()
-            .getAttribute("href");
-        const id = view?.split("/").at(-1);
-        expect(id).toBeTruthy();
-        await northwind(page.request).delete(`/services/bookings/${id}`);
     });
 
     test("opens on the day the Calendar asked for, and closing leaves the address", async ({

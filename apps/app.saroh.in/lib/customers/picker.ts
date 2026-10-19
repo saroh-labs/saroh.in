@@ -5,7 +5,7 @@
  * What is here only reads what was typed into the fields it belongs in.
  */
 
-import { withoutTitle } from "@/lib/names";
+import { initials } from "@/lib/names";
 import { phoneNumberProblem } from "@saroh/block-contract";
 
 /** Why a search result is exactly what was typed (C2's rules, on the API). */
@@ -119,14 +119,9 @@ export function listLabel(typed: string, found: number): string {
     return found > 0 ? "Matches" : `No one called “${text}” yet`;
 }
 
-/** "Kabir Singh" → "KS"; one letter for one word, "?" for none. */
+/** "Kabir Singh" → "KS": the one rule for initials (`lib/names.ts`). */
 export function initialsOf(name: string | null): string {
-    const words = withoutTitle(name).split(/\s+/).filter(Boolean);
-    if (words.length === 0) return "?";
-    return words
-        .slice(0, 2)
-        .map((w) => w.charAt(0).toUpperCase())
-        .join("");
+    return initials(name);
 }
 
 /** What is wrong with a new customer's fields, by field. */
@@ -190,12 +185,6 @@ export function exactly(
 ): CustomerSearchResult | undefined {
     return results.find((r) => r.exactOn.includes(on));
 }
-
-/**
- * Fewest digits a walk-in's phone keeps them by: the API's rule (C2's
- * `normalisePhone`).
- */
-export const MIN_WALK_IN_PHONE_DIGITS = 7;
 
 /** What a walk-in's phone field holds: nothing, too little, or a phone. */
 export type WalkInPhone = "none" | "short" | "phone";

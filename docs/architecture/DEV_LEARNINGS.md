@@ -5311,6 +5311,16 @@ rule stands for the profile's own fields.
 
 **Rule.** In a hand check, empty a field the way a person does: click it, Select all (Meta+A), Backspace (`press_key`), never `fill("")`. Before calling a "clearing doesn't save" bug, read the field's value back from React's side (the form's request, or the field after a re-render), not the box. `docs/patterns/frontend-verification.md`.
 
+### A held Came or cancel that never got there stayed on screen (19 Oct 2026)
+
+**Symptom.** Review of the Bookings rebuild: Came, Didn't come, a cancel and a class cancel on the calendar, All bookings and the booking page are held ten seconds, then written. When the write threw (offline, a deploy mid-request) the row stayed Came or Cancelled with no message and nothing saved; a refused first mark also wiped a newer mark made inside the ten seconds. Several Undos had the same shape: Undo sent a whole snapshot (the week as the sheet opened, all four person rules, every "Who can book it" box) over changes made since.
+
+**Cause.** `startHold` ends a hold whose commit throws as `failed`, and `useHold` only dropped it: no `onUndo`, no toast. Each screen's refusal branch restored its "was" value unconditionally. And Undos were written as "put back the state before", not "take back this change".
+
+**Fix.** `useHold` catches a commit that throws (`UNREACHED`) or answers `{ ok: false }` (the API's reason), says it and runs `onUndo`; callers return the action's result and their `onUndo` restores only while their own mark is still shown (`use-calendar-actions.ts`, `bookings-view.tsx`, `use-outcome-mark.ts`). Undos send only what their change changed: person rules the one key, "Every <weekday>" the week as saved minus its range, "Who can book it" its own fields merged into what is shown; and a new change dismisses the previous Undo toast.
+
+**Rule.** A held commit returns its result to `useHold` and never swallows a throw itself; its `onUndo` takes back only its own change. An Undo sends the inverse of its change, never a snapshot of the whole thing. `docs/patterns/frontend-error-feedback.md` → the ten-second hold.
+
 ### Review of the Bookings rebuild: races a sequential spec never sees (19 Oct 2026)
 
 **Symptom.** The code review of batch-2026-10-19-1 found, with every spec green: asking again for a rules change could overwrite an approval or turn-down that committed first (a 500 against the decided-reason check); two people saving different rules of one person lost one change, and Undo put back a change someone else made; two `PUT saved-views` at once left two "opens on" rows; a backdated own rate over a replaced one hit the table's trigger (500); the sweep re-picked an invoice forever when the month's first later manager was off commission; and booking a new phone could make a second contact beside a walk-in order's.

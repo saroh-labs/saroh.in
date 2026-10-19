@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 
 import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
 import {
+    phone as aPhone,
     aService,
     bookOwn,
     makeContact,
@@ -360,40 +361,34 @@ test.describe("bookings calendar", () => {
         }
     });
 
-    test("a booking with no phone says where to add one", async ({ page }) => {
-        await signIn(page);
-        const from = new Date().toISOString();
-        const to = new Date(Date.now() + 7 * 86_400_000).toISOString();
-        const candidates = (await diaries(page.request, from, to))
-            .filter((d) => d.person)
-            .flatMap((d) => d.bookings)
-            .filter(
-                (b) =>
-                    b.status === "CONFIRMED" &&
-                    b.bookerName &&
-                    b.contact &&
-                    !b.bookerPhone,
+    test("a booking with no phone says where to add one", async ({
+        page,
+    }, testInfo) => {
+        // On Northwind, with a customer of its own who has no phone and a
+        // booking for them: the seed's phones are not this test's to rely on.
+        await useSession(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const s = ownStamp(testInfo);
+        const who = await makeContact(page.request, {
+            firstName: "Nophone",
+            lastName: s,
+            email: `nophone-${s}@example.test`,
+        });
+        const booked = await bookOwn(page.request, who.id);
+        try {
+            const sheet = await openPeek(page, {
+                startAt: booked.startAt,
+                bookerName: who.name,
+            });
+            await expect(
+                sheet.getByText("No phone yet. Add it on their page"),
+            ).toBeVisible();
+        } finally {
+            await northwind(page.request).delete(
+                `/services/bookings/${booked.id}`,
             );
-        let found: (typeof candidates)[number] | undefined;
-        for (const b of candidates) {
-            const res = await page.request.get(
-                api(`/contacts/${b.contact?.id}`),
-                { headers: orgHeader },
-            );
-            if (
-                res.ok() &&
-                !((await res.json()) as { phone: string | null }).phone
-            ) {
-                found = b;
-                break;
-            }
+            await northwind(page.request).delete(`/contacts/${who.id}`);
         }
-        test.skip(!found, "Every upcoming booking has a phone in the seed");
-        if (!found) return;
-        const sheet = await openPeek(page, found);
-        await expect(
-            sheet.getByText("No phone yet. Add it on their page"),
-        ).toBeVisible();
     });
 
     test("cancel from the quick look, then Undo: nothing is sent", async ({
@@ -708,7 +703,12 @@ test.describe("the List (U6)", () => {
             .filter((d) => d.person)
             .flatMap((d) => d.bookings)
             .find((b) => b.status === "CONFIRMED" && b.bookerName);
-        test.skip(!found, "No one-to-one booking in the seed's fortnight");
+        // Pulse is the showcase gym: its seed books every fortnight. None
+        // is a broken seed, not a reason to pass.
+        expect(
+            found,
+            "Pulse has a one-to-one booking in the fortnight",
+        ).toBeTruthy();
         if (!found) return;
         const day = new Date(Date.parse(found.startAt) + IST_OFFSET_MS)
             .toISOString()
@@ -823,66 +823,61 @@ test.describe("the List (U6)", () => {
 test.describe("New booking finds the customer (E4)", () => {
     test("the last 4 digits of a phone find them, +91 or not, and nothing is saved", async ({
         page,
-    }) => {
-        await signIn(page);
-        const people = (await (
-            await page.request.get(api("/contacts"), { headers: orgHeader })
-        ).json()) as {
-            id: string;
-            firstName: string | null;
-            lastName: string | null;
-            phone: string | null;
-        }[];
-        const withPhone = people.find(
-            (c) =>
-                c.firstName && (c.phone ?? "").replace(/\D/g, "").length >= 10,
-        );
-        test.skip(!withPhone, "Nobody on Pulse has a phone");
-        if (!withPhone) return;
-        const digits = (withPhone.phone ?? "").replace(/\D/g, "").slice(-10);
-        const name = [withPhone.firstName, withPhone.lastName]
-            .filter(Boolean)
-            .join(" ");
+    }, testInfo) => {
+        // On Northwind, with a customer of its own and a phone no other test
+        // holds: nothing about the seed's phones is assumed.
+        await useSession(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const s = ownStamp(testInfo);
+        const number = aPhone();
+        const made = await makeContact(page.request, {
+            firstName: "Digits",
+            lastName: s,
+            email: `digits-${s}@example.test`,
+            phone: number,
+        });
+        try {
+            const digits = number.replace(/\D/g, "").slice(-10);
 
-        // The search itself: the same person by +91 and without.
-        const ids = async (q: string) =>
-            (
-                (await (
-                    await page.request.get(
-                        api(`/contacts/search?q=${encodeURIComponent(q)}`),
-                        { headers: orgHeader },
+            // The search itself: the same person by +91 and without.
+            const ids = async (q: string) =>
+                (
+                    await northwind(page.request).get<{ id: string }[]>(
+                        `/contacts/search?q=${encodeURIComponent(q)}`,
                     )
-                ).json()) as { id: string }[]
-            ).map((r) => r.id);
-        expect(await ids(`+91 ${digits}`)).toContain(withPhone.id);
-        expect(await ids(digits)).toContain(withPhone.id);
+                ).map((r) => r.id);
+            expect(await ids(`+91 ${digits}`)).toContain(made.id);
+            expect(await ids(digits)).toContain(made.id);
 
-        // And in New booking (U8): typing the last 4 finds them, and
-        // picking them moves on to what they are booking.
-        await page.goto("/bookings");
-        await page
-            .getByRole("button", { name: "New booking", exact: true })
-            .filter({ visible: true })
-            .first()
-            .click();
-        const book = page.getByRole("dialog", { name: "New booking" });
-        await book.getByLabel("Find the customer").fill(digits.slice(-4));
-        const row = book
-            .getByRole("list")
-            .getByRole("button", { name: new RegExp(name) })
-            .first();
-        await expect(row).toBeVisible();
-        await row.click();
-        await expect(
-            book.getByText("Step 2 of 5 · Service").first(),
-        ).toBeVisible();
-        // Nothing is written until Book: closing asks, and Discard drops it.
-        await page.keyboard.press("Escape");
-        await page
-            .getByRole("alertdialog", { name: "Discard what you typed?" })
-            .getByRole("button", { name: "Discard" })
-            .click();
-        await expect(book).toBeHidden();
+            // And in New booking (U8): typing the last 4 finds them, and
+            // picking them moves on to what they are booking.
+            await page.goto("/bookings");
+            await page
+                .getByRole("button", { name: "New booking", exact: true })
+                .filter({ visible: true })
+                .first()
+                .click();
+            const book = page.getByRole("dialog", { name: "New booking" });
+            await book.getByLabel("Find the customer").fill(digits.slice(-4));
+            const row = book
+                .getByRole("list")
+                .getByRole("button", { name: new RegExp(s) })
+                .first();
+            await expect(row).toBeVisible();
+            await row.click();
+            await expect(
+                book.getByText("Step 2 of 5 · Service").first(),
+            ).toBeVisible();
+            // Nothing is written until Book: closing asks, and Discard drops it.
+            await page.keyboard.press("Escape");
+            await page
+                .getByRole("alertdialog", { name: "Discard what you typed?" })
+                .getByRole("button", { name: "Discard" })
+                .click();
+            await expect(book).toBeHidden();
+        } finally {
+            await northwind(page.request).delete(`/contacts/${made.id}`);
+        }
     });
 });
 
@@ -1161,13 +1156,9 @@ test.describe("the Service Editor on Northwind (E2)", () => {
             level: 1,
             name: "New service",
         });
-        // isVisible() doesn't wait: give the page its first paint before
-        // deciding Northwind takes no bookings.
-        const opened = await heading
-            .waitFor({ timeout: 10_000 })
-            .then(() => true)
-            .catch(() => false);
-        test.skip(!opened, "Northwind doesn't take bookings");
+        // Northwind takes bookings in the seed: no editor is a failure,
+        // never a reason to pass.
+        await expect(heading).toBeVisible();
         const name = `E2E either ${ownStamp(test.info())}`;
         await page.getByLabel("What is it called?").fill(name);
         // Where is under More details, in a panel of its own (U16); on a

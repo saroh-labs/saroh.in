@@ -187,15 +187,18 @@ export function changeToldText(
     first: string,
 ): string {
     const who = first || "They";
+    // "They are", "They see": the verb agrees when there is no name.
+    const is = first ? "is" : "are";
+    const sees = first ? "sees" : "see";
     switch (reach) {
         case "EMAIL_AND_ACCOUNT":
-            return `${who} is emailed either way and sees the change in their account on your site.`;
+            return `${who} ${is} emailed either way and ${sees} the change in their account on your site.`;
         case "EMAIL":
-            return `${who} is emailed either way.`;
+            return `${who} ${is} emailed either way.`;
         case "ACCOUNT":
             return `Either way, it shows in ${first ? `${first}'s` : "their"} account on your site.`;
         case "ON_SIGN_IN":
-            return `${who} sees it when they sign in on your site. Tell them yourself if it's soon.`;
+            return `${who} ${sees} it when they sign in on your site. Tell them yourself if it's soon.`;
         default:
             return `Saroh doesn't message ${first || "them"}. Tell them yourself either way.`;
     }

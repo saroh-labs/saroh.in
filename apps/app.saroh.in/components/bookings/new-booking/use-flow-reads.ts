@@ -11,7 +11,8 @@ import { PICKER_DAYS } from "@/lib/services/time-picker";
 /**
  * Who they'll see, each with when they are next free (BKMNewBookingStep3):
  * the service's free times over the picker's two weeks, read once the
- * step is open. Null until read, or for another service.
+ * step is open. Null until read, for another service, or when the read
+ * failed: then nobody is said to have no free time.
  */
 export function useNextFree(
     serviceId: string | null,
@@ -20,21 +21,24 @@ export function useNextFree(
 ): PickerSlot[] | null {
     const [read, setRead] = useState<{
         serviceId: string;
-        slots: PickerSlot[];
+        slots: PickerSlot[] | null;
     } | null>(null);
     useEffect(() => {
         if (!open || !serviceId) return;
         let live = true;
         const to = now + PICKER_DAYS * 24 * 60 * 60 * 1000;
-        void listAvailability(
+        listAvailability(
             serviceId,
             new Date(now).toISOString(),
             new Date(to).toISOString(),
-        )
-            .catch((): PickerSlot[] => [])
-            .then((slots) => {
+        ).then(
+            (slots) => {
                 if (live) setRead({ serviceId, slots });
-            });
+            },
+            () => {
+                if (live) setRead({ serviceId, slots: null });
+            },
+        );
         return () => {
             live = false;
         };
@@ -46,15 +50,17 @@ export function useNextFree(
  * The customer's class packs for the service (ADR-007), keyed
  * `contact:service` so a stale read for someone else is never shown;
  * `reload` reads them again (a pack refused at Book). Empty until read.
+ * `failed` when they couldn't be read: the flow says so, rather than
+ * booking someone who holds a pack as unpaid without a word.
  */
 export function useHeldPacks(
     key: string | null,
     reload: number,
-): PackPurchase[] {
+): { packs: PackPurchase[]; failed: boolean } {
     const [held, setHeld] = useState<{
         key: string;
         reload: number;
-        packs: PackPurchase[];
+        packs: PackPurchase[] | null;
     } | null>(null);
     useEffect(() => {
         if (!key) return;
@@ -63,11 +69,15 @@ export function useHeldPacks(
         void packsFor(forContact, forService)
             .catch(() => null)
             .then((found) => {
-                if (live) setHeld({ key, reload, packs: found ?? [] });
+                if (live) setHeld({ key, reload, packs: found });
             });
         return () => {
             live = false;
         };
     }, [key, reload]);
-    return held?.key === key && held.reload === reload ? held.packs : [];
+    const now = held?.key === key && held.reload === reload ? held : null;
+    return {
+        packs: now?.packs ?? [],
+        failed: now !== null && now.packs === null,
+    };
 }

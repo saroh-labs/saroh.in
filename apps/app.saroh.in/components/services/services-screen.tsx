@@ -169,11 +169,21 @@ export function ServicesScreen({
 
     const onTaking = canEdit
         ? (row: ServiceRowView, next: boolean) =>
-              void taking.setTakingWho(row.service, next, (who) =>
-                  setFlipped((had) => ({
-                      ...had,
-                      [row.service.id]: { who, at: row.service.updatedAt },
-                  })),
+              void taking.setTakingWho(row.service, next, (change) =>
+                  setFlipped((had) => {
+                      const s = row.service;
+                      const flip = had[s.id];
+                      const now: WhoFields = {
+                          status: s.status,
+                          showOnBookingPage: s.showOnBookingPage,
+                          bookableByTeam: s.bookableByTeam,
+                          ...(flip?.at === s.updatedAt ? flip.who : {}),
+                      };
+                      return {
+                          ...had,
+                          [s.id]: { who: change(now), at: s.updatedAt },
+                      };
+                  }),
               )
         : null;
 

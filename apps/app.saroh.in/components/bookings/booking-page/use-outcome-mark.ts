@@ -1,6 +1,5 @@
 "use client";
 
-import { showError } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -12,7 +11,7 @@ import { BOOKING_WORDS } from "@/lib/services/booking-words";
 /**
  * Came / Didn't come on a booking's page (U12): shown at once, held ten
  * seconds with Undo on the toast and beside the buttons, then recorded.
- * A refusal says why and puts back what it was.
+ * A refusal says why and puts back what it was (`useHold`).
  */
 export function useOutcomeMark({
     bookingId,
@@ -44,14 +43,18 @@ export function useOutcomeMark({
                 ? `${first || "They"} ${BOOKING_WORDS.came.toLowerCase()}.`
                 : `Marked ${first || "them"} as ${BOOKING_WORDS.didntCome.toLowerCase()}.`,
             async () => {
-                const res = await recordBookingOutcome(bookingId, next);
-                if (!res.ok) {
-                    showError(res.error);
-                    setMark(undefined);
+                try {
+                    return await recordBookingOutcome(bookingId, next);
+                } finally {
+                    router.refresh();
                 }
-                router.refresh();
             },
-            () => setMark(was === saved ? undefined : was),
+            // Undone, refused or never got there: back to what it was,
+            // unless a newer mark has been made on top of this one since.
+            () =>
+                setMark((now) =>
+                    now === next ? (was === saved ? undefined : was) : now,
+                ),
         );
     };
 

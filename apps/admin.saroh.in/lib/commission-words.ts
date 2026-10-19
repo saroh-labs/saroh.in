@@ -192,7 +192,7 @@ export function rateLabel(basisPoints: number | null): string {
     return `${whole}.${String(rest).padStart(2, "0").replace(/0$/, "")}%`;
 }
 
-/** A line's rate, saying when it is the business's own: "4% (own rate for Asha's)". */
+/** A line's rate, saying when it is the business's own: "<rate> (own rate for Asha's)". */
 export function lineRateWords(
     line: Pick<StatementLine, "basisPoints" | "ownRate" | "businessName">,
 ): string {

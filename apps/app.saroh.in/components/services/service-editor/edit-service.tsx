@@ -128,6 +128,16 @@ export function EditService(props: EditorProps & { service: Service }) {
         showOnBookingPage: service.showOnBookingPage,
         bookableByTeam: service.bookableByTeam,
     });
+    // A fresh read of the service (after a save or an Undo) wins.
+    const [whoAt, setWhoAt] = useState(service.updatedAt);
+    if (whoAt !== service.updatedAt) {
+        setWhoAt(service.updatedAt);
+        setWho({
+            status: service.status,
+            showOnBookingPage: service.showOnBookingPage,
+            bookableByTeam: service.bookableByTeam,
+        });
+    }
     const bookers = bookersOf(who);
     const [panel, setPanel] = useState<PanelKey | null>(null);
     const [lastPanel, setLastPanel] = useState<PanelKey>("what");

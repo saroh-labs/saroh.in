@@ -1,8 +1,14 @@
 "use client";
 
-import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
+import type { ToastId } from "@saroh/ui/toast";
+import {
+    dismissToast,
+    showError,
+    showSuccess,
+    showUndo,
+} from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
 import { firstName } from "@/lib/names";
@@ -120,13 +126,18 @@ export function usePersonRules({
     const nameOfRequest = (r: RuleRequest) =>
         firstName(personOf(r.staffId)?.name ?? r.staffName);
 
+    // Only the latest change keeps its Undo: two on screen is how the
+    // wrong one gets pressed.
+    const lastUndo = useRef<ToastId | null>(null);
+
     async function pick(
         person: StaffView,
         key: PersonRuleKey,
         value: number | null,
     ) {
         const name = firstName(person.name);
-        if (ownOf(person)[key] === value) {
+        const was = ownOf(person)[key];
+        if (was === value) {
             setPanel({ kind: "list", staffId: person.id });
             return;
         }
@@ -153,13 +164,23 @@ export function usePersonRules({
             return;
         }
         setPanel({ kind: "list", staffId: person.id });
-        showUndo(personRuleSaved(key, value, name), async () => {
-            const back = await updatePersonRules(person.id, saved.previous);
-            if (!back.ok) return back;
-            setOverrides((o) => ({ ...o, [person.id]: back.data.rules.own }));
-            router.refresh();
-            return { ok: true };
-        });
+        // Undo puts back this one rule, never the others changed since.
+        const previous = saved.previous[key];
+        const undo = { [key]: previous === undefined ? was : previous };
+        if (lastUndo.current !== null) dismissToast(lastUndo.current);
+        lastUndo.current = showUndo(
+            personRuleSaved(key, value, name),
+            async () => {
+                const back = await updatePersonRules(person.id, undo);
+                if (!back.ok) return back;
+                setOverrides((o) => ({
+                    ...o,
+                    [person.id]: back.data.rules.own,
+                }));
+                router.refresh();
+                return { ok: true };
+            },
+        );
     }
 
     async function withdraw() {

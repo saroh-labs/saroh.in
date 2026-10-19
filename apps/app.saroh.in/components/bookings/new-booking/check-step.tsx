@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { Notice } from "@saroh/ui/notice";
 import { OptionSelect } from "@saroh/ui/option-select";
 import type { ComponentProps } from "react";
@@ -22,6 +23,7 @@ export function CheckStep({
     pay,
     packs,
     packRefusal,
+    packsFailed = null,
     refusal,
 }: {
     rows: readonly CheckRow[];
@@ -35,6 +37,8 @@ export function CheckStep({
         onChange: (id: string) => void;
     } | null;
     packRefusal: string | null;
+    /** Their class packs couldn't be read: said, with Try again. */
+    packsFailed?: { first: string; onRetry: () => void } | null;
     refusal: string | null;
 }) {
     return (
@@ -53,6 +57,26 @@ export function CheckStep({
                     onValueChange={packs.onChange}
                     options={packs.options}
                 />
+            ) : null}
+            {packsFailed ? (
+                <Notice
+                    tone="warning"
+                    align="center"
+                    action={
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={packsFailed.onRetry}
+                        >
+                            Try again
+                        </Button>
+                    }
+                >
+                    Couldn&apos;t check{" "}
+                    {packsFailed.first ? `${packsFailed.first}'s` : "their"}{" "}
+                    class packs. If they hold one, try again before you book.
+                </Notice>
             ) : null}
             {packRefusal ? <Notice tone="error">{packRefusal}</Notice> : null}
             <Refusal>{refusal}</Refusal>

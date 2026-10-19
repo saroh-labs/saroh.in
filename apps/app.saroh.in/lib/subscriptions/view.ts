@@ -2,6 +2,7 @@ import { formatDate, formatDateTime } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count, plural } from "@/lib/format/plural";
 import { payOf, setPriceWords } from "@/lib/gst/on-price";
+import { initials } from "@/lib/names";
 import { absentText } from "@saroh/ui/lib/absent";
 
 import type {
@@ -435,15 +436,11 @@ export function autopayBadgeText(
     return badge.hint ? `${head} · ${badge.hint}` : head;
 }
 
-/** A person's initials, for the round avatar: "Nisha Kulkarni" → "NK". */
-export function initials(name: string): string {
-    return name
-        .split(/\s+/)
-        .filter(Boolean)
-        .map((w) => w[0].toUpperCase())
-        .join("")
-        .slice(0, 2);
-}
+/**
+ * A person's initials, for the round avatar: "Nisha Kulkarni" → "NK". The
+ * one rule (`lib/names.ts`), past any title.
+ */
+export { initials };
 
 // — Plans (D1) —————————————————————————————————————————————————
 

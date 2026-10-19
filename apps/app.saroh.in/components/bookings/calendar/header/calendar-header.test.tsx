@@ -201,6 +201,14 @@ describe("the header on the desk", () => {
         draw({ picked: "arjun", opens: { ...OPENS_DEFAULT, showFor: "all" } });
         expect(host.textContent).not.toContain("your last pick");
     });
+
+    it("doesn't call a person a link opened on your last pick", () => {
+        draw({
+            picked: "arjun",
+            opens: { ...OPENS_DEFAULT, lastPerson: "meera" },
+        });
+        expect(host.textContent).not.toContain("your last pick");
+    });
 });
 
 describe("Go to a day", () => {

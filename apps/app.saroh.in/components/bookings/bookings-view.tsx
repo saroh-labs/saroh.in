@@ -8,7 +8,6 @@ import { ListTable, listTable, ListTableHead } from "@saroh/ui/list-table";
 import { ListFilter, ListToolbar } from "@saroh/ui/list-toolbar";
 import { useLocalPages } from "@saroh/ui/page-sizes";
 import { ScrollX } from "@saroh/ui/scroll-x";
-import { showError } from "@saroh/ui/toast";
 import { CalendarDays } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
@@ -196,29 +195,31 @@ export function BookingsView({
     const mark = (b: DiaryBooking, outcome: BookingOutcome) => {
         const key = `outcome:${b.id}`;
         const was = marks[b.id];
-        const put = (o: BookingOutcome | undefined) =>
+        // Undone or refused: back to what it was, unless a newer mark has
+        // been made on top of this one since.
+        const back = () =>
             setMarks((all) => {
+                if (all[b.id] !== outcome) return all;
                 const next = { ...all };
-                if (o) next[b.id] = o;
+                if (was) next[b.id] = was;
                 else delete next[b.id];
                 return next;
             });
-        put(outcome);
-        const first = firstName(whoFor(b)) || "They";
+        setMarks((all) => ({ ...all, [b.id]: outcome }));
+        const first = firstName(whoFor(b));
         hold(
             key,
             outcome === "ATTENDED"
-                ? `${first} ${BOOKING_WORDS.came.toLowerCase()}.`
-                : `Marked ${first} as ${BOOKING_WORDS.didntCome.toLowerCase()}.`,
+                ? `${first || "They"} ${BOOKING_WORDS.came.toLowerCase()}.`
+                : `Marked ${first || "them"} as ${BOOKING_WORDS.didntCome.toLowerCase()}.`,
             async () => {
-                const res = await recordBookingOutcome(b.id, outcome);
-                if (!res.ok) {
-                    showError(res.error);
-                    put(was);
+                try {
+                    return await recordBookingOutcome(b.id, outcome);
+                } finally {
+                    router.refresh();
                 }
-                router.refresh();
             },
-            () => put(was),
+            back,
         );
     };
 

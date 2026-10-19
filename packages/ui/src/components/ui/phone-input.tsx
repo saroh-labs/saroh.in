@@ -101,7 +101,11 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
         const [own, setOwn] = React.useState(value);
         if (value !== seen) {
             setSeen(value);
-            if (value !== own) setParts(splitPhone(value, parts.country));
+            if (value !== own) {
+                setParts(splitPhone(value, parts.country));
+                // Adopted: the same value sent again later is read again too.
+                setOwn(value);
+            }
         }
 
         const numberRef = React.useRef<HTMLInputElement | null>(null);

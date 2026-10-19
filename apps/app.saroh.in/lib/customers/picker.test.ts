@@ -6,7 +6,6 @@ import {
     apartByEmailMessage,
     initialsOf,
     listLabel,
-    MIN_WALK_IN_PHONE_DIGITS,
     newCustomerProblems,
     walkInCopy,
     walkInPhone,
@@ -25,7 +24,6 @@ describe("walkInPhone", () => {
     });
 
     it("is short below the digits the API keeps a customer by", () => {
-        expect(MIN_WALK_IN_PHONE_DIGITS).toBe(7);
         expect(walkInPhone("12345")).toBe("short");
         expect(walkInPhone("+91")).toBe("short");
     });
@@ -96,7 +94,7 @@ describe("adding a customer while booking (DEC-170, U3)", () => {
         expect(listLabel("Ro", 2)).toBe("Matches");
         expect(listLabel("Zara", 0)).toBe("No one called “Zara” yet");
         expect(initialsOf("Kabir Singh")).toBe("KS");
-        expect(initialsOf("Zara")).toBe("Z");
+        expect(initialsOf("Zara")).toBe("ZA");
         expect(initialsOf(null)).toBe("?");
     });
 

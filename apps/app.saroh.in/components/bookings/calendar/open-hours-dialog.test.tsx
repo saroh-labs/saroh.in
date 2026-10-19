@@ -312,6 +312,19 @@ describe.each([
         expect(chosen()).toBe("2 hours");
         await press(cardNamed("Every Monday"));
         expect(said(sheet())).toContain("Adds it to Meera's weekly hours.");
+        // The week as saved: with a Saturday someone added since the
+        // sheet opened, which Undo must keep.
+        const saturday = range(6, 600, 720);
+        actions.replaceStaffHours.mockResolvedValueOnce({
+            ok: true,
+            data: {
+                staff: {
+                    ...MEERA,
+                    hours: [...WEEK, saturday, range(1, 1140, 1260)],
+                },
+                outside: [],
+            },
+        });
         await save();
         expect(actions.replaceStaffHours).toHaveBeenCalledWith("st_meera", [
             ...WEEK,
@@ -322,10 +335,11 @@ describe.each([
             "Opened 7:00 to 9:00 pm for Meera, every Monday.",
         );
         await undo();
-        expect(actions.replaceStaffHours).toHaveBeenLastCalledWith(
-            "st_meera",
-            WEEK,
-        );
+        // Only the range it added goes.
+        expect(actions.replaceStaffHours).toHaveBeenLastCalledWith("st_meera", [
+            ...WEEK,
+            saturday,
+        ]);
     });
 
     it("starts from the half hour pressed", () => {

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { firstName, withoutTitle } from "./names";
+import { avatarInitials } from "@saroh/ui/avatar";
+
+import { firstName, initials, TITLES, withoutTitle } from "./names";
 
 describe("firstName", () => {
     it("is what someone is called by, past any title", () => {
@@ -23,5 +25,25 @@ describe("withoutTitle", () => {
         expect(withoutTitle("Meera Iyer")).toBe("Meera Iyer");
         expect(withoutTitle("Dr.")).toBe("Dr.");
         expect(withoutTitle(null)).toBe("");
+    });
+});
+
+describe("initials", () => {
+    it("is the avatar's rule, past any title", () => {
+        expect(initials("Dr. Arun Kumar Pillai")).toBe("AP");
+        expect(initials("Dr. Arun Kumar Pillai")).toBe(
+            avatarInitials("Dr. Arun Kumar Pillai"),
+        );
+        expect(initials("Kabir Singh")).toBe("KS");
+        expect(initials("Zara")).toBe("ZA");
+    });
+    it("is ? for no name", () => {
+        expect(initials("")).toBe("?");
+        expect(initials("   ")).toBe("?");
+        expect(initials(null)).toBe("?");
+    });
+    it("uses the one title list", () => {
+        expect(TITLES.has("dr")).toBe(true);
+        expect(TITLES.has("smt")).toBe(true);
     });
 });

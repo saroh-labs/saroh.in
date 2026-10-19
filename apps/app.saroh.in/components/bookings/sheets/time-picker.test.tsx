@@ -246,3 +246,27 @@ describe("the time picker", () => {
         expect(host.textContent).toContain("Today 19 Oct");
     });
 });
+
+describe("a read that fails", () => {
+    it("says it couldn't load times, not that nobody is free, and tries again", async () => {
+        listAvailability.mockRejectedValueOnce(new Error("offline"));
+        await draw();
+        expect(host.textContent).toContain("Couldn't load times");
+        expect(host.textContent).not.toContain("No free times");
+        expect(host.textContent).not.toContain("Why isn't a time offered?");
+        const again = Array.from(host.querySelectorAll("button")).find(
+            (b) => b.textContent === "Try again",
+        );
+        expect(again).toBeDefined();
+        await act(async () => {
+            again?.click();
+            await Promise.resolve();
+        });
+        await act(async () => {
+            await Promise.resolve();
+        });
+        expect(listAvailability).toHaveBeenCalledTimes(2);
+        expect(host.textContent).not.toContain("Couldn't load times");
+        expect(host.textContent).toContain("9:00");
+    });
+});

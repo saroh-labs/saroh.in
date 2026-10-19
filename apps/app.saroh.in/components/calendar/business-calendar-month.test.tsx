@@ -407,6 +407,13 @@ for (const size of ["desk", "phone"] as const) {
             const box = day();
             expect(box?.textContent).toContain("19 Oct · today");
             expect(box?.textContent).toMatch(/11 things · In ₹.* · Out ₹/);
+            // Something went out today, so Out is drawn as a loss; at ₹0
+            // it is not (dayMoney's hasOut, money.test.ts).
+            const out = Array.from(
+                box?.querySelectorAll("[data-day-line] > span") ?? [],
+            ).find((s) => s.textContent.startsWith("Out "));
+            expect(out?.textContent).toBe("Out ₹200");
+            expect(out?.className).toContain("destructive");
             expect(box?.textContent).toContain("Bookings · 8");
             const rows = Array.from(
                 box?.querySelectorAll<HTMLAnchorElement>(

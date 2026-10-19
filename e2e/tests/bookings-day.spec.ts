@@ -40,10 +40,10 @@ async function aWorkingDay(page: Page) {
     const { staff } = (await res.json()) as { staff: Person[] };
     const active = staff.filter((p) => p.status === "ACTIVE");
     const person = active.find((p) => p.hours.length > 0);
-    if (!person) {
-        test.skip(true, "Nobody on Pulse has weekly hours in the seed");
-        throw new Error("skipped");
-    }
+    // Pulse is the showcase gym and its seed gives its people weekly hours:
+    // none is a broken seed, not a reason to pass.
+    expect(person, "someone on Pulse has weekly hours").toBeTruthy();
+    if (!person) throw new Error("Nobody on Pulse has weekly hours");
     const days = new Set(person.hours.map((h) => h.dayOfWeek));
     // A week or more ahead, so nothing is booked into all of it yet.
     for (let d = 7; d < 14; d++) {

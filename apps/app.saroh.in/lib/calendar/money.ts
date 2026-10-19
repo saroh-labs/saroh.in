@@ -300,7 +300,14 @@ export function stripBreakdown(
 export function dayMoney(
     entries: MoneyEntry[],
     currency: string,
-): { in: string; out: string; due: string | null; why: string } | null {
+): {
+    in: string;
+    out: string;
+    /** Something went out: only then is Out drawn as a loss. */
+    hasOut: boolean;
+    due: string | null;
+    why: string;
+} | null {
     const sum = sumEntries(entries);
     if (!sum.in && !sum.out && !sum.due) return null;
     const count = (kind: MoneyEntry["kind"]) =>
@@ -314,6 +321,7 @@ export function dayMoney(
     return {
         in: minorMoney(sum.in, currency),
         out: minorMoney(sum.out, currency),
+        hasOut: sum.out > 0,
         due: sum.due ? minorMoney(sum.due, currency) : null,
         why: whys.length ? `Out is ${whys.join(" and ")}.` : "",
     };

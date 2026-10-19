@@ -47,6 +47,9 @@ export async function blockGapTime(
     const { staff, date, free } = target;
     const to = Math.min(free[0] + minutes, 1440);
     const startAt = zonedInstant(date, free[0], timezone).toISOString();
+    // What they had before: the new time off is the one not among these,
+    // even when another already starts at the same minute.
+    const known = new Set(staff.timeOff.map((t) => t.id));
     const res = await runAction(
         () =>
             addTimeOff(staff.id, {
@@ -59,7 +62,8 @@ export async function blockGapTime(
     if (!res) return;
     if (!res.ok) return showError(res.error);
     const added = res.data.staff.timeOff.find(
-        (t) => Date.parse(t.startAt) === Date.parse(startAt),
+        (t) =>
+            !known.has(t.id) && Date.parse(t.startAt) === Date.parse(startAt),
     );
     onClose();
     refresh();
@@ -107,19 +111,23 @@ export async function closeExtraHours(
     );
 }
 
+/** A service's first start in the gap: null can't, undefined not known. */
+export type GapStarts = Record<string, number | null | undefined>;
+
 /**
  * Where each offered service can start in this free time with this
  * person, as the API works it out (their hours and the service's own
  * rules both): null while it is read; a service missing from it can't.
+ * A service whose read failed is there as `undefined`: not known, so it
+ * stays offered from the gap's start and the API decides at Book, rather
+ * than calling the time one it can't start in.
  */
 export function useGapStarts(
     offered: readonly Service[],
     target: GapTarget,
     timezone: string,
-): Record<string, number | null> | null {
-    const [starts, setStarts] = useState<Record<string, number | null> | null>(
-        null,
-    );
+): GapStarts | null {
+    const [starts, setStarts] = useState<GapStarts | null>(null);
     const { staff, date, free } = target;
     const key = offered.map((s) => `${s.id}:${s.durationMinutes}`).join(",");
     useEffect(() => {
@@ -134,10 +142,18 @@ export function useGapStarts(
                     from.toISOString(),
                     to.toISOString(),
                     staff.id,
-                ).catch(() => []);
+                ).catch(() => null);
                 return [
                     id,
-                    firstStartIn(slots, free, Number(minutes), date, timezone),
+                    slots === null
+                        ? undefined
+                        : firstStartIn(
+                              slots,
+                              free,
+                              Number(minutes),
+                              date,
+                              timezone,
+                          ),
                 ] as const;
             }),
         ).then((pairs) => {

@@ -10,6 +10,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { NOT_SENT, SENDING_SOON, useHold } from "@/components/shared/use-hold";
+import { UNREACHED } from "@/lib/api/unreached";
 import { HOLD_UNDO_MS } from "@/lib/hold-undo";
 
 const showUndo = vi.fn();
@@ -161,6 +162,49 @@ describe("useHold", () => {
         expect(second).not.toHaveBeenCalled();
         await run(HOLD_UNDO_MS);
         expect(second).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("useHold: a commit that fails", () => {
+    it("a commit that throws puts the screen back and says so", async () => {
+        const back = vi.fn();
+        act(() =>
+            api.hold(
+                "k",
+                "Held.",
+                () => Promise.reject(new Error("offline")),
+                back,
+            ),
+        );
+        await run(HOLD_UNDO_MS);
+        expect(back).toHaveBeenCalledTimes(1);
+        expect(showError).toHaveBeenCalledWith(UNREACHED);
+        expect(pending()).toBe("");
+    });
+
+    it("a refused commit puts the screen back with the API's reason", async () => {
+        const back = vi.fn();
+        act(() =>
+            api.hold(
+                "k",
+                "Held.",
+                () => Promise.resolve({ ok: false, error: "Already started." }),
+                back,
+            ),
+        );
+        await run(HOLD_UNDO_MS);
+        expect(back).toHaveBeenCalledTimes(1);
+        expect(showError).toHaveBeenCalledWith("Already started.");
+    });
+
+    it("a commit that went through leaves the screen as it is", async () => {
+        const back = vi.fn();
+        act(() =>
+            api.hold("k", "Held.", () => Promise.resolve({ ok: true }), back),
+        );
+        await run(HOLD_UNDO_MS);
+        expect(back).not.toHaveBeenCalled();
+        expect(showError).not.toHaveBeenCalled();
     });
 });
 

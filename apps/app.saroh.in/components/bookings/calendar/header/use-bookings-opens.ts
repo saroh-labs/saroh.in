@@ -16,16 +16,23 @@ import { saveBookingsOpens } from "@/lib/services/bookings-opens-actions";
 export function useBookingsOpens(initial: BookingsOpens) {
     const [opens, setOpens] = useState(initial);
     const [from, setFrom] = useState(initial);
-    // A new read of the page (a refresh, another business) wins.
-    if (from !== initial) {
+    // Changes on their way to the API.
+    const [saving, setSaving] = useState(0);
+    // A new read of the page that says something new (another business,
+    // a change made elsewhere) wins. One that says what the last did is
+    // only a refresh; and while a change is on its way, a read is from
+    // before it (a pick navigates first, then keeps the choice).
+    if (!sameOpens(from, initial)) {
         setFrom(initial);
-        setOpens(initial);
+        if (saving === 0) setOpens(initial);
     }
 
     async function change(next: Partial<BookingsOpens>) {
         const was = opens;
         setOpens({ ...opens, ...next });
+        setSaving((n) => n + 1);
         const res = await runAction(() => saveBookingsOpens(next));
+        setSaving((n) => n - 1);
         if (!res) {
             setOpens(was);
             return;
@@ -37,4 +44,12 @@ export function useBookingsOpens(initial: BookingsOpens) {
     }
 
     return { opens, change };
+}
+
+function sameOpens(a: BookingsOpens, b: BookingsOpens): boolean {
+    return (
+        a.start === b.start &&
+        a.showFor === b.showFor &&
+        a.lastPerson === b.lastPerson
+    );
 }

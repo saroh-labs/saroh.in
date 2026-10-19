@@ -15,7 +15,7 @@ type Open = "set" | "end" | null;
 /**
  * A business's own commission rate on its Team card (DEC-169, #1035),
  * beside the account manager. Only for `team:pay` or `commission:rates`
- * holders: the line "Own rate 4% from 10 Sep" (nobody else is sent it,
+ * holders: the line "Own rate N% from 10 Sep" (nobody else is sent it,
  * nor sees the number); with `commission:rates`, Set commission… and,
  * while one runs or is to come, End…. Read when the card shows it, again
  * after each write.

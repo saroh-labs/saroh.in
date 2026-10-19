@@ -163,7 +163,13 @@ export function DayPanel({
                     <>
                         {n > 0 ? " · " : ""}In{" "}
                         <span className="tabular-nums">{cash.in}</span> ·{" "}
-                        <span className="text-destructive-subtle-foreground">
+                        <span
+                            className={
+                                cash.hasOut
+                                    ? "text-destructive-subtle-foreground"
+                                    : undefined
+                            }
+                        >
                             Out <span className="tabular-nums">{cash.out}</span>
                         </span>
                         {cash.due ? (

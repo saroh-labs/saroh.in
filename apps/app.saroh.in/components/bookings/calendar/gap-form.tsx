@@ -115,7 +115,7 @@ export function GapForm({
         serviceFit(
             s,
             free,
-            starts === null ? undefined : (starts[s.id] ?? null),
+            starts === null ? undefined : s.id in starts ? starts[s.id] : null,
         );
     const chosen = offered.find((s) => s.id === serviceId) ?? null;
     const at = (chosen ? fitOf(chosen).at : null) ?? free[0];

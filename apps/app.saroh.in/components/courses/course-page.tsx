@@ -48,7 +48,7 @@ import { useHold } from "@/components/shared/use-hold";
 
 import { runAction } from "@/lib/api/run-action";
 import type { GstAsk } from "@/lib/gst/item-words";
-import { withoutTitle } from "@/lib/names";
+import { initials } from "@/lib/names";
 import { AddSessionDialog } from "./add-session-dialog";
 import { EnrolDialog } from "./enrol-dialog";
 
@@ -60,14 +60,6 @@ const STANDING_WORD = {
     VOID: "Void",
     CREDITED: "Credited",
 } as const;
-
-const initials = (name: string) =>
-    withoutTitle(name)
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((w) => w.charAt(0).toUpperCase())
-        .join("");
 
 /**
  * A course, after the "Saroh Billing and Classes" design: its sessions on

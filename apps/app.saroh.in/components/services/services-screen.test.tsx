@@ -64,6 +64,7 @@ const toast = { showError: vi.fn(), showUndo: vi.fn() };
 vi.mock("@saroh/ui/toast", () => ({
     showError: (...a: unknown[]) => toast.showError(...a) as unknown,
     showUndo: (...a: unknown[]) => toast.showUndo(...a) as unknown,
+    dismissToast: vi.fn(),
 }));
 
 const service = (over: Partial<Service> = {}): Service => ({

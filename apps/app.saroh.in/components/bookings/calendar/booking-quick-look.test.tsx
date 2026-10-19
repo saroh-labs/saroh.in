@@ -164,7 +164,6 @@ const act$ = {
     checkIn: vi.fn(),
     noShow: vi.fn(),
     cancel: vi.fn(),
-    move: vi.fn(),
     cancelClass: vi.fn(),
 };
 const undoOutcome = vi.fn();

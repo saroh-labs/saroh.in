@@ -146,8 +146,11 @@ export function deadlineText(iso: string, timeZone: string): string {
     return formatDateTime(iso, timeZone, { weekday: "short" });
 }
 
-/** What a cancel could hand back: never more than was received. */
-function refundable(m: BookingMoney): number {
+/**
+ * What a cancel could hand back: never more than was received. The one
+ * rule; the cancel sheet's choice (`cancel-choice.ts`) reads it too.
+ */
+export function refundable(m: BookingMoney): number {
     return m.refundableCents ?? m.paidOnlineCents;
 }
 

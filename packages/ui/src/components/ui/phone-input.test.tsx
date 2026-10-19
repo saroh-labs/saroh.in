@@ -227,4 +227,28 @@ describe("PhoneInput (#1036)", () => {
         fireEvent.click(screen.getByRole("button", { name: "Clear" }));
         expect(box()).toHaveValue("");
     });
+    it("reads a value again after a reset, even one it last sent", () => {
+        function Reset() {
+            const [v, setV] = React.useState("");
+            return (
+                <>
+                    <Field label="Phone">
+                        <PhoneInput value={v} onValueChange={setV} />
+                    </Field>
+                    <button type="button" onClick={() => setV("")}>
+                        Clear
+                    </button>
+                    <button type="button" onClick={() => setV("+919876543210")}>
+                        Restore
+                    </button>
+                </>
+            );
+        }
+        render(<Reset />);
+        fireEvent.change(box(), { target: { value: "98765 43210" } });
+        fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+        expect(box()).toHaveValue("");
+        fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+        expect(box()).toHaveValue("98765 43210");
+    });
 });
