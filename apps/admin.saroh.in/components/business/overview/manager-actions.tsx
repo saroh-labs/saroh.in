@@ -87,7 +87,9 @@ export function ManagerActions({
                         />
                     }
                     submitLabel={
-                        manager ? "Move the business" : "Give the business"
+                        manager
+                            ? "Change account manager"
+                            : "Assign account manager"
                     }
                     onSubmit={async ({ reason, idempotencyKey, values }) => {
                         const platformAdminId = values.platformAdminId ?? "";

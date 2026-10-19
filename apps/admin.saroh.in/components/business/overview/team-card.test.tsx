@@ -174,7 +174,9 @@ describe("the Team card's account manager (U25)", () => {
             target: { value: "Vikram covers Pune" },
         });
         fireEvent.click(
-            within(dialog).getByRole("button", { name: "Give the business" }),
+            within(dialog).getByRole("button", {
+                name: "Assign account manager",
+            }),
         );
         await waitFor(() =>
             expect(actions.assignManagerAction).toHaveBeenCalledWith("org_1", {

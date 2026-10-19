@@ -195,7 +195,7 @@ export function managerHow(manager: Pick<OverviewManager, "source">): string {
         case "LEAD_EMAIL":
             return "Brought in from their lead";
         default:
-            return "Given to them by Saroh's team";
+            return "Assigned by Saroh's team";
     }
 }
 
