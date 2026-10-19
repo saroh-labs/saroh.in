@@ -192,18 +192,6 @@ export const DONE_PANEL: PanelCopy = {
     ],
 };
 
-/** `/account`: the person's own details, in the frame every page wears. */
-export const ACCOUNT_PANEL: PanelCopy = {
-    eyebrow: "Your account",
-    heading: "How you sign in, in one place.",
-    body: "Your name, your email and your password are yours, not any one business's. Next, change what you need and go back to Saroh.",
-    points: [
-        "A code to your email always signs you in",
-        "A password is optional, and you can set or change it here",
-        "Signing out here signs you out of every Saroh app",
-    ],
-};
-
 export const INVITE_PANEL: PanelCopy = {
     eyebrow: "Invitation",
     heading: "You are joining, not starting.",
@@ -212,6 +200,18 @@ export const INVITE_PANEL: PanelCopy = {
         "The role decides what you see and can change",
         "Whoever invited you can change or withdraw it later",
         "You can be in as many businesses as you like",
+    ],
+};
+
+/** An invite to Saroh's own team (admin console U24). */
+export const STAFF_INVITE_PANEL: PanelCopy = {
+    eyebrow: "Saroh team",
+    heading: "You are joining the people who run Saroh.",
+    body: "The console is where the team looks after the businesses on Saroh. Next, sign in or make your account with the address the invite went to.",
+    points: [
+        "Your roles decide what you see and can change",
+        "The link works once, for this address only",
+        "A Platform owner can change your roles later",
     ],
 };
 

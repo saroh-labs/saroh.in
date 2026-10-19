@@ -4,12 +4,18 @@ import Link from "next/link";
 
 import { Container } from "@/components/v2/container";
 import { PreviewBanner } from "@/components/v2/pricing/preview-banner";
+import { PreviewControls } from "@/components/v2/pricing/preview-controls";
 import { PricingPage } from "@/components/v2/pricing/pricing-page";
 import { SiteFooter } from "@/components/v2/site-footer";
 import { SiteNav } from "@/components/v2/site-nav";
 import { LAUNCH_MODE } from "@/lib/links";
-import { readPreviewPricing } from "@/lib/pricing";
-import { PREVIEW_COOKIE } from "@/lib/pricing-preview";
+import { readLivePricing, readPreviewPricing } from "@/lib/pricing";
+import { markChanges } from "@/lib/pricing-marks";
+import {
+    PREVIEW_COOKIE,
+    previewHref,
+    previewViewFrom,
+} from "@/lib/pricing-preview";
 import { pricingPageModel } from "@/lib/pricing-view";
 
 /**
@@ -21,6 +27,12 @@ import { pricingPageModel } from "@/lib/pricing-view";
  *
  * Outside the `(v2)` group so the amber bar sits above the nav, as the
  * design draws it; it brings the V2 chrome itself.
+ *
+ * The bar holds the preview's controls (admin redesign U13, R24): the draft
+ * or what is live now, desktop or phone width, and Show what changed, which
+ * marks on the draft what differs from live. Phone draws this same page,
+ * bar-less (`frame=1`), in a phone-sized frame, so the page's own phone
+ * layout shows rather than a squeezed desktop one.
  */
 export const dynamic = "force-dynamic";
 
@@ -30,7 +42,12 @@ export const metadata: Metadata = {
     referrer: "no-referrer",
 };
 
-export default async function PricingDraftRoute() {
+export default async function PricingDraftRoute({
+    searchParams,
+}: {
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+    const view = previewViewFrom(await searchParams);
     const token = (await cookies()).get(PREVIEW_COOKIE)?.value;
     const read = token
         ? await readPreviewPricing(token)
@@ -76,9 +93,58 @@ export default async function PricingDraftRoute() {
         );
     }
 
+    const live = await readLivePricing().catch(() => null);
+    const draftModel = pricingPageModel(read.catalog);
+    const liveModel = live ? pricingPageModel(live) : null;
+    const showLive = view.show === "live" && liveModel !== null;
+    const model = showLive
+        ? liveModel
+        : view.marks && liveModel
+          ? markChanges(draftModel, liveModel)
+          : draftModel;
+
+    if (view.frame) {
+        return (
+            <Chrome banner={null}>
+                <PricingPage model={model} />
+            </Chrome>
+        );
+    }
+
+    const banner = (
+        <PreviewBanner
+            controls={
+                <PreviewControls view={view} hasLive={liveModel !== null} />
+            }
+        >
+            {showLive
+                ? "Live now: what visitors see."
+                : "Draft preview. Visitors still see the published pricing."}
+        </PreviewBanner>
+    );
+
+    if (view.width === "phone") {
+        return (
+            <div className="min-h-screen bg-mk-line-soft text-foreground [line-height:normal]">
+                {banner}
+                <div className="flex justify-center px-4 pb-16 pt-7">
+                    <iframe
+                        src={previewHref({ ...view, frame: true })}
+                        title={
+                            showLive
+                                ? "The pricing page at phone width, as it is live"
+                                : "The draft pricing page at phone width"
+                        }
+                        className="h-[844px] w-[390px] max-w-full rounded-[28px] border border-border bg-background shadow-lg"
+                    />
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <Chrome banner={<PreviewBanner />}>
-            <PricingPage model={pricingPageModel(read.catalog)} />
+        <Chrome banner={banner}>
+            <PricingPage model={model} />
         </Chrome>
     );
 }

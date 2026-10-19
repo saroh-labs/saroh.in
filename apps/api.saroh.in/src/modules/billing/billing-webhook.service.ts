@@ -15,6 +15,7 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { CommissionQueue } from "../commission/commission-queue";
 import type { EndedAddons } from "./addon-charges";
 import {
     clearAddonsInTx,
@@ -165,6 +166,12 @@ export class BillingWebhookService {
         @Optional() private readonly invoices?: SarohInvoicesService,
         /** The activation ledger, for the first paid plan (DEC-125). */
         @Optional() private readonly activation?: ActivationEvents,
+        /**
+         * Commission (DEC-169, U21), queued only after the transaction has
+         * committed (`afterCommit`). Always provided by `BillingModule`; a
+         * spec that builds the service by hand without it queues none.
+         */
+        @Optional() private readonly commission?: CommissionQueue,
     ) {}
 
     async handle(
@@ -281,7 +288,53 @@ export class BillingWebhookService {
 
         await this.recordCompleted(outcome.completed);
         await recordAddonsEnded(this.audit, outcome.ended);
+        if (outcome.result.status !== "duplicate") {
+            await this.afterCommit(name, event);
+        }
         return outcome.result;
+    }
+
+    /**
+     * Commission on what this event charged or refunded (DEC-169, U21),
+     * queued once the payment's transaction has committed and never in its
+     * way: a failure here is logged, the webhook still answers 200, and the
+     * hourly commission sweep writes what was missed.
+     */
+    private async afterCommit(
+        provider: string,
+        event: ParsedBillingEvent,
+    ): Promise<void> {
+        if (!this.commission) return;
+        try {
+            await this.commission.afterBillingEvent(provider, event);
+        } catch (error) {
+            this.logger.error(
+                `commission_enqueue_failed provider=${provider} event=${event.providerEventId}: ${
+                    error instanceof Error ? error.name : "unknown error"
+                }`,
+            );
+        }
+    }
+
+    /** {@link afterCommit} for the business's return, by its checkout's provider. */
+    private async afterCheckoutCommit(
+        checkoutId: string,
+        event: ParsedBillingEvent,
+    ): Promise<void> {
+        if (!this.commission) return;
+        try {
+            const checkout = await prisma.billingCheckout.findUnique({
+                where: { id: checkoutId },
+                select: { provider: true },
+            });
+            if (checkout) await this.afterCommit(checkout.provider, event);
+        } catch (error) {
+            this.logger.error(
+                `commission_enqueue_failed checkout=${checkoutId}: ${
+                    error instanceof Error ? error.name : "unknown error"
+                }`,
+            );
+        }
     }
 
     /**
@@ -312,6 +365,9 @@ export class BillingWebhookService {
         });
         await this.recordCompleted(outcome.completed);
         await recordAddonsEnded(this.audit, outcome.ended);
+        if (outcome.result.changed) {
+            await this.afterCheckoutCommit(checkoutId, event);
+        }
         return outcome.result;
     }
 

@@ -5200,3 +5200,103 @@ rule stands for the profile's own fields.
 **Fix.** A profile may also adopt a customer for a business its owner owns (OWNER membership) that is on no profile yet. Never one naming another profile, another owner's business or a business on another profile, nor one another profile holds (`billing/billing-customer.ts`, `isOwn`). The owner's memberships are read outside the business's RLS context (`outsideOrgContext`), because a checkout runs scoped to one business and Membership is isolated per business, so inside it only that business's membership would be seen. The fake provider now refuses the same email with no phone as Razorpay does.
 
 **Rule.** A read that spans an owner's businesses (memberships, anything org-isolated) is made with `outsideOrgContext`, and its spec runs one path scoped to a single business under `TEST_RLS=on`. A job runs with no context, so a job-only test passes either way (`docs/patterns/backend-data-and-money.md`, cross-business reads).
+
+### The console said a module was On while its release was off (18 Oct 2026)
+
+**Symptom.** A business page's "What they see" listed Bookings under "On" for a business whose Bookings release was off for everyone: the business saw no Bookings, and the operator was told it had them. A module outside their plan with plan limits enforced read On the same way.
+
+**Cause.** The console worded only the business's own switch (`OrganizationModule.status` in the business page's `modules` panel). Whether a business can use a module is `ModuleAvailabilityService.evaluate()`: the release, their switch, the project, the plan and readiness, in that order. The console re-derived the answer from one of those gates.
+
+**Fix.** `GET /admin/organizations/:id/modules/state` (`admin/admin-business-modules.service.ts`, `organization:read`, no support session) runs `evaluate()` for every module that isn't hidden, as the business's owner role, and returns On, Off or Locked with the gate in the way, its reason in words, the fix, dependencies as information, and "Plan limits not enforced yet" once per business. `lib/what-they-see.ts` only words that answer. Hidden modules are left out by `moduleHidden` in `capabilities/module-registry.ts`, the source `moduleRolledOut` reads.
+
+**Rule.** A console or app screen that says whether a business can use a module reads `evaluate()`'s answer through the API, never one gate's row; dependencies are information, never a blocker the workspace doesn't enforce (`.agents/skills/saroh-module-capability/SKILL.md` › Rules; `admin-business-modules.db.spec.ts` checks the release-off case).
+
+### A component test stalled for ten seconds on a ⋯ menu (18 Oct 2026)
+
+**Symptom.** In the Releases component tests (U7), opening a dialog from a Radix `DropdownMenu` item blocked the event loop for 2 to 11 seconds a test, enough to time out. The same dialog opened from a plain button took milliseconds.
+
+**Cause.** When the menu closes, Radix looks for somewhere to put the focus, and every candidate is checked with `getComputedStyle`. In jsdom that cascades jsdom's whole built-in stylesheet through `nwsapi` for each element, which is slow. A browser does it in microseconds, so the screen itself is fine.
+
+**Fix.** `components/releases/releases.test.tsx` mocks `@saroh/ui/dropdown-menu` with plain buttons (`role="menuitem"`). The real menu is covered by the browser spec `e2e/tests/admin-releases.spec.ts`. A dialog opened from a menu is a controlled `OperatorDialog` (`open`, `onOpenChange`, no `trigger`), and the menu doesn't hand the focus back to ⋯ while one is open (`onCloseAutoFocus`).
+
+**Rule.** A vitest that opens a Radix menu mocks the menu, and leaves the real menu to the browser spec. A test that suddenly takes seconds is usually jsdom's `getComputedStyle`: profile it with `--pool=forks --execArgv=--cpu-prof` before raising the timeout.
+
+### Mark verified kept a password nobody had proven (19 Oct 2026)
+
+**Symptom.** The owner, reviewing U9's Mark verified, asked what happens if the account wasn't the person's own. Anyone can sign up with someone else's email and set a password; Better Auth then refuses that password until the address is proven. When staff pressed Mark verified, `emailVerified` became true and the stranger's password started working. When the real owner later signed in with a code, nothing was removed, because Better Auth's `revokeUnprovenAccountAccess` only runs for an address that is still unverified.
+
+**Cause.** Mark verified set `emailVerified` and nothing else. Staff can check the mailbox is the caller's; they can't know who set the password on an address nobody had proven. Nothing records who set a password, so there is nothing to "track"; the only safe answer is to treat it as unproven.
+
+**Fix.** `markVerified` (`admin/admin-sign-in-help.service.ts`) does what a first code sign-in does: in the same transaction it deletes the `credential` account and every session, and the ledger row says whether a password was removed (`unprovenSignInRemoved`, `sessionsEnded`). Provider accounts stay. The dialog tells staff the person signs in with a code and can set a new password. `admin-people.db.spec.ts` checks it, plain and under `TEST_RLS=on`.
+
+**Rule.** Anything outside Better Auth that marks an address verified removes the password and sessions set before the address was proven, as `revokeUnprovenAccountAccess` does. An audit metadata key never contains `password`, `credential`, `token` or `secret` (`SECRET_BEARING_KEY` refuses the write).
+
+### A redesign took away per-plan counting (19 Oct 2026)
+
+**Symptom.** In the admin plan editor's new feature sheet (U12), how a feature's limit is counted (in total or each month) could only be set for every plan at once. Before, each plan set its own. The owner: "we should have full control, I thought we are only improving the UI and not changing the functionality".
+
+**Cause.** The unit's agent folded the per-plan "Counted" select into one "on every plan" control to match the mock, and flagged it only in its report.
+
+**Fix.** Each plan's line in the feature sheet has "Counted on <plan>" again (`components/plans/plans/module-row.tsx`); "Counted, for every plan at once" stays as a shortcut and shows "Differs by plan" when they differ. `sheets.test.tsx` checks a single plan can count differently.
+
+**Rule.** A redesign changes how a screen looks and reads, never what it can do. Every control the old screen had is still reachable on the new one; a unit that thinks a capability should go stops and asks the owner before building it, and the brief says so.
+
+### Billing profiles passed every test and still needed fixing in a browser (19 Oct 2026)
+
+**Symptom.** #1015's pages passed unit, component and db tests. Tried by hand on the local stack (owner: "the UI has to be verified"), saves from accounts.saroh.in were refused until U24 sent an `Origin` header with server-side writes, and four smaller problems showed: a 10-digit Indian phone was refused ("Start with + and the country code") although the box shows +91; a saved phone read "+919876543210"; the Move dialog's "+ A new billing profile" lost the business being moved; the Move dialog said "pays for 0"; and the State list was in GST-code order, not by name.
+
+**Cause.** Component tests mock the server actions and the API, so nothing exercised the real request; the phone rule asked for a + that an owner in India never types.
+
+**Fix.** `normalisePublicPhone` (API) and `phoneProblem` (app) read a number typed without + as Indian (10 digits, a trunk 0, or 91 / 0091 in front); accounts shows phones grouped (`phoneLabel`); the Move dialog's link carries `&bill=<business>` so the new profile bills it; "pays for nothing yet"; states by name.
+
+**Rule.** A unit with a form that writes is not done until one save of each kind has been made in a browser on the local stack (`docs/patterns/frontend-verification.md`); a phone field takes the number as an owner says it.
+
+### A saved plans draft listed add-ons nobody touched (19 Oct 2026)
+
+**Symptom.** On the admin Plans screen, after one price edit was undone, the draft bar said "0 changes, not live yet" and then "14 businesses on Grow and Pro would move at their renewal"; "Changes in this draft" listed eight "Add-on changed" rows.
+
+**Cause.** `draftChanges` (`components/plans/preview/changes.ts`) compared add-ons with `JSON.stringify(was) !== JSON.stringify(now)`. A draft read back from the API has its keys in another order and empty fields filled in, so equal add-ons looked different. The bar's count came from the API check, which compares field by field, so the two halves of one sentence disagreed.
+
+**Fix.** `sameValue` compares by what a value says: key order doesn't count, and a missing field equals null or undefined. `preview.test.tsx` has an add-on read back in another order. The empty draft now says "No changes in this draft yet."
+
+**Rule.** Never compare objects with `JSON.stringify`; a value that made a round trip through the API changes key order. Use a field-by-field or order-blind compare (`sameValue`, `sameCell`, `samePlan`).
+
+### Hidden words for screen readers widened whole pages on a phone (19 Oct 2026)
+
+**Symptom.** At 390px, every admin Billing page measured 420px wide. The tab strip scrolled and clipped correctly, so nothing visible ran off the edge, but the document was wider than the screen.
+
+**Cause.** A tab's count badge carries `sr-only` words ("1 open"). `sr-only` is `position: absolute`. The strip's scroller (`ScrollX`) had `overflow-x: auto` but no positioning of its own, so the absolute text was placed against the page, not the scroller, and its clipping didn't apply.
+
+**Fix.** `ScrollX`'s scroller is `relative` (`packages/ui/src/components/ui/scroll-x.tsx`). That fixes every tab strip and wide table built on it. Found by loading every admin route at 390px and checking `scrollWidth`; the cause was found by hiding one section at a time.
+
+**Rule.** An element that clips with `overflow` must also be the positioning parent (`relative`) if anything inside it can be absolutely positioned, including `sr-only` text. A phone check measures `documentElement.scrollWidth`, not only what looks cut off.
+
+### "You're on the team" turned into "can't be used" the moment someone joined (19 Oct 2026)
+
+**Symptom.** The browser test for a staff invite reached Join the team, the API accepted (200), and the page then showed no "You're on the team". A real invitee would have read that their invite can no longer be used, right after joining.
+
+**Cause.** `acceptStaffInviteAction` deleted the invite's cookie once the invite was over. In Next, a server action that sets or deletes a cookie re-renders the page, so the server page ran again: with no token, and an invite now used, it drew "gone" over the client's answer. Final refusals ("You're already on the team") were lost the same way. Unit tests mocked the action, so none saw the re-render.
+
+**Fix.** The action leaves a ten-minute `saroh_staff_invite_done` cookie (joined or the final refusal's code) in place of the token, and the page draws that outcome before anything else (`app/staff-invite/page.tsx`, `doneAfterAccept` / `doneWords`).
+
+**Rule.** A server action that changes a cookie re-renders its page. Whatever answer the client is showing must survive that render: let the page draw it from the server state, not only from the client's `useState`.
+
+### Staff invites failed with a 500 when two were sent at once (19 Oct 2026)
+
+**Symptom.** Under the parallel browser run, `POST /admin/staff/invites` answered 500 `TransactionWriteConflict`.
+
+**Cause.** Invite, resend and withdraw run Serializable transactions with no retry; another staff write at the same moment (any test granting access) failed the snapshot. Accept already retried.
+
+**Fix.** All three go through `serializable()` in `admin-staff-invites.service.ts`, which runs again on `isSerializationFailure`; the checks inside run again, so a real conflict is still refused.
+
+**Rule.** Every `isolationLevel: "Serializable"` transaction retries a serialization failure a few times (`isSerializationFailure`), or says why it must not.
+
+### A seed test passed locally and failed in CI on DATABASE_URL (19 Oct 2026)
+
+**Symptom.** PR #1037's Unit tests job failed on `seed/staff.test.ts` ("grants no console access on a database that isn't on this machine"): `Cannot read properties of undefined (reading 'upsert')`. `pnpm prepush --all` had passed.
+
+**Cause.** The test called `seedStaff(prisma, undefined)` to mean "no URL", but an `undefined` argument takes the default, `process.env.DATABASE_URL`. CI's unit job sets that to a localhost name, so the seed ran against the stub; the local gate had no DATABASE_URL, so it returned null.
+
+**Fix.** The test stubs `DATABASE_URL` (`vi.stubEnv`) instead of passing `undefined`. The next CI run then failed `user-menu.test.tsx`, which expected `https://accounts.saroh.in/…` while CI sets `NEXT_PUBLIC_ACCOUNTS_URL` to a local address; it now compares with `billingProfilesUrl`. `scripts/prepush.sh` runs the vitest and seed steps with CI's unit job environment (`CI_UNIT_ENV`), so both read the same values.
+
+**Rule.** Passing `undefined` never tests "not set" for a parameter with a default. A test that depends on an environment variable sets it itself; the local gate runs unit tests with CI's environment.

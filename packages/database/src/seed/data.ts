@@ -104,6 +104,14 @@ export const CALENDAR_ONLY_EMAIL = "tara.calendar@saroh.dev";
  */
 export const FOUNDER_EMAIL = "founder@saroh.dev";
 
+/**
+ * Sam, Saroh staff: a Platform owner on the operator console (admin plan
+ * U23), and in no business. The console's browser specs sign in as them
+ * (`e2e/tests/admin-*.spec.ts`). Seeded on a database on this machine only
+ * (`seed/staff.ts`).
+ */
+export const STAFF_EMAIL = "staff@saroh.dev";
+
 export const ORG_SLUG = "demo-org";
 export const ORG_NAME = "Northwind Supply";
 /**

@@ -72,7 +72,8 @@ Handler context comes from `@CurrentUser`, `@OrgContext`, `@PlatformAdminContext
 Every `/admin` route stacks all three of `BetterAuthGuard` →
 `PlatformAdminGuard` → `PlatformPermissionGuard`. Organization membership never
 grants platform access. The fixed staff roles are `PLATFORM_OWNER`, `SUPPORT`,
-`OPERATIONS`, `BILLING`, `RELEASE_MANAGER` and `AUDITOR`; their closed
+`OPERATIONS`, `BILLING`, `RELEASE_MANAGER`, `AUDITOR` and `ACCOUNT_MANAGER`
+(DEC-169, scoped to its own businesses and leads by `staff-scope.ts`); their closed
 permission vocabulary lives in
 [`src/modules/admin/admin-permissions.ts`](src/modules/admin/admin-permissions.ts).
 

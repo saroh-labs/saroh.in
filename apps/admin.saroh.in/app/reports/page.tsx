@@ -49,7 +49,7 @@ export default async function ReportsPage({
         <AdminShell staff={staff}>
             <PageContainer>
                 <PageHeader
-                    breadcrumb={["Instance", "Reports"]}
+                    breadcrumb={["Help customers", "Reports"]}
                     title="Reports"
                     description={
                         page

@@ -78,6 +78,7 @@ export function DataView<TRow>({
     bulkActions,
     emptyState,
     paging,
+    rowChanged,
 }: DataViewProps<TRow>) {
     const { mode, wide, deskMode, phoneMode, choose } = useViewMode(
         viewId,
@@ -400,6 +401,7 @@ export function DataView<TRow>({
                                     data-state={
                                         isSelected ? "selected" : undefined
                                     }
+                                    {...changedAttrs(rowChanged, row)}
                                     // The row is the action (brand file §10):
                                     // anywhere on it opens the item. Controls
                                     // inside stop the click.
@@ -577,6 +579,7 @@ export function DataView<TRow>({
                     return (
                         <li
                             key={rowKey(row)}
+                            {...changedAttrs(rowChanged, row)}
                             style={
                                 {
                                     "--wk-i": rowIndex,
@@ -953,4 +956,16 @@ export function DataView<TRow>({
             ) : null}
         </div>
     );
+}
+
+/** A just-changed row's attributes, only for a view that tracks changes. */
+function changedAttrs<TRow>(
+    rowChanged: ((row: TRow) => boolean) | undefined,
+    row: TRow,
+) {
+    if (!rowChanged) return {};
+    return {
+        "data-changed-row": "",
+        "data-just-changed": rowChanged(row) ? "" : undefined,
+    };
 }

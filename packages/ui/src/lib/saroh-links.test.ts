@@ -39,7 +39,7 @@ describe("the days the footer's pages publish", () => {
 
 describe("sarohFooterLinks", () => {
     it("is Privacy, Terms and Help once all three are published", () => {
-        expect(sarohFooterLinks(new Date("2026-10-17T00:00:00+05:30"))).toEqual(
+        expect(sarohFooterLinks(new Date("2026-10-19T00:00:00+05:30"))).toEqual(
             [
                 { label: "Privacy", href: `${SAROH_SITE_URL}/privacy` },
                 { label: "Terms", href: `${SAROH_SITE_URL}/terms` },

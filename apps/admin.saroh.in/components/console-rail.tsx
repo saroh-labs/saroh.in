@@ -57,7 +57,7 @@ export function ConsoleRail({
         >
             {groups.map((group) => (
                 <div key={group.label} className="flex flex-col gap-1">
-                    {icons ? (
+                    {group.plain ? null : icons ? (
                         // Announced, not drawn: the heading still names the
                         // group for anyone listening, and the icons below it
                         // keep their grouping in the accessibility tree.
@@ -107,7 +107,7 @@ export function ConsoleRail({
 
             {!icons && (
                 <p className="mt-auto px-2.5 text-[11.5px] leading-[1.5] text-muted-foreground">
-                    This console is the instance, not a business. Nothing here
+                    This console runs Saroh itself, not a business. Nothing here
                     is reachable from a merchant&rsquo;s workspace.
                 </p>
             )}

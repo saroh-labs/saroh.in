@@ -1,4 +1,5 @@
 import {
+    ConflictException,
     HttpException,
     Injectable,
     Logger,
@@ -97,6 +98,11 @@ export interface BillingProfileChosen extends BusinessBillingProfileView {
 
 export { CHECKOUT_WAITING, CHECKOUT_WAITING_MESSAGE } from "./profile-switch";
 
+/** A paid business moved to a profile its provider hasn't linked (step 2). */
+export const PROFILE_NOT_LINKED = "profile-not-linked";
+export const PROFILE_NOT_LINKED_MESSAGE =
+    "Razorpay hasn't linked this billing profile yet, so it can't take a paid business. Fix it and try again before moving a paid business here.";
+
 @Injectable()
 export class BusinessBillingProfileService {
     private readonly logger = new Logger(BusinessBillingProfileService.name);
@@ -174,6 +180,7 @@ export class BusinessBillingProfileService {
         ctx: OrganizationContext,
         billingProfileId: string,
         now: Date = new Date(),
+        options: { linkedForRenewal?: boolean } = {},
     ): Promise<BillingProfileChosen> {
         authorize(ctx, "billing:manage");
         const move = await prisma.$transaction(async (tx) => {
@@ -191,12 +198,32 @@ export class BusinessBillingProfileService {
                 });
                 if (!mine) throw profileNotFound();
             }
-            return profileMoveInTx(
+            const decided = await profileMoveInTx(
                 tx,
                 ctx.organizationId,
                 billingProfileId,
                 now,
             );
+            // From the account's Billing profiles (step 2): a paid business
+            // moves only to a profile its provider has a customer for, so
+            // the payment to authorise names it. Nothing was written yet
+            // for a move at the renewal, so refusing here changes nothing.
+            if (options.linkedForRenewal && decided.kind === "schedule") {
+                const to = await tx.billingProfile.findUnique({
+                    where: { id: billingProfileId },
+                    select: { providerCustomerId: true },
+                });
+                if (!to?.providerCustomerId) {
+                    throw new ConflictException({
+                        message: PROFILE_NOT_LINKED_MESSAGE,
+                        details: {
+                            field: "billingProfile",
+                            code: PROFILE_NOT_LINKED,
+                        },
+                    });
+                }
+            }
+            return decided;
         });
         return this.settle(ctx, move, billingProfileId, "chosen", now);
     }

@@ -14,9 +14,12 @@ import {
     ACTIVE_ORG_USER_COOKIE,
 } from "./left-business";
 import {
+    carriedManagerLink,
     carriedReferral,
+    MANAGER_COOKIE,
     REFERRAL_COOKIE,
     referralCookieDomain,
+    typedManagerCode,
 } from "./referral-carry";
 
 import type {
@@ -143,29 +146,50 @@ export async function checkAddress(
  * the dashboard renders under the new tenant on the next navigation/refresh.
  *
  * A referral code the browser carried from saroh.in goes with it (DEC-156,
- * `referral-carry.ts`): read here on the server, never from the form, and
- * cleared once the business exists, so the next business this browser makes
- * isn't put down to the same link.
+ * `referral-carry.ts`), and so does an account manager's link (DEC-169,
+ * `?am=`): both read here on the server, never from the form, and cleared
+ * once the business exists, so the next business this browser makes isn't
+ * put down to the same link. The code an owner typed for the teammate
+ * helping them is the form's, sent as typed when it is shaped like one.
  */
 export async function createOrganization(
     input: CreateOrganizationInput,
 ): Promise<OrganizationResult<{ id: string; slug: string }>> {
     const jar = await cookies();
     const referralCode = carriedReferral(jar.get(REFERRAL_COOKIE)?.value);
-    // `referralCode` is the cookie's or nothing, whatever the caller sent.
-    const res = await createOrganizationApi({ ...input, referralCode });
+    const managerLink = carriedManagerLink(jar.get(MANAGER_COOKIE)?.value);
+    const managerCode = typedManagerCode(input.managerCode);
+    // The carried codes are the cookies' or nothing, whatever the caller
+    // sent.
+    const {
+        managerLinkCode: _sentLink,
+        managerLinkSetAt: _sentAt,
+        managerCode: _typed,
+        ...rest
+    } = input;
+    const res = await createOrganizationApi({
+        ...rest,
+        referralCode,
+        ...(managerLink ?? {}),
+        ...(managerCode ? { managerCode } : {}),
+    });
     if (res.ok) {
         await writeActiveOrgCookie(res.data.id, input.name);
-        if (jar.has(REFERRAL_COOKIE)) {
+        const carried = [REFERRAL_COOKIE, MANAGER_COOKIE].filter((name) =>
+            jar.has(name),
+        );
+        if (carried.length > 0) {
             const from = await headers();
             const domain = referralCookieDomain(
                 from.get("x-forwarded-host") ?? from.get("host"),
             );
-            jar.set(REFERRAL_COOKIE, "", {
-                path: "/",
-                maxAge: 0,
-                ...(domain ? { domain } : {}),
-            });
+            for (const name of carried) {
+                jar.set(name, "", {
+                    path: "/",
+                    maxAge: 0,
+                    ...(domain ? { domain } : {}),
+                });
+            }
         }
     }
     return res;

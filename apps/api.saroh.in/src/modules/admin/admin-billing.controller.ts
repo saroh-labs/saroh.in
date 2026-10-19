@@ -8,6 +8,7 @@ import {
     ExportSarohInvoicesDto,
     ListSarohInvoicesDto,
     ListSarohSubscriptionsDto,
+    SubscriptionHistoryDto,
 } from "./admin-billing.dto";
 import { AdminBillingService } from "./admin-billing.service";
 import { AdminPermission } from "./admin-permissions";
@@ -29,6 +30,16 @@ export class AdminBillingController {
         private readonly billing: AdminBillingService,
         private readonly adminAudit: AdminAuditService,
     ) {}
+
+    /**
+     * Each tab's count, for Billing's tabs (R25). Not on the ledger: it is
+     * four numbers about no business, read on every Billing screen.
+     */
+    @Get("billing/counts")
+    @RequireAdminPermission(AdminPermission.SarohBillingRead)
+    counts(@PlatformAdminContext() staff: PlatformAdminInfo) {
+        return this.billing.counts(staff);
+    }
 
     @Get("billing/invoices")
     @RequireAdminPermission(AdminPermission.SarohBillingRead)
@@ -114,6 +125,31 @@ export class AdminBillingController {
             organizationId: detail.subscription.organization.id,
         });
         return detail;
+    }
+
+    /**
+     * One subscription's history (admin plan U15): provider events (never
+     * their payload), invoices, billing emails and staff actions, merged
+     * newest first and paged.
+     */
+    @Get("billing/subscriptions/:subscriptionId/history")
+    @RequireAdminPermission(AdminPermission.SarohBillingRead)
+    async history(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("subscriptionId") subscriptionId: string,
+        @Query() query: SubscriptionHistoryDto,
+    ) {
+        const { organizationId, ...page } = await this.billing.history(
+            staff,
+            subscriptionId,
+            query,
+        );
+        await this.read(staff, "billing.subscription.history", "subscription", {
+            targetId: subscriptionId,
+            organizationId,
+            metadata: { ...filters(query), resultCount: page.items.length },
+        });
+        return page;
     }
 
     /** A successful read on the admin ledger; an audit outage is logged. */

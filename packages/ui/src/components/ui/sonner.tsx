@@ -31,7 +31,10 @@ export const brandToastOptions: ToasterProps["toastOptions"] = {
         // by an action in that sheet, could not be pressed.
         toast: "pointer-events-auto flex w-full min-w-0 items-center sm:min-w-[300px] gap-3 rounded-[10px] bg-primary px-[15px] py-3 text-[13px] text-primary-foreground shadow-lg [&>[data-icon]]:shrink-0 [&_[data-icon]_svg]:size-4",
         title: "font-medium",
-        description: "mt-0.5 text-[12.5px] opacity-80",
+        // `!text-current`: Sonner's dark theme paints `[data-description]`
+        // light grey through an attribute selector that outranks a class,
+        // and on the inverted (Paper) bar that grey all but vanished.
+        description: "mt-0.5 text-[12.5px] !text-current opacity-80",
         actionButton:
             "ml-auto inline-flex shrink-0 cursor-pointer items-center justify-center rounded-md px-1.5 py-1 text-[12.5px] font-semibold text-[#F0A92B] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground dark:text-[#91550C] coarse:-my-2 coarse:min-h-11 coarse:min-w-11 coarse:px-3 coarse:text-sm",
         cancelButton:

@@ -6,6 +6,10 @@ export const AdminRole = {
     Billing: "BILLING",
     ReleaseManager: "RELEASE_MANAGER",
     Auditor: "AUDITOR",
+    // Looks after the businesses they brought in or were given, and works
+    // Saroh's own sales leads (DEC-169). Sees only their own: every read it
+    // makes goes through `scopeForStaff` (`staff-scope.ts`).
+    AccountManager: "ACCOUNT_MANAGER",
 } as const;
 
 export type AdminRole = (typeof AdminRole)[keyof typeof AdminRole];
@@ -17,6 +21,13 @@ export type AdminRole = (typeof AdminRole)[keyof typeof AdminRole];
  * nothing requires is a promise the console cannot keep, so it is removed
  * rather than kept for later (the incidents pair went this way when
  * incidents were deferred; see the admin console plan).
+ *
+ * One planned exception: the Team permissions (DEC-169, admin console
+ * redesign plan 2026-10-18-002) were added together in U18 so the role table
+ * is reviewed once. Those no endpoint requires yet are listed in
+ * `AWAITING_ENDPOINT` with the unit that wires them, and
+ * `admin-permissions.spec.ts` fails if one is still listed once a route
+ * requires it, or if any other permission is unused.
  */
 export const AdminPermission = {
     PlatformRead: "platform:read",
@@ -82,6 +93,30 @@ export const AdminPermission = {
     // the owner made by hand. Platform Owners and Billing only, like the
     // read; every write asks a reason and is on the ledger.
     SarohBillingAct: "saroh-billing:act",
+    // Team (DEC-169). See the team and each teammate's profile.
+    TeamRead: "team:read",
+    // Change a teammate's profile: job, contact, reporting, capacity,
+    // commission flag, tax id. Platform Owners only.
+    TeamWrite: "team:write",
+    // Which manager looks after which business. Account managers hold it
+    // scoped to their own (`scopeForStaff`); everyone else sees all.
+    AccountsRead: "accounts:read",
+    // Give a business a manager, move it, end the link, share out.
+    AccountsAssign: "accounts:assign",
+    // Saroh's own sales leads (not a business's Leads). Account managers
+    // hold both scoped to the leads they own.
+    SarohLeadsRead: "saroh-leads:read",
+    SarohLeadsWrite: "saroh-leads:write",
+    // Money owed to the team: earnings, statements, Mark paid, and a
+    // teammate's tax id (last 4 characters only). Platform Owners and Billing.
+    TeamPay: "team:pay",
+    // Set the commission rates. Platform Owners only. The rates live in the
+    // database, never in code.
+    CommissionRates: "commission:rates",
+    // Help a person sign in (U9): send a code, mark an email verified,
+    // change a sign-in email or confirm another's change. Platform owners
+    // and Support.
+    PeopleSignInHelp: "people:sign-in-help",
 } as const;
 
 export type AdminPermission =
@@ -90,6 +125,15 @@ export type AdminPermission =
 export const ALL_ADMIN_PERMISSIONS = Object.freeze(
     Object.values(AdminPermission),
 );
+
+/**
+ * Permissions in the vocabulary that no endpoint requires yet, each with the
+ * unit of plan 2026-10-18-002 that wires it. Remove a row in the unit that
+ * adds its first route; `admin-permissions.spec.ts` enforces both directions.
+ */
+export const AWAITING_ENDPOINT: Readonly<
+    Partial<Record<AdminPermission, string>>
+> = Object.freeze({});
 
 const ROLE_PERMISSIONS = {
     [AdminRole.PlatformOwner]: ALL_ADMIN_PERMISSIONS,
@@ -105,6 +149,14 @@ const ROLE_PERMISSIONS = {
         AdminPermission.OrganizationTrackersWrite,
         // Support reads customers' reports and marks them done (DEC-121).
         AdminPermission.ReportsResolve,
+        // Team (DEC-169): sees the team and who looks after which business,
+        // assigns managers and unowned leads, and helps people sign in.
+        AdminPermission.TeamRead,
+        AdminPermission.AccountsRead,
+        AdminPermission.AccountsAssign,
+        AdminPermission.SarohLeadsRead,
+        AdminPermission.SarohLeadsWrite,
+        AdminPermission.PeopleSignInHelp,
     ],
     [AdminRole.Operations]: [
         AdminPermission.PlatformRead,
@@ -131,6 +183,10 @@ const ROLE_PERMISSIONS = {
         AdminPermission.SarohBillingRead,
         // Acting on them: Needs action, autopay, refunds (DEC-166).
         AdminPermission.SarohBillingAct,
+        // Team (DEC-169): who looks after whom, and what the team is owed.
+        AdminPermission.TeamRead,
+        AdminPermission.AccountsRead,
+        AdminPermission.TeamPay,
     ],
     [AdminRole.ReleaseManager]: [
         AdminPermission.PlatformRead,
@@ -149,10 +205,29 @@ const ROLE_PERMISSIONS = {
         AdminPermission.StaffRead,
         AdminPermission.AuditRead,
         AdminPermission.PricingRead,
+        // Team (DEC-169), read-only.
+        AdminPermission.TeamRead,
+        AdminPermission.AccountsRead,
+    ],
+    // DEC-169. Only their own businesses and leads, through `scopeForStaff`.
+    // Never organization:read (every business), accounts:assign, team:write
+    // or staff:grant; `admin-permissions.spec.ts` pins the whole set.
+    [AdminRole.AccountManager]: [
+        AdminPermission.AccountsRead,
+        AdminPermission.SarohLeadsRead,
+        AdminPermission.SarohLeadsWrite,
     ],
 } as const satisfies Record<AdminRole, readonly AdminPermission[]>;
 
 const ADMIN_ROLES = new Set<string>(Object.values(AdminRole));
+
+/**
+ * Roles whose holders see every business and lead (no owner filter). The
+ * Account manager is the one role scoped to its own (`staff-scope.ts`).
+ */
+export const OWN_SCOPED_ROLES: readonly AdminRole[] = Object.freeze([
+    AdminRole.AccountManager,
+]);
 
 export function isAdminRole(value: string): value is AdminRole {
     return ADMIN_ROLES.has(value);

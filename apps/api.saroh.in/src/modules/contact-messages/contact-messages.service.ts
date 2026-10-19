@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { sendContactMessageNotice } from "../../common/email";
+import { recordWebsiteLead } from "../saroh-leads/lead-intake";
 import type { WaitlistKind } from "../waitlist/waitlist-keys";
 import type { ContactTopic } from "./dto";
 
@@ -32,6 +33,11 @@ const TOPIC_WORDS: Record<ContactTopic, string> = {
  * one came in (`sendContactMessageNotice`). The writer is sent nothing, so a
  * stranger can't use the form to make Saroh write to someone else. A message
  * is deleted 12 months after it arrives (`contact-retention.ts`).
+ *
+ * A question before signing up also becomes Saroh's own sales lead
+ * (DEC-169, U20), merged by email with one the waitlist made. The other
+ * topics come from people already using Saroh, or from partners and press,
+ * and are not leads.
  */
 @Injectable()
 export class ContactMessagesService {
@@ -49,6 +55,16 @@ export class ContactMessagesService {
             },
             select: { id: true },
         });
+        // After the message is saved, and never throwing: a lead that can't
+        // be written is logged and the visitor's message stands.
+        if (input.topic === "question") {
+            await recordWebsiteLead({
+                source: "WEBSITE",
+                email: input.email,
+                name: input.name,
+                kind: input.kind,
+            }).catch(() => "failed" as const);
+        }
         // Stored first, so the notice failing loses nothing: the message is
         // in the admin console either way, and the visitor is told it went.
         const notice = await sendContactMessageNotice({

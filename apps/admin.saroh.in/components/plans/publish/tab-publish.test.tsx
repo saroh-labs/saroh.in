@@ -19,8 +19,12 @@ import {
     fakeVersion,
 } from "@/test/pricing-fixture";
 
+import type { Catalog } from "@saroh/pricing-catalog";
+import { formatInr } from "@saroh/pricing-catalog";
+
 import { PlansShell } from "../plans-shell";
 import { dateProblem, publishLabel, tomorrowStart } from "./publish";
+import { reachCounts } from "./reach";
 
 const actions = vi.hoisted(() => ({
     savePricingDraftAction: vi.fn(),
@@ -87,11 +91,11 @@ afterEach(() => {
     vi.clearAllMocks();
 });
 
-describe("Review & publish", () => {
+describe("Review and publish", () => {
     it("shows what the draft does, from the API's figures", () => {
         draw();
         const impact = screen.getByRole("region", {
-            name: "What this draft does",
+            name: "Who it reaches",
         });
         expect(within(impact).getByText("Plan B costs more")).toBeTruthy();
         expect(within(impact).getByText("Shop One")).toBeTruthy();
@@ -255,6 +259,201 @@ describe("Review & publish", () => {
         // No empty Live / Draft table with nothing in it.
         expect(screen.queryByRole("table")).toBeNull();
         expect(screen.queryByRole("region", { name: "Publish" })).toBeNull();
+    });
+});
+
+describe("each change, and who it reaches (U13)", () => {
+    const PRICE = `Plan B: ${formatInr(11_100)} → ${formatInr(22_200)} a month`;
+
+    it("lists each change with its plan, who it reaches, Edit and Undo", async () => {
+        actions.savePricingDraftAction.mockResolvedValue({
+            ok: true,
+            data: { revision: 4, valid: true, errors: [], changes: [] },
+        });
+        draw({
+            pricing: fakePricing({
+                draft: fakeDraft(),
+                plans: [
+                    {
+                        planId: "b",
+                        name: "Plan B",
+                        retired: false,
+                        businesses: 2,
+                        olderVersion: 0,
+                    },
+                ],
+            }),
+        });
+        expect(
+            screen.getByText("1 change becomes version 2 when you publish."),
+        );
+        const list = screen.getByRole("region", {
+            name: "Changes in this draft",
+        });
+        const row = within(list).getByRole("listitem");
+        expect(within(row).getByText("Plan B")).toBeTruthy();
+        expect(within(row).getByText(PRICE)).toBeTruthy();
+        expect(within(row).getByText("2 businesses at renewal")).toBeTruthy();
+
+        // Undo takes back that change, and only it.
+        fireEvent.click(
+            within(row).getByRole("button", { name: `Undo: ${PRICE}` }),
+        );
+        expect(within(list).queryByRole("listitem")).toBeNull();
+        expect(within(list).getByText("No changes yet.")).toBeTruthy();
+        await waitFor(() =>
+            expect(actions.savePricingDraftAction).toHaveBeenCalled(),
+        );
+        const sent = actions.savePricingDraftAction.mock.calls.at(-1)?.[0] as {
+            catalog: { plans: { id: string; pricePaise: number }[] };
+        };
+        expect(sent.catalog.plans.find((p) => p.id === "b")?.pricePaise).toBe(
+            11_100,
+        );
+    });
+
+    it("opens where a change is made from its Edit", () => {
+        draw();
+        fireEvent.click(screen.getByRole("button", { name: `Edit: ${PRICE}` }));
+        expect(window.location.search).toBe("?tab=plans");
+        // The Plans tab, opened on Plan B's sheet, where its price is.
+        expect(
+            within(screen.getByRole("dialog")).getAllByText(/Plan B/).length,
+        ).toBeGreaterThan(0);
+    });
+
+    it("counts who comes out better off, worse off and on a new price", () => {
+        const counts = reachCounts(
+            {
+                items: [
+                    {
+                        tone: "ok",
+                        label: "Gives more",
+                        title: "Things added to Plan C",
+                        detail: "",
+                        businesses: [
+                            { id: "o1", name: "Shop One" },
+                            { id: "o2", name: "Shop Two" },
+                        ],
+                    },
+                    {
+                        tone: "danger",
+                        label: "Takes away",
+                        title: "Things taken off Plan A",
+                        detail: "",
+                        businesses: [{ id: "o3", name: "Shop Three" }],
+                    },
+                    {
+                        tone: "warn",
+                        label: "Check",
+                        title: PRICE,
+                        detail: "",
+                        businesses: [
+                            { id: "o1", name: "Shop One" },
+                            { id: "o4", name: "Shop Four" },
+                        ],
+                    },
+                ],
+                touched: 4,
+                total: 5,
+                revenue: { nowPaise: 0, nextPaise: 0 },
+            },
+            new Set([PRICE]),
+        );
+        expect(counts).toEqual({ better: 2, worse: 1, price: 2 });
+
+        draw();
+        const reach = screen.getByRole("region", { name: "Who it reaches" });
+        expect(within(reach).getByText("Better off")).toBeTruthy();
+        expect(within(reach).getByText("Worse off")).toBeTruthy();
+        expect(
+            within(reach).getByText(
+                "Nobody loses a module or goes over a limit",
+            ),
+        ).toBeTruthy();
+    });
+
+    it("saves an edit made here before publishing, and asks for a reason", async () => {
+        actions.savePricingDraftAction.mockResolvedValue({
+            ok: true,
+            data: { revision: 4, valid: true, errors: [], changes: [] },
+        });
+        actions.publishPricingAction.mockResolvedValue({
+            ok: true,
+            data: {
+                version: 2,
+                goLiveAt: "2026-10-03T00:00:00.000Z",
+                status: "live",
+                policy: "keep",
+                changes: [],
+                moves: { moved: 0, notices: 0 },
+                providerPlans: 0,
+            },
+        });
+        const draftCatalog = fakeDraft().catalog as Catalog;
+        draftCatalog.plans[2].pricePaise = 33_300;
+        draw({
+            pricing: fakePricing({
+                draft: fakeDraft({ catalog: draftCatalog }),
+            }),
+        });
+        // Taken back here, and not saved yet when Publish is pressed.
+        fireEvent.click(screen.getByRole("button", { name: `Undo: ${PRICE}` }));
+        fireEvent.click(
+            screen.getByRole("radio", {
+                name: /They keep their current terms/,
+            }),
+        );
+        fireEvent.click(publishButton());
+        const dialog = screen.getByRole("dialog");
+        const confirm = within(dialog).getByRole("button", {
+            name: "Publish version 2",
+        });
+        expect(within(dialog).getByLabelText(/Reason/)).toBeTruthy();
+        fireEvent.change(within(dialog).getByLabelText(/Reason/), {
+            target: { value: "Agreed in review" },
+        });
+        await act(async () => {
+            fireEvent.click(confirm);
+            await Promise.resolve();
+        });
+        await waitFor(() =>
+            expect(actions.publishPricingAction).toHaveBeenCalled(),
+        );
+        // Saved first, and the revision that save returned is published.
+        const saveOrder =
+            actions.savePricingDraftAction.mock.invocationCallOrder[0] ?? 0;
+        const publishOrder =
+            actions.publishPricingAction.mock.invocationCallOrder[0] ?? 0;
+        expect(saveOrder).toBeLessThan(publishOrder);
+        expect(actions.publishPricingAction).toHaveBeenCalledWith(
+            expect.objectContaining({
+                revision: 4,
+                reason: "Agreed in review",
+            }),
+        );
+    });
+
+    it("can't publish a draft a newer version has overtaken", () => {
+        draw({
+            pricing: fakePricing({
+                draft: fakeDraft({ baseVersion: 1 }),
+                liveVersion: 2,
+                versions: [
+                    fakeVersion({ version: 2 }),
+                    fakeVersion({ status: "earlier" }),
+                ],
+            }),
+        });
+        fireEvent.click(
+            screen.getByRole("radio", {
+                name: /They keep their current terms/,
+            }),
+        );
+        expect(publishButton().textContent).toBe(
+            "Version 2 was published since this draft was started",
+        );
+        expect(publishButton()).toHaveProperty("disabled", true);
     });
 });
 

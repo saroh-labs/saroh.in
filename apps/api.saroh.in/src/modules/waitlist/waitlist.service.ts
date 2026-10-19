@@ -3,13 +3,16 @@ import { prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
 import { businessByReferralCode } from "../organizations/referral";
+import { recordWebsiteLead } from "../saroh-leads/lead-intake";
 import type { WaitlistKind, WaitlistPlan } from "./waitlist-keys";
 import {
     businessKey,
     cleanSource,
+    LINK_PREVIEW_SOURCE,
     maskEmail,
     newRefCode,
     normaliseEmail,
+    QR_MAKER_SOURCE,
     REF_CODE_PATTERN,
     waitlistTemplate,
 } from "./waitlist-keys";
@@ -42,6 +45,9 @@ export interface JoinWaitlistInput {
 export type JoinWaitlistResult =
     | { created: true; position: number; refCode: string | null }
     | { created: false };
+
+/** Sources of entries a tool's email gate made, not people waiting. */
+const TOOL_SOURCES = new Set<string>([LINK_PREVIEW_SOURCE, QR_MAKER_SOURCE]);
 
 /** How many times a clashing referral id is drawn again. */
 const REF_CODE_ATTEMPTS = 3;
@@ -115,6 +121,20 @@ export class WaitlistService {
                 this.logger.log(
                     `waitlist: new signup ${maskEmail(email)}${referredById ? " (referred)" : ""}`,
                 );
+                // Saroh's own sales lead (DEC-169, U20), merged by email
+                // with one an enquiry made. Never throws: the entry stands
+                // whatever happens to the lead. A tool's email gate (the
+                // link preview, the QR code maker) is not someone waiting
+                // for Saroh, so it makes none.
+                if (!TOOL_SOURCES.has(data.source)) {
+                    await recordWebsiteLead({
+                        source: "WAITLIST",
+                        email,
+                        name: businessName,
+                        kind: data.kind,
+                        city: data.city,
+                    }).catch(() => "failed" as const);
+                }
                 return {
                     created: true,
                     position: row.position,

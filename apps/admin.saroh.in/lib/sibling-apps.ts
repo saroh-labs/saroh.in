@@ -70,7 +70,7 @@ export async function instanceApps(): Promise<InstanceApps | null> {
             {
                 key: "website",
                 name: "Website",
-                description: "The public site for this instance.",
+                description: "Saroh's public site.",
                 href: `https://${domain}`,
             },
         ],

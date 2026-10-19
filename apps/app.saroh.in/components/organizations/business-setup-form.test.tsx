@@ -567,6 +567,9 @@ describe("the draft", () => {
             "country",
             "goal",
             "kind",
+            // A Saroh teammate's code (DEC-169): an id they were given,
+            // not a secret.
+            "managerCode",
             "name",
             "yourName",
         ]);

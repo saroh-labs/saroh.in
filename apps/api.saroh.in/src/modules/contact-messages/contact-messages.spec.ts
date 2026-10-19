@@ -9,12 +9,22 @@ jest.mock("../../common/email", () => ({
     sendContactMessageNotice: jest.fn().mockResolvedValue("sent"),
 }));
 
+// Saroh's own leads (U20) have their rows in saroh-leads.db.spec.ts.
+jest.mock("../saroh-leads/lead-retention", () => ({
+    deleteStaleWebsiteLeads: jest.fn().mockResolvedValue(0),
+}));
+jest.mock("../saroh-leads/lead-intake", () => ({
+    recordWebsiteLead: jest.fn().mockResolvedValue("created"),
+}));
+
 import { HttpException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 
 import { sendContactMessageNotice } from "../../common/email";
+import { recordWebsiteLead } from "../saroh-leads/lead-intake";
+import { deleteStaleWebsiteLeads } from "../saroh-leads/lead-retention";
 import { ContactMessagesService } from "./contact-messages.service";
 import {
     CONTACT_MESSAGE_KEEP_DAYS,
@@ -256,6 +266,31 @@ describe("deleteOldContactMessages", () => {
         expect(CONTACT_MESSAGE_KEEP_DAYS).toBe(365);
         expect(db.contactMessage.deleteMany).toHaveBeenCalledWith({
             where: { createdAt: { lt: new Date("2026-10-20T00:00:00Z") } },
+        });
+        // The unconverted leads those enquiries made go with them.
+        expect(deleteStaleWebsiteLeads).toHaveBeenCalledWith(now);
+    });
+});
+
+describe("a question before signing up is a lead (U20)", () => {
+    it("records a WEBSITE lead for a question, and none for the other topics", async () => {
+        const service = new ContactMessagesService();
+        const base = {
+            name: "Asha Rao",
+            email: "asha.rao@example.com",
+            message: "Can I take bookings?",
+        };
+        jest.mocked(recordWebsiteLead).mockClear();
+        await service.send({ ...base, topic: "question", kind: "salon" });
+        await service.send({ ...base, topic: "help" });
+        await service.send({ ...base, topic: "bug" });
+        await service.send({ ...base, topic: "other" });
+        expect(recordWebsiteLead).toHaveBeenCalledTimes(1);
+        expect(recordWebsiteLead).toHaveBeenCalledWith({
+            source: "WEBSITE",
+            email: "asha.rao@example.com",
+            name: "Asha Rao",
+            kind: "salon",
         });
     });
 });

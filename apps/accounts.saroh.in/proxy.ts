@@ -22,7 +22,9 @@ async function proxy(req: NextRequest) {
     });
 
     const isLoggedIn = !!sessionCookie;
-    const isOnProtectedRoute = protectedRoutes.has(nextUrl.pathname);
+    const isOnProtectedRoute =
+        protectedRoutes.has(nextUrl.pathname) ||
+        nextUrl.pathname.startsWith("/account/");
     const isOnAuthRoute = SIGNED_OUT_PAGES.some((p) =>
         nextUrl.pathname.startsWith(p),
     );

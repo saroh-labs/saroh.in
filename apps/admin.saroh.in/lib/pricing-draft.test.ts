@@ -43,12 +43,16 @@ describe("tabLabels", () => {
         expect(
             tabLabels({ versions: 2, hasDraft: false, changes: 0 }),
         ).toMatchObject({
-            versions: "Versions · 2",
-            publish: "Review & publish",
+            plans: { label: "Plans", badge: null },
+            versions: { label: "Versions", badge: "2" },
+            publish: { label: "Review and publish", badge: null },
         });
-        expect(
-            tabLabels({ versions: 2, hasDraft: true, changes: 1 }).publish,
-        ).toBe("Review & publish · 1");
+        const draft = tabLabels({ versions: 2, hasDraft: true, changes: 1 });
+        expect(draft.publish).toEqual({
+            label: "Review and publish",
+            badge: "1",
+        });
+        expect(draft.plans.badge).toBe("1 changed");
     });
 });
 
@@ -226,7 +230,7 @@ describe("the first version (nothing live yet)", () => {
                 changes: 0,
                 firstVersion: true,
             }).publish,
-        ).toBe("Review & publish");
+        ).toEqual({ label: "Review and publish", badge: null });
         expect(
             draftSummary({
                 check: { valid: true, errors: [], changes: [] },

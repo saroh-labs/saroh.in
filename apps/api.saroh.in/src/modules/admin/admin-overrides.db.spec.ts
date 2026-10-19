@@ -24,7 +24,7 @@ import { PRICING_MOVE_NOTICE_TYPE } from "../pricing/moves.service";
 import { AdminAuditService } from "./admin-audit.service";
 import { AdminOrganizationViewService } from "./admin-organization-view.service";
 import { AdminOverridesService } from "./admin-overrides.service";
-import { AdminPermission } from "./admin-permissions";
+import { AdminPermission, AdminRole } from "./admin-permissions";
 
 const tag = `${process.pid}-${Date.now()}`;
 const DAY = 24 * 60 * 60 * 1000;
@@ -47,6 +47,16 @@ const staff = (permissions: string[] = [AdminPermission.PricingOverride]) =>
         platformAdminId: "pa",
         roles: [],
         permissions,
+        viaBootstrap: false,
+    }) as never;
+
+/** Take away a module… is a Platform owner's alone (U5). */
+const owner = () =>
+    ({
+        userId: staffId,
+        platformAdminId: "pa",
+        roles: [AdminRole.PlatformOwner],
+        permissions: [AdminPermission.PricingOverride],
         viaBootstrap: false,
     }) as never;
 
@@ -192,14 +202,16 @@ describe("business overrides (DB, U11)", () => {
     });
 
     it("lets a removal replace a grant on the same row, so the latest stands", async () => {
+        // On Free: a row their paid plan includes is never taken away (U5).
         const o = await org("Flipped");
-        await subscribe(o.id, "grow");
+        await subscribe(o.id, "free");
         const grant = await service.setModuleOverride(
             cmd(o.id, { kind: "grant", moduleKey: "bookings" }),
         );
-        await service.setModuleOverride(
-            cmd(o.id, { kind: "remove", moduleKey: "bookings" }),
-        );
+        await service.setModuleOverride({
+            ...(cmd(o.id, { kind: "remove", moduleKey: "bookings" }) as object),
+            staff: owner(),
+        } as never);
 
         expect(await row(o.id, "bookings")).toMatchObject({
             state: "hidden",
@@ -269,10 +281,11 @@ describe("business overrides (DB, U11)", () => {
 
     it("refuses a limit on a row an operator removed", async () => {
         const o = await org("Off row");
-        await subscribe(o.id, "grow");
-        await service.setModuleOverride(
-            cmd(o.id, { kind: "remove", moduleKey: "products" }),
-        );
+        await subscribe(o.id, "free");
+        await service.setModuleOverride({
+            ...(cmd(o.id, { kind: "remove", moduleKey: "products" }) as object),
+            staff: owner(),
+        } as never);
         await expect(
             service.setModuleOverride(
                 cmd(o.id, { kind: "limit", moduleKey: "products", value: 4 }),

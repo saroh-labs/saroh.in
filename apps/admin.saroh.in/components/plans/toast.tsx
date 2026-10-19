@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
 import {
     createContext,
@@ -40,7 +41,14 @@ export function useFlash(): Flash {
     return flash;
 }
 
-export function PlansToast({ children }: { children: ReactNode }) {
+export function PlansToast({
+    children,
+    raised = false,
+}: {
+    children: ReactNode;
+    /** Above the draft bar, which sits where the toast would. */
+    raised?: boolean;
+}) {
     const [message, setMessage] = useState("");
     const [action, setAction] = useState<FlashAction | null>(null);
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -76,7 +84,10 @@ export function PlansToast({ children }: { children: ReactNode }) {
             <div
                 role="status"
                 aria-live="polite"
-                className="pointer-events-none fixed inset-x-0 bottom-6 z-[95] flex justify-center px-4"
+                className={cn(
+                    "pointer-events-none fixed inset-x-0 z-[95] flex justify-center px-4",
+                    raised ? "bottom-28" : "bottom-6",
+                )}
             >
                 {message && (
                     <p className="pointer-events-auto flex items-center gap-3 rounded-[10px] bg-foreground px-4 py-[11px] text-[13px] font-semibold text-background">

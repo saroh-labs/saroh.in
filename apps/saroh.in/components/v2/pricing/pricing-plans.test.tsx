@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { markChanges } from "@/lib/pricing-marks";
 import { placeholderPricingModel, pricingPageModel } from "@/lib/pricing-view";
 import { fakeCatalog } from "@/lib/pricing.fixture";
 import { resetTags, syncTags } from "@/lib/tags";
@@ -212,5 +213,38 @@ describe("PricingPlans", () => {
         expect(card(container, "grow").getByRole("link").textContent).toBe(
             "Get early access · Grow",
         );
+    });
+});
+
+/** The staff draft preview with "Show what changed" (admin redesign U13). */
+describe("PricingPlans with what changed marked", () => {
+    it("marks the changed card line and says what the cell was", () => {
+        const live = pricingPageModel(fakeCatalog());
+        const draft = pricingPageModel(
+            fakeCatalog((c) => {
+                c.modules[1].cells.grow = {
+                    inc: true,
+                    text: "Many",
+                    card: "Many items",
+                };
+            }),
+        );
+        const { container } = render(
+            <PricingPlans model={markChanges(draft, live)} />,
+        );
+        const grow = card(container, "grow");
+        expect(grow.getByText("Many items").textContent).toBe(
+            "✓Many items (changed)",
+        );
+        expect(card(container, "free").queryByText(/\(changed\)/)).toBeNull();
+        const table = screen.getByRole("region", {
+            name: "Plan comparison table",
+        });
+        expect(within(table).getByText("was More")).toBeTruthy();
+    });
+
+    it("marks nothing on the public page's model", () => {
+        render(<PricingPlans model={pricingPageModel(fakeCatalog())} />);
+        expect(screen.queryByText(/\(changed\)|^was /)).toBeNull();
     });
 });

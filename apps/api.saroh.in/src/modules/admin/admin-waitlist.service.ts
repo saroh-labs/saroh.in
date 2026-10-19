@@ -7,6 +7,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
+import { deleteWebsiteLeadOnRequest } from "../saroh-leads/lead-retention";
 import { WaitlistInvitesService } from "../waitlist/invites.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import { AdminPermission } from "./admin-permissions";
@@ -230,20 +231,34 @@ export class AdminWaitlistService {
         const why = reason.trim();
         if (why.length < 4)
             throw new BadRequestException("Give a reason for removing them.");
-        const { count } = await prisma.waitlistSignup.deleteMany({
-            where: { id },
+        return prisma.$transaction(async (tx) => {
+            const entry = await tx.waitlistSignup.findUnique({
+                where: { id },
+                select: { emailKey: true },
+            });
+            const { count } = await tx.waitlistSignup.deleteMany({
+                where: { id },
+            });
+            if (!entry || count === 0) {
+                throw new NotFoundException("Not on the waitlist");
+            }
+            // Their unconverted sales lead goes too (DEC-169, U20).
+            const leadRemoved = await deleteWebsiteLeadOnRequest(
+                tx,
+                entry.emailKey,
+            );
+            await this.audit.write(tx, {
+                actorUserId: staff.userId,
+                permission: AdminPermission.WaitlistInvite,
+                action: "waitlist.removed",
+                targetType: "waitlist",
+                targetId: id,
+                reason: why,
+                outcome: AdminAuditOutcome.Success,
+                metadata: { leadRemoved },
+            });
+            return { removed: true };
         });
-        if (count === 0) throw new NotFoundException("Not on the waitlist");
-        await this.audit.write(prisma, {
-            actorUserId: staff.userId,
-            permission: AdminPermission.WaitlistInvite,
-            action: "waitlist.removed",
-            targetType: "waitlist",
-            targetId: id,
-            reason: why,
-            outcome: AdminAuditOutcome.Success,
-        });
-        return { removed: true };
     }
 }
 

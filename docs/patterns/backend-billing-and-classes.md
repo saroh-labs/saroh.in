@@ -284,6 +284,59 @@ checkout, and an add-on is a line on the charge after the period it covers
 invoice's lines are worked out by one rule each, so they agree. Rules in
 `PRICING_ROLLOUT.md` › "Trials, yearly, coupons and add-ons (U16)".
 
+## Commission on Saroh's payments — **Current** (DEC-169, admin console U21)
+
+What an account manager earns on the payments of the businesses they look
+after: `modules/commission/`. **No rate is ever in code, tests, seeds,
+fixtures or docs**: a rate is a `CommissionRate` row for a link kind
+(`BROUGHT_IN`, `ASSIGNED`), set in the console by `commission:rates`, from
+now or a later day, never backdated; specs draw theirs at random per run.
+
+- **Payments stay correct.** Nothing commission does is inside a payment's
+  transaction. `BillingWebhookService` calls `CommissionQueue` only after
+  its transaction has committed (`afterCommit`), wrapped so a failure is
+  logged (`commission_enqueue_failed`) and the webhook still answers. The
+  queue writes a `commission.line` job for each invoice the event wrote
+  whose business had a manager then, and a `commission.refund` job for a
+  refunded or disputed payment whose invoice has lines. No `*InTx` billing
+  function, `saroh-invoices.service.ts` or `billing-refunds.ts` knows
+  commission exists; `commission.db.spec.ts` proves a payment records the
+  same with the job failing every try, the enqueue failing, and the
+  tables gone.
+- **A line** (`CommissionLine`, relation-free like `BillingAction`, one per
+  invoice and installment) is for the manager whose link was open when the
+  invoice was issued, at the rate in force then for the link's kind, on
+  the invoice's `taxablePaise` (before GST, after its discount), rounded
+  half up once (`commissionPaise`). The rate and its id are copied onto the
+  line: a later rate never moves it. No link, a manager not
+  `onCommission`, or nothing before GST: no line. A paid first month and
+  an upgrade's difference are invoices like any other, so they earn; a
+  trial with no charge, Free and a failed payment have no invoice. A year
+  paid at once is twelve lines, one twelfth each (`splitEvenly`, adding up
+  exactly), the k-th payable at the end of the k-th month (owner, 19 Oct).
+- **When it is paid** (`settleInvoiceInTx`, `nextStatus`): PENDING until
+  its `periodEnd` passes with no refund or dispute open, then PAYABLE in
+  `statementMonth`, the month the period ended in India (`monthOf`), or
+  the next month not yet marked paid for that manager. HELD while the
+  invoice's `providerAmountPaise` differs from its total and the
+  `amount-mismatch:<invoice>` Needs-action row is unresolved. NO_RATE
+  while no rate exists for the kind (worked out with the first set after
+  the payment, at once when a rate is set and by the sweep). A refund
+  PROCESSED or a dispute LOST cancels it, whether written before or after
+  the line (matched by invoice or payment id); PENDING refunds and open
+  disputes hold it; FAILED, WON and CLOSED change nothing. Once PAID a
+  line never changes: a refund then raises
+  `commission_refund_after_payout` once, and nothing is deducted.
+- **Mark paid** (`team:pay`, never one's own) turns the month's PAYABLE
+  lines PAID with a `CommissionPayout` (a reference, a reason), and that
+  month is locked for them. Both run under `commission-payout:<id>`.
+- **The jobs** retry; the line job's last try raises
+  `commission_line_failed` once per invoice. `commission.sweep`
+  (hourly) writes lines a lost job missed (60 days back), moves lines
+  whose period ended or that are HELD, NO_RATE or PAYABLE, and re-checks
+  invoices whose refund changed in the last 3 days (hand refunds
+  included).
+
 ## Moving to a lower plan — **Current** (#800, #801, #802; the Terms' "Moving to a lower plan")
 
 What is over the plan's limits becomes read-only; nothing is deleted, and

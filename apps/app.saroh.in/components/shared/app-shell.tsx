@@ -33,6 +33,7 @@ import { RAIL_COLLAPSED, RAIL_COOKIE } from "@/lib/nav/rail-cookie";
 import { unreadNotificationCount } from "@/lib/notifications/service";
 import { closingOrNull } from "@/lib/organizations/closing-service";
 import {
+    accountManagerOrNull,
     activeOrganizationOnce,
     organizationsOnce,
 } from "@/lib/organizations/service";
@@ -135,6 +136,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         paused,
         closing,
         usageSharing,
+        accountManager,
     ] = await Promise.all([
         unreadNotificationCount(),
         listModules().catch(() => null),
@@ -185,6 +187,9 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         // could start, and only where session recording is switched on at
         // all. Null when unread: not recorded.
         recordingOn ? usageSharingOrNull() : null,
+        // Who at Saroh looks after this business (DEC-169, U26), for the
+        // account menu's card. Null without a manager or when unread.
+        activeOrg ? accountManagerOrNull(activeOrg.id) : null,
     ]);
     // Available modules, plus those shut only by the plan: locked, not off,
     // so they stay in the rail with a lock and a way up (U14). None while
@@ -287,6 +292,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 user={session.user}
                 organizations={organizations}
                 activeOrg={activeOrg}
+                accountManager={accountManager}
                 moduleKeys={moduleKeys}
                 unread={
                     navCan({ role, actions }, NOTIFICATIONS_NAV.action)

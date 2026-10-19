@@ -10,9 +10,11 @@ import {
     sendDeleteAccountEmail,
     sendExistingAccountEmail,
     sendPasswordResetEmail,
-    sendVerificationOtpEmail,
 } from "../email";
+import { clearStaffVerification } from "./email-verification";
 import { reportAuthServerError } from "./report-auth-error";
+import { mayStartSession } from "./sign-in-holds";
+import { deliverVerificationOtp } from "./verification-otp";
 
 /**
  * The Better Auth instance — api.saroh.in is now the auth SERVER (it hosts
@@ -24,13 +26,14 @@ const deletionLogger = new Logger("AccountDeletion");
 export const auth: Auth = createAuth({
     // Email verification is code-based (see the emailOTP plugin in @saroh/auth):
     // no verification LINK is sent, so there is no link sender to inject.
-    sendVerificationOTP: ({ to, otp, type }) =>
-        sendVerificationOtpEmail(
-            to,
-            otp,
-            type,
-            VERIFICATION_OTP_EXPIRY_SECONDS,
-        ),
+    // A held address gets none (admin console U9, `verification-otp.ts`).
+    sendVerificationOTP: (args) =>
+        deliverVerificationOtp(args, VERIFICATION_OTP_EXPIRY_SECONDS),
+    // The same hold, for every way in: no session for a held person.
+    mayStartSession: ({ id }) => mayStartSession(id),
+    // A code proves the mailbox: a verification staff marked becomes the
+    // person's own (`email-verification.ts`).
+    onMailboxProven: ({ id }) => clearStaffVerification(id),
     sendResetPassword: ({ to, url }) => sendPasswordResetEmail(to, url),
     // A sign-up for an address that already has an account: the screen says
     // "Check your email" either way, and this is what arrives.

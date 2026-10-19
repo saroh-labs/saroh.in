@@ -6,7 +6,7 @@ import { CommandTrigger } from "@/components/shared/command-trigger";
 import { NotificationsLink } from "@/components/shared/notifications-link";
 import { SkinSwitcher } from "@/components/shared/skin-switcher";
 import { UserMenu } from "@/components/shared/user-menu";
-import type { Organization } from "@/lib/organizations/service";
+import type { AccountManager, Organization } from "@/lib/organizations/service";
 
 /**
  * The top bar, across the full width above the rail (the "Saroh Products
@@ -44,6 +44,12 @@ type AppHeaderProps =
            * `null` = unknown, and search fails open, as the rail does.
            */
           moduleKeys?: string[] | null;
+          /**
+           * Who at Saroh looks after the active business (U26): the
+           * account menu shows them while one is linked. Null or absent,
+           * nothing shows.
+           */
+          accountManager?: AccountManager | null;
       };
 
 export function AppHeader(props: AppHeaderProps) {
@@ -63,7 +69,14 @@ export function AppHeader(props: AppHeaderProps) {
         );
     }
 
-    const { organizations, activeOrg, user, unread, moduleKeys = null } = props;
+    const {
+        organizations,
+        activeOrg,
+        user,
+        unread,
+        moduleKeys = null,
+        accountManager = null,
+    } = props;
 
     return (
         // Gaps, not controls, give way on a phone: the switcher's name
@@ -103,6 +116,10 @@ export function AppHeader(props: AppHeaderProps) {
                     name={user.name}
                     email={user.email}
                     businessName={activeOrg?.name}
+                    ownsABusiness={organizations.some(
+                        (o) => o.role === "OWNER",
+                    )}
+                    accountManager={accountManager}
                 />
             </div>
         </header>

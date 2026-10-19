@@ -9,18 +9,44 @@ import { prisma } from "@saroh/database";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import {
+    BILLING_EMAIL_NOTICE_KIND,
+    BILLING_EMAIL_TYPE,
+} from "../billing/billing-email.job";
+import { BILLING_NOTE_AUTHOR } from "../billing/billing-ops-notice";
+import {
     REFUND_AUDIT_ACTION,
     REFUNDED_AUDIT_ACTION,
 } from "../billing/double-charge";
 import { renderSarohInvoicePdf } from "../billing/saroh-invoice-paper";
-import type { SubscriptionStatusKey, SubscriptionView } from "./admin-billing";
+import type {
+    InvoiceStatus,
+    NextChargeHow,
+    SubscriptionStatusKey,
+    SubscriptionView,
+} from "./admin-billing";
 import {
+    INVOICE_STATUSES,
     invoicesCsv,
     invoicesCsvFileName,
     istMonthRange,
     mrrPaise,
+    nextChargeOf,
     subscriptionViewWhere,
 } from "./admin-billing";
+import type { BillingHistoryPage, HistoryShow } from "./admin-billing-history";
+import {
+    auditRow,
+    emailJobRow,
+    emailKindOf,
+    HISTORY_MAX_PAGE,
+    HISTORY_PAGE_SIZE,
+    invoiceEmailedRow,
+    invoiceIssuedRow,
+    mergeHistory,
+    noticeRow,
+    providerEventRow,
+    SHOW_KINDS,
+} from "./admin-billing-history";
 import { subscriptionTerms } from "./admin-billing-terms";
 import { AdminPermission } from "./admin-permissions";
 
@@ -35,6 +61,8 @@ export interface InvoiceQuery {
     q?: string;
     /** "yes": only invoices with a buyer GSTIN; "no": only without. */
     gstin?: "yes" | "no";
+    /** Paid, unpaid (Razorpay took less) or refunded (R29). */
+    status?: InvoiceStatus;
     page?: number;
 }
 
@@ -98,6 +126,11 @@ export interface AdminInvoicePage {
     page: number;
     limit: number;
     totals: InvoiceTotals;
+    /**
+     * How many invoices each status holds under the other filters (month,
+     * search, GSTIN), for the status chips (R29).
+     */
+    statusCounts: Record<InvoiceStatus, number>;
 }
 
 export interface SubscriptionQuery {
@@ -134,6 +167,20 @@ export interface AdminSubscriptionRow {
     /** When the autopay (or the year paid once) runs out, if known. */
     termEndsAt: string | null;
     termPayment: "AUTOPAY" | "ONE_TIME" | null;
+    /**
+     * When the autopay takes its next charge: the end of the period it is
+     * in. Null when nothing more is taken (see `nextChargeHow`).
+     */
+    nextChargeAt: string | null;
+    /** On autopay, paid for the year at once, or not charged again. */
+    nextChargeHow: NextChargeHow;
+    /** The autopay's approved charges run out within 30 days. */
+    autopayRunsOutSoon: boolean;
+    /**
+     * Who the business is billed to (DEC-167): the profile's legal name and
+     * how many businesses it bills. Null: no profile chosen yet.
+     */
+    billingProfile: { name: string; businesses: number } | null;
     lastInvoice: {
         id: string;
         number: string;
@@ -147,7 +194,18 @@ export interface SubscriptionSummary {
     byPlan: { key: string; name: string; count: number }[];
     /** Before GST, at each plan row's price; ACTIVE and PAST_DUE only. */
     mrrPaise: number;
+    /** Ending, or moving to another plan, in the next 30 days. */
+    endingSoon: number;
     currency: string;
+}
+
+/** How many rows each Billing tab holds (R25). */
+export interface BillingCounts {
+    subscriptions: number;
+    invoices: number;
+    /** Needs action rows still open. */
+    openActions: number;
+    events: number;
 }
 
 export interface AdminSubscriptionPage {
@@ -162,6 +220,18 @@ export interface AdminSubscriptionPage {
 
 export interface AdminSubscriptionDetail {
     subscription: AdminSubscriptionRow;
+    /** When the business first got a subscription. */
+    since: string;
+    /**
+     * The plan's list price, before GST, for its cycle; and a custom
+     * monthly price staff gave the business (an offer), with its end.
+     */
+    price: {
+        listPaise: number;
+        currency: string;
+        customPaise: number | null;
+        customUntil: string | null;
+    };
     /**
      * Who Saroh bills the business to (DEC-167): its billing profile, the
      * profile's customer at the provider and its sync, and the other
@@ -263,9 +333,11 @@ export class AdminBillingService {
         query: InvoiceQuery,
     ): Promise<AdminInvoicePage> {
         assertSarohBillingReader(staff);
-        const where = invoiceWhere(query);
+        const refunded = await refundedInvoiceIds();
+        const where = invoiceWhere(query, refunded);
+        const others = invoiceWhere({ ...query, status: undefined });
         const page = Math.max(1, query.page ?? 1);
-        const [rows, sums] = await Promise.all([
+        const [rows, sums, ...byStatus] = await Promise.all([
             prisma.sarohInvoice.findMany({
                 where,
                 orderBy: [{ issuedAt: "desc" }, { number: "desc" }],
@@ -278,6 +350,13 @@ export class AdminBillingService {
                 _count: { _all: true },
                 _sum: { taxablePaise: true, taxPaise: true, totalPaise: true },
             }),
+            ...INVOICE_STATUSES.map((status) =>
+                prisma.sarohInvoice.count({
+                    where: {
+                        AND: [others, invoiceStatusWhere(status, refunded)],
+                    },
+                }),
+            ),
         ]);
         const refunds = await refundsByInvoice(rows.map((r) => r.id));
         return {
@@ -313,13 +392,17 @@ export class AdminBillingService {
                 taxPaise: sums._sum.taxPaise ?? 0,
                 totalPaise: sums._sum.totalPaise ?? 0,
             },
+            statusCounts: Object.fromEntries(
+                INVOICE_STATUSES.map((status, i) => [status, byStatus[i]]),
+            ) as Record<InvoiceStatus, number>,
         };
     }
 
     /**
      * One month's invoices as a CSV for GST filing, in number order. The
      * month is required: an export of everything ever is not a filing.
-     * The other filters apply too, so "with GSTIN" exports the B2B rows.
+     * The other filters apply too, so "with GSTIN" exports the B2B rows
+     * and "Refunded" the month's refunded ones (R29).
      */
     async exportInvoices(
         staff: PlatformAdminInfo,
@@ -329,8 +412,9 @@ export class AdminBillingService {
         if (!query.month || !istMonthRange(query.month)) {
             throw new BadRequestException("Choose a month to export.");
         }
+        const refunded = query.status ? await refundedInvoiceIds() : [];
         const rows = await prisma.sarohInvoice.findMany({
-            where: invoiceWhere(query),
+            where: invoiceWhere(query, refunded),
             orderBy: [{ issuedAt: "asc" }, { number: "asc" }],
             take: CSV_MAX_ROWS,
             include: {
@@ -359,6 +443,25 @@ export class AdminBillingService {
         return { ...pdf, organizationId: invoice.organizationId };
     }
 
+    // ── The tabs' counts ───────────────────────────────────────────────
+
+    /**
+     * What each Billing tab holds, for its tab (R25): every subscription,
+     * every invoice, the open Needs-action rows and every provider event.
+     * Counts only, nothing about a business.
+     */
+    async counts(staff: PlatformAdminInfo): Promise<BillingCounts> {
+        assertSarohBillingReader(staff);
+        const [subscriptions, invoices, openActions, events] =
+            await Promise.all([
+                prisma.subscription.count(),
+                prisma.sarohInvoice.count(),
+                prisma.billingAction.count({ where: { resolvedAt: null } }),
+                prisma.billingWebhookEvent.count(),
+            ]);
+        return { subscriptions, invoices, openActions, events };
+    }
+
     // ── Subscriptions ──────────────────────────────────────────────────
 
     async listSubscriptions(
@@ -385,7 +488,7 @@ export class AdminBillingService {
                 include: SUBSCRIPTION_INCLUDE,
             }),
             prisma.subscription.count({ where }),
-            this.summary(),
+            this.summary(now),
             prisma.plan.findMany({
                 where: { subscriptions: { some: {} } },
                 distinct: ["key"],
@@ -437,11 +540,19 @@ export class AdminBillingService {
                     processedAt: true,
                 },
             }),
-            this.detailExtra(sub.organizationId),
+            this.detailExtra(sub.organizationId, now),
         ]);
         return {
             subscription: rows[0],
-            ...extra,
+            since: sub.createdAt.toISOString(),
+            price: {
+                listPaise: sub.plan.priceCents,
+                currency: sub.plan.currency,
+                customPaise: extra.customPrice?.value ?? null,
+                customUntil:
+                    extra.customPrice?.expiresAt?.toISOString() ?? null,
+            },
+            ...extra.shown,
             checkouts: checkouts.map((c) => ({
                 id: c.id,
                 kind: c.kind,
@@ -468,61 +579,215 @@ export class AdminBillingService {
     }
 
     /**
+     * One subscription's history (admin plan U15, R27): one timeline,
+     * newest first, merged from the five places it is kept: what the
+     * billing provider sent (`BillingWebhookEvent`: its type and ids,
+     * **never its payload**, which is not even selected), the invoices
+     * Saroh issued and emailed (`SarohInvoice`), the billing emails sent
+     * (`CustomerNotice` of kind `SAROH_BILLING_EMAIL`) or still waiting or
+     * failed (`Job` of type `billing.email`, its payload's `kind` only),
+     * and every write staff or Saroh made to the business
+     * (`AdminAuditEvent` rows with an idempotency key; reads, this one
+     * included, carry none and stay out).
+     *
+     * Paged by number: each source reads its newest `page × limit + 1`
+     * rows and the merge cuts the page, so no row is skipped or repeated
+     * across pages.
+     */
+    async history(
+        staff: PlatformAdminInfo,
+        subscriptionId: string,
+        query: { show?: HistoryShow; page?: number } = {},
+    ): Promise<BillingHistoryPage & { organizationId: string }> {
+        assertSarohBillingReader(staff);
+        const sub = await prisma.subscription.findUnique({
+            where: { id: subscriptionId },
+            select: { organizationId: true },
+        });
+        if (!sub) throw new NotFoundException("Subscription not found");
+        const organizationId = sub.organizationId;
+        const show = query.show ?? "everything";
+        const kinds = new Set(SHOW_KINDS[show]);
+        const page = Math.min(HISTORY_MAX_PAGE, Math.max(1, query.page ?? 1));
+        const limit = HISTORY_PAGE_SIZE;
+        const take = page * limit + 1;
+        const none = Promise.resolve([] as never[]);
+
+        const [events, invoices, emailed, notices, jobs, audits] =
+            await Promise.all([
+                kinds.has("provider")
+                    ? prisma.billingWebhookEvent.findMany({
+                          where: { organizationId },
+                          orderBy: [{ receivedAt: "desc" }, { id: "desc" }],
+                          take,
+                          // Never the payload: the provider's whole message.
+                          select: {
+                              id: true,
+                              provider: true,
+                              providerEventId: true,
+                              type: true,
+                              receivedAt: true,
+                              processedAt: true,
+                          },
+                      })
+                    : none,
+                kinds.has("invoice")
+                    ? prisma.sarohInvoice.findMany({
+                          where: { organizationId },
+                          orderBy: [{ issuedAt: "desc" }, { id: "desc" }],
+                          take,
+                          select: INVOICE_FOR_HISTORY,
+                      })
+                    : none,
+                kinds.has("email")
+                    ? prisma.sarohInvoice.findMany({
+                          where: { organizationId, emailedAt: { not: null } },
+                          orderBy: [{ emailedAt: "desc" }, { id: "desc" }],
+                          take,
+                          select: INVOICE_FOR_HISTORY,
+                      })
+                    : none,
+                kinds.has("email")
+                    ? prisma.customerNotice.findMany({
+                          where: {
+                              organizationId,
+                              kind: BILLING_EMAIL_NOTICE_KIND,
+                          },
+                          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                          take,
+                          select: { id: true, eventKey: true, createdAt: true },
+                      })
+                    : none,
+                kinds.has("email")
+                    ? prisma.job.findMany({
+                          where: {
+                              organizationId,
+                              type: BILLING_EMAIL_TYPE,
+                              // A sent one is its notice or its invoice.
+                              status: { not: "DONE" },
+                          },
+                          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                          take,
+                          select: {
+                              id: true,
+                              status: true,
+                              attempts: true,
+                              maxAttempts: true,
+                              createdAt: true,
+                              payload: true,
+                          },
+                      })
+                    : none,
+                kinds.has("staff")
+                    ? prisma.adminAuditEvent.findMany({
+                          where: {
+                              organizationId,
+                              // Writes only: a read carries no key.
+                              idempotencyKey: { not: null },
+                          },
+                          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                          take,
+                          select: {
+                              id: true,
+                              action: true,
+                              actorUserId: true,
+                              reason: true,
+                              outcome: true,
+                              targetId: true,
+                              createdAt: true,
+                          },
+                      })
+                    : none,
+            ]);
+
+        const names = await actorNames(audits.map((a) => a.actorUserId));
+        const merged = mergeHistory(
+            [
+                events.map(providerEventRow),
+                invoices.map(invoiceIssuedRow),
+                emailed.map(invoiceEmailedRow),
+                notices.map(noticeRow),
+                jobs.map((j) =>
+                    emailJobRow({ ...j, emailKind: emailKindOf(j.payload) }),
+                ),
+                audits.map((a) =>
+                    auditRow(a, names.get(a.actorUserId) ?? "Staff"),
+                ),
+            ],
+            page,
+            limit,
+        );
+        return { ...merged, page, limit, show, organizationId };
+    }
+
+    /**
      * What the sheet shows beyond the subscription (DEC-166): the billing
      * profile with its provider customer and sync (DEC-167), the last 12 invoices with their refunds,
      * every refund and dispute, and the double charges owed or refunded.
      */
-    private async detailExtra(organizationId: string) {
-        const [org, invoices, refunds, claims, actions] = await Promise.all([
-            prisma.organization.findUnique({
-                where: { id: organizationId },
-                select: {
-                    billingProfile: {
-                        include: {
-                            organizations: {
-                                where: { id: { not: organizationId } },
-                                orderBy: [{ name: "asc" }, { id: "asc" }],
-                                take: 50,
-                                select: { id: true, name: true },
+    private async detailExtra(organizationId: string, now: Date) {
+        const [org, invoices, refunds, claims, actions, customPrice] =
+            await Promise.all([
+                prisma.organization.findUnique({
+                    where: { id: organizationId },
+                    select: {
+                        billingProfile: {
+                            include: {
+                                organizations: {
+                                    where: { id: { not: organizationId } },
+                                    orderBy: [{ name: "asc" }, { id: "asc" }],
+                                    take: 50,
+                                    select: { id: true, name: true },
+                                },
                             },
                         },
                     },
-                },
-            }),
-            prisma.sarohInvoice.findMany({
-                where: { organizationId },
-                orderBy: [{ issuedAt: "desc" }, { number: "desc" }],
-                take: 12,
-                include: { organization: ORG_BRIEF },
-            }),
-            prisma.billingRefund.findMany({
-                where: { organizationId },
-                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-                take: 50,
-            }),
-            prisma.adminAuditEvent.findMany({
-                where: {
-                    organizationId,
-                    action: {
-                        in: [REFUND_AUDIT_ACTION, REFUNDED_AUDIT_ACTION],
+                }),
+                prisma.sarohInvoice.findMany({
+                    where: { organizationId },
+                    orderBy: [{ issuedAt: "desc" }, { number: "desc" }],
+                    take: 12,
+                    include: { organization: ORG_BRIEF },
+                }),
+                prisma.billingRefund.findMany({
+                    where: { organizationId },
+                    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                    take: 50,
+                }),
+                prisma.adminAuditEvent.findMany({
+                    where: {
+                        organizationId,
+                        action: {
+                            in: [REFUND_AUDIT_ACTION, REFUNDED_AUDIT_ACTION],
+                        },
                     },
-                },
-                orderBy: { createdAt: "asc" },
-                take: 100,
-                select: {
-                    action: true,
-                    targetId: true,
-                    reason: true,
-                    metadata: true,
-                    createdAt: true,
-                },
-            }),
-            prisma.billingAction.findMany({
-                where: { organizationId, resolvedAt: null },
-                orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-                take: 25,
-            }),
-        ]);
+                    orderBy: { createdAt: "asc" },
+                    take: 100,
+                    select: {
+                        action: true,
+                        targetId: true,
+                        reason: true,
+                        metadata: true,
+                        createdAt: true,
+                    },
+                }),
+                prisma.billingAction.findMany({
+                    where: { organizationId, resolvedAt: null },
+                    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+                    take: 25,
+                }),
+                // A custom price staff gave it, still standing (an offer).
+                prisma.entitlementOverride.findFirst({
+                    where: {
+                        organizationId,
+                        kind: "price",
+                        revokedAt: null,
+                        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+                    },
+                    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                    select: { value: true, expiresAt: true },
+                }),
+            ]);
         const refundRows = refunds.map(refundRow);
         const byInvoice = new Map<string, AdminRefundRow[]>();
         for (const r of refundRows) {
@@ -532,7 +797,7 @@ export class AdminBillingService {
                 r,
             ]);
         }
-        return {
+        const shown = {
             billingProfile: profileOf(org?.billingProfile ?? null),
             invoices: invoices.map((r) =>
                 invoiceRow(r, byInvoice.get(r.id) ?? []),
@@ -547,14 +812,20 @@ export class AdminBillingService {
                 createdAt: a.createdAt.toISOString(),
             })),
         };
+        return { shown, customPrice };
     }
 
     /** Counts by status and plan, and the list-price monthly figure. */
-    private async summary(): Promise<SubscriptionSummary> {
-        const groups = await prisma.subscription.groupBy({
-            by: ["planId", "status"],
-            _count: { _all: true },
-        });
+    private async summary(now: Date): Promise<SubscriptionSummary> {
+        const [groups, endingSoon] = await Promise.all([
+            prisma.subscription.groupBy({
+                by: ["planId", "status"],
+                _count: { _all: true },
+            }),
+            prisma.subscription.count({
+                where: subscriptionViewWhere("ending-soon", now),
+            }),
+        ]);
         const plans = await prisma.plan.findMany({
             where: { id: { in: [...new Set(groups.map((g) => g.planId))] } },
             select: {
@@ -595,6 +866,7 @@ export class AdminBillingService {
             })),
             byPlan: [...byPlan.values()].sort((a, b) => b.count - a.count),
             mrrPaise: mrrPaise(priced),
+            endingSoon,
             currency: plans[0]?.currency ?? "INR",
         };
     }
@@ -624,9 +896,15 @@ export class AdminBillingService {
         return subs.map((s) => {
             const term = terms.get(s.id) ?? null;
             const last = lastBy.get(s.organizationId);
+            const next = nextChargeOf(s, term, now);
+            const profile = s.organization.billingProfile;
             return {
                 id: s.id,
-                organization: s.organization,
+                organization: {
+                    id: s.organization.id,
+                    name: s.organization.name,
+                    slug: s.organization.slug,
+                },
                 plan: s.plan,
                 status: s.status,
                 billingCycle: s.billingCycle,
@@ -644,6 +922,15 @@ export class AdminBillingService {
                 providerCustomerId: s.providerCustomerId,
                 termEndsAt: term?.endsAt.toISOString() ?? null,
                 termPayment: term?.payment ?? null,
+                nextChargeAt: next.nextChargeAt?.toISOString() ?? null,
+                nextChargeHow: next.nextChargeHow,
+                autopayRunsOutSoon: next.autopayRunsOutSoon,
+                billingProfile: profile
+                    ? {
+                          name: profile.legalName,
+                          businesses: profile._count.organizations,
+                      }
+                    : null,
                 lastInvoice: last
                     ? {
                           id: last.id,
@@ -658,10 +945,61 @@ export class AdminBillingService {
 }
 
 const SUBSCRIPTION_INCLUDE = {
-    organization: ORG_BRIEF,
-    plan: { select: { ...PLAN_BRIEF.select, priceCents: true } },
+    organization: {
+        select: {
+            ...ORG_BRIEF.select,
+            // Who it is billed to, and how many businesses that profile
+            // bills (DEC-167): a count, never the other businesses' rows.
+            billingProfile: {
+                select: {
+                    legalName: true,
+                    _count: { select: { organizations: true } },
+                },
+            },
+        },
+    },
+    plan: {
+        select: { ...PLAN_BRIEF.select, priceCents: true, currency: true },
+    },
     pendingPlan: PLAN_BRIEF,
 } as const;
+
+/** What an invoice's history rows read: no buyer's details. */
+const INVOICE_FOR_HISTORY = {
+    id: true,
+    number: true,
+    issuedAt: true,
+    emailedAt: true,
+    source: true,
+    planName: true,
+    totalPaise: true,
+    currency: true,
+    provider: true,
+    providerPaymentId: true,
+} as const;
+
+/**
+ * Who did each staff action: the staff's name (or email), "Saroh" for
+ * what Saroh did itself (the billing provider's notes, the sweeps).
+ */
+async function actorNames(ids: string[]): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    const people = [...new Set(ids)];
+    if (people.length === 0) return out;
+    const users = await prisma.user.findMany({
+        where: { id: { in: people } },
+        select: { id: true, name: true, email: true },
+    });
+    for (const u of users) {
+        const name = u.name?.trim() ?? "";
+        out.set(u.id, name === "" ? u.email : name);
+    }
+    for (const id of people) {
+        if (!out.has(id)) out.set(id, "Saroh");
+    }
+    out.set(BILLING_NOTE_AUTHOR, "Saroh");
+    return out;
+}
 
 type SubscriptionRecord = Prisma.SubscriptionGetPayload<{
     include: typeof SUBSCRIPTION_INCLUDE;
@@ -679,11 +1017,16 @@ export function assertSarohBillingReader(staff: PlatformAdminInfo | undefined) {
     }
 }
 
-/** The invoices `where` for a query: month, search and GSTIN. */
+/**
+ * The invoices `where` for a query: month, search, GSTIN and, given the
+ * refunded invoices' ids ({@link refundedInvoiceIds}), the status.
+ */
 export function invoiceWhere(
     query: InvoiceQuery,
+    refunded: readonly string[] = [],
 ): Prisma.SarohInvoiceWhereInput {
     const and: Prisma.SarohInvoiceWhereInput[] = [];
+    if (query.status) and.push(invoiceStatusWhere(query.status, refunded));
     const range = istMonthRange(query.month);
     if (range) and.push({ issuedAt: { gte: range.from, lt: range.to } });
     if (query.gstin === "yes") and.push({ billToGstin: { not: null } });
@@ -718,6 +1061,61 @@ export function invoiceWhere(
         });
     }
     return { AND: and };
+}
+
+/**
+ * Money given back on a Saroh invoice: a refund the provider processed, or
+ * a dispute the business lost. A pending or failed refund, and a dispute
+ * still open or won, leave the invoice as it was.
+ */
+const MONEY_BACK: Prisma.BillingRefundWhereInput = {
+    invoiceId: { not: null },
+    OR: [
+        { kind: "REFUND", status: "PROCESSED" },
+        { kind: "DISPUTE", status: "LOST" },
+    ],
+};
+
+/** The ids of every invoice with money given back on it. */
+async function refundedInvoiceIds(): Promise<string[]> {
+    const rows = await prisma.billingRefund.findMany({
+        where: MONEY_BACK,
+        select: { invoiceId: true },
+        distinct: ["invoiceId"],
+    });
+    return rows.flatMap((r) => (r.invoiceId ? [r.invoiceId] : []));
+}
+
+/**
+ * One invoice status (R29) as a `where`. Refunded: money given back on it.
+ * Unpaid: Razorpay says it took less than the invoice's total. Paid: the
+ * rest; an invoice is written when a charge is taken, so one the provider
+ * hasn't confirmed an amount for yet reads as paid.
+ */
+export function invoiceStatusWhere(
+    status: InvoiceStatus,
+    refunded: readonly string[],
+): Prisma.SarohInvoiceWhereInput {
+    if (status === "refunded") return { id: { in: [...refunded] } };
+    const notRefunded = { id: { notIn: [...refunded] } };
+    const total = prisma.sarohInvoice.fields.totalPaise;
+    if (status === "unpaid") {
+        return {
+            AND: [notRefunded, { providerAmountPaise: { lt: total } }],
+        };
+    }
+    // Not `NOT short`: a NULL amount would make it NULL, and drop the row.
+    return {
+        AND: [
+            notRefunded,
+            {
+                OR: [
+                    { providerAmountPaise: null },
+                    { providerAmountPaise: { gte: total } },
+                ],
+            },
+        ],
+    };
 }
 
 function profileOf(

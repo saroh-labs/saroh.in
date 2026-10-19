@@ -187,6 +187,13 @@ export function TabModules() {
                     </AddButton>
                 )}
             </div>
+            {catalog.groups.length > 0 && (
+                <p className="text-[12.5px] text-muted-foreground">
+                    What each module is called on the pricing page, its order
+                    and whether it shows. Which plans include it is on Plans,
+                    and whether businesses can use it at all is in Releases.
+                </p>
+            )}
             {canEdit && catalog.groups.length === 0 && (
                 <p
                     id="add-module-why"
@@ -213,7 +220,7 @@ export function TabModules() {
                 ))}
 
             <p className="flex flex-wrap gap-x-3.5 gap-y-1 text-[12px] text-muted-foreground">
-                <span>Click a cell to edit it plan by plan.</span>
+                <span>Click a cell to edit that feature on every plan.</span>
                 <span className="inline-flex items-center gap-1.5">
                     <span
                         aria-hidden

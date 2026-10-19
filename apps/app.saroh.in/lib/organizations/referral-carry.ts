@@ -20,6 +20,56 @@ export function carriedReferral(value: string | undefined): string | undefined {
 }
 
 /**
+ * The account manager's link a visitor's browser carried from saroh.in
+ * (DEC-169, `?am=`): the same kind of cookie, `<code>.<seconds>`, set
+ * beside the referral's (`apps/saroh.in/lib/referral.ts`; change one,
+ * change both). Setup sends the code and when it was kept with the
+ * business, and clears it once the business exists. Whether the code names
+ * an account manager, and whether that counts, is the API's alone.
+ */
+export const MANAGER_COOKIE = "saroh_am";
+
+const MANAGER_CODE = /^[2-9A-HJKMNP-Z]{8}$/;
+
+/** The link's code and when it was kept, or nothing when it isn't one. */
+export function carriedManagerLink(
+    value: string | undefined,
+): { managerLinkCode: string; managerLinkSetAt?: string } | undefined {
+    if (!value || value.length > 64) return undefined;
+    const parts = value.trim().split(".");
+    const code = parts[0].toUpperCase();
+    const seconds = parts.length > 1 ? parts[1] : "";
+    if (!MANAGER_CODE.test(code)) return undefined;
+    const keptAt = /^\d{9,11}$/.test(seconds)
+        ? new Date(Number(seconds) * 1000).toISOString()
+        : undefined;
+    return {
+        managerLinkCode: code,
+        ...(keptAt ? { managerLinkSetAt: keptAt } : {}),
+    };
+}
+
+/**
+ * The code an owner typed for the Saroh teammate helping them, as the API
+ * stores it, or nothing when the field was left empty. A code that isn't
+ * shaped like one is the form's to point out (`managerCodeProblem`).
+ */
+export function typedManagerCode(
+    value: string | undefined,
+): string | undefined {
+    const code = value?.replace(/[\s-]+/g, "").toUpperCase();
+    return code && MANAGER_CODE.test(code) ? code : undefined;
+}
+
+/** What the form says under a typed code that can't be one, or null. */
+export function managerCodeProblem(value: string | undefined): string | null {
+    if (!value?.trim()) return null;
+    return typedManagerCode(value)
+        ? null
+        : "A code is 8 letters and numbers. Check it with the person who gave it to you.";
+}
+
+/**
  * The domain the cookie was set on, from this app's own host: the host
  * without its first label (`app.saroh.in` → `saroh.in`). A cookie is
  * cleared only by naming the domain it was set with. Undefined for a host

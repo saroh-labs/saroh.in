@@ -52,6 +52,14 @@ in; about 150 UI sign-ins a run became four.
   in through the form in a fresh context instead, as `auth.spec.ts` does.
 - **Choosing a business is safe.** The open business is the workspace's own
   cookie, written into that spec's context only.
+- **Staff for the operator console** is `useSession(page, "staff")`:
+  `staff@saroh.dev`, a Platform owner by a recorded grant (not the
+  `ADMIN_ALLOWLIST` break-glass), in no business. The seed writes them on a
+  database on this machine or CI's only (`packages/database/src/seed/staff.ts`).
+  They sign in through the same form as everyone else. A console spec opens
+  `urls.ADMIN_URL`; to see a refusal, open it as the owner, never by revoking
+  Sam's grant (every other console spec shares it). See
+  `admin-smoke.spec.ts`.
 - A new person: add them to `people` in `fixtures/sessions.ts`; the setup
   project picks them up.
 
@@ -137,6 +145,9 @@ changes reach; CI runs them all.
 - `web:/<route>`: a route of the marketing site, saroh.in. A run that
   picks a `web:` spec also builds and starts that site (on 3002, at
   `E2E_WEB_URL`; `marketing.spec.ts`).
+- `admin:/<route>`: a route of the operator console, admin.saroh.in. A run
+  that picks an `admin:` spec also builds and starts the console (on 3006,
+  at `E2E_ADMIN_URL`); CI always does. Name `api:admin` beside it.
 - `api:<module>`: each module behind a screen it drives or an endpoint it
   calls, by folder under `apps/api.saroh.in/src/modules`.
 - `pkg:<package>`: a shared package it renders, such as `pkg:site-blocks`

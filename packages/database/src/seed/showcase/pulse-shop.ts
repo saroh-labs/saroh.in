@@ -1060,7 +1060,10 @@ function planCounter(a: {
     for (let d = -90; d <= 0; d++) {
         const noon = istAt(now, d, 12 * 60);
         const weekday = new Date(noon.getTime() + 330 * 60_000).getUTCDay();
-        const base = weekday === 0 ? 1.5 : weekday === 6 ? 4.5 : 5.4;
+        // Enough that any 30 days clears the 120 the check below asks for,
+        // whatever weekday and season the seed runs on (it fell to 118 on
+        // a Monday morning in October).
+        const base = weekday === 0 ? 1.5 : weekday === 6 ? 5 : 6;
         const mean = base * seasonAt("gym", noon);
         let count = Math.max(
             0,

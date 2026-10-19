@@ -14,6 +14,12 @@ jest.mock("@saroh/database", () => {
             count: jest.fn(),
         },
         adminAccessSession: { updateMany: jest.fn(async () => ({ count: 1 })) },
+        // Account-manager links a revoke or amend ends (U25): none here.
+        accountManagerLink: {
+            findMany: jest.fn(async () => []),
+            updateMany: jest.fn(async () => ({ count: 0 })),
+        },
+        adminAuditEvent: { create: jest.fn() },
         $transaction: jest.fn((callback: (tx: unknown) => unknown) =>
             callback(prisma),
         ),

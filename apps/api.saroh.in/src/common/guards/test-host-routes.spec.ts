@@ -85,6 +85,9 @@ const REFUSED = [
     // saroh.in/contact's message to the team: stored for staff; only
     // saroh.in's server sends one, never a merchant's test release.
     "POST public/contact-messages",
+    // A staff invite's preview (admin plan U24): it writes nothing, but only
+    // accounts' server calls it, never a merchant's test release.
+    "POST public/staff-invites/preview",
     // Plans, packs and autopay.
     "POST public/site-accounts/me/plans/:ref/join",
     "POST public/site-accounts/me/plan/:ref/cancel",

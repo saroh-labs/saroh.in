@@ -6,6 +6,7 @@ import { OptionSelect } from "@saroh/ui/option-select";
 import type { ChangeEvent } from "react";
 
 import { GST_STATES } from "@/lib/invoices/gst";
+import { phoneProblem } from "@/lib/organizations/business-phone";
 import type { BillingDetail, ChangeQuote } from "@/lib/saroh-billing/plan-view";
 
 /**
@@ -149,10 +150,8 @@ export function detailsProblems(
         out.billingState = "Choose the state your business is registered in.";
     }
     if (gstin && !GSTIN.test(gstin)) out.gstin = "A GSTIN is 15 characters.";
-    const phone = d.phone.replace(/[\s\-.()]/g, "");
-    if (phone && !/^\+[1-9]\d{7,14}$/.test(phone)) {
-        out.phone = "Start with + and the country code, like +91 98450 12345.";
-    }
+    const phone = d.phone.trim() ? phoneProblem(d.phone) : null;
+    if (phone) out.phone = phone;
     return out;
 }
 

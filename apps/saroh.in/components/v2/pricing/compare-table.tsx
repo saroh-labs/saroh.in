@@ -103,6 +103,9 @@ export function CompareTable({
                                                 tint(
                                                     plans[j]?.featured ?? false,
                                                 ),
+                                                (c.was !== undefined ||
+                                                    r.added) &&
+                                                    "shadow-[inset_3px_0_0_hsl(var(--brand-500))]",
                                             )}
                                         >
                                             {c.yes ? (
@@ -130,6 +133,15 @@ export function CompareTable({
                                                     </span>
                                                 </Fragment>
                                             )}
+                                            {c.was !== undefined ? (
+                                                <span className="block text-[12.5px] font-semibold text-brand-700">
+                                                    was {c.was}
+                                                </span>
+                                            ) : r.added ? (
+                                                <span className="block text-[12.5px] font-semibold text-brand-700">
+                                                    New in the draft
+                                                </span>
+                                            ) : null}
                                         </td>
                                     ))}
                                 </tr>

@@ -19,16 +19,26 @@ const SEPARATORS = /[\s\-.()]/g;
 export const PHONE_EXAMPLE = "+91 98450 12345";
 
 /**
+ * An Indian number typed the way people say it, with no `+`: ten digits
+ * ("98450 12345"), a trunk 0 ("098450 12345"), or 91 / 0091 in front.
+ * Saroh's businesses are in India, so these mean +91.
+ */
+const INDIAN_WITHOUT_PLUS = /^(?:0091|91|0)?([1-9]\d{9})$/;
+
+/**
  * A typed number as it is stored, or why it can't be: "" clears it (null),
- * and "+91 98450-12345" is kept as "+919845012345". Pure; the settings save
- * says the problem on the field.
+ * "+91 98450-12345" is kept as "+919845012345", and an Indian number typed
+ * without the + ("98450 12345") gets +91. Pure; the settings save says the
+ * problem on the field.
  */
 export function normalisePublicPhone(
     raw: string,
 ): { phone: string | null } | { problem: string } {
     const trimmed = raw.trim();
     if (trimmed === "") return { phone: null };
-    const compact = trimmed.replace(SEPARATORS, "");
+    let compact = trimmed.replace(SEPARATORS, "");
+    const indian = INDIAN_WITHOUT_PLUS.exec(compact);
+    if (indian) compact = `+91${indian[1]}`;
     if (!compact.startsWith("+")) {
         return {
             problem: `Start with + and the country code, like ${PHONE_EXAMPLE}.`,

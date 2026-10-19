@@ -27,7 +27,14 @@ model User {
 
   // Better Auth stores the email/password credential on the Account row,
   // so the User table no longer carries a password column.
-  emailVerified Boolean @default(false)
+  emailVerified          Boolean   @default(false)
+  // When Saroh staff marked this address verified from the console (admin
+  // console U9, "Mark verified"). Null: the person proved it themselves, by
+  // a code, or it is not verified. Staff-marked verification never counts as
+  // the person's own (attribution, staff invites): read it through
+  // `emailVerifiedBySelf` (api `common/auth/email-verification.ts`). Cleared
+  // when they next prove the mailbox with a code, and on a change of address.
+  emailVerifiedByStaffAt DateTime?
 
   // "Help improve Saroh": whether this person shares how they use the
   // workspace, as masked session recordings (DEC-125). Null: never chosen,
@@ -79,7 +86,43 @@ model User {
   // businesses (DEC-167).
   billingProfiles BillingProfile[] @relation("BillingProfileOwner")
 
+  // Sign-in email changes staff made for them (admin console U9).
+  signInEmailChanges SignInEmailChange[]
+
   @@index([email])
+}
+
+// SignInEmailChange — Saroh staff changed a person's sign-in email from the
+// console (admin console U9, "Change sign-in email…"). Saroh's record, not a
+// business's: no organizationId and no row-level policy (rls-coverage.test.ts
+// lists it in NOT_TENANT_OWNED).
+//
+// The takeover safeguard: the new address gets no sign-in code, and the
+// person can start no session, until `codeHeldUntil` (24 hours after the
+// change) — unless a second, different staff member confirms first
+// (`confirmedByUserId`, CHECKed apart from `requestedByUserId`). A row only
+// holds while it is the person's latest and its `newEmail` is still their
+// address. `codeSentAt` is when the held code went out, by the confirm or by
+// the `people.sign-in-email.release` job.
+model SignInEmailChange {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  oldEmail          String
+  newEmail          String
+  // Staff user ids, not foreign keys: the record outlives a staff account.
+  requestedByUserId String
+  reason            String
+  codeHeldUntil     DateTime
+  confirmedByUserId String?
+  confirmedAt       DateTime?
+  codeSentAt        DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([newEmail])
 }
 
 // Organization: the sole tenant root (DEC-005 / ADR-001). Owns Stores and
@@ -131,6 +174,10 @@ model Organization {
   stores              Store[]
   memberships         Membership[]
   adminAccessSessions AdminAccessSession[]
+  // Calls and visits Saroh's team logged with this business (DEC-169).
+  sarohContactLogs    SarohContactLog[]
+  // Who at Saroh looks after it, and who did before (DEC-169).
+  accountManagerLinks AccountManagerLink[]
 
   // Optional groupings beneath the org (S1-010). Projects and Teams are NEVER
   // a tenant/ownership/billing root — always org-scoped (ADR-001).
@@ -394,7 +441,7 @@ model Organization {
   // the same transaction, or whose profile's owner was deleted; a checkout
   // then makes one for the paying owner.
   billingProfileId         String?
-  billingProfile           BillingProfile?          @relation("OrganizationBillingProfile", fields: [billingProfileId], references: [id], onDelete: SetNull)
+  billingProfile           BillingProfile?           @relation("OrganizationBillingProfile", fields: [billingProfileId], references: [id], onDelete: SetNull)
   sarohInvoices            SarohInvoice[]
   // Saroh billing: add-ons owed on the next charge (pricing catalogue U16).
   subscriptionAddonCharges SubscriptionAddonCharge[]
@@ -2578,6 +2625,15 @@ model PlatformAdmin {
   roleAssignments PlatformAdminRoleAssignment[]
   accessSessions  AdminAccessSession[]
 
+  // DEC-169: the teammate's own record, and whom they report to.
+  staffProfile StaffProfile?  @relation("StaffProfileOf")
+  reports      StaffProfile[] @relation("StaffProfileReportsTo")
+
+  // DEC-169, U20: Saroh's own sales leads this teammate owns, and the calls
+  // and visits they logged.
+  sarohLeads       SarohLead[]       @relation("SarohLeadOwner")
+  sarohContactLogs SarohContactLog[] @relation("SarohContactLogAuthor")
+
   grantedByUserId String?
   grantedBy       User?   @relation("PlatformAdminGrantedBy", fields: [grantedByUserId], references: [id], onDelete: SetNull)
 
@@ -2643,6 +2699,359 @@ model PlatformAdminRoleAssignment {
 
   @@index([platformAdminId, revokedAt, expiresAt])
   @@index([role, revokedAt])
+}
+
+// A teammate's record on the console's Team (DEC-169, admin console U18):
+// their job, contact, reporting line, capacity and how they are paid. One per
+// PlatformAdmin, kept apart from the access grant so revoking access never
+// loses who they were. Not a tenant row: it belongs to Saroh, not a business.
+//
+// `worksAs` is the job, separate from the console role: ACCOUNT_MANAGER_JOB,
+// FINDS_BUSINESSES or OTHER. `engagement` is FULL_TIME, PART_TIME or
+// FREELANCE. Both are CHECKed in the migration (`staff-profile.ts` holds the
+// lists). `managerCode` is generated by the API, never typed, and is what an
+// owner enters at sign-up to name the manager who brought them in.
+//
+// The tax id is sealed with AES-256-GCM under `STAFF_PII_ENC_KEY` (never the
+// payments key); all three parts are set together or not at all. It is never
+// returned whole: Platform owner and Billing see its last 4 characters.
+model StaffProfile {
+  id String @id @default(cuid())
+
+  platformAdminId String        @unique
+  platformAdmin   PlatformAdmin @relation("StaffProfileOf", fields: [platformAdminId], references: [id], onDelete: Cascade)
+
+  worksAs   String
+  workEmail String?
+  phone     String?
+  city      String?
+  languages String[]  @default([])
+  joinedOn  DateTime? @db.Date
+
+  reportsToPlatformAdminId String?
+  reportsTo                PlatformAdmin? @relation("StaffProfileReportsTo", fields: [reportsToPlatformAdminId], references: [id], onDelete: SetNull)
+
+  engagement String?
+  /// How many businesses they can look after at once; null when not set.
+  capacity   Int?
+
+  managerCode  String  @unique
+  onCommission Boolean @default(false)
+
+  taxIdCiphertext String?
+  taxIdIv         String?
+  taxIdAuthTag    String?
+
+  emergencyContact String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([reportsToPlatformAdminId])
+}
+
+// An invitation to Saroh's team (DEC-169, admin console U24), for someone
+// who may have no Saroh account yet. Sent by a holder of `staff:grant`, and
+// never for a role that can do more than the sender can.
+//
+// Only a sha256 of the token is stored: the token itself exists only in the
+// email. A resend draws a new token over the old hash, so the earlier link
+// stops working. Accepting needs the person's own verified email to be
+// `email` (never one staff marked verified), and the last sender to still
+// hold `staff:grant` and reach every role on the invite. It then makes the
+// grant, the roles and the profile (`worksAs`, `onCommission`) in one
+// transaction.
+//
+// Staff and user ids are bare, not foreign keys, as on the role
+// assignments: the record outlives the accounts it names. Saroh's, not a
+// business's, so it has no organizationId and no row-level policy.
+model StaffInvite {
+  id String @id @default(cuid())
+
+  /// Lower-cased: the address the link was sent to, and the only one that may accept.
+  email        String
+  name         String
+  roles        String[]
+  worksAs      String
+  onCommission Boolean  @default(false)
+  reason       String
+
+  tokenHash String   @unique
+  expiresAt DateTime
+
+  /// Who sent the link last: the first sender, or whoever resent it.
+  invitedByUserId String
+  sentAt          DateTime @default(now())
+  sendCount       Int      @default(1)
+
+  acceptedAt       DateTime?
+  acceptedByUserId String?
+  platformAdminId  String?
+
+  withdrawnAt       DateTime?
+  withdrawnByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+}
+
+// Saroh's own sales lead (DEC-169, admin console U20): someone who may
+// become a paying business, not a business's own Leads (the merchant CRM).
+// It comes from a saroh.in enquiry ("A question before signing up"), the
+// waitlist, or a manager who added it; one lead per person, merged by the
+// normalised email (`emailKey`, the waitlist's rule).
+//
+// `source` is WEBSITE, WAITLIST or ADDED: where it first came from. `stage`
+// is NEW, TALKED, DEMO, TRIAL, WON or LOST. Won names the business it became
+// (`wonOrganizationId`, a plain id like `referredByOrganizationId`: read back
+// through the business's own rules); Lost carries why. All CHECKed in the
+// migration (`saroh-leads/lead-rules.ts` holds the lists).
+//
+// The owner is the one manager working it: the first to record its email
+// (ADDED), or the one Support or a Platform owner gave it to (ASSIGNED).
+// Unowned leads are seen only by staff with every lead in scope. When each
+// email was recorded is kept, so a business counts as brought in by a lead
+// only if the lead had its email before the business was made (U19).
+//
+// Retention: a lead that came from the website and never became a business
+// goes 12 months after the website last saw it, once no waitlist entry with
+// its email is left (`saroh-leads/lead-retention.ts`, the enquiry purge).
+// Not a tenant row: it belongs to Saroh.
+model SarohLead {
+  id String @id @default(cuid())
+
+  /// Who: the business's or the person's name, as known.
+  name     String
+  email    String?
+  emailKey String?   @unique
+  /// When this email was first put on the lead.
+  emailAt  DateTime?
+
+  /// The email the business signed up with, when it isn't `email`.
+  signUpEmail    String?
+  signUpEmailKey String?   @unique
+  signUpEmailAt  DateTime?
+
+  phone String?
+  city  String?
+  /// One of the waitlist's kinds of business (`WAITLIST_KINDS`), if known.
+  kind  String?
+
+  source   String
+  stage    String   @default("NEW")
+  stagedAt DateTime @default(now())
+
+  /// The day to follow up, as the day reads in India.
+  followUpOn DateTime? @db.Date
+  notes      String?
+
+  wonOrganizationId String?
+  wonAt             DateTime?
+  lostReason        String?
+
+  ownerPlatformAdminId String?
+  owner                PlatformAdmin? @relation("SarohLeadOwner", fields: [ownerPlatformAdminId], references: [id], onDelete: SetNull)
+  ownerSince           DateTime?
+  ownedHow             String?
+
+  /// When an enquiry or a waitlist entry last brought this lead in.
+  websiteSeenAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  log SarohContactLog[]
+
+  @@index([ownerPlatformAdminId, stage])
+  @@index([stage, followUpOn])
+  @@index([websiteSeenAt])
+}
+
+// A call, visit or message Saroh's team logged (DEC-169, U20): on a lead, or
+// on a business a manager looks after, with what was said about the product.
+// At least one of `leadId` and `organizationId` (CHECKed). A business's rows
+// carry its organizationId and the org-isolation policy; a lead's have none
+// and are written and read only by the admin console, with no org context.
+model SarohContactLog {
+  id String @id @default(cuid())
+
+  leadId String?
+  lead   SarohLead? @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Who logged it; null if their team record is gone.
+  platformAdminId String?
+  author          PlatformAdmin? @relation("SarohContactLogAuthor", fields: [platformAdminId], references: [id], onDelete: SetNull)
+  actorUserId     String
+
+  /// CALL, VISIT or MESSAGE (CHECKed).
+  kind       String
+  happenedAt DateTime
+  minutes    Int?
+  summary    String
+  /// What they said about Saroh itself.
+  feedback   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([leadId, happenedAt])
+  @@index([organizationId, happenedAt])
+  @@index([platformAdminId, happenedAt])
+}
+
+// Who at Saroh looks after a business (DEC-169, admin console U19): one
+// account manager at a time, with every earlier one kept. Append-only: a
+// link is written once and only ever ended (`endedAt`, why, by whom); a
+// move to another manager ends the old link and starts a new one. A
+// trigger in the migration refuses any other change, and a partial unique
+// index allows one open link per business.
+//
+// `source` is how it started: LINK (the sign-up carried the manager's
+// `?am=` link), CODE (the owner typed the manager's code), LEAD_EMAIL (the
+// owner's own verified email was on the manager's lead before the business
+// was made) or ASSIGNED (staff gave it). The first three are BROUGHT_IN,
+// the last ASSIGNED (`kind`). All CHECKed (`organizations/account-manager.ts`
+// holds the lists). `evidence` is the proof as it was when the link started:
+// the code, when the link's cookie was set, the lead and when its email was
+// recorded. Never a person's email.
+//
+// The manager is a bare `platformAdminId`, not a foreign key, as on staff
+// invites and role assignments: who looked after a business outlives the
+// teammate's account. A business's row, so it carries the org-isolation
+// policy.
+model AccountManagerLink {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  platformAdminId String
+
+  source   String
+  kind     String
+  evidence Json   @default("{}")
+
+  startedAt       DateTime @default(now())
+  /// Who gave it, for ASSIGNED; null when the business's own sign-up started it.
+  startedByUserId String?
+
+  endedAt       DateTime?
+  endedByUserId String?
+  endedReason   String?
+
+  @@unique([organizationId], map: "AccountManagerLink_one_open_per_business", where: raw("\"endedAt\" IS NULL"))
+  @@index([organizationId, startedAt])
+  @@index([platformAdminId, endedAt])
+}
+
+// A commission rate (DEC-169, admin console U21): what share of a payment
+// before GST a manager earns, for one link kind (BROUGHT_IN or ASSIGNED),
+// from `effectiveFrom` on. Set in the console by a holder of
+// `commission:rates`; never written in code, tests, seeds or docs (the repo
+// is public). Append-only: a change is a new row, and a line copies the
+// rate it was worked out with, so a later change never moves it. Saroh's,
+// not a business's.
+model CommissionRate {
+  id String @id @default(cuid())
+
+  /// BROUGHT_IN | ASSIGNED, as `AccountManagerLink.kind`.
+  kind          String
+  /// Hundredths of a percent, 0..10000 (CHECKed).
+  basisPoints   Int
+  effectiveFrom DateTime
+  setByUserId   String
+  reason        String
+
+  createdAt DateTime @default(now())
+
+  @@index([kind, effectiveFrom])
+}
+
+// What one cleared Saroh payment earns its business's manager (DEC-169,
+// admin console U21): written by the `commission.line` job after the
+// payment's transaction has committed, never inside it, so a commission
+// failure can never touch a payment. One line per invoice, or twelve for a
+// year paid at once (one twelfth each month, owner 19 Oct): `installment`
+// of `installments`.
+//
+// - PENDING until the period it pays for (`periodEnd`) ends with no refund
+//   or dispute; then PAYABLE in `statementMonth` (the month the period
+//   ended in India, or the next month not yet paid).
+// - HELD while the provider took a different amount from the invoice.
+// - NO_RATE when no rate was set for the link's kind as it paid: it earns
+//   nothing, for good (no back-pay, owner 19 Oct).
+// - CANCELLED by a refund, or a dispute lost, before it was paid.
+// - PAID with its month's payout; a refund after that is a Needs action
+//   for the owner, and the line stays as it was.
+//
+// Relation-free, like BillingAction: the invoice, the business and the
+// manager are plain ids, so what the team was paid outlives them. A
+// business's row, so it carries the org-isolation policy.
+model CommissionLine {
+  id String @id @default(cuid())
+
+  organizationId  String
+  platformAdminId String
+  linkId          String
+  sarohInvoiceId  String
+  installment     Int    @default(1)
+  installments    Int    @default(1)
+
+  /// The link's kind when the payment cleared: BROUGHT_IN | ASSIGNED.
+  kind            String
+  /// This line's share of the invoice's amount before GST, in paise.
+  baseAmountPaise Int
+  /// The rate copied from `CommissionRate` (`rateId`); null while NO_RATE.
+  rateId          String?
+  basisPoints     Int?
+  /// What it earns, in paise; null while NO_RATE.
+  amountPaise     Int?
+  /// When it can become payable: the end of the period (or month) it pays for.
+  periodEnd       DateTime
+
+  /// PENDING | HELD | NO_RATE | PAYABLE | CANCELLED | PAID
+  status         String
+  /// "2026-12": the statement it is paid in, once PAYABLE.
+  statementMonth String?
+  payoutId       String?
+  /// Why it is held or was cancelled, in Saroh's words.
+  note           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sarohInvoiceId, installment])
+  @@index([platformAdminId, statementMonth])
+  @@index([platformAdminId, status])
+  @@index([status, periodEnd])
+  @@index([organizationId])
+}
+
+// A month's commission paid to one teammate (DEC-169, admin console U21):
+// marked paid in the console with the bank's reference by someone else
+// with `team:pay`. It locks the month: a line that becomes payable later
+// goes to the next month's statement. Saroh's, not a business's.
+model CommissionPayout {
+  id String @id @default(cuid())
+
+  platformAdminId String
+  /// "2026-12"
+  month           String
+  amountPaise     Int
+  lineCount       Int
+  reference       String
+  reason          String
+  paidAt          DateTime
+  paidByUserId    String
+
+  createdAt DateTime @default(now())
+
+  @@unique([platformAdminId, month])
+  @@index([month])
 }
 
 // Global, append-only history of staff activity in the Saroh control plane.

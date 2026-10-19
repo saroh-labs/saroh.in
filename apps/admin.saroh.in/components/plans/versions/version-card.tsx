@@ -1,8 +1,11 @@
 "use client";
 
+import type { Catalog } from "@saroh/pricing-catalog";
+import { diff } from "@saroh/pricing-catalog";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { useId, useState } from "react";
 
 import { OperatorDialog } from "@/components/operator-dialog";
 import {
@@ -47,13 +50,20 @@ export function VersionCard({
     nextV,
     canPublish,
     rollbackBlockedBy,
+    live = null,
 }: {
     version: AdminVersion;
     nextV: number;
     canPublish: boolean;
     /** Why rolling back can't happen now; null when it can. */
     rollbackBlockedBy: string | null;
+    /** The live catalogue, for Compare with live; null with none live. */
+    live?: Catalog | null;
 }) {
+    const compareId = useId();
+    const [comparing, setComparing] = useState(false);
+    const canCompare = live !== null && v.status !== "live";
+    const differs = comparing && live ? diff(live, v.catalog) : [];
     const flash = useFlash();
     const { refresh } = useDraft();
     const sync = syncLine(v);
@@ -83,8 +93,22 @@ export function VersionCard({
                 <span className="text-[12px] text-muted-foreground">
                     {policyLine(v)}
                 </span>
-                {(canRoll || canCancel || canDownload) && (
-                    <span className="ml-auto flex gap-1.5">
+                {(canRoll || canCancel || canDownload || canCompare) && (
+                    <span className="ml-auto flex flex-wrap gap-1.5">
+                        {canCompare && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                className={ACTION}
+                                aria-expanded={comparing}
+                                aria-controls={compareId}
+                                onClick={() => setComparing((on) => !on)}
+                            >
+                                {comparing
+                                    ? "Hide comparison"
+                                    : "Compare with live"}
+                            </Button>
+                        )}
                         {canDownload && (
                             <Button
                                 type="button"
@@ -175,6 +199,30 @@ export function VersionCard({
                 )}
             </div>
             {v.note && <p className="text-foreground/80">{v.note}</p>}
+            {comparing && (
+                <div
+                    id={compareId}
+                    className="grid gap-1 rounded-[10px] bg-secondary/60 px-3 py-2.5 text-[12.5px]"
+                >
+                    <span className="font-semibold">
+                        Version {v.version} next to live
+                    </span>
+                    {differs.length === 0 ? (
+                        <span className="text-muted-foreground">
+                            The same as the live version.
+                        </span>
+                    ) : (
+                        <ul
+                            aria-label={`How version ${v.version} differs from live`}
+                            className="grid list-disc gap-[3px] pl-[18px] text-foreground/80"
+                        >
+                            {differs.map((c, i) => (
+                                <li key={`${i}-${c}`}>{c}</li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            )}
             <ul className="grid list-disc gap-[3px] pl-[18px] text-[12.5px] text-muted-foreground">
                 {changesShown(v).map((c, i) => (
                     <li key={`${i}-${c}`}>{c}</li>

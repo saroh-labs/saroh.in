@@ -4,7 +4,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resetAddress, takeAddress } from "./page-address";
 import {
     keepReferral,
+    keptManagerLink,
     keptReferral,
+    MANAGER_COOKIE,
+    managerCookie,
+    managerFromSearch,
     REFERRAL_COOKIE,
     REFERRAL_DAYS,
     referralCookie,
@@ -184,5 +188,96 @@ describe("keeping the code a visitor arrived with", () => {
         open("/?ref=abcd2345");
         expect(() => keepReferral("not an address")).not.toThrow();
         expect(keptReferral(document.cookie)).toBeNull();
+    });
+});
+
+describe("an account manager's link (DEC-169)", () => {
+    const forgetManager = () => {
+        document.cookie = `${MANAGER_COOKIE}=; Max-Age=0; Path=/`;
+    };
+    const AT = new Date("2026-11-29T09:00:00.000Z");
+    const LATER = new Date("2026-11-30T09:00:00.000Z");
+    const at = () => AT;
+
+    beforeEach(forgetManager);
+    afterEach(forgetManager);
+
+    it("reads the code from ?am= in any case, with spaces or dashes", () => {
+        expect(managerFromSearch("?am=ABCD2345")).toBe("ABCD2345");
+        expect(managerFromSearch("?src=site&am=abcd-2345")).toBe("ABCD2345");
+    });
+
+    it.each([
+        "",
+        "?am=",
+        "?am=ABCD234",
+        // 0, 1, I, L and O are left out of the alphabet.
+        "?am=ABCD0345",
+        "?am=you@example.com",
+        "?ref=abcd2345",
+    ])("is nothing for %j", (search) => {
+        expect(managerFromSearch(search)).toBeNull();
+    });
+
+    it("is a cookie of its own: the code and when it was kept, on the shared domain", () => {
+        expect(
+            managerCookie("ABCD2345", AT, {
+                host: "www.saroh.in",
+                accountsHost: "accounts.saroh.in",
+                secure: true,
+            }),
+        ).toBe(
+            `saroh_am=ABCD2345.${AT.getTime() / 1000}; Max-Age=${REFERRAL_DAYS * 86400}; Path=/; Domain=saroh.in; SameSite=Lax; Secure`,
+        );
+        expect(
+            keptManagerLink(`a=1; saroh_am=ABCD2345.${AT.getTime() / 1000}`),
+        ).toEqual({ code: "ABCD2345", keptAt: AT });
+        expect(keptManagerLink("saroh_am=<script>")).toBeNull();
+        expect(keptManagerLink("saroh_am=ABCD2345")).toBeNull();
+    });
+
+    it("keeps it from the page they land on, the waitlist too, beside a referral", () => {
+        open("/waitlist?am=abcd2345&ref=wxyz6789");
+        keepReferral(ACCOUNTS, window, at);
+        expect(keptManagerLink(document.cookie)).toEqual({
+            code: "ABCD2345",
+            keptAt: AT,
+        });
+        // The waitlist's ?ref= is still an entrant's id.
+        expect(keptReferral(document.cookie)).toBeNull();
+
+        open("/?am=abcd2345&ref=wxyz6789");
+        keepReferral(ACCOUNTS, window, at);
+        expect(keptReferral(document.cookie)).toBe("wxyz6789");
+    });
+
+    it("keeps when the link was first kept when it is opened again", () => {
+        open("/?am=ABCD2345");
+        keepReferral(ACCOUNTS, window, at);
+        open("/pricing?am=ABCD2345");
+        keepReferral(ACCOUNTS, window, () => LATER);
+        expect(keptManagerLink(document.cookie)?.keptAt).toEqual(AT);
+    });
+
+    it("lets another manager's later link win", () => {
+        open("/?am=ABCD2345");
+        keepReferral(ACCOUNTS, window, at);
+        open("/?am=WXYZ6789");
+        keepReferral(ACCOUNTS, window, () => LATER);
+        expect(keptManagerLink(document.cookie)).toEqual({
+            code: "WXYZ6789",
+            keptAt: LATER,
+        });
+    });
+
+    it("still finds it after the address was cut for the tags, and puts nothing back", () => {
+        open("/?am=ABCD2345&utm_source=site");
+        takeAddress();
+        expect(window.location.search).toBe("?utm_source=site");
+
+        keepReferral(ACCOUNTS, window, at);
+
+        expect(keptManagerLink(document.cookie)?.code).toBe("ABCD2345");
+        expect(window.location.href).not.toContain("ABCD2345");
     });
 });

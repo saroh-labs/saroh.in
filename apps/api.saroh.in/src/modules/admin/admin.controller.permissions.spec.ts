@@ -9,9 +9,14 @@ import { PATH_METADATA } from "@nestjs/common/constants";
 
 import { IDENTITY_ONLY } from "../../common/decorators/identity-only.decorator";
 import { REQUIRE_ADMIN_PERMISSIONS } from "../../common/decorators/require-admin-permission.decorator";
-import { AdminPermission } from "./admin-permissions";
+import {
+    AdminPermission,
+    ALL_ADMIN_PERMISSIONS,
+    AWAITING_ENDPOINT,
+} from "./admin-permissions";
 import { AdminController } from "./admin.controller";
 import { AdminModule } from "./admin.module";
+import { ORGANIZATION_ACCESS_INTENT } from "./organization-access-session.guard";
 
 /* eslint-disable @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access */
 
@@ -97,7 +102,12 @@ describe("Admin console authorization contract", () => {
         // `/admin/me` returns the caller's own identity and permissions, which
         // the console needs before it can render anything. Any addition here is
         // a decision worth arguing for in review.
-        expect(identityOnly).toEqual(["me"]);
+        //
+        // `/admin/search` (U10): the header search answers each part under
+        // that part's own permission inside the service, and an Account
+        // manager, who holds no platform-wide read, must still find the
+        // businesses they look after. `admin-search.db.spec.ts` pins it.
+        expect(identityOnly.sort()).toEqual(["consoleSearch", "me"]);
     });
 });
 
@@ -109,6 +119,10 @@ describe("AdminController permission assignments", () => {
 
     it("protects aggregate metrics with platform read", () => {
         expect(perms("getMetrics")).toEqual([AdminPermission.PlatformRead]);
+    });
+
+    it("protects Home's counts with platform read, like the metrics", () => {
+        expect(perms("home")).toEqual([AdminPermission.PlatformRead]);
     });
 
     it("protects Organization targets with Organization read", () => {
@@ -185,18 +199,33 @@ describe("Admin console permission assignments", () => {
         },
     );
 
+    it("reads a business's module state with Organization read, no support session", () => {
+        expect(perms("moduleState")).toEqual([
+            AdminPermission.OrganizationRead,
+        ]);
+        const route = routeHandlers().find((r) => r.name === "moduleState");
+        expect(
+            Reflect.getMetadata(ORGANIZATION_ACCESS_INTENT, route!.handler),
+        ).toBeUndefined();
+    });
+
     it("keeps the business page behind view-as", () => {
         expect(perms("viewOrganization")).toEqual([
             AdminPermission.OrganizationViewAs,
         ]);
     });
 
-    it.each(["grant", "amend", "revoke"] as const)(
-        "lets only a staff granter %s staff",
-        (method) => {
-            expect(perms(method)).toEqual([AdminPermission.StaffGrant]);
-        },
-    );
+    it.each([
+        "grant",
+        "claimPlatformOwner",
+        "amend",
+        "revoke",
+        "inviteTeammate",
+        "resendInvite",
+        "withdrawInvite",
+    ] as const)("lets only a staff granter %s staff", (method) => {
+        expect(perms(method)).toEqual([AdminPermission.StaffGrant]);
+    });
 
     it.each([
         "endSessions",
@@ -354,6 +383,67 @@ describe("Pricing permissions", () => {
     );
 });
 
+describe("Team permissions (DEC-169)", () => {
+    const perms = (name: string) => {
+        const route = routeHandlers().find((r) => r.name === name);
+        return route ? permissionsOf(route.handler) : undefined;
+    };
+
+    it("reads a teammate's profile with team read", () => {
+        expect(perms("profile")).toEqual([AdminPermission.TeamRead]);
+    });
+
+    // The tax id inside a save also needs team:pay, which the service checks.
+    it("saves a teammate's profile with team write", () => {
+        expect(perms("saveProfile")).toEqual([AdminPermission.TeamWrite]);
+    });
+
+    // Saroh's own leads (U20): the service scopes each through scopeForStaff.
+    it.each([
+        ["leadsBoard", AdminPermission.SarohLeadsRead],
+        ["leadDetail", AdminPermission.SarohLeadsRead],
+        ["leadLog", AdminPermission.SarohLeadsRead],
+        ["leadWonCandidates", AdminPermission.SarohLeadsRead],
+        ["leadManagers", AdminPermission.SarohLeadsWrite],
+        ["addLead", AdminPermission.SarohLeadsWrite],
+        ["updateLead", AdminPermission.SarohLeadsWrite],
+        ["moveLeadStage", AdminPermission.SarohLeadsWrite],
+        ["assignLead", AdminPermission.SarohLeadsWrite],
+        ["logLeadContact", AdminPermission.SarohLeadsWrite],
+        // A member page's Log a call with a business (U22), scoped the same.
+        ["logBusinessContact", AdminPermission.SarohLeadsWrite],
+        // A member page (U22): the route admits accounts:read (the Account
+        // manager too); the service opens anyone's to team:read, one's own
+        // to the rest (admin-team-member.db.spec.ts).
+        ["member", AdminPermission.AccountsRead],
+        // Account managers (U25): Support and Platform owner only.
+        ["managerCandidates", AdminPermission.AccountsAssign],
+        ["assignManager", AdminPermission.AccountsAssign],
+        ["endManager", AdminPermission.AccountsAssign],
+        ["shareOut", AdminPermission.AccountsAssign],
+    ])("%s needs %s", (name, permission) => {
+        expect(perms(name)).toEqual([permission]);
+    });
+});
+
+/**
+ * Every permission is a promise an endpoint keeps (admin-permissions.ts).
+ * The Team permissions were added ahead of their routes in U18, each listed
+ * in AWAITING_ENDPOINT with the unit that wires it; nothing else may wait.
+ */
+describe("Every permission is required by some route", () => {
+    const required = new Set(
+        routeHandlers().flatMap(({ handler }) => permissionsOf(handler) ?? []),
+    );
+
+    it("leaves no permission unused but those awaiting a later unit", () => {
+        const unused = ALL_ADMIN_PERMISSIONS.filter(
+            (permission) => !required.has(permission),
+        ).sort();
+        expect(unused).toEqual(Object.keys(AWAITING_ENDPOINT).sort());
+    });
+});
+
 describe("AdminController staff identity", () => {
     it("returns the server-resolved roles and permissions to the admin shell", () => {
         const controller = new AdminController(
@@ -377,6 +467,8 @@ describe("AdminController staff identity", () => {
             ),
         ).toEqual({
             userId: "user_1",
+            // Their own team record, for the console's Your page (U22).
+            platformAdminId: "platform_admin_1",
             email: "staff@example.test",
             roles: ["AUDITOR"],
             permissions: [AdminPermission.AuditRead],

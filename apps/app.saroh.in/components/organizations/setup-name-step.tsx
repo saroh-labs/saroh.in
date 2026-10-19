@@ -19,6 +19,7 @@ import { cleanAddressInput } from "@/lib/organizations/address";
 import { kindDefaults, kindWords } from "@/lib/organizations/kind";
 import type { SetupValues } from "@/lib/organizations/setup-steps";
 
+import { SetupManagerCode } from "./setup-manager-code";
 import type { AddressState } from "./use-address-check";
 
 /**
@@ -44,7 +45,8 @@ const COMMON_COUNTRIES = [
  * so it is asked once, here, and never again when Website is turned on.
  *
  * The country stays on this step, under the address: it is one tap, India
- * is chosen, and it is rarely changed.
+ * is chosen, and it is rarely changed. Under it, one quiet line asks
+ * whether someone from Saroh is helping, for their code (DEC-169).
  *
  * It draws inside the setup form's `<Form>`: the answers are that one
  * form's, so leaving this step and coming back loses nothing.
@@ -257,6 +259,8 @@ export function SetupNameStep({
                     You can change it in Settings.
                 </FormDescription>
             </FormItem>
+
+            <SetupManagerCode />
         </>
     );
 }

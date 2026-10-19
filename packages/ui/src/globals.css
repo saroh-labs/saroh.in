@@ -209,6 +209,13 @@
         --info-subtle: 212 42% 94%;
         --info-subtle-foreground: 209 63% 29%; /* 7.67:1 */
 
+        /* ---- just changed ----
+           The ground of a row a live write just changed (admin console R9):
+           two seconds, then it fades back. The success tint, by reference,
+           so each register's own cut follows; drawn by `[data-just-changed]`
+           below. */
+        --just-changed: var(--success-subtle);
+
         /* ---- role rings (Team screen) ----
            Each workspace role wears one ring around a neutral monogram, and a
            dot of the same colour beside its name. A ring only reinforces: the
@@ -471,6 +478,22 @@
         letter-spacing: 0.1em;
         text-transform: uppercase;
         color: hsl(var(--muted-foreground));
+    }
+}
+
+/* ─── Just changed ───────────────────────────────────────────────────────────
+   A row a live write just changed carries `data-just-changed` for two
+   seconds (`apps/admin.saroh.in/components/changed-row.tsx`). The ground
+   eases in and back out on the slow step; under reduced motion it simply
+   appears and goes. A token rule, not a utility, so no app needs its own
+   CSS file for it.
+   ─── */
+@layer components {
+    [data-changed-row] {
+        transition: background-color var(--duration-slow) var(--ease-out);
+    }
+    [data-just-changed] {
+        background-color: hsl(var(--just-changed));
     }
 }
 

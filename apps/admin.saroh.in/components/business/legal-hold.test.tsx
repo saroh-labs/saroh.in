@@ -27,18 +27,83 @@ vi.mock("@/lib/business-actions", () => ({
         actions.liftLegalHoldAction(...a) as unknown,
 }));
 
-import type { BusinessView } from "@/lib/businesses";
+vi.mock("@saroh/ui/toast", () => ({
+    showError: vi.fn(),
+    showSuccess: vi.fn(),
+}));
+// The ⋯ menu, open in place: its rows are what a press would show.
+vi.mock("@saroh/ui/dropdown-menu", () => ({
+    DropdownMenu: ({ children }: { children: ReactNode }) => <>{children}</>,
+    DropdownMenuTrigger: ({ children }: { children: ReactNode }) => (
+        <>{children}</>
+    ),
+    DropdownMenuContent: ({ children }: { children: ReactNode }) => (
+        <div role="menu">{children}</div>
+    ),
+    DropdownMenuItem: ({
+        children,
+        onSelect,
+    }: {
+        children: ReactNode;
+        onSelect?: () => void;
+    }) => (
+        <button type="button" role="menuitem" onClick={() => onSelect?.()}>
+            {children}
+        </button>
+    ),
+    DropdownMenuLabel: ({ children }: { children: ReactNode }) => (
+        <p>{children}</p>
+    ),
+    DropdownMenuSeparator: () => null,
+}));
+
+import type { ReactNode } from "react";
+
+import type { BusinessView, LifecycleStatus } from "@/lib/businesses";
 
 import { DeletionPanels } from "./deletion-panels";
 import { LegalHoldNotice } from "./legal-hold-notice";
-import { LEGAL_HOLD_CHECKBOX, LifecycleActions } from "./lifecycle-actions";
+import { LEGAL_HOLD_CHECKBOX } from "./lifecycle-actions";
+import { MoreActions } from "./more-actions";
 
 /**
  * The console's words and controls for a legal hold and for how long a
  * deleted business's data is kept (DEC-122, owner 10 Oct).
  */
+/** The lifecycle rows of the ⋯ menu ("Copy id" is always there). */
 const buttons = () =>
-    screen.queryAllByRole("button").map((b) => b.textContent.trim());
+    screen
+        .queryAllByRole("menuitem")
+        .map((b) => b.textContent.trim().replace(/…$/, ""))
+        .filter((label) => label !== "Copy id");
+
+/** The ⋯ menu for an operator who may change a business's state. */
+function LifecycleActions({
+    status,
+    held = false,
+    canLiftHold = false,
+}: {
+    organizationId: string;
+    name: string;
+    status: LifecycleStatus;
+    held?: boolean;
+    canLiftHold?: boolean;
+}) {
+    return (
+        <MoreActions
+            organizationId="org_1"
+            name="Rye Bakery"
+            status={status}
+            held={held}
+            canLifecycle
+            canLiftHold={canLiftHold}
+        />
+    );
+}
+
+/** Choose a row of the ⋯ menu, which opens its dialog. */
+const choose = (label: string) =>
+    fireEvent.click(screen.getByRole("menuitem", { name: `${label}…` }));
 
 /** The dialog's "Type ‹name› to confirm" field. */
 function nameField(): HTMLInputElement {
@@ -71,7 +136,7 @@ describe("LifecycleActions and a legal hold", () => {
                 status="ACTIVE"
             />,
         );
-        fireEvent.click(screen.getByRole("button", { name: "Suspend" }));
+        choose("Suspend");
         fireEvent.click(screen.getByLabelText(LEGAL_HOLD_CHECKBOX));
         fireEvent.change(screen.getByLabelText(/Reason/), {
             target: { value: "Selling counterfeit goods" },
@@ -102,7 +167,7 @@ describe("LifecycleActions and a legal hold", () => {
                 status="ACTIVE"
             />,
         );
-        fireEvent.click(screen.getByRole("button", { name: "Suspend" }));
+        choose("Suspend");
         fireEvent.change(screen.getByLabelText(/Reason/), {
             target: { value: "Chargeback investigation" },
         });
@@ -154,9 +219,7 @@ describe("LifecycleActions and a legal hold", () => {
                 status="SUSPENDED"
             />,
         );
-        fireEvent.click(
-            screen.getByRole("button", { name: "Place legal hold" }),
-        );
+        choose("Place legal hold");
         fireEvent.change(screen.getByLabelText(/Why its data must be kept/), {
             target: { value: "Police notice 14/2026" },
         });
@@ -211,9 +274,7 @@ describe("LifecycleActions and a legal hold", () => {
             />,
         );
         expect(buttons()).toEqual(["Lift legal hold"]);
-        fireEvent.click(
-            screen.getByRole("button", { name: "Lift legal hold" }),
-        );
+        choose("Lift legal hold");
         fireEvent.change(screen.getByLabelText(/Why the hold can be lifted/), {
             target: { value: "Case closed, order of 2 Dec" },
         });
@@ -240,9 +301,7 @@ describe("LifecycleActions and a legal hold", () => {
                 status="ACTIVE"
             />,
         );
-        fireEvent.click(
-            screen.getByRole("button", { name: "Schedule deletion" }),
-        );
+        choose("Schedule deletion");
         expect(screen.getByText(/kept for 180 days more/)).toBeTruthy();
         expect(screen.getByText(/stay as tax records/)).toBeTruthy();
     });

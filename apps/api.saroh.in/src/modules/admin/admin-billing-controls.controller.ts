@@ -42,6 +42,8 @@ export class AdminBillingControlsController {
         const page = await this.actions.list(staff, query);
         await this.read(staff, "billing.actions.list", "billing_action", {
             state: query.state ?? "open",
+            // Never the search text: it may be a name.
+            ...(query.q ? { searched: true } : {}),
             resultCount: page.items.length,
         });
         return page;
@@ -68,6 +70,7 @@ export class AdminBillingControlsController {
         const page = await this.actions.events(staff, query);
         await this.read(staff, "billing.events.list", "billing_webhook_event", {
             filter: query.filter ?? "all",
+            ...(query.q ? { searched: true } : {}),
             resultCount: page.items.length,
         });
         return page;

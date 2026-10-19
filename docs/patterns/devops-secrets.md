@@ -15,6 +15,12 @@
 - Provider credentials are encrypted at rest and never returned
   (`backend-integrations.md`); logs redact sensitive headers and fields
   (`devops-observability.md`).
+- A teammate's tax id (DEC-169) is sealed under its own key,
+  `STAFF_PII_ENC_KEY`, never `PAYMENTS_ENC_KEY`
+  (`apps/api.saroh.in/src/common/crypto.ts`). The API returns only whether it
+  is set, or its last 4 characters to `team:pay` holders, and every such read
+  or replacement is on the admin ledger. The owner sets the value on Coolify;
+  it is never written in the repo.
 - Test fixtures use visibly fake values (`user:pass@prod-host`).
 - `.claude/settings.local.json` is ignored by git.
 

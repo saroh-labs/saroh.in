@@ -1,5 +1,14 @@
 import { Transform, Type } from "class-transformer";
-import { IsIn, IsInt, IsOptional, Matches, Max, Min } from "class-validator";
+import {
+    IsIn,
+    IsInt,
+    IsOptional,
+    IsString,
+    Matches,
+    Max,
+    MaxLength,
+    Min,
+} from "class-validator";
 
 import { OperatorReasonDto } from "./dto";
 
@@ -14,6 +23,13 @@ export class ListBillingActionsDto {
     @IsOptional()
     @IsIn(ACTION_STATES)
     state?: ActionState;
+
+    /** Billing's one search (R25): a business, or a provider id. */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(120)
+    q?: string;
 
     @IsOptional()
     @Type(() => Number)
@@ -31,6 +47,13 @@ export class ListProviderEventsDto {
     @IsOptional()
     @IsIn(EVENT_FILTERS)
     filter?: EventFilter;
+
+    /** Billing's one search (R25): a business, a provider id or an event's id. */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(120)
+    q?: string;
 
     @IsOptional()
     @Type(() => Number)

@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 
+import type { AdminPermission } from "./control-plane";
 import { adminFetch, getJson } from "./control-plane";
+import type { BusinessOverview } from "./overview-words";
 import type { EffectivePlan, UsageNote } from "./plan-words";
 
 /**
@@ -377,6 +379,66 @@ export function getBusinessSummary(id: string): Promise<BusinessRow | null> {
     );
 }
 
+/** A module's true state for the business (API U1, #989). */
+export interface BusinessModuleState {
+    moduleKey: string;
+    label: string;
+    state: "on" | "off" | "locked";
+    /** The gate (or setup step) in the way; null when none. */
+    blocker: string | null;
+    /** Why, in words, as the API words it; null when nothing is in the way. */
+    reason: string | null;
+    fix: {
+        kind: "release" | "switch-on" | "plan" | "merchant";
+        label: string;
+        permission?: AdminPermission;
+        flagKey?: string;
+    } | null;
+    /** Modules this one needs on first. Information, never a gate. */
+    dependencies: { moduleKey: string; label: string; on: boolean }[];
+}
+
+export interface BusinessModulesState {
+    organizationId: string;
+    planLimitsEnforced: boolean;
+    /** Once per business ("Plan limits not enforced yet"), never per row. */
+    note: string | null;
+    modules: BusinessModuleState[];
+}
+
+/**
+ * Each module's true state for one business: the availability check the
+ * business's own workspace runs, as its owner meets it — not only their own
+ * switch. Needs `organization:read`, no support session. A refusal or an
+ * outage is a failed panel, never a guess.
+ */
+export async function getModuleState(
+    organizationId: string,
+): Promise<Panel<BusinessModulesState>> {
+    try {
+        const data = await getJson<BusinessModulesState>(
+            `/organizations/${encodeURIComponent(organizationId)}/modules/state`,
+        );
+        return data ? { status: "ok", data } : { status: "failed" };
+    } catch {
+        return { status: "failed" };
+    }
+}
+
+/**
+ * A business's Overview (admin plan U3): the cards and the tab badges in
+ * one read, with `organization:read` and no support session. `null` on a
+ * refusal (403/401): the caller draws no Overview and no badges. Throws on
+ * an outage, so the tab says it failed rather than that there is nothing.
+ */
+export function getBusinessOverview(
+    organizationId: string,
+): Promise<BusinessOverview | null> {
+    return getJson<BusinessOverview>(
+        `/organizations/${encodeURIComponent(organizationId)}/overview`,
+    );
+}
+
 export function listPlans(): Promise<PlanOption[] | null> {
     return getJson<PlanOption[]>("/plans");
 }
@@ -388,6 +450,29 @@ export function listPlans(): Promise<PlanOption[] | null> {
  */
 export function accessCookieName(organizationId: string): string {
     return `console_access_${organizationId.replace(/[^A-Za-z0-9_-]/g, "")}`;
+}
+
+/**
+ * The cookie beside it holding when that session lapses (admin plan U6,
+ * R16: "Open until hh:mm" by Close support access). httpOnly too, set and
+ * cleared with the session's own.
+ */
+export function accessUntilCookieName(organizationId: string): string {
+    return `${accessCookieName(organizationId)}_until`;
+}
+
+/**
+ * When this operator's support session on the business lapses, as the API
+ * said when it opened; null when unknown (a session opened before this was
+ * kept) or none is open.
+ */
+export async function getAccessUntil(
+    organizationId: string,
+): Promise<string | null> {
+    const jar = await cookies();
+    if (!jar.get(accessCookieName(organizationId))?.value) return null;
+    const until = jar.get(accessUntilCookieName(organizationId))?.value;
+    return until && !Number.isNaN(Date.parse(until)) ? until : null;
 }
 
 export type BusinessViewResult =

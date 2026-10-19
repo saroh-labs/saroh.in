@@ -5,6 +5,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { env } from "../../env";
 import { AnalyticsCoreModule } from "../analytics/analytics-core.module";
 import { AuditModule } from "../audit/audit.module";
+import { CommissionModule } from "../commission/commission.module";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
@@ -18,6 +19,7 @@ import {
 import { BILLING_CUSTOMER_SYNC_TYPE } from "./billing-customer-sync";
 import { BILLING_EMAIL_TYPE, BillingEmailHandler } from "./billing-email.job";
 import { BILLING_PROFILE_SYNC_TYPE } from "./billing-profile-sync";
+import { BillingProfilesAccountService } from "./billing-profiles-account.service";
 import { BillingProfilesController } from "./billing-profiles.controller";
 import { BillingProfilesService } from "./billing-profiles.service";
 import {
@@ -116,6 +118,9 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         // nothing itself, so it adds no cycle.
         AnalyticsCoreModule,
         AuditModule,
+        // Commission (DEC-169, U21): the webhook queues a line after its
+        // transaction commits. Imports only the jobs module, so no cycle.
+        CommissionModule,
         FeatureFlagModule,
         JobsModule,
         forwardRef(() => OrganizationsModule),
@@ -149,6 +154,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         BillingProfileSyncHandler,
         BillingProfilesService,
         BusinessBillingProfileService,
+        // The account's Billing profiles (DEC-167 step 2).
+        BillingProfilesAccountService,
         // The daily match of what the provider took (DEC-166).
         BillingReconcileHandler,
         SarohInvoicesService,

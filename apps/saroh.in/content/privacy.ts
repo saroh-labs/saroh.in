@@ -9,7 +9,8 @@
  * addition for the owner to review; the referral code cookie, 13 Oct
  * (DEC-156), the owner's agreed sentence, rev 74; page visits, 14 Oct
  * (DEC-160), the owner's agreed wording; Razorpay registers each business
- * at sign-up, 17 Oct (DEC-165), the owner's agreed wording). Published VERBATIM at
+ * at sign-up, 17 Oct (DEC-165), the owner's agreed wording; the account
+ * manager's link cookie, 19 Oct (DEC-169), the owner agreed it in chat). Published VERBATIM at
  * /privacy: do not reword it here. A change comes from the owner's text,
  * and moves `publishOn`, which is the "Last updated" date the page shows.
  *
@@ -111,6 +112,8 @@ If a breach affects your personal data, we'll tell you and the Data Protection B
 Saroh's apps use only the cookies that keep you signed in. saroh.in also uses Google Analytics cookies to count visits and, if you accept the cookie notice, records how the site is used, including which pages are opened and for how long; this sets no cookie and stores nothing in your browser. Refuse, and neither runs and the site works the same. You can change your answer at any time with "Cookie choices" at the foot of every page. We don't count or record a browser that sends Do Not Track or Global Privacy Control.
 
 If you reach saroh.in from a link on a business's site, saroh.in keeps that business's referral code in a cookie for 90 days, so that if you start a business on Saroh we can record which business referred you. It holds nothing about you and is not shared with anyone.
+
+If you reach saroh.in from a Saroh team member's link, saroh.in keeps their code in a cookie for 90 days, so that if you start a business on Saroh we know who helped you set it up. It holds nothing about you and is not shared with anyone.
 
 ## How we protect it
 

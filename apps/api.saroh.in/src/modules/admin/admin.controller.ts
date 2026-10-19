@@ -61,6 +61,9 @@ export class AdminController {
     ) {
         return {
             userId: user.id,
+            // Their own team record, for the console's Your page (U22);
+            // null for break-glass access.
+            platformAdminId: ctx.platformAdminId,
             email: user.email,
             roles: ctx.roles,
             permissions: ctx.permissions,

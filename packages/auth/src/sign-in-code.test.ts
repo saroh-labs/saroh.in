@@ -30,7 +30,12 @@ type Sent = Parameters<
     NonNullable<CreateAuthOptions["sendVerificationOTP"]>
 >[0];
 
-function stack(extra: { rateLimit?: boolean } = {}) {
+function stack(
+    extra: {
+        rateLimit?: boolean;
+        hooks?: Pick<CreateAuthOptions, "mayStartSession" | "onMailboxProven">;
+    } = {},
+) {
     const sent: Sent[] = [];
     type Rows = Record<string, unknown>[];
     // Read through `db` each time: the adapter replaces a table's array.
@@ -46,6 +51,7 @@ function stack(extra: { rateLimit?: boolean } = {}) {
             sendVerificationOTP: (mail) => {
                 sent.push(mail);
             },
+            ...extra.hooks,
         }),
         baseURL: BASE,
         trustedOrigins: [ORIGIN],
@@ -368,5 +374,86 @@ describe("sign up and sign in with an emailed code", () => {
             expect(CODE_RESEND_SECONDS).toBe(30);
             expect(CODE_LIMIT_MAX).toBeGreaterThanOrEqual(2);
         });
+    });
+});
+
+/**
+ * The two session hooks the API's sign-in help hangs on (admin console U9):
+ * a held person starts no session by any way in, and only a code is the
+ * person's own proof of their mailbox.
+ */
+describe("session hooks: a hold, and the mailbox proven", () => {
+    beforeEach(() => {
+        vi.stubEnv("BETTER_AUTH_SECRET", "test-secret-for-the-code-flow-only");
+        vi.stubEnv("BETTER_AUTH_URL", BASE);
+    });
+
+    async function priya(s: ReturnType<typeof stack>) {
+        await s.post("/sign-up/email", {
+            name: "Priya",
+            email: "priya@example.com",
+            password: "a-long-password",
+        });
+        await s.post("/email-otp/verify-email", {
+            email: "priya@example.com",
+            otp: s.lastCode(),
+        });
+    }
+
+    it("refuses a session by code and by password while the host holds the person", async () => {
+        let held = false;
+        const s = stack({ hooks: { mayStartSession: () => !held } });
+        await priya(s);
+        held = true;
+
+        await s.ask("priya@example.com");
+        const byCode = await s.signIn("priya@example.com", s.lastCode());
+        expect(byCode.status).not.toBe(200);
+        const byPassword = await s.post("/sign-in/email", {
+            email: "priya@example.com",
+            password: "a-long-password",
+        });
+        expect(byPassword.status).not.toBe(200);
+
+        held = false;
+        const after = await s.post("/sign-in/email", {
+            email: "priya@example.com",
+            password: "a-long-password",
+        });
+        expect(after.status).toBe(200);
+    });
+
+    it("refuses when the hold can't be checked", async () => {
+        const s = stack({
+            hooks: {
+                mayStartSession: () => {
+                    throw new Error("database away");
+                },
+            },
+        });
+        await s.ask("asha@example.com");
+        const tried = await s.signIn("asha@example.com", s.lastCode());
+        expect(tried.status).not.toBe(200);
+    });
+
+    it("tells the host the mailbox was proven by a code, never by a password", async () => {
+        const proven: string[] = [];
+        const s = stack({
+            hooks: { onMailboxProven: ({ id }) => void proven.push(id) },
+        });
+        await priya(s);
+        // Verifying the address with a code is a proof.
+        expect(proven).toHaveLength(1);
+
+        await s.post("/sign-in/email", {
+            email: "priya@example.com",
+            password: "a-long-password",
+        });
+        expect(proven).toHaveLength(1);
+
+        await s.ask("priya@example.com");
+        await s.signIn("priya@example.com", s.lastCode());
+        expect(proven).toHaveLength(2);
+        expect(new Set(proven).size).toBe(1);
     });
 });

@@ -65,6 +65,16 @@ insufficient" (PRODUCT_STRATEGY §18).
   changes a business-wide setting is tagged `@serial` and runs alone after
   the rest. Writes go to Northwind only. The browser-tests skill has the
   rules.
+- **Current** — **The operator console has browser specs too** (2026-10-18,
+  admin plan U23). A console spec is `e2e/tests/admin-*.spec.ts`, names
+  `admin:/<route>` keys (with `api:admin`), and signs in as the seeded staff
+  login, `useSession(page, "staff")`: `staff@saroh.dev`, a Platform owner by
+  a recorded grant, in no business, seeded on local and CI databases only.
+  The stack serves the console on 3006 at `E2E_ADMIN_URL`; `pnpm prepush
+--e2e` builds and starts it only when an `admin:` spec runs, CI always.
+  Refusal is checked as a business's owner (`"owner"`), never by revoking
+  Sam's grant on the shared session. `e2e/tests/admin-smoke.spec.ts` is the
+  pattern.
 - **Current** — **Cross-origin, layout and touch questions need a browser:**
   `e2e/` (Playwright) and `.agents/skills/saroh-browser-tests/SKILL.md`, with
   `E2E_IGNORE_HTTPS_ERRORS=1` locally.

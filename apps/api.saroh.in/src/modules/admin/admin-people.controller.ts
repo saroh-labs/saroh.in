@@ -8,12 +8,21 @@ import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import { AdminPeopleService } from "./admin-people.service";
 import { AdminPermission } from "./admin-permissions";
 import { AdminRoutes } from "./admin-routes.decorator";
-import { ChangeMemberRoleDto, OperatorReasonDto, SearchPeopleDto } from "./dto";
+import { AdminSignInHelpService } from "./admin-sign-in-help.service";
+import {
+    ChangeMemberRoleDto,
+    ChangeSignInEmailDto,
+    OperatorReasonDto,
+    SearchPeopleDto,
+} from "./dto";
 
 /**
- * People across the instance (admin console U6). Every route reads or
- * changes personal data, so every route needs `organization:pii:read`, and
- * the writes need `organization:people:write` as well.
+ * People across the instance (admin console U6; Users, U9). Every route
+ * reads or changes personal data, so every route needs
+ * `organization:pii:read`. A change to someone's place in a business needs
+ * `organization:people:write` as well; sign-in help (a code, Mark verified,
+ * a changed sign-in email and its second confirmer) needs
+ * `people:sign-in-help`, which Platform owners and Support hold.
  */
 @AdminRoutes()
 export class AdminPeopleController {
@@ -21,6 +30,7 @@ export class AdminPeopleController {
         private readonly people: AdminPeopleService,
         private readonly adminAudit: AdminAuditService,
         private readonly idempotency: IdempotencyService,
+        private readonly signInHelp: AdminSignInHelpService,
     ) {}
 
     @Get("people")
@@ -29,14 +39,21 @@ export class AdminPeopleController {
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Query() query: SearchPeopleDto,
     ) {
-        const rows = await this.people.search(query.q);
+        const rows = await this.people.search({
+            q: query.q,
+            filters: query.filter,
+        });
         await this.adminAudit.recordRead({
             actorUserId: staff.userId,
             permission: AdminPermission.OrganizationPiiRead,
             action: "person.search",
             targetType: "user",
             outcome: AdminAuditOutcome.Success,
-            metadata: { resultCount: rows.length },
+            metadata: {
+                resultCount: rows.length,
+                searched: Boolean(query.q),
+                filters: query.filter ?? [],
+            },
         });
         return rows;
     }
@@ -78,6 +95,119 @@ export class AdminPeopleController {
             outcome: AdminAuditOutcome.Success,
         });
         return person;
+    }
+
+    /** The History tab: what staff did to this person, newest first. */
+    @Get("people/:userId/history")
+    @RequireAdminPermission(AdminPermission.OrganizationPiiRead)
+    async history(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("userId") userId: string,
+    ) {
+        const rows = await this.people.history(userId);
+        await this.adminAudit.recordRead({
+            actorUserId: staff.userId,
+            permission: AdminPermission.OrganizationPiiRead,
+            action: "person.history.read",
+            targetType: "user",
+            targetId: userId,
+            outcome: AdminAuditOutcome.Success,
+        });
+        return rows;
+    }
+
+    /** Send a sign-in code through Better Auth; rate limited (U9). */
+    @Post("people/:userId/sign-in-code")
+    @RequireAdminPermission(
+        AdminPermission.OrganizationPiiRead,
+        AdminPermission.PeopleSignInHelp,
+    )
+    sendSignInCode(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("userId") userId: string,
+        @Body() dto: OperatorReasonDto,
+    ) {
+        return this.idempotency.run(
+            {
+                scope: "admin.person.sign-in-code",
+                key: dto.idempotencyKey,
+                actorUserId: staff.userId,
+            },
+            { userId, reason: dto.reason },
+            () => this.signInHelp.sendCode(staff, userId, dto.reason),
+        );
+    }
+
+    /** Mark their email verified, as staff's word, never theirs (U9). */
+    @Post("people/:userId/mark-verified")
+    @RequireAdminPermission(
+        AdminPermission.OrganizationPiiRead,
+        AdminPermission.PeopleSignInHelp,
+    )
+    markVerified(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("userId") userId: string,
+        @Body() dto: OperatorReasonDto,
+    ) {
+        return this.idempotency.run(
+            {
+                scope: "admin.person.mark-verified",
+                key: dto.idempotencyKey,
+                actorUserId: staff.userId,
+            },
+            { userId, reason: dto.reason },
+            () => this.signInHelp.markVerified(staff, userId, dto.reason),
+        );
+    }
+
+    /** Change their sign-in email, with the takeover safeguards (U9). */
+    @Put("people/:userId/email")
+    @RequireAdminPermission(
+        AdminPermission.OrganizationPiiRead,
+        AdminPermission.PeopleSignInHelp,
+    )
+    changeEmail(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("userId") userId: string,
+        @Body() dto: ChangeSignInEmailDto,
+    ) {
+        return this.idempotency.run(
+            {
+                scope: "admin.person.sign-in-email",
+                key: dto.idempotencyKey,
+                actorUserId: staff.userId,
+            },
+            { userId, email: dto.email, reason: dto.reason },
+            () =>
+                this.signInHelp.changeEmail({
+                    staff,
+                    userId,
+                    email: dto.email,
+                    reason: dto.reason,
+                }),
+        );
+    }
+
+    /** A second, different staff member releases a held change (U9). */
+    @Post("people/:userId/email/confirm")
+    @RequireAdminPermission(
+        AdminPermission.OrganizationPiiRead,
+        AdminPermission.PeopleSignInHelp,
+    )
+    confirmEmail(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("userId") userId: string,
+        @Body() dto: OperatorReasonDto,
+    ) {
+        return this.idempotency.run(
+            {
+                scope: "admin.person.sign-in-email.confirm",
+                key: dto.idempotencyKey,
+                actorUserId: staff.userId,
+            },
+            { userId, reason: dto.reason },
+            () => this.signInHelp.confirmEmailChange(staff, userId, dto.reason),
+        );
     }
 
     @Post("people/:userId/end-sessions")

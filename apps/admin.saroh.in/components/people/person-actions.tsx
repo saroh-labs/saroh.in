@@ -52,15 +52,23 @@ export function ChangeRole({
     userId,
     name,
     role,
+    trigger = "Change role",
+    roles = BUILT_IN_ROLES,
+    onChanged,
 }: {
     organizationId: string;
     userId: string;
     name: string;
     role: string;
+    trigger?: string;
+    /** The roles to offer; each may say what it can do. */
+    roles?: readonly { value: string; label: string; can?: string }[];
+    /** After the API took it: the new role and the reason, for feedback. */
+    onChanged?: (change: { from: string; to: string; reason: string }) => void;
 }) {
     return (
         <OperatorDialog
-            trigger="Change role"
+            trigger={trigger}
             triggerVariant="ghost"
             title={`Change ${name}'s role`}
             effect="The business's history records the change under your name, and the trail records your reason."
@@ -73,25 +81,30 @@ export function ChangeRole({
                         defaultValue={role}
                         className="h-[38px] w-full rounded-md border border-input bg-field px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11"
                     >
-                        {BUILT_IN_ROLES.map((option) => (
+                        {roles.map((option) => (
                             <option key={option.value} value={option.value}>
-                                {option.label}
+                                {option.can
+                                    ? `${option.label}: ${option.can}`
+                                    : option.label}
                             </option>
                         ))}
-                        {!BUILT_IN_ROLES.some(
-                            (option) => option.value === role,
-                        ) && <option value={role}>{role}</option>}
+                        {!roles.some((option) => option.value === role) && (
+                            <option value={role}>{role}</option>
+                        )}
                     </select>
                 </div>
             }
             submitLabel="Change role"
-            onSubmit={({ reason, idempotencyKey, values }) =>
-                changeMemberRoleAction(organizationId, userId, {
-                    reason,
-                    idempotencyKey,
-                    role: values.role ?? role,
-                })
-            }
+            onSubmit={async ({ reason, idempotencyKey, values }) => {
+                const to = values.role ?? role;
+                const result = await changeMemberRoleAction(
+                    organizationId,
+                    userId,
+                    { reason, idempotencyKey, role: to },
+                );
+                if (result.ok) onChanged?.({ from: role, to, reason });
+                return result;
+            }}
         />
     );
 }
@@ -101,26 +114,34 @@ export function RemoveMember({
     userId,
     name,
     business,
+    trigger = "Remove",
+    onRemoved,
 }: {
     organizationId: string;
     userId: string;
     name: string;
     business: string;
+    trigger?: string;
+    /** After the API took it, for feedback. */
+    onRemoved?: () => void;
 }) {
     return (
         <OperatorDialog
-            trigger="Remove"
+            trigger={trigger}
             triggerVariant="ghost"
             title={`Remove ${name} from ${business}`}
             effect="They lose access to this business at once, and their share links stop working. Their account and other businesses are untouched."
             destructive
             submitLabel="Remove from business"
-            onSubmit={({ reason, idempotencyKey }) =>
-                removeMemberAction(organizationId, userId, {
-                    reason,
-                    idempotencyKey,
-                })
-            }
+            onSubmit={async ({ reason, idempotencyKey }) => {
+                const result = await removeMemberAction(
+                    organizationId,
+                    userId,
+                    { reason, idempotencyKey },
+                );
+                if (result.ok) onRemoved?.();
+                return result;
+            }}
         />
     );
 }

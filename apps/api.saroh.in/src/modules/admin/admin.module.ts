@@ -1,6 +1,7 @@
 import type { OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { Module } from "@nestjs/common";
 
+import { SignInCodeSender } from "../../common/auth/sign-in-code-sender";
 import { PlatformAdminGuard } from "../../common/guards/platform-admin.guard";
 import { PlatformPermissionGuard } from "../../common/guards/platform-permission.guard";
 import { IdempotencyService } from "../../common/idempotency/idempotency.service";
@@ -18,34 +19,51 @@ import { AdminPricingController } from "../pricing/admin-pricing.controller";
 import { CatalogueWritesService } from "../pricing/catalogue-writes.service";
 import { CouponsService } from "../pricing/coupons.service";
 import { PricingModule } from "../pricing/pricing.module";
+import { SarohLeadsController } from "../saroh-leads/saroh-leads.controller";
+import { SarohLeadsModule } from "../saroh-leads/saroh-leads.module";
+import { StaffInvitesModule } from "../staff-invites/staff-invites.module";
 import { WaitlistModule } from "../waitlist/waitlist.module";
 import { WebhooksModule } from "../webhooks/webhooks.module";
 import { AdminAccessService } from "./admin-access.service";
+import { AdminAccountManagersController } from "./admin-account-managers.controller";
+import { AdminAccountManagersService } from "./admin-account-managers.service";
 import { AdminAuditService } from "./admin-audit.service";
 import { AdminBillingActionsService } from "./admin-billing-actions.service";
 import { AdminBillingControlsController } from "./admin-billing-controls.controller";
 import { AdminBillingControlsService } from "./admin-billing-controls.service";
 import { AdminBillingController } from "./admin-billing.controller";
 import { AdminBillingService } from "./admin-billing.service";
+import { AdminBusinessModulesService } from "./admin-business-modules.service";
 import { AdminBusinessReportsController } from "./admin-business-reports.controller";
 import { AdminBusinessReportsService } from "./admin-business-reports.service";
+import { AdminCommissionController } from "./admin-commission.controller";
+import { AdminCommissionService } from "./admin-commission.service";
+import { AdminConsoleController } from "./admin-console.controller";
 import { AdminContactMessagesController } from "./admin-contact-messages.controller";
 import { AdminContactMessagesService } from "./admin-contact-messages.service";
 import { AdminDeploymentsController } from "./admin-deployments.controller";
 import { AdminDeploymentsService } from "./admin-deployments.service";
 import { AdminFlagsService } from "./admin-flags.service";
 import { AdminHealthService } from "./admin-health.service";
+import { AdminHomeService } from "./admin-home.service";
 import { AdminLifecycleService } from "./admin-lifecycle.service";
 import { AdminMachineryController } from "./admin-machinery.controller";
 import { AdminMachineryService } from "./admin-machinery.service";
 import { AdminMetricsService } from "./admin-metrics.service";
 import { AdminOperationsService } from "./admin-operations.service";
+import { AdminOrganizationOverviewController } from "./admin-organization-overview.controller";
+import { AdminOrganizationOverviewService } from "./admin-organization-overview.service";
 import { AdminOrganizationViewService } from "./admin-organization-view.service";
 import { AdminOrganizationsController } from "./admin-organizations.controller";
 import { AdminOrganizationsService } from "./admin-organizations.service";
 import { AdminOverridesService } from "./admin-overrides.service";
 import { AdminPeopleController } from "./admin-people.controller";
 import { AdminPeopleService } from "./admin-people.service";
+import { AdminSearchService } from "./admin-search.service";
+import {
+    AdminSignInHelpService,
+    SIGN_IN_EMAIL_RELEASE_TYPE,
+} from "./admin-sign-in-help.service";
 import { AdminSiteTrackersService } from "./admin-site-trackers.service";
 import { AdminStaffController } from "./admin-staff.controller";
 import { AdminStaffService } from "./admin-staff.service";
@@ -54,6 +72,10 @@ import { AdminUsageService } from "./admin-usage.service";
 import { AdminWaitlistController } from "./admin-waitlist.controller";
 import { AdminWaitlistService } from "./admin-waitlist.service";
 import { AdminController } from "./admin.controller";
+import {
+    MANAGER_LINK_SWEEP_TYPE,
+    ManagerLinkSweepJob,
+} from "./manager-link-sweep.job";
 import { OrganizationAccessSessionGuard } from "./organization-access-session.guard";
 import {
     ORGANIZATION_DELETION_CLEANUP_TYPE,
@@ -71,6 +93,7 @@ import {
     SECURITY_LOG_RETENTION_TYPE,
     SecurityLogRetentionHandler,
 } from "./security-log-retention.handler";
+import { SignInEmailReleaseHandler } from "./sign-in-email-release.handler";
 
 /** How often a stopped deletion chain is looked for and restarted. */
 const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
@@ -95,10 +118,16 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         // A deleted business's files, erased when its retention ends
         // (`organization.retention.erase`, DEC-122).
         MediaStorageModule,
+        // Staff invites (U24): the service the console's invite routes use,
+        // with the preview and accept a person not yet staff reaches.
+        StaffInvitesModule,
+        // Saroh's own sales leads (DEC-169, U20).
+        SarohLeadsModule,
     ],
     controllers: [
         AdminController,
         AdminOrganizationsController,
+        AdminOrganizationOverviewController,
         AdminStaffController,
         AdminPeopleController,
         AdminMachineryController,
@@ -110,6 +139,13 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AdminUsageController,
         AdminBillingController,
         AdminBillingControlsController,
+        SarohLeadsController,
+        // Home and the header search (admin console redesign U10).
+        AdminConsoleController,
+        // Who looks after which business (DEC-169, U25).
+        AdminAccountManagersController,
+        // What the team is owed, and the rates (DEC-169, U21).
+        AdminCommissionController,
     ],
     providers: [
         IdempotencyService,
@@ -117,13 +153,26 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AdminAccessService,
         AdminAuditService,
         AdminMetricsService,
+        AdminHomeService,
+        AdminSearchService,
         AdminOrganizationViewService,
+        AdminOrganizationOverviewService,
+        AdminBusinessModulesService,
         AdminOrganizationsService,
         AdminLifecycleService,
         AdminOverridesService,
         AdminSiteTrackersService,
         AdminStaffService,
+        // Account managers: assign, reassign, end, share out (U25).
+        AdminAccountManagersService,
+        // Commission: statements, Mark paid, earnings, rates (U21).
+        AdminCommissionService,
         AdminPeopleService,
+        // Sign-in help (U9): codes through Better Auth, and the end of a
+        // changed sign-in email's 24-hour hold.
+        AdminSignInHelpService,
+        SignInCodeSender,
+        SignInEmailReleaseHandler,
         AdminMachineryService,
         AdminOperationsService,
         AdminHealthService,
@@ -149,6 +198,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         OrganizationRetentionEraseHandler,
         // Security logs kept one year (DEC-122).
         SecurityLogRetentionHandler,
+        // Links end with the Account manager role (DEC-169, U25).
+        ManagerLinkSweepJob,
     ],
 })
 export class AdminModule implements OnModuleInit, OnModuleDestroy {
@@ -160,6 +211,8 @@ export class AdminModule implements OnModuleInit, OnModuleDestroy {
         private readonly cleanup: OrganizationDeletionCleanupHandler,
         private readonly retentionErase: OrganizationRetentionEraseHandler,
         private readonly securityLogs: SecurityLogRetentionHandler,
+        private readonly signInRelease: SignInEmailReleaseHandler,
+        private readonly managerLinks: ManagerLinkSweepJob,
     ) {}
 
     /**
@@ -184,14 +237,24 @@ export class AdminModule implements OnModuleInit, OnModuleDestroy {
             SECURITY_LOG_RETENTION_TYPE,
             this.securityLogs.handle,
         );
+        this.registry.register(
+            SIGN_IN_EMAIL_RELEASE_TYPE,
+            this.signInRelease.handle,
+        );
+        this.registry.register(
+            MANAGER_LINK_SWEEP_TYPE,
+            this.managerLinks.handle,
+        );
         if (env.NODE_ENV === "test") return;
         await this.deletion.schedule(new Date());
         await this.retentionErase.schedule(new Date());
         await this.securityLogs.schedule(new Date());
+        await this.managerLinks.schedule(new Date());
         this.chainCheck = setInterval(() => {
             void this.deletion.ensureScheduled();
             void this.retentionErase.ensureScheduled();
             void this.securityLogs.ensureScheduled();
+            void this.managerLinks.ensureScheduled();
         }, CHAIN_CHECK_MS);
         this.chainCheck.unref();
     }

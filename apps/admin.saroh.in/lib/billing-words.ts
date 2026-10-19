@@ -64,6 +64,49 @@ export interface SarohInvoicePage {
         taxPaise: number;
         totalPaise: number;
     };
+    /** Each status's count under the other filters (R29). */
+    statusCounts?: Record<InvoiceStatus, number>;
+}
+
+/** Billing › Invoices' status chips (R29), as the API takes them. */
+export const INVOICE_STATUSES = ["paid", "unpaid", "refunded"] as const;
+export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
+
+export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
+    paid: "Paid",
+    unpaid: "Unpaid",
+    refunded: "Refunded",
+};
+
+export function readInvoiceStatus(
+    value: string | undefined,
+): InvoiceStatus | undefined {
+    return INVOICE_STATUSES.find((s) => s === value);
+}
+
+/**
+ * One invoice's status, by the API's rule (R29): Refunded when money went
+ * back on it (a processed refund or a lost dispute), Unpaid when Razorpay
+ * says it took less than the total, Paid otherwise.
+ */
+export function invoiceStatus(row: {
+    totalPaise: number;
+    providerAmountPaise: number | null;
+    refunds: { kind: string; status: string }[];
+}): InvoiceStatus {
+    const moneyBack = row.refunds.some(
+        (r) =>
+            (r.kind === "REFUND" && r.status === "PROCESSED") ||
+            (r.kind === "DISPUTE" && r.status === "LOST"),
+    );
+    if (moneyBack) return "refunded";
+    if (
+        row.providerAmountPaise !== null &&
+        row.providerAmountPaise < row.totalPaise
+    ) {
+        return "unpaid";
+    }
+    return "paid";
 }
 
 export interface PlanBrief {
@@ -72,6 +115,8 @@ export interface PlanBrief {
     version: number;
     interval: string;
 }
+
+export type NextChargeHow = "AUTOPAY" | "PAID_FOR_YEAR" | "NONE";
 
 export interface SarohSubscriptionRow {
     id: string;
@@ -88,6 +133,14 @@ export interface SarohSubscriptionRow {
     providerCustomerId: string | null;
     termEndsAt: string | null;
     termPayment: "AUTOPAY" | "ONE_TIME" | null;
+    /** The autopay's next charge; null when nothing more is taken. */
+    nextChargeAt: string | null;
+    /** On autopay, the year paid at once, or not charged again. */
+    nextChargeHow: NextChargeHow;
+    /** The autopay's approved charges run out within 30 days. */
+    autopayRunsOutSoon: boolean;
+    /** Who it is billed to, and how many businesses that profile bills. */
+    billingProfile: { name: string; businesses: number } | null;
     lastInvoice: {
         id: string;
         number: string;
@@ -105,13 +158,36 @@ export interface SarohSubscriptionPage {
         byStatus: { status: string; count: number }[];
         byPlan: { key: string; name: string; count: number }[];
         mrrPaise: number;
+        /** Ending, or moving plan, in the next 30 days. */
+        endingSoon: number;
         currency: string;
     };
     plans: { key: string; name: string }[];
 }
 
+/** How many rows each Billing tab holds (R25). */
+export interface BillingCounts {
+    subscriptions: number;
+    invoices: number;
+    /** Needs action rows still open. */
+    openActions: number;
+    events: number;
+}
+
 export interface SarohSubscriptionDetail {
     subscription: SarohSubscriptionRow;
+    /** When the business first got a subscription. */
+    since: string;
+    /**
+     * The plan's list price for its cycle, before GST, and a custom price
+     * staff gave the business, with when it ends (null: no end).
+     */
+    price: {
+        listPaise: number;
+        currency: string;
+        customPaise: number | null;
+        customUntil: string | null;
+    };
     /**
      * Who Saroh bills the business to (DEC-167): its billing profile, the
      * profile's customer at the provider and its last sync, and the other
@@ -311,7 +387,7 @@ export function istDateTime(value: string | null | undefined): string {
 // ── Words ────────────────────────────────────────────────────────────────
 
 export const STATUS_LABEL: Record<SubscriptionStatus, string> = {
-    TRIALING: "First month",
+    TRIALING: "In trial",
     ACTIVE: "Active",
     PAST_DUE: "Payment failed",
     CANCELLED: "Ended",
@@ -413,4 +489,77 @@ export function refundedPaise(row: {
 /** Where an invoice's PDF downloads from, through the console. */
 export function invoicePdfHref(invoiceId: string): string {
     return `/billing/invoices/${encodeURIComponent(invoiceId)}/pdf`;
+}
+
+// ── A subscription row, in words (R26) ───────────────────────────────────
+
+/**
+ * Who the business is billed to: the profile's name, and "2 businesses on
+ * one profile" when it bills more than this one. Null with no profile.
+ */
+export function billedToLine(row: SarohSubscriptionRow): string | null {
+    const profile = row.billingProfile;
+    if (!profile) return null;
+    return profile.businesses > 1
+        ? `${profile.name} · ${profile.businesses} businesses on one profile`
+        : profile.name;
+}
+
+/**
+ * The plan's note: a move waiting ("Moves to Pro on 1 Nov 2026"), an end
+ * the business chose, or a trial's end. Null when there is nothing to add.
+ */
+export function planNote(row: SarohSubscriptionRow): string | null {
+    const ending = endingLine(row);
+    if (ending) return ending;
+    if (row.status === "TRIALING") {
+        return row.currentPeriodEnd
+            ? `Trial until ${istDate(row.currentPeriodEnd)}`
+            : "Trial";
+    }
+    return null;
+}
+
+/**
+ * The next charge and how it is paid: "17 Nov 2026 · autopay", "Paid for
+ * the year · ends 5 May 2027", or "None" with why when there is a why.
+ */
+export function nextChargeLine(row: SarohSubscriptionRow): string {
+    if (row.nextChargeHow === "AUTOPAY" && row.nextChargeAt) {
+        return `${istDate(row.nextChargeAt)} · autopay`;
+    }
+    if (row.nextChargeHow === "PAID_FOR_YEAR") {
+        const ends = row.termEndsAt ?? row.currentPeriodEnd;
+        return ends
+            ? `Paid for the year · ends ${istDate(ends)}`
+            : "Paid for the year";
+    }
+    if (row.status === "CANCELLED") return "None · ended";
+    if (row.cancelAtPeriodEnd && row.currentPeriodEnd) {
+        return `None · ends ${istDate(row.currentPeriodEnd)}`;
+    }
+    return "None";
+}
+
+/** The autopay's state, and whether it asks for a look (orange). */
+export function autopayState(row: SarohSubscriptionRow): {
+    label: string;
+    warn: boolean;
+} {
+    if (row.status === "PAST_DUE") return { label: "Declined", warn: true };
+    if (row.autopayRunsOutSoon && row.termEndsAt) {
+        return { label: `Runs out ${istDate(row.termEndsAt)}`, warn: true };
+    }
+    if (row.nextChargeHow === "AUTOPAY") {
+        return {
+            label: row.termEndsAt
+                ? `On until ${istDate(row.termEndsAt)}`
+                : "On",
+            warn: false,
+        };
+    }
+    if (row.nextChargeHow === "PAID_FOR_YEAR") {
+        return { label: "Not needed", warn: false };
+    }
+    return { label: "Off", warn: false };
 }

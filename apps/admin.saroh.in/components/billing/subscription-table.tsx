@@ -6,12 +6,18 @@ import { DataView } from "@saroh/ui/data-view";
 
 import type { SarohSubscriptionRow } from "@/lib/billing-words";
 import {
+    autopayState,
+    billedToLine,
     cycleLabel,
-    endingLine,
+    formatPaise,
     istDate,
+    nextChargeLine,
+    planNote,
     statusLabel,
 } from "@/lib/billing-words";
 import { plural } from "@/lib/format";
+
+import { useSubscriptionChanges } from "./subscription-changes";
 
 /** A state pill's tone; the state is always said in words too. */
 export const STATUS_TONE: Record<
@@ -24,6 +30,9 @@ export const STATUS_TONE: Record<
     CANCELLED: "neutral",
 };
 
+/** A quiet second line under a cell's first. */
+const SUB = "truncate text-[12px] text-muted-foreground";
+
 const COLUMNS: DataColumn<SarohSubscriptionRow>[] = [
     {
         id: "business",
@@ -32,8 +41,12 @@ const COLUMNS: DataColumn<SarohSubscriptionRow>[] = [
         cell: (row) => (
             <div className="min-w-0">
                 <p className="truncate font-medium">{row.organization.name}</p>
-                <p className="truncate font-mono text-[12px] text-muted-foreground">
-                    {row.organization.slug}
+                <p className={SUB}>
+                    {billedToLine(row) ?? (
+                        <span className="font-mono">
+                            {row.organization.slug}
+                        </span>
+                    )}
                 </p>
             </div>
         ),
@@ -42,22 +55,23 @@ const COLUMNS: DataColumn<SarohSubscriptionRow>[] = [
         id: "plan",
         header: "Plan",
         priority: "primary",
-        cell: (row) => (
-            <div className="min-w-0">
-                <p className="truncate">
-                    {row.plan.name} · {cycleLabel(row.billingCycle)}
-                </p>
-                <p className="truncate text-[12px] text-muted-foreground">
-                    Version {row.plan.version}
-                </p>
-            </div>
-        ),
+        cell: (row) => {
+            const note = planNote(row);
+            return (
+                <div className="min-w-0">
+                    <p className="truncate">
+                        {row.plan.name} · {cycleLabel(row.billingCycle)}
+                    </p>
+                    {note ? <p className={SUB}>{note}</p> : null}
+                </div>
+            );
+        },
     },
     {
         id: "status",
         header: "Status",
         priority: "secondary",
-        width: "150px",
+        width: "140px",
         cell: (row) => (
             <Badge variant={STATUS_TONE[row.status] ?? "neutral"}>
                 {statusLabel(row.status)}
@@ -65,35 +79,25 @@ const COLUMNS: DataColumn<SarohSubscriptionRow>[] = [
         ),
     },
     {
-        id: "period",
-        header: "Paid until",
+        id: "next",
+        header: "Next charge",
         priority: "secondary",
-        width: "200px",
-        cell: (row) => {
-            const ending = endingLine(row);
-            return (
-                <div className="min-w-0">
-                    <p>{istDate(row.currentPeriodEnd)}</p>
-                    {ending ? (
-                        <p className="truncate text-[12px] text-muted-foreground">
-                            {ending}
-                        </p>
-                    ) : null}
-                </div>
-            );
-        },
+        width: "220px",
+        cell: (row) => <p className="truncate">{nextChargeLine(row)}</p>,
     },
     {
         id: "autopay",
-        header: "Autopay runs out",
+        header: "Autopay",
         priority: "detail",
-        width: "150px",
-        cell: (row) =>
-            row.termEndsAt ? (
-                istDate(row.termEndsAt)
+        width: "160px",
+        cell: (row) => {
+            const autopay = autopayState(row);
+            return autopay.warn ? (
+                <Badge variant="warning">{autopay.label}</Badge>
             ) : (
-                <span className="text-muted-foreground">—</span>
-            ),
+                <span className="text-muted-foreground">{autopay.label}</span>
+            );
+        },
     },
     {
         id: "last",
@@ -107,7 +111,8 @@ const COLUMNS: DataColumn<SarohSubscriptionRow>[] = [
                         {row.lastInvoice.number}
                     </p>
                     <p className="text-[12px] text-muted-foreground">
-                        {istDate(row.lastInvoice.issuedAt)}
+                        {istDate(row.lastInvoice.issuedAt)} ·{" "}
+                        {formatPaise(row.lastInvoice.totalPaise)}
                     </p>
                 </div>
             ) : (
@@ -116,7 +121,10 @@ const COLUMNS: DataColumn<SarohSubscriptionRow>[] = [
     },
 ];
 
-/** One page of subscriptions; a row opens its side sheet. */
+/**
+ * One page of subscriptions; a row opens its side sheet. A row the sheet
+ * just changed lights for two seconds (R9).
+ */
 export function SubscriptionTable({
     rows,
     openHref,
@@ -125,6 +133,7 @@ export function SubscriptionTable({
     /** This screen's address with the row's sheet open. */
     openHref: Record<string, string>;
 }) {
+    const changes = useSubscriptionChanges();
     return (
         <DataView
             viewId="console-billing-subscriptions"
@@ -132,6 +141,9 @@ export function SubscriptionTable({
             columns={COLUMNS}
             rowKey={(row) => row.id}
             rowHref={(row) => openHref[row.id] ?? "#"}
+            rowChanged={
+                changes ? (row) => changes.isHighlighted(row.id) : undefined
+            }
             modes={["table", "list"]}
             noun={{ one: "subscription", other: "subscriptions" }}
             countLabel={(visible) =>

@@ -6,6 +6,7 @@ import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-c
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import type { ActionState, EventFilter } from "./admin-billing-controls.dto";
 import { assertSarohBillingActor } from "./admin-billing-controls.service";
+import { searchedOrganizationIds } from "./admin-billing-search";
 import { assertSarohBillingReader } from "./admin-billing.service";
 import { requireReason } from "./admin-lifecycle.service";
 import { AdminPermission } from "./admin-permissions";
@@ -89,13 +90,17 @@ export class AdminBillingActionsService {
 
     async list(
         staff: PlatformAdminInfo,
-        query: { state?: ActionState; page?: number },
+        query: { state?: ActionState; q?: string; page?: number },
     ): Promise<AdminBillingActionPage> {
         assertSarohBillingReader(staff);
         const resolved = query.state === "resolved";
-        const where: Prisma.BillingActionWhereInput = resolved
-            ? { resolvedAt: { not: null } }
-            : { resolvedAt: null };
+        const searched = await searchedOrganizationIds(query.q);
+        const where: Prisma.BillingActionWhereInput = {
+            ...(resolved
+                ? { resolvedAt: { not: null } }
+                : { resolvedAt: null }),
+            ...(searched ? { organizationId: { in: searched } } : {}),
+        };
         const page = Math.max(1, query.page ?? 1);
         const [rows, total, openCount, jobs] = await Promise.all([
             prisma.billingAction.findMany({
@@ -208,15 +213,29 @@ export class AdminBillingActionsService {
      */
     async events(
         staff: PlatformAdminInfo,
-        query: { filter?: EventFilter; page?: number },
+        query: { filter?: EventFilter; q?: string; page?: number },
     ): Promise<ProviderEventPage> {
         assertSarohBillingReader(staff);
-        const where: Prisma.BillingWebhookEventWhereInput =
-            query.filter === "not-applied"
-                ? { processedAt: null }
-                : query.filter === "no-business"
-                  ? { organizationId: null }
-                  : {};
+        const q = query.q?.trim();
+        const searched = await searchedOrganizationIds(q);
+        const where: Prisma.BillingWebhookEventWhereInput = {
+            AND: [
+                query.filter === "not-applied"
+                    ? { processedAt: null }
+                    : query.filter === "no-business"
+                      ? { organizationId: null }
+                      : {},
+                // The search: a business it matched, or the event's own id.
+                searched && q
+                    ? {
+                          OR: [
+                              { organizationId: { in: searched } },
+                              { providerEventId: q },
+                          ],
+                      }
+                    : {},
+            ],
+        };
         const page = Math.max(1, query.page ?? 1);
         const [rows, total] = await Promise.all([
             prisma.billingWebhookEvent.findMany({

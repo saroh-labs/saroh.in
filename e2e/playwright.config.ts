@@ -59,7 +59,22 @@ const RENDERER_URL =
  */
 const WEB_URL = process.env.E2E_WEB_URL ?? "https://saroh.localhost";
 
-export const urls = { APP_URL, ACCOUNTS_URL, API_URL, RENDERER_URL, WEB_URL };
+/**
+ * The operator console, admin.saroh.in: portless names it `admin.saroh`, and
+ * the seeded stack serves it on 3006 (`scripts/prepush.sh`, CI's browser
+ * shards). The `admin-*.spec.ts` specs open it, signed in as seeded staff
+ * (`people.staff`, fixtures/sessions.ts).
+ */
+const ADMIN_URL = process.env.E2E_ADMIN_URL ?? "https://admin.saroh.localhost";
+
+export const urls = {
+    APP_URL,
+    ACCOUNTS_URL,
+    API_URL,
+    RENDERER_URL,
+    WEB_URL,
+    ADMIN_URL,
+};
 
 /**
  * Whether a browser this suite opens should accept portless's local CA.

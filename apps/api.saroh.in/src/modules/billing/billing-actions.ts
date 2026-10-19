@@ -2,6 +2,36 @@ import type { Prisma } from "@saroh/database";
 
 type Tx = Pick<Prisma.TransactionClient, "billingAction">;
 
+/**
+ * Every code a billing action is raised with (DEC-166), in one list, so a
+ * new one can't be raised without being named here first: the raise
+ * functions take only these. Admin › Billing › Needs action says each in
+ * words (`apps/admin.saroh.in/lib/billing-action-words.ts`, whose test
+ * reads this list and fails on a code it has no words for).
+ */
+export const BILLING_ACTION_CODES = [
+    "billing_double_charge_refund_owed",
+    "billing_double_charge_refund_given_up",
+    "billing_provider_cancel_stuck",
+    "billing_provider_cancel_given_up",
+    "billing_webhook_unmatched",
+    "billing_reconcile_payment_unmatched",
+    "saroh_invoice_amount_mismatch",
+    "billing_credit_note_may_be_needed",
+    "billing_refund_failed",
+    "billing_dispute_open",
+    "billing_customer_refused",
+    "billing_payment_notes_given_up",
+    "billing_profile_owner_left",
+    "billing_profile_gone",
+    // Commission (DEC-169, admin console U21): a payment's line the job
+    // couldn't write after its tries, and a refund after the line was paid.
+    "commission_line_failed",
+    "commission_refund_after_payout",
+] as const;
+
+export type BillingActionCode = (typeof BILLING_ACTION_CODES)[number];
+
 /** Ids an operator follows a billing action by; empty values are left out. */
 export type BillingActionRefs = Record<string, string | null | undefined>;
 
@@ -25,7 +55,7 @@ export async function raiseBillingActionInTx(
     input: {
         organizationId: string | null;
         /** The log code, e.g. `billing_double_charge_refund_given_up`. */
-        code: string;
+        code: BillingActionCode;
         refs: BillingActionRefs;
         /** What happened and what to do. */
         note: string;

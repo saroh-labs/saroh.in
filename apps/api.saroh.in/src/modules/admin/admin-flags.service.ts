@@ -24,6 +24,11 @@ export interface AdminFlagView {
         organizationName: string;
         enabled: boolean;
     }[];
+    /**
+     * The newest change to it and who made it (the Releases table's last
+     * column), or `null` when it has never changed.
+     */
+    lastChange: { at: Date; actorName: string | null } | null;
 }
 
 /** One change to a flag, with who made it and for which business, by name. */
@@ -72,6 +77,7 @@ export class AdminFlagsService {
         const defaultByKey = new Map(
             defaults.map((row) => [row.key, row.enabledByDefault]),
         );
+        const lastChange = await this.lastChanges();
 
         return FLAG_KEYS.map((key) => ({
             key,
@@ -87,7 +93,59 @@ export class AdminFlagsService {
                 .sort((a, b) =>
                     a.organizationName.localeCompare(b.organizationName),
                 ),
+            lastChange: lastChange.get(key) ?? null,
         }));
+    }
+
+    /**
+     * Each flag's newest ledger row and its author's name: one aggregate for
+     * the newest time per flag, one read of those rows, one of the names.
+     */
+    private async lastChanges(): Promise<
+        Map<string, { at: Date; actorName: string | null }>
+    > {
+        const newest = await prisma.featureFlagAudit.groupBy({
+            by: ["flagKey"],
+            _max: { createdAt: true },
+        });
+        const wanted = newest.flatMap((row) =>
+            row._max.createdAt
+                ? [{ flagKey: row.flagKey, createdAt: row._max.createdAt }]
+                : [],
+        );
+        if (wanted.length === 0) return new Map();
+        const rows = await prisma.featureFlagAudit.findMany({
+            where: { OR: wanted },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            select: { flagKey: true, actorUserId: true, createdAt: true },
+        });
+        const names = await this.actorNames(rows.map((row) => row.actorUserId));
+        const out = new Map<string, { at: Date; actorName: string | null }>();
+        for (const row of rows) {
+            // Two changes in the same instant: the first (highest id) wins.
+            if (out.has(row.flagKey)) continue;
+            out.set(row.flagKey, {
+                at: row.createdAt,
+                actorName: names.get(row.actorUserId) ?? null,
+            });
+        }
+        return out;
+    }
+
+    /** The operator's name, else their email, by user id. */
+    private async actorNames(ids: string[]): Promise<Map<string, string>> {
+        const unique = [...new Set(ids)];
+        if (unique.length === 0) return new Map();
+        const users = await prisma.user.findMany({
+            where: { id: { in: unique } },
+            select: { id: true, name: true, email: true },
+        });
+        return new Map(
+            users.map((user) => [
+                user.id,
+                user.name?.trim() ? user.name.trim() : user.email,
+            ]),
+        );
     }
 
     /**

@@ -8,7 +8,11 @@ import {
 } from "../modules/site-accounts/sender-name";
 import type { WelcomeMail } from "./email-welcome";
 import { welcomeEmail } from "./email-welcome";
-import { siteCodesFakeAllowed, writeSiteCodeOutbox } from "./site-code-outbox";
+import {
+    siteCodesFakeAllowed,
+    writeSiteCodeOutbox,
+    writeStaffInviteOutbox,
+} from "./site-code-outbox";
 import { dayWords } from "./words-format";
 
 const FROM =
@@ -315,6 +319,40 @@ export function sendChangeEmailConfirmationEmail(
         ),
     });
     return Promise.resolve();
+}
+
+/**
+ * Saroh staff changed this account's sign-in email (admin console U9). Sent
+ * to the OLD address, naming the new one only masked (`maskEmail`), so the
+ * mailbox's owner can tell it wasn't them without the notice handing out
+ * where the account went. The new address gets no code for 24 hours unless
+ * a second staff member confirms, so there is time to answer.
+ */
+export function sendSignInEmailChangedNotice(
+    to: string,
+    maskedNewEmail: string,
+): Promise<void> {
+    const html = signInEmailChangedEmail(maskedNewEmail);
+    if (!transporter) {
+        console.info(`[Sign-in email changed] (no SMTP) notice to ${to}`);
+        return Promise.resolve();
+    }
+    void transporter.sendMail({
+        from: FROM,
+        to,
+        subject: "Your Saroh sign-in email was changed",
+        html,
+    });
+    return Promise.resolve();
+}
+
+/** The notice's body; the masked address is escaped like any value. */
+export function signInEmailChangedEmail(maskedNewEmail: string): string {
+    return `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2>Your sign-in email was changed</h2>
+  <p>Saroh support changed the email you sign in to Saroh with, at your request, to ${esc(maskedNewEmail)}. This address won't sign you in any more.</p>
+  <p>If you didn't ask for this, reply to this email or write to Saroh support straight away. The new address can't sign in for 24 hours unless a second person at Saroh confirms the change, so there is time to stop it.</p>
+</div>`;
 }
 
 /** Confirm account deletion. Irreversible, so it always requires this link. */
@@ -690,6 +728,69 @@ export function launchInviteEmail(
   <p>Create your account with this email address and set up ${what}. It starts on the launch offer from the waitlist page, and you add no payment details to begin.</p>
   <p><a href="${href}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">Set up ${what}</a></p>
   <p style="color:#666;font-size:12px">The link is yours alone: it works once, with this email address, for ${validDays} days. Or paste it: ${href}</p>
+</div>`;
+}
+
+export const STAFF_INVITE_SUBJECT = "You're invited to join Saroh's team";
+
+/**
+ * An invitation to Saroh's team (admin console U24): a one-time link, valid
+ * for `validDays`, that works only with this email address. Awaited, and it
+ * says how it went, so the console can offer Resend when it didn't leave.
+ *
+ * With no SMTP it never reaches the network: where the fake transport is
+ * allowed (`siteCodesFakeAllowed`, never production) the link is left in
+ * the staff-invite outbox for the browser test and the log says only that
+ * one was sent, never the link (it is a credential); `fail` fails it.
+ */
+export async function sendStaffInviteEmail(
+    to: string,
+    details: {
+        url: string;
+        name: string;
+        invitedByName: string | null;
+        validDays: number;
+    },
+): Promise<EmailOutcome> {
+    if (!transporter) {
+        if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
+            if (env.SITE_CODES_EMAIL_FAKE === "fail") return "failed";
+            writeStaffInviteOutbox(to, details.url);
+            console.info(`[Staff invite] (no SMTP) to ${to}`);
+            return "sent";
+        }
+        return "not-configured";
+    }
+    try {
+        await transporter.sendMail({
+            from: FROM,
+            to,
+            subject: STAFF_INVITE_SUBJECT,
+            html: staffInviteEmail(details),
+        });
+        return "sent";
+    } catch {
+        return "failed";
+    }
+}
+
+/** The invite's body; every value in it is escaped. */
+export function staffInviteEmail(details: {
+    url: string;
+    name: string;
+    invitedByName: string | null;
+    validDays: number;
+}): string {
+    const href = esc(details.url);
+    const who = details.invitedByName
+        ? `${esc(details.invitedByName)} has invited you`
+        : "You've been invited";
+    return `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2>Hi ${esc(details.name)}, join Saroh's team</h2>
+  <p>${who} to work on Saroh's console, where the team looks after the businesses on Saroh.</p>
+  <p>Open the link, then sign in or create your Saroh account with this email address. You'll be asked to confirm it with a code.</p>
+  <p><a href="${href}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">Join the team</a></p>
+  <p style="color:#666;font-size:12px">The link is yours alone: it works once, with this email address, for ${details.validDays} days. Don't forward it. If you weren't expecting it, ignore this email. Or paste it: ${href}</p>
 </div>`;
 }
 

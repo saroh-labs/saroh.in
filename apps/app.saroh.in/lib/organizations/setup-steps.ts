@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import type { OrganizationKind } from "./kind";
 import { kindOf, ORGANIZATION_KINDS } from "./kind";
+import { managerCodeProblem } from "./referral-carry";
 import type { SetupBilling } from "./setup-billing";
 import { BILLING_FIELDS, billingProblems } from "./setup-billing";
 
@@ -70,8 +71,19 @@ export function setupSchema(
             billAddress: z.string().optional(),
             billCity: z.string().optional(),
             billPin: z.string().optional(),
+            // The code of a Saroh teammate helping them (DEC-169):
+            // optional, and said under the field when it can't be a code.
+            managerCode: z.string().optional(),
         })
         .superRefine((values, ctx) => {
+            const codeProblem = managerCodeProblem(values.managerCode);
+            if (codeProblem) {
+                ctx.addIssue({
+                    code: "custom",
+                    path: ["managerCode"],
+                    message: codeProblem,
+                });
+            }
             if (!billing) return;
             for (const [field, message] of billingProblems(values, billing)) {
                 ctx.addIssue({ code: "custom", path: [field], message });
@@ -99,7 +111,7 @@ export interface SetupStep {
 
 const FIELDS: Record<SetupStepId, readonly SetupField[]> = {
     kind: ["kind"],
-    name: ["yourName", "name", "address", "country"],
+    name: ["yourName", "name", "address", "country", "managerCode"],
     billing: BILLING_FIELDS,
     first: ["goal"],
 };
@@ -364,6 +376,7 @@ const draftSchema = z.object({
         address: z.string().max(100),
         country: z.string().length(2),
         goal: z.string().min(1).max(40),
+        managerCode: z.string().max(20).optional(),
     }),
     edited: z.boolean(),
     goalPicked: z.boolean(),

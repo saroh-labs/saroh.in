@@ -48,15 +48,17 @@ export function ConsoleDrawer({
                 <SheetHeader className="px-4 pb-2 pt-4 text-left">
                     <SheetTitle className="text-[15px]">Console</SheetTitle>
                     <SheetDescription className="text-[12.5px]">
-                        The instance, not a business.
+                        Saroh itself, not a business.
                     </SheetDescription>
                 </SheetHeader>
                 <div className="flex flex-col gap-5 px-3 pb-5">
                     {groups.map((group) => (
                         <div key={group.label} className="flex flex-col gap-1">
-                            <p className="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                                {group.label}
-                            </p>
+                            {!group.plain && (
+                                <p className="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                                    {group.label}
+                                </p>
+                            )}
                             {group.items.map((item) => {
                                 const on =
                                     item.href === "/"

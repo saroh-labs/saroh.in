@@ -246,6 +246,14 @@ const envSchema = z.object({
     // credential is en/decrypted) and throws a clear error if it is
     // missing/malformed. Never logged.
     PAYMENTS_ENC_KEY: z.string().optional(),
+    // Staff personal data (DEC-169): seals a teammate's tax id on their
+    // StaffProfile. Its own 32-byte AES-256-GCM key (base64 or 64-hex), never
+    // the payments key, so one leaked key opens only one kind of value.
+    // OPTIONAL at boot like PAYMENTS_ENC_KEY; `staff-profile.ts` checks it
+    // the moment a tax id is sealed or its last 4 characters are read, and
+    // refuses with a clear error when it is missing or malformed. Never
+    // logged, never in an example file with a value.
+    STAFF_PII_ENC_KEY: z.string().optional(),
     // Which Cashfree the API talks to, for merchants' payments and Saroh's own
     // billing alike: `sandbox` for test credentials, `production` (default)
     // for live ones. The API sends the mode with every checkout's client

@@ -298,3 +298,52 @@ describe("the Versions tab", () => {
         ).toBeNull();
     });
 });
+
+describe("the draft and Compare with live (U13)", () => {
+    it("heads the list with the draft as the version it would become", () => {
+        draw({ pricing: history({ draft: fakeDraft({ baseVersion: 2 }) }) });
+        const row = screen.getByRole("article", { name: "Draft" });
+        expect(
+            within(row).getByText("Draft · would be version 4"),
+        ).toBeTruthy();
+        expect(within(row).getByText(/edited by Ravi/)).toBeTruthy();
+        fireEvent.click(within(row).getByRole("button", { name: "Review…" }));
+        expect(window.location.search).toBe("?tab=publish");
+    });
+
+    it("compares any version but the live one with live", () => {
+        const v1 = fakeVersion({
+            version: 1,
+            status: "earlier",
+            businesses: 0,
+        });
+        v1.catalog.plans = v1.catalog.plans.map((p) =>
+            p.id === "c" ? { ...p, name: "Plan Old" } : p,
+        );
+        draw({
+            pricing: history({
+                versions: [history().versions[0], history().versions[1], v1],
+            }),
+        });
+        expect(
+            within(card(2)).queryByRole("button", {
+                name: "Compare with live",
+            }),
+        ).toBeNull();
+        fireEvent.click(
+            within(card(1)).getByRole("button", { name: "Compare with live" }),
+        );
+        const list = within(card(1)).getByRole("list", {
+            name: "How version 1 differs from live",
+        });
+        expect(
+            within(list).getByText("Plan C renamed to Plan Old"),
+        ).toBeTruthy();
+        fireEvent.click(
+            within(card(3)).getByRole("button", { name: "Compare with live" }),
+        );
+        expect(
+            within(card(3)).getByText("The same as the live version."),
+        ).toBeTruthy();
+    });
+});

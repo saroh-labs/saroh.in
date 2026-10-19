@@ -1,6 +1,7 @@
 import type { Logger } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
+import type { BillingActionCode } from "./billing-actions";
 import { raiseBillingActionInTx } from "./billing-actions";
 
 type NoteTx = Pick<Prisma.TransactionClient, "adminOrganizationNote">;
@@ -31,8 +32,8 @@ export async function raiseBillingOpsNoticeInTx(
     tx: Tx,
     logger: Pick<Logger, "error">,
     input: {
-        /** The log code, e.g. `billing_paid_on_dropped_checkout`. */
-        code: string;
+        /** The log code, e.g. `billing_provider_cancel_stuck`. */
+        code: BillingActionCode;
         organizationId: string;
         /** Ids an operator follows it by (provider ids, the checkout). */
         refs: Record<string, string | null | undefined>;

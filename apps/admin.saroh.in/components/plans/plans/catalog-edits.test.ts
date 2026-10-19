@@ -15,6 +15,7 @@ import {
     patchIncluded,
     rupeesText,
     sameCell,
+    setLimit,
     setModuleGroup,
     toggleFeatured,
     usageLine,
@@ -259,5 +260,48 @@ describe("the usage line", () => {
             "Nobody on A yet",
         );
         expect(usageLine(undefined, "A", capped(5))).toBeNull();
+    });
+});
+
+describe("a limit set from the grid", () => {
+    const things = (c: ReturnType<typeof tabCatalog>, plan: string) =>
+        c.modules.find((m) => m.id === "things")?.cells[plan];
+
+    it("takes the table's words and the card's number along while they only said the number", () => {
+        const c = tabCatalog();
+        setLimit(c, "things", "a", 22);
+        expect(things(c, "a")).toMatchObject({
+            limit: 22,
+            text: "22",
+            card: "22 things",
+        });
+        setLimit(c, "things", "a", null);
+        expect(things(c, "a")).toMatchObject({
+            limit: null,
+            text: "No limit",
+            soft: false,
+        });
+        setLimit(c, "things", "a", 3);
+        expect(things(c, "a")).toMatchObject({ limit: 3, text: "3" });
+    });
+
+    it("leaves the operator's own words alone", () => {
+        const c = tabCatalog();
+        patchIncluded(c, "things", "b", { text: "Up to 111 a day" });
+        setLimit(c, "things", "b", 5);
+        expect(things(c, "b")).toMatchObject({
+            limit: 5,
+            text: "Up to 111 a day",
+            soft: true,
+        });
+    });
+
+    it("does nothing to a cell the plan hasn't got", () => {
+        const c = tabCatalog();
+        setLimit(c, "widgets", "a", 5);
+        expect(c.modules.find((m) => m.id === "widgets")?.cells.a).toEqual({
+            inc: false,
+            off: "hidden",
+        });
     });
 });

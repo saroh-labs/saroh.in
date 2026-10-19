@@ -309,7 +309,8 @@ describe("the console's read", () => {
 
         expect(await prisma.waitlistSignup.count()).toBe(3);
         expect(audit.write).toHaveBeenCalledWith(
-            prisma,
+            // The removal's own transaction (it takes the lead too, U20).
+            expect.anything(),
             expect.objectContaining({
                 action: "waitlist.removed",
                 targetId: first!.id,

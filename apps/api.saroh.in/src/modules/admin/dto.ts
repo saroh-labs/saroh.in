@@ -10,6 +10,7 @@ import {
     IsISO8601,
     IsOptional,
     IsString,
+    Matches,
     Max,
     MaxLength,
     Min,
@@ -20,6 +21,16 @@ import type { ContactTopic } from "../contact-messages/dto";
 import { CONTACT_TOPICS } from "../contact-messages/dto";
 import type { DeployApp, DeployEnvironment } from "./admin-deployments";
 import { DEPLOY_APPS, DEPLOY_ENVIRONMENTS } from "./admin-deployments";
+import type { PreviewKind } from "./admin-offers";
+import { PREVIEW_KINDS } from "./admin-offers";
+import { AdminRole } from "./admin-permissions";
+import type { PeopleFilter } from "./sign-in-help-rules";
+import { PEOPLE_FILTERS } from "./sign-in-help-rules";
+import type { StaffEngagement, StaffJob } from "./staff-profile";
+import { STAFF_ENGAGEMENTS, STAFF_JOBS } from "./staff-profile";
+
+/** As many roles as the registry has: a grant may hold every one. */
+const ROLE_COUNT = Object.values(AdminRole).length;
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -301,7 +312,7 @@ export class GrantStaffDto {
 
     @IsArray()
     @ArrayMinSize(1)
-    @ArrayMaxSize(6)
+    @ArrayMaxSize(ROLE_COUNT)
     @IsString({ each: true })
     roles!: string[];
 
@@ -315,6 +326,15 @@ export class GrantStaffDto {
     @IsISO8601()
     expiresAt?: string;
 
+    /** Add a teammate (U17): what they work as, kept on their profile. */
+    @IsOptional()
+    @IsIn(STAFF_JOBS)
+    worksAs?: StaffJob;
+
+    @IsOptional()
+    @IsBoolean()
+    onCommission?: boolean;
+
     @Transform(trim)
     @IsString()
     @MinLength(8)
@@ -326,7 +346,7 @@ export class GrantStaffDto {
 export class AmendStaffDto extends OperatorReasonDto {
     @IsArray()
     @ArrayMinSize(1)
-    @ArrayMaxSize(6)
+    @ArrayMaxSize(ROLE_COUNT)
     @IsString({ each: true })
     roles!: string[];
 
@@ -336,12 +356,118 @@ export class AmendStaffDto extends OperatorReasonDto {
     expiresAt?: string;
 }
 
+/**
+ * A teammate's profile (DEC-169, U18). A PUT: every field but the tax id is
+ * set to what is sent, so a field left out is cleared. The tax id is the
+ * exception: left out, it stays as it is (it is never sent back to be
+ * re-sent); sent, it replaces the one on file.
+ */
+export class SaveStaffProfileDto extends OperatorReasonDto {
+    @IsIn(STAFF_JOBS)
+    worksAs!: StaffJob;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsEmail()
+    @MaxLength(320)
+    workEmail?: string | null;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(32)
+    phone?: string | null;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(80)
+    city?: string | null;
+
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(12)
+    @IsString({ each: true })
+    @MaxLength(40, { each: true })
+    languages?: string[];
+
+    /** A calendar date, `YYYY-MM-DD`. */
+    @IsOptional()
+    @Matches(/^\d{4}-\d{2}-\d{2}$/, {
+        message: "joinedOn is a date like 2026-10-18",
+    })
+    joinedOn?: string | null;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    reportsToPlatformAdminId?: string | null;
+
+    @IsOptional()
+    @IsIn(STAFF_ENGAGEMENTS)
+    engagement?: StaffEngagement | null;
+
+    /** How many businesses they can look after at once. */
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(10_000)
+    capacity?: number | null;
+
+    @IsOptional()
+    @IsBoolean()
+    onCommission?: boolean;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(200)
+    emergencyContact?: string | null;
+
+    /** Replaces the tax id on file. Needs `team:pay` as well as `team:write`. */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MinLength(4)
+    @MaxLength(32)
+    taxId?: string;
+}
+
+/**
+ * The Users list (U9): an optional search and the chips, as
+ * `?q=…&filter=owners,unverified`. With neither, the newest accounts.
+ */
 export class SearchPeopleDto {
+    @IsOptional()
     @Transform(trim)
     @IsString()
     @MinLength(2)
     @MaxLength(200)
-    q!: string;
+    q?: string;
+
+    @IsOptional()
+    @Transform(({ value }: { value: unknown }) =>
+        typeof value === "string"
+            ? value
+                  .split(",")
+                  .map((part) => part.trim())
+                  .filter((part) => part.length > 0)
+            : value,
+    )
+    @IsArray()
+    @ArrayMaxSize(PEOPLE_FILTERS.length)
+    @IsIn(PEOPLE_FILTERS, { each: true })
+    filter?: PeopleFilter[];
+}
+
+/** Change a person's sign-in email (U9). */
+export class ChangeSignInEmailDto extends OperatorReasonDto {
+    @Transform(({ value }: { value: unknown }) =>
+        typeof value === "string" ? value.trim().toLowerCase() : value,
+    )
+    @IsEmail({}, { message: "Enter a whole email address" })
+    @MaxLength(254)
+    email!: string;
 }
 
 export class ChangeMemberRoleDto extends OperatorReasonDto {
@@ -533,6 +659,42 @@ export class PlanOverrideDto extends OperatorReasonDto {
 
     @IsISO8601()
     expiresAt!: string;
+}
+
+/**
+ * The dry run of a custom offer or of Take away a module… (admin console
+ * U5, R5): the offer as filled in so far. No reason or idempotency key: it
+ * writes nothing, and the write that follows takes both.
+ */
+export class OfferPreviewDto {
+    @IsIn(PREVIEW_KINDS)
+    kind!: PreviewKind;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(80)
+    planKey?: string;
+
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(100_000_000)
+    pricePaise?: number;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(80)
+    moduleKey?: string;
+
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(1_000_000)
+    value?: number;
+
+    @IsOptional()
+    @IsISO8601()
+    expiresAt?: string;
 }
 
 /** Move one business to the live catalogue version, now or at its renewal. */

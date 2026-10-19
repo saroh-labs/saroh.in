@@ -110,6 +110,18 @@ export interface CreateOrganizationInput {
      */
     referralCode?: string;
     /**
+     * An account manager's `?am=` link the browser carried from saroh.in
+     * (DEC-169), and when it was kept: added by the create action from its
+     * cookie, never by a form.
+     */
+    managerLinkCode?: string;
+    managerLinkSetAt?: string;
+    /**
+     * The code of the Saroh teammate helping them, typed at setup
+     * (DEC-169). Optional; the API decides whether it names anyone.
+     */
+    managerCode?: string;
+    /**
      * Who Saroh bills for it (DEC-167, R7): one of the owner's billing
      * profiles, or a new one. An owner with a profile must send one; the
      * API names `billingProfile` when they don't.
@@ -217,6 +229,38 @@ export async function getOrganization(
         );
     }
     return (await res.json()) as Organization;
+}
+
+/**
+ * Who at Saroh looks after the business (DEC-169, U26): their name and the
+ * work email on their staff profile, never the email they sign in with, and
+ * no phone. Both can be null, never both at once.
+ */
+export interface AccountManager {
+    name: string | null;
+    workEmail: string | null;
+}
+
+/**
+ * The business's Saroh contact for the account menu, or null while no
+ * manager is linked. An aid like the shell's other reads: null too when it
+ * can't be read, and the menu then simply doesn't show the card.
+ */
+export async function accountManagerOrNull(
+    organizationId: string,
+): Promise<AccountManager | null> {
+    try {
+        const res = await apiFetch(`/organizations/${organizationId}`);
+        if (!res.ok) return null;
+        const read = (await res.json()) as {
+            accountManager?: AccountManager | null;
+        };
+        const manager = read.accountManager;
+        if (!manager || (!manager.name && !manager.workEmail)) return null;
+        return { name: manager.name, workEmail: manager.workEmail };
+    } catch {
+        return null;
+    }
 }
 
 /**

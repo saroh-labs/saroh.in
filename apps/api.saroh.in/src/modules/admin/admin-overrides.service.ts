@@ -7,17 +7,13 @@ import {
     Optional,
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
-import {
-    liveCataloguePlanRow,
-    liveCatalogueVersion,
-    prisma,
-} from "@saroh/database";
-import type { Catalog } from "@saroh/pricing-catalog";
+import { liveCataloguePlanRow, prisma } from "@saroh/database";
 import {
     CATALOG_PLAN_KEY_PREFIX,
     catalogPlanIdForKey,
-    validateCatalog,
 } from "@saroh/pricing-catalog";
+
+import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 
 import { mapEntry } from "../billing/catalogue-access";
 import { CatalogueAccessService } from "../billing/catalogue-access.service";
@@ -39,6 +35,11 @@ import {
     assertNotProviderManaged,
     requireReason,
 } from "./admin-lifecycle.service";
+import type { OfferOptions } from "./admin-offer-options";
+import { offerOptions } from "./admin-offer-options";
+import { previewOffer } from "./admin-offer-preview";
+import type { OfferDraft, OfferPreview } from "./admin-offers";
+import { assertMayTakeAway, endDate, liveCatalog } from "./admin-offers";
 import { AdminPermission } from "./admin-permissions";
 import { catalogueUsage } from "./catalogue-usage";
 import { limitOverrideWarning } from "./limit-override-warning";
@@ -49,9 +50,6 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** How long after a plan override's end its "back on your plan" notice runs. */
 const PLAN_END_GRACE_MS = 60 * 1000;
-
-/** The furthest ahead an override's end date may be. */
-const MAX_END_DAYS = 5 * 366;
 
 export type ModuleOverrideKind = "grant" | "remove" | "limit";
 
@@ -109,6 +107,26 @@ export class AdminOverridesService {
         private readonly flags: FeatureFlagService = new FeatureFlagService(),
     ) {}
 
+    /**
+     * The dry run of a custom offer or of Take away a module… (U5, R5):
+     * the write's checks, then what the business would see. Writes nothing.
+     */
+    preview(
+        staff: PlatformAdminInfo,
+        organizationId: string,
+        draft: OfferDraft,
+    ): Promise<OfferPreview> {
+        return previewOffer(this.access, staff, organizationId, draft);
+    }
+
+    /** What the offer sheet can give this business (U5). Writes nothing. */
+    offers(
+        staff: PlatformAdminInfo,
+        organizationId: string,
+    ): Promise<OfferOptions> {
+        return offerOptions(this.access, staff, organizationId);
+    }
+
     /** Grant, remove, or set the limit of one catalogue row. */
     async setModuleOverride(
         command: OperatorCommand & {
@@ -127,6 +145,17 @@ export class AdminOverridesService {
         if (!row) {
             throw new BadRequestException(
                 `"${command.moduleKey}" isn't a module in version ${access.version}.`,
+            );
+        }
+
+        // Take away a module… (U5): a Platform owner's alone, and never a
+        // row their paid plan includes (an override is a gift).
+        if (command.kind === "remove") {
+            await assertMayTakeAway(
+                this.access,
+                command.staff,
+                command.organizationId,
+                row,
             );
         }
 
@@ -620,36 +649,6 @@ const PLAN_SELECT = {
     priceCents: true,
     entitlements: true,
 } as const;
-
-/** The live version's snapshot, or null when none is live or it is invalid. */
-async function liveCatalog(): Promise<Catalog | null> {
-    const row = await liveCatalogueVersion(prisma);
-    if (!row) return null;
-    const r = validateCatalog(row.catalog);
-    return r.ok ? r.catalog : null;
-}
-
-/**
- * An override's end date: in the future and at most {@link MAX_END_DAYS}
- * away. Without one it lasts until removed, unless `required`.
- */
-function endDate(value: string | undefined, required: boolean): Date | null {
-    if (!value) {
-        if (required) throw new BadRequestException("Give an end date.");
-        return null;
-    }
-    const at = new Date(value);
-    const now = Date.now();
-    if (Number.isNaN(at.getTime()) || at.getTime() <= now) {
-        throw new BadRequestException("The end date must be in the future.");
-    }
-    if (at.getTime() > now + MAX_END_DAYS * DAY_MS) {
-        throw new BadRequestException(
-            "The end date must be within five years.",
-        );
-    }
-    return at;
-}
 
 async function organizationOrThrow(tx: Tx, organizationId: string) {
     const organization = await tx.organization.findUnique({

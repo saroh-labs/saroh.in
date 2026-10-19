@@ -49,9 +49,9 @@ export default async function WebhooksPage({
         <AdminShell staff={staff}>
             <PageContainer width="wide">
                 <PageHeader
-                    breadcrumb={["Operations", "Webhooks"]}
+                    breadcrumb={["Keep it running", "Webhooks"]}
                     title="Webhooks"
-                    description="What payment providers told this instance, and what it did about it."
+                    description="What payment providers told Saroh, and what it did about it."
                     actions={
                         canReplay && failedHere.length > 0 ? (
                             <BulkAction

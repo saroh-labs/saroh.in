@@ -50,9 +50,15 @@ export function OperatorDialog({
     disabledReason,
     quickReasons,
     reasonLabel = "Reason (kept in the audit trail)",
+    open: openProp,
+    onOpenChange: onOpenChangeProp,
     onSubmit,
 }: {
-    trigger: string;
+    /**
+     * The button that opens it. Leave it out when the dialog is opened from
+     * elsewhere (a ⋯ menu row) with `open` and `onOpenChange`.
+     */
+    trigger?: string;
     triggerVariant?:
         | "outline"
         | "secondary"
@@ -80,13 +86,22 @@ export function OperatorDialog({
      */
     quickReasons?: readonly string[];
     reasonLabel?: string;
+    /**
+     * Opened from elsewhere: whether it is open. Mount it when it opens, so
+     * each opening is a fresh attempt with its own idempotency key.
+     */
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
     onSubmit: (
         input: OperatorSubmit,
     ) => Promise<{ ok: boolean; error?: string }>;
 }) {
     const id = useId();
-    const [open, setOpen] = useState(false);
-    const [key, setKey] = useState("");
+    const controlled = openProp !== undefined;
+    const [openState, setOpenState] = useState(false);
+    const open = controlled ? openProp : openState;
+    // Mounted already open (from a menu): this attempt's key from the start.
+    const [key, setKey] = useState(() => (openProp ? crypto.randomUUID() : ""));
     const [reason, setReason] = useState("");
     const [typed, setTyped] = useState("");
     const [error, setError] = useState<string | null>(null);
@@ -94,6 +109,11 @@ export function OperatorDialog({
 
     const nameOk = confirmName === undefined || typed.trim() === confirmName;
     const reasonOk = !reasonRequired || reason.trim().length >= 4;
+
+    function setOpen(next: boolean) {
+        if (!controlled) setOpenState(next);
+        onOpenChangeProp?.(next);
+    }
 
     function onOpenChange(next: boolean) {
         setOpen(next);
@@ -127,9 +147,9 @@ export function OperatorDialog({
         });
     }
 
-    return (
-        <div className="flex flex-col items-start gap-1">
-            <Dialog open={open} onOpenChange={onOpenChange}>
+    const dialog = (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            {trigger !== undefined && (
                 <DialogTrigger asChild>
                     <Button
                         type="button"
@@ -141,114 +161,117 @@ export function OperatorDialog({
                         {trigger}
                     </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-lg">
-                    <form
-                        className="grid gap-4"
-                        onSubmit={(event) => {
-                            event.preventDefault();
-                            submit(event.currentTarget);
-                        }}
-                    >
-                        <DialogHeader>
-                            <DialogTitle>{title}</DialogTitle>
-                            <DialogDescription asChild>
-                                <div className="text-sm text-muted-foreground">
-                                    {effect}
+            )}
+            <DialogContent className="sm:max-w-lg">
+                <form
+                    className="grid gap-4"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        submit(event.currentTarget);
+                    }}
+                >
+                    <DialogHeader>
+                        <DialogTitle>{title}</DialogTitle>
+                        <DialogDescription asChild>
+                            <div className="text-sm text-muted-foreground">
+                                {effect}
+                            </div>
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {fields}
+
+                    {reasonRequired && (
+                        <div className="grid gap-1.5">
+                            <Label htmlFor={`${id}-reason`}>
+                                {reasonLabel}
+                            </Label>
+                            {quickReasons && quickReasons.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                    {quickReasons.map((quick) => (
+                                        <Button
+                                            key={quick}
+                                            type="button"
+                                            size="sm"
+                                            variant={
+                                                reason === quick
+                                                    ? "secondary"
+                                                    : "outline"
+                                            }
+                                            aria-pressed={reason === quick}
+                                            disabled={pending}
+                                            onClick={() => setReason(quick)}
+                                        >
+                                            {quick}
+                                        </Button>
+                                    ))}
                                 </div>
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        {fields}
-
-                        {reasonRequired && (
-                            <div className="grid gap-1.5">
-                                <Label htmlFor={`${id}-reason`}>
-                                    {reasonLabel}
-                                </Label>
-                                {quickReasons && quickReasons.length > 0 && (
-                                    <div className="flex flex-wrap gap-2">
-                                        {quickReasons.map((quick) => (
-                                            <Button
-                                                key={quick}
-                                                type="button"
-                                                size="sm"
-                                                variant={
-                                                    reason === quick
-                                                        ? "secondary"
-                                                        : "outline"
-                                                }
-                                                aria-pressed={reason === quick}
-                                                disabled={pending}
-                                                onClick={() => setReason(quick)}
-                                            >
-                                                {quick}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                )}
-                                <Textarea
-                                    id={`${id}-reason`}
-                                    value={reason}
-                                    onChange={(e) => setReason(e.target.value)}
-                                    rows={3}
-                                    required
-                                    minLength={4}
-                                    maxLength={500}
-                                    disabled={pending}
-                                />
-                            </div>
-                        )}
-
-                        {confirmName !== undefined && (
-                            <div className="grid gap-1.5">
-                                <Label htmlFor={`${id}-confirm`}>
-                                    Type <strong>{confirmName}</strong> to
-                                    confirm
-                                </Label>
-                                <Input
-                                    id={`${id}-confirm`}
-                                    name="confirmName"
-                                    value={typed}
-                                    onChange={(e) => setTyped(e.target.value)}
-                                    autoComplete="off"
-                                    disabled={pending}
-                                />
-                            </div>
-                        )}
-
-                        {error && (
-                            <p
-                                className="text-sm text-destructive"
-                                role="alert"
-                            >
-                                {error}
-                            </p>
-                        )}
-
-                        <DialogFooter>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={() => setOpen(false)}
+                            )}
+                            <Textarea
+                                id={`${id}-reason`}
+                                value={reason}
+                                onChange={(e) => setReason(e.target.value)}
+                                rows={3}
+                                required
+                                minLength={4}
+                                maxLength={500}
                                 disabled={pending}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="submit"
-                                variant={
-                                    destructive ? "destructive" : "default"
-                                }
-                                disabled={pending || !nameOk || !reasonOk}
-                            >
-                                {pending ? "Working…" : submitLabel}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
+                            />
+                        </div>
+                    )}
+
+                    {confirmName !== undefined && (
+                        <div className="grid gap-1.5">
+                            <Label htmlFor={`${id}-confirm`}>
+                                Type <strong>{confirmName}</strong> to confirm
+                            </Label>
+                            <Input
+                                id={`${id}-confirm`}
+                                name="confirmName"
+                                value={typed}
+                                onChange={(e) => setTyped(e.target.value)}
+                                autoComplete="off"
+                                disabled={pending}
+                            />
+                        </div>
+                    )}
+
+                    {error && (
+                        <p className="text-sm text-destructive" role="alert">
+                            {error}
+                        </p>
+                    )}
+
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => setOpen(false)}
+                            disabled={pending}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant={destructive ? "destructive" : "default"}
+                            disabled={pending || !nameOk || !reasonOk}
+                        >
+                            {pending ? "Working…" : submitLabel}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+    if (trigger === undefined) return dialog;
+
+    return (
+        // `w-min`: the reason wraps to the button's width, so a row of
+        // actions keeps its spacing when one of them is switched off.
+        <div className="flex w-min flex-col items-stretch gap-1 [&>button]:whitespace-nowrap">
+            {dialog}
             {disabled && disabledReason && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs leading-snug text-muted-foreground">
                     {disabledReason}
                 </p>
             )}
