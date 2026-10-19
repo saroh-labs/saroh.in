@@ -21,7 +21,7 @@ export function firstName(name: string | null | undefined): string {
     const words = text.split(/\s+/).filter(Boolean);
     return (
         words.find((w) => !TITLES.has(w.replace(/\.$/, "").toLowerCase())) ??
-        words[0] ??
+        words.at(0) ??
         ""
     );
 }
