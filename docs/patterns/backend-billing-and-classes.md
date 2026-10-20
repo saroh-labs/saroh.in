@@ -1272,7 +1272,8 @@ options, items, more }` and a sentence with the count, the first
   a new link replaces the old, and voiding the invoice or deleting its contact
   clears it. Never log `/public/invoices/<token>` — the request log redacts it.
 - **The public read is an allow-list** (business name, number, dates, lines,
-  tax, total, `paidSoFar` and `leftToPay` (DEC-173), currency, status,
+  tax, total, `paidSoFar` and `leftToPay` (DEC-173), `payments` (U16),
+  currency, status,
   billed-to name, `payOnline`, and on an owed
   view-only invoice `payInstructions`, R32) served
   server-to-server to `saroh.app/pay/<token>`; reads and payment starts are
@@ -1296,6 +1297,20 @@ options, items, more }` and a sentence with the count, the first
   paid by hand while the checkout was open: `MORE_THAN_LEFT`), is
   `CAPTURED_NEEDS_REFUND`, raised on Home until the provider's refund webhook
   clears it. A refund never changes an invoice's status.
+- **The page says what was paid, and only that** (DEC-173, U16 #1128). The
+  pay read's `payments` (`payments/pay-link-payments.ts`, the newest 20,
+  oldest first) is its own allow-list: amount, method, `receivedAt`, and a
+  cheque's number, bank and bank status. Never a reference, note, reason,
+  who recorded it or an id; a removed payment is left out; a bounced cheque
+  stays so the page can say why the amount is due again. The renderer
+  (`saroh.app` `lib/invoice-paid-shape.ts`, `components/invoice-paid-so-far.tsx`)
+  draws the newest payment as a receipt ("₹4,000.00 received · Cash · 19
+  October 2026"), Paid so far and Left to pay under the total, and Pay for
+  what is left. A cheque not in the bank yet has its own words ("This invoice
+  is settled once the cheque clears…"), is badged "Cheque received", never
+  "Paid", and offers no Pay when it covers what was left. Every owed figure on
+  the page (Pay, autopay's "just pay", How to pay us' amount and QR) reads
+  `leftToPay`. An older API without these fields reads as before.
 
 ## How to pay us: offline payment details — **Current** (R32)
 

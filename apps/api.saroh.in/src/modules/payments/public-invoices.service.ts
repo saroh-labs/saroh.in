@@ -49,6 +49,8 @@ import { AutopayService } from "./autopay.service";
 import type { ChargeUnderWay } from "./charge-under-way";
 import { autopayChargeInProgress, chargeUnderWayOn } from "./charge-under-way";
 import { MandateChargesService } from "./mandate-charges.service";
+import type { PayLinkPayment } from "./pay-link-payments";
+import { payLinkPayments } from "./pay-link-payments";
 import type { CreateIntentResult } from "./payments.service";
 import { PaymentsService } from "./payments.service";
 import type { MandateMethod } from "./providers/provider.port";
@@ -101,6 +103,13 @@ export interface PublicInvoiceView {
      */
     paidSoFar: string;
     leftToPay: string;
+    /**
+     * What has been received on it (DEC-173, U16 #1128), oldest first: the
+     * amount, how, the day, and a cheque's number, bank and bank status
+     * (`pay-link-payments.ts`). Only the pay link's read carries it; absent
+     * from an older API and from the account area's receipt.
+     */
+    payments?: PayLinkPayment[];
     currency: string;
     /** Overdue is derived, as in the workspace. Void means not payable. */
     status: Exclude<InvoiceStanding, "DRAFT">;
@@ -356,11 +365,13 @@ export class PublicInvoicesService {
         }
         const found = await this.find(tokenHash);
         return runInOrgContext(found.organizationId, async () => {
-            const [paper, payOnline] = await Promise.all([
+            const [paper, payOnline, payments] = await Promise.all([
                 invoicePaper(found.organizationId, found.id),
                 // A link sent before Payments went off opens as a view
                 // link: it never errors (DEC-070).
                 invoicePayOnline(prisma, found.organizationId, found),
+                // What has been received, as the page says it (U16).
+                payLinkPayments(found.organizationId, found.id),
             ]);
             // Autopay only on a plan's invoice that offers it (D12), and
             // only while the business takes payment online.
@@ -394,6 +405,7 @@ export class PublicInvoicesService {
                     : null;
             return {
                 ...view,
+                payments,
                 payUrl: await payLinkUrlFor(found.organizationId, token),
                 ...(payInstructions !== undefined ? { payInstructions } : {}),
                 ...(businessContact !== undefined ? { businessContact } : {}),

@@ -20,7 +20,10 @@ import {
     InvoiceCopyActions,
 } from "@/components/download-pdf-button";
 import { InvoiceAutopay } from "@/components/invoice-autopay";
+import { InvoicePaidSoFar } from "@/components/invoice-paid-so-far";
 import { PrintButton } from "@/components/print-button";
+import type { PaidStanding } from "@/lib/invoice-paid-shape";
+import { paidStanding } from "@/lib/invoice-paid-shape";
 import type { PayInvoice } from "@/lib/invoice-pay";
 import type { PayContact } from "@/lib/invoice-pay-shape";
 import {
@@ -58,6 +61,11 @@ import { hasCustomerPdf } from "@/lib/invoice-pdf";
  * a copy, and as a quieter line under the pay page's other actions. A void
  * invoice has none.
  *
+ * What has been paid (DEC-173, U16): the newest payment as a receipt, a
+ * cheque's own words while it waits for the bank, or one the bank returned
+ * (`InvoicePaidSoFar`), and under the total, Paid so far and Left to pay.
+ * Pay charges what is left, and says so on its button.
+ *
  * Styled in the business's `--site-*` tokens, never Saroh's brand. Status is
  * an opaque fill with its own foreground, for the reason checkout gives: the
  * page ground is the merchant's, so a tint cannot be trusted against it.
@@ -86,6 +94,9 @@ export function InvoicePay({
     const refresh = useCallback(() => router.refresh(), [router]);
 
     const money = (a: string) => payMoney(a, invoice.currency);
+    // Paid so far, what is left and what was received (DEC-173, U16).
+    const standing = paidStanding(invoice);
+    const owedNow = money(standing.leftToPay);
     const issued = payDate(invoice.issuedAt);
     const due = payDate(invoice.dueAt);
     // While autopay is charging it (D13) there is nothing to pay here: the
@@ -116,7 +127,7 @@ export function InvoicePay({
                 <h2 className="text-base font-semibold text-site-body">
                     {payTitle(invoice)} {invoice.number}
                 </h2>
-                <StatusBadge status={invoice.status} />
+                <StatusBadge status={invoice.status} standing={standing} />
             </div>
             <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
                 {invoice.billedTo ? (
@@ -125,6 +136,8 @@ export function InvoicePay({
                 {issued ? <Fact label="Issued" value={issued} /> : null}
                 {due ? <Fact label="Due" value={due} /> : null}
             </dl>
+
+            <InvoicePaidSoFar standing={standing} currency={invoice.currency} />
 
             <div className="mt-8 overflow-x-auto rounded-xl border border-site-border">
                 <table className="w-full min-w-[320px] text-sm">
@@ -190,6 +203,32 @@ export function InvoicePay({
                                 {money(invoice.total)}
                             </td>
                         </tr>
+                        {standing.partPaid ? (
+                            <>
+                                <tr className="text-site-body">
+                                    <td
+                                        colSpan={2}
+                                        className="px-4 pb-2 text-right text-site-muted"
+                                    >
+                                        Paid so far
+                                    </td>
+                                    <td className="px-4 pb-2 text-right tabular-nums">
+                                        {money(standing.paidSoFar)}
+                                    </td>
+                                </tr>
+                                <tr className="text-base font-semibold text-site-fg">
+                                    <td
+                                        colSpan={2}
+                                        className="px-4 pb-3 text-right"
+                                    >
+                                        Left to pay
+                                    </td>
+                                    <td className="px-4 pb-3 text-right tabular-nums">
+                                        {owedNow}
+                                    </td>
+                                </tr>
+                            </>
+                        ) : null}
                     </tfoot>
                 </table>
             </div>
@@ -204,7 +243,7 @@ export function InvoicePay({
                     <PayLinkPay
                         start={start}
                         refresh={refresh}
-                        amount={money(invoice.total)}
+                        amount={owedNow}
                         businessName={invoice.businessName}
                         description={`${payTitle(invoice)} ${invoice.number}`}
                         payerName={invoice.billedTo}
@@ -220,13 +259,13 @@ export function InvoicePay({
                                           autopay={autopay}
                                           businessName={invoice.businessName}
                                           billedTo={invoice.billedTo}
-                                          total={money(invoice.total)}
+                                          total={owedNow}
                                           payable
                                           onJustPay={paying.pay}
                                           justPayBusy={paying.busy}
                                           justPayLabel={payLinkButtonLabel(
                                               paying,
-                                              money(invoice.total),
+                                              owedNow,
                                           )}
                                           apiUrl={apiUrl}
                                       />
@@ -242,12 +281,12 @@ export function InvoicePay({
                         <PayInstructionsCard
                             instructions={invoice.payInstructions}
                             businessName={invoice.businessName}
-                            amount={invoice.total}
+                            amount={standing.leftToPay}
                             currency={invoice.currency}
                             reference={`${payTitle(invoice)} ${invoice.number}`}
                             lead={offlineLead(
                                 invoice.businessName,
-                                money(invoice.total),
+                                owedNow,
                                 payWaysText(invoice.payInstructions),
                             )}
                         />
@@ -311,9 +350,11 @@ export function InvoicePay({
                 <div className="mt-6 space-y-4">
                     <div className="rounded-xl border border-site-border bg-site-surface p-5 text-center">
                         <p className="text-site-fg">
-                            {invoice.status === "PAID"
-                                ? "This invoice is paid. Thank you, there's nothing more to do."
-                                : `This invoice is no longer payable. If you think that's a mistake, ask ${invoice.businessName}.`}
+                            {settledWords(
+                                invoice.status,
+                                standing,
+                                invoice.businessName,
+                            )}
                         </p>
                         {invoice.status === "PAID" && nextCharge ? (
                             <p className="mt-1 text-sm text-site-muted">
@@ -365,6 +406,23 @@ function offlineLead(
         : `${business} doesn't take payment online. Keep a copy of this invoice for your records.`;
 }
 
+/**
+ * The settled box's words. A cheque still waiting for the bank is never
+ * called paid: the receipt above says what it is (DEC-173).
+ */
+function settledWords(
+    status: PayInvoice["status"],
+    standing: PaidStanding,
+    business: string,
+): string {
+    if (status !== "PAID") {
+        return `This invoice is no longer payable. If you think that's a mistake, ask ${business}.`;
+    }
+    return standing.waitingCheque
+        ? "There's nothing to pay now. Thank you."
+        : "This invoice is paid. Thank you, there's nothing more to do.";
+}
+
 function Fact({ label, value }: { label: string; value: string }) {
     return (
         <div className="min-w-0">
@@ -387,8 +445,24 @@ const STATUS: Record<PayInvoice["status"], { label: string; cls: string }> = {
     },
 };
 
-function StatusBadge({ status }: { status: PayInvoice["status"] }) {
-    const s = STATUS[status];
+/**
+ * The status, as the page knows it: "Partly paid" on an owed invoice with
+ * money in (overdue stays Overdue), and "Cheque received" on one a cheque
+ * paid that isn't in the bank yet, never "Paid" (DEC-173).
+ */
+function StatusBadge({
+    status,
+    standing,
+}: {
+    status: PayInvoice["status"];
+    standing: PaidStanding;
+}) {
+    const s =
+        status === "ISSUED" && standing.partPaid
+            ? { ...STATUS.ISSUED, label: "Partly paid" }
+            : status === "PAID" && standing.waitingCheque
+              ? { ...STATUS.ISSUED, label: "Cheque received" }
+              : STATUS[status];
     return (
         <span
             className={cn(

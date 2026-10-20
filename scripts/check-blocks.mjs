@@ -156,6 +156,10 @@ const SITE_LAYER_ALLOWED = new Set([
     // Its "Pay and turn on autopay" (D12): part of the same pay page, whose
     // options are the package's own (PayOption, AutopayMethodChoice).
     "apps/saroh.app/components/invoice-autopay.tsx",
+    // Its receipt of what was paid (DEC-173, U16) and the page a link that
+    // no longer opens shows: parts of the same pay page, drawing no block.
+    "apps/saroh.app/components/invoice-paid-so-far.tsx",
+    "apps/saroh.app/components/pay-link-gone.tsx",
     // An order's pay link (plan B, B11): the invoice pay page's twin for an
     // order, the same category and drawing no block.
     "apps/saroh.app/app/pay/o/[token]/page.tsx",
