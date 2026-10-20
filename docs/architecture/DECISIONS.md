@@ -2252,7 +2252,16 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - The Turn on sheet says the booking page comes with Bookings, from `setup-defaults`' `alsoBookingPage`.
 - Rules: `docs/patterns/backend-auth-and-access.md` → "Bookings makes the booking page, as selling online makes the shop".
 
-> **DEC-176** is reserved for the GST branch (PR #1164), where it is written.
+## DEC-176 The GST rate is chosen with buttons: 0, 5, 18 and 40%, with the rest behind Other rate
+
+**Status: Accepted — 2026-10-20, to build** · owner. Plan: `docs/plans/2026-10-20-003-feat-gst-rate-picker-plan.md`, issue #1160.
+
+- One shared picker, shown as buttons, everywhere a GST rate is asked. It replaces the dropdowns and the paper editor's own chips.
+- **Main buttons** are the slabs since GST 2.0 (22 Sep 2025): 0% (nil-rated or exempt), 5%, 18% and 40%. **Other rate** opens 0.25%, 1.5%, 3%, 12% and 28% in place.
+- **1.5% is added** to the rates GST has, for cut and polished diamonds.
+- **Nothing saved changes:** a rate saved at 12% or 28% keeps it and opens with Other shown; issued invoices are never touched.
+- Not set stays only where a field may be left empty today. There is no new business "usual rate" setting.
+- Rules: `docs/patterns/frontend-forms.md` → "A GST rate is always chosen with `GstRatePicker`"; checked by `lib/consistency/shared-pieces.test.ts`.
 
 ## DEC-177 Looks, fonts and colours: free ones for everyone, the rest on paid plans, chosen in admin
 
@@ -2286,14 +2295,3 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - Before the looks reach production, the owner ticks the free typefaces and colourways in admin and publishes (`SITE_LOOKS_ROLLOUT.md`).
 - Rules: `docs/patterns/backend-auth-and-access.md` → "A look, typeface or colourway is free or paid, and the catalogue says which"; `docs/patterns/frontend-design-system.md` → "A paid style is refused in the Style panel, and every look can be previewed".
 - Rules: `docs/patterns/backend-data-and-money.md` → Money (the ledger in integer paise, U1 #1113); the rest added as each unit is built.
-
-## DEC-176 The GST rate is chosen with buttons: 0, 5, 18 and 40%, with the rest behind Other rate
-
-**Status: Accepted — 2026-10-20, to build** · owner. Plan: `docs/plans/2026-10-20-003-feat-gst-rate-picker-plan.md`, issue #1160.
-
-- One shared picker, shown as buttons, everywhere a GST rate is asked. It replaces the dropdowns and the paper editor's own chips.
-- **Main buttons** are the slabs since GST 2.0 (22 Sep 2025): 0% (nil-rated or exempt), 5%, 18% and 40%. **Other rate** opens 0.25%, 1.5%, 3%, 12% and 28% in place.
-- **1.5% is added** to the rates GST has, for cut and polished diamonds.
-- **Nothing saved changes:** a rate saved at 12% or 28% keeps it and opens with Other shown; issued invoices are never touched.
-- Not set stays only where a field may be left empty today. There is no new business "usual rate" setting.
-- Rules: `docs/patterns/frontend-forms.md` → "A GST rate is always chosen with `GstRatePicker`"; checked by `lib/consistency/shared-pieces.test.ts`.
