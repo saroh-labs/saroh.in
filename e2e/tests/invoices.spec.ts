@@ -38,13 +38,14 @@ test.describe("invoices", () => {
         await signIn(page);
         await page.goto(`/open/${ORG}`);
 
-        // 1. Write it: who, one line, when it falls due.
+        // 1. Write it: who, one line, when it falls due (New invoice A,
+        //    U14 #1126: it saves as it is typed).
         await page.goto("/billing/invoices/new");
         await expect(
             page.getByRole("heading", { name: "New invoice" }),
         ).toBeVisible();
         const issue = page.getByRole("button", {
-            name: /^Issue (with payment link|it)$/,
+            name: /^Issue (and share|it)$/,
         });
         await expect(issue).toBeDisabled();
 
@@ -54,15 +55,17 @@ test.describe("invoices", () => {
         await page.getByLabel("Line 1: what it's for").fill(what);
         await page.getByLabel("Line 1: quantity").fill("3");
         await page.getByLabel(/^Line 1: price each/).fill("450");
-        await expect(page.getByText("₹1,350").first()).toBeVisible();
-        await page.getByRole("radio", { name: "In 7 days" }).click();
         await expect(
-            page.getByRole("radio", { name: "In 7 days" }),
+            page.getByText("₹1,350").filter({ visible: true }).first(),
+        ).toBeVisible();
+        await page.getByRole("radio", { name: /^7 days/ }).click();
+        await expect(
+            page.getByRole("radio", { name: /^7 days/ }),
         ).toHaveAttribute("aria-checked", "true");
 
         // 2. Issue it: numbered, lines locked, the payment link copied.
         await expect(issue).toBeEnabled();
-        await expect(issue).toHaveText("Issue with payment link");
+        await expect(issue).toHaveText("Issue and share");
         await issue.click();
         await page.waitForURL(/\/billing\/invoices\/(?!new)[^/?]+$/, {
             timeout: 30_000,

@@ -1,3 +1,5 @@
+import type { PaperStyle } from "@saroh/block-contract";
+
 import { apiFetch, getJson, orgBase } from "@/lib/api/http";
 
 import type { ApiResult } from "@/lib/api/failure";
@@ -292,6 +294,14 @@ export interface Invoice {
     sellerName?: string | null;
     sellerLegalName?: string | null;
     sellerEmail?: string | null;
+    /**
+     * How the paper looks (DEC-173, U6 #1118): a draft's own choice, else
+     * the business's default as it is today; issued paper's frozen look.
+     * Absent from an API older than styles: Classic in ink.
+     */
+    paper?: { style: PaperStyle; colour: string | null };
+    /** What this invoice chose itself; null follows the business's. */
+    paperChoice?: { style: PaperStyle | null; colour: string | null };
     currency: string;
     subtotal: string;
     tax: string;

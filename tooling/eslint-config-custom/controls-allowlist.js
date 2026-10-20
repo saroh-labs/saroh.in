@@ -155,12 +155,12 @@ export const RAW_ALLOWED = {
     "components/insights/period-control.tsx": ["button"],
     // button: "Cheques not in the bank", a line that is one pressed filter (DEC-173)
     "components/invoices/cheques-line.tsx": ["button"],
-    // button: a control styled by its screen's own helper
-    "components/invoices/invoice-form.tsx": ["button"],
     // button: a row or card that is one button
     "components/invoices/invoice-row.tsx": ["button"],
     // button: a figure of the money strip, a card that is one pressed filter (DEC-173)
     "components/invoices/money-strip.tsx": ["button"],
+    // button: a line's remove button, drawn twice (phone and desk) in the table's own grid
+    "components/invoices/new-invoice/lines-table.tsx": ["button"],
     // button: a row or card that is one button
     "components/organizations/organization-switcher.tsx": ["button"],
     // button: a row that opens its role

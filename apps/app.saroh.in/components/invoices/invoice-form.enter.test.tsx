@@ -2,7 +2,7 @@
 /**
  * Enter in an invoice field never issues it. Issuing numbers the invoice
  * and locks its lines, so it is a press of its own button. The form's one
- * submit, which Enter runs, saves the draft. Pinned on the new invoice and
+ * submit, which Enter runs, keeps the draft. Pinned on the new invoice and
  * on a draft being changed (the edit route draws the same form).
  */
 import { act } from "react";
@@ -26,6 +26,9 @@ const actions = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/invoices/actions", () => actions);
 vi.mock("@/lib/invoices/link-actions", () => ({ newPayLink: vi.fn() }));
+vi.mock("@/lib/invoices/product-actions", () => ({
+    findInvoiceProducts: vi.fn(),
+}));
 vi.mock("@/lib/contacts/create", () => ({ createContact: vi.fn() }));
 vi.mock("@/components/organizations/use-business-details-step", () => ({
     useBusinessDetailsStep: () => ({
@@ -69,6 +72,7 @@ beforeEach(() => {
     root = createRoot(host);
     push.mockReset();
     for (const fn of Object.values(actions)) fn.mockReset();
+    for (const fn of Object.values(toast)) fn.mockReset();
     actions.updateInvoice.mockResolvedValue(SAVED);
     actions.createInvoice.mockResolvedValue(SAVED);
     actions.issueInvoice.mockResolvedValue({
@@ -105,6 +109,7 @@ const form = () => {
     if (!el) throw new Error("No form");
     return el;
 };
+/** The visible copy: the desk's header buttons come first. */
 const named = (name: string) => {
     const hit = Array.from(form().querySelectorAll("button")).find(
         (b) => b.textContent.trim() === name,
@@ -114,7 +119,7 @@ const named = (name: string) => {
 };
 /** Let the form's async validation and the save finish. */
 async function settle() {
-    for (let i = 0; i < 6; i++)
+    for (let i = 0; i < 8; i++)
         await act(async () => {
             await Promise.resolve();
         });
@@ -123,22 +128,28 @@ async function settle() {
 describe("Enter in the invoice form", () => {
     it("the form's only submit button is the draft's; Issue is a plain button", () => {
         render(DRAFT);
-        const submits = Array.from(
-            form().querySelectorAll<HTMLButtonElement>('button[type="submit"]'),
-        ).map((b) => b.textContent.trim());
-        expect(submits).toEqual(["Save the draft"]);
+        const submits = new Set(
+            Array.from(
+                form().querySelectorAll<HTMLButtonElement>(
+                    'button[type="submit"]',
+                ),
+            ).map((b) => b.textContent.trim()),
+        );
+        expect(submits).toEqual(new Set(["Save draft"]));
         expect(named("Issue it").type).toBe("button");
 
         act(() => root.unmount());
         root = createRoot(host);
         render();
         expect(
-            Array.from(
-                form().querySelectorAll<HTMLButtonElement>(
-                    'button[type="submit"]',
-                ),
-            ).map((b) => b.textContent.trim()),
-        ).toEqual(["Save as draft"]);
+            new Set(
+                Array.from(
+                    form().querySelectorAll<HTMLButtonElement>(
+                        'button[type="submit"]',
+                    ),
+                ).map((b) => b.textContent.trim()),
+            ),
+        ).toEqual(new Set(["Save draft"]));
         expect(named("Issue it").type).toBe("button");
     });
 
@@ -152,11 +163,12 @@ describe("Enter in the invoice form", () => {
         expect(form().querySelectorAll('input[type="submit"]')).toHaveLength(0);
     });
 
-    it("submitting the form, as Enter does, saves the draft and never issues", async () => {
+    it("submitting the form, as Enter does, keeps the draft and never issues", async () => {
         render(DRAFT);
         act(() => form().requestSubmit());
         await settle();
-        expect(actions.updateInvoice).toHaveBeenCalledTimes(1);
+        // Nothing changed since it opened: it is already saved.
+        expect(actions.updateInvoice).not.toHaveBeenCalled();
         expect(actions.issueInvoice).not.toHaveBeenCalled();
         expect(toast.showSuccess).toHaveBeenCalledWith(
             "Saved as a draft for Asha Rao. No number yet.",
@@ -168,7 +180,7 @@ describe("Enter in the invoice form", () => {
         render();
         // The default button is off until there is a line, and a form
         // whose default button is off isn't submitted by Enter.
-        expect(named("Save as draft").disabled).toBe(true);
+        expect(named("Save draft").disabled).toBe(true);
         expect(named("Issue it").disabled).toBe(true);
         await settle();
         expect(actions.createInvoice).not.toHaveBeenCalled();
@@ -179,10 +191,10 @@ describe("Enter in the invoice form", () => {
         render(DRAFT);
         act(() => named("Issue it").click());
         await settle();
-        expect(actions.updateInvoice).toHaveBeenCalledTimes(1);
         expect(actions.issueInvoice).toHaveBeenCalledWith("inv_1");
         expect(toast.showSuccess).toHaveBeenCalledWith(
             "INV-0007 issued. Its lines are locked.",
         );
+        expect(push).toHaveBeenCalledWith("/billing/invoices/inv_1");
     });
 });

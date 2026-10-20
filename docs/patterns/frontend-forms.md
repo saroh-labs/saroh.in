@@ -83,6 +83,24 @@ Editor's rules (problems, the save blocker, "When you publish" lines) are pure
 in `lib/subscriptions/plan-editor.ts`, and `plan-editor-adapter.ts` turns the
 typed form into the API's values and back.
 
+**Current** — **A form with no publish step saves as it is typed on the
+shell's autosave alone** (New invoice A, DEC-173 U14 #1126). An invoice
+draft has no revision and nothing to publish, so it doesn't take the whole
+`EditorShell`: `components/invoices/new-invoice/use-invoice-draft.ts`
+drives the shell's `Autosave` (`lib/editor-shell/autosave.ts`) from the
+react-hook-form's `watch`, sends nothing while the zod schema refuses the
+values (the form says what, on leaving a field, as before), makes the
+draft on the first save and changes it after, and puts the draft's own
+address in the bar (`/billing/invoices/<id>/edit`) with
+`history.replaceState`, so a reload never starts a second draft. The pill
+beside the title is the save state ("Draft · saved", "Saving…", "Not
+saved" with Try again). The leave guard takes `flush` (and `save`, which
+says what is wrong), so leaving asks only when the save can't go. Save
+draft and Issue flush first and then go on with the draft the server has.
+A live preview beside such a form is drawn from the typed values with the
+API's rule mirrored in a pure module (`lib/invoices/new-invoice-lines.ts`
+`previewSums`), never sent.
+
 **Current** — **An editor never opens in an error state over a rule newer
 than the record** (UX audit, 12 Oct). A plan or pack published before a GST
 rate was asked for opens with a plain note beside the field ("This plan has
@@ -319,7 +337,7 @@ preview under its fields, from the draft.
   is the reversible one** (UX audit, 10 Oct). A step that can't be taken
   back (issuing an invoice numbers it and locks its lines) is a
   `type="button"` with its own press, never the form's submit: the invoice
-  form's one submit is Save as draft. Where the primary is reversible (a
+  form's one submit is Save draft. Where the primary is reversible (a
   course), it is the submit, so Enter runs it.
 - **Current** — **One leave guard, one question** (UX audit, 10 Oct). Every
   create and edit flow mounts `useLeaveGuard({ dirty, lost, save? })` from

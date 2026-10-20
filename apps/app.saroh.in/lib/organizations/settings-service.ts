@@ -1,4 +1,8 @@
-import type { SocialLinks, SocialNetwork } from "@saroh/block-contract";
+import type {
+    PaperStyle,
+    SocialLinks,
+    SocialNetwork,
+} from "@saroh/block-contract";
 
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getJson, orgBase } from "@/lib/api/http";
@@ -159,6 +163,11 @@ export interface OrganizationSettings {
      * an older API: none.
      */
     registeredAddressMapUrl?: string | null;
+    /**
+     * The look its invoices go out in when a draft chooses none (DEC-173,
+     * U6 #1118). Absent from an older API: Classic in ink.
+     */
+    invoicePaper?: { style: PaperStyle; colour: string | null };
 }
 
 /**
