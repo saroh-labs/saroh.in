@@ -200,7 +200,13 @@ const ROWERS: Partial<Record<string, Rower>> = {
         row: (action, ev, zone) => ({
             ...fromEvidence(action, ev),
             title: `overdue from ${ev.subtitle ?? "a customer"}`,
-            sub: joined(ev.title, ev.detail, wasDue(ev.at, zone)),
+            sub: joined(
+                ev.title,
+                ev.detail,
+                wasDue(ev.at, zone),
+                // "reminded yesterday" (U8): said on the row it concerns.
+                ev.reminded ? ev.reminded.toLowerCase() : null,
+            ),
             amountIn: "title",
         }),
         more: (n) => `${n} more overdue invoice${n === 1 ? "" : "s"}`,

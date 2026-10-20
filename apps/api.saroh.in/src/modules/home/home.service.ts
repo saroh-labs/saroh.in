@@ -4,6 +4,10 @@ import { prisma } from "@saroh/database";
 import { planConnectsOwnAccounts } from "../billing/online-payments-plan";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
+import {
+    overdueBillIds,
+    REMIND_ALL_QUIET_DAYS,
+} from "../invoices/overdue-bills";
 import { accountAreaOn } from "../site-accounts/account-area";
 import { ThreadsService } from "../site-accounts/threads.service";
 import { StockChecksService } from "../stock/stock-checks.service";
@@ -435,7 +439,13 @@ export class HomeService {
             canReadInvoices
                 ? guard(
                       { moduleKey: "PAYMENTS", label: "Overdue invoices" },
-                      () => overdueInvoices(this.db, input.organizationId, now),
+                      () =>
+                          overdueInvoices(
+                              this.db,
+                              input.organizationId,
+                              now,
+                              zone,
+                          ),
                       null,
                   )
                 : skip(null),
@@ -732,6 +742,29 @@ export class HomeService {
                 },
             },
         );
+        // Remind all (DEC-171, U8): the bills it reminds, for someone who
+        // may send a reminder. A failed read leaves the group without the
+        // button, never Home without its groups.
+        const bills = grouped.needGroups.find((g) => g.kind === "BILLS");
+        if (bills && holds(input, "invoice:write")) {
+            try {
+                const invoiceIds = await overdueBillIds(
+                    this.db,
+                    input.organizationId,
+                    now,
+                );
+                if (invoiceIds.length > 0) {
+                    bills.remind = {
+                        invoiceIds,
+                        quietDays: REMIND_ALL_QUIET_DAYS,
+                    };
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `Remind all's bills couldn't be read: ${(error as Error).message}`,
+                );
+            }
+        }
         const openRead =
             available.has("COMMERCE") &&
             (holds(input, "order:read") || holds(input, "order:stage")) &&

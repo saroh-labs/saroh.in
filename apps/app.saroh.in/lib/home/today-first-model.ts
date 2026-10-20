@@ -121,6 +121,12 @@ export interface HomeNeedGroup {
     more: number;
     /** Bills only: every unpaid bill, overdue or not. */
     all?: number;
+    /**
+     * Bills only, for someone who may send a reminder: Remind all's bills
+     * (the 100 oldest overdue) and the quiet days it asks for (DEC-171,
+     * U8). Absent, the group offers no Remind all.
+     */
+    remind?: { invoiceIds: string[]; quietDays: number };
     href: string;
     codes: string[];
 }

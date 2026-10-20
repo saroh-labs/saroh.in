@@ -7,6 +7,12 @@ import { withLive } from "@/lib/lists/capped";
 import type { PayInstructionsSettings } from "@/lib/organizations/pay-instructions";
 import type { OnlineBlocker } from "@/lib/staff/types";
 
+import type {
+    ReminderAsk,
+    ReminderPreview,
+    ReminderSendResult,
+} from "./remind-all";
+
 /**
  * Invoices a business issues (ADR-007) — read and written through the
  * org-nested `/organizations/:id/invoices` routes. Server-only: `orgBase`
@@ -510,5 +516,29 @@ export function remindInvoice(id: string) {
         "POST",
         {},
         "Couldn't send that reminder.",
+    );
+}
+
+/**
+ * Remind many (DEC-173, U5): how each picked invoice's reminder would go,
+ * and the words the first email one gets. Home's Remind all asks it with
+ * `quietDays` (DEC-171, U8).
+ */
+export function previewReminders(ask: ReminderAsk) {
+    return send<ReminderPreview>(
+        "/reminders/preview",
+        "POST",
+        ask,
+        "Couldn't read who owes you.",
+    );
+}
+
+/** Send them: the email ones go, each read again as Send reminder does. */
+export function sendReminders(ask: ReminderAsk) {
+    return send<ReminderSendResult>(
+        "/reminders",
+        "POST",
+        ask,
+        "Couldn't send those reminders.",
     );
 }

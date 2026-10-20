@@ -2150,6 +2150,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **Suggestions follow three rules**: a class nearly always full; a bill more than 3 weeks late; something selling less than before. One at a time; **"Not now" hides one for 7 days**.
 - **Nothing is taken away**: every control today's Home and Insights have keeps a place on the new screens (the plan lists each one and where it goes). Money still follows permissions (DEC-098).
 - **The full designs come first** (owner, 19 Oct): every screen of Home A and Insights B is drawn for desktop and phone and confirmed by the owner before issues are opened or code starts.
+- Rules: `docs/patterns/backend-billing-and-classes.md` → "Overdue bills have one definition" and "Remind all" (U8 #1085); the rest added as each unit is built.
 
 ## DEC-173 Invoices: part payments in a ledger, cheques with a bank status, share and remind by WhatsApp link, three invoice styles
 

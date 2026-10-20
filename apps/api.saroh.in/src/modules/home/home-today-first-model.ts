@@ -160,6 +160,13 @@ export interface HomeNeedGroup {
      * bills", "6 not due yet"), when the owed read worked.
      */
     all?: number;
+    /**
+     * Bills only, for someone who may send a reminder (`invoice:write`):
+     * Remind all's bills, the 100 oldest overdue, and the quiet days it
+     * asks `POST invoices/reminders` for (DEC-171, U8). Absent, no Remind
+     * all.
+     */
+    remind?: { invoiceIds: string[]; quietDays: number };
     /** The list it opens: Orders, the overdue bills, Bookings, … */
     href: string;
     /** The sources in it, e.g. `COMMERCE_OPEN_ORDERS`. */

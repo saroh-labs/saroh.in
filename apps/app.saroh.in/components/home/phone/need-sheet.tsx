@@ -8,11 +8,15 @@ import { useState } from "react";
 
 import { onItsWayLabel, phoneGroupTitle } from "@/lib/home/group-words";
 import { IN_PROGRESS_HREF } from "@/lib/home/needs";
+import { REMIND_ALL_KEY, remindLine } from "@/lib/home/remind-all";
 import type { HomeNeedGroup } from "@/lib/home/service";
 
 import { groupOpenAll } from "@/lib/home/group-body";
 
+import type { RemindAllState } from "@/lib/home/remind-all";
 import { NeedGroupBody } from "../need-group-body";
+import { RemindAll } from "../remind-all";
+
 import type { InlineActions } from "../use-inline-actions";
 import { HomeSheet } from "./home-sheet";
 
@@ -28,7 +32,10 @@ import { HomeSheet } from "./home-sheet";
  * count drops by what was done.
  *
  * Its foot is the group's way to the whole list (`groupOpenAll`): Open all
- * orders, See bills, Open bookings, Set stock levels…
+ * orders, See bills, Open bookings, Set stock levels… On the bills, Remind
+ * all (U8) sits beside See bills for whoever the API sent its bills to;
+ * while the reminders wait their ten seconds the foot says who they go to
+ * in its place, and the toast holds Undo.
  */
 export function NeedSheet({
     group,
@@ -45,7 +52,11 @@ export function NeedSheet({
 }) {
     const [open, setOpen] = useState(false);
     const onItsWay = group.kind === "ORDERS" ? onItsWayLabel(inProgress) : "";
-    const foot = sheetFoot(group);
+    const held =
+        group.kind === "BILLS" && REMIND_ALL_KEY in actions.done
+            ? actions.done[REMIND_ALL_KEY]
+            : undefined;
+    const foot = sheetFoot(group, actions, held?.remind, held?.undo);
     return (
         <HomeSheet
             name={group.kind}
@@ -80,11 +91,55 @@ export function NeedSheet({
 }
 
 /** The group's own way out to its list, as the boards draw each foot. */
-function sheetFoot(group: HomeNeedGroup) {
+function sheetFoot(
+    group: HomeNeedGroup,
+    actions: InlineActions,
+    remind: RemindAllState | undefined,
+    undo: (() => void) | undefined,
+) {
     const all = groupOpenAll(group);
+    const offers = group.kind === "BILLS" && !!group.remind?.invoiceIds.length;
+    if (!offers) {
+        return (
+            <Button asChild variant="outline" className="w-full">
+                <Link href={all.href}>{all.label}</Link>
+            </Button>
+        );
+    }
+    const line = remind
+        ? remindLine({ title: "", sub: null, tag: null }, remind)
+        : null;
     return (
-        <Button asChild variant="outline" className="w-full">
-            <Link href={all.href}>{all.label}</Link>
-        </Button>
+        <>
+            <Button asChild variant="outline" className="flex-1">
+                <Link href={all.href}>{all.label}</Link>
+            </Button>
+            {line ? (
+                <p
+                    data-remind-status=""
+                    role="status"
+                    className="min-w-0 flex-[2_1_0] text-[12.5px] text-muted-foreground [overflow-wrap:anywhere]"
+                >
+                    {line.sub}
+                    {/* The toast's Undo sits behind this sheet: the same
+                        Undo, here, as a done row's is (`HPSheets`). */}
+                    {remind?.phase === "held" && undo ? (
+                        <>
+                            {" · "}
+                            <Button
+                                type="button"
+                                variant="link"
+                                size="inline"
+                                onClick={undo}
+                            >
+                                Undo
+                            </Button>
+                        </>
+                    ) : null}
+                </p>
+            ) : (
+                <RemindAll group={group} actions={actions} inSheet />
+            )}
+        </>
     );
 }

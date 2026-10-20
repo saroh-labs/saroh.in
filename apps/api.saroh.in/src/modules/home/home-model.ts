@@ -91,6 +91,8 @@ export interface HomeEvidence {
     headline?: string;
     /** A few more words for the line under it, e.g. an invoice's first line. */
     detail?: string;
+    /** An overdue bill's last reminder this week: "Reminded yesterday" (U8). */
+    reminded?: string;
     /** The action the row offers in place (F4), set by `home-inline.ts`. */
     inline?: HomeInline;
     /** A second action the row opens elsewhere, set by `home-inline.ts`. */

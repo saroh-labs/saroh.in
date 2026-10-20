@@ -264,7 +264,7 @@ describe("NeedGroups", () => {
         expect(labels.indexOf("Remind all")).toBeLessThan(
             labels.indexOf("See bills"),
         );
-        expect(slot).toHaveBeenCalledWith(BILLS);
+        expect(slot).toHaveBeenCalledWith(BILLS, expect.anything());
     });
 
     it("a group emptied here folds, and the count drops", async () => {

@@ -2,14 +2,19 @@ import { HttpException, Injectable } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { authorize } from "../organizations/organization-policy";
+import { allows, authorize } from "../organizations/organization-policy";
 import { assertBusinessDetails } from "./business-details";
+import { reminderSample } from "./invoice-reminder-sample";
 import type { EmailBlocker, SendRow } from "./invoice-send.service";
 import { InvoiceSendService, SEND_SELECT } from "./invoice-send.service";
 import type { BulkRemindersDto } from "./invoice-share.dto";
 import { BULK_REMINDER_MAX } from "./invoice-share.dto";
 import { leftToPayCents } from "./invoice-state";
+import type { LastHeard } from "./overdue-bills";
+import { daysAgo, heardWords, lastHeardFrom } from "./overdue-bills";
 import { fromCents } from "./totals";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** How one invoice's reminder goes in Remind many. */
 export type ReminderWay = "EMAIL" | "WHATSAPP" | "WAIT" | "NONE";
@@ -17,7 +22,8 @@ export type ReminderWay = "EMAIL" | "WHATSAPP" | "WAIT" | "NONE";
 /**
  * Why, for each way:
  * - WHATSAPP: why not email (`EmailBlocker`);
- * - WAIT: `REMINDED_TODAY`, with `retryAt`;
+ * - WAIT: `REMINDED_TODAY`, with `retryAt`; or, when the call asked for
+ *   `quietDays`, `REMINDED_RECENTLY`: sent or reminded inside them;
  * - NONE: not one of the business's invoices (`NOT_FOUND`), not owed
  *   (`DRAFT`, `PAID`, `ORDER`, `NOT_OWED` for void, credited or a credit
  *   note), an autopay charge under way (`AUTOPAY_PENDING`), or no way to
@@ -27,6 +33,7 @@ export type ReminderWay = "EMAIL" | "WHATSAPP" | "WAIT" | "NONE";
 export type ReminderReason =
     | EmailBlocker
     | "REMINDED_TODAY"
+    | "REMINDED_RECENTLY"
     | "NOT_FOUND"
     | "DRAFT"
     | "PAID"
@@ -51,9 +58,32 @@ export interface ReminderPreviewRow {
     /** Who and what, for the sheet's lines; absent for NOT_FOUND. */
     number?: string | null;
     name?: string | null;
-    /** What is left to pay, as a Decimal string, and its currency. */
+    /**
+     * What is left to pay, as a Decimal string, and its currency. Absent
+     * for a role without `payment:read` (DEC-098).
+     */
     leftToPay?: string;
     currency?: string;
+    /** When it was due, and how many whole days late in the business's zone. */
+    dueAt?: string | null;
+    lateDays?: number;
+    /**
+     * When it was last sent or reminded, in the last `quietDays` (or the
+     * last day), and in words: "Reminded yesterday", "Sent 2 days ago".
+     */
+    lastAt?: string;
+    lastWords?: string;
+}
+
+/** The preview: each invoice, and the words the first email one gets. */
+export interface ReminderPreview {
+    invoices: ReminderPreviewRow[];
+    /**
+     * The reminder email the first EMAIL row's customer gets, as plain
+     * words, its link named ("What they get"). Null when none goes by
+     * email, and for a role without `payment:read`: it names the amount.
+     */
+    message: string | null;
 }
 
 /** One invoice's outcome after Send. */
@@ -80,7 +110,10 @@ export interface ReminderSendRow extends ReminderPreviewRow {
  *    reached by any channel.
  *
  * A customer reminded today, either way, **waits**, with `retryAt`
- * (one reminder a day). Drafts, paid and order invoices, and ids that
+ * (one reminder a day); with `quietDays` (Home's Remind all asks 3,
+ * DEC-171), anyone sent or reminded inside them waits too, as
+ * `REMINDED_RECENTLY`, read again at Send so one reminded elsewhere while
+ * the business's Undo ran is not sent twice. Drafts, paid and order invoices, and ids that
  * aren't the business's, are each refused with a reason, never a failure
  * for the lot. Send emails the EMAIL ones, each exactly as `remind` does
  * (its own transaction, lock and one-a-day check), and answers per
@@ -95,9 +128,24 @@ export class InvoiceRemindersService {
     async preview(
         ctx: OrganizationContext,
         dto: BulkRemindersDto,
-    ): Promise<{ invoices: ReminderPreviewRow[] }> {
+    ): Promise<ReminderPreview> {
         authorize(ctx, "invoice:write");
-        return { invoices: await this.ways(ctx, dto.invoiceIds, new Date()) };
+        const now = new Date();
+        const { rows, found, zone } = await this.read(ctx, dto, now);
+        const money = allows(ctx, "payment:read");
+        const first = rows.find((r) => r.way === "EMAIL");
+        const firstRow = first ? found.get(first.invoiceId) : undefined;
+        const message =
+            money && first && firstRow
+                ? await reminderSample(
+                      ctx.organizationId,
+                      firstRow.row,
+                      firstRow.payOnline,
+                      zone,
+                      now,
+                  )
+                : null;
+        return { invoices: rows.map((r) => shown(r, money)), message };
     }
 
     async send(
@@ -108,17 +156,18 @@ export class InvoiceRemindersService {
         // Every reminder carries a link that asks to be paid (DEC-068):
         // the business's details are the business's, so one refusal.
         await assertBusinessDetails(prisma, ctx.organizationId);
-        const rows = await this.ways(ctx, dto.invoiceIds, new Date());
+        const money = allows(ctx, "payment:read");
+        const { rows } = await this.read(ctx, dto, new Date());
         const results: ReminderSendRow[] = [];
         for (const row of rows) {
             if (row.way !== "EMAIL") {
-                results.push({ ...row, outcome: "NOT_SENT" });
+                results.push({ ...shown(row, money), outcome: "NOT_SENT" });
                 continue;
             }
             try {
                 const sent = await this.sending.remind(ctx, row.invoiceId);
                 results.push({
-                    ...row,
+                    ...shown(row, money),
                     outcome:
                         sent.email?.status === "SUPPRESSED"
                             ? "SUPPRESSED"
@@ -141,7 +190,7 @@ export class InvoiceRemindersService {
                         ? body.details.retryAt
                         : undefined;
                 results.push({
-                    ...row,
+                    ...shown(row, money),
                     ...(retryAt
                         ? { way: "WAIT", reason: "REMINDED_TODAY", retryAt }
                         : {}),
@@ -153,46 +202,84 @@ export class InvoiceRemindersService {
         return { invoices: results };
     }
 
-    /** How each picked invoice would go, in the order they were picked. */
-    private async ways(
+    /**
+     * How each picked invoice would go, in the order they were picked,
+     * with each found row and whether its link is a pay link (for the
+     * sample's words).
+     */
+    private async read(
         ctx: OrganizationContext,
-        invoiceIds: string[],
+        dto: BulkRemindersDto,
         now: Date,
-    ): Promise<ReminderPreviewRow[]> {
-        const ids = [...new Set(invoiceIds)].slice(0, BULK_REMINDER_MAX);
-        const found = await prisma.invoice.findMany({
-            where: { id: { in: ids }, organizationId: ctx.organizationId },
-            select: SEND_SELECT,
-        });
+    ): Promise<{
+        rows: ReminderPreviewRow[];
+        found: Map<string, { row: SendRow; payOnline: boolean }>;
+        zone: string;
+    }> {
+        const ids = [...new Set(dto.invoiceIds)].slice(0, BULK_REMINDER_MAX);
+        const [found, zone] = await Promise.all([
+            prisma.invoice.findMany({
+                where: { id: { in: ids }, organizationId: ctx.organizationId },
+                select: SEND_SELECT,
+            }),
+            this.sending.zone(prisma, ctx.organizationId),
+        ]);
         const byId = new Map(found.map((row) => [row.id, row]));
-        const out: ReminderPreviewRow[] = [];
+        // Sent or reminded inside the quiet days the call asked for, read
+        // for them all at once: the same three things one a day counts.
+        const quiet = dto.quietDays ?? 0;
+        const heard =
+            quiet > 0
+                ? await lastHeardFrom(
+                      prisma,
+                      ctx.organizationId,
+                      found.map((r) => r.id),
+                      new Date(now.getTime() - quiet * DAY_MS),
+                  )
+                : new Map<string, LastHeard>();
+        const rows: ReminderPreviewRow[] = [];
+        const kept = new Map<string, { row: SendRow; payOnline: boolean }>();
         for (const id of ids) {
             const row = byId.get(id);
-            out.push(
-                row
-                    ? await this.way(ctx.organizationId, row, now)
-                    : { invoiceId: id, way: "NONE", reason: "NOT_FOUND" },
+            if (!row) {
+                rows.push({ invoiceId: id, way: "NONE", reason: "NOT_FOUND" });
+                continue;
+            }
+            const { out, payOnline } = await this.way(
+                ctx.organizationId,
+                row,
+                now,
+                zone,
+                quiet > 0 ? { days: quiet, last: heard.get(id) } : null,
             );
+            rows.push(out);
+            kept.set(id, { row, payOnline });
         }
-        return out;
+        return { rows, found: kept, zone };
     }
 
     private async way(
         organizationId: string,
         row: SendRow,
         now: Date,
-    ): Promise<ReminderPreviewRow> {
+        zone: string,
+        quiet: { days: number; last: LastHeard | undefined } | null,
+    ): Promise<{ out: ReminderPreviewRow; payOnline: boolean }> {
         const base = {
             invoiceId: row.id,
             number: row.number,
             name: nameOf(row),
             leftToPay: fromCents(leftToPayCents(row)),
             currency: row.currency,
+            dueAt: row.dueAt?.toISOString() ?? null,
+            lateDays:
+                row.dueAt && row.dueAt < now
+                    ? Math.max(1, daysAgo(row.dueAt, now, zone))
+                    : 0,
         };
-        const none = (reason: ReminderReason): ReminderPreviewRow => ({
-            ...base,
-            way: "NONE",
-            reason,
+        const none = (reason: ReminderReason) => ({
+            out: { ...base, way: "NONE", reason } satisfies ReminderPreviewRow,
+            payOnline: false,
         });
         if (row.orderId) return none("ORDER");
         if (row.kind === "CREDIT_NOTE") return none("NOT_OWED");
@@ -209,38 +296,68 @@ export class InvoiceRemindersService {
         if (reach.send.reason === "AUTOPAY_PENDING") {
             return none("AUTOPAY_PENDING");
         }
+        const payOnline = reach.send.payOnline;
         const phone = reach.phone ? { phone: reach.phone } : {};
+        const last = quiet?.last
+            ? {
+                  lastAt: quiet.last.at.toISOString(),
+                  lastWords: heardWords(quiet.last, now, zone),
+              }
+            : {};
+        const go = (out: ReminderPreviewRow) => ({ out, payOnline });
         if (reach.send.nextReminderAt) {
-            return {
+            return go({
                 ...base,
                 ...phone,
+                ...last,
                 way: "WAIT",
                 reason: "REMINDED_TODAY",
                 retryAt: reach.send.nextReminderAt,
-            };
+            });
+        }
+        if (quiet?.last) {
+            return go({
+                ...base,
+                ...phone,
+                ...last,
+                way: "WAIT",
+                reason: "REMINDED_RECENTLY",
+                retryAt: new Date(
+                    quiet.last.at.getTime() + quiet.days * DAY_MS,
+                ).toISOString(),
+            });
         }
         if (reach.emailTo) {
-            return {
+            return go({
                 ...base,
                 ...phone,
                 way: "EMAIL",
                 reason: null,
                 email: reach.emailTo,
-            };
+            });
         }
         if (reach.phone) {
-            return {
+            return go({
                 ...base,
                 phone: reach.phone,
                 way: "WHATSAPP",
                 reason: reach.emailBlocked,
-            };
+            });
         }
-        return {
-            ...none("UNREACHABLE"),
+        return go({
+            ...base,
+            way: "NONE",
+            reason: "UNREACHABLE",
             ...(reach.emailBlocked ? { emailBlocked: reach.emailBlocked } : {}),
-        };
+        });
     }
+}
+
+/** A row as this viewer may see it: no amount without `payment:read`. */
+function shown<T extends ReminderPreviewRow>(row: T, money: boolean): T {
+    if (money) return row;
+    const { leftToPay: _amount, ...rest } = row;
+    return rest as T;
 }
 
 function nameOf(row: SendRow): string | null {

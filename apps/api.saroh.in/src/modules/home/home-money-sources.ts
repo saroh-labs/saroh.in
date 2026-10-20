@@ -1,12 +1,14 @@
-import type { prisma, Prisma } from "@saroh/database";
+import type { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
+import { isPastDue, leftToPayCents } from "../invoices/invoice-state";
 import {
-    CAPTURED_NEEDS_REFUND,
-    isPastDue,
-    leftToPayCents,
-    OWED_WHERE,
-} from "../invoices/invoice-state";
+    heardWords,
+    lastHeardFrom,
+    latestPeriodInvoices,
+    LIVE_SUBSCRIPTION,
+    overdueBillsWhere,
+} from "../invoices/overdue-bills";
 import type { ChargeUnderWay } from "../payments/charge-under-way";
 import {
     AUTOPAY_CHARGE_IN_PROGRESS,
@@ -28,6 +30,9 @@ import { EVIDENCE_LIMIT, overdueTag, personName } from "./home-model";
  */
 
 type Db = typeof prisma;
+
+/** How far back a bill's row says when it was last reminded: a week. */
+const HEARD_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** What happened to a renewal's charge, from D9's subscription event log. */
 export type RenewalEventKind = "RENEWAL_FAILED" | "MANDATE_LIMIT_LOW";
@@ -148,40 +153,6 @@ export function chargingTag(at: Date, zone: string): string {
 }
 
 /** Not cancelled: ACTIVE or PAUSED, and still owed what it billed. */
-const LIVE_SUBSCRIPTION = {
-    status: { not: "CANCELLED" },
-} satisfies Prisma.CustomerSubscriptionWhereInput;
-
-/**
- * Each subscription's latest period invoice — the last ISSUED or PAID one
- * by issue date, the rule Subscription Detail's failed charge uses — as
- * subscription id → invoice id. The failed-renewal row speaks for that one
- * invoice; any other unpaid invoice of a live subscription is listed as an
- * overdue invoice instead.
- */
-async function latestPeriodInvoices(
-    db: Db,
-    organizationId: string,
-    subscriptionIds: readonly string[],
-): Promise<Map<string | null, string>> {
-    const ids = Array.from(new Set(subscriptionIds));
-    if (ids.length === 0) return new Map();
-    const latest = await db.invoice.findMany({
-        where: {
-            organizationId,
-            subscriptionId: { in: ids },
-            status: { in: ["ISSUED", "PAID"] },
-        },
-        orderBy: [
-            { issuedAt: { sort: "desc", nulls: "last" } },
-            { id: "desc" },
-        ],
-        distinct: ["subscriptionId"],
-        select: { id: true, subscriptionId: true },
-    });
-    return new Map(latest.map((l) => [l.subscriptionId, l.id]));
-}
-
 /**
  * Failed renewals — the one source for them (overview, "Failed renewals on
  * Home"). A live subscription whose latest period invoice is unpaid, and
@@ -346,57 +317,9 @@ export async function overdueInvoices(
     db: Db,
     organizationId: string,
     now: Date,
+    zone = "Asia/Kolkata",
 ): Promise<HomeAction | null> {
-    const pastDue = {
-        organizationId,
-        ...OWED_WHERE,
-        status: "ISSUED",
-        dueAt: { lt: now },
-        // A booking's pay link paid after the booking was cancelled leaves
-        // its invoice issued, but the customer paid and is owed it back
-        // (K-1): the refund row asks for that, and Home never asks to chase
-        // them for it too.
-        paymentIntents: {
-            none: { attempts: { some: { status: CAPTURED_NEEDS_REFUND } } },
-        },
-    } satisfies Prisma.InvoiceWhereInput;
-
-    // A live subscription's past-due invoices that are NOT its latest period
-    // invoice: the failed-renewal row speaks only for the latest, so an
-    // older one left unpaid after a later one was paid would otherwise show
-    // nowhere (H-2). Listed here, as the money owed that it is.
-    const live = await db.invoice.findMany({
-        where: {
-            ...pastDue,
-            subscriptionId: { not: null },
-            subscription: { is: LIVE_SUBSCRIPTION },
-        },
-        select: { id: true, subscriptionId: true },
-    });
-    const latestOf = await latestPeriodInvoices(
-        db,
-        organizationId,
-        live.flatMap((i) => (i.subscriptionId ? [i.subscriptionId] : [])),
-    );
-    const olderOfLive = live
-        .filter(
-            (i) =>
-                i.subscriptionId !== null &&
-                latestOf.get(i.subscriptionId) !== i.id,
-        )
-        .map((i) => i.id);
-
-    const where = {
-        ...pastDue,
-        // Spelled out rather than `NOT: { subscription: … }`: in SQL, NOT of
-        // a match on a null subscriptionId is null, not true, and would drop
-        // every invoice that has no subscription at all.
-        OR: [
-            { subscriptionId: null },
-            { subscription: { is: { status: "CANCELLED" } } },
-            ...(olderOfLive.length > 0 ? [{ id: { in: olderOfLive } }] : []),
-        ],
-    } satisfies Prisma.InvoiceWhereInput;
+    const where = await overdueBillsWhere(db, organizationId, now);
 
     const [count, rows] = await Promise.all([
         db.invoice.count({ where }),
@@ -426,9 +349,19 @@ export async function overdueInvoices(
     ]);
     if (count === 0) return null;
 
+    // Each bill's last reminder in the past week (U8): "reminded yesterday"
+    // on its row, so nobody is chased twice without knowing it.
+    const heard = await lastHeardFrom(
+        db,
+        organizationId,
+        rows.map((r) => r.id),
+        new Date(now.getTime() - HEARD_WINDOW_MS),
+    );
+
     const evidence: HomeEvidence[] = rows.map((inv) => {
         const first =
             inv.lines.length > 0 ? inv.lines[0].description.trim() : "";
+        const last = heard.get(inv.id);
         return {
             id: inv.id,
             title: inv.number ?? "Invoice",
@@ -442,6 +375,7 @@ export async function overdueInvoices(
             tag: inv.dueAt ? overdueTag(inv.dueAt, now) : undefined,
             tone: "bad",
             ...(first ? { detail: first } : {}),
+            ...(last ? { reminded: heardWords(last, now, zone) } : {}),
         };
     });
 

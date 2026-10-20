@@ -61,6 +61,10 @@ function moneyDb(opts: {
         subscriptionEvent: { findMany: jest.fn().mockResolvedValue([]) },
         // D13: no autopay charge under way.
         paymentIntent: { findMany: jest.fn().mockResolvedValue([]) },
+        // U8: no bill reminded this week.
+        message: { findMany: jest.fn().mockResolvedValue([]) },
+        customerThreadMessage: { findMany: jest.fn().mockResolvedValue([]) },
+        invoiceShare: { findMany: jest.fn().mockResolvedValue([]) },
         invoice: {
             findMany,
             count: jest

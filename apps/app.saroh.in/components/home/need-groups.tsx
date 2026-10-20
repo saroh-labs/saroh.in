@@ -22,6 +22,7 @@ import {
 } from "@/lib/home/group-words";
 import { openTotal } from "@/lib/home/inline-actions";
 import { formatList, IN_PROGRESS_HREF } from "@/lib/home/needs";
+import { REMIND_ALL_KEY, remindLine } from "@/lib/home/remind-all";
 import type {
     HomeChequesWaiting,
     HomeNeedGroup,
@@ -32,6 +33,8 @@ import type {
 import { DeskChequesLine } from "./cheques-line";
 import { NeedGroup } from "./need-group";
 import { NeedGroupBody } from "./need-group-body";
+import { RemindAll } from "./remind-all";
+import type { InlineActions } from "./use-inline-actions";
 import { confirmKey, useInlineActions } from "./use-inline-actions";
 
 /** The group Home opens with: what to pack or hand over (plan U7). */
@@ -86,8 +89,12 @@ export function NeedGroups({
     dueToday?: number;
     /** The groups open when Home is opened. */
     defaultOpen?: readonly HomeNeedKind[];
-    /** The bills group's Remind all (U8), drawn before See bills. */
-    remindAll?: (group: HomeNeedGroup) => ReactNode;
+    /**
+     * The bills group's Remind all (U8), drawn before See bills. It is
+     * handed Home's inline actions, so its ten-second hold is the one slot
+     * every other held action on Home shares.
+     */
+    remindAll?: (group: HomeNeedGroup, actions: InlineActions) => ReactNode;
     /** Cheques not in the bank (U18); null while none waits. */
     cheques?: HomeChequesWaiting | null;
 }) {
@@ -149,6 +156,11 @@ export function NeedGroups({
     const chequesLine = cheques ? (
         <DeskChequesLine key="cheques" cheques={cheques} />
     ) : null;
+    // Remind all waiting its ten seconds, or sent (U8, `HARemindUndoD`).
+    const remind =
+        REMIND_ALL_KEY in actions.done
+            ? actions.done[REMIND_ALL_KEY].remind
+            : undefined;
     const onItsWay = onItsWayLabel(inProgress);
 
     return (
@@ -224,10 +236,13 @@ export function NeedGroups({
                 line={
                     gone
                         ? emptiedLine(group.kind)
-                        : groupLine(
-                              group,
-                              now,
-                              group.kind === "ORDERS" ? dueToday : 0,
+                        : remindLine(
+                              groupLine(
+                                  group,
+                                  now,
+                                  group.kind === "ORDERS" ? dueToday : 0,
+                              ),
+                              group.kind === "BILLS" ? remind : undefined,
                           )
                 }
                 href={group.href}
@@ -240,7 +255,14 @@ export function NeedGroups({
                             open={isOpen}
                             one={groupOneAction(group, doneIds)}
                             onStart={(rowId) => start(group.kind, rowId)}
-                            remindAll={remindAll}
+                            remindAll={
+                                remind
+                                    ? undefined
+                                    : (g) =>
+                                          remindAll
+                                              ? remindAll(g, actions)
+                                              : remindAllOf(g, actions)
+                            }
                         />
                     )
                 }
@@ -253,6 +275,19 @@ export function NeedGroups({
             </NeedGroup>
         );
     }
+}
+
+/**
+ * Remind all (U8) on the bills group, for whoever the API sent its bills
+ * to (`group.remind`, `invoice:write`); nothing for anyone else.
+ */
+export function remindAllOf(
+    group: HomeNeedGroup,
+    actions: InlineActions,
+): ReactNode {
+    return group.remind?.invoiceIds.length ? (
+        <RemindAll group={group} actions={actions} />
+    ) : null;
 }
 
 /**

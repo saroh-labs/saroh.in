@@ -26,8 +26,17 @@ import {
     undoneText,
     writesReply,
 } from "@/lib/home/inline-actions";
+import type { RemindAllPick, RemindAllState } from "@/lib/home/remind-all";
+import {
+    fromResult,
+    heldToast,
+    REMIND_ALL_KEY,
+    resultWords,
+} from "@/lib/home/remind-all";
 import type { HomeInline, HomeNeed } from "@/lib/home/service";
+import { sendReminders } from "@/lib/invoices/actions";
 import { remindWithLink } from "@/lib/invoices/link-actions";
+import { forgetLink } from "@/lib/invoices/minted-links";
 import { sendOutcome } from "@/lib/invoices/send";
 import { moveStage, undoStage } from "@/lib/orders/actions";
 import type { KitchenStage } from "@/lib/orders/read";
@@ -46,6 +55,8 @@ export interface DoneRow {
     link?: string;
     /** When it was done here, "2:14 pm": "Marked sent 2:14 pm". */
     at?: string;
+    /** Remind all on the bills group (U8): waiting, or sent. */
+    remind?: RemindAllState;
 }
 
 /** Which of a row's actions: its own, or the quiet one beside it (A7). */
@@ -411,6 +422,74 @@ export function useInlineActions() {
         );
     }
 
+    /**
+     * Remind all on the bills group (DEC-171, U8): held ten seconds with
+     * Undo, on the same one slot as every other held action, then one call
+     * sends them (`POST invoices/reminders`, U5), which reads each bill again:
+     * one reminded elsewhere meanwhile, or paid, is skipped and named. Undo
+     * in the ten seconds sends nothing; leaving Home sends them, as asked.
+     */
+    function remindAll(pick: RemindAllPick) {
+        let refused: string | null = null;
+        let toastId: ToastId | null = null;
+        const text = heldToast(pick.invoiceIds.length, pick.skipped);
+        const remind: RemindAllState = {
+            phase: "held",
+            people: pick.people,
+            skipped: pick.skipped,
+            reasons: pick.reasons,
+        };
+        const held = slot().start({
+            commit: async () => {
+                const res = await sendReminders({
+                    invoiceIds: pick.invoiceIds,
+                    ...(pick.quietDays ? { quietDays: pick.quietDays } : {}),
+                });
+                if (!res.ok) {
+                    refused = res.error;
+                    throw new Error(res.error);
+                }
+                const result = fromResult(res.data);
+                // A reminder mints a fresh link: the one this tab kept is gone.
+                for (const s of result.sent) forgetLink(s.invoiceId);
+                const said = resultWords(result);
+                setDone(REMIND_ALL_KEY, {
+                    text: said.title,
+                    remind: {
+                        ...remind,
+                        phase: "sent",
+                        sent: result.sent.length,
+                    },
+                });
+                showSuccess(said.title, said.body);
+            },
+            onChange: (state) => {
+                if (state.status === "held") return;
+                if (state.status === "committing" || state.status === "undoing")
+                    return;
+                if (toastId !== null) dismissToast(toastId);
+                if (state.status === "undone") {
+                    setDone(REMIND_ALL_KEY, null);
+                    showSuccess("Nothing was sent.");
+                } else if (state.status === "failed") {
+                    setDone(REMIND_ALL_KEY, null);
+                    showError(
+                        "Those reminders weren't sent.",
+                        refused ?? "Try again.",
+                    );
+                }
+            },
+        });
+        setDone(REMIND_ALL_KEY, {
+            text,
+            undo: () => void held.undo(),
+            remind,
+        });
+        toastId = showUndo(text, () => void held.undo(), {
+            duration: HOLD_UNDO_MS,
+        });
+    }
+
     /** The confirm's button: run the row's action, or the one beside it. */
     function confirm(need: HomeNeed, which: InlineWhich = "inline") {
         const inline = inlineOf(need, which);
@@ -446,6 +525,7 @@ export function useInlineActions() {
         setDraft: (id: string, text: string) =>
             setDrafts((all) => ({ ...all, [id]: text })),
         confirm,
+        remindAll,
     };
 }
 

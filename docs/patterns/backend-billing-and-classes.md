@@ -145,6 +145,23 @@ requireProvider: false })`), the email says "view it and download a copy",
   (`home/home-cheques.ts`, `{ count, totals, href }`, href
   `/billing/invoices?view=cheques`) reads the same `readChequesWaiting`,
   and is null without `payment:read` or while none waits.
+- **Overdue bills have one definition** (`invoices/overdue-bills.ts`,
+  `overdueBillsWhere`): issued, past due, not an order's or a credit note,
+  not a live subscription's latest period invoice, not a cancelled
+  booking's paid link. Home's bills group (`home-money-sources.ts`) and
+  Remind all both read it, so "10 overdue" and the people Remind all
+  lists never disagree. Never write a second where for "overdue bills".
+- **Remind all** (DEC-171, Home plan U8 #1085) is Remind many with
+  `quietDays: 3`, never a route of its own. Home's bills group carries
+  `remind: { invoiceIds, quietDays }` (the 100 oldest overdue,
+  `overdueBillIds`) only for `invoice:write`; the sheet posts them to
+  `POST invoices/reminders/preview` and, after the ten-second hold with
+  Undo on Home's one hold (`useInlineActions().remindAll`), the EMAIL ones
+  to `POST invoices/reminders` with the same `quietDays`, which reads every
+  bill again. "Heard from" is `lastHeardFrom`: an email that went, an
+  account-thread post or a WhatsApp NEW or REMINDER share, the three
+  things one reminder a day counts. On a phone it is the bills sheet's
+  foot, beside See bills, with the hold's Undo in the sheet.
 - **Search speed:** a business's invoices are filtered after the
   `organizationId` index; 5,000 invoices (among 55,000) search in about
   4 ms, so there is no trigram index. `list-filter.db.spec.ts` times 1,500.
@@ -178,7 +195,12 @@ invoices/reminders` (`InvoiceRemindersService`, `invoice:write`, at most
   else WHATSAPP with a phone, else NONE with why (`UNREACHABLE` with
   `emailBlocked`; `DRAFT`, `PAID`, `ORDER`, `NOT_OWED`, `AUTOPAY_PENDING`,
   `NOT_FOUND` for an id that isn't the business's); one reminded today is
-  WAIT with `retryAt`. Send emails the EMAIL ones, each through `remind`
+  WAIT with `retryAt`; with `quietDays` (1 to 14) one sent or reminded
+  inside them is WAIT `REMINDED_RECENTLY` with `lastAt`, `lastWords`
+  ("Reminded 2 days ago") and `retryAt`, read again at Send. Each row has
+  `dueAt` and `lateDays`; `leftToPay` only with `payment:read`. The
+  preview's `message` is the first EMAIL row's reminder email as words
+  (`invoice-reminder-sample.ts`), null without `payment:read`. Send emails the EMAIL ones, each through `remind`
   (its own transaction and checks), and sends nothing else: the business
   opens each WhatsApp one through the share route. Never a failure for
   the lot.

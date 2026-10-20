@@ -3,9 +3,12 @@ import {
     ArrayMinSize,
     IsArray,
     IsIn,
+    IsInt,
     IsOptional,
     IsString,
+    Max,
     MaxLength,
+    Min,
 } from "class-validator";
 
 import type { ShareKind } from "./invoice-share-words";
@@ -30,6 +33,9 @@ export type LoggedShareChannel = Exclude<ShareChannel, "EMAIL">;
 
 /** At most this many invoices in one Remind many. */
 export const BULK_REMINDER_MAX = 100;
+
+/** The longest quiet a Remind many can ask for, in days. */
+export const REMINDER_QUIET_MAX = 14;
 
 /** `POST :invoiceId/share`. */
 export class ShareInvoiceDto {
@@ -61,4 +67,16 @@ export class BulkRemindersDto {
     @IsString({ each: true })
     @MaxLength(64, { each: true })
     invoiceIds!: string[];
+
+    /**
+     * Wait anyone sent or reminded in the last this many days, not only
+     * today: Home's Remind all asks 3 (DEC-171, U8). Left out, one a day.
+     */
+    @IsOptional()
+    @IsInt({ message: "Say how many days as a whole number." })
+    @Min(1, { message: "Wait at least a day." })
+    @Max(REMINDER_QUIET_MAX, {
+        message: `Wait at most ${REMINDER_QUIET_MAX} days.`,
+    })
+    quietDays?: number;
 }

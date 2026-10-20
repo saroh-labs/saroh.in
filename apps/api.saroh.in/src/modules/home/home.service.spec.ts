@@ -879,6 +879,68 @@ describe("HomeService: Home A (DEC-171)", () => {
         expect(home.tiles?.toPack).toBeDefined();
     });
 
+    describe("Remind all's bills (U8)", () => {
+        const BILL = {
+            id: "inv_1",
+            number: "RC/0056",
+            status: "ISSUED",
+            total: "1800.00",
+            paidCents: 0,
+            currency: "INR",
+            dueAt: new Date("2026-09-22T00:00:00.000Z"),
+            billToName: "Arjun Mehta",
+            subscriptionId: null,
+            contact: null,
+            lines: [],
+        };
+        function withBill() {
+            const service = build(VIEWS);
+            const db = (
+                service as unknown as {
+                    db: Record<string, Record<string, jest.Mock>>;
+                }
+            ).db;
+            db.invoice.count.mockResolvedValue(1);
+            db.invoice.findMany.mockImplementation(
+                (args: { where?: { status?: unknown; dueAt?: unknown } }) =>
+                    Promise.resolve(
+                        args.where?.status === "ISSUED" && args.where.dueAt
+                            ? [BILL]
+                            : [],
+                    ),
+            );
+            db.message = { findMany: jest.fn().mockResolvedValue([]) };
+            db.customerThreadMessage = {
+                findMany: jest.fn().mockResolvedValue([]),
+            };
+            db.invoiceShare = { findMany: jest.fn().mockResolvedValue([]) };
+            return service;
+        }
+
+        it("hands the bills group its overdue bills for someone who may send a reminder", async () => {
+            const home = await withBill().build(INPUT);
+            const bills = home.needGroups?.find((g) => g.kind === "BILLS");
+            expect(bills?.remind).toEqual({
+                invoiceIds: ["inv_1"],
+                quietDays: 3,
+            });
+        });
+
+        it("sends no Remind all to a role without invoice:write", async () => {
+            const home = await withBill().build({
+                ...INPUT,
+                organizationRole: "MEMBER",
+                organizationActions: new Set([
+                    "invoice:read",
+                    "payment:read",
+                ] as const),
+            });
+            const bills = home.needGroups?.find((g) => g.kind === "BILLS");
+            expect(bills).toBeDefined();
+            expect(bills?.remind).toBeUndefined();
+        });
+    });
+
     it("sends no To pack tile when the open orders read failed", async () => {
         const service = build(VIEWS, { orders: [OPEN_ORDER] });
         const db = (

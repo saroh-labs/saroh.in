@@ -19,6 +19,7 @@ import {
     PHONE_LINES,
     phoneLines,
 } from "@/lib/home/phone-home";
+import { REMIND_ALL_KEY } from "@/lib/home/remind-all";
 import type {
     HomeChequesWaiting,
     HomeNeedGroup,
@@ -79,6 +80,13 @@ export function PhoneNeeds({
     const chequesAt = phoneChequesAt(lines.shown);
     const any = groups.length > 0 || cheques !== null;
     const couldnt = couldntCheckLine(unavailable);
+    // Remind all waiting its ten seconds (U8): the bills line says so.
+    const sending =
+        (REMIND_ALL_KEY in actions.done
+            ? actions.done[REMIND_ALL_KEY].remind?.phase
+            : undefined) === "held"
+            ? ({ label: "Sending", tone: "info" } as const)
+            : null;
 
     return (
         <section
@@ -151,11 +159,17 @@ export function PhoneNeeds({
                     trigger={
                         <PhoneNeedLine
                             group={group}
-                            tag={phoneGroupTag(
-                                group,
-                                now,
-                                group.kind === "ORDERS" ? dueToday : 0,
-                            )}
+                            tag={
+                                group.kind === "BILLS" && sending
+                                    ? sending
+                                    : phoneGroupTag(
+                                          group,
+                                          now,
+                                          group.kind === "ORDERS"
+                                              ? dueToday
+                                              : 0,
+                                      )
+                            }
                         />
                     }
                 />
