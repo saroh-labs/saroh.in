@@ -160,6 +160,7 @@ function ChoiceButtons({
             {who ? (
                 <Button
                     type="button"
+                    data-ph-mask=""
                     variant="outline"
                     className={cn(QL_BTN, "w-full gap-2")}
                     onClick={who.run}

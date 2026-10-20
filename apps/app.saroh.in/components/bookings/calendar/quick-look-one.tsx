@@ -324,6 +324,7 @@ export function OneLook({
                             aside={
                                 <Button
                                     type="button"
+                                    data-ph-mask=""
                                     variant="ghost"
                                     className="min-h-11 px-2 text-[12.5px] text-muted-foreground min-[760px]:text-[13.5px] min-[760px]:font-semibold min-[760px]:text-foreground"
                                     onClick={() => onStep("who")}
