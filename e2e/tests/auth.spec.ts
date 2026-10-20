@@ -25,9 +25,13 @@ async function signIn(page: import("@playwright/test").Page) {
     await page.getByLabel("Email").fill(demoUser.email);
     await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
     await page.getByRole("button", { name: "Sign in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    // Polled: `waitForURL` fails on a navigation cut short on the way
+    // (net::ERR_ABORTED), though the page lands where it should.
+    await expect
+        .poll(() => new URL(page.url()).pathname.startsWith("/login"), {
+            timeout: 30_000,
+        })
+        .toBe(false);
     // The landing page has finished loading: a `goto` made while sign-in
     // is still moving the page on is aborted (net::ERR_ABORTED).
     await page.waitForLoadState("load");
