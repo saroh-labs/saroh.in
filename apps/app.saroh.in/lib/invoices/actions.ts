@@ -32,10 +32,21 @@ export async function createInvoice(input: InvoiceInput) {
     return res;
 }
 
+/**
+ * The editor's later saves, made as it is typed (`use-invoice-draft.ts`),
+ * revalidate nothing, not even the list's path. Any revalidation makes the
+ * router read the page it is on again, and once a new draft has its own
+ * address (`/<id>/edit`) that is another page than the one drawn (`/new`):
+ * the editor was thrown away and drawn again on its second save, closing
+ * a phone's Style sheet under the finger, with whatever else was open or
+ * focused (20 Oct). The first save (`createInvoice`) still revalidates, on
+ * `/new`, where the page read again is the one drawn. A screen opened
+ * afterwards reads the draft from the API (no fetch is cached,
+ * `lib/api/http.ts`); one brought back by the browser's Back can show it
+ * as it was until it is read again.
+ */
 export async function updateInvoice(id: string, input: InvoiceInput) {
-    const res = await api.updateInvoice(id, input);
-    if (res.ok) refresh(id);
-    return res;
+    return api.updateInvoice(id, input);
 }
 
 export async function deleteInvoice(id: string) {
