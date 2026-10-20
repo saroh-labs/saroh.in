@@ -90,6 +90,23 @@ insufficient" (PRODUCT_STRATEGY §18).
 - **Adopted** — **Merchant pages:** check a seeded site
   (`https://northwind.saroh.app.localhost`) and a draft preview, in the merchant's
   palette and on the neutral defaults.
+- **Current** — **The looks have quality gates** (2026-10-20, DEC-172, plan
+  U17). `e2e/tests/site-looks-quality.spec.ts` runs Folio, Quiet and Live on
+  Northwind's live home, booking page and shop, desk and phone: axe finds no
+  serious or critical issue; the first view holds exactly one button filled
+  in the site's accent and every view below at most one; a phone shows at
+  most one fixed bar; every control and standalone link is 44×44 on a phone
+  (a link inside running text is exempt; on a desk a smaller one is a
+  warning, since blocks size targets for a coarse pointer); CLS stays at 0.1
+  or less under Lighthouse's 4G profile (a hard gate) while LCP over 2.5 s
+  is only a warning; at most two font families are requested; and the page
+  says `lang="en-IN"`. A new look block or page joins that spec. Motion is
+  checked without a browser: `pnpm run check:site-motion`
+  (`scripts/check-site-motion.mjs`, in prepush and CI) fails site-blocks on a
+  duration over 200 ms, `infinite`, an overshooting curve or a scroll-linked
+  animation. A delay is a wait, not a motion, and is not counted. Classic's
+  two older motions stay, each named with its reason in the script's
+  `ALLOWED`; that list only shrinks.
 - **Adopted** — **Say what you checked.** Name the scenes, widths, skins and
   variants, and attach rendered evidence to the PR (18 §4). "Looks good" without
   a list means it was not checked.

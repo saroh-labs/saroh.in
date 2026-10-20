@@ -14,6 +14,7 @@
         "check:icon-button-tips": "node scripts/check-icon-button-tips.mjs",
         "check:edge-headers": "node scripts/check-edge-headers.mjs",
         "check:security-headers": "node scripts/check-security-headers.mjs",
+        "check:site-motion": "node --test scripts/check-site-motion.test.mjs && node scripts/check-site-motion.mjs",
         "check:copy": "node scripts/check-app-copy.mjs",
         "check:e2e-covers": "node --test scripts/e2e-affected.test.mjs && node scripts/e2e-affected.mjs --check",
         "check:e2e-signed-in-request": "node scripts/check-e2e-signed-in-request.mjs",

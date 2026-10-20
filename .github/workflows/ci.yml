@@ -192,6 +192,12 @@ jobs:
       - name: Site blocks gate
         run: pnpm run check:blocks
 
+      # Merchant sites move for 200 ms or less, with no loop, no overshoot
+      # and nothing tied to the scroll (DEC-172, KD5); a delay is not a
+      # duration. Its test proves it fails a 600 ms animation.
+      - name: Site motion
+        run: pnpm run check:site-motion
+
       # Merchant sites never load a tracker of Saroh's: no PostHog SDK,
       # address or public key under apps/saroh.app or packages/site-blocks
       # (DEC-125). Their own server's errors are reported server-side only.
