@@ -74,7 +74,7 @@ export function NeedGroupBody({
                 <p className="pb-1 pt-2">
                     <TextLink
                         href={group.href}
-                        className="text-[13px] coarse:min-h-11"
+                        className="text-[13px] coarse:inline-flex coarse:min-h-11 coarse:items-center"
                     >
                         {more}
                     </TextLink>
@@ -85,7 +85,7 @@ export function NeedGroupBody({
                     {note.text}{" "}
                     <TextLink
                         href={note.link.href}
-                        className="text-[13px] coarse:min-h-11"
+                        className="text-[13px] coarse:inline-flex coarse:min-h-11 coarse:items-center"
                     >
                         {note.link.label}
                     </TextLink>
