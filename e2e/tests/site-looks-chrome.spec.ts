@@ -213,8 +213,9 @@ test.describe("each look's chrome", { tag: "@serial" }, () => {
                 await expect(
                     dialog.getByRole("link", { name: "Visit us" }),
                 ).toBeVisible();
-                // While it is open, no bar stands over it.
-                expect(await fixedBars(page)).toEqual([]);
+                // While it is open, no bar stands over it (Live's dock
+                // fades out as the menu opens: polled).
+                await expect.poll(() => fixedBars(page)).toEqual([]);
                 await page.keyboard.press("Tab");
                 await expect(dialog.locator(":focus")).toHaveCount(1);
                 await page.keyboard.press("Escape");
