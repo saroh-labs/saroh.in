@@ -1,7 +1,12 @@
 import { BadRequestException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
-import { bpsToRate, isGstRate, rateToBps } from "../invoices/gst";
+import {
+    bpsToRate,
+    isGstRate,
+    notGstRateMessage,
+    rateToBps,
+} from "../invoices/gst";
 import type { GstPriceMode, PriceTerms } from "../invoices/gst-price";
 import { businessPriceMode } from "../invoices/gst-price";
 import { gstinProblem, stateCode, stateName } from "../invoices/gst-states";
@@ -407,10 +412,7 @@ export function taxChanges(current: TaxCurrent | null, sent: TaxSent): TaxData {
 
     if (tax?.deliveryRate !== undefined) {
         if (!isGstRate(tax.deliveryRate)) {
-            taxError(
-                `${tax.deliveryRate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
-                "deliveryRate",
-            );
+            taxError(notGstRateMessage(tax.deliveryRate), "deliveryRate");
         }
         data.deliveryGstRate = tax.deliveryRate;
     }

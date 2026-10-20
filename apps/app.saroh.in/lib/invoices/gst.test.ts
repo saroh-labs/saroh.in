@@ -14,6 +14,8 @@ describe("GST in the editors", () => {
     it("reads a saved rate as its option, whatever its decimals", () => {
         expect(rateOption("18.00")).toBe("18");
         expect(rateOption("0.25")).toBe("0.25");
+        expect(rateOption("1.50")).toBe("1.5");
+        expect(rateOption("1.4")).toBe("");
         expect(rateOption("0")).toBe("0");
         expect(rateOption(null)).toBe("");
         expect(rateOption("7")).toBe("");

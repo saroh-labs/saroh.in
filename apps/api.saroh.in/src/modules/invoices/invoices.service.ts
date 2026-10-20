@@ -31,7 +31,7 @@ import type {
     VoidInvoiceDto,
 } from "./dto";
 import { exemptInvoiceIds } from "./exempt-invoices";
-import { isGstRate, rateToBps } from "./gst";
+import { isGstRate, notGstRateMessage, rateToBps } from "./gst";
 import { assertRatesSet } from "./gst-rate-required";
 import { gstinProblem, stateCode } from "./gst-states";
 import { lockInvoiceForLedger } from "./invoice-ledger";
@@ -1001,10 +1001,7 @@ export class InvoicesService {
         }
         for (const line of lines) {
             if (line.gstRate && !isGstRate(line.gstRate)) {
-                fieldError(
-                    `${line.gstRate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
-                    "lines",
-                );
+                fieldError(notGstRateMessage(line.gstRate), "lines");
             }
         }
         const doc = buildManualInvoice(

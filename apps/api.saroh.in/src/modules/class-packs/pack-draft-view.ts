@@ -11,7 +11,12 @@ import {
 import { toMinor, toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { PLATFORM_OPERATOR_ROLE_KEY } from "../audit/audit.service";
-import { bpsToRate, isGstRate, rateToBps } from "../invoices/gst";
+import {
+    bpsToRate,
+    isGstRate,
+    notGstRateMessage,
+    rateToBps,
+} from "../invoices/gst";
 import type { GstPriceMode } from "../invoices/gst-price";
 import { isGstPriceMode } from "../invoices/gst-price";
 import { loadPriceTerms } from "../invoices/price-terms";
@@ -69,10 +74,7 @@ export function packRateOf(
 ): string | null {
     if (rate === null) return null;
     if (!isGstRate(rate)) {
-        fail(
-            `${rate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
-            "gstRate",
-        );
+        fail(notGstRateMessage(rate), "gstRate");
     }
     return packRate(rate);
 }

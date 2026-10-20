@@ -20,7 +20,12 @@ import {
 import { BookingEventType } from "../bookings/booking-event-type";
 import { BookingsService } from "../bookings/bookings.service";
 import { assertBusinessDetails } from "../invoices/business-details";
-import { bpsToRate, isGstRate, rateToBps } from "../invoices/gst";
+import {
+    bpsToRate,
+    isGstRate,
+    notGstRateMessage,
+    rateToBps,
+} from "../invoices/gst";
 import type {
     GstOnPrice,
     GstPriceMode,
@@ -1075,10 +1080,7 @@ function gstColumns(dto: CourseInputDto) {
         dto.gstRate !== null &&
         !isGstRate(dto.gstRate)
     ) {
-        fieldError(
-            `${dto.gstRate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
-            "gstRate",
-        );
+        fieldError(notGstRateMessage(dto.gstRate), "gstRate");
     }
     return {
         ...(dto.gstRate !== undefined ? { gstRate: dto.gstRate } : {}),

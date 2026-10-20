@@ -547,6 +547,7 @@ describe("a plan's GST (12 Oct 2026)", () => {
             "Choose a rate",
             "0%, nil-rated or exempt",
             "0.25%",
+            "1.5%",
             "3%",
             "5%",
             "12%",

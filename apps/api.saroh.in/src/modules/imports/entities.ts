@@ -3,7 +3,7 @@ import type { ValidationError } from "class-validator";
 import { validateSync } from "class-validator";
 
 import { CreateCustomerDto } from "../customers/dto";
-import { isGstRate } from "../invoices/gst";
+import { isGstRate, notGstRateMessage } from "../invoices/gst";
 import type { ProductStatus } from "../products/dto";
 import { CreateProductDto, PRODUCT_STATUSES } from "../products/dto";
 import { slugify } from "../stores/slug";
@@ -285,7 +285,7 @@ export const ENTITY_DESCRIPTORS: Record<ImportEntity, EntityDescriptor> = {
             ) {
                 issues.push({
                     field: "gstRate",
-                    message: `${rate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
+                    message: notGstRateMessage(rate),
                 });
             }
             return issues;
