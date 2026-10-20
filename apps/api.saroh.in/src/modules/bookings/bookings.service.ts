@@ -23,7 +23,7 @@ import { assertPlanTakesOnlinePayment } from "../billing/online-payments-plan";
 import { ModuleSetupService } from "../capabilities/setup/module-setup.service";
 import { redeemPackInTx } from "../class-packs/redeem-pack";
 import { assertBusinessDetails } from "../invoices/business-details";
-import { isGstRate } from "../invoices/gst";
+import { isGstRate, notGstRateMessage } from "../invoices/gst";
 import { loadPriceTerms } from "../invoices/price-terms";
 import { allows } from "../organizations/organization-policy";
 import { PaymentsService } from "../payments/payments.service";
@@ -250,7 +250,7 @@ function serviceGstRate(rate: string | null | undefined): string | null {
     if (rate === undefined || rate === null) return null;
     if (!isGstRate(rate)) {
         throw new BadRequestException({
-            message: `${rate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
+            message: notGstRateMessage(rate),
             details: { field: "gstRate" },
         });
     }

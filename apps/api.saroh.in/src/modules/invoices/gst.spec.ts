@@ -1,6 +1,8 @@
 import {
     allocate,
+    bpsToRate,
     isGstRate,
+    notGstRateMessage,
     placeOfSupply,
     rateToBps,
     splitInclusive,
@@ -54,7 +56,7 @@ describe("GST on one line", () => {
         expect(s.taxableCents + s.taxCents).toBe(9999);
 
         for (const cents of [1, 7, 101, 4999, 12345, 99999]) {
-            for (const bps of [25, 300, 500, 1200, 1800, 2800, 4000]) {
+            for (const bps of [25, 150, 300, 500, 1200, 1800, 2800, 4000]) {
                 for (const t of ["INTRA", "INTER"] as const) {
                     const x = splitInclusive(cents, bps, t);
                     expect(
@@ -66,6 +68,48 @@ describe("GST on one line", () => {
                 }
             }
         }
+    });
+
+    it("₹1,015 of cut diamonds at 1.5% within the state → ₹1,000 + CGST ₹7.50 + SGST ₹7.50", () => {
+        expect(splitInclusive(101_500, 150, "INTRA")).toEqual({
+            taxableCents: 100_000,
+            cgstCents: 750,
+            sgstCents: 750,
+            igstCents: 0,
+            taxCents: 1500,
+        });
+    });
+
+    it("₹999.99 at 1.5% rounds to the paisa, and ₹10.01 gives the odd paisa to CGST", () => {
+        // 99999 / 1.015 = 98521.18… → ₹985.21, tax ₹14.78, split 7.39 + 7.39.
+        const s = splitInclusive(99_999, 150, "INTRA");
+        expect(s).toEqual({
+            taxableCents: 98_521,
+            cgstCents: 739,
+            sgstCents: 739,
+            igstCents: 0,
+            taxCents: 1478,
+        });
+        expect(s.taxableCents + s.cgstCents + s.sgstCents).toBe(99_999);
+        // 1001 / 1.015 = 986.2… → ₹9.86, tax ₹0.15, split 0.08 + 0.07.
+        const odd = splitInclusive(1001, 150, "INTRA");
+        expect(odd).toEqual({
+            taxableCents: 986,
+            cgstCents: 8,
+            sgstCents: 7,
+            igstCents: 0,
+            taxCents: 15,
+        });
+    });
+
+    it("the same diamonds to another state → all of the 1.5% is IGST", () => {
+        expect(splitInclusive(101_500, 150, "INTER")).toEqual({
+            taxableCents: 100_000,
+            cgstCents: 0,
+            sgstCents: 0,
+            igstCents: 1500,
+            taxCents: 1500,
+        });
     });
 
     it("₹5 coffee at 5% keeps the halves within a paisa", () => {
@@ -81,6 +125,8 @@ describe("rates", () => {
         expect(rateToBps("18")).toBe(1800);
         expect(rateToBps("0.25")).toBe(25);
         expect(rateToBps("5.00")).toBe(500);
+        expect(rateToBps("1.5")).toBe(150);
+        expect(rateToBps("1.50")).toBe(150);
         expect(rateToBps(null)).toBeNull();
     });
 
@@ -88,6 +134,8 @@ describe("rates", () => {
         for (const r of [
             "0",
             "0.25",
+            "1.5",
+            "1.50",
             "3",
             "5",
             "12",
@@ -97,8 +145,20 @@ describe("rates", () => {
             "18.00",
         ])
             expect(isGstRate(r)).toBe(true);
-        for (const r of ["7", "-5", "abc", "100"])
+        for (const r of ["7", "-5", "abc", "100", "1.4", "1.25", "15"])
             expect(isGstRate(r)).toBe(false);
+    });
+
+    it("writes a rate back the one way", () => {
+        expect(bpsToRate(150)).toBe("1.5");
+        expect(bpsToRate(25)).toBe("0.25");
+        expect(bpsToRate(1800)).toBe("18");
+    });
+
+    it("lists every rate GST has when it refuses one", () => {
+        expect(notGstRateMessage("1.4")).toBe(
+            "1.4% is not a GST rate. Use 0, 0.25, 1.5, 3, 5, 12, 18, 28 or 40.",
+        );
     });
 });
 

@@ -140,9 +140,8 @@ export function TopBarActions({
                                   ? Tablet
                                   : Monitor;
                         return (
-                            <Tip label={d.label}>
+                            <Tip key={d.key} label={d.label}>
                                 <button
-                                    key={d.key}
                                     type="button"
                                     onClick={() => p.setDevice(d.key)}
                                     aria-pressed={p.device === d.key}

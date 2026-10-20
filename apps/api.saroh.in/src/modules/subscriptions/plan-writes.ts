@@ -7,7 +7,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { assertPlanStartsSubscriptions } from "../billing/online-payments-plan";
-import { isGstRate } from "../invoices/gst";
+import { isGstRate, notGstRateMessage } from "../invoices/gst";
 import { fromCents, toCents } from "../invoices/totals";
 import type { PlanInputDto } from "./dto";
 import type { PlanActor } from "./plan-events";
@@ -51,10 +51,7 @@ export function gstColumns(dto: PlanInputDto) {
         dto.gstRate !== null &&
         !isGstRate(dto.gstRate)
     ) {
-        fieldError(
-            `${dto.gstRate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
-            "gstRate",
-        );
+        fieldError(notGstRateMessage(dto.gstRate), "gstRate");
     }
     return {
         ...(dto.gstRate !== undefined ? { gstRate: dto.gstRate } : {}),

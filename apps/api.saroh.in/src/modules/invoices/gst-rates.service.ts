@@ -28,7 +28,7 @@ import {
 } from "../products/product-rules";
 import { enqueuePageRevalidation } from "../sites/page-cache-revalidate";
 import { actorFromContext } from "../subscriptions/event-actors";
-import { bpsToRate, isGstRate, rateToBps } from "./gst";
+import { bpsToRate, isGstRate, notGstRateMessage, rateToBps } from "./gst";
 import type { GstPriceMode } from "./gst-price";
 import { businessPriceMode, isGstPriceMode } from "./gst-price";
 import type { RatedKind, SetGstRatesDto } from "./gst-rates.dto";
@@ -346,7 +346,7 @@ export class GstRatesService {
         for (const item of dto.items) {
             if (!isGstRate(item.rate)) {
                 throw new BadRequestException({
-                    message: `${item.rate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
+                    message: notGstRateMessage(item.rate),
                     details: { field: "rate" },
                 });
             }

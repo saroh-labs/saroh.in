@@ -14,6 +14,14 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+    otherRateButton,
+    pickRate,
+    ratePicker,
+    rateShown,
+    ratesOffered,
+} from "@/components/shared/gst-rate-picker.testing";
+
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import type { ProductDetail } from "@/lib/products/service";
 
@@ -126,7 +134,7 @@ interface Page {
     canWrite?: boolean;
 }
 
-function render(page: Page = {}) {
+function render(page: Page & { rateNeeded?: boolean } = {}) {
     const { registered = true, businessPriceMode = "INCLUDED" } = page;
     act(() =>
         root.render(
@@ -141,7 +149,7 @@ function render(page: Page = {}) {
                     storeId="s1"
                     currency="INR"
                     gstRegistered={registered}
-                    gstRateNeeded={registered}
+                    gstRateNeeded={page.rateNeeded ?? registered}
                     businessPriceMode={businessPriceMode}
                     categories={[]}
                     manageCategoriesHref="/commerce/products/settings"
@@ -253,6 +261,60 @@ describe("GST on this price", () => {
     it("is off for someone who can't change products", () => {
         render({ canWrite: false });
         expect(modeSelect()?.disabled).toBe(true);
+    });
+});
+
+/** The GST rate as buttons (DEC-176), saved with the rest of Basics. */
+describe("the GST rate", () => {
+    const rate = () => ratePicker("GST rate", host);
+    const sentRate = () =>
+        (patchProduct.mock.calls.at(-1)?.[2] as { gstRate?: unknown }).gstRate;
+
+    it("opens on the saved rate, its chip pressed, and saves another chosen by button", async () => {
+        render();
+        expect(rateShown(rate())).toBe("18");
+        // A registered business must answer: no "Not set".
+        expect(ratesOffered(rate())).toEqual(["0", "5", "18", "40"]);
+        pickRate(rate(), "5");
+        await settle();
+        await save();
+        expect(sentRate()).toBe("5");
+    });
+
+    it("saves a rate behind Other rate, 1.5%", async () => {
+        render();
+        pickRate(rate(), "1.5");
+        await settle();
+        expect(rateShown(rate())).toBe("1.5");
+        await save();
+        expect(sentRate()).toBe("1.5");
+    });
+
+    it("opens a saved 12% with Other rate shown and 12% pressed", () => {
+        render({ product: product({ gstRate: "12.00" }) });
+        expect(otherRateButton(rate()).getAttribute("aria-expanded")).toBe(
+            "true",
+        );
+        expect(rateShown(rate())).toBe("12");
+    });
+
+    it("offers Not set where the rate may be left empty, and saves it as none", async () => {
+        render({ rateNeeded: false });
+        expect(ratesOffered(rate())[0]).toBe("");
+        pickRate(rate(), "");
+        await settle();
+        expect(rateShown(rate())).toBe("");
+        await save();
+        expect(sentRate()).toBeNull();
+    });
+
+    it("is off for someone who can't change products", () => {
+        render({ canWrite: false });
+        expect(
+            Array.from(rate().querySelectorAll("button")).every(
+                (b) => b.disabled,
+            ),
+        ).toBe(true);
     });
 });
 

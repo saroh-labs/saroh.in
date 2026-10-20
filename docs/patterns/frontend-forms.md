@@ -522,6 +522,23 @@ preview under its fields, from the draft.
     `Chip as="toggle"`. Never a hand-made `role="radio"`, `role="checkbox"`
     or `role="switch"` button.
 
+- **Current** — **A GST rate is always chosen with `GstRatePicker`**
+  (`components/shared/gst-rate-picker.tsx`, DEC-176, 20 Oct), never a
+  dropdown, a typed box or chips of a screen's own. Its main row is GST's
+  slabs since GST 2.0, 0%, 5%, 18% and 40% (`MAIN_GST_RATES`); "Other
+  rate" is a disclosure beside them (`aria-expanded`, not a radio) that
+  opens 0.25%, 1.5%, 3%, 12% and 28% in place. The chosen rate's own chip
+  is the one lit, in whichever row it sits, and a saved rate from the
+  second row opens with that row shown. `optional` adds "Not set" for a
+  field that may be left empty, and only there. Inside a `Field`, use its
+  function child with `pickerWiring(control)` so the label, the hint and
+  the one error line are the Field's. Unit tests press rates with
+  `gst-rate-picker.testing.ts`, browser specs with `e2e/fixtures/gst-rate.ts`.
+  `lib/consistency/shared-pieces.test.ts` fails a file outside
+  `lib/invoices/gst.ts` that reads `GST_RATE_OPTIONS` or `GST_RATE_CHOICES`.
+- **Current** — **A chip set in error takes the keyboard.**
+  `focusFirstError` puts it on a radio group's one tab stop (the chosen
+  chip, else the first), so a missing rate is reached like a missing box.
 - **Current** — **The label is above a choice strip, and the strip is as
   wide as its words.** `Segmented` is a block of its own (`flex w-fit`),
   so after a label it drops to the next line and in a grid or a stacked
