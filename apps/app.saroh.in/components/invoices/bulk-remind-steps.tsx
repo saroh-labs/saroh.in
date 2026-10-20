@@ -300,48 +300,35 @@ export function EmailCard({
             line = "Nothing was emailed.";
             break;
     }
+    const sent = emails.phase === "sent" && emails.emailed.length > 0;
     return (
-        <div
+        <Notice
+            tone={sent ? "success" : "neutral"}
             role="status"
             data-remind-emails={emails.phase}
-            className="flex items-start gap-3 rounded-[10px] border border-border px-3.5 py-3"
-        >
-            {emails.phase === "sent" && emails.emailed.length > 0 ? (
-                <Check
-                    aria-hidden
-                    strokeWidth={2.2}
-                    className="mt-0.5 size-4 flex-none text-success-subtle-foreground"
-                />
-            ) : (
-                <Mail
-                    aria-hidden
-                    className="mt-0.5 size-4 flex-none text-muted-foreground"
-                />
-            )}
-            <div className="grid min-w-0 flex-1 gap-0.5">
-                <p className="text-[13.5px] font-semibold tabular-nums">
-                    {title}
-                </p>
-                {line ? (
-                    <p
-                        data-ph-mask=""
-                        className="text-[12.5px] text-muted-foreground"
+            icon={
+                sent ? (
+                    <Check aria-hidden strokeWidth={2.2} />
+                ) : (
+                    <Mail aria-hidden />
+                )
+            }
+            title={<span className="tabular-nums">{title}</span>}
+            action={
+                emails.phase === "held" ? (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={onUndo}
                     >
-                        {line}
-                    </p>
-                ) : null}
-            </div>
-            {emails.phase === "held" ? (
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={onUndo}
-                >
-                    Undo
-                </Button>
-            ) : null}
-        </div>
+                        Undo
+                    </Button>
+                ) : null
+            }
+        >
+            {line ? <span data-ph-mask="">{line}</span> : null}
+        </Notice>
     );
 }
 
