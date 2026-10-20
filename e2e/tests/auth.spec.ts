@@ -84,7 +84,10 @@ test.describe("cross-origin session", () => {
             .fill(demoUser.password);
         await page.getByRole("button", { name: "Sign in" }).click();
 
-        await page.waitForURL(/\/bookings/, { timeout: 30_000 });
+        // Polled, not `waitForURL`: on the way to /bookings one navigation
+        // replaces another, and `waitForURL` fails on the one cut short
+        // (net::ERR_ABORTED) though the visitor lands where they asked.
+        await expect(page).toHaveURL(/\/bookings/, { timeout: 30_000 });
 
         /*
          * The claim is about the DESTINATION, so that is what is asserted.
