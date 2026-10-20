@@ -13,6 +13,7 @@ import {
     prisma,
     repeatedAnchor,
 } from "@saroh/database";
+import type { LookId } from "@saroh/templates";
 import { isDeepStrictEqual } from "node:util";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -125,7 +126,7 @@ import {
     publicSiteIcon,
     siteIconView,
 } from "./site-icon";
-import { assertLookAllowed, looksRolloutOn } from "./site-looks";
+import { assertLookAllowed, looksRolloutOn, snapshotLook } from "./site-looks";
 import type { SiteNavigation } from "./site-navigation";
 import {
     parseSiteNavigation,
@@ -551,6 +552,13 @@ export interface SiteDetailView {
      */
     looksAvailable: boolean;
     /**
+     * The look the live site is in (DEC-172, U16): null for Classic or a
+     * site never published. The editor says "Not published yet" while the
+     * draft's look differs, and offers it back while `looksAvailable` is
+     * off.
+     */
+    liveLook: LookId | null;
+    /**
      * The shop could serve (`SITE_SHOP`, Commerce rolled out and on) and a
      * storefront with products could be chosen, but Sells from is
      * unanswered, so `/shop` isn't live (P4). The Shop settings say so.
@@ -700,6 +708,8 @@ interface PendingChanges {
     sections: number;
     /** Which site-level settings differ from what is live. */
     site: SiteChangeKind[];
+    /** The look the live site is in; null for Classic (U16). */
+    liveLook: LookId | null;
 }
 
 /** A section as stored on a page's current draft. */
@@ -923,6 +933,7 @@ export class SitesService {
             byId.set(site.id, {
                 sections: countPendingSectionChanges(pages, live),
                 site: pendingSiteChanges(draft.site, pages, live),
+                liveLook: snapshotLook(live) ?? null,
             });
         }
         return byId;
@@ -1080,6 +1091,7 @@ export class SitesService {
             navigation: parseSiteNavigation(navigation),
             sellsFrom,
             looksAvailable: await looksRolloutOn(ctx.organizationId),
+            liveLook: pending.get(site.id)?.liveLook ?? null,
             // Asked only when it could be true: Commerce's gate is a read.
             shopAwaitsSellsFrom:
                 sellsFrom !== null &&

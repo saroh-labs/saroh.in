@@ -2,8 +2,11 @@ import { showError } from "@saroh/ui/toast";
 import { useEffect, useRef, useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
+import { lookName } from "@/components/sites/look-picker";
 import { updateSiteStyle } from "@/lib/sites/actions";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
+import { inLook } from "@/lib/sites/style";
+import type { LookId } from "@saroh/block-contract";
 
 /**
  * The site's look and its autosave. Moved out of `site-editor.tsx` unchanged
@@ -27,6 +30,12 @@ export function useEditorStyle({
     const [savedStyleJson, setSavedStyleJson] = useState(() =>
         JSON.stringify(initialStyle),
     );
+    // The look the server holds for the draft, and why the last choice of
+    // another didn't save (U16): said in the Look row, not a toast.
+    const [savedLook, setSavedLook] = useState<LookId | null>(
+        initialStyle.look ?? null,
+    );
+    const [lookError, setLookError] = useState<string | null>(null);
 
     /*
      * A style change that is unsaved or still saving counts as unpublished
@@ -63,11 +72,31 @@ export function useEditorStyle({
             const payload = style;
             const payloadJson = JSON.stringify(payload);
             setStyleSaving(true);
+            const payloadLook = payload.look ?? null;
+            /*
+             * A save that changed the look and failed puts the previous
+             * look back, and says why in the Look row (U16): a look the
+             * server refused must not stay drawn as if it were the site's.
+             * Anything else changed with it stays, and saves on its own.
+             */
+            const lookFailed = (reason: string) => {
+                if (payloadLook === savedLook) return false;
+                const said = /[.!?]$/.test(reason) ? reason : `${reason}.`;
+                setLookError(`${said} The look stays ${lookName(savedLook)}.`);
+                setStyle((now) =>
+                    (now.look ?? null) === payloadLook
+                        ? inLook(now, savedLook)
+                        : now,
+                );
+                return true;
+            };
+            setStyleSaving(true);
             updateSiteStyle(siteId, payload)
                 .then((res) => {
                     if (res.ok) {
                         failedStyleJson.current = null;
                         setSavedStyleJson(payloadJson);
+                        setSavedLook(payloadLook);
                         // A saved style is a change publishing would make;
                         // without this the pill read "Published" (review).
                         onSaved();
@@ -75,11 +104,14 @@ export function useEditorStyle({
                         failedStyleJson.current = payloadJson;
                         // Themes and fonts aren't in the plan (U13).
                         if (res.plan) showPlanRefusal(res.plan);
-                        else showError(res.error);
+                        if (!lookFailed(res.error) && !res.plan) {
+                            showError(res.error);
+                        }
                     }
                 })
                 .catch(() => {
                     failedStyleJson.current = payloadJson;
+                    if (lookFailed("Couldn't reach Saroh.")) return;
                     showError(
                         "Couldn't reach Saroh. Your style is still here and will save with your next change.",
                     );
@@ -87,7 +119,13 @@ export function useEditorStyle({
                 .finally(() => setStyleSaving(false));
         }, 700);
         return () => clearTimeout(id);
-    }, [style, savedStyleJson, siteId, styleSaving, onSaved]);
+    }, [style, savedStyleJson, savedLook, siteId, styleSaving, onSaved]);
+
+    /** Choose a look, or Classic for null (U16): a draft change. */
+    function chooseLook(look: LookId | null) {
+        setLookError(null);
+        setStyle((now) => inLook(now, look));
+    }
 
     function resetStyle() {
         // Back to the business's own defaults — which is what the site looked
@@ -97,8 +135,11 @@ export function useEditorStyle({
         const start = styleOptions.colourways?.find(
             (c) => c.id === styleOptions.startColourway,
         );
+        // Reset is colours, type and spacing: the look stays as chosen
+        // (U16), since Classic is its own choice in the Look row.
+        const look = style.look ?? null;
         if (start) {
-            setStyle(start.style);
+            setStyle(inLook(start.style, look));
             return;
         }
         const defaults: SiteStyle = {
@@ -109,10 +150,19 @@ export function useEditorStyle({
                 styleOptions.scalars.map((sc) => [sc.key, sc.default]),
             ),
         };
-        setStyle(defaults);
+        setStyle(inLook(defaults, look));
     }
 
-    return { style, setStyle, styleSaving, styleDirty, resetStyle };
+    return {
+        style,
+        setStyle,
+        styleSaving,
+        styleDirty,
+        resetStyle,
+        chooseLook,
+        lookError,
+        savedLook,
+    };
 }
 
 export type EditorStyle = ReturnType<typeof useEditorStyle>;

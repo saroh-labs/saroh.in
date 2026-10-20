@@ -43,7 +43,7 @@ export type {
  * knows about, and the exhaustive `Record<SectionType, …>` maps in the editor
  * start demanding their entries instead of silently accepting six.
  */
-import type { SectionType } from "@saroh/block-contract";
+import type { LookId, SectionType } from "@saroh/block-contract";
 import type { SiteChangeKind } from "./pending";
 
 export type { SectionType };
@@ -764,6 +764,17 @@ export interface SiteDetail extends SiteSummary {
      * recorded; absent from an older API.
      */
     template?: SiteTemplate | null;
+    /**
+     * Whether this business may choose a look (`SITE_LOOKS`, DEC-172).
+     * Off, Website › Style offers no look to a Classic site. Absent from an
+     * older API, which reads as off.
+     */
+    looksAvailable?: boolean;
+    /**
+     * The look the live site is in (U16); null for Classic or a site never
+     * published. Absent from an older API.
+     */
+    liveLook?: LookId | null;
 }
 
 /** Which template a site came from: its id, version and style, if any. */
@@ -1296,7 +1307,12 @@ export interface PublishedPage {
 
 /** The parts of a publication snapshot the version preview reads (#283). */
 export interface PublishedSnapshot {
-    site?: { name?: string; styleVariables?: Record<string, string> | null };
+    site?: {
+        name?: string;
+        styleVariables?: Record<string, string> | null;
+        /** The look it was published in (DEC-172); absent is Classic. */
+        look?: string;
+    };
     pages?: PublishedPage[];
 }
 

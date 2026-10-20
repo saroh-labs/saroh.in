@@ -4,7 +4,8 @@ import { useCallback, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { useSiteFaces } from "@/components/sites/site-faces";
-import { SiteTheme } from "@saroh/site-blocks";
+import type { LookId } from "@saroh/block-contract";
+import { lookScope, SiteTheme } from "@saroh/site-blocks";
 
 /**
  * A block drawn at a real desk width inside its own document, scaled down to
@@ -36,11 +37,17 @@ const BLANK = "<!DOCTYPE html><html><head></head><body></body></html>";
 
 export function BlockThumbnail({
     variables,
+    look,
     height = 168,
     children,
 }: {
     /** This merchant's `--site-*` variables; absent → SiteTheme's defaults. */
     variables?: Record<string, string>;
+    /**
+     * The draft's look (DEC-172, U16), so a block is pictured as it will
+     * be drawn. Pass it to the block inside too. Absent is Classic.
+     */
+    look?: LookId;
     /** The card's visible height in px; the top of the block shows. */
     height?: number;
     children: React.ReactNode;
@@ -110,8 +117,13 @@ export function BlockThumbnail({
                       <div
                           inert
                           className="min-h-screen bg-site-bg text-site-fg"
+                          {...lookScope(look)}
                       >
-                          <SiteTheme variables={variables} faces={faces} />
+                          <SiteTheme
+                              variables={variables}
+                              faces={faces}
+                              look={look}
+                          />
                           {children}
                       </div>,
                       doc.body,

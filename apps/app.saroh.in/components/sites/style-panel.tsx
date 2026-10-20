@@ -5,6 +5,8 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 
 import { ChoiceGroup } from "@/components/shared/choice-group";
+import type { LookChoices } from "@/components/sites/look-picker";
+import { LookPicker } from "@/components/sites/look-picker";
 import { useSiteFaces } from "@/components/sites/site-faces";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { activeColourway, contrastOk, inColourway } from "@/lib/sites/style";
@@ -31,6 +33,10 @@ import { Label } from "@saroh/ui/label";
  * Every change applies to the preview immediately — the values resolve into
  * `--site-*` custom properties on the preview subtree, so nothing round-trips
  * to show a colour.
+ *
+ * The Look row leads the panel (DEC-172, U16) when `looks` is given and
+ * there is a look to offer; every control below it stays, under a look
+ * too, and comes back into force with Classic.
  */
 export function StylePanel({
     style,
@@ -38,12 +44,15 @@ export function StylePanel({
     onChange,
     onReset,
     saving,
+    looks,
 }: {
     style: SiteStyle;
     options: SiteStyleOptions;
     onChange: (next: SiteStyle) => void;
     onReset: () => void;
     saving: boolean;
+    /** The Look row's facts and its choice; absent draws no row. */
+    looks?: LookChoices;
 }) {
     const swatchesFor = (row: string) =>
         options.rows.find((r) => r.key === row)?.swatches ?? [];
@@ -124,7 +133,10 @@ export function StylePanel({
          * the page's blocks, so it carries no header or Back of its own.
          */
         <div className="flex min-h-0 flex-col">
-            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3">
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3 [&>section+section]:border-t [&>section+section]:pt-4">
+                {looks ? (
+                    <LookPicker style={style} options={options} {...looks} />
+                ) : null}
                 {/* The pairing picker H1's note promised (DEC-046); an
                     older API that serves no pairs shows no choice. */}
                 {fontPairs.length > 0 ? (
@@ -154,12 +166,7 @@ export function StylePanel({
                         />
                     </section>
                 ) : null}
-                <section
-                    className={cn(
-                        "space-y-3",
-                        fontPairs.length > 0 && "border-t pt-4",
-                    )}
-                >
+                <section className="space-y-3">
                     <h3 className="label">Colour</h3>
                     {colourways.length > 0 ? (
                         <ChoiceGroup
@@ -266,7 +273,7 @@ export function StylePanel({
                     ))}
                 </section>
 
-                <section className="space-y-3 border-t pt-4">
+                <section className="space-y-3">
                     <h3 className="label">Spacing and shape</h3>
                     {options.scalars.map((scalar) => {
                         const value = style.scalars[scalar.key] ?? scalar.min;

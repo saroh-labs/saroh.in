@@ -14,8 +14,8 @@ import type { SiteStyle } from "./site-style";
  *
  * - a style save that sets a look, or changes it to another, needs the
  *   flag on for the business ({@link assertLookAllowed});
- * - keeping the look the draft already has, and clearing it back to
- *   Classic, are always accepted, so turning the flag off never locks an
+ * - keeping the look the draft already has (or the live site's), and
+ *   clearing it back to Classic, are always accepted, so turning the flag off never locks an
  *   owner out of Website › Style;
  * - a new site starts in its template's look only while the flag is on
  *   ({@link newSiteLook}).
@@ -46,10 +46,21 @@ export function storedLook(stored: unknown): LookId | undefined {
 }
 
 /**
+ * The look a publication's snapshot was published in, or undefined
+ * (Classic, an older snapshot, or no publication).
+ */
+export function snapshotLook(snapshot: unknown): LookId | undefined {
+    if (snapshot === null || typeof snapshot !== "object") return undefined;
+    return storedLook((snapshot as { site?: unknown }).site);
+}
+
+/**
  * Refuse setting or changing a look while `SITE_LOOKS` is off for the
  * business: a 400 with `details.code` {@link LOOK_NOT_AVAILABLE}. A save
  * without a look, or with the one the draft already has, costs no read
- * of the flag.
+ * of the flag. The look the live site is in is always accepted too
+ * (U16): an owner who went back to Classic in the draft can undo that
+ * before publishing, flag or no flag.
  */
 export async function assertLookAllowed(
     organizationId: string,
@@ -63,6 +74,12 @@ export async function assertLookAllowed(
     });
     if (storedLook(site?.style) === next.look) return;
     if (await looksRolloutOn(organizationId)) return;
+    // Only now the live snapshot, which is the larger read.
+    const live = await prisma.site.findFirst({
+        where: { id: siteId, organizationId, deletedAt: null },
+        select: { currentPublication: { select: { snapshot: true } } },
+    });
+    if (snapshotLook(live?.currentPublication?.snapshot) === next.look) return;
     throw new BadRequestException({
         message: "Looks aren't available for this business yet",
         details: { field: "look", code: LOOK_NOT_AVAILABLE },

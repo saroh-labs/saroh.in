@@ -236,6 +236,51 @@ describe("choosing a look (SITE_LOOKS)", () => {
         expect((await sites.getSite(ctx, siteId)).looksAvailable).toBe(false);
     });
 
+    it("names the live site's look, and lets the draft take it back after the flag goes off (U16)", async () => {
+        const ctx = await business();
+        const { siteId } = await classicSite(ctx);
+        // Never published: no live look.
+        expect((await sites.getSite(ctx, siteId)).liveLook).toBeNull();
+
+        await looks(ctx.organizationId, true);
+        await sites.updateStyle(ctx, siteId, {
+            ...defaultSiteStyle(),
+            look: "quiet",
+        });
+        await sites.publishSite(ctx, siteId);
+        expect((await sites.getSite(ctx, siteId)).liveLook).toBe("quiet");
+
+        // The flag off, the draft back to Classic: the live site stays Quiet.
+        await looks(ctx.organizationId, false);
+        await sites.updateStyle(ctx, siteId, defaultSiteStyle());
+        const draftClassic = await sites.getSite(ctx, siteId);
+        expect(draftClassic.style.look).toBeUndefined();
+        expect(draftClassic.liveLook).toBe("quiet");
+        expect(draftClassic.looksAvailable).toBe(false);
+
+        // The live look comes back; any other is still refused.
+        const back = await sites.updateStyle(ctx, siteId, {
+            ...defaultSiteStyle(),
+            look: "quiet",
+        });
+        expect(back.style.look).toBe("quiet");
+        await sites.updateStyle(ctx, siteId, defaultSiteStyle());
+        const body = await refusal(
+            sites.updateStyle(ctx, siteId, {
+                ...defaultSiteStyle(),
+                look: "live",
+            }),
+        );
+        expect(body.details?.code).toBe(LOOK_NOT_AVAILABLE);
+    });
+
+    it("reads a Classic live site's look as null", async () => {
+        const ctx = await business();
+        const { siteId } = await classicSite(ctx);
+        await sites.publishSite(ctx, siteId);
+        expect((await sites.getSite(ctx, siteId)).liveLook).toBeNull();
+    });
+
     it("never touches another business's site", async () => {
         const ours = await business();
         const theirs = await business();

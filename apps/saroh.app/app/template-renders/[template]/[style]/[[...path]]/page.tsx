@@ -3,6 +3,8 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import {
+    lookOf,
+    lookScope,
     PageSections,
     SiteChromeFrame,
     SiteFooter,
@@ -28,6 +30,8 @@ import { rootDomain } from "@/lib/test-release";
  * Only on the renderer's own host, with `TEMPLATE_RENDERS=on`, and never on
  * a production deployment (`lib/template-renders/guard.ts`); otherwise a
  * 404. Never indexed. `_` for the colourway is the template's first.
+ * `?look=quiet` (or `folio`, `live`) draws it in that look (DEC-172, U16),
+ * for the editor's Look row pictures; anything else is Classic.
  */
 
 export const metadata: Metadata = {
@@ -37,8 +41,10 @@ export const metadata: Metadata = {
 
 export default async function TemplateRenderPage({
     params,
+    searchParams,
 }: {
     params: Promise<{ template: string; style: string; path?: string[] }>;
+    searchParams: Promise<{ look?: string | string[] }>;
 }) {
     const host = (await headers()).get("host");
     if (
@@ -53,10 +59,12 @@ export default async function TemplateRenderPage({
     }
 
     const { template, style, path } = await params;
+    const look = lookOf((await searchParams).look);
     const render = templateRender(
         decodeURIComponent(template),
         style === "_" ? undefined : decodeURIComponent(style),
         `/${(path ?? []).map(decodeURIComponent).join("/")}`,
+        look,
     );
     if (!render) notFound();
 
@@ -64,12 +72,18 @@ export default async function TemplateRenderPage({
         <div
             className="min-h-screen bg-site-bg text-site-body"
             data-template-render={render.templateId}
+            {...lookScope(look)}
         >
-            <SiteTheme variables={render.styleVariables} faces={SITE_FACES} />
+            <SiteTheme
+                variables={render.styleVariables}
+                faces={SITE_FACES}
+                look={look}
+            />
             <SiteChromeFrame
                 account={false}
                 header={
                     <SiteHeader
+                        look={look}
                         name={render.name}
                         navigation={render.navigation}
                         action={render.action}
@@ -78,6 +92,7 @@ export default async function TemplateRenderPage({
                 }
                 footer={
                     <SiteFooter
+                        look={look}
                         footer={render.footer}
                         name={render.name}
                         // The header's menu again at the foot, as live.
@@ -95,6 +110,7 @@ export default async function TemplateRenderPage({
                     packs={render.packs}
                     productGrids={render.productGrids}
                     fixtures={render.fixtures}
+                    look={look}
                 />
             </SiteChromeFrame>
         </div>

@@ -169,6 +169,7 @@ export default async function PastVersionPage({
                 <PastVersionPreview
                     sections={sections}
                     variables={publication.snapshot.site?.styleVariables}
+                    look={publication.snapshot.site?.look}
                 />
             ) : (
                 <p className="text-sm text-muted-foreground">
