@@ -10,7 +10,7 @@ import { SiteFooter, SiteHeader } from "./site-chrome";
 import type { SiteContact } from "./site-footer-contact";
 import type { SiteHeaderAction } from "./site-header-menu";
 import { chromeActionShows, chromePageKind } from "./site-primary-action";
-import { StickyActions } from "./sticky-actions";
+import { pagePrimaries, StickyActions } from "./sticky-actions";
 import { viewport } from "./test-viewport";
 
 /**
@@ -636,6 +636,22 @@ describe("one filled button, one fixed bar", () => {
         expect(
             within(dock).getByRole("link", { name: "Home" }),
         ).toHaveAttribute("aria-current", "page");
+    });
+});
+
+describe("the page's own buttons", () => {
+    afterEach(() => {
+        document.documentElement.removeAttribute("data-site-primary");
+        document.body.innerHTML = "";
+    });
+
+    it("never counts the root, which says whether one is shown", () => {
+        document.documentElement.setAttribute("data-site-primary", "shown");
+        document.body.innerHTML =
+            '<main><a href="/book" data-site-primary="">Book</a></main>';
+        const found = pagePrimaries(document);
+        expect(found).toHaveLength(1);
+        expect(found[0]?.tagName).toBe("A");
     });
 });
 

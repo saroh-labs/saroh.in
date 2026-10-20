@@ -56,9 +56,14 @@ import { chromeActionShows, chromePageKind } from "./site-primary-action";
  * foot); the dock stays on the shop's grid, where nothing else does.
  */
 
-/** The page's filled buttons: what "the page's main action" means here. */
+/**
+ * The page's filled buttons: what "the page's main action" means here.
+ * Never the root, which carries `data-site-primary` itself to say whether
+ * one is on screen: matched, it is always in view, and once a rescan
+ * watched it the Book bar never came.
+ */
 const PRIMARY =
-    "[data-site-primary], a.bg-site-accent, button.bg-site-accent, a.bg-site-cta-fg";
+    "[data-site-primary]:not(html), a.bg-site-accent, button.bg-site-accent, a.bg-site-cta-fg";
 
 /** The chrome's own buttons, which are never the page's. */
 const CHROME =
