@@ -15,7 +15,7 @@ import {
 } from "../../common/drafts/draft-record";
 import { toMoneyString } from "../../common/money";
 import { assertPlanStartsSubscriptions } from "../billing/online-payments-plan";
-import { isGstRate } from "../invoices/gst";
+import { isGstRate, notGstRateMessage } from "../invoices/gst";
 import { businessCurrency } from "../stores/currency";
 import type { PlanDraftDto, PlanInputDto } from "./dto";
 import type { PlanDraftRow, PlanValues } from "./plan-draft-view";
@@ -112,10 +112,7 @@ function patchOf(dto: PlanInputDto): DraftPatch<PlanValues> {
     // same rate typed twice is never a change.
     if (typeof patch.gstRate === "string") {
         if (!isGstRate(patch.gstRate)) {
-            fieldError(
-                `${patch.gstRate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
-                "gstRate",
-            );
+            fieldError(notGstRateMessage(patch.gstRate), "gstRate");
         }
         patch.gstRate = planRate(patch.gstRate);
     }

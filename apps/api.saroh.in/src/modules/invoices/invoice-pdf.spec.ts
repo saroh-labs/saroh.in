@@ -497,6 +497,47 @@ describe("an issued paper names the seller as it was at issue (DEC-082)", () => 
     });
 });
 
+describe("a paper issued before GST registration (#1161)", () => {
+    /**
+     * Rye issued 0012 unregistered, then added a GSTIN and issued 0013.
+     * The seller's GSTIN is read only from what each froze at issue; the
+     * business's settings today carry none into the paper.
+     */
+    const before = () =>
+        row({
+            sellerName: "Rye & Co.",
+            sellerAddress:
+                "22 Hill Road, Indiranagar, Bengaluru 560038, Karnataka",
+        });
+    const after = () =>
+        taxInvoice({ number: "RYE/26-27/0013", sellerName: "Rye & Co." });
+
+    it("the earlier paper has no GSTIN and keeps its not-registered lines", () => {
+        const v = view(before());
+        expect(v.seller.tax).toBe("Not registered for GST");
+        expect(v.seller.lines.join(" ")).not.toContain("GSTIN");
+        expect(v.hsnColumn).toBe(false);
+        expect(v.footer).toBe(
+            "Rye & Co. is not registered for GST, so no tax is charged.",
+        );
+    });
+
+    it("the invoice issued after registering prints its GSTIN", () => {
+        const v = view(after());
+        expect(v.seller.tax).toBe(`GSTIN ${GSTIN} · Karnataka (29)`);
+        expect(v.footer).toContain("Tax invoice under section 31");
+    });
+
+    it("the PDFs say the same", async () => {
+        const first = await pdfText(before());
+        expect(first.text).not.toContain("GSTIN");
+        expect(first.text).toContain("Not registered for GST");
+        expect(first.text).toContain("so no tax is charged.");
+        const second = await pdfText(after());
+        expect(second.text).toContain(`GSTIN ${GSTIN}`);
+    });
+});
+
 describe("How to pay us on an unpaid invoice (#833)", () => {
     const PAY = {
         upiId: "rye@okhdfc",

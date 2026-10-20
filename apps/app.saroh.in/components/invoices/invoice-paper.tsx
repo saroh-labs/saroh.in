@@ -91,7 +91,14 @@ export function InvoicePaper({
     const taxed = gst && !isExemptPaper(i) ? gst : null;
     const credit = i.kind === "CREDIT_NOTE";
     const title = paperTitle(i);
-    const gstin = gst?.sellerGstin ?? business?.gstin ?? null;
+    // The seller's GSTIN as it was at issue (DEC-082, #1161): issued paper
+    // prints the one frozen on it, and only when it was issued as a tax
+    // invoice — paper issued before the business registered has none, even
+    // after a GSTIN is added. A draft prints today's.
+    const gstin =
+        i.status === "DRAFT"
+            ? (business?.gstin ?? null)
+            : (gst?.sellerGstin ?? null);
     const sellerState =
         gst?.sellerState && business?.state?.code === gst.sellerState
             ? `${business.state.name ?? ""} (${gst.sellerState})`

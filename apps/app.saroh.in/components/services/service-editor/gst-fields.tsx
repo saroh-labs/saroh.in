@@ -5,6 +5,10 @@ import { Input } from "@saroh/ui/input";
 import { OptionSelect } from "@saroh/ui/option-select";
 import type { FocusEvent } from "react";
 
+import {
+    GstRatePicker,
+    pickerWiring,
+} from "@/components/shared/gst-rate-picker";
 import type { GstForm } from "@/lib/gst/item-words";
 import type { GstPriceMode, ItemModeValue } from "@/lib/gst/price-mode";
 import {
@@ -12,12 +16,6 @@ import {
     itemModeOptions,
     rateHint,
 } from "@/lib/gst/price-mode";
-import type { GstRateValue } from "@/lib/invoices/gst";
-import {
-    GST_RATE_CHOICES,
-    GST_RATE_OPTIONS,
-    GST_RATE_PLACEHOLDER,
-} from "@/lib/invoices/gst";
 
 /** The two GST fields that can be wrong. */
 export type GstField = "gstRate" | "sacCode";
@@ -43,16 +41,12 @@ export interface GstEdit {
 }
 
 /**
- * Whether a blur is the rate box being left. Opening its list moves the
- * keyboard into the list, which is not leaving the field, and a blur inside
- * the list reaches here through React though the list is drawn elsewhere.
+ * Whether a blur is the rate being left: the keyboard goes somewhere outside
+ * the field. Moving between its chips, or opening Other rate, is not.
  */
 function leftRate(e: FocusEvent<HTMLElement>): boolean {
-    const from = e.target;
-    if (!e.currentTarget.contains(from)) return false;
-    if (from.getAttribute("aria-expanded") === "true") return false;
     const to = e.relatedTarget;
-    return !(to instanceof Element && to.closest('[role="listbox"]'));
+    return !(to instanceof Node && e.currentTarget.contains(to));
 }
 
 /**
@@ -62,8 +56,9 @@ function leftRate(e: FocusEvent<HTMLElement>): boolean {
  * in one of two places (`gstPlace`).
  *
  * Beside the price, for a GST-registered business (`asked`): the rate is a
- * question with no "Not set" row. The box starts on "Choose a rate", and
- * 0% is a choice like any other, for an exempt or nil-rated service. Beside
+ * question with no "Not set" chip (`GstRatePicker`, DEC-176). It starts with
+ * no chip pressed, and 0% is a choice like any other, for an exempt or
+ * nil-rated service. Beside
  * it, "GST on this price" for the one service priced differently from the
  * business's own way (12 Oct 2026); a business that isn't registered is
  * never shown it.
@@ -98,7 +93,7 @@ export function GstFields({
                 // Saroh's own words, whichever way the price carries GST.
                 holdsData={false}
                 label="GST rate"
-                className="flex-[1_1_200px]"
+                className="flex-[1_1_100%]"
                 error={problem("gstRate")}
                 // Where a note may stand in for the problem (the editor
                 // shell), tabbing past the box without choosing is leaving
@@ -122,16 +117,18 @@ export function GstFields({
                     )
                 }
             >
-                <OptionSelect<GstRateValue>
-                    value={draft.gstRate as GstRateValue}
-                    onValueChange={(gstRate) => {
-                        set({ gstRate });
-                        leave?.("gstRate");
-                    }}
-                    options={asked ? GST_RATE_CHOICES : GST_RATE_OPTIONS}
-                    placeholder={asked ? GST_RATE_PLACEHOLDER : undefined}
-                    disabled={!canEdit}
-                />
+                {(control) => (
+                    <GstRatePicker
+                        {...pickerWiring(control)}
+                        value={draft.gstRate}
+                        optional={!asked}
+                        onChange={(gstRate) => {
+                            set({ gstRate });
+                            leave?.("gstRate");
+                        }}
+                        disabled={!canEdit}
+                    />
+                )}
             </Field>
             {/* Only a registered business chooses how a price carries GST
                 (12 Oct 2026); most leave it as the business's own way. */}

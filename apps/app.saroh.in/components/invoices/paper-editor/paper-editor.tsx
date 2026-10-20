@@ -338,7 +338,11 @@ export function PaperEditor({
     );
 
     return (
-        <div className="grid items-start gap-5 min-[1100px]:grid-cols-[minmax(0,1fr)_260px]">
+        // The paper's column stops at its own width (820px), so the Style
+        // panel sits right beside it on a wide screen rather than at the
+        // far edge (#1161, the INVNewEdit board); narrower, the paper
+        // gives way first. Below the desk it is one column, as before.
+        <div className="grid items-start gap-5 min-[1100px]:grid-cols-[minmax(0,820px)_260px]">
             <div className="min-w-0 max-w-[820px]">
                 <div className="mb-2.5 flex flex-wrap items-center gap-2">
                     <p className="flex-1 text-[13px] text-muted-foreground">

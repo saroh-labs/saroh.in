@@ -10,6 +10,13 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+    pickRate,
+    ratePicker,
+    rateShown,
+    ratesOffered,
+} from "@/components/shared/gst-rate-picker.testing";
+
 import type { InvoiceFormBusiness } from "@/lib/invoices/new-invoice";
 import type { Invoice } from "@/lib/invoices/service";
 
@@ -293,12 +300,26 @@ describe("editing a part of the paper", () => {
     it("a line's GST is chosen as a chip, and Remove line takes it off", async () => {
         render();
         act(() => part("Change line 2").click());
-        choose("5%");
+        const rate = ratePicker("GST", all());
+        // The shared picker (DEC-176): no "Not set", the line's 18% pressed.
+        expect(ratesOffered(rate)).toEqual(["0", "5", "18", "40"]);
+        expect(rateShown(rate)).toBe("18");
+        pickRate(rate, "5");
         expect(paperText()).toContain("GST 5% · HSN 19059020");
         act(() => button("Remove line").click());
         await settle();
         expect(paperText()).not.toContain("Butter croissant");
         expect(paperText()).toContain("₹4,800");
+    });
+
+    it("a line's 1.5% behind Other rate splits into CGST and SGST at 0.75% each", () => {
+        render();
+        act(() => part("Change line 2").click());
+        pickRate(ratePicker("GST", all()), "1.5");
+        expect(rateShown(ratePicker("GST", all()))).toBe("1.5");
+        expect(paperText()).toContain("GST 1.5% · HSN 19059020");
+        expect(paperText()).toContain("CGST 0.75%");
+        expect(paperText()).toContain("SGST 0.75%");
     });
 
     it("who it's billed to opens the same fields as the form, the place of supply following them", () => {
@@ -464,6 +485,21 @@ describe("the style rail", () => {
         expect(paper().dataset.style).toBe("CLASSIC");
         expect(text()).toContain("Your default look: Classic · ink.");
         expect(hasButton("Use my default")).toBe(false);
+    });
+
+    it("sits beside the paper on a wide screen, not at the page's far edge (#1161)", () => {
+        render();
+        const rail = host.querySelector<HTMLElement>(
+            'aside[aria-label="Style"]',
+        );
+        const grid = rail?.parentElement;
+        // The paper's track is capped at its own width, so no free space
+        // opens between it and the rail; one column below the desk.
+        expect(grid?.className).toContain(
+            "min-[1100px]:grid-cols-[minmax(0,820px)_260px]",
+        );
+        expect(grid?.className).not.toContain("1fr");
+        expect(grid?.firstElementChild?.className).toContain("max-w-[820px]");
     });
 
     it("Band and a colour are the draft's own, drawn and saved", async () => {

@@ -19,14 +19,17 @@ import {
     fieldWidth,
     RegisteredAddressFields,
 } from "@/components/organizations/registered-address-fields";
-import { GST_RATE_OPTIONS, rateOption } from "@/lib/invoices/gst";
+import { GstRatePicker } from "@/components/shared/gst-rate-picker";
+import { rateOption } from "@/lib/invoices/gst";
 import { GSTIN_EXAMPLE } from "@/lib/invoices/gstin";
 import { formatOf, prefixOf } from "@/lib/invoices/invoice-number";
 import type { BusinessSheet } from "@/lib/organizations/business-rows";
-import { OptionSelect } from "@saroh/ui/option-select";
 
-/** Delivery always carries a rate: no "Not set" row. */
-const DELIVERY_RATES = GST_RATE_OPTIONS.filter((o) => o.value !== "");
+/**
+ * Delivery always carries a rate: the picker with no "Not set" chip
+ * (DEC-176). The label names its chips, so it is pointed at by id.
+ */
+const DELIVERY_RATE_LABEL = "business-delivery-rate-label";
 
 /** One field's wrapper, at the width the design gives it. */
 const at = fieldWidth;
@@ -216,16 +219,15 @@ export function BusinessTaxFields({
                         control={control}
                         name="deliveryRate"
                         render={({ field }) => (
-                            <FormItem {...at("160px", false)}>
-                                <FormLabel>GST on delivery</FormLabel>
-                                <FormControl>
-                                    <OptionSelect
-                                        value={rateOption(field.value) || "18"}
-                                        onValueChange={field.onChange}
-                                        options={DELIVERY_RATES}
-                                        className="w-full"
-                                    />
-                                </FormControl>
+                            <FormItem {...at("100%")}>
+                                <FormLabel id={DELIVERY_RATE_LABEL}>
+                                    GST on delivery
+                                </FormLabel>
+                                <GstRatePicker
+                                    labelledBy={DELIVERY_RATE_LABEL}
+                                    value={rateOption(field.value) || "18"}
+                                    onChange={field.onChange}
+                                />
                                 <FormMessage />
                             </FormItem>
                         )}

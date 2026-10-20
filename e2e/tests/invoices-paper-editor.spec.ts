@@ -2,6 +2,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { chooseRate, otherRate, ratePicker } from "../fixtures/gst-rate";
 import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
 import { makeContact, northwind, stamp } from "../fixtures/own-data";
 import { pressUntil } from "../fixtures/press";
@@ -155,6 +156,14 @@ test.describe("New invoice on the paper", () => {
         await line.getByRole("radio", { name: "5%", exact: true }).click();
         await expect(paper).toContainText("GST 5%");
         await expect(paper).toContainText("₹640");
+        // A rate behind Other rate (DEC-176): its own chip is the one lit.
+        const rates = ratePicker(line, "GST");
+        await chooseRate(rates, "12");
+        await expect(otherRate(rates)).toHaveAttribute("aria-expanded", "true");
+        await expect(
+            line.getByRole("radio", { name: "5%", exact: true }),
+        ).toHaveAttribute("aria-checked", "false");
+        await expect(paper).toContainText("GST 12%");
     });
 
     test("the GSTIN, the number and the section 31 line are labelled and can't be removed", async ({

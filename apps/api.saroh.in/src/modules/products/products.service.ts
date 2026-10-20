@@ -29,7 +29,7 @@ import {
     productFieldsFor,
     saveProductFieldValues,
 } from "../catalogue/fields.service";
-import { isGstRate, rateToBps } from "../invoices/gst";
+import { isGstRate, notGstRateMessage, rateToBps } from "../invoices/gst";
 import { loadPriceTerms } from "../invoices/price-terms";
 import { productTypesOf } from "../orders/fulfilment";
 import { enqueuePageRevalidation } from "../sites/page-cache-revalidate";
@@ -160,7 +160,7 @@ function checkGstRate(rate: string | null | undefined): string | null {
     if (rate === undefined || rate === null) return null;
     if (!isGstRate(rate)) {
         throw new BadRequestException({
-            message: `${rate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
+            message: notGstRateMessage(rate),
             field: "gstRate",
         });
     }

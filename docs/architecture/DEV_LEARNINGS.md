@@ -12,6 +12,34 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## E2E — the product editor's Sections strip and a long field value failed a new phone check
+
+**Symptom**: 21 Oct 2026. The new `gst-rate-picker.spec.ts` failed on
+phone-serial only, in `expectNothingHiddenSideways`: at 320px on the product
+editor `nav.flex.flex-wrap.gap-1 730>320` and `input.flex.w-full.rounded-md
+241>226`, and at 412px on a new invoice `input.flex.w-full.rounded-md
+341>294`. Desk passed, and so did every other phone spec.
+**Root cause**: Two things. (1) The editor's Sections links turn into one
+row below the desk with a bare `overflow-x-auto`: a strip that means to
+scroll, but with no fade and no `data-scroll-x`, so nothing on a phone said
+there was more, and the check took it as hidden content. No spec had run the
+check on the product editor before, so it had been there on development all
+along. (2) A text field whose value is longer than the field scrolls the
+value inside itself (`scrollWidth > clientWidth`); the test's names ("E2E GST
+1.5 phone-serial", "Cut diamond <stamp>") were longer than a phone's field.
+The fields themselves fitted their columns.
+**Fix**: The Sections `nav` takes `useEdgeFade` and `data-scroll-x`, as
+`SectionList`'s phone row does (UX-079): it still scrolls, now fading the
+side with more. The spec passes `{ allow: ["input"] }`, as
+`qr-code-maker.spec.ts` does: a field scrolling its own value is the
+field's job; anything laid out wider than its column is still caught on its
+parent.
+**Rule**: A row that scrolls itself on a phone uses `useEdgeFade` +
+`data-scroll-x` (or `ScrollX`), never a bare `overflow-x-auto`. A phone spec
+that types long values into fields allows `input` and says why
+(`docs/patterns/frontend-verification.md`, `e2e/fixtures/hidden-sideways.ts`).
+**Category**: e2e · layout · `apps/app.saroh.in/components/commerce/product-editor-v2/editor-shell.tsx`
+
 ## Home — Turn down's Undo was drawn and pulled away in the same moment
 
 **Symptom**: 20 Oct 2026. `home-needs-groups.spec.ts` "Turn down is held

@@ -303,7 +303,16 @@ describe("the typed price is read back from the frozen unit amount", () => {
 
     it("and for large prices: ₹1,000, ₹99,999.99, ₹12,34,567.89", () => {
         for (const typed of [100_000, 9_999_999, 123_456_789]) {
-            for (const rate of ["0.25", "3", "5", "12", "18", "28", "40"]) {
+            for (const rate of [
+                "0.25",
+                "1.5",
+                "3",
+                "5",
+                "12",
+                "18",
+                "28",
+                "40",
+            ]) {
                 const pay = unitPayCents(typed, rateToBps(rate), "ADDED");
                 expect(
                     addedLine({
