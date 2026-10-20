@@ -132,3 +132,15 @@ today.
 - **Specs choosing by dropdown:** every spec that picks a rate through the
   dropdown changes. `git grep "Choose a rate"` and the `/GST rate/` label
   finds them.
+
+## Also in this batch (#1161)
+
+### U4. An invoice issued before GST registration carries no GSTIN
+
+- **Today:** the seller block reads the business as it is now, while the footer reads the GST details frozen on the invoice at issue. An invoice issued unregistered says "not registered for GST" under today's GSTIN.
+- **Fix:** the seller block reads what was frozen at issue (name, address, and the GSTIN only on a tax invoice), on the details sheet's paper, the full page, the PDF and the customer's pay page.
+- **Tests:** issued unregistered, then a GSTIN added: no GSTIN on its paper, and the "not registered" line kept. A new invoice shows the GSTIN. A db spec and a paper unit test.
+
+### U5. The paper editor's wide-screen gap
+
+- Keep the Style panel beside the paper on a wide screen, as on the INVNewEdit board. Check at 1280, 1440 and 1920.
