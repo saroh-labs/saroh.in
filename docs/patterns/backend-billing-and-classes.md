@@ -136,7 +136,36 @@ requireProvider: false })`), the email says "view it and download a copy",
 - **Tests:** `invoice-ledger.spec.ts` (the settle rules) and
   `invoice-payments.db.spec.ts` (every refusal, repeats, two payments
   racing on the row lock, one business never reaching another's), plain
-  and under `TEST_RLS=on`.
+  and under `TEST_RLS=on`. The whole journey (written on the paper in
+  Band, issued and shared on WhatsApp, ₹1,000 in cash taking ₹1,000 off
+  Owed, the rest by cheque, the cheques line, in the bank, the receipt
+  shared) is one browser spec on Northwind's own data,
+  `e2e/tests/invoices-journey.spec.ts`, `@serial` because the strip and
+  the cheques line are business-wide (U17 #1129).
+- **Demo data shows every state** (U17 #1129). The showcase plans what
+  happened to an invoice after it went out in
+  `packages/database/src/seed/showcase/invoice-states.ts`: its ledger
+  rows, its share log and its `INVOICE_SENT` / `INVOICE_REMINDER` emails,
+  and the look it went out in. The invoice's status and paid columns are
+  worked out from the planned rows by `settleLedger`, the API's `settle`
+  rules, never typed by hand, and an overpayment stops the seed. Rye &
+  Co. (`bakery.ts`, GST) has a part payment, two cheques waiting (₹8,400
+  and ₹5,600), one in the bank, one bounced and owed again, overdue a
+  week, a month and longer, WhatsApp shares, reminders both ways, a
+  credit note with the invoice written again, and Classic, Band and
+  Compact paper with Band in its colour as the default. Pulse (`pulse.ts`,
+  not registered) has part payments on two renewals, a void invoice
+  written again, and Compact in its colour. A paid invoice planned without
+  rows gets its one payment from the ledger backfill, as a live database
+  did. The seed's own check (`check.ts`) fails on: `paidCents` not its
+  live sum, a PAID invoice with no payment, a status that doesn't follow
+  the payments, a paid date that isn't the last payment's, cheque fields
+  that don't fit the method and bank status, a payment on paper that
+  doesn't take one or out of time, a share or email before issue, a
+  rewrite from an invoice that wasn't cancelled, and a style or colour the
+  API wouldn't store; `checkRye` and `checkPulse` fail when a state is
+  missing. The emails are `Message` rows, which an invoice's delete leaves
+  (`SetNull`): a seed clears them on its own seeded ids.
 - **The list's search, views and money strip** (U4, #1116). `GET /`
   takes `q` (trimmed, at most 80 characters): a name (bill-to, or the
   contact's first and last name, so a draft is found too), part of a
@@ -1797,3 +1826,5 @@ options, items, more }` and a sentence with the count, the first
 - Demo data: `db:seed:showcase` builds Pulse (subscriptions and invoices),
   Prana (courses, packs, online classes) and CarePoint (a clinic without
   Payments), and checks its own sums in SQL (`docs/architecture/LOCAL_DEV.md`).
+  Rye & Co. and Pulse carry every state the rebuilt invoice screens draw
+  ("Payments on an invoice are a ledger" → Demo data, #1129).
