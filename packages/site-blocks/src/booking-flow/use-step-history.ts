@@ -17,6 +17,24 @@ export type StepMove = "push" | "replace";
 const MARK = { sarohBookingStep: true };
 
 /**
+ * Whether the page is writing its own address now. Next's router copies
+ * its `__NA` mark into every write that passes its patch of the History
+ * API, so the mark alone can't tell its writes from the page's.
+ */
+let writingOwn = false;
+
+/** The page's own write of its address. */
+function write(how: StepMove, url: string): void {
+    writingOwn = true;
+    try {
+        if (how === "push") window.history.pushState(MARK, "", url);
+        else window.history.replaceState(MARK, "", url);
+    } finally {
+        writingOwn = false;
+    }
+}
+
+/**
  * The booking step in the address, kept in step with the page (U9, KD7).
  *
  * The page says what the address should be (`want`) on every draw. A move
@@ -33,6 +51,14 @@ const MARK = { sarohBookingStep: true };
  * Nothing is written as the page first draws: the address it was opened
  * on is the server's, and the first draw matches it — unless it named a
  * step the page can't stand on, which is put right in place.
+ *
+ * Next's router can fall behind these writes: a Server Action that sets a
+ * cookie (signing in with the code) refreshes the page at the address the
+ * router last knew, and its history sync then pushes an earlier step's
+ * address over the one on screen, so Back skipped a step. While the page
+ * is up, a write of the router's own (`__NA`) to an address this page wrote
+ * earlier and has since left is kept on the address the page is on, in
+ * place (`keepOwnAddress`).
  */
 export function useStepHistory({
     want,
@@ -61,7 +87,7 @@ export function useStepHistory({
             const named = parseStepUrl(window.location.search).step;
             if (named !== null && named !== want.step) {
                 try {
-                    window.history.replaceState(MARK, "", wanted);
+                    write("replace", wanted);
                 } catch {
                     // As below.
                 }
@@ -81,9 +107,9 @@ export function useStepHistory({
             (how === "push" || stepIndex(next) > stepIndex(from));
         try {
             if (push) {
-                window.history.pushState(MARK, "", wanted);
+                write("push", wanted);
             } else {
-                window.history.replaceState(MARK, "", wanted);
+                write("replace", wanted);
             }
         } catch {
             // An address the browser won't take: the page still works.
@@ -92,6 +118,20 @@ export function useStepHistory({
         // `want.step` is in `wanted`.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [wanted]);
+
+    // Every address this page has written, for `keepOwnAddress`.
+    const left = useRef(new Set<string>());
+    useEffect(() => {
+        if (written.current !== null) left.current.add(written.current);
+    });
+    useEffect(
+        () =>
+            keepOwnAddress(
+                () => written.current,
+                (url) => left.current.has(url),
+            ),
+        [],
+    );
 
     useEffect(() => {
         const onPop = () => {
@@ -108,6 +148,58 @@ export function useStepHistory({
     }, []);
 
     return { willPush };
+}
+
+/**
+ * Wrap the History API while the booking page is up: a write of Next's
+ * router (marked `__NA`) to an address the page wrote before and has left
+ * since is a stale sync (see `useStepHistory`), so it replaces the entry in
+ * place with the address the page is on. Any other write, and every write
+ * once the page is gone, goes through as it was. Returns the unwrap.
+ */
+function keepOwnAddress(
+    current: () => string | null,
+    wroteBefore: (url: string) => boolean,
+): () => void {
+    if (typeof window === "undefined") return () => undefined;
+    const { history } = window;
+    const push = history.pushState.bind(history);
+    const replace = history.replaceState.bind(history);
+    let active = true;
+    const stale = (data: unknown, url: string | URL | null | undefined) => {
+        const now = current();
+        if (
+            !active ||
+            writingOwn ||
+            now === null ||
+            url === undefined ||
+            url === null
+        )
+            return null;
+        if (!(data as { __NA?: unknown } | null)?.__NA) return null;
+        const to = new URL(String(url), window.location.href);
+        const address = `${to.pathname}${to.search}${to.hash}`;
+        return address !== now && wroteBefore(address) ? now : null;
+    };
+    const ownPush: History["pushState"] = (data, unused, url) => {
+        const keep = stale(data, url);
+        if (keep !== null) return replace(data, unused, keep);
+        return push(data, unused, url);
+    };
+    const ownReplace: History["replaceState"] = (data, unused, url) => {
+        const keep = stale(data, url);
+        return replace(data, unused, keep ?? url);
+    };
+    history.pushState = ownPush;
+    history.replaceState = ownReplace;
+    return () => {
+        // Something that wrapped these after us (Next's router) may still
+        // call ours: they pass everything through from now on, and come
+        // off only where they are still the outermost.
+        active = false;
+        if (history.pushState === ownPush) history.pushState = push;
+        if (history.replaceState === ownReplace) history.replaceState = replace;
+    };
 }
 
 /** The step an address is on: the one it names, else what its choices reach. */
