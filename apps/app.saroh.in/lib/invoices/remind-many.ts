@@ -7,6 +7,7 @@ import type {
     ReminderRow,
     ReminderSendResult,
 } from "./remind-all";
+import { reminderWhy, suppressedWhy } from "./reminder-why";
 import type { Invoice } from "./service";
 import { billedTo, lateBy, leftCents } from "./status";
 
@@ -156,48 +157,17 @@ export interface Ways {
     noProvider: boolean;
 }
 
-/** Why a WhatsApp one isn't emailed, as the board says it. */
-export function whatsappWhy(row: Pick<ReminderRow, "reason">): string {
-    switch (row.reason) {
-        case "EMAIL_OFF":
-            return "Turned off email from you";
-        case "NO_EMAIL_PROVIDER":
-            return "Email not connected";
-        default:
-            return "No email";
-    }
+/** Why a WhatsApp one isn't emailed (`reminder-why.ts`, the one wording). */
+export function whatsappWhy(
+    row: Pick<ReminderRow, "way" | "reason" | "emailBlocked">,
+): string {
+    return reminderWhy({ ...row, way: "WHATSAPP" })?.words ?? "";
 }
 
 /** Why one can't be reached now; null when it goes. */
 export function cantReachWhy(row: ReminderRow): string | null {
-    switch (row.way) {
-        case "EMAIL":
-        case "WHATSAPP":
-            return null;
-        case "WAIT":
-            return row.reason === "REMINDED_RECENTLY"
-                ? (row.lastWords ?? "Reminded in the last few days")
-                : "Reminded today. Next one tomorrow (one a day).";
-        case "NONE":
-            switch (row.reason) {
-                case "AUTOPAY_PENDING":
-                    return "Autopay is taking it now";
-                case "UNREACHABLE":
-                    return row.emailBlocked === "NO_EMAIL_PROVIDER"
-                        ? "No phone, and email isn't connected"
-                        : row.emailBlocked === "EMAIL_OFF"
-                          ? "Turned off email from you, and no phone"
-                          : "No email or phone";
-                case "PAID":
-                    return "Paid already";
-                case "DRAFT":
-                    return "Not issued yet";
-                case "ORDER":
-                    return "Belongs to an order: remind from the order";
-                default:
-                    return "Not owed any more";
-            }
-    }
+    if (row.way === "EMAIL" || row.way === "WHATSAPP") return null;
+    return reminderWhy(row)?.words ?? null;
 }
 
 function wayRowOf(row: ReminderRow, note: string): WayRow {
@@ -340,7 +310,7 @@ export function emailOutcome(
         if (row.outcome === "EMAILED") out.emailed.push(name);
         else if (row.way === "WAIT") out.waits.push(name);
         else if (row.outcome === "SUPPRESSED") {
-            out.failed.push({ name, words: "Turned off email from you" });
+            out.failed.push({ name, words: suppressedWhy().words });
         } else if (row.outcome === "FAILED") {
             out.failed.push({
                 name,

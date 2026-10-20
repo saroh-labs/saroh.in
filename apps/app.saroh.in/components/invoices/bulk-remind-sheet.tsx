@@ -15,6 +15,7 @@ import {
 import { openWhatsAppShare } from "@/components/invoices/whatsapp-share";
 import { FormSheet } from "@/components/shared/form-sheet";
 import { useHold } from "@/components/shared/use-hold";
+import { useLatestCall } from "@/components/shared/use-latest-call";
 import { count } from "@/lib/format/plural";
 import { previewReminders, sendReminders } from "@/lib/invoices/actions";
 import { forgetLink } from "@/lib/invoices/minted-links";
@@ -106,6 +107,8 @@ export function BulkRemindSheet({
     // The send ran (and so its refusal is a failure, not an Undo).
     const ran = useRef(false);
     const { send: hold, undo } = useHold();
+    // Step 2's read: only the newest pick's preview lands (review #12).
+    const latest = useLatestCall();
 
     // Each opening starts again at step 1, unless Undo brought it back.
     const [wasOpen, setWasOpen] = useState(open);
@@ -114,7 +117,9 @@ export function BulkRemindSheet({
     const openNow = useRef(open);
     useEffect(() => {
         openNow.current = open;
-    }, [open]);
+        // A read from before a close or a reopen answers to nobody.
+        latest.drop();
+    }, [open, latest]);
     if (open !== wasOpen) {
         setWasOpen(open);
         if (open && backToWays) setBackToWays(false);
@@ -139,6 +144,7 @@ export function BulkRemindSheet({
     }
 
     async function load(ids: readonly string[]) {
+        const current = latest.begin();
         setRead({ status: "loading" });
         try {
             const parts = await Promise.all(
@@ -146,6 +152,8 @@ export function BulkRemindSheet({
                     previewReminders({ invoiceIds }),
                 ),
             );
+            // An older pick's preview that answered late: the newer one wins.
+            if (!current()) return;
             if (parts.some((p) => !p.ok)) {
                 setRead({ status: "failed" });
                 return;
@@ -157,7 +165,7 @@ export function BulkRemindSheet({
                 ),
             });
         } catch {
-            setRead({ status: "failed" });
+            if (current()) setRead({ status: "failed" });
         }
     }
 
@@ -364,7 +372,10 @@ export function BulkRemindSheet({
                 <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setStep("pick")}
+                    onClick={() => {
+                        latest.drop();
+                        setStep("pick");
+                    }}
                 >
                     Back
                 </Button>

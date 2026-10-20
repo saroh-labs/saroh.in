@@ -37,6 +37,7 @@ export function useBusinessDetailsStep({
     then,
     continueLabel,
     onFile: readWithPage = null,
+    inPlace = false,
 }: {
     /** What happens once saved ("issue it"). */
     then: string;
@@ -44,6 +45,11 @@ export function useBusinessDetailsStep({
     continueLabel: string;
     /** What is on file, read with the page; enables `ensure`. */
     onFile?: DetailsOnFile | null;
+    /**
+     * Asked from a screen that must stay drawn (the invoice editor): the
+     * save revalidates nothing (review #15).
+     */
+    inPlace?: boolean;
 }) {
     const [asking, setAsking] = useState<{
         missing: BusinessDetail[];
@@ -104,6 +110,7 @@ export function useBusinessDetailsStep({
             then={then}
             continueLabel={continueLabel}
             onDone={done}
+            inPlace={inPlace}
         />
     );
     return { run, ensure, step };

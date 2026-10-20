@@ -341,6 +341,8 @@ export interface ActionsContext {
     linkBusy?: boolean;
     /** The PDF is being made. */
     pdfBusy?: boolean;
+    /** The receipt is being emailed: one tap sends one (review #13). */
+    receiptBusy?: boolean;
     /** A link is out that this tab can't show (UX-048): it says Make a new link. */
     linkUnseen?: boolean;
 }
@@ -525,8 +527,9 @@ function receiptChannels(ctx: ActionsContext): InvoiceAction[] {
               }
             : {
                   id: "emailReceipt",
-                  label: "Email the receipt",
+                  label: ctx.receiptBusy ? "Sending…" : "Email the receipt",
                   kind: "RECEIPT",
+                  disabled: ctx.receiptBusy ? true : undefined,
               },
     ];
 }

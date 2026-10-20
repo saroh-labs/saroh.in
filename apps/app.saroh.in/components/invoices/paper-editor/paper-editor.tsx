@@ -23,7 +23,7 @@ import { EMPTY_LINE, isGoodLine, issueLine } from "@/lib/invoices/new-invoice";
 import type { PickRow } from "@/lib/invoices/new-invoice-lines";
 import { lineOfProduct } from "@/lib/invoices/new-invoice-lines";
 import { hasOwnLook, lookOf } from "@/lib/invoices/paper-look";
-import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
+import { saveOrganizationSettingsInPlace } from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 
 import { CustomerBlock } from "../new-invoice/customer-block";
@@ -83,6 +83,7 @@ export function PaperEditor({
     disabled,
     canSetDefault,
     onSettings,
+    flush,
 }: {
     form: UseFormReturn<InvoiceFormValues>;
     lines: UseFieldArrayReturn<InvoiceFormValues, "lines">;
@@ -102,6 +103,8 @@ export function PaperEditor({
     canSetDefault: boolean;
     /** The business's settings as a save here answered. */
     onSettings: (next: OrganizationSettings) => void;
+    /** Saves what is typed now (`use-invoice-draft`), before a settings save. */
+    flush: () => Promise<boolean>;
 }) {
     const phone = usePhone();
     const [editing, setEditing] = useState<PaperTarget | null>(null);
@@ -161,15 +164,22 @@ export function PaperEditor({
         form.setValue("paperStyle", "", MARK);
         form.setValue("paperColour", "", MARK);
     }
+    /**
+     * A save of the business's settings from here never redraws the page
+     * (review #15): on a new invoice that has its own address by now, a
+     * revalidation threw the editor away, with the Style sheet and the last
+     * 800 ms of typing. So the draft is saved first, and the settings save
+     * is the one that revalidates nothing; the editor takes its answer.
+     */
     async function makeDefault() {
+        const paperLook = { style: look.style, colour: look.colour ?? "" };
         const res = await runAction(
-            () =>
-                saveOrganizationSettings({
-                    invoicePaper: {
-                        style: look.style,
-                        colour: look.colour ?? "",
-                    },
-                }),
+            async () => {
+                await flush();
+                return saveOrganizationSettingsInPlace({
+                    invoicePaper: paperLook,
+                });
+            },
             { setBusy: setSavingDefault },
         );
         if (!res) return;
@@ -417,6 +427,7 @@ export function PaperEditor({
                     }}
                     open={sheet.open}
                     returnTo="paper-change-logo"
+                    inPlace
                     onClose={() =>
                         setSheet((s) => (s ? { ...s, open: false } : s))
                     }
@@ -432,6 +443,7 @@ export function PaperEditor({
                     businessName={businessName}
                     open={sheet.open}
                     returnTo={partId({ part: "notes" })}
+                    inPlace
                     onClose={() =>
                         setSheet((s) => (s ? { ...s, open: false } : s))
                     }

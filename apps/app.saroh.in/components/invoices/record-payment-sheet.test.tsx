@@ -459,6 +459,59 @@ describe("Record payment", () => {
         expect(takeBack).toHaveBeenCalled();
     });
 
+    // Review #14: the offer's toast comes ten seconds later, when the
+    // details may have closed or moved to another invoice.
+    it("the offer opens the share sheet only while its screen is still on that invoice", async () => {
+        const flush = () =>
+            act(async () => {
+                for (let i = 0; i < 10; i++) await Promise.resolve();
+            });
+        const onShareReceipt = vi.fn();
+        const draw = (invoice: RecordPaymentInvoice) =>
+            act(() =>
+                root.render(
+                    <RecordPaymentSheet
+                        open
+                        onOpenChange={vi.fn()}
+                        invoice={invoice}
+                        onShareReceipt={onShareReceipt}
+                    />,
+                ),
+            );
+        draw({ ...VIVEK, emailTo: null });
+        await flush();
+        actions.recordPayment.mockResolvedValue(answer({ leftToPay: "0.00" }));
+        act(() => button("Record ₹8,400").click());
+        await flush();
+        const share = (
+            wa.offerWhatsAppReceipt.mock.calls.at(-1) as unknown as [
+                string,
+                string,
+                number,
+                (() => boolean) | undefined,
+            ]
+        )[3];
+        expect(share).toBeTypeOf("function");
+
+        // Still here, on Vivek's invoice: the share sheet opens.
+        expect(share?.()).toBe(true);
+        expect(onShareReceipt).toHaveBeenCalledTimes(1);
+
+        // Moved on to the next invoice: not this one's sheet.
+        draw({ ...VIVEK, id: "inv_107", emailTo: null });
+        await flush();
+        expect(share?.()).toBe(false);
+        expect(onShareReceipt).toHaveBeenCalledTimes(1);
+
+        // Back on Vivek's, then closed for good: the toast opens WhatsApp itself.
+        draw({ ...VIVEK, emailTo: null });
+        await flush();
+        expect(share?.()).toBe(true);
+        act(() => root.render(<></>));
+        expect(share?.()).toBe(false);
+        expect(onShareReceipt).toHaveBeenCalledTimes(2);
+    });
+
     it("records on another day picked", async () => {
         drawSheet();
         await settle();

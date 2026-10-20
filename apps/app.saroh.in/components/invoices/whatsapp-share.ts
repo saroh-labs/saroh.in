@@ -67,18 +67,26 @@ export async function openWhatsAppShare(
  * the offer back, for Undo. With `share`, the toast opens the share sheet
  * on the receipt (U11), where a missing number can be typed; without it,
  * WhatsApp opens straight away.
+ *
+ * The toast outlives the screen that offered it: the details may have
+ * closed or moved to another invoice in the ten seconds (review #14).
+ * `share` answers false when its screen can't open this receipt any more,
+ * and WhatsApp opens straight away instead, so the button always does
+ * what it says.
  */
 export function offerWhatsAppReceipt(
     invoiceId: string,
     who: string,
     afterMs: number,
-    share?: () => void,
+    share?: () => boolean,
 ): () => void {
     const timer = setTimeout(() => {
         showSuccess(`Receipt ready for ${who}.`, undefined, {
             label: SHARE_RECEIPT_ON_WHATSAPP,
-            onClick: () =>
-                share ? share() : void openWhatsAppShare(invoiceId, "RECEIPT"),
+            onClick: () => {
+                if (share?.()) return;
+                void openWhatsAppShare(invoiceId, "RECEIPT");
+            },
         });
     }, afterMs);
     return () => clearTimeout(timer);

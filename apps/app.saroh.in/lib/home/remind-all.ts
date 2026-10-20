@@ -5,6 +5,8 @@ import type {
     ReminderRow,
     ReminderSendResult,
 } from "@/lib/invoices/remind-all";
+import type { ReminderWhyCode } from "@/lib/invoices/reminder-why";
+import { reminderWhy, suppressedWhy } from "@/lib/invoices/reminder-why";
 
 import type { GroupLine } from "./group-words";
 
@@ -46,6 +48,8 @@ export interface RemindAllBill {
 
 export interface RemindAllSkipped extends RemindAllBill {
     reason: RemindAllSkip;
+    /** Why exactly (`reminder-why.ts`): what the sheet branches on. */
+    why: ReminderWhyCode;
     /** "Reminded yesterday", "No email or phone to reach them". */
     words: string;
 }
@@ -70,6 +74,7 @@ export interface RemindAllResult {
         invoiceId: string;
         name: string | null;
         reason: RemindAllSkip;
+        why?: ReminderWhyCode;
         words: string;
     }[];
 }
@@ -100,45 +105,42 @@ function billOf(row: ReminderRow): RemindAllBill {
     };
 }
 
-/** Why one row isn't reminded, and its words; null when it goes. */
+/** Remind all's group for each reason (`reminder-why.ts`). */
+const SKIP_OF: Record<ReminderWhyCode, RemindAllSkip> = {
+    REMINDED_TODAY: "RECENT",
+    REMINDED_RECENTLY: "RECENT",
+    EMAIL_NOT_CONNECTED: "WHATSAPP",
+    EMAIL_OFF: "WHATSAPP",
+    NO_EMAIL: "WHATSAPP",
+    AUTOPAY: "AUTOPAY",
+    UNREACHABLE_NOT_CONNECTED: "NO_PROVIDER",
+    UNREACHABLE_EMAIL_OFF: "NO_WAY",
+    UNREACHABLE: "NO_WAY",
+    PAID: "NOT_OVERDUE",
+    DRAFT: "NOT_OVERDUE",
+    ORDER: "NOT_OVERDUE",
+    NOT_OWED: "NOT_OVERDUE",
+};
+
+/**
+ * Why one row isn't reminded, and its words; null when it goes. The
+ * words are Remind many's (one wording, review #30); a WhatsApp one adds
+ * where to send it from, since Remind all sends no WhatsApp.
+ */
 export function skipOf(
     row: ReminderRow,
-): { reason: RemindAllSkip; words: string } | null {
-    switch (row.way) {
-        case "EMAIL":
-            return null;
-        case "WAIT":
-            return {
-                reason: "RECENT",
-                words: row.lastWords ?? "Reminded today",
-            };
-        case "WHATSAPP":
-            return {
-                reason: "WHATSAPP",
-                words:
-                    row.reason === "NO_EMAIL_PROVIDER"
-                        ? "No email provider connected · WhatsApp from the bill"
-                        : row.reason === "EMAIL_OFF"
-                          ? "Turned email off · WhatsApp from the bill"
-                          : "No email address · WhatsApp from the bill",
-            };
-        case "NONE":
-            if (row.reason === "AUTOPAY_PENDING") {
-                return { reason: "AUTOPAY", words: "Autopay is taking it now" };
-            }
-            if (row.reason === "UNREACHABLE") {
-                return row.emailBlocked === "NO_EMAIL_PROVIDER"
-                    ? {
-                          reason: "NO_PROVIDER",
-                          words: "No email provider connected",
-                      }
-                    : {
-                          reason: "NO_WAY",
-                          words: "No email or phone to reach them",
-                      };
-            }
-            return { reason: "NOT_OVERDUE", words: "No longer overdue" };
-    }
+): { reason: RemindAllSkip; why: ReminderWhyCode; words: string } | null {
+    const why = reminderWhy(row);
+    if (!why) return null;
+    const reason = SKIP_OF[why.code];
+    return {
+        reason,
+        why: why.code,
+        words:
+            reason === "WHATSAPP"
+                ? `${why.words} · WhatsApp from the bill`
+                : why.words,
+    };
 }
 
 /** Different people: one name is one person; a bill with none is its own. */
@@ -199,11 +201,13 @@ export function fromResult(result: ReminderSendResult): RemindAllResult {
             continue;
         }
         if (row.outcome === "SUPPRESSED") {
+            const off = suppressedWhy();
             out.skipped.push({
                 invoiceId: row.invoiceId,
                 name,
                 reason: "NO_WAY",
-                words: "Turned email off",
+                why: off.code,
+                words: off.words,
             });
             continue;
         }
@@ -333,10 +337,13 @@ export function noneWords(preview: RemindAllPreview): {
     /** "Connect an email provider", when that is what's missing. */
     connect: boolean;
 } {
+    // On the reason's code, never its words (review #30).
     const noProvider =
         preview.skipped.length > 0 &&
-        preview.skipped.every((s) =>
-            s.words.startsWith("No email provider connected"),
+        preview.skipped.every(
+            (s) =>
+                s.why === "EMAIL_NOT_CONNECTED" ||
+                s.why === "UNREACHABLE_NOT_CONNECTED",
         );
     if (noProvider) {
         return {

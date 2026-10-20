@@ -13,7 +13,7 @@ import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess, showUndo, UNDO_MS } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { ChipGroup } from "@/components/shared/choice-group";
 import { FormSheet } from "@/components/shared/form-sheet";
@@ -108,6 +108,7 @@ export function RecordPaymentSheet({
         setWasOpen(open);
         if (open) setOpening((n) => n + 1);
     }
+    const shareHere = useShareHere(invoice.id, onShareReceipt);
     return (
         <RecordPaymentDraft
             key={opening}
@@ -115,10 +116,43 @@ export function RecordPaymentSheet({
             onOpenChange={onOpenChange}
             invoice={invoice}
             onRecorded={onRecorded}
-            onShareReceipt={onShareReceipt}
+            onShareReceipt={onShareReceipt ? shareHere : undefined}
             returnFocusTo={returnFocusTo}
         />
     );
+}
+
+/**
+ * The receipt's share sheet, only while the screen that offered it is
+ * still here and still on that invoice (review #14). The offer's toast
+ * comes ten seconds after the payment; by then the details may have closed,
+ * or moved on to the next invoice, whose share sheet would open on the
+ * wrong receipt. It answers false then, and the toast opens WhatsApp itself.
+ */
+function useShareHere(
+    invoiceId: string,
+    share: (() => void) | undefined,
+): (forInvoice: string) => boolean {
+    const here = useRef({ mounted: false, invoiceId, share });
+    useEffect(() => {
+        here.current.invoiceId = invoiceId;
+        here.current.share = share;
+    }, [invoiceId, share]);
+    useEffect(() => {
+        const now = here.current;
+        now.mounted = true;
+        return () => {
+            now.mounted = false;
+        };
+    }, []);
+    return useCallback((forInvoice: string) => {
+        const now = here.current;
+        if (!now.mounted || now.invoiceId !== forInvoice || !now.share) {
+            return false;
+        }
+        now.share();
+        return true;
+    }, []);
 }
 
 type Load =
@@ -138,7 +172,8 @@ function RecordPaymentDraft({
     onOpenChange: (open: boolean) => void;
     invoice: RecordPaymentInvoice;
     onRecorded?: (invoice: Invoice) => void;
-    onShareReceipt?: () => void;
+    /** The receipt's share sheet; false when its screen has gone. */
+    onShareReceipt?: (invoiceId: string) => boolean;
     returnFocusTo?: string | (() => HTMLElement | null | undefined);
 }) {
     const [load, setLoad] = useState<Load>(
@@ -251,7 +286,7 @@ function RecordPaymentForm({
     onOpenChange: (open: boolean) => void;
     target: PaymentTarget;
     onRecorded?: (invoice: Invoice) => void;
-    onShareReceipt?: () => void;
+    onShareReceipt?: (invoiceId: string) => boolean;
     returnFocusTo?: string | (() => HTMLElement | null | undefined);
 }) {
     const router = useRouter();
@@ -386,7 +421,9 @@ function RecordPaymentForm({
                       target.id,
                       target.who,
                       UNDO_MS,
-                      onShareReceipt,
+                      onShareReceipt
+                          ? () => onShareReceipt(target.id)
+                          : undefined,
                   )
                 : () => undefined;
         const words = recordedToast({
