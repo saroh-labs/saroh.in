@@ -60,6 +60,8 @@ import {
     numberFor,
     writeDocumentLines,
 } from "./order-invoicing";
+import type { PaperColumns } from "./paper-styles";
+import { paperWrite, resolvePaper } from "./paper-styles";
 import { invoiceOnlineBlocker } from "./pay-online";
 import { mintPayToken } from "./pay-token";
 import { assertPaymentsOn } from "./payments-on";
@@ -118,6 +120,33 @@ function fieldError(message: string, field: string): never {
 
 function notFound(): never {
     throw new NotFoundException("Invoice not found");
+}
+
+/** Where a refused style or colour is shown on the draft. */
+const PAPER_FIELDS = { style: "paperStyle", colour: "paperColour" };
+
+/** The business's default look (DEC-173): its style and colour, or none. */
+async function businessPaperDefault(
+    db: Pick<Tx, "businessProfile">,
+    organizationId: string,
+): Promise<PaperColumns | null> {
+    const p = await db.businessProfile.findUnique({
+        where: { organizationId },
+        select: { invoiceStyle: true, invoiceColour: true },
+    });
+    return p ? { style: p.invoiceStyle, colour: p.invoiceColour } : null;
+}
+
+/**
+ * The look issued paper freezes: the draft's own, else the default, each
+ * written out (never null), so the paper never reads a default again.
+ */
+function frozenPaper(
+    own: PaperColumns,
+    fallback: PaperColumns,
+): { paperStyle: string; paperColour: string | null } {
+    const paper = resolvePaper(own, fallback);
+    return { paperStyle: paper.style, paperColour: paper.colour };
 }
 
 /** What another module asks to be invoiced, inside its own transaction. */
@@ -224,9 +253,14 @@ export class InvoicesService {
             select: INVOICE_LIST_SELECT,
         });
         const exempt = await exemptInvoiceIds(prisma, organizationId, rows);
+        // Drafts show the look they will go out in (DEC-173).
+        const paperDefault = rows.some((r) => r.status === "DRAFT")
+            ? await businessPaperDefault(prisma, organizationId)
+            : null;
         return rows.map((r) =>
             serializeInvoice(r as InvoiceRow, now, {
                 exempt: exempt.has(r.id),
+                paperDefault,
             }),
         );
     }
@@ -514,6 +548,12 @@ export class InvoicesService {
         });
         const profile = await loadTaxProfile(prisma, ctx.organizationId);
         const doc = this.price(dto.lines, profile, gst, dto.tax ?? "0");
+        // Its own look, else none: a draft follows the business's default
+        // until it chooses (DEC-173, #1118).
+        const paper = paperWrite(
+            { style: dto.paperStyle, colour: dto.paperColour },
+            PAPER_FIELDS,
+        );
 
         const id = await prisma.$transaction(async (tx) => {
             const created = await tx.invoice.create({
@@ -525,6 +565,8 @@ export class InvoicesService {
                     currency,
                     ...gst,
                     ...documentColumns(doc),
+                    paperStyle: paper.style ?? null,
+                    paperColour: paper.colour ?? null,
                     dueAt: dto.dueAt ? new Date(dto.dueAt) : null,
                     createdByUserId: ctx.userId,
                 },
@@ -566,6 +608,21 @@ export class InvoicesService {
         // A receipt keeps the tax typed on it; a tax invoice derives its own.
         const typedTax = dto.tax ?? (current.gst ? "0" : current.tax);
         const doc = this.price(lines, profile, gst, typedTax);
+        // The draft's own look: what was sent, else what it had chosen.
+        const sentPaper = paperWrite(
+            { style: dto.paperStyle, colour: dto.paperColour },
+            PAPER_FIELDS,
+        );
+        const paper = {
+            paperStyle:
+                sentPaper.style !== undefined
+                    ? sentPaper.style
+                    : current.paperChoice.style,
+            paperColour:
+                sentPaper.colour !== undefined
+                    ? sentPaper.colour
+                    : current.paperChoice.colour,
+        };
 
         await prisma.$transaction(async (tx) => {
             // Guarded on DRAFT so an issue that lands between the read and
@@ -584,6 +641,7 @@ export class InvoicesService {
                         : {}),
                     ...gst,
                     ...documentColumns(doc),
+                    ...paper,
                 },
             });
             if (count === 0) this.assertDraft("ISSUED", "changed");
@@ -640,6 +698,8 @@ export class InvoicesService {
                     billToGstin: true,
                     billToState: true,
                     billToAddress: true,
+                    paperStyle: true,
+                    paperColour: true,
                     lines: {
                         orderBy: { position: "asc" },
                         select: {
@@ -726,6 +786,19 @@ export class InvoicesService {
                         ),
                     ...billTo,
                     ...documentColumns(doc),
+                    // Frozen (DEC-173, DEC-082): the draft's own look,
+                    // else the business's default as it is now. A later
+                    // change of default never redraws this paper.
+                    ...frozenPaper(
+                        {
+                            style: draft.paperStyle,
+                            colour: draft.paperColour,
+                        },
+                        {
+                            style: profile.seller.paperStyle,
+                            colour: profile.seller.paperColour,
+                        },
+                    ),
                 },
             });
             // Throwing rolls the number back with everything else.
@@ -835,6 +908,8 @@ export class InvoicesService {
                     billToGstin: true,
                     billToState: true,
                     billToAddress: true,
+                    paperStyle: true,
+                    paperColour: true,
                     lines: {
                         orderBy: { position: "asc" },
                         select: {
@@ -869,6 +944,9 @@ export class InvoicesService {
                     billToGstin: old.billToGstin,
                     billToState: old.billToState,
                     billToAddress: old.billToAddress,
+                    // Written again in the look it went out in (DEC-173).
+                    paperStyle: old.paperStyle,
+                    paperColour: old.paperColour,
                     reissuedFromId: id,
                     createdByUserId: ctx.userId,
                 },
@@ -982,7 +1060,15 @@ export class InvoicesService {
             select: INVOICE_DETAIL_SELECT,
         });
         if (!row) notFound();
-        return serializeInvoice(row, new Date(), { detail: true });
+        // A draft that chose no look follows the business's (DEC-173).
+        const paperDefault =
+            row.status === "DRAFT"
+                ? await businessPaperDefault(db, organizationId)
+                : null;
+        return serializeInvoice(row, new Date(), {
+            detail: true,
+            paperDefault,
+        });
     }
 
     /**

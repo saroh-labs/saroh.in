@@ -527,6 +527,15 @@ model BusinessProfile {
   logoMedia   Media?  @relation("BusinessLogo", fields: [logoMediaId], references: [id], onDelete: SetNull)
   logoUrl     String?
 
+  // How the business's invoices look by default (DEC-173, #1118): the
+  // style, CLASSIC, BAND or COMPACT, and its colour, "#RRGGBB" from its
+  // brand. Null style is Classic and null colour is ink, so paper from
+  // before the choice reads as it always did. A draft may choose its own;
+  // issuing freezes both on the invoice (`Invoice.paperStyle`). The words
+  // and contrast rules are `invoices/paper-styles.ts`.
+  invoiceStyle  String?
+  invoiceColour String?
+
   // Products (#484, the business's since #529): how the editor suggests a
   // SKU. Null = the built-in pattern; suggestions off leave the SKU empty.
   skuPattern String?
@@ -6769,6 +6778,14 @@ model Invoice {
   sellerName      String?
   sellerLegalName String?
   sellerEmail     String?
+  // How the paper looks (DEC-173, #1118): CLASSIC, BAND or COMPACT, and
+  // its colour ("#RRGGBB"). On a draft, its own choice, null following the
+  // business's default (`BusinessProfile.invoiceStyle`); issuing freezes
+  // the one it went out in, so a later change of default never redraws
+  // issued paper. Null on issued paper is Classic in ink. The logo stays
+  // live (DEC-082).
+  paperStyle      String?
+  paperColour     String?
   placeOfSupply   String?
   taxType         String?
   cgst            Decimal @default(0) @db.Decimal(12, 2)

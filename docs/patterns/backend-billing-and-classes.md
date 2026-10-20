@@ -228,6 +228,54 @@ invoices/reminders` (`InvoiceRemindersService`, `invoice:write`, at most
   `invoice-reminders.db.spec.ts`, `invoice-receipt.db.spec.ts` and
   `rls/invoice-shares-rls.db.spec.ts`, plain and under `TEST_RLS=on`.
 
+## Invoice styles: Classic, Band, Compact, frozen at issue — **Current** (DEC-173, U6 #1118)
+
+- **Three styles in the business's colour.** `PAPER_STYLES` (CLASSIC, BAND,
+  COMPACT), the colour rule and `RULE_46_FIELDS` live in
+  `@saroh/block-contract` (`invoice-paper.ts`) so the app's paper and the
+  API's PDF draw from one rule; `invoices/paper-styles.ts` is the API's
+  side (what a write may store, which look a paper is drawn in). Null style
+  is Classic and null colour is ink: every invoice issued before styles
+  reads as it did, with no backfill.
+- **The business's default** is `BusinessProfile.invoiceStyle` and
+  `invoiceColour`, set through the settings PATCH as `invoicePaper: {
+style, colour }` (Owner or Admin, `org:update`) and read back as
+  `invoicePaper` on the settings read. It is its own field, not part of
+  `tax`, so a style save never re-runs the GSTIN and address checks.
+- **A draft may choose its own** (`paperStyle`, `paperColour` on the draft
+  DTO); null follows the default, read when the draft is (`paper` on the
+  read is what it will go out in, `paperChoice` what it chose itself).
+  Style and colour fall back on their own. `""` or null clears one.
+- **Issuing freezes the look** (DEC-082): `issue` writes the draft's own
+  choice, else the default as it is then, never null, so a later change of
+  default never redraws issued paper. Every other path that issues
+  (orders, bookings, plans, packs) freezes the default through
+  `loadTaxProfile` → `documentColumns`. A credit note takes its original's
+  look (`sellerOf`, `asOriginal`); a reissued draft carries it too. The
+  logo stays live.
+- **Validation:** a colour is `#RRGGBB` (stored in capitals), a style one
+  of the three; anything else is a 400 on its field (`paperWrite`, after
+  the DTO's own check). A colour is never refused for being pale or dark.
+- **Readable by rule, never typed:** the colour as text and heavy rules is
+  the business's when it reads at 4.5:1 on white, else moved toward ink
+  (`paperColours`, the safe-colour rule the site looks use). Band's text is
+  ink or white, whichever reads on the fill (`bandTextTone`); a mid grey
+  neither reads on is moved, not refused.
+- **The PDF** (`invoice-pdf.ts`): Classic is today's paper with the colour
+  on the title, the labels and the heavy rules; Band fills the top of the
+  first page edge to edge, measured first, with the seller and the number
+  on it; Compact has smaller rows and the seller, the buyer and the place
+  of supply side by side, still A4. Every style draws every Rule 46
+  particular; an unregistered business's paper draws no GST in any.
+  Saroh's own invoices to businesses carry no look: Classic in ink.
+- **Not here:** terms and a business's own signature are #1060.
+- **Tests:** `paper-styles.spec.ts`, `invoice-pdf.styles.spec.ts` (each
+  style against `RULE_46_FIELDS`, no GST unregistered, a long name, pale
+  and dark colours read from the uncompressed drawing, with and without a
+  logo), `invoice-paper-styles.db.spec.ts` (the default's permissions and
+  refusals, the freeze, credit notes and reissues), plain and under
+  `TEST_RLS=on`; `@saroh/block-contract` `invoice-paper.test.ts`.
+
 ## Saroh's own invoices — **Current** (pricing catalogue U17)
 
 Saroh billing a business for its plan is not the business's paper: it is

@@ -32,6 +32,12 @@ import {
     NUMBER_RESTARTS,
     NUMBER_SEPARATORS,
 } from "../invoices/numbering";
+import {
+    COLOUR_INPUT,
+    COLOUR_MESSAGE,
+    STYLE_INPUTS,
+    STYLE_MESSAGE,
+} from "../invoices/paper-styles";
 
 import { managerCodeOf } from "./account-manager";
 import type { AcceptedBusinessType } from "./business-type";
@@ -426,6 +432,25 @@ export class PayInstructionsDto {
 }
 
 /**
+ * How the business's invoices look by default (DEC-173, #1118): CLASSIC,
+ * BAND or COMPACT, and a colour as `#RRGGBB`. "" clears either, back to
+ * Classic in ink. Owner/Admin (`org:update`), as the tax settings are. A
+ * draft may choose its own; issued paper keeps the look it went out in.
+ */
+export class InvoicePaperDto {
+    @IsOptional()
+    @Transform(trim)
+    @IsIn(STYLE_INPUTS, { message: STYLE_MESSAGE })
+    style?: string;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @Matches(COLOUR_INPUT, { message: COLOUR_MESSAGE })
+    colour?: string;
+}
+
+/**
  * Payload for `PATCH /organizations/:organizationId`. Both fields are optional
  * so a caller can rename the org, edit the business profile, or both.
  *
@@ -533,6 +558,12 @@ export class UpdateOrganizationDto {
     @IsString()
     @MaxLength(MAP_LINK_MAX, { message: "That link is too long." })
     registeredAddressMapUrl?: string;
+
+    /** The invoices' default style and colour (DEC-173, #1118). */
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => InvoicePaperDto)
+    invoicePaper?: InvoicePaperDto;
 }
 
 /**

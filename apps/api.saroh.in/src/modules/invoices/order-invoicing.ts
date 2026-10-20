@@ -72,6 +72,8 @@ export async function loadTaxProfile(
             postalCode: true,
             legalName: true,
             contactEmail: true,
+            invoiceStyle: true,
+            invoiceColour: true,
         },
     });
     // The name the paper prints is the organization's (DEC-082).
@@ -96,6 +98,9 @@ export async function loadTaxProfile(
             sellerName: org?.name ?? null,
             sellerLegalName: p?.legalName ?? null,
             sellerEmail: p?.contactEmail ?? null,
+            // Its default look, frozen like the rest (DEC-173, #1118).
+            paperStyle: p?.invoiceStyle ?? null,
+            paperColour: p?.invoiceColour ?? null,
         },
     };
 }
@@ -147,6 +152,8 @@ export function documentColumns(doc: BuiltDocument) {
         sellerName: doc.sellerName,
         sellerLegalName: doc.sellerLegalName,
         sellerEmail: doc.sellerEmail,
+        paperStyle: doc.paperStyle ?? null,
+        paperColour: doc.paperColour ?? null,
     };
 }
 
@@ -362,6 +369,8 @@ const ORIGINAL_SELECT = {
     sellerName: true,
     sellerLegalName: true,
     sellerEmail: true,
+    paperStyle: true,
+    paperColour: true,
     placeOfSupply: true,
     taxType: true,
     tax: true,
@@ -510,6 +519,9 @@ function asOriginal(row: OriginalRow): Original {
         sellerName: row.sellerName,
         sellerLegalName: row.sellerLegalName,
         sellerEmail: row.sellerEmail,
+        // A correction is drawn as its original was (DEC-173).
+        paperStyle: row.paperStyle,
+        paperColour: row.paperColour,
         placeOfSupply: row.placeOfSupply,
         taxType: row.taxType,
         tax: row.tax,

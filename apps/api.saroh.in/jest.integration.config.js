@@ -159,6 +159,11 @@ module.exports = {
         "<rootDir>/src/modules/invoices/list-filter.spec.ts",
         // D16: pure; invoice-pdf.db.spec.ts runs here.
         "<rootDir>/src/modules/invoices/invoice-pdf.spec.ts",
+        // DEC-173 (U6 #1118): the three invoice styles in the PDF, and
+        // what a style or colour write may store — pure
+        // (invoice-paper-styles.db.spec.ts runs in integration).
+        "<rootDir>/src/modules/invoices/invoice-pdf.styles.spec.ts",
+        "<rootDir>/src/modules/invoices/paper-styles.spec.ts",
         // DEC-072: a line's GST note on the paper and the PDF — pure.
         "<rootDir>/src/modules/invoices/invoice-line-gst.spec.ts",
         "<rootDir>/src/modules/invoices/invoice-pdf-logo.spec.ts",

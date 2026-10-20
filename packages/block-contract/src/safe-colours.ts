@@ -100,8 +100,12 @@ function moveUntil(
     return extreme;
 }
 
-/** `colour` if it reads at `min` on every ground, else moved toward `toward`. */
-function reaching(
+/**
+ * `colour` if it reads at `min` on every ground, else moved toward `toward`.
+ * Exported for the invoice paper's colour (`invoice-paper.ts`), which keeps
+ * a business's colour readable by the same rule a look does.
+ */
+export function reaching(
     colour: string,
     grounds: readonly string[],
     min: number,
@@ -111,7 +115,7 @@ function reaching(
 }
 
 /** Ink or white on `fill`, whichever reads better. */
-function textOn(fill: string, ink: string): string {
+export function textOn(fill: string, ink: string): string {
     return contrastRatio(ink, fill) >= contrastRatio(WHITE, fill) ? ink : WHITE;
 }
 
