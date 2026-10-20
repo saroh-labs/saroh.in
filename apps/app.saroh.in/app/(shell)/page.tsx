@@ -9,7 +9,10 @@ import { ReviewerHome } from "@/components/home/reviewer-home";
 import { StaffHome } from "@/components/home/staff-home";
 import { Moment } from "@/components/shared/moment";
 import { PageContainer } from "@/components/shared/page-container";
-import { homeNewFor } from "@/components/shared/quick-actions";
+import {
+    homeNewFor,
+    homeNewModuleKeys,
+} from "@/components/shared/quick-actions";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 import type { InvoiceJobFacts } from "@/lib/home/first-run";
 import { mayWriteInvoices } from "@/lib/home/first-run";
@@ -92,11 +95,7 @@ export default async function Home() {
     // New (DEC-171, A17): by the permissions the API resolved for this
     // person, never by their role's name.
     const newMenu = homeNewFor({
-        moduleKeys: allModules
-            ? allModules
-                  .filter((m) => m.readiness !== "DISABLED")
-                  .map((m) => m.key)
-            : null,
+        moduleKeys: allModules ? homeNewModuleKeys(allModules) : null,
         actions: business?.actions,
     });
 

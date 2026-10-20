@@ -17,6 +17,7 @@ import {
 import { WHO_CAN_CHANGE } from "@/lib/access/who-can-change";
 import type { StorefrontAllowance } from "@/lib/business-limits";
 import { mayAddStorefront, mayAddWebsite } from "@/lib/business-limits";
+import type { ModuleView } from "@/lib/modules/schema";
 import { permits } from "@/lib/organizations/permits";
 
 import type { NavAction, NavRole } from "./nav-items";
@@ -317,6 +318,26 @@ export function homeNewFor({
                 ? notInRole(lacking.map((row) => row.doing))
                 : null,
     };
+}
+
+/**
+ * The modules the business has on, for `homeNewFor`. A module reads
+ * DISABLED for this person when their role doesn't reach it
+ * (`UNAUTHORIZED`), yet the business still does it: that start is one
+ * their role leaves out, and the role line names it ("Taking orders …
+ * aren't part of your role"), never drops it as if the business didn't
+ * sell (Calendar only, #868). Any other closed gate is the business's.
+ */
+export function homeNewModuleKeys(modules: readonly ModuleView[]): string[] {
+    return modules
+        .filter(
+            (m) =>
+                m.readiness !== "DISABLED" ||
+                (m.lifecycle === "ENABLED" &&
+                    m.blockers.length > 0 &&
+                    m.blockers.every((b) => b.code === "UNAUTHORIZED")),
+        )
+        .map((m) => m.key);
 }
 
 /** "Taking orders and sending invoices aren't part of your role. …" */

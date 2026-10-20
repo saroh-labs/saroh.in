@@ -10,6 +10,7 @@ import { NAV_GROUPS, navGroupsWithSites } from "./nav-items";
 import {
     HOME_NEW,
     homeNewFor,
+    homeNewModuleKeys,
     QUICK_ACTIONS,
     quickActionsFor,
 } from "./quick-actions";
@@ -367,5 +368,40 @@ describe("Home's New menu", () => {
 
     it("offers by permission alone while the modules aren't known", () => {
         expect(offered(OWNER, null).items).toHaveLength(3);
+    });
+
+    it("counts a module the role doesn't reach as the business's, so the line names it (Calendar only)", () => {
+        const view = (
+            key: string,
+            readiness: "ACTIVE" | "DISABLED",
+            codes: string[] = [],
+            lifecycle: "ENABLED" | "DISABLED" = "ENABLED",
+        ) => ({
+            key,
+            label: key,
+            lifecycle,
+            readiness,
+            selectedForProject: true,
+            canManage: false,
+            dependencies: [],
+            blockers: codes.map((code) => ({ code })),
+        });
+        const keys = homeNewModuleKeys([
+            view("APPOINTMENTS", "ACTIVE"),
+            view("COMMERCE", "DISABLED", ["UNAUTHORIZED"]),
+            view("PAYMENTS", "DISABLED", ["UNAUTHORIZED"]),
+            // Off for the business, or not rolled out to it: not its.
+            view("CRM", "DISABLED", ["UNAUTHORIZED"], "DISABLED"),
+            view("CLASS_PACKS", "DISABLED", [
+                "UNAUTHORIZED",
+                "ROLLOUT_DISABLED",
+            ]),
+        ]);
+        expect(keys).toEqual(["APPOINTMENTS", "COMMERCE", "PAYMENTS"]);
+        expect(
+            homeNewFor({ moduleKeys: keys, actions: CALENDAR_ONLY }).roleLine,
+        ).toBe(
+            "Taking orders and sending invoices aren't part of your role. An owner or admin can change this in Settings › Team.",
+        );
     });
 });
