@@ -286,6 +286,27 @@ describe("an overdue invoice", () => {
         expect(main?.getAttribute("aria-describedby")).toBeTruthy();
         expect(document.body.textContent).not.toContain("Next step is yours");
     });
+
+    it("reminded on WhatsApp today, with no email: Share on WhatsApp is off, and says when the next can go", () => {
+        show(
+            details({
+                send: {
+                    channels: [],
+                    reason: "NO_EMAIL_PROVIDER",
+                    payOnline: true,
+                    nextReminderAt: at(1),
+                },
+            }),
+        );
+        const whatsapp = button("Share on WhatsApp", card() ?? document);
+        expect(whatsapp?.disabled).toBe(true);
+        const why = document.getElementById(
+            whatsapp?.getAttribute("aria-describedby") ?? "",
+        );
+        expect(why?.textContent).toContain(
+            "One reminder a day. The next can go after",
+        );
+    });
 });
 
 describe("a draft", () => {

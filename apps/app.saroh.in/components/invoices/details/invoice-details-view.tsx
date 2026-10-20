@@ -27,6 +27,7 @@ import {
     moneyMessage,
     sourceLine,
 } from "@/lib/invoices/status";
+import { NEXT_REMINDER_AFTER, REMINDED_TODAY } from "@/lib/invoices/words";
 import { invoiceZone } from "@/lib/invoices/zone";
 
 /** Where the menus open from: up from a sheet's foot, down from a header. */
@@ -70,6 +71,8 @@ export function InvoiceDetailsView({
     const zone = invoiceZone(details.business);
     const who = billedTo(i).name;
     const readOnlyId = useId();
+    // The note that says why a card button is off, read with the button.
+    const whyId = useId();
     const run = useDetailsActions({ details, onChanged, onGone, print });
     const { actions, does } = run;
 
@@ -78,22 +81,31 @@ export function InvoiceDetailsView({
         i.kind !== "CREDIT_NOTE" &&
         !i.order;
     const nextReminderAt = i.send?.nextReminderAt ?? null;
+    // A reminder went today, by email or WhatsApp, so the next waits: said
+    // whenever a button is off for it, even with no email to send by (a
+    // WhatsApp reminder turns Share on WhatsApp off, 20 Oct).
+    const reminderWaits =
+        nextReminderAt !== null &&
+        ((run.sendable && wasSent(i.sent)) ||
+            [actions.main, ...actions.beside].some(
+                (a) => a?.disabled && a.reason === REMINDED_TODAY,
+            ));
     // One note under the money, never a stack (owner, 13 Oct): the first
     // that applies. The rest is said on the buttons it is about.
     const note: ReactNode = run.charging ? (
-        <>
+        <span id={whyId}>
             <span className="font-semibold text-foreground">
                 Autopay charge in progress ·{" "}
                 <ViewerDate iso={run.charging.at} />
             </span>
             . The payment link and reminders are held until {who}&apos;s bank
             answers, so they&apos;re never charged twice.
-        </>
-    ) : owed && run.sendable && wasSent(i.sent) && nextReminderAt ? (
-        <>
-            One reminder a day. The next can go after{" "}
+        </span>
+    ) : owed && reminderWaits && nextReminderAt ? (
+        <span id={whyId}>
+            {NEXT_REMINDER_AFTER}{" "}
             <ViewerDate iso={nextReminderAt} variant="datetime" />.
-        </>
+        </span>
     ) : owed && !run.linkBox && !run.payOnline ? (
         <OfflinePayHint
             blocker={i.online?.onlineBlocker ?? null}
@@ -149,7 +161,7 @@ export function InvoiceDetailsView({
             note={note}
             foot={emailLine}
             extra={run.linkBox}
-            describedBy={readOnlyId}
+            describedBy={can.write ? whyId : readOnlyId}
         />
     );
     const readOnly = !can.write ? (
