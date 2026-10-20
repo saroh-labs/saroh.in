@@ -578,6 +578,20 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   enables each first. Whether Saroh has rolled a module out is one function,
   `moduleRolledOut`, which also treats a `hidden` module (Automations) as not
   rolled out. `modules/capabilities/README.md` has the payloads.
+- **Current** (DEC-175, #1158) — **Bookings makes the booking page, as
+  selling online makes the shop.** After Bookings is switched on (any way:
+  the sheet, the plain switch) and after a service customers can book online
+  is added or opened to them, `ModuleSetupService.makeBookingSite` makes the
+  starter site on the business's address, Website switched on with it
+  through Website's own setup, not published. It asks `site:create` and
+  `module:manage` of the person (Owner, Admin): anyone else adds the service
+  and no site. It never makes a second site, nor brings back a deleted one,
+  and it never refuses its caller (`capabilities/setup/booking-site.ts`).
+  `GET|POST organizations/:id/booking-page` and `POST …/booking-page/publish`
+  (`sites/booking-page.controller.ts`, gated on APPOINTMENTS, not WEBSITE)
+  read it, make it and publish the business's website through
+  `SitesService.publishSite`, so `site:publish` and "Publishing needs
+  approval" hold as in Website. `sites/booking-page.db.spec.ts`.
 - **Current** — **State-changing requests are origin-checked.** `OriginGuard`
   rejects an untrusted **or missing** `Origin` (falling back to `Referer`) on
   POST, PUT, PATCH and DELETE (#50). **A frontend's server-side call to the

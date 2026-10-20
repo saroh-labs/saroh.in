@@ -2307,3 +2307,28 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **DEC-086's code is deleted, not fenced** (U3): the flag was never on, and every notice this decision adds would otherwise carry its route and tests. A source scan fails if a customer-notice path imports a Saroh sender.
 - **Defaults taken while open** (the plan's Assumptions A1–A17): D1 has no switch of its own; a renewal with live autopay isn't sent as a pay request; the refund notice goes when the provider accepts it; "Tell the customer" on an order cancel starts ticked; a team reply is held 60 s and coalesced; one enquiry auto-reply per address per day; Delivered, Sent and later tracking share one switch; the pack receipt is DEC-173's receipt with a pack line; staff alerts reach only staff with a login; overdue reminders count only automatic ones; a back-in-stock opt-in makes no contact and is no marketing consent.
 - Rules: added when built (`docs/patterns/backend-jobs.md` → Customer notices and Team alerts; `docs/patterns/saroh-product.md` → Communications).
+
+## DEC-175 A booking page on the business's address without building a website
+
+**Status: Accepted — 2026-10-20** · owner, issue #1158 · amends DEC-069 (selling online makes the website) the same way for Bookings; builds on DEC-141's starter
+
+- Context:
+    - A business that only takes bookings has a web address but nothing customers can book on: `/book` is drawn only when the website is published, and only selling online made a website (DEC-069). A salon or a physio had to go through Website and publish a whole site.
+- Decision:
+    - **Bookings makes the booking page, as selling online makes the shop.** When Bookings is turned on, or a service customers can book online is added or opened to them, and the business has no website, Saroh makes the starter site (DEC-141, whatever the kind) on the business's address, with Website switched on and its Book page, Contact and a plain Home. Nothing is published.
+    - **One row in Bookings › Services:** "Your booking page", the address (`<address>.saroh.app/book`, or the verified custom domain).
+        - Before it is live: "Not live yet: customers can't open it", with no Copy link and no QR code. **Publish booking page** opens a sheet that publishes it and finishes there with Copy link and the QR code.
+        - Live: the address, Copy link and the QR code (the existing QR button, kind BOOK).
+        - Read first; the sheet does the one task in place.
+    - **Who may:** making it asks what turning Website on asks (`site:create` and `module:manage`: Owner and Admin). Publishing it asks `site:publish`, with "Publishing needs approval" applied as in Website. Anyone else reads the row and is told who can.
+    - **One site, never two.** A business with a website just sees its link; Bookings adds its Book page to it (DEC-141's module sync). A website once deleted is never brought back by itself. Turning Website on later, or editing it, is the same site.
+    - **Every capability stays.** Website › Publish works as before; publishing from Bookings is the same publish of the same site.
+    - Defaults taken while open:
+        - The row sends a website that is already published but whose `/book` isn't served to Website, rather than publishing from Bookings, which would put every waiting change live too.
+        - A business with Bookings on before this decision and no website gets **Make my booking page** on the row.
+        - When Website is turned on in the same sheet as Bookings, it goes first, so the site is the one its fields say and Bookings joins it.
+        - A refusal while making it by itself (no room on the plan, an address taken since) is logged and Bookings carries on; the address it offers instead is tried once.
+- Consequences:
+    - Turning Bookings on switches Website on too for a business with no website, so Website shows in the menu, as it does after selling online.
+    - The Turn on sheet says the booking page comes with Bookings, from `setup-defaults`' `alsoBookingPage`.
+- Rules: `docs/patterns/backend-auth-and-access.md` → "Bookings makes the booking page, as selling online makes the shop".

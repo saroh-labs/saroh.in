@@ -123,6 +123,11 @@ export interface SetupDefaults {
      */
     templates: WebsiteTemplateChoice[];
     kind: string | null;
+    /**
+     * Bookings only, with no website (DEC-175): the address its booking
+     * page will be made on. Absent: none is coming.
+     */
+    bookingPage?: { address: string } | null;
 }
 
 /** A template the Website step may offer (`setup-defaults`' `templates`). */
@@ -154,6 +159,10 @@ const defaultsEnvelopeSchema = z.object({
     // Lenient: a list this app can't read offers no choice, not a failure.
     templates: z.array(templateChoiceSchema).optional().catch(undefined),
     kind: z.string().nullish().catch(null),
+    alsoBookingPage: z
+        .object({ address: z.string().min(1) })
+        .nullish()
+        .catch(null),
 });
 
 /**
@@ -193,6 +202,7 @@ export function decodeSetupDefaults(key: string, raw: unknown): SetupDefaults {
         template: parsed.data.template ?? null,
         templates: parsed.data.templates ?? [],
         kind: parsed.data.kind ?? null,
+        bookingPage: parsed.data.alsoBookingPage ?? null,
     };
 }
 

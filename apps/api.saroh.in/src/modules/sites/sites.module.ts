@@ -10,6 +10,8 @@ import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { MediaStorageModule } from "../media/media-storage.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { BookingPageController } from "./booking-page.controller";
+import { BookingPageService } from "./booking-page.service";
 import { GoLiveHandler, SITE_GO_LIVE_TYPE } from "./go-live.handler";
 import { SITE_PAGES_REVALIDATE_TYPE } from "./page-cache-revalidate";
 import { PageCacheRevalidateHandler } from "./page-cache.job";
@@ -66,9 +68,12 @@ import { TestReleasesService } from "./test-releases.service";
         QrCodesController,
         PublicSitesController,
         PublicQrController,
+        // "Your booking page" in Bookings (DEC-175).
+        BookingPageController,
     ],
     providers: [
         SitesService,
+        BookingPageService,
         SitePreviewLinksService,
         SiteTrackingService,
         SiteIconService,
