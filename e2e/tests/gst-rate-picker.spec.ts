@@ -149,7 +149,9 @@ test.describe("the GST rate as buttons (DEC-176)", { tag: "@serial" }, () => {
             );
             if (onPhone(page)) {
                 await page.setViewportSize({ width: 320, height: 720 });
-                await expectNothingHiddenSideways(page);
+                // A text field scrolls its own long value; that is the
+                // field's job (as qr-code-maker.spec.ts allows it).
+                await expectNothingHiddenSideways(page, { allow: ["input"] });
             }
             await saveBasics(page);
             await expect.poll(() => savedRate(page, id)).toBe(1.5);
@@ -219,7 +221,9 @@ test.describe("the GST rate as buttons (DEC-176)", { tag: "@serial" }, () => {
         await chooseRate(line, "5");
         await chooseRate(line, "1.5");
         if (onPhone(page)) {
-            await expectNothingHiddenSideways(page);
+            // The line's name scrolls inside its own field, as a text
+            // field does; nothing else may hide.
+            await expectNothingHiddenSideways(page, { allow: ["input"] });
         }
 
         const paper = await invoicePaper(page);
