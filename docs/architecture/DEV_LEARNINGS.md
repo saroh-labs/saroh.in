@@ -12,6 +12,90 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Sites — closing a look's booking left the hold standing, and the panel and the save disagreed on paid styles
+
+**Symptom**: 20 Oct 2026, review of the looks release (#20, #22). On a
+look's pay step, Escape or Close left for the page the booking came from
+and the time stayed held for 15 minutes, free to nobody; pressed mid-Book,
+the answer landed on a page that had gone, and a reload booked again under
+a new idempotency key. Separately, Website › Style could mark a typeface or
+colourway "Paid plans" and refuse it while the save would have taken it, or
+the other way round.
+**Cause**: the frames' Close called the router directly, with no idea of a
+hold; the attempt's key lived in a ref, gone with the component. The
+free/paid rule was written twice: the app took a saved style's default
+pair from the options list's first and matched a colourway by colours and
+type, the API used `DEFAULT_FONT_PAIR` and the exact palette.
+**Fix**: Close and Escape run `letGoToLeave` first (paid meanwhile, the
+ticket shows; a hold that won't let go stays and says so) and do nothing
+mid-Book; the key is kept in `sessionStorage` (`saroh.booking-attempt`,
+nothing about the person) until its answer comes. The style rule lives once
+in `@saroh/block-contract` (`style-access.ts`), and `STYLE_ACCESS_CASES`
+run through the API's and the app's tests alike.
+**Rule**: a rule both the app and the API apply is one function in a shared
+package, with one set of fixtures both sides' tests run; leaving a flow
+lets go of what the flow holds.
+
+## E2E — the data-removal specs passed by skipping themselves
+
+**Symptom**: 20 Oct 2026, review of the looks release (#25).
+`customers-data-requests.spec.ts` and `site-account-data-request.spec.ts`
+were green in CI and in the gate, and had never run: each skips unless
+`SITE_ACCOUNT_AREA === "on"` in the runner's env, which neither CI's e2e
+job nor `scripts/prepush.sh` set. So did `site-account.spec.ts`'s signed-in
+half, `site-account-looks`, `customer-detail`'s account test and the
+account half of `site-looks-chrome`.
+**Cause**: the account area ships dark behind an environment switch, and
+the specs were written for a stack started with it on. Production and
+development have had it on since 14 Oct; the e2e stacks were never moved.
+**Fix**: `SITE_ACCOUNT_AREA=on` in CI's e2e env and in prepush's e2e
+exports, which the API, saroh.app and the runner all read, as
+`NEXT_PUBLIC_TEMPLATES` and `E2E_DOMAIN_HOSTING` are. `site-account.spec`'s
+"area off" test now skips instead; the off path stays covered by the API's
+db specs (every account route a 404).
+**Rule**: a spec that skips on a switch names a switch the e2e stack sets,
+in `ci.yml` and `prepush.sh` both; turn the stack's switch on when
+production's is.
+
+## Database — a new migration dated before development's would not apply
+
+**Symptom**: 20 Oct 2026, the looks release. The data-removal requests
+migration was written as `20261029…`, while development already held
+migrations stamped in December. Caught by eye at the merge and renamed by
+hand to `20261220100000` (review #39).
+**Cause**: Prisma replays migration folders in name order. A database that
+has run development's later migrations sees an older-dated new one as out
+of order, and `migrate deploy` refuses it or applies it after schema it was
+written before. `check:migration-ids` only checked that each stamp was
+unique.
+**Fix**: `scripts/check-migration-ids.mjs` now also fails a migration
+folder that is new on the branch and sorts before the latest one on the
+base branch (`MIGRATION_BASE`, else `origin/development`; CI passes the
+PR's base). Without that ref it says the order wasn't checked.
+**Rule**: `.agents/skills/saroh-migrations/SKILL.md`: a new migration's
+stamp is later than every one already on development; take it when the
+unit is merged into the batch, not when the unit started.
+
+## Docs — DECISIONS.md had three decisions twice after a merge
+
+**Symptom**: 20 Oct 2026, review of the looks release (#23). DEC-171,
+DEC-173 and DEC-174 were each written twice, the second copies after
+DEC-172, DEC-173 ended in eleven stacked "Rules:" lines, DEC-174 carried one
+of DEC-173's, and DEC-172 had a copy of DEC-170's owner answers (the
+commission paragraph). Nobody could tell which copy was the decision.
+**Cause**: each unit appended its own Rules line to the same decision, and
+the batch merges resolved the conflicts by keeping both sides. Nothing
+checked that a decision number appears once.
+**Fix**: one copy of each, in number order; DEC-173 keeps its fullest
+Rules line (U17's "as built"), plus U15's and U16's own; DEC-176 is
+marked reserved for the GST branch (PR #1164). `pnpm run
+check:decision-ids` fails on a DEC heading written twice, in prepush and CI.
+DEC-163 is allowed twice: two decisions took it on 17 Oct and both are cited
+in code.
+**Rule**: a unit that adds rules to a decision rewrites the one Rules line,
+never appends another; resolve a DECISIONS.md conflict by hand, never by
+keeping both sides. `scripts/check-decision-ids.mjs`.
+
 ## Bookings — a free time called fully booked when bookings landed together
 
 **Symptom**: 20 Oct 2026, the looks release gate. `public-booking.spec.ts`

@@ -52,6 +52,13 @@ The fix is to guard the early migration on what actually exists and apply the
 final state in a later migration — never to renumber a migration that has run
 anywhere.
 
+**A new migration sorts after every one already on development.** Take its
+timestamp when the unit lands in the batch, later than development's latest,
+not the day the unit started. `pnpm run check:migration-ids` fails a folder
+that is new on the branch and sorts before the base's latest
+(`MIGRATION_BASE`, else `origin/development`); rename it while it has run
+nowhere but your own test database.
+
 ### 2. The migration and the datamodel disagree
 
 `20260905000000_booking_outcome` created an index:

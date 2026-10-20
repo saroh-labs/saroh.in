@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 
 import { pressInvoiceAction } from "../fixtures/invoice-actions";
 import { makeContact, northwind, stamp } from "../fixtures/own-data";
+import { pressUntil } from "../fixtures/press";
 import { useSession } from "../fixtures/sessions";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
 
@@ -113,14 +114,10 @@ test.describe("invoices without Payments (DEC-070)", { tag: "@serial" }, () => {
                     .getByRole("button", { name: /^More/ });
                 // Pressed until it opens: a press before hydration
                 // does nothing.
-                await expect(async () => {
-                    await more.click();
-                    await expect(
-                        page.getByRole("dialog", {
-                            name: "Everything else",
-                        }),
-                    ).toBeVisible({ timeout: 2_000 });
-                }).toPass({ timeout: 20_000 });
+                await pressUntil(
+                    more,
+                    page.getByRole("dialog", { name: "Everything else" }),
+                );
                 await page
                     .getByRole("dialog", { name: "Everything else" })
                     .getByRole("link", { name: /^Invoices/ })

@@ -1,7 +1,11 @@
-import type { LookId } from "@saroh/block-contract";
+import type { LookId, SiteStyleAccess, StyleKind } from "@saroh/block-contract";
+import {
+    heldStyleIds,
+    isPaidStyle,
+    needsPaidPlan,
+} from "@saroh/block-contract";
 
 import type { SiteStyle, SiteStyleOptions } from "./style";
-import { activeColourway } from "./style";
 
 /**
  * Free and paid looks, typefaces and colourways in Website › Style
@@ -12,19 +16,10 @@ import { activeColourway } from "./style";
  * place exactly what the save would refuse.
  */
 
-/** The site read's `styleAccess`. */
-export interface SiteStyleAccess {
-    free: {
-        looks: LookId[];
-        fontPairs: string[];
-        /** The site's template's colourways, by their own id. */
-        colourways: string[];
-    };
-    /** The plan includes "Themes, fonts and templates": all are open. */
-    paidIncluded: boolean;
-}
+/** The site read's `styleAccess`: `@saroh/block-contract`'s, as the API serves it. */
+export type { SiteStyleAccess };
 
-export type PaidKind = "look" | "fontPair" | "colourway";
+export type PaidKind = StyleKind;
 
 /** What the Style panel asks of a choice before taking it. */
 export interface StyleChoiceRules {
@@ -43,27 +38,11 @@ export const ALL_FREE: StyleChoiceRules = {
     refuses: () => false,
 };
 
-const FREE_LIST: Record<PaidKind, keyof SiteStyleAccess["free"]> = {
-    look: "looks",
-    fontPair: "fontPairs",
-    colourway: "colourways",
-};
-
-/** The id a style holds for each kind; Classic and the default pair too. */
-function heldBy(
-    style: SiteStyle,
-    options: SiteStyleOptions,
-): Record<PaidKind, string | null> {
-    return {
-        look: style.look ?? null,
-        fontPair: style.fontPair ?? options.fontPairs?.[0]?.key ?? null,
-        colourway: activeColourway(style, options.colourways)?.id ?? null,
-    };
-}
-
 /**
  * The rules for one site: what it may choose for nothing, its plan, and
- * the style the server holds (so its own choices stay open to it).
+ * the style the server holds (so its own choices stay open to it). The
+ * rule is `@saroh/block-contract`'s, the one the API's save runs (review
+ * #22): a colourway by its exact palette, no pair the system font.
  */
 export function styleChoiceRules(
     access: SiteStyleAccess | null | undefined,
@@ -73,16 +52,20 @@ export function styleChoiceRules(
     liveLook: LookId | null = null,
 ): StyleChoiceRules {
     if (!access) return ALL_FREE;
-    const has = heldBy(saved, options);
-    const isPaid = (kind: PaidKind, id: string) =>
-        !(access.free[FREE_LIST[kind]] as string[]).includes(id);
+    const colourways = (options.colourways ?? []).map((c) => ({
+        id: c.id,
+        palette: c.style.palette,
+    }));
+    const ctx = {
+        free: access.free,
+        held: heldStyleIds(saved, colourways),
+        liveLook,
+        colourways,
+    };
     return {
-        isPaid,
+        isPaid: (kind, id) => isPaidStyle(access.free, kind, id, colourways),
         refuses: (kind, id) =>
-            !access.paidIncluded &&
-            isPaid(kind, id) &&
-            has[kind] !== id &&
-            !(kind === "look" && id === liveLook),
+            !access.paidIncluded && needsPaidPlan(ctx, kind, id),
     };
 }
 

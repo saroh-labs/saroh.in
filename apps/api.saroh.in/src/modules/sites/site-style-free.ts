@@ -1,9 +1,18 @@
 import { Logger } from "@nestjs/common";
+import type {
+    PaidStylePart,
+    SiteFreeStyles,
+    SiteStyleAccess,
+} from "@saroh/block-contract";
+import {
+    colourwayKey,
+    paidStyleParts as sharedPaidStyleParts,
+    siteFreeStyles,
+} from "@saroh/block-contract";
 import { prisma } from "@saroh/database";
 import type { FreeStyles } from "@saroh/pricing-catalog";
 import { freeStylesOf } from "@saroh/pricing-catalog";
 import type { LookId, TemplateManifest } from "@saroh/templates";
-import { DEFAULT_FONT_PAIR, LOOK_IDS, samePalette } from "@saroh/templates";
 
 import { CatalogueAccessService } from "../billing/catalogue-access.service";
 import { planMeter } from "../billing/metering.service";
@@ -38,77 +47,20 @@ import { recordedTemplate, templateColourways } from "./site-style-offer";
 const logger = new Logger("SiteStyleFree");
 const catalogue = new CatalogueAccessService();
 
-/** What a site may choose for nothing, by kind: ids as the editor holds them. */
-export interface SiteFreeStyles {
-    looks: LookId[];
-    fontPairs: string[];
-    /** The site's template's colourways, by their own id (`kesar`). */
-    colourways: string[];
-}
-
-/** What the editor's Style panel needs to mark and refuse a paid choice. */
-export interface SiteStyleAccess {
-    free: SiteFreeStyles;
-    /** The plan includes `themes`: every choice is open to it. */
-    paidIncluded: boolean;
-}
-
-/** A part of a style save that is paid and not already the site's. */
-export interface PaidStylePart {
-    field: "look" | "fontPair" | "palette";
-    /** The look, pair or colourway (`template:colourway`) chosen. */
-    id: string;
-}
+export { colourwayKey, siteFreeStyles };
+export type { PaidStylePart, SiteFreeStyles, SiteStyleAccess };
 
 type SiteTemplate = Pick<TemplateManifest, "id" | "version" | "styles">;
 
 const NONE_FREE: FreeStyles = { looks: [], fontPairs: [], colourways: [] };
 
-/** A colourway's id in the catalogue: unique only with its template's. */
-export function colourwayKey(templateId: string, colourwayId: string): string {
-    return `${templateId}:${colourwayId}`;
-}
-
-/**
- * What one site may choose for nothing: the catalogue's free lists, as they
- * apply to its template, plus what every site always has.
- */
-export function siteFreeStyles(
-    lists: FreeStyles,
-    template: SiteTemplate | null | undefined,
-    startColourway: string | null | undefined,
-): SiteFreeStyles {
-    const looks = LOOK_IDS.filter((l) => lists.looks.includes(l));
-    const presets = template?.styles ?? [];
-    const ownPairs = presets.flatMap((p) =>
-        p.style.fontPair ? [p.style.fontPair as string] : [],
-    );
-    const fontPairs = [
-        ...new Set<string>([
-            DEFAULT_FONT_PAIR,
-            ...ownPairs,
-            ...lists.fontPairs,
-        ]),
-    ];
-    // The one it was made in, else the template's first (as Reset reads it).
-    const start = presets.some((p) => p.id === startColourway)
-        ? startColourway
-        : presets[0]?.id;
-    const colourways = presets
-        .filter(
-            (p) =>
-                p.id === start ||
-                (template !== null &&
-                    template !== undefined &&
-                    lists.colourways.includes(colourwayKey(template.id, p.id))),
-        )
-        .map((p) => p.id);
-    return { looks, fontPairs, colourways };
-}
-
 /**
  * The parts of `next` that are paid for this site and not what it already
- * has. Empty: the save needs no plan row.
+ * has. Empty: the save needs no plan row. The rule itself is
+ * `@saroh/block-contract`'s, the one the app's Style panel runs (review
+ * #22); a colourway is told apart by its exact palette (DEC-090), and that
+ * it is one of the template's is `assertTemplateLookOffered`'s rule,
+ * checked first.
  */
 export function paidStyleParts(
     next: SiteStyle,
@@ -126,42 +78,16 @@ export function paidStyleParts(
         free: SiteFreeStyles;
     },
 ): PaidStylePart[] {
-    const paid: PaidStylePart[] = [];
-
-    if (
-        next.look &&
-        next.look !== stored?.look &&
-        next.look !== liveLook &&
-        !free.looks.includes(next.look)
-    ) {
-        paid.push({ field: "look", id: next.look });
-    }
-
-    const pair = next.fontPair ?? DEFAULT_FONT_PAIR;
-    const had = stored?.fontPair ?? DEFAULT_FONT_PAIR;
-    if (pair !== had && !free.fontPairs.includes(pair)) {
-        paid.push({ field: "fontPair", id: pair });
-    }
-
-    // A colourway is its exact palette (DEC-090); that it is one of the
-    // template's is `assertTemplateLookOffered`'s rule, checked first.
-    const palette = next.palette;
-    if (
-        palette &&
-        template &&
-        !(stored?.palette && samePalette(stored.palette, palette))
-    ) {
-        const colourway = templateColourways(template).find(
-            (c) => c.style.palette && samePalette(c.style.palette, palette),
-        );
-        if (colourway && !free.colourways.includes(colourway.id)) {
-            paid.push({
-                field: "palette",
-                id: colourwayKey(template.id, colourway.id),
-            });
-        }
-    }
-    return paid;
+    return sharedPaidStyleParts(next, {
+        stored,
+        liveLook,
+        templateId: template?.id ?? null,
+        colourways: templateColourways(template).map((c) => ({
+            id: c.id,
+            palette: c.style.palette,
+        })),
+        free,
+    });
 }
 
 /**

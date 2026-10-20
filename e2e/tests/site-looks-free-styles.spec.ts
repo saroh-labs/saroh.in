@@ -80,6 +80,9 @@ test.describe("free and paid styles", { tag: "@serial" }, () => {
             if (!access || !paid) return;
 
             await useSession(page, "owner");
+            // The style autosave waits 700ms: on the page's own clock, so
+            // the spec can run past it and know a save would have gone.
+            await page.clock.install();
             await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
             await page.goto(`${urls.APP_URL}/sites/${look.siteId}`);
             await openBrand(page, phone);
@@ -92,7 +95,33 @@ test.describe("free and paid styles", { tag: "@serial" }, () => {
                 await choice.click();
                 await expect(choice).toHaveAttribute("aria-checked", "true");
                 await expect(choice).not.toContainText("Paid plans");
+                await page.clock.runFor(1_000);
+                await expect
+                    .poll(
+                        async () =>
+                            (
+                                await look.owner.get<SiteView>(
+                                    `/sites/${look.siteId}`,
+                                )
+                            ).style.look,
+                        { timeout: 15_000 },
+                    )
+                    .toBe(free);
             }
+
+            // Every style save from here on: the editor saves through a
+            // server action, whose body carries the style (review #26).
+            const saves: string[] = [];
+            page.on("request", (req) => {
+                const body = req.postData() ?? "";
+                if (
+                    req.method() === "POST" &&
+                    req.headers()["next-action"] &&
+                    body.includes(paid.key)
+                ) {
+                    saves.push(body);
+                }
+            });
 
             // A paid typeface: marked, refused in place, nothing saved.
             const typeface = page.getByRole("radiogroup", {
@@ -109,17 +138,16 @@ test.describe("free and paid styles", { tag: "@serial" }, () => {
             await expect(line).toContainText(
                 `${paid.name} comes with a paid plan`,
             );
-            await expect
-                .poll(
-                    async () =>
-                        (
-                            await look.owner.get<SiteView>(
-                                `/sites/${look.siteId}`,
-                            )
-                        ).style.fontPair ?? "system",
-                    { timeout: 5_000 },
-                )
-                .toBe(had);
+            // Past the autosave's wait: a save of the paid typeface would
+            // have been sent by now. None was, and the API still holds the
+            // typeface the site had.
+            await page.clock.runFor(2_000);
+            await expect(option).toHaveAttribute("aria-checked", "false");
+            expect(saves).toEqual([]);
+            const after = await look.owner.get<SiteView>(
+                `/sites/${look.siteId}`,
+            );
+            expect(after.style.fontPair ?? "system").toBe(had);
         } finally {
             await enforced.restore();
             await look.restore();

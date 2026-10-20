@@ -3,6 +3,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { northwind } from "../fixtures/own-data";
+import { pressUntil } from "../fixtures/press";
 import { useSession } from "../fixtures/sessions";
 import { overrideNorthwindFlag, setNorthwindLook } from "../fixtures/site-look";
 import { takeProduct } from "../fixtures/throwaway-products";
@@ -99,10 +100,7 @@ async function addFromItsPage(page: Page, slug: string, name: string) {
         .getByRole("button", { name: `Take ${name} out of your bag` })
         .filter({ visible: true })
         .first();
-    await expect(async () => {
-        await add.click();
-        await expect(stepper).toBeVisible({ timeout: 2_000 });
-    }).toPass({ timeout: 20_000 });
+    await pressUntil(add, stepper);
     // The stepper is 44px a button, on a phone too.
     const box = await stepper.boundingBox();
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);

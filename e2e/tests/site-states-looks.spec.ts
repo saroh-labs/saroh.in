@@ -164,8 +164,21 @@ test.describe("each look's state pages", { tag: "@serial" }, () => {
                 await expect(heroAction).toHaveCount(1);
                 {
                     await heroAction.scrollIntoViewIfNeeded();
-                    // Let the banner look again after the scroll.
-                    await site.waitForTimeout(250);
+                    // The banner looks again after the scroll: wait until
+                    // both boxes hold still across two reads, never a
+                    // fixed sleep (review #24).
+                    let last = "";
+                    await expect
+                        .poll(async () => {
+                            const now = JSON.stringify([
+                                await banner.boundingBox(),
+                                await heroAction.boundingBox(),
+                            ]);
+                            const still = now === last;
+                            last = now;
+                            return still;
+                        })
+                        .toBe(true);
                     const b = await banner.boundingBox();
                     const h = await heroAction.boundingBox();
                     if (b && h) expect(overlapping(b, h)).toBe(false);

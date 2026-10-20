@@ -172,5 +172,66 @@ export function holdActions(ctx: FlowActionsContext) {
         }
     };
 
-    return { nameFor, timeGone, backToChoosing, settleAside, leaveHold };
+    /**
+     * Leaving the booking (a look's Close or Escape) with a hold of theirs
+     * standing — on the pay step, or kept while they went Back a step:
+     * let it go first, so the time is free again for someone else (review
+     * #20). Paid meanwhile, the place is theirs, so the page says so and
+     * stays. A hold that won't let go stays and says so (K-2), as Back
+     * does. Paid in the checkout with its word on the way, the hold is
+     * theirs: it is left to confirm. Returns whether the page may close.
+     */
+    const letGoToLeave = async (): Promise<boolean> => {
+        const { phase } = ctx.s;
+        const paying = phase.kind === "paying" ? phase : null;
+        if (paying?.checkoutPaid) return true;
+        const held = paying ?? ctx.s.aside;
+        if (!held) return true;
+        if (ctx.keys.leavingRef.current) return false;
+        ctx.keys.leavingRef.current = true;
+        ctx.s.setLeaving(true);
+        let gone = false;
+        try {
+            const released = await releaseHold(apiUrl, held.token).catch(
+                (): Result<HoldView> => OFFLINE_RESULT,
+            );
+            if (released.ok && released.value.state === "CONFIRMED") {
+                ctx.s.setAside(null);
+                ctx.s.setPhase(
+                    paidPhase(held, released.value.booking, ctx.bookerFirst),
+                );
+                return false;
+            }
+            if (!released.ok || released.value.state === "HELD") {
+                const text = released.ok ? LEAVE_HOLD_FAILED : released.message;
+                if (paying) {
+                    ctx.s.setPhase((p) =>
+                        p.kind === "paying" && p.token === held.token
+                            ? { ...p, payError: text }
+                            : p,
+                    );
+                } else ctx.s.sayError(text);
+                return false;
+            }
+            if (!paying) ctx.s.setAside(null);
+            gone = true;
+            return true;
+        } finally {
+            // Let go and closing: the page stays busy until it is gone, and
+            // the hold's watch never draws "ran out" for a hold let go.
+            if (!gone) {
+                ctx.keys.leavingRef.current = false;
+                ctx.s.setLeaving(false);
+            }
+        }
+    };
+
+    return {
+        nameFor,
+        timeGone,
+        backToChoosing,
+        settleAside,
+        leaveHold,
+        letGoToLeave,
+    };
 }

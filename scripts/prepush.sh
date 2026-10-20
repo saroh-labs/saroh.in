@@ -359,6 +359,10 @@ e2e_stack() {
     export SITE_RELAY_SECRET=saroh-dev-insecure-site-relay-secret-not-for-production
     export SITE_ACCOUNTS_CODE_SECRET=ci-placeholder-site-code-secret-at-least-32-chars # gitleaks:allow (CI placeholder)
     export SITE_CODES_EMAIL_FAKE=log
+    # Customers' accounts on merchant sites, as CI and production: the API,
+    # saroh.app and the runner all read it, so the account specs run instead
+    # of skipping themselves (review #25).
+    export SITE_ACCOUNT_AREA=on
     # The link preview tool's spec serves its pages on this machine, which
     # the API's SSRF guard refuses; this test-only list lets it reach them.
     # The API won't boot with it under NODE_ENV=production.
@@ -862,6 +866,7 @@ bg_step cycles pnpm run check:cycles
 bg_step e2e-covers pnpm run check:e2e-covers
 bg_step merchant-site-tracking pnpm run check:merchant-site-tracking
 bg_step migration-ids pnpm run check:migration-ids
+bg_step decision-ids pnpm run check:decision-ids
 bg_step mktemp pnpm run check:mktemp
 bg_step date-inputs pnpm run check:date-inputs
 bg_step history-state pnpm run check:history-state

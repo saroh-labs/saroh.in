@@ -12,6 +12,11 @@ import {
     startPayment,
 } from "./api";
 import { accountPhone } from "./booking-account";
+import {
+    clearAttemptKey,
+    keepAttemptKey,
+    keptAttemptKey,
+} from "./booking-draft";
 import { newKey } from "./flow-helpers";
 import { holdActions, SIGNED_OUT } from "./hold-actions";
 import type { BookResult } from "./model";
@@ -40,11 +45,20 @@ const NAME_AFTER_SIGN_IN = "You're signed in. Add your name, then book.";
  * address (#508's keys, K-2's hold that may still stand, A9's time gone
  * while signing in, A10's credit found, A12's waitlist).
  */
+/** Whether the attempt's key still stands, read after the press. */
+const keyStands = (ref: React.RefObject<string | null>) => ref.current !== null;
+
 export function useBookingActions(ctx: FlowActionsContext) {
     const { account, apiUrl, times, chosenStart } = ctx;
     const service = times.service;
-    const { nameFor, timeGone, backToChoosing, settleAside, leaveHold } =
-        holdActions(ctx);
+    const {
+        nameFor,
+        timeGone,
+        backToChoosing,
+        settleAside,
+        leaveHold,
+        letGoToLeave,
+    } = holdActions(ctx);
 
     const confirm = async () => {
         ctx.s.setTouched(true);
@@ -215,7 +229,31 @@ export function useBookingActions(ctx: FlowActionsContext) {
         }
     };
 
+    /**
+     * Book, with the attempt's key kept for the visit until its answer
+     * comes (review #20): a page closed or reloaded mid-Book sends the
+     * same key when the same choice is booked again.
+     */
     const submit = async (who: SignedInCustomer, justSignedIn: boolean) => {
+        if (!service || !chosenStart) return;
+        const attempt = {
+            serviceId: service.id,
+            startAt: chosenStart.startAt,
+            staffId: chosenStart.staffId ?? null,
+            pay: ctx.pay,
+        };
+        const key = (ctx.keys.attemptKey.current ??=
+            keptAttemptKey(attempt) ?? newKey());
+        keepAttemptKey(attempt, key);
+        try {
+            await book(who, justSignedIn);
+        } finally {
+            // Answered (the key let go): the next press is a new attempt.
+            if (!keyStands(ctx.keys.attemptKey)) clearAttemptKey();
+        }
+    };
+
+    const book = async (who: SignedInCustomer, justSignedIn: boolean) => {
         if (!service || !chosenStart) return;
         const pay = ctx.pay;
         ctx.s.setSubmitting(true);
@@ -338,6 +376,7 @@ export function useBookingActions(ctx: FlowActionsContext) {
         signedInHere,
         notYou,
         leaveHold,
+        letGoToLeave,
         backToChoosing,
         bookAnother,
     };

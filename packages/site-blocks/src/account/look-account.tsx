@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { cn } from "../lib/utils";
 import { LOOK_EASE, LOOK_RING } from "../look-header-parts";
+import { DOCK_BAR, DOCK_TAB } from "../site-dock";
 import { ACCOUNT_TAB_HREF, currentTab } from "./hrefs";
 import { accountLookRules } from "./look-account-rules";
 import {
@@ -120,10 +121,7 @@ const BAR: Record<"folio" | "live", { nav: string; tab: string }> = {
     },
     // VB19–24 phone: the account's tabs where the dock stands, in the
     // dock's own ink and shape (`site-dock.tsx`).
-    live: {
-        nav: "bg-site-fg text-site-bg inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] h-[66px] items-center gap-0.5 rounded-[24px] p-1.5 shadow-[0_18px_40px_-16px_hsl(var(--site-fg)/0.55)]",
-        tab: "aria-[current=page]:bg-site-bg/15 h-[54px] justify-center rounded-[18px] px-1 text-[11px] font-semibold aria-[current=page]:font-bold focus-visible:ring-site-bg focus-visible:outline-none focus-visible:ring-2",
-    },
+    live: { nav: DOCK_BAR, tab: DOCK_TAB },
 };
 
 /**

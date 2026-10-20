@@ -75,6 +75,16 @@ const SITE_LAYER_RE =
     /(?:\b(?:bg|text|border|ring|divide|from|to|via)-site-[\w-]+\b)|(?:var\(--site-[\w-]+\))/;
 
 /**
+ * `--site-*` read by its name as a string key in a component
+ * (`vars["--site-bg"]`, `style={{ "--site-accent": … }}`): the look picker's
+ * thumbnails painted the resolved layer that way and the two forms above
+ * missed it (review #40). Only in `.tsx`, where things are drawn; a `.ts`
+ * module that names the variables (the palette, the type scale, the API's
+ * style read, seed data) produces names and draws nothing.
+ */
+const SITE_LAYER_KEY_RE = /["'`]--site-[\w-]+/;
+
+/**
  * Source with comments removed.
  *
  * The first run of this script failed on its own documentation: a comment in
@@ -215,6 +225,13 @@ const SITE_LAYER_ALLOWED = new Set([
     // block to BlockFixturePreview from @saroh/site-blocks, which the catalog
     // uses too. It draws no block of its own.
     "apps/app.saroh.in/components/sites/block-thumbnail.tsx",
+    // The Look row's drawn phone (DEC-172, U16; review #40): when no picture
+    // of the template in a look was captured, a 50px sketch of a page in the
+    // business's own resolved colours, the look's corners and heading face,
+    // so the four looks read apart at a glance. It reads the resolved
+    // `--site-*` values by name and draws no block; the real look is shown by
+    // Preview, which renders through @saroh/site-blocks.
+    "apps/app.saroh.in/components/sites/look-thumbnail.tsx",
     // Version history's preview of a past version (#283). The same category as
     // the editor's frame directly above: it supplies the merchant's page ground
     // — in the palette THAT version was published with, read from its snapshot —
@@ -256,7 +273,11 @@ for (const root of SEARCH_ROOTS) {
         // The style resolvers produce the variable NAMES; they draw nothing.
         if (/site-style\.ts$|lib\/sites\/style\.ts$/.test(rel)) continue;
         const source = await readFile(file, "utf8");
-        if (SITE_LAYER_RE.test(code(source))) {
+        const drawn = code(source);
+        if (
+            SITE_LAYER_RE.test(drawn) ||
+            (rel.endsWith(".tsx") && SITE_LAYER_KEY_RE.test(drawn))
+        ) {
             failures.push(
                 `G6  ${rel}  draws the --site-* layer outside packages/site-blocks. There is one renderer (#252); a second one drifts, and #189 is what that costs.`,
             );

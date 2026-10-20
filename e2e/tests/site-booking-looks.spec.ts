@@ -2,6 +2,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { stamp } from "../fixtures/own-data";
 import { setNorthwindLook } from "../fixtures/site-look";
 import { urls } from "../playwright.config";
 import { asNewVisitor, expectNoZoomOnFocus, readSiteCode } from "./site-codes";
@@ -169,7 +170,7 @@ test.describe("booking in each look", { tag: "@serial" }, () => {
         }, testInfo) => {
             test.setTimeout(240_000);
             const phone = testInfo.project.name.startsWith("phone");
-            const email = `look-${id}-${testInfo.project.name}-${Date.now()}@example.com`;
+            const email = `look-${id}-${stamp(testInfo)}@example.com`;
             const look = await setNorthwindLook(browser, id, testInfo);
             try {
                 await look.publish();
@@ -213,8 +214,14 @@ test.describe("booking in each look", { tag: "@serial" }, () => {
                     .click();
                 const times = timeRadios(page);
                 await expect(times.first()).toBeVisible({ timeout: 15_000 });
-                const time =
-                    (await times.count()) > 1 ? times.nth(1) : times.first();
+                // The middle of the day: public-booking takes these days'
+                // first time and site-booking-steps their last, so the
+                // second (next to the first, and the same person's) could
+                // overlap a booking another test makes at the same moment
+                // (review #41).
+                const time = times.nth(
+                    Math.floor(((await times.count()) - 1) / 2),
+                );
                 await time.click();
                 await expect(time).toHaveAttribute("aria-checked", "true");
                 await holdsTheRules(page, phone);

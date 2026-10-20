@@ -6,6 +6,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LookPreviewSource } from "@/components/sites/look-preview";
 import type { Section, SitePage } from "@/lib/sites/service";
+import type { SitePalette } from "@saroh/block-contract";
+import {
+    PALETTE_ROLES,
+    PALETTE_SAFE_ROLES,
+    PALETTE_STATUS_ROLES,
+} from "@saroh/block-contract";
+
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { inLook } from "@/lib/sites/style";
 import type { SiteStyleAccess } from "@/lib/sites/style-access";
@@ -42,6 +49,17 @@ const actions = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/sites/actions", () => actions);
 
+// A colourway is told apart by its exact palette (DEC-090), as the API's
+// save tells it (review #22).
+const paletteOf = (hex: string) =>
+    Object.fromEntries(
+        [...PALETTE_ROLES, ...PALETTE_STATUS_ROLES, ...PALETTE_SAFE_ROLES].map(
+            (role) => [role, hex],
+        ),
+    ) as unknown as SitePalette;
+const KESAR = paletteOf("#fbf7f2");
+const MAUVE = paletteOf("#f6f0f4");
+
 const options: SiteStyleOptions = {
     rows: [
         {
@@ -76,6 +94,7 @@ const options: SiteStyleOptions = {
             style: {
                 colours: { pageGround: "paper", text: "ink", accent: "clay" },
                 scalars: {},
+                palette: KESAR,
             },
             chips: [],
         },
@@ -85,6 +104,7 @@ const options: SiteStyleOptions = {
             style: {
                 colours: { pageGround: "paper", text: "ink", accent: "teal" },
                 scalars: {},
+                palette: MAUVE,
             },
             chips: [],
         },
@@ -96,6 +116,7 @@ const style: SiteStyle = {
     colours: { pageGround: "paper", text: "ink", accent: "clay" },
     scalars: {},
     fontPair: "own",
+    palette: KESAR,
 };
 
 const FREE: SiteStyleAccess["free"] = {

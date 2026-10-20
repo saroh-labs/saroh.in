@@ -7,6 +7,7 @@
         "check:branch-base": "node scripts/check-branch-base.mjs",
         "check:catalog-lock": "node scripts/check-catalog-lock.mjs",
         "check:client-calls": "node scripts/check-client-calls.mjs",
+        "check:decision-ids": "node scripts/check-decision-ids.mjs",
         "check:deploy-env": "node --test scripts/cf-env.test.mjs && node scripts/check-deploy-env.mjs",
         "check:date-inputs": "node scripts/check-date-inputs.mjs",
         "check:db-teardown": "node scripts/check-db-teardown.mjs",

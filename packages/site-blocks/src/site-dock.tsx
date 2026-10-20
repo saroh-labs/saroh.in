@@ -25,6 +25,16 @@ import { isCurrent } from "./site-header-menu";
  * In the page's ink, with its paper for words: a dock is the site's own,
  * never Saroh's.
  */
+/**
+ * The dock's shape and ink, and its tab's: one place, so the account's
+ * tabs under Live (`look-account.tsx`), which stand where the dock stands,
+ * are drawn the same (review #45).
+ */
+export const DOCK_BAR =
+    "bg-site-fg text-site-bg inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] h-[66px] items-center gap-0.5 rounded-[24px] p-1.5 shadow-[0_18px_40px_-16px_hsl(var(--site-fg)/0.55)]";
+export const DOCK_TAB =
+    "focus-visible:ring-site-bg aria-[current=page]:bg-site-bg/15 h-[54px] justify-center rounded-[18px] px-1 text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 aria-[current=page]:font-bold";
+
 export function SiteDock({
     tabs,
     current,
@@ -41,7 +51,7 @@ export function SiteDock({
             style={{
                 gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`,
             }}
-            className="bg-site-fg text-site-bg font-site-body fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-40 grid h-[66px] items-center gap-0.5 rounded-[24px] p-1.5 shadow-[0_18px_40px_-16px_hsl(var(--site-fg)/0.55)] min-[700px]:hidden"
+            className={`${DOCK_BAR} font-site-body fixed z-40 grid min-[700px]:hidden`}
         >
             {tabs.map((tab) => {
                 const on = isCurrent(tab.href, current);
@@ -51,7 +61,7 @@ export function SiteDock({
                         href={tab.href}
                         aria-current={on ? "page" : undefined}
                         data-dock-tab={tab.key}
-                        className={`focus-visible:ring-site-bg aria-[current=page]:bg-site-bg/15 flex h-[54px] min-w-0 cursor-pointer flex-col items-center justify-center gap-[3px] rounded-[18px] px-1 text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 aria-[current=page]:font-bold ${LOOK_EASE} active:opacity-80 ${
+                        className={`${DOCK_TAB} flex min-w-0 cursor-pointer flex-col items-center gap-[3px] ${LOOK_EASE} active:opacity-80 ${
                             tab.primary
                                 ? "[html[data-site-primary=gone]_&]:bg-site-accent [html[data-site-primary=gone]_&]:text-site-accent-fg text-xs font-extrabold"
                                 : ""

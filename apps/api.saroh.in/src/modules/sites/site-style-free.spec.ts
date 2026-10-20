@@ -2,6 +2,10 @@
 // the catalogue's free lists and what every site always has. The templates
 // are the real ones (the salon's two colourways, Kesar and Mauve, both in
 // Fraunces and Inter Tight); the catalogue lists are made up here.
+import {
+    STYLE_ACCESS_FIXTURE as F,
+    STYLE_ACCESS_CASES,
+} from "@saroh/block-contract";
 import { getTemplate } from "@saroh/templates";
 
 import type { SiteStyle } from "./site-style";
@@ -146,5 +150,52 @@ describe("paidStyleParts", () => {
 
     it("reads a default style with no palette as no colourway", () => {
         expect(paid(defaultSiteStyle(), { stored: undefined })).toEqual([]);
+    });
+});
+
+/**
+ * The same fixtures the app's Style panel runs (review #22,
+ * `lib/sites/style-access.test.ts`): what the save refuses is what the
+ * panel refuses.
+ */
+describe("paidStyleParts, on the shared fixtures", () => {
+    const clinic = getTemplate("clinic", 1)!;
+    const palettes = [salon.styles![0]!, salon.styles![1]!, clinic.styles![0]!];
+    const template = {
+        id: F.templateId,
+        version: 1,
+        styles: F.colourwayIds.map((id, i) => ({
+            ...palettes[i]!,
+            id,
+            style: { ...palettes[i]!.style, fontPair: F.ownPair },
+        })),
+    } as unknown as NonNullable<ReturnType<typeof getTemplate>>;
+    const [first, , third] = templateColourways(template);
+    const colourways = templateColourways(template);
+    const stored: SiteStyle = { ...first!.style, fontPair: F.ownPair };
+
+    function next(kind: string, id: string): SiteStyle {
+        if (kind === "look") return { ...stored, look: id as "live" };
+        if (kind === "fontPair") {
+            const { fontPair: _pair, ...rest } = stored;
+            return id === "system" ? rest : { ...rest, fontPair: id };
+        }
+        const c = colourways.find((x) => x.id === id)!;
+        return { ...stored, palette: c.style.palette };
+    }
+
+    it("has three told-apart colourways", () => {
+        expect(third!.style.palette).toBeDefined();
+        expect(new Set(colourways.map((c) => c.id)).size).toBe(3);
+    });
+
+    it.each(STYLE_ACCESS_CASES)("$name", (c) => {
+        const parts = paidStyleParts(next(c.kind, c.id), {
+            stored,
+            liveLook: c.liveLook,
+            template,
+            free: siteFreeStyles(F.lists, template, F.startColourway),
+        });
+        expect(parts.length > 0).toBe(c.refused);
     });
 });

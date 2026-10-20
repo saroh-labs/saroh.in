@@ -12,8 +12,8 @@ import { useSession } from "./sessions";
  * set a look the same way and none leaves Northwind changed:
  *
  * 1. Sam (`people.staff`) turns `SITE_LOOKS` on for Northwind alone, as
- *    admin → Flags does (a per-business override). The global flag and
- *    every other business are left alone.
+ *    admin → Flags does (a per-business override, `overrideNorthwindFlag`).
+ *    The global flag and every other business are left alone.
  * 2. The demo owner saves Northwind's style with the look, to the draft.
  *    The spec publishes when it needs the live site to wear it.
  * 3. `restore()` saves the style Northwind had back (and publishes again
@@ -70,36 +70,8 @@ export async function setNorthwindLook(
     look: LookId | null,
     testInfo: TestInfo,
 ): Promise<NorthwindLook> {
-    const key = (what: string) => `site-look-${what}-${stamp(testInfo)}`;
-    const reason = "Browser test: a look on Northwind's website";
-
-    // Sam's side, in a context of its own.
-    const staffContext = await browser.newContext({
-        baseURL: urls.APP_URL,
-        ignoreHTTPSErrors,
-    });
-    const staffPage = await staffContext.newPage();
-    await useSession(staffPage, "staff");
-    const admin = staffPage.request;
-    const headers = { origin: urls.APP_URL };
-    const flagUrl = `${urls.API_URL}/admin/flags/${FLAG}`;
-    const overrideUrl = `${flagUrl}/organizations/${NORTHWIND_ORG}`;
-
-    const explained = await admin.get(
-        `${flagUrl}/explain?organizationId=${NORTHWIND_ORG}`,
-        { headers },
-    );
-    expect(explained.ok(), await explained.text()).toBe(true);
-    const before = (await explained.json()) as FlagExplanation;
-    let flips = 0;
-    const flag = async (enabled: boolean) => {
-        const res = await admin.put(overrideUrl, {
-            headers,
-            data: { enabled, reason, idempotencyKey: key(`flag${++flips}`) },
-        });
-        expect(res.ok(), await res.text()).toBe(true);
-    };
-    await flag(true);
+    // Sam's side: the flag, through the one override helper (review #45).
+    const flagged = await overrideNorthwindFlag(browser, FLAG, testInfo);
 
     // The owner's side.
     const ownerContext = await browser.newContext({
@@ -129,7 +101,7 @@ export async function setNorthwindLook(
         siteId: site.id,
         owner: nw,
         saveLook,
-        flag,
+        flag: flagged.set,
         publish: async () => {
             await nw.post(`/sites/${site.id}/publish`, { override: true });
             published = true;
@@ -139,23 +111,8 @@ export async function setNorthwindLook(
             if (published) {
                 await nw.post(`/sites/${site.id}/publish`, { override: true });
             }
-            const back =
-                before.source === "OVERRIDE"
-                    ? await admin.put(overrideUrl, {
-                          headers,
-                          data: {
-                              enabled: before.value,
-                              reason,
-                              idempotencyKey: key("back"),
-                          },
-                      })
-                    : await admin.delete(overrideUrl, {
-                          headers,
-                          data: { reason, idempotencyKey: key("clear") },
-                      });
-            expect(back.ok(), await back.text()).toBe(true);
+            await flagged.restore();
             await ownerContext.close();
-            await staffContext.close();
         },
     };
 }
@@ -170,7 +127,11 @@ export async function overrideNorthwindFlag(
     browser: Browser,
     flagName: string,
     testInfo: TestInfo,
-): Promise<{ restore: () => Promise<void> }> {
+): Promise<{
+    /** Turn the override on or off again, mid-spec. */
+    set: (enabled: boolean) => Promise<void>;
+    restore: () => Promise<void>;
+}> {
     const key = (what: string) => `flag-${flagName}-${what}-${stamp(testInfo)}`;
     const reason = `Browser test: ${flagName} on Northwind`;
     const context = await browser.newContext({
@@ -190,13 +151,18 @@ export async function overrideNorthwindFlag(
     );
     expect(explained.ok(), await explained.text()).toBe(true);
     const before = (await explained.json()) as FlagExplanation;
-    const on = await admin.put(overrideUrl, {
-        headers,
-        data: { enabled: true, reason, idempotencyKey: key("on") },
-    });
-    expect(on.ok(), await on.text()).toBe(true);
+    let flips = 0;
+    const set = async (enabled: boolean) => {
+        const res = await admin.put(overrideUrl, {
+            headers,
+            data: { enabled, reason, idempotencyKey: key(`set${++flips}`) },
+        });
+        expect(res.ok(), await res.text()).toBe(true);
+    };
+    await set(true);
 
     return {
+        set,
         restore: async () => {
             const back =
                 before.source === "OVERRIDE"

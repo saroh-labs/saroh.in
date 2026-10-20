@@ -1,3 +1,8 @@
+import {
+    STYLE_ACCESS_FIXTURE as F,
+    siteFreeStyles,
+    STYLE_ACCESS_CASES,
+} from "@saroh/block-contract";
 import { describe, expect, it } from "vitest";
 
 import type { SiteStyle, SiteStyleOptions } from "./style";
@@ -90,5 +95,71 @@ describe("styleChoiceRules", () => {
         expect(paidRefusalWords("Archivo")).toBe(
             "Archivo comes with a paid plan. Your site keeps what it has.",
         );
+    });
+});
+
+/**
+ * The same fixtures the API's save runs (review #22,
+ * `site-style-free.spec.ts`): what the panel marks and refuses is what the
+ * save refuses.
+ */
+describe("styleChoiceRules, on the shared fixtures", () => {
+    const bgs = ["#ffffff", "#eeeeee", "#dddddd"];
+    const shared: SiteStyleOptions = {
+        rows: [],
+        scalars: [],
+        // A list whose first isn't the system font: no pair saved is still
+        // the system font, as the API holds it.
+        fontPairs: [
+            { key: "archivo", name: "Archivo" },
+            { key: "system", name: "System" },
+        ],
+        colourways: F.colourwayIds.map((id, i) => ({
+            id,
+            name: id,
+            style: { colours: {}, scalars: {}, palette: { bg: bgs[i] } },
+            chips: [],
+        })) as unknown as SiteStyleOptions["colourways"],
+    };
+    const template = {
+        id: F.templateId,
+        styles: F.colourwayIds.map((id) => ({
+            id,
+            style: { fontPair: F.ownPair },
+        })),
+    };
+    const stored = {
+        colours: {},
+        scalars: {},
+        fontPair: F.ownPair,
+        palette: { bg: bgs[0] },
+    } as unknown as SiteStyle;
+
+    it.each(STYLE_ACCESS_CASES)("$name", (c) => {
+        const rules = styleChoiceRules(
+            {
+                free: siteFreeStyles(F.lists, template, F.startColourway),
+                paidIncluded: false,
+            },
+            stored,
+            shared,
+            c.liveLook ?? null,
+        );
+        expect(rules.isPaid(c.kind, c.id)).toBe(c.paid);
+        expect(rules.refuses(c.kind, c.id)).toBe(c.refused);
+    });
+
+    it("never refuses going back to the system font when no pair is saved", () => {
+        const { fontPair: _pair, ...noPair } = stored;
+        const rules = styleChoiceRules(
+            {
+                free: { looks: [], fontPairs: [], colourways: [] },
+                paidIncluded: false,
+            },
+            noPair,
+            shared,
+        );
+        expect(rules.refuses("fontPair", "system")).toBe(false);
+        expect(rules.refuses("fontPair", "archivo")).toBe(true);
     });
 });

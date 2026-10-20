@@ -2,6 +2,7 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { stamp } from "../fixtures/own-data";
 import { setNorthwindLook } from "../fixtures/site-look";
 import { urls } from "../playwright.config";
 import {
@@ -103,7 +104,7 @@ test.describe("the customer's account in each look", { tag: "@serial" }, () => {
         }, testInfo) => {
             test.setTimeout(180_000);
             const phone = testInfo.project.name.startsWith("phone");
-            const email = `account-${id}-${testInfo.project.name}-${Date.now()}@example.com`;
+            const email = `account-${id}-${stamp(testInfo)}@example.com`;
             const look = await setNorthwindLook(browser, id, testInfo);
             try {
                 await look.publish();

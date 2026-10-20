@@ -59,7 +59,8 @@ import { useBookingFlow } from "./use-booking-flow";
  * - Paying says only what is known (`look-paying.tsx`); booked is the
  *   ticket first (`look-booked.tsx`).
  * - Escape and Close leave to the page it was opened from, the choices
- *   kept (`book-return.ts`).
+ *   kept (`book-return.ts`). Not while Book is under way; a hold of
+ *   theirs (paying, or kept while they went Back) is let go first.
  * - One filled button per view: the step's own. On a phone it sits in the
  *   one bar fixed at the foot.
  */
@@ -82,7 +83,19 @@ export function LookBookingFlow(props: BookingFlowProps & { look: LookId }) {
         { root: rootRef, heading: headingRef },
     );
     const { s, times, words, act, pick } = flow;
-    const close = useCloseBooking();
+    const closeBooking = useCloseBooking();
+    // Escape and Close (review #20): never mid-Book — the answer decides
+    // whether there is a hold — and a hold of theirs is let go first.
+    const close = () => {
+        if (s.submitting || s.leaving) return;
+        if (s.phase.kind !== "paying" && !s.aside) {
+            closeBooking();
+            return;
+        }
+        void act.letGoToLeave().then((ok) => {
+            if (ok) closeBooking();
+        });
+    };
     const { service, zone } = times;
     const { phase, customer } = s;
     const frame = LOOKS[look].booking;

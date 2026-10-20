@@ -2,8 +2,14 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { stamp } from "../fixtures/own-data";
 import { ignoreHTTPSErrors, urls } from "../playwright.config";
-import { asNewVisitor, nameThenBook, signInOnSheet } from "./site-codes";
+import {
+    asNewVisitor,
+    bookUntilOurs,
+    nameThenBook,
+    signInOnSheet,
+} from "./site-codes";
 
 /**
  * The booking step in the address (site templates v2 U9, #1098): each step
@@ -232,7 +238,7 @@ test.describe("the booking step in the address", () => {
     }, testInfo) => {
         test.setTimeout(150_000);
         const phone = testInfo.project.name.startsWith("phone");
-        const email = `steps-${testInfo.project.name}-${Date.now()}@example.in`;
+        const email = `steps-${stamp(testInfo)}@example.in`;
 
         await page.goto(`${NORTHWIND}/book`);
         await page
@@ -259,12 +265,15 @@ test.describe("the booking step in the address", () => {
             .click();
         await signInOnSheet(page, email);
         await nameThenBook(page, "Asha Rao");
+        // The last free time is a guess another test can take first: on a
+        // refusal, the next free time is booked instead.
+        await bookUntilOurs(
+            page,
+            page.getByRole("heading", { name: /to confirm your place$/ }),
+        );
         const payToken =
             new URL((await intent).url()).pathname.split("/")[3] ?? "";
         expect(payToken).toBeTruthy();
-        await expect(
-            page.getByRole("heading", { name: /to confirm your place$/ }),
-        ).toBeVisible({ timeout: 15_000 });
         await expect.poll(() => stepOf(page)).toBe("pay");
         // The address never carries the hold's token or the email.
         expect(page.url()).not.toContain(payToken);
