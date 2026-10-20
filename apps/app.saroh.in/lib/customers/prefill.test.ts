@@ -6,6 +6,7 @@ import {
     arrivalContactId,
     isOpeningPick,
     pickFromPerson,
+    withArrival,
     withoutArrival,
 } from "./prefill";
 
@@ -135,5 +136,26 @@ describe("withoutArrival", () => {
             "/bookings",
         );
         expect(withoutArrival("/bookings", "")).toBe("/bookings");
+    });
+});
+
+describe("withArrival", () => {
+    it("carries new=1 and the customer onto the page's own new address", () => {
+        expect(
+            withArrival(
+                "/bookings?layout=agenda&date=2026-10-20",
+                "?new=1&contactId=c_1",
+            ),
+        ).toBe("/bookings?layout=agenda&date=2026-10-20&new=1&contactId=c_1");
+        expect(withArrival("/bookings", "?new=1")).toBe("/bookings?new=1");
+    });
+
+    it("leaves the address alone when nothing was opened by it", () => {
+        expect(withArrival("/bookings?layout=agenda", "?contactId=c_1")).toBe(
+            "/bookings?layout=agenda",
+        );
+        expect(withArrival("/bookings?layout=agenda", "")).toBe(
+            "/bookings?layout=agenda",
+        );
     });
 });

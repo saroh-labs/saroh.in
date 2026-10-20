@@ -89,3 +89,20 @@ export function withoutArrival(pathname: string, search: string): string {
     const rest = q.toString();
     return rest ? `${pathname}?${rest}` : pathname;
 }
+
+/**
+ * `href` with the arrival's `new` and `contactId` carried over from
+ * `search`: a page that moves its own address while a flow it was opened
+ * with is up (a phone's Bookings moving to List) keeps saying so, so the
+ * open flow is never a page the address no longer names.
+ */
+export function withArrival(href: string, search: string): string {
+    const from = new URLSearchParams(search);
+    if (from.get("new") !== "1") return href;
+    const [path, query = ""] = href.split("?", 2);
+    const q = new URLSearchParams(query);
+    q.set("new", "1");
+    const contactId = from.get("contactId");
+    if (contactId) q.set("contactId", contactId);
+    return `${path}?${q.toString()}`;
+}

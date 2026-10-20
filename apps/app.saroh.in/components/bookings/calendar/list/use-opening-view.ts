@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 
+import { withArrival } from "@/lib/customers/prefill";
 import { rememberLastView } from "@/lib/services/bookings-opens";
 import type { CalendarLayout } from "@/lib/services/calendar-href";
 
@@ -33,7 +34,8 @@ export function useOpeningView({
             typeof window.matchMedia === "function" &&
             window.matchMedia(PHONE_WIDTHS).matches;
         if (listFirst && layout === "day" && phone) {
-            replace(listHref);
+            // New booking opened by the address (`?new=1`) stays named.
+            replace(withArrival(listHref, window.location.search));
             return;
         }
         rememberLastView(layout);
