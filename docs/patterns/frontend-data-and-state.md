@@ -108,6 +108,17 @@ add or change there may be served to the next visitor without rendering.
   a `"use client"` file reaches a server component as a reference, not its
   value: the account's addresses are in `site-blocks/account/hrefs.ts` for
   that reason, not in the tab bar.
+- **A fact that changes by the minute is a live fact, read in the browser**
+  (DEC-172, U8, #1042): "Next free", places left, "Open now", stock.
+  Never on the server, never with `dontCachePage`: read it with
+  `useLiveRead` and draw it with `LiveFact` (`site-blocks/src/live/`). One read
+  per address on a page, every 30 s while the page is in view, none while
+  it is hidden. The box keeps its height in every state (loading, fresh,
+  stale, unknown, failed); the cached HTML is always "loading", holding the
+  plain way in ("See times"). A count shows only under a minute old and 5
+  or fewer (`placesLeftWords`); an older answer keeps the time and hides
+  the count. `e2e/tests/site-live-facts.spec.ts` fetches the page with no
+  scripts and finds no time and no count.
 - **A live read outside the publication shortens the page's life.** The
   head (trackers, codes; DEC-108) keeps it 60 seconds at most
   (`keepPageAtMost`). Everything else lives `SITE_PAGE_CACHE_TTL` (five

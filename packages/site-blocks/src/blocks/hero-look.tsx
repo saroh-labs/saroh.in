@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
+import { HeroNextFree } from "../live/next-free";
 import { HeroHeading } from "./hero-heading";
 import type { HeroLevel } from "./hero-level";
 import type { FrontDoor, PageProof } from "./look-front";
@@ -35,9 +36,10 @@ import { OwnerPhotoNote } from "./no-photo";
  * says "No photo yet", where the photo would be.
  *
  * THE NEXT BOOKING is a slot (`data-site-next-free`) with its height kept
- * from the first paint. Live facts are fetched in the browser (U8, #1042):
- * until they are, the slot holds the plain way in, "See times", from the
- * cached page, and never a made-up time. A site that sells but takes no
+ * from the first paint. Live facts are fetched in the browser (U8, #1042,
+ * `live/next-free.tsx`): until they are, and whenever the read fails or
+ * finds nothing free, the slot holds the plain way in, "See times", from
+ * the cached page, and never a made-up time. A site that sells but takes no
  * bookings gets the shop's entry there instead; one that does neither gets
  * no slot.
  *
@@ -58,6 +60,8 @@ export default function LookHero({
     isOwnerPreview = false,
     frontDoor = null,
     proof = null,
+    siteId,
+    apiUrl,
 }: {
     content: RenderedHero;
     look: LookId;
@@ -66,6 +70,10 @@ export default function LookHero({
     isOwnerPreview?: boolean;
     frontDoor?: FrontDoor | null;
     proof?: PageProof | null;
+    /** The live site, for Next free's read in the browser (U8). */
+    siteId?: string | null;
+    /** Base URL of the public API, for that read. */
+    apiUrl?: string;
 }) {
     const src = content.image?.src.trim() ? content.image : null;
     const parts: HeroParts = {
@@ -87,7 +95,14 @@ export default function LookHero({
                 className={BUTTON_WIDTH[look]}
             />
         ) : null,
-        door: frontDoor ? <FrontDoorSlot door={frontDoor} look={look} /> : null,
+        door: frontDoor ? (
+            <FrontDoorSlot
+                door={frontDoor}
+                look={look}
+                siteId={siteId}
+                apiUrl={apiUrl}
+            />
+        ) : null,
         proof: proof ? <ProofLine proof={proof} look={look} /> : null,
         photo: (aspect: string, sizes: string, className?: string) =>
             src ? (
@@ -399,8 +414,37 @@ function LiveHero({
  * entry. Its height is kept from the first paint, so nothing moves when
  * the live facts arrive or fail; until then it holds the plain way in.
  */
-function FrontDoorSlot({ door, look }: { door: FrontDoor; look: LookId }) {
+function FrontDoorSlot({
+    door,
+    look,
+    siteId,
+    apiUrl,
+}: {
+    door: FrontDoor;
+    look: LookId;
+    siteId?: string | null;
+    apiUrl?: string;
+}) {
     const label = door.kind === "book" ? "See times" : "See the shop";
+    const plain =
+        look === "live" ? (
+            <Link
+                href={door.href}
+                className={cn(
+                    "bg-site-surface text-site-fg inline-flex min-h-11 items-center gap-2 rounded-full px-3.5 text-[14px] font-semibold",
+                    FRONT_RING,
+                )}
+            >
+                {label}
+            </Link>
+        ) : (
+            <Link
+                href={door.href}
+                className={frontButton(look, "link", "text-site-accent-text")}
+            >
+                {label}
+            </Link>
+        );
     return (
         <div
             data-site-front-door={door.kind}
@@ -413,27 +457,18 @@ function FrontDoorSlot({ door, look }: { door: FrontDoor; look: LookId }) {
                 door.kind === "book" && DOOR_HEIGHT[look],
             )}
         >
-            {look === "live" ? (
-                <Link
-                    href={door.href}
-                    className={cn(
-                        "bg-site-surface text-site-fg inline-flex min-h-11 items-center gap-2 rounded-full px-3.5 text-[14px] font-semibold",
-                        FRONT_RING,
-                    )}
-                >
-                    {label}
-                </Link>
+            {door.kind === "book" && siteId ? (
+                // Next free, read in the browser; "See times" until then
+                // and whenever it can't say (U8, #1042).
+                <HeroNextFree
+                    look={look}
+                    siteId={siteId}
+                    apiUrl={apiUrl}
+                    bookHref={door.href}
+                    fallback={plain}
+                />
             ) : (
-                <Link
-                    href={door.href}
-                    className={frontButton(
-                        look,
-                        "link",
-                        "text-site-accent-text",
-                    )}
-                >
-                    {label}
-                </Link>
+                plain
             )}
         </div>
     );

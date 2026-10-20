@@ -101,6 +101,8 @@ export default function HeroSection({
                 isOwnerPreview={isOwnerPreview}
                 frontDoor={frontDoor}
                 proof={proof}
+                siteId={siteId}
+                apiUrl={apiUrl}
             />
         );
     }

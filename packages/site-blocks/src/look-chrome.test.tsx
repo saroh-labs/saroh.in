@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resetLiveReads } from "./live/use-live-read";
 import { dockTabs, withVisitUs } from "./look-chrome";
 import { todayLine } from "./look-menu";
 import { SiteFooter, SiteHeader } from "./site-chrome";
@@ -377,6 +378,124 @@ describe("one filled button, one fixed bar", () => {
             );
         },
     );
+
+    describe("the Book bar's Next free (U8)", () => {
+        const realFetch = globalThis.fetch;
+        afterEach(() => {
+            resetLiveReads();
+            globalThis.fetch = realFetch;
+        });
+
+        /** The Book bar, drawn. */
+        function theBar(): HTMLElement {
+            const el = document.querySelector<HTMLElement>(
+                '[data-site-chrome-bar="book"]',
+            );
+            if (!el) throw new Error("no Book bar");
+            return el;
+        }
+
+        function barPage(action: SiteHeaderAction) {
+            return render(
+                <>
+                    <main>
+                        <a
+                            href="/book"
+                            className="bg-site-accent"
+                            data-testid="hero-book"
+                        >
+                            Book a class
+                        </a>
+                    </main>
+                    <StickyActions
+                        look="quiet"
+                        action={action}
+                        live={{
+                            siteId: "site_1",
+                            apiUrl: "https://api.example.com",
+                        }}
+                    />
+                </>,
+            );
+        }
+
+        it("says the next free time beside Book, read in the browser", async () => {
+            globalThis.fetch = vi.fn<typeof fetch>(() =>
+                Promise.resolve(
+                    new Response(
+                        JSON.stringify({
+                            timezone: "Asia/Kolkata",
+                            date: "2026-10-20",
+                            appointments: true,
+                            classes: true,
+                            items: [],
+                            hours: null,
+                            closedDates: [],
+                            nextFree: {
+                                kind: "class",
+                                serviceId: "svc_1",
+                                serviceName: "Vinyasa flow",
+                                durationMinutes: 60,
+                                startAt: "2026-10-20T12:30:00.000Z",
+                                date: "2026-10-20",
+                                time: "18:00",
+                                staffName: null,
+                                placesLeft: 4,
+                            },
+                        }),
+                        { status: 200 },
+                    ),
+                ),
+            );
+            go("/about");
+            barPage(BOOK);
+            act(() => FakeObserver.see(screen.getByTestId("hero-book"), false));
+            const bar = theBar();
+            expect(
+                await within(bar).findByText("Next free: today, 6:00 pm"),
+            ).toBeInTheDocument();
+            expect(
+                within(bar).getByRole("link", { name: "Book" }),
+            ).toHaveAttribute("href", "/book");
+            expect(globalThis.fetch).toHaveBeenCalledWith(
+                "https://api.example.com/public/sites/site_1/today",
+                expect.objectContaining({ cache: "no-store" }),
+            );
+        });
+
+        it("keeps Book where it is when the read fails, with an empty line", async () => {
+            globalThis.fetch = vi.fn<typeof fetch>(() =>
+                Promise.resolve(new Response("no", { status: 500 })),
+            );
+            go("/about");
+            barPage(BOOK);
+            act(() => FakeObserver.see(screen.getByTestId("hero-book"), false));
+            const bar = theBar();
+            await vi.waitFor(() =>
+                expect(bar.querySelector("[data-live-fact]")).toHaveAttribute(
+                    "data-live-state",
+                    "failed",
+                ),
+            );
+            expect(bar.querySelector("[data-live-fact]")?.textContent).toBe("");
+            expect(
+                within(bar).getByRole("link", { name: "Book" }),
+            ).toBeInTheDocument();
+        });
+
+        it("reads nothing when the bar's action is not booking", () => {
+            globalThis.fetch = vi.fn<typeof fetch>();
+            go("/about");
+            barPage({ kind: "shop", label: "Shop", href: "/shop" });
+            act(() => FakeObserver.see(screen.getByTestId("hero-book"), false));
+            expect(
+                document.querySelector(
+                    '[data-site-chrome-bar="book"] [data-live-fact]',
+                ),
+            ).toBeNull();
+            expect(globalThis.fetch).not.toHaveBeenCalled();
+        });
+    });
 
     it("waits while the consent banner is open: it is the bar then", () => {
         go("/about");

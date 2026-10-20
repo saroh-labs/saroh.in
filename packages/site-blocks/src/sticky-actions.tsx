@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { BarNextFree } from "./live/next-free";
 import type { DockTab } from "./look-chrome";
 import { lookHasBookBar } from "./look-chrome";
 import { LOOK_EASE, LOOK_RING } from "./look-header-parts";
@@ -37,7 +38,11 @@ import { chromeActionShows, chromePageKind } from "./site-primary-action";
  *
  * - Folio and Quiet: the Book bar, the site's main action full width at
  *   the thumb, once the page's own has scrolled away. Quiet's header Book
- *   gives way while it shows (`data-site-bar="book"`).
+ *   gives way while it shows (`data-site-bar="book"`). When the action is
+ *   booking and the site is live, the bar says the next free time beside
+ *   the button (VD01), read in the browser (U8, #1042); until it is, or
+ *   when it can't be, the line is empty at the same height and the button
+ *   keeps its place.
  * - Live: its dock (`site-dock.tsx`).
  * - Room under the footer for whichever it is, so the last line clears it.
  *
@@ -69,6 +74,16 @@ export function footTaken(doc: Document): boolean {
     );
 }
 
+/** Whether the site's main action is its booking page. */
+function isBookAction(action: SiteHeaderAction, basePath: string): boolean {
+    if (action.kind) return action.kind === "book";
+    const own =
+        basePath && action.href.startsWith(basePath)
+            ? action.href.slice(basePath.length)
+            : action.href;
+    return own === "/book" || own.startsWith("/book?");
+}
+
 const BAR: Record<"folio" | "quiet", string> = {
     folio: "border-site-fg px-5 pb-[calc(14px+env(safe-area-inset-bottom))]",
     quiet: "border-site-border px-6 pb-[calc(16px+env(safe-area-inset-bottom))]",
@@ -79,10 +94,16 @@ export function StickyActions({
     action,
     dock = [],
     basePath = "",
+    live = null,
 }: {
     look: LookId;
     /** The site's main action, as the header has it; none draws no bar. */
     action: SiteHeaderAction | null;
+    /**
+     * The live site, for the Book bar's Next free (U8). None (a preview,
+     * the editor): the bar is the button alone.
+     */
+    live?: { siteId: string; apiUrl?: string } | null;
     /** Live's tabs (`dockTabs`); ignored by the other looks. */
     dock?: DockTab[];
     basePath?: string;
@@ -159,6 +180,9 @@ export function StickyActions({
         chromeActionShows(path, action, basePath) &&
         primaryShown === false &&
         !taken;
+    // Next free beside Book, only when the bar books (U8).
+    const nextFree =
+        live && action !== null && isBookAction(action, basePath) ? live : null;
     const dockRoom =
         look === "live" &&
         dock.length > 1 &&
@@ -195,9 +219,15 @@ export function StickyActions({
                     data-site-rise=""
                     className={`bg-site-bg font-site-body fixed inset-x-0 bottom-0 z-40 flex items-center gap-3 border-t pt-3 min-[700px]:hidden ${BAR[look]}`}
                 >
+                    {nextFree ? (
+                        <BarNextFree
+                            siteId={nextFree.siteId}
+                            apiUrl={nextFree.apiUrl}
+                        />
+                    ) : null}
                     <Link
                         href={action.href}
-                        className={`bg-site-accent text-site-accent-fg border-site-accent rounded-site flex h-[52px] flex-1 cursor-pointer items-center justify-center border text-[15px] font-semibold tracking-[0.02em] ${LOOK_RING} ${LOOK_EASE} active:opacity-80`}
+                        className={`bg-site-accent text-site-accent-fg border-site-accent rounded-site flex h-[52px] cursor-pointer items-center justify-center border text-[15px] font-semibold tracking-[0.02em] ${nextFree ? "flex-none px-6" : "flex-1"} ${LOOK_RING} ${LOOK_EASE} active:opacity-80`}
                     >
                         {action.label}
                     </Link>

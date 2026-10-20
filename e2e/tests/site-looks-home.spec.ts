@@ -127,10 +127,15 @@ test.describe("each look's home and About", { tag: "@serial" }, () => {
                     const kind = await door.getAttribute(
                         "data-site-front-door",
                     );
+                    // The booking page's slot holds "See times" until the
+                    // live read answers, then the next free time's own link
+                    // (U8, #1042).
                     await expect(
                         door.getByRole("link", {
                             name:
-                                kind === "shop" ? "See the shop" : "See times",
+                                kind === "shop"
+                                    ? "See the shop"
+                                    : /^(See times|Book this (class|time)|Next free: .+)$/,
                         }),
                     ).toBeVisible();
                 }

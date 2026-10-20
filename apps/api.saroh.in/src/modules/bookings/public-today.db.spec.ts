@@ -234,6 +234,145 @@ describe("On today (real database)", () => {
         expect(read.appointments).toBe(false);
     });
 
+    it("names the next free start today: Hatha's 11:00 is after Karan's 10:00", async () => {
+        const read = await today.read(
+            studio.siteId,
+            "visitor",
+            nextMonday(9, 10),
+        );
+        expect(read.nextFree).not.toBeNull();
+        expect(read.nextFree!.startAt > nextMonday(9, 10).toISOString()).toBe(
+            true,
+        );
+        // Soonest of everything the panel could list.
+        const soonest = [...read.items]
+            .filter((i) => i.kind === "one" || (i.placesLeft ?? 0) > 0)
+            .map((i) => i.startAt)
+            .sort()[0];
+        expect(read.nextFree!.startAt).toBe(soonest);
+    });
+
+    it("looks past today when nothing is left: next Monday's first time (U8)", async () => {
+        // After closing on Monday: nothing today, so the next free is a
+        // later day's, within the booking page's window.
+        const now = nextMonday(20);
+        const read = await today.read(studio.siteId, "visitor", now);
+        expect(read.items).toEqual([]);
+        expect(read.nextFree).not.toBeNull();
+        const at = new Date(read.nextFree!.startAt);
+        expect(at > now).toBe(true);
+        expect(at.getUTCDay()).toBe(MONDAY);
+        expect(read.nextFree!.date).toBe(at.toISOString().slice(0, 10));
+        // Only what the booking page offers for that service.
+        const page = await publicDays(read.nextFree!.serviceId, now);
+        const offered = page.days.flatMap((d) =>
+            d.starts.map((s) => s.startAt),
+        );
+        expect(offered).toContain(read.nextFree!.startAt);
+    });
+
+    it("never names a full class as next free", async () => {
+        const gym = await business("Full Class Gym");
+        const svc = await prisma.service.create({
+            data: {
+                organizationId: gym.organizationId,
+                name: "Spin",
+                durationMinutes: 60,
+                capacity: 2,
+                timezone: "UTC",
+                availabilityRules: {
+                    create: {
+                        organizationId: gym.organizationId,
+                        dayOfWeek: MONDAY,
+                        startMinute: 11 * 60,
+                        endMinute: 12 * 60,
+                    },
+                },
+            },
+        });
+        const now = nextMonday(10);
+        const before = await today.read(gym.siteId, "visitor", now);
+        const first = before.nextFree;
+        expect(first?.serviceId).toBe(svc.id);
+        // Fill that session.
+        for (let i = 0; i < 2; i++) {
+            await prisma.booking.create({
+                data: {
+                    organizationId: gym.organizationId,
+                    serviceId: svc.id,
+                    startAt: new Date(first!.startAt),
+                    endAt: new Date(
+                        new Date(first!.startAt).getTime() + 60 * 60_000,
+                    ),
+                    timezone: "UTC",
+                    status: "CONFIRMED",
+                    bookerName: `Asha ${i}`,
+                    bookerEmail: `asha${i}@example.com`,
+                    snapshot: {},
+                },
+            });
+        }
+        const after = await today.read(gym.siteId, "visitor", now);
+        expect(after.nextFree?.startAt).not.toBe(first!.startAt);
+    });
+
+    it("leaves out a service the booking page doesn't show, and another business's", async () => {
+        const quiet = await business("Hidden Service Studio");
+        await prisma.service.create({
+            data: {
+                organizationId: quiet.organizationId,
+                name: "Private",
+                durationMinutes: 60,
+                capacity: 3,
+                timezone: "UTC",
+                showOnBookingPage: false,
+                availabilityRules: {
+                    create: {
+                        organizationId: quiet.organizationId,
+                        dayOfWeek: MONDAY,
+                        startMinute: 11 * 60,
+                        endMinute: 12 * 60,
+                    },
+                },
+            },
+        });
+        const read = await today.read(quiet.siteId, "visitor", nextMonday(10));
+        expect(read.nextFree).toBeNull();
+        // Pulse's services exist and are free, but never reach this site.
+        expect(JSON.stringify(read)).not.toContain(hatha);
+        expect(JSON.stringify(read)).not.toContain(training);
+    });
+
+    it("leaves out a service kept for another site of the same business", async () => {
+        const second = await prisma.site.create({
+            data: {
+                organizationId: studio.organizationId,
+                name: "Pulse Two",
+                slug: uniq("g18-site"),
+            },
+        });
+        const only = await prisma.service.create({
+            data: {
+                organizationId: studio.organizationId,
+                siteId: second.id,
+                name: "Second-site class",
+                durationMinutes: 30,
+                capacity: 4,
+                timezone: "UTC",
+                availabilityRules: {
+                    create: {
+                        organizationId: studio.organizationId,
+                        dayOfWeek: MONDAY,
+                        startMinute: 9 * 60 + 30,
+                        endMinute: 10 * 60,
+                    },
+                },
+            },
+        });
+        const read = await today.read(studio.siteId, "visitor", nextMonday(9));
+        expect(JSON.stringify(read)).not.toContain(only.id);
+    });
+
     it("limits each visitor", async () => {
         const strict = new PublicTodayService(new FixedWindowRateLimiter(1));
         await strict.read(studio.siteId, "one-visitor", nextMonday(8));

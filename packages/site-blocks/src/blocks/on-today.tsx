@@ -72,7 +72,8 @@ export interface PublicToday {
     closedDates: string[];
 }
 
-function isTodayItem(value: unknown): value is PublicTodayItem {
+/** One row, narrowed (also `nextFree`, U8). */
+export function isTodayItem(value: unknown): value is PublicTodayItem {
     if (typeof value !== "object" || value === null) return false;
     const v = value as Record<string, unknown>;
     return (

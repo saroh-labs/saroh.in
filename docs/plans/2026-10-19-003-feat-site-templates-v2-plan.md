@@ -729,6 +729,14 @@ Every unit follows `docs/patterns/00-universal.md` §15 (keep every capability: 
 
 **Verification:** Northwind's home served from the page cache shows live values after load. The HTML is the same for two visitors.
 
+**Notes (built 20 Oct, #1042):**
+
+- **The read** (`live/use-live-read.ts`, `live/live-state.ts`): one source per address, shared by every fact on the page; reads on mount, every 30 s while the page is visible (VB00Live says 30 s; a 60 s poll against a 60 s freshness window would turn every count stale before each read), stops while hidden and reads at once when shown; 8 s timeout. Status is pure (`liveStatus`): loading, fresh, refreshing, stale (older than 60 s), failed; "unknown" is the fact's own (`LiveFact`'s `pick` finds nothing).
+- **The box** (`live/live-fact.tsx`): one `min-h-*` in every state; the server and the first paint are always "loading" (`data-live-state`), so the cached HTML holds no value.
+- **API**: `GET public/sites/:id/today` gains `nextFree` (`firstFree` over today's rows; only when none is free, the next 13 days per service through `publicDays(…, { skip: 1 })`). An API without it reads as nothing free.
+- **Where it shows** (`live/next-free.tsx`): the look hero's slot (`HeroNextFree`, "Next free · Hatha yoga · tomorrow, 7:00 am · 3 places left" and "Book this class"; "See times" while loading, failed or nothing free); Live's Now strip (time, service, "3 left", "Open now · closes 9pm · Checked 5:20 pm"); Folio's and Quiet's Book bar ("Next free: today, 6:00 pm" beside Book, the button keeping its place when there is none).
+- **Not here**: places left on the timetable rows and "Places checked" (U7 owns `timetable.tsx`; it can use `useLiveRead`, `LiveFact` and `placesLeftWords`); stock counts on cached product pages (the rest of #1042); Open now in Visit us (U7). The board's price beside Next free (VD01) and "with Kabir" are left out: no price in the read, and the person is Phase 2.
+
 ---
 
 #### U9. One booking route with the step in the URL (characterization and split)

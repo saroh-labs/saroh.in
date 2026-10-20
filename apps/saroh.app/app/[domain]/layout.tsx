@@ -513,6 +513,17 @@ export default async function SiteLayout({
                                 <StickyActions
                                     look={look}
                                     action={action}
+                                    // Next free beside Book, read in the
+                                    // browser (U8, #1042): the cached
+                                    // page carries no time.
+                                    live={
+                                        siteId
+                                            ? {
+                                                  siteId,
+                                                  apiUrl: publicApiUrl(),
+                                              }
+                                            : null
+                                    }
                                     dock={lookDock({
                                         look,
                                         navigation,

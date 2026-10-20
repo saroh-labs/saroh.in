@@ -36,6 +36,12 @@ import { businessTimezone } from "./staff-availability";
 /** How many rows the panel shows. */
 export const TODAY_ITEMS = 4;
 
+/**
+ * How far ahead "Next free" looks (U8, #1042): the booking page's own
+ * window, so a time named on the home is always one it offers.
+ */
+export const NEXT_FREE_DAYS = 14;
+
 /** Page views per visitor per minute, as the Visit us read allows. */
 const READS_PER_WINDOW = 120;
 const READ_WINDOW_MS = 60_000;
@@ -80,6 +86,14 @@ export interface PublicToday {
      * of its hours (E3), so the line never says "opens" on a closed day.
      */
     closedDates: string[];
+    /**
+     * "Next free" on a look's home (DEC-172, U8, #1042): the soonest start
+     * any service on the booking page can still be booked at, today or in
+     * the next {@link NEXT_FREE_DAYS} days. A class with no places left is
+     * never it. Per service, never per person (that is Phase 2, #1041).
+     * Null when nothing is free in that window, or Appointments is off.
+     */
+    nextFree: TodayItem | null;
 }
 
 /** Every miss looks the same. */
@@ -105,7 +119,39 @@ export function todayRows(
 ): TodayItem[] {
     const day = days.days.find((d) => d.date === today);
     if (!day) return [];
-    return day.starts.map((start) => {
+    return startRows(service, days, day.starts, today);
+}
+
+/** Every day's starts as rows, in the order the booking page lists them. */
+export function allRows(service: ServiceRow, days: PublicDays): TodayItem[] {
+    return days.days.flatMap((day) =>
+        startRows(service, days, day.starts, day.date),
+    );
+}
+
+/**
+ * The soonest row someone could book now: any one-to-one start, or a class
+ * with a place left. A full class is never "free".
+ */
+export function firstFree(rows: readonly TodayItem[]): TodayItem | null {
+    let best: TodayItem | null = null;
+    for (const row of rows) {
+        const free =
+            row.kind === "one" ||
+            (row.placesLeft !== null && row.placesLeft > 0);
+        if (!free) continue;
+        if (!best || row.startAt < best.startAt) best = row;
+    }
+    return best;
+}
+
+function startRows(
+    service: ServiceRow,
+    days: PublicDays,
+    starts: PublicDays["days"][number]["starts"],
+    fallbackDate: string,
+): TodayItem[] {
+    return starts.map((start) => {
         const local = DateTime.fromISO(start.startAt, { zone: days.timezone });
         return {
             kind: days.kind,
@@ -113,7 +159,7 @@ export function todayRows(
             serviceName: service.name,
             durationMinutes: service.durationMinutes,
             startAt: start.startAt,
-            date: local.toISODate() ?? today,
+            date: local.toISODate() ?? fallbackDate,
             time: local.toFormat("HH:mm"),
             staffName: start.staffName,
             placesLeft: days.kind === "class" ? start.placesLeft : null,
@@ -236,6 +282,24 @@ export class PublicTodayService {
                 )
             ).flat();
 
+            // Next free: today's own rows first, read already. Only when
+            // nothing today is free are the later days read, from tomorrow,
+            // through the same booking-page read (U8, #1042).
+            let nextFree = firstFree(rows);
+            if (!nextFree && services.length > 0) {
+                const later = await Promise.all(
+                    services.map((service) =>
+                        publicDays(service.id, now, NEXT_FREE_DAYS - 1, {
+                            skip: 1,
+                        }).then(
+                            (days) => allRows(service, days),
+                            () => [] as TodayItem[],
+                        ),
+                    ),
+                );
+                nextFree = firstFree(later.flat());
+            }
+
             return {
                 timezone: zone,
                 date,
@@ -244,6 +308,7 @@ export class PublicTodayService {
                 items: pickToday(rows),
                 hours,
                 closedDates: shut,
+                nextFree,
             };
         });
     }
