@@ -96,6 +96,8 @@ export const RAW_ALLOWED = {
     "components/commerce/order-detail/stepper.tsx": ["button"],
     // button: a row or card that is one button
     "components/commerce/orders/bulk-bar.tsx": ["button"],
+    // button: the ink bar's own buttons, as Orders' bulk bar draws them
+    "components/invoices/remind-bar.tsx": ["button"],
     // button: a row or card that is one button
     "components/commerce/orders/order-row.tsx": ["button"],
     // button: a combobox trigger

@@ -1,11 +1,13 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Checkbox } from "@saroh/ui/checkbox";
 import { countLabel, PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { BulkRemindSheet } from "@/components/invoices/bulk-remind-sheet";
 import { ChequesLine } from "@/components/invoices/cheques-line";
 import { InvoiceDetailsSheet } from "@/components/invoices/details/invoice-details-sheet";
 import type { InvoiceBusinessTax } from "@/components/invoices/gst-status-line";
@@ -14,6 +16,8 @@ import type { ListEmpty } from "@/components/invoices/invoice-list-body";
 import { InvoiceListBody } from "@/components/invoices/invoice-list-body";
 import { InvoiceSearch } from "@/components/invoices/invoice-search";
 import { MoneyStrip } from "@/components/invoices/money-strip";
+import { RemindBar } from "@/components/invoices/remind-bar";
+import { useRowShare } from "@/components/invoices/row-share";
 import { ScopeNotice, SourceFilter } from "@/components/invoices/source-filter";
 import { ListFilter, ListToolbar } from "@/components/shared/list-toolbar";
 import { SinceNotice } from "@/components/shared/since-notice";
@@ -32,6 +36,13 @@ import {
     withTab,
 } from "@/lib/invoices/list-view";
 import { exemptNote } from "@/lib/invoices/paper-title";
+import type { PickRow, RemindedBy } from "@/lib/invoices/remind-many";
+import {
+    pickRowsOf,
+    remindable,
+    remindAllLabel,
+    remindedWords,
+} from "@/lib/invoices/remind-many";
 import type { Invoice } from "@/lib/invoices/service";
 import type { InvoiceScope, SourceChip } from "@/lib/invoices/sources";
 import {
@@ -44,6 +55,7 @@ import {
 import type { InvoiceTab } from "@/lib/invoices/status";
 import { inTab, INVOICE_TABS, paidSinceRows } from "@/lib/invoices/status";
 import type { InvoiceSummary, SummaryFilter } from "@/lib/invoices/summary";
+import { invoiceZone } from "@/lib/invoices/zone";
 import { withoutSince } from "@/lib/views/since";
 
 export type { InvoiceBusinessTax } from "@/components/invoices/gst-status-line";
@@ -67,6 +79,13 @@ export type { InvoiceBusinessTax } from "@/components/invoices/gst-status-line";
  * states. A row opens the invoice's details in a side sheet (U9 #1121),
  * where every action finishes; `?invoice=` keeps it open on a reload.
  *
+ * Remind many (U12 #1124): "Remind all N" on the Overdue view, or the
+ * rows ticked at a desk, opens the three steps (`BulkRemindSheet`); on
+ * Overdue each row also has its own Remind, U11's share sheet on the
+ * reminder. A row reminded here says so ("Reminded today · by email")
+ * until the list is read again. Only someone who may write invoices sees
+ * any of it.
+ *
  * Overdue is worked out from the due date by the API, never stored. A
  * credit note sits under the invoice it corrects and never counts as
  * owed; an order's own paper is owed on the order.
@@ -84,7 +103,10 @@ export function InvoicesScreen({
     timeZone,
     missingRates = null,
     summary,
+    businessName = "This business",
 }: {
+    /** The business's name as it signs its messages, for a reminder's preview. */
+    businessName?: string;
     /**
      * What is on sale with a price and no GST rate, for a GST-registered
      * business: a tax invoice for one shows no GST. Null when it couldn't
@@ -147,6 +169,23 @@ export function InvoicesScreen({
         setChip(initialChip);
     }
     const shownQuery = picked ?? query;
+
+    // Remind many (U12): the three steps' sheet, what it opens on, the
+    // rows ticked at a desk (kept against the view, so a new filter starts
+    // with none), and how each row was reminded here.
+    const [remindOpen, setRemindOpen] = useState(false);
+    const [remindOn, setRemindOn] = useState<{
+        rows: PickRow[];
+        ticked?: string[];
+    }>({ rows: [] });
+    const [ticks, setTicks] = useState<{
+        view: string;
+        ids: ReadonlySet<string>;
+    }>({ view: "", ids: new Set() });
+    const [reminded, setReminded] = useState<
+        Partial<Record<string, RemindedBy>>
+    >({});
+    const rowShare = useRowShare({ onDone: () => router.refresh() });
 
     const go = (next: URLSearchParams) =>
         start(() => router.replace(hrefOf(pathname, next), { scroll: false }));
@@ -277,6 +316,26 @@ export function InvoicesScreen({
     const exempt = exemptNote(invoices);
     const chequesOn = shownQuery.cheques;
 
+    const view = `${shownQuery.tab}|${chip}|${shownQuery.owed}|${shownQuery.cheques}|${shownQuery.paidFrom}|${shownQuery.q}`;
+    const owed = canWrite ? pickRowsOf(rows) : [];
+    const onOverdue = shownQuery.tab === "overdue";
+    const tickedIds = ticks.view === view ? ticks.ids : new Set<string>();
+    const tickedRows = owed.filter((r) => tickedIds.has(r.invoiceId));
+    const selecting = canWrite && owed.length > 0;
+
+    function tick(id: string) {
+        const next = new Set(tickedIds);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setTicks({ view, ids: next });
+    }
+
+    /** Opens the three steps on these rows, the ticked ones ticked. */
+    function openRemind(on: PickRow[], ticked?: string[]) {
+        setRemindOn({ rows: on, ticked });
+        setRemindOpen(true);
+    }
+
     return (
         // One block: the page container spaces its children apart, and the
         // design sets the title, the lines and the strip close together.
@@ -344,6 +403,18 @@ export function InvoicesScreen({
                     />
                 }
                 onClear={somethingNarrows ? clearAll : undefined}
+                end={
+                    onOverdue && owed.length > 0 ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => openRemind(owed)}
+                            data-remind-all=""
+                        >
+                            {remindAllLabel(owed.length)}
+                        </Button>
+                    ) : undefined
+                }
                 clearLabel={
                     shownQuery.q && !narrowed({ ...shownQuery, q: "" })
                         ? "Clear search"
@@ -389,6 +460,52 @@ export function InvoicesScreen({
                 truncated={truncated && !onServer}
                 canWrite={canWrite}
                 busy={busy}
+                rowBefore={
+                    selecting
+                        ? (i) =>
+                              remindable(i) ? (
+                                  <Checkbox
+                                      checked={tickedIds.has(i.id)}
+                                      onCheckedChange={() => tick(i.id)}
+                                      aria-label={`Pick ${i.number ?? "this invoice"} to remind`}
+                                      className="relative z-[1] size-[17px] rounded-[5px]"
+                                  />
+                              ) : (
+                                  <span aria-hidden className="size-[17px]" />
+                              )
+                        : undefined
+                }
+                rowAfter={
+                    onOverdue && canWrite
+                        ? (i) => (
+                              <div className="flex w-[96px] justify-end max-md:hidden">
+                                  {reminded[i.id] ? (
+                                      <span
+                                          data-reminded={reminded[i.id]}
+                                          className="text-right text-[11.5px] leading-tight text-muted-foreground"
+                                      >
+                                          {remindedWords(
+                                              reminded[i.id] ?? "email",
+                                          )}
+                                      </span>
+                                  ) : remindable(i) ? (
+                                      <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          disabled={rowShare.loading === i.id}
+                                          aria-label={`Remind ${i.number ?? "this invoice"}`}
+                                          onClick={() =>
+                                              rowShare.open(i.id, "REMINDER")
+                                          }
+                                      >
+                                          Remind
+                                      </Button>
+                                  ) : null}
+                              </div>
+                          )
+                        : undefined
+                }
                 notice={
                     paidSince ? (
                         <SinceNotice
@@ -403,6 +520,39 @@ export function InvoicesScreen({
                     ) : null
                 }
             />
+
+            {tickedRows.length > 0 ? (
+                <RemindBar
+                    count={tickedRows.length}
+                    onRemind={() =>
+                        openRemind(
+                            tickedRows,
+                            tickedRows.map((r) => r.invoiceId),
+                        )
+                    }
+                    onClear={() => setTicks({ view, ids: new Set() })}
+                />
+            ) : null}
+
+            <BulkRemindSheet
+                open={remindOpen}
+                onOpenChange={setRemindOpen}
+                rows={remindOn.rows}
+                ticked={remindOn.ticked}
+                invoices={rows}
+                businessName={businessName}
+                timeZone={invoiceZone(timeZone ? { timeZone } : null)}
+                onReminded={(id, by) => {
+                    setReminded((was) => ({ ...was, [id]: by }));
+                    setTicks((was) => {
+                        if (!was.ids.has(id)) return was;
+                        const ids = new Set(was.ids);
+                        ids.delete(id);
+                        return { view: was.view, ids };
+                    });
+                }}
+            />
+            {rowShare.overlays}
 
             <InvoiceDetailsSheet
                 invoiceId={openId}

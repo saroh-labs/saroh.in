@@ -240,6 +240,24 @@ invoices/reminders` (`InvoiceRemindersService`, `invoice:write`, at most
   (its own transaction and checks), and sends nothing else: the business
   opens each WhatsApp one through the share route. Never a failure for
   the lot.
+- **Remind many's three steps** (U12 #1124, INVBulkSend;
+  `components/invoices/bulk-remind-sheet.tsx`, its steps in
+  `bulk-remind-steps.tsx`, the words in `lib/invoices/remind-many.ts`):
+  "Remind all N" on the Overdue view, or the rows ticked at a desk (the
+  ink bar, `remind-bar.tsx`), opens one `FormSheet`: Pick who (all
+  ticked), How each one goes (the preview grouped Email / WhatsApp /
+  Can't reach now, headed by INVShareB's one look, the button saying
+  "Send 3 emails, then WhatsApp 2"), Send. The emails go through
+  `useHold().send` (ten seconds; the sheet draws its own Undo, since the
+  toast is behind a modal); Undo before any WhatsApp opened comes back to
+  step 2, after one it stands. WhatsApp is walked one at a time with Open
+  (`openWhatsAppShare`, the share route, so it is logged and counts as the
+  day's reminder) or Skip. More than 100 picked go in calls of at most 100
+  (`chunks`), for the preview and the send. A row reminded here shows
+  "Reminded today · by email / on WhatsApp" until the list is read again.
+  On Overdue each row also has its own Remind: the share sheet on the
+  reminder, through `useRowShare` (details read, then `useShareFlow`).
+  Only `invoice:write` sees any of it.
 - **The receipt is automatic** (owner, 20 Oct). `paymentRecordedInTx`
   queues `invoice.receipt` (`invoice-receipt.ts`) at
   `now + RECEIPT_HOLD_MS`, for every payment the ledger records, by hand,

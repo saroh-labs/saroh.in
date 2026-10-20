@@ -658,8 +658,11 @@ export function ShareSheet({
     );
 }
 
-/** The preview bubble, with the link drawn as a chip until it is made. */
-function MessagePreview({ text }: { text: string }) {
+/**
+ * The preview bubble, with the link drawn as a chip until it is made. Remind
+ * many's WhatsApp step (U12) draws the same one.
+ */
+export function MessagePreview({ text }: { text: string }) {
     const [before, after] = text.includes(LINK_SLOT)
         ? text.split(LINK_SLOT)
         : [text, null];

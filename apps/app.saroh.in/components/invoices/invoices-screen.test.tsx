@@ -43,6 +43,34 @@ vi.mock("@/components/invoices/details/invoice-details-sheet", () => ({
             </div>
         ) : null,
 }));
+// Remind many's sheet and a row's share sheet have their own tests: here
+// it is what they are opened on.
+const remind = vi.hoisted(() => ({ rowShare: vi.fn() }));
+vi.mock("@/components/invoices/bulk-remind-sheet", () => ({
+    BulkRemindSheet: ({
+        open,
+        rows,
+        ticked,
+    }: {
+        open: boolean;
+        rows: readonly { invoiceId: string }[];
+        ticked?: readonly string[];
+    }) =>
+        open ? (
+            <div
+                role="dialog"
+                data-remind-sheet={rows.map((r) => r.invoiceId).join(",")}
+                data-ticked={ticked?.join(",") ?? "all"}
+            />
+        ) : null,
+}));
+vi.mock("@/components/invoices/row-share", () => ({
+    useRowShare: () => ({
+        open: remind.rowShare,
+        loading: null,
+        overlays: null,
+    }),
+}));
 vi.mock("@/lib/gst-rates/actions", () => ({ saveGstRates: vi.fn() }));
 vi.mock("@/components/gst-rates/gst-rates-sheet", () => ({
     GstRatesSheet: () => null,
@@ -393,5 +421,63 @@ describe("InvoicesScreen: rows", () => {
                 ?.getAttribute("data-details-sheet"),
         ).toBe(LATE.id);
         search = "";
+    });
+});
+
+describe("InvoicesScreen: Remind many (U12)", () => {
+    const sheet = () =>
+        document.querySelector<HTMLElement>("[data-remind-sheet]");
+    const ticks = () =>
+        Array.from(
+            document.querySelectorAll<HTMLButtonElement>(
+                'button[role="checkbox"][aria-label^="Pick"]',
+            ),
+        ).map((b) => b.getAttribute("aria-label"));
+
+    it("Overdue has Remind all N, which opens the three steps on every overdue one", () => {
+        search = "tab=overdue";
+        show({ query: { ...ALL, tab: "overdue" } });
+        const all = s.button("Remind all 1");
+        expect(all).toBeTruthy();
+        act(() => all?.click());
+        expect(sheet()?.dataset.remindSheet).toBe("0106");
+        expect(sheet()?.dataset.ticked).toBe("all");
+    });
+
+    it("Remind all is drawn on Overdue only", () => {
+        show();
+        expect(s.text()).not.toContain("Remind all");
+    });
+
+    it("each overdue row has its own Remind: the share sheet on the reminder", () => {
+        search = "tab=overdue";
+        show({ query: { ...ALL, tab: "overdue" } });
+        const own = s.button("Remind RC/26-27/0106");
+        act(() => own?.click());
+        expect(remind.rowShare).toHaveBeenCalledWith("0106", "REMINDER");
+    });
+
+    it("owed rows can be ticked at a desk; the bar's Remind opens the steps on those", () => {
+        show();
+        // Due and overdue only: paid and draft ones have no tick.
+        expect(ticks()).toEqual([
+            "Pick RC/26-27/0105 to remind",
+            "Pick RC/26-27/0106 to remind",
+        ]);
+        const box = document.querySelector<HTMLButtonElement>(
+            'button[aria-label="Pick RC/26-27/0105 to remind"]',
+        );
+        act(() => box?.click());
+        expect(s.text()).toContain("1 invoice ticked");
+        act(() => s.button("Remind 1")?.click());
+        expect(sheet()?.dataset.remindSheet).toBe("0105");
+        expect(sheet()?.dataset.ticked).toBe("0105");
+    });
+
+    it("a role without write gets no Remind, no ticks and no bar", () => {
+        search = "tab=overdue";
+        show({ canWrite: false, query: { ...ALL, tab: "overdue" } });
+        expect(s.text()).not.toContain("Remind");
+        expect(ticks()).toEqual([]);
     });
 });

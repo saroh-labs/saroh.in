@@ -46,6 +46,8 @@ export function InvoiceListBody({
     canWrite,
     busy,
     notice,
+    rowBefore,
+    rowAfter,
 }: {
     rows: readonly Invoice[];
     /** Set when there is nothing to show, and why. */
@@ -61,6 +63,10 @@ export function InvoiceListBody({
     busy: boolean;
     /** Above the rows: "Only the 3 invoices paid in the last 24 hours". */
     notice?: ReactNode;
+    /** A row's tick, while rows can be picked to remind (U12, desk only). */
+    rowBefore?: (invoice: Invoice) => ReactNode;
+    /** A row's own action beside it: Remind on Overdue (U12). */
+    rowAfter?: (invoice: Invoice) => ReactNode;
 }) {
     const { rows: paged, paging } = useLocalPages("invoices", rows, {
         label: "Pages of invoices",
@@ -105,7 +111,13 @@ export function InvoiceListBody({
             ) : (
                 <ListTable>
                     <ListTableHead
-                        className={cn(INVOICE_GRID, "max-md:hidden")}
+                        className={cn(
+                            INVOICE_GRID,
+                            "max-md:hidden",
+                            // The ticks' column, ahead of the head's own.
+                            rowBefore && "md:pl-[52px]",
+                            rowAfter && "md:pr-[122px]",
+                        )}
                     >
                         <span>Billed to</span>
                         <span>Invoice</span>
@@ -120,6 +132,8 @@ export function InvoiceListBody({
                                     selected={selectedId === i.id}
                                     onOpen={() => onOpen(i)}
                                     timeZone={timeZone}
+                                    before={rowBefore?.(i)}
+                                    after={rowAfter?.(i)}
                                 />
                             </li>
                         ))}
