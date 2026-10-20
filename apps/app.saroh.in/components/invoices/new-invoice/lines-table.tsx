@@ -5,15 +5,13 @@ import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { MoneyInput } from "@saroh/ui/money-input";
-import { OptionSelect } from "@saroh/ui/option-select";
 import { X } from "lucide-react";
 import { useId } from "react";
 import type { UseFieldArrayReturn, UseFormReturn } from "react-hook-form";
 import { Controller } from "react-hook-form";
 
+import { GstRatePicker } from "@/components/shared/gst-rate-picker";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
-import type { GstRateValue } from "@/lib/invoices/gst";
-import { GST_RATE_OPTIONS } from "@/lib/invoices/gst";
 import type { InvoiceFormValues } from "@/lib/invoices/new-invoice";
 import type { PickRow } from "@/lib/invoices/new-invoice-lines";
 import { lineOfProduct } from "@/lib/invoices/new-invoice-lines";
@@ -22,22 +20,12 @@ import { placeLine, takeLine } from "./line-ops";
 import { ProductPick } from "./product-pick";
 
 /**
- * The rates as a line's narrow box shows them: "0%" with what it means as
- * the option's second line, so the box reads in its column.
- */
-const LINE_RATES = GST_RATE_OPTIONS.map((o) =>
-    o.value === "0"
-        ? { value: o.value, label: "0%", hint: "Nil-rated or exempt" }
-        : { value: o.value, label: o.label },
-);
-
-/**
  * The desk's one row a line (INVNewA): what it's for, Qty, Price each,
- * then GST and HSN on a registered business, then remove. A phone stacks
- * it (T7).
+ * then HSN on a registered business, then remove, with the GST rate's
+ * buttons under it (DEC-176). A phone stacks it (T7).
  */
 const DESK_ROW = "sm:grid-cols-[minmax(0,1fr)_60px_104px_30px]";
-const DESK_ROW_GST = "sm:grid-cols-[minmax(0,1fr)_56px_100px_104px_96px_30px]";
+const DESK_ROW_GST = "sm:grid-cols-[minmax(0,1fr)_56px_100px_96px_30px]";
 
 /**
  * What it's for (INVNewA): the lines, each with its description, quantity,
@@ -98,12 +86,7 @@ export function LinesTable({
                 <span>Item</span>
                 <span>Qty</span>
                 <span>Price each</span>
-                {registered ? (
-                    <>
-                        <span>GST</span>
-                        <span>HSN</span>
-                    </>
-                ) : null}
+                {registered ? <span>HSN</span> : null}
             </div>
             <ul className="grid gap-2 sm:gap-1.5">
                 {fields.map((line, i) => {
@@ -115,8 +98,8 @@ export function LinesTable({
                         >
                             {/* A phone stacks the line (T7): what it's for
                                 beside its remove button, then Quantity and
-                                Price each, labelled, side by side, then GST
-                                and HSN. The desk keeps one row. The remove
+                                Price each, labelled, side by side, then HSN,
+                                then the GST rate's buttons. The desk keeps one row. The remove
                                 button is drawn twice (one per layout, the
                                 other display:none) so the tab order follows
                                 what is seen. */}
@@ -193,38 +176,6 @@ export function LinesTable({
                                     <>
                                         <div className="col-start-1 grid gap-1 sm:contents">
                                             <Label
-                                                htmlFor={`${ids.lines}-${i}-gst`}
-                                                className="text-[12px] text-muted-foreground sm:hidden"
-                                            >
-                                                GST rate
-                                            </Label>
-                                            <Controller
-                                                control={form.control}
-                                                name={`lines.${i}.gstRate`}
-                                                render={({ field }) => (
-                                                    <OptionSelect
-                                                        id={`${ids.lines}-${i}-gst`}
-                                                        aria-label={`Line ${i + 1}: GST rate`}
-                                                        value={
-                                                            field.value as GstRateValue
-                                                        }
-                                                        onValueChange={
-                                                            field.onChange
-                                                        }
-                                                        options={LINE_RATES}
-                                                        placeholder="GST rate"
-                                                        disabled={disabled}
-                                                        aria-invalid={
-                                                            lineErr?.gstRate
-                                                                ? true
-                                                                : undefined
-                                                        }
-                                                    />
-                                                )}
-                                            />
-                                        </div>
-                                        <div className="grid gap-1 sm:contents">
-                                            <Label
                                                 htmlFor={`${ids.lines}-${i}-hsn`}
                                                 className="text-[12px] text-muted-foreground sm:hidden"
                                             >
@@ -254,6 +205,37 @@ export function LinesTable({
                                     onRemove={() => removeLine(i)}
                                 />
                             </div>
+                            {/* The rate as buttons under the line, on the
+                                desk and on a phone (DEC-176): a row of chips
+                                is wider than any column the line has. */}
+                            {registered ? (
+                                <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+                                    <span
+                                        aria-hidden
+                                        className="text-[12px] text-muted-foreground"
+                                    >
+                                        GST rate
+                                    </span>
+                                    <Controller
+                                        control={form.control}
+                                        name={`lines.${i}.gstRate`}
+                                        render={({ field }) => (
+                                            <GstRatePicker
+                                                label={`Line ${i + 1}: GST rate`}
+                                                // As the box had: "Not set"
+                                                // until the line is issued.
+                                                optional
+                                                value={field.value}
+                                                onChange={field.onChange}
+                                                disabled={disabled}
+                                                invalid={Boolean(
+                                                    lineErr?.gstRate,
+                                                )}
+                                            />
+                                        )}
+                                    />
+                                </div>
+                            ) : null}
                             {lineErr ? (
                                 <p className="text-[12px] text-destructive-subtle-foreground">
                                     {lineErr.description?.message ??

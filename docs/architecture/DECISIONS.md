@@ -2218,4 +2218,4 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **1.5% is added** to the rates GST has, for cut and polished diamonds.
 - **Nothing saved changes:** a rate saved at 12% or 28% keeps it and opens with Other shown; issued invoices are never touched.
 - Not set stays only where a field may be left empty today. There is no new business "usual rate" setting.
-- Rules: added when built (`docs/patterns/frontend-forms.md`).
+- Rules: `docs/patterns/frontend-forms.md` → "A GST rate is always chosen with `GstRatePicker`"; checked by `lib/consistency/shared-pieces.test.ts`.

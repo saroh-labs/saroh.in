@@ -11,8 +11,7 @@ import type { UseFormReturn } from "react-hook-form";
 import { Controller, useWatch } from "react-hook-form";
 
 import { HeaderOverlay } from "@/components/bookings/calendar/header/header-overlay";
-import { ChipGroup } from "@/components/shared/choice-group";
-import { GST_RATE_CHOICES } from "@/lib/invoices/gst";
+import { GstRatePicker } from "@/components/shared/gst-rate-picker";
 import type { InvoiceFormValues } from "@/lib/invoices/new-invoice";
 
 import type { PaperTarget } from "../new-invoice/paper-preview";
@@ -84,12 +83,6 @@ export function PartOverlay({
         </div>
     );
 }
-
-/** The rates as chips: "0%", "5%", … every rate GST has. */
-const RATE_CHIPS = GST_RATE_CHOICES.map((o) => ({
-    value: o.value,
-    label: `${o.value}%`,
-}));
 
 /**
  * A line, changed on the paper (INVNewEdit's "Line 2"): what it's for,
@@ -189,11 +182,12 @@ export function LineEditor({
                     >
                         GST
                     </span>
-                    <ChipGroup
+                    <GstRatePicker
                         labelledBy={`${id}-gst`}
-                        choices={RATE_CHIPS}
-                        value={rate || null}
+                        value={rate}
                         invalid={Boolean(err?.gstRate)}
+                        // The line's problem is said once, under the line.
+                        errorId={err?.gstRate ? `${id}-problem` : undefined}
                         onChange={(v) =>
                             form.setValue(`lines.${index}.gstRate`, v, {
                                 shouldDirty: true,
@@ -205,6 +199,7 @@ export function LineEditor({
             ) : null}
             {problem ? (
                 <p
+                    id={`${id}-problem`}
                     role="alert"
                     className="text-[12px] text-destructive-subtle-foreground"
                 >

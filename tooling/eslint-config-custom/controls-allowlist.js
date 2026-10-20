@@ -189,6 +189,8 @@ export const RAW_ALLOWED = {
     "components/shared/choice-group.tsx": ["button"],
     // button: a control styled by its screen's own helper
     "components/shared/failed-read.tsx": ["button"],
+    // button: Other rate, a chip-shaped disclosure (aria-expanded) beside the rates (DEC-176)
+    "components/shared/gst-rate-picker.tsx": ["button"],
     // input: a file picker
     "components/shared/logo-upload.tsx": ["input"],
     // button: a tab

@@ -8,6 +8,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+    otherRateButton,
+    pickRate,
+    ratePicker,
+    rateShown,
+    ratesOffered,
+} from "@/components/shared/gst-rate-picker.testing";
+
+import {
     address,
     draw,
     edit,
@@ -161,5 +169,27 @@ describe("a phone taken off", () => {
         await press(item("Save"));
         expect(save).toHaveBeenCalledWith({ profile: { phone: "" } });
         expect(sheet()).toBeNull();
+    });
+});
+
+describe("GST on delivery", () => {
+    it("is chosen by button, a rate behind Other rate included, and saved (DEC-176)", async () => {
+        save.mockResolvedValue({ ok: true, data: noAddress() });
+        onTab("tax", "&edit=delivery");
+        draw(noAddress());
+        const rate = () => ratePicker("GST on delivery", sheet() ?? document);
+        // Delivery always carries a rate: no "Not set".
+        expect(ratesOffered(rate())).toEqual(["0", "5", "18", "40"]);
+        expect(rateShown(rate())).toBe("18");
+        pickRate(rate(), "12");
+        expect(otherRateButton(rate()).getAttribute("aria-expanded")).toBe(
+            "true",
+        );
+        expect(rateShown(rate())).toBe("12");
+        await press(item("Save"));
+        const sent = save.mock.calls.at(-1)?.[0] as {
+            tax?: { deliveryRate?: string };
+        };
+        expect(sent.tax?.deliveryRate).toBe("12");
     });
 });

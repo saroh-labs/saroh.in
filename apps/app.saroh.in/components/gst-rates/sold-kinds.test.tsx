@@ -17,6 +17,11 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+    pickRate,
+    ratePicker,
+} from "@/components/shared/gst-rate-picker.testing";
+
 import type { SellablePack } from "@/components/class-packs/sell-pack-dialog";
 import { SellPackDialog } from "@/components/class-packs/sell-pack-dialog";
 import type { EnrolCourse } from "@/components/courses/enrol-dialog";
@@ -147,17 +152,7 @@ async function press(name: string) {
 }
 
 function choose(name: string, rate: string) {
-    const box = document.querySelector<HTMLSelectElement>(
-        `select[aria-label="GST rate for ${name}"]`,
-    );
-    if (!box) throw new Error(`No GST rate box for ${name}`);
-    act(() => {
-        Object.getOwnPropertyDescriptor(
-            HTMLSelectElement.prototype,
-            "value",
-        )?.set?.call(box, rate);
-        box.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    pickRate(ratePicker(`GST rate for ${name}`), rate);
 }
 
 const page = () => document.body.textContent;
@@ -166,7 +161,9 @@ const page = () => document.body.textContent;
 function rateSheet(name: string): HTMLElement | null {
     return (
         document
-            .querySelector(`select[aria-label="GST rate for ${name}"]`)
+            .querySelector(
+                `[role="radiogroup"][aria-label="GST rate for ${name}"]`,
+            )
             ?.closest<HTMLElement>('[role="dialog"]') ?? null
     );
 }

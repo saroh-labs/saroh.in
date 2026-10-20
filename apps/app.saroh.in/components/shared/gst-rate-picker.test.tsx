@@ -37,7 +37,18 @@ const names = (group?: HTMLElement) => chips(group).map((c) => c.textContent);
 const chosen = (group?: HTMLElement) =>
     chips(group).find((c) => c.getAttribute("aria-checked") === "true")
         ?.textContent ?? null;
+const otherToggle = () => {
+    const button = host.querySelector<HTMLButtonElement>(
+        "button[aria-expanded]",
+    );
+    if (!button) throw new Error("no Other rate button");
+    return button;
+};
 const press = (name: string, group?: HTMLElement) => {
+    if (name === "Other rate" && !group) {
+        act(() => otherToggle().click());
+        return;
+    }
     const chip = chips(group).find((c) => c.textContent === name);
     if (!chip) throw new Error(`no chip ${name}: ${names(group).join(", ")}`);
     act(() => chip.click());
@@ -80,7 +91,11 @@ describe("GstRatePicker", () => {
     it("shows the main rates and Other rate, and chooses and changes each", () => {
         const onChange = vi.fn();
         act(() => root.render(<Picker onChange={onChange} />));
-        expect(names()).toEqual(["0%", "5%", "18%", "40%", "Other rate"]);
+        expect(names()).toEqual(["0%", "5%", "18%", "40%"]);
+        // Other rate is a disclosure beside the rates, never one of them.
+        expect(otherToggle().textContent).toBe("Other rate");
+        expect(otherToggle().getAttribute("role")).toBeNull();
+        expect(otherToggle().getAttribute("aria-expanded")).toBe("false");
         expect(chosen()).toBeNull();
         for (const [name, rate] of [
             ["5%", "5"],
@@ -100,7 +115,12 @@ describe("GstRatePicker", () => {
         act(() => root.render(<Picker start="5" onChange={onChange} />));
         press("Other rate");
         expect(onChange).not.toHaveBeenCalled();
-        expect(chosen()).toBe("Other rate");
+        // The rate is still 5%, and 5% still says so.
+        expect(chosen()).toBe("5%");
+        expect(otherToggle().getAttribute("aria-expanded")).toBe("true");
+        expect(otherToggle().getAttribute("aria-controls")).toBe(
+            otherRow()?.parentElement?.id,
+        );
         expect(names(otherRow())).toEqual(
             OTHER_GST_RATE_CHOICES.map((o) => `${o.value}%`),
         );
@@ -110,13 +130,31 @@ describe("GstRatePicker", () => {
         press("12%", otherRow());
         expect(onChange).toHaveBeenLastCalledWith("12");
         expect(groups()).toHaveLength(2);
-        expect(chosen()).toBe("Other rate");
+        expect(chosen()).toBeNull();
         expect(chosen(otherRow())).toBe("12%");
+    });
+
+    it("closes Other rate again while the rate is a main one, never while it is in the row", () => {
+        act(() => root.render(<Picker start="5" />));
+        press("Other rate");
+        expect(groups()).toHaveLength(2);
+        press("Other rate");
+        expect(groups()).toHaveLength(1);
+        expect(otherToggle().getAttribute("aria-expanded")).toBe("false");
+        expect(chosen()).toBe("5%");
+
+        press("Other rate");
+        press("1.5%", otherRow());
+        press("Other rate");
+        expect(groups()).toHaveLength(2);
+        expect(otherToggle().getAttribute("aria-expanded")).toBe("true");
+        expect(chosen(otherRow())).toBe("1.5%");
     });
 
     it("opens a saved 28.00 with Other shown and 28% chosen", () => {
         act(() => root.render(<Picker start="28.00" />));
-        expect(chosen()).toBe("Other rate");
+        expect(chosen()).toBeNull();
+        expect(otherToggle().getAttribute("aria-expanded")).toBe("true");
         expect(otherRow()).toBeDefined();
         expect(chosen(otherRow())).toBe("28%");
     });
@@ -211,17 +249,18 @@ describe("GstRatePicker", () => {
     it("moves through the chips with the arrow keys", () => {
         const onChange = vi.fn();
         act(() => root.render(<Picker start="5" onChange={onChange} />));
-        expect(chips().map((c) => c.tabIndex)).toEqual([-1, 0, -1, -1, -1]);
+        expect(chips().map((c) => c.tabIndex)).toEqual([-1, 0, -1, -1]);
         arrow("ArrowRight");
         expect(onChange).toHaveBeenLastCalledWith("18");
         expect(document.activeElement?.textContent).toBe("18%");
         arrow("ArrowLeft");
         arrow("ArrowLeft");
         expect(onChange).toHaveBeenLastCalledWith("0");
-        // Left from the first wraps to Other rate, which opens the row.
+        // Left from the first wraps to the last rate, not to Other rate.
         arrow("ArrowLeft");
-        expect(chosen()).toBe("Other rate");
-        expect(otherRow()).toBeDefined();
+        expect(onChange).toHaveBeenLastCalledWith("40");
+        expect(otherRow()).toBeUndefined();
+        press("Other rate");
         // Nothing chosen there yet: the arrows start from its first chip.
         arrow("ArrowRight", otherRow());
         expect(chosen(otherRow())).toBe(names(otherRow())[1]);
@@ -269,7 +308,7 @@ describe("GstRatePicker", () => {
             ),
         );
         expect(
-            [...chips(), ...chips(otherRow())].every(
+            [...chips(), ...chips(otherRow()), otherToggle()].every(
                 (c) => (c as HTMLButtonElement).disabled,
             ),
         ).toBe(true);

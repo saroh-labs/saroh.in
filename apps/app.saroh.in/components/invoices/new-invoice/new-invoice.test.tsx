@@ -10,6 +10,14 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+    otherRateButton,
+    pickRate,
+    ratePicker,
+    rateShown,
+    ratesOffered,
+} from "@/components/shared/gst-rate-picker.testing";
+
 import type { InvoiceFormBusiness } from "@/lib/invoices/new-invoice";
 import type { Invoice } from "@/lib/invoices/service";
 
@@ -326,6 +334,26 @@ describe("what is wrong is said before anything is saved", () => {
         );
         expect(actions.issueInvoice).not.toHaveBeenCalled();
     });
+
+    it("chooses a line's rate by button, and one behind Other rate (DEC-176)", async () => {
+        render({ initialContactId: "c_1", registered: true });
+        type("Line 1: what it's for", "Diamond setting");
+        type("Line 1: price each, INR", "1000");
+        const picker = ratePicker("Line 1: GST rate", host);
+        // The box's "Not set" stays, first, beside the main rates.
+        expect(ratesOffered(picker)).toEqual(["", "0", "5", "18", "40"]);
+        expect(rateShown(picker)).toBe("");
+        pickRate(picker, "5");
+        await settle();
+        expect(rateShown(picker)).toBe("5");
+        pickRate(picker, "1.5");
+        await settle();
+        expect(rateShown(picker)).toBe("1.5");
+        expect(otherRateButton(picker).getAttribute("aria-expanded")).toBe(
+            "true",
+        );
+        expect(text()).toContain("GST 1.5%");
+    });
 });
 
 describe("+ Pick from your products", () => {
@@ -366,7 +394,7 @@ describe("+ Pick from your products", () => {
         expect(field("Line 1: what it's for").value).toBe("Focaccia (trade)");
         expect(field("Line 1: price each, INR").value).toBe("220");
         expect(field("Line 1: HSN or SAC").value).toBe("19059090");
-        expect(field("Line 1: GST rate").textContent).toContain("5%");
+        expect(rateShown(ratePicker("Line 1: GST rate", host))).toBe("5");
         // The paper shows it at once.
         expect(text()).toContain("GST 5% · HSN 19059090");
     });

@@ -116,14 +116,16 @@ describe("InvoiceForm's line editor", () => {
         expect(at("Line 1: price each")).toBeLessThan(at("hidden sm:grid"));
     });
 
-    it("a registered business's line has its GST rate and HSN, labelled on a phone", () => {
+    it("a registered business's line has its GST rate as buttons and its HSN, labelled on a phone", () => {
         const gst = draw({ registered: true, business: BUSINESS });
-        expect(gst).toContain('aria-label="Line 1: GST rate"');
+        // The rate is buttons under the line (DEC-176), named for the line.
+        expect(gst).toMatch(/role="radiogroup" aria-label="Line 1: GST rate"/);
         expect(gst).toContain('aria-label="Line 1: HSN or SAC"');
-        expect(gst).toMatch(/<label[^>]*>GST rate<\/label>/);
+        expect(gst).toMatch(/<span aria-hidden="true"[^>]*>GST rate<\/span>/);
         expect(gst).toMatch(/<label[^>]*>HSN \/ SAC<\/label>/);
-        // The desk's one row has a GST and an HSN column.
-        expect(gst).toContain("<span>GST</span><span>HSN</span>");
+        // The desk's one row has an HSN column; the rate sits under it.
+        expect(gst).toContain("<span>HSN</span>");
+        expect(gst).not.toContain("<span>GST</span>");
         expect(out).not.toContain("Line 1: GST rate");
     });
 });

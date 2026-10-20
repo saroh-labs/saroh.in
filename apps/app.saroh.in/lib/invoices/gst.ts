@@ -52,9 +52,6 @@ export const OTHER_GST_RATE_CHOICES = GST_RATE_CHOICES.filter(
     (option) => !isMainGstRate(option.value),
 );
 
-/** What the box says before a rate is chosen. */
-export const GST_RATE_PLACEHOLDER = "Choose a rate";
-
 /** What a priced thing with no rate is told, under its GST rate box. */
 export const GST_RATE_NEEDED =
     "Choose a GST rate. Pick 0% if it's exempt or nil-rated.";

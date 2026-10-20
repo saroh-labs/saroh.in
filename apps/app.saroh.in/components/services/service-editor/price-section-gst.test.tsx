@@ -13,6 +13,14 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+    otherRateButton,
+    pickRate,
+    ratePicker,
+    rateShown,
+    ratesOffered,
+} from "@/components/shared/gst-rate-picker.testing";
+
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import type {
     ServiceCharged,
@@ -176,6 +184,50 @@ describe("GST on this price", () => {
             "The rate added on top of the price.",
         );
         expect(host.textContent).not.toContain("It isn't added on top.");
+    });
+});
+
+/** The GST rate as buttons (DEC-176), into the draft the page saves. */
+describe("the GST rate", () => {
+    const rate = () => ratePicker("GST rate", host);
+    const sent = () => serviceInput(draft, "INR").gstRate;
+
+    it("opens on the draft's rate and takes another by button", () => {
+        render();
+        expect(rateShown(rate())).toBe("18");
+        // A registered business answers it: no "Not set".
+        expect(ratesOffered(rate())).toEqual(["0", "5", "18", "40"]);
+        pickRate(rate(), "5");
+        expect(sent()).toBe("5");
+        expect(rateShown(rate())).toBe("5");
+    });
+
+    it("takes 12% behind Other rate, and keeps it shown", () => {
+        render();
+        pickRate(rate(), "12");
+        expect(sent()).toBe("12");
+        expect(otherRateButton(rate()).getAttribute("aria-expanded")).toBe(
+            "true",
+        );
+        expect(rateShown(rate())).toBe("12");
+    });
+
+    it("opens a saved 28% with Other rate shown", () => {
+        draft = { ...draft, gstRate: "28" };
+        render();
+        expect(otherRateButton(rate()).getAttribute("aria-expanded")).toBe(
+            "true",
+        );
+        expect(rateShown(rate())).toBe("28");
+    });
+
+    it("is off for someone who can't change services", () => {
+        render({ canEdit: false });
+        expect(
+            Array.from(rate().querySelectorAll("button")).every(
+                (b) => b.disabled,
+            ),
+        ).toBe(true);
     });
 });
 

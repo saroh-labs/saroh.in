@@ -2,6 +2,7 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { chooseRate, otherRate } from "../fixtures/gst-rate";
 import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
 import { makeContact, northwind, stamp } from "../fixtures/own-data";
 import { pressUntil } from "../fixtures/press";
@@ -209,12 +210,35 @@ test.describe("invoices list: Rye & Co., read only", () => {
             await expect(count).toHaveCount(0);
             return;
         }
-        await pressUntil(
-            count,
-            page.getByRole("dialog", { name: "GST rates to choose" }),
-        );
+        const sheet = page.getByRole("dialog", { name: "GST rates to choose" });
+        await pressUntil(count, sheet);
+        // Each row's rate is buttons (DEC-176): 5%, then 12% behind Other
+        // rate, in place, and the rows fit a phone with nothing sideways.
+        const rates = sheet.locator('[data-slot="gst-rate-picker"]').first();
+        await chooseRate(rates, "5");
+        await chooseRate(rates, "12");
+        await expect(otherRate(rates)).toHaveAttribute("aria-expanded", "true");
+        if (onPhone(page)) {
+            for (const width of [320, 390]) {
+                await page.setViewportSize({ width, height: 800 });
+                const wide = await sheet.evaluate((el) =>
+                    Array.from(el.querySelectorAll<HTMLElement>("*")).some(
+                        (x) =>
+                            x.scrollWidth > x.clientWidth + 1 &&
+                            getComputedStyle(x).overflowX !== "visible",
+                    ),
+                );
+                expect(wide, `nothing sideways at ${width}px`).toBe(false);
+            }
+        }
         // Closed without saving: Rye is only read.
         await page.keyboard.press("Escape");
+        const discard = page
+            .getByRole("alertdialog")
+            .getByRole("button", { name: /^Discard/ });
+        if (await discard.isVisible().catch(() => false)) {
+            await discard.click();
+        }
         await expect(
             page.getByRole("dialog", { name: "GST rates to choose" }),
         ).toHaveCount(0);

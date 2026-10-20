@@ -2,6 +2,12 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import {
+    chooseRate,
+    otherRate,
+    rateChip,
+    ratePicker,
+} from "../fixtures/gst-rate";
 import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
 import { makeContact, northwind, stamp } from "../fixtures/own-data";
 import { pressUntil } from "../fixtures/press";
@@ -111,9 +117,10 @@ test.describe("New invoice (A)", () => {
         );
         await expect(page.getByLabel("Line 1: HSN or SAC")).toHaveValue(hsn);
         if (rate?.[1]) {
-            await expect(page.getByLabel("Line 1: GST rate")).toContainText(
-                `${rate[1]}%`,
-            );
+            // The product's rate is the chip lit, in whichever row it sits.
+            await expect(
+                rateChip(ratePicker(page, "Line 1: GST rate"), rate[1]),
+            ).toHaveAttribute("aria-checked", "true");
         }
         await expect((await paper(page)).getByText(name)).toBeVisible();
     });
@@ -157,11 +164,23 @@ test.describe("New invoice (A)", () => {
                 "Choose this line's GST rate. Pick 0% if it's exempt or nil-rated.",
             ),
         ).toBeVisible();
-        await expect(page.getByLabel("Line 1: GST rate")).toHaveAttribute(
-            "aria-invalid",
-            "true",
-        );
+        const rates = ratePicker(page, "Line 1: GST rate");
+        await expect(
+            page.getByRole("radiogroup", {
+                name: "Line 1: GST rate",
+                exact: true,
+            }),
+        ).toHaveAttribute("aria-invalid", "true");
         await expect(page).toHaveURL(/\/billing\/invoices\/new$/);
+
+        // Chosen by button (DEC-176): 5%, then 12% behind Other rate.
+        await chooseRate(rates, "5");
+        await chooseRate(rates, "12");
+        await expect(otherRate(rates)).toHaveAttribute("aria-expanded", "true");
+        await expect(rateChip(rates, "5")).toHaveAttribute(
+            "aria-checked",
+            "false",
+        );
     });
 
     test("leaving with typed work that isn't saved asks once", async ({
