@@ -75,6 +75,7 @@ export function InlineCode({
     options,
     api,
     onSignedIn,
+    onSent,
     handle,
 }: {
     /** The flow's `useId()`, so each field's id is its own. */
@@ -82,6 +83,11 @@ export function InlineCode({
     options: SignInOptions;
     api: SignInApi;
     onSignedIn: (customer: SignedInCustomer) => void;
+    /**
+     * Whether a code is on its way (the code field is open): the account's
+     * sign-in page (U12) hides its "Send me a code" then.
+     */
+    onSent?: (sent: boolean) => void;
     handle?: Ref<InlineCodeHandle>;
 }) {
     const testRelease = useTestRelease() !== null;
@@ -122,6 +128,12 @@ export function InlineCode({
         }
         /* eslint-enable react-hooks/set-state-in-effect */
     }, []);
+
+    useEffect(() => {
+        onSent?.(sentTo !== null);
+        // Told when it changes, not when the caller's function does.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sentTo]);
 
     useEffect(() => {
         writeSignInDraft({

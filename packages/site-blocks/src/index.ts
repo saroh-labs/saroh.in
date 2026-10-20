@@ -421,6 +421,16 @@ export type {
 } from "./account/packs-api";
 // G20: joining a plan and buying a pack from the site's Prices page.
 export { AccountTabBar } from "./account/tab-bar";
+// The account in a look (DEC-172, plan U12).
+export { AccountLookFrame } from "./account/look-account";
+export {
+    ACCOUNTS_OFF_TEXT,
+    greetingWords,
+    lookTabLabel,
+} from "./account/look-account-words";
+export { LookSignIn } from "./account/look-sign-in";
+export { SignInOpener } from "./account/sign-in-return";
+export { orderStatusWords } from "./account/status-words";
 // The account's compact header, and the site's chrome stepping aside for it
 // (DEC-073 #10).
 export {

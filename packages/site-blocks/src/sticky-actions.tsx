@@ -48,6 +48,10 @@ import { chromeActionShows, chromePageKind } from "./site-primary-action";
  * - Room under the footer for whichever it is, so the last line clears it.
  *
  * Neither is drawn on `/book` (the step's own action is the bar there),
+ * nor on Folio's or Live's account pages, whose tabs are the bar there
+ * (`account/look-account.tsx`, U12): room is left for them while they
+ * stand (`data-site-chrome-bar="account"`), and the root says
+ * `data-site-bar="account"`, or `"none"` while the foot is taken.
  * nor on a product or checkout page (Add to bag and Place order hold the
  * foot); the dock stays on the shop's grid, where nothing else does.
  */
@@ -115,6 +119,7 @@ export function StickyActions({
     useBookReturnFocus(path);
     const [primaryShown, setPrimaryShown] = useState<boolean | null>(null);
     const [taken, setTaken] = useState(false);
+    const [accountBar, setAccountBar] = useState(false);
 
     useEffect(() => {
         const root = document.documentElement;
@@ -136,6 +141,10 @@ export function StickyActions({
                   });
         const scan = () => {
             setTaken(footTaken(document));
+            setAccountBar(
+                document.querySelector('[data-site-chrome-bar="account"]') !==
+                    null,
+            );
             const next = new Set(pagePrimaries(document));
             watched.forEach((el) => {
                 if (!next.has(el)) {
@@ -176,7 +185,12 @@ export function StickyActions({
         path && basePath && path.startsWith(basePath)
             ? path.slice(basePath.length) || "/"
             : path;
+    // Folio's and Live's account pages: the account's tabs are the bar.
+    const inAccount =
+        look !== "quiet" &&
+        (ownPath === "/account" || (ownPath ?? "").startsWith("/account/"));
     const bookBar =
+        !inAccount &&
         lookHasBookBar(look) &&
         action !== null &&
         kind === "page" &&
@@ -187,11 +201,18 @@ export function StickyActions({
     const nextFree =
         live && action !== null && isBookAction(action, basePath) ? live : null;
     const dockRoom =
+        !inAccount &&
         look === "live" &&
         dock.length > 1 &&
         (kind === "page" || ownPath === "/shop" || ownPath === "/shop/");
     const dockOn = dockRoom && !taken;
-    const bar = bookBar ? "book" : dockOn ? "dock" : "none";
+    const bar = bookBar
+        ? "book"
+        : dockOn
+          ? "dock"
+          : inAccount && accountBar && !taken
+            ? "account"
+            : "none";
 
     useEffect(() => {
         const root = document.documentElement;
@@ -202,7 +223,9 @@ export function StickyActions({
     // Room under the footer while a bar may stand over it.
     const room =
         dockRoom ||
-        (lookHasBookBar(look) &&
+        (inAccount && accountBar) ||
+        (!inAccount &&
+            lookHasBookBar(look) &&
             action !== null &&
             kind === "page" &&
             chromeActionShows(path, action, basePath));
@@ -213,7 +236,7 @@ export function StickyActions({
                 <div
                     aria-hidden="true"
                     data-site-bar-room=""
-                    className={`bg-site-footer-bg min-[700px]:hidden ${look === "live" ? "h-24" : "h-[84px]"}`}
+                    className={`bg-site-footer-bg min-[700px]:hidden ${look === "live" ? "h-24" : inAccount ? "h-[72px]" : "h-[84px]"}`}
                 />
             ) : null}
             {bookBar && look !== "live" ? (

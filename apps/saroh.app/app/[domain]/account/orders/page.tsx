@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import type { TrackLookup } from "@saroh/site-blocks";
-import { ACCOUNT_TAB_HREF, AccountOrders } from "@saroh/site-blocks";
+import { ACCOUNT_TAB_HREF, AccountOrders, lookOf } from "@saroh/site-blocks";
 
 import { getAccount, getOrder, getOrders } from "@/lib/account-area";
 import { accountTitle, getAccountSite } from "@/lib/account-site";
@@ -59,6 +59,8 @@ export default async function AccountOrdersPage({
                     ? ACCOUNT_TAB_HREF.messages
                     : null
             }
+            // The look's words for each order's stage (DEC-172, U12).
+            look={lookOf(site?.snapshot.site.look)}
         />
     );
 }

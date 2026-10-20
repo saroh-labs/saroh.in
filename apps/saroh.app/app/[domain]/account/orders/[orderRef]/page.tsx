@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 
-import { ACCOUNT_TAB_HREF, AccountOrderPage } from "@saroh/site-blocks";
+import { ACCOUNT_TAB_HREF, AccountOrderPage, lookOf } from "@saroh/site-blocks";
 
 import { getAccount, getOrder } from "@/lib/account-area";
+import { getAccountSite } from "@/lib/account-site";
 import { accountPageTitle, orderPageTitle } from "@/lib/account-title";
 
 /**
@@ -43,9 +44,12 @@ export async function generateMetadata({
 export default async function AccountOrderRoute({
     params,
 }: {
-    params: Promise<{ orderRef: string }>;
+    params: Promise<{ domain: string; orderRef: string }>;
 }) {
-    const [{ orderRef }, lookup] = await Promise.all([params, getAccount()]);
+    const [{ domain, orderRef }, lookup] = await Promise.all([
+        params,
+        getAccount(),
+    ]);
     if (!lookup.ok) return null; // The layout drew the signed-out state.
     const { account } = lookup;
     const ref = refOf(orderRef);
@@ -58,6 +62,8 @@ export default async function AccountOrderRoute({
             businessName={account.businessName}
             messagesHref={has("messages") ? ACCOUNT_TAB_HREF.messages : null}
             ordersTab={has("orders")}
+            // The look's words for the order's stage (DEC-172, U12).
+            look={lookOf((await getAccountSite(domain))?.snapshot.site.look)}
         />
     );
 }

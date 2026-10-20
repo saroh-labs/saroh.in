@@ -1,5 +1,6 @@
 "use client";
 
+import type { LookId } from "@saroh/block-contract";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -117,20 +118,27 @@ export function AccountHeader({
  * header's account entry, the letter back to the site) swaps them at once.
  * `account` is off while the area is switched off: `/account` is then the
  * site's 404, in the site's chrome.
+ *
+ * Under a look (DEC-172, plan U12) the account is a page of the site like
+ * any other, inside its header and footer, as the boards draw it: the
+ * chrome stays everywhere.
  */
 export function SiteChromeFrame({
     header,
     footer,
     account,
+    look,
     children,
 }: {
     header: ReactNode;
     footer: ReactNode;
     account: boolean;
+    /** The site's look; absent is Classic. */
+    look?: LookId;
     children: ReactNode;
 }) {
     const pathname = usePathname();
-    const inAccount = account && isAccountPath(pathname);
+    const inAccount = !look && account && isAccountPath(pathname);
     return (
         <>
             {inAccount ? null : header}

@@ -12,6 +12,7 @@ import {
     lookOf,
     lookScope,
     ShopBag,
+    SignInOpener,
     SiteChromeFrame,
     SiteTheme,
     StickyActions,
@@ -442,6 +443,9 @@ export default async function SiteLayout({
                 footer (DEC-073 #10): the frame leaves these out there. */}
                 <SiteChromeFrame
                     account={accountAreaOn()}
+                    // Under a look the account is a page of the site, in
+                    // its header and footer (DEC-172, U12).
+                    look={look}
                     header={
                         <SiteHeader
                             name={snapshot.site.name}
@@ -509,6 +513,10 @@ export default async function SiteLayout({
                             {/* One fixed bar on a phone, and the header's Book
                             filled only while the page's own is off screen
                             (DEC-172, U5). Classic has none. */}
+                            {/* Under a look, "Sign in" in the menu or the
+                            footer comes back to the page it was pressed on
+                            (U12). */}
+                            {look && accountAreaOn() ? <SignInOpener /> : null}
                             {look ? (
                                 <StickyActions
                                     look={look}

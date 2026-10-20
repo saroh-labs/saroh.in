@@ -561,6 +561,74 @@ describe("one filled button, one fixed bar", () => {
         ).toBeNull();
     });
 
+    describe("on the account's pages (U12)", () => {
+        /** The account's own bar, as `AccountLookFrame` draws it. */
+        const accountBar = (
+            <nav aria-label="Your account" data-site-chrome-bar="account">
+                <a href="/account">Home</a>
+            </nav>
+        );
+
+        it.each(["folio", "live"] as const)(
+            "%s: the account's tabs are the one bar, never Book's or the dock",
+            (look) => {
+                go("/account/bookings");
+                page(look, accountBar);
+                act(() =>
+                    FakeObserver.see(screen.getByTestId("hero-book"), false),
+                );
+                expect(
+                    document.querySelectorAll("[data-site-chrome-bar]"),
+                ).toHaveLength(1);
+                expect(
+                    document.querySelector('[data-site-chrome-bar="account"]'),
+                ).not.toBeNull();
+                expect(document.documentElement).toHaveAttribute(
+                    "data-site-bar",
+                    "account",
+                );
+                // Room under the footer for it.
+                expect(
+                    document.querySelector("[data-site-bar-room]"),
+                ).not.toBeNull();
+            },
+        );
+
+        it("signed out under Folio: no bar at all, and no room for one", () => {
+            go("/account");
+            page("folio");
+            act(() => FakeObserver.see(screen.getByTestId("hero-book"), false));
+            expect(document.querySelector("[data-site-chrome-bar]")).toBeNull();
+            expect(document.querySelector("[data-site-bar-room]")).toBeNull();
+        });
+
+        it("the account's bar steps aside while a sheet is open", () => {
+            go("/account/me");
+            page(
+                "live",
+                <>
+                    {accountBar}
+                    <div role="dialog" aria-modal="true">
+                        Sheet
+                    </div>
+                </>,
+            );
+            expect(document.documentElement).toHaveAttribute(
+                "data-site-bar",
+                "none",
+            );
+        });
+
+        it("Quiet keeps Book's bar: its tabs sit at the top", () => {
+            go("/account/bookings");
+            page("quiet");
+            act(() => FakeObserver.see(screen.getByTestId("hero-book"), false));
+            expect(
+                document.querySelector('[data-site-chrome-bar="book"]'),
+            ).not.toBeNull();
+        });
+    });
+
     it("Live on the home: Home is the lit tab", () => {
         go("/");
         page("live");
