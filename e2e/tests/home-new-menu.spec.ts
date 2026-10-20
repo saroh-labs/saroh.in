@@ -170,13 +170,20 @@ test.describe("the desk's New menu by keyboard (U5)", () => {
         const menu = page.getByRole("menu");
         const items = menu.getByRole("menuitem");
 
-        // Pressed until it answers: a press before hydration is lost.
+        // Pressed until the first row holds focus. A press before hydration
+        // is lost, or React replays it once hydrated: the menu opens, but
+        // Radix's document listener never saw the key, takes it for a
+        // pointer, and leaves focus on the menu itself. Then Escape, and
+        // Enter again on the hydrated page.
         await expect(async () => {
+            if (await menu.isVisible()) {
+                await page.keyboard.press("Escape");
+                await expect(menu).toBeHidden({ timeout: 2_000 });
+            }
             await button.focus();
             await page.keyboard.press("Enter");
-            await expect(menu).toBeVisible({ timeout: 2_000 });
+            await expect(items.nth(0)).toBeFocused({ timeout: 2_000 });
         }).toPass({ timeout: 20_000 });
-        await expect(items.nth(0)).toBeFocused();
         await page.keyboard.press("ArrowDown");
         await expect(items.nth(1)).toBeFocused();
         await page.keyboard.press("ArrowUp");
