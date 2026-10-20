@@ -64,6 +64,7 @@ export function PickStep({
                         />
                         <Label
                             htmlFor={id}
+                            data-ph-mask=""
                             className="grid min-w-0 flex-1 cursor-pointer gap-0.5 font-normal"
                         >
                             <span

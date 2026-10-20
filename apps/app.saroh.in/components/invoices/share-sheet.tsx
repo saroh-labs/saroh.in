@@ -574,6 +574,7 @@ export function ShareSheet({
                             ) : (
                                 <Field
                                     label="To"
+                                    holdsData
                                     hint={`No number for ${first} on this invoice. It's used for this message only.`}
                                     error={typedProblem}
                                 >
