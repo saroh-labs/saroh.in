@@ -189,6 +189,7 @@ test.describe("the desk's New menu by keyboard (U5)", () => {
         await page.keyboard.press("Enter");
         await expect(items.nth(0)).toBeFocused();
         await page.keyboard.press("ArrowDown");
+        await expect(items.nth(1)).toBeFocused();
         await expect(items.nth(1)).toHaveText(/Book someone/);
         await page.keyboard.press("Enter");
         await expect(page).toHaveURL(/\/bookings\?new=1/);
@@ -238,12 +239,19 @@ test.describe("the phone's + sheet (U5)", () => {
         const plus = deskNew(page).first();
         // Over the tab bar, not under it.
         const bar = page.getByRole("navigation", { name: "Main" });
-        const [p, b] = await Promise.all([
-            plus.boundingBox(),
-            bar.boundingBox(),
-        ]);
-        expect((p?.y ?? 0) + (p?.height ?? 0)).toBeLessThanOrEqual(b?.y ?? 0);
-        expect(p?.height).toBe(56);
+        await expect(plus).toBeVisible();
+        await expect(bar).toBeVisible();
+        // Measured once both are drawn where they rest.
+        await expect
+            .poll(async () => {
+                const [p, b] = await Promise.all([
+                    plus.boundingBox(),
+                    bar.boundingBox(),
+                ]);
+                if (!p || !b) return null;
+                return { over: p.y + p.height <= b.y, height: p.height };
+            })
+            .toEqual({ over: true, height: 56 });
 
         const sheet = await openNew(page);
         await expect(sheet.getByRole("heading", { name: "New" })).toBeVisible();

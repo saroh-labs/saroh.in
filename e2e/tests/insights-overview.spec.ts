@@ -14,17 +14,18 @@ import { urls } from "../playwright.config";
  * refresh keep both; the line under the title names the days compared;
  * the Overview's three answers each lead to their tab.
  *
- * Read only, on Rye & Co. (a film set no test writes to). What it took
+ * Read only, on Pulse Fitness (a film set no test writes to, which sells,
+ * takes bookings and has a website, with Insights on; Rye & Co. has none). What it took
  * depends on the day the seed was made, so this reads the shape, the
  * questions and the windows' words, not the amounts (those are
  * `overview-words.test.ts` and `money.db.spec.ts`).
  */
 
-const RYE = "seed_sc_rc_org";
+const PULSE = "seed_sc_pulse_org";
 
 async function openInsights(page: Page, query = "") {
     await useSession(page);
-    await page.goto(`${urls.APP_URL}/open/${RYE}`);
+    await page.goto(`${urls.APP_URL}/open/${PULSE}`);
     await page.goto(`${urls.APP_URL}/analytics${query}`);
     await expect(
         page.getByRole("heading", { level: 1, name: "Insights" }),

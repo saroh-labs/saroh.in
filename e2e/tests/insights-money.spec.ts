@@ -131,18 +131,31 @@ test("a bar opens that week's orders: beside the page on a desk, from the foot o
         "href",
         /^\/commerce\/orders\?date=custom&from=\d{4}-\d{2}-\d{2}&to=\d{4}-\d{2}-\d{2}&payment=paid$/,
     );
-    const box = await sheet.boundingBox();
-    const view = page.viewportSize();
-    if (box && view) {
-        if (onPhone(page)) {
-            // From the foot of the screen, the screen's width.
-            expect(Math.round(box.y + box.height)).toBe(view.height);
-            expect(Math.round(box.width)).toBe(view.width);
-        } else {
-            // Beside the page, on the right.
-            expect(Math.round(box.x + box.width)).toBe(view.width);
-            expect(box.width).toBeLessThan(view.width / 2);
-        }
+    // Where it rests, once it has slid in: measured while it moves, it is
+    // still partly off the screen.
+    const view = page.viewportSize() ?? { width: 0, height: 0 };
+    const edges = async () => {
+        const box = await sheet.boundingBox();
+        return box
+            ? {
+                  right: Math.round(box.x + box.width),
+                  bottom: Math.round(box.y + box.height),
+                  width: Math.round(box.width),
+              }
+            : null;
+    };
+    if (onPhone(page)) {
+        // From the foot of the screen, the screen's width.
+        await expect
+            .poll(async () => {
+                const e = await edges();
+                return e && { bottom: e.bottom, width: e.width };
+            })
+            .toEqual({ bottom: view.height, width: view.width });
+    } else {
+        // Beside the page, on the right, under half its width.
+        await expect.poll(async () => (await edges())?.right).toBe(view.width);
+        expect((await edges())?.width).toBeLessThan(view.width / 2);
     }
     await page.keyboard.press("Escape");
     await expect(sheet).toBeHidden();

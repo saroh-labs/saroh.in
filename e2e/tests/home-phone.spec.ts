@@ -62,14 +62,28 @@ async function noSideways(page: Page) {
         .toEqual({ vw: width, sw: width });
 }
 
-/** Every control drawn in `within` shorter than a thumb (44px). */
+/**
+ * Every control drawn in `within` shorter than a thumb (44px). A stretched
+ * link (its `::after` laid over the whole row, as Today's rows are) is
+ * pressed anywhere on that row, so it is measured by the row it covers,
+ * not by its line of text.
+ */
 async function short(within: Locator): Promise<string[]> {
     return within.locator("a, button").evaluateAll((els) =>
         els
-            .map((el) => ({
-                name: el.textContent.trim().slice(0, 40),
-                h: Math.round(el.getBoundingClientRect().height),
-            }))
+            .map((el) => {
+                const after = getComputedStyle(el, "::after");
+                const stretched =
+                    after.content !== "none" && after.position === "absolute";
+                const target =
+                    stretched && el instanceof HTMLElement && el.offsetParent
+                        ? el.offsetParent
+                        : el;
+                return {
+                    name: el.textContent.trim().slice(0, 40),
+                    h: Math.round(target.getBoundingClientRect().height),
+                };
+            })
             // Height 0 is a control not drawn here.
             .filter((c) => c.h > 2 && c.h < 44)
             .map((c) => `${c.name} (${c.h}px)`),

@@ -207,7 +207,15 @@ test.describe("Remind all on the unpaid bills (U8)", () => {
         async ({ page }) => {
             await openNorthwindAs(page, "member");
             await page.goto("/");
-            await expect(page.locator("main")).toBeVisible();
+            // Home itself, drawn: while it streams in, the page also holds
+            // its loading frame's <main> for a moment (one when settled).
+            await expect(
+                page.getByRole("heading", {
+                    level: 1,
+                    name: /^(Good (morning|afternoon|evening)|Welcome|Hello)\b/,
+                }),
+            ).toBeVisible();
+            await expect(page.getByRole("main")).toHaveCount(1);
             await expect(
                 page.getByRole("button", { name: "Remind all", exact: true }),
             ).toHaveCount(0);

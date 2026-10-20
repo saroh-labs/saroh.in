@@ -14,7 +14,8 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  * one suggestion at a time, "1 of N", Next suggestion wrapping round, and
  * Not now hiding one for this person with Undo bringing it back.
  *
- * The first test only reads, on Rye & Co. (a film set no test writes to):
+ * The first test only reads, on Pulse Fitness (a film set no test writes
+ * to, with Insights on; Rye & Co. has none):
  * whichever its seed gives today, the card or the one line that says there
  * is nothing to suggest. Next is the screen's own and writes nothing.
  *
@@ -27,7 +28,7 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  * test's Undo, or by the clean-up when the test failed first.
  */
 
-const RYE = "seed_sc_rc_org";
+const PULSE = "seed_sc_pulse_org";
 
 interface SuggestionRead {
     key: string;
@@ -69,11 +70,11 @@ async function expectTouchTargets(page: Page) {
     for (const h of heights) expect(h).toBeGreaterThanOrEqual(44);
 }
 
-test("one suggestion at a time, Next goes round them all (read only, Rye)", async ({
+test("one suggestion at a time, Next goes round them all (read only, Pulse)", async ({
     page,
 }) => {
     await useSession(page);
-    await page.goto(`${urls.APP_URL}/open/${RYE}`);
+    await page.goto(`${urls.APP_URL}/open/${PULSE}`);
     await page.goto(`${urls.APP_URL}/analytics`);
     await expect(
         page.getByRole("heading", { level: 1, name: "Insights" }),
@@ -167,7 +168,8 @@ test(
 
         // Gone from the card, and from what the API suggests.
         if (before.length > 1) {
-            await expect(place(page).or(title(page))).toBeVisible();
+            // Another suggestion takes its place.
+            await expect(title(page)).toBeVisible();
             await expect(title(page)).not.toHaveText(shown ?? "");
             if (before.length > 2) {
                 await expect(place(page)).toHaveText(

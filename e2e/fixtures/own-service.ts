@@ -1,5 +1,7 @@
 import type { APIRequestContext, TestInfo } from "@playwright/test";
+import { expect } from "@playwright/test";
 
+import { NORTHWIND_ORG, urls } from "../playwright.config";
 import { northwind, stamp } from "./own-data";
 
 /**
@@ -79,16 +81,25 @@ export async function bookOnOwn(
         new Date(
             (Math.floor(Date.now() / STEP_MS) + 1) * STEP_MS,
         ).toISOString();
-    const made = await northwind(request).post<{ id: string }>(
-        `/services/${service.id}/bookings`,
-        {
-            startAt,
-            bookerName: booker.name,
-            bookerPhone: booker.phone,
-            ...(options.paidBy
-                ? { paidWith: "PAID", paidBy: options.paidBy }
-                : {}),
-        },
-    );
+    const nw = northwind(request);
+    const body = {
+        startAt,
+        bookerName: booker.name,
+        bookerPhone: booker.phone,
+        ...(options.paidBy ? { paidWith: "PAID", paidBy: options.paidBy } : {}),
+    };
+    // Lost a race on Northwind's shared rows (another test's booking or
+    // order beside this one, at Serializable): the API says "Try again",
+    // and nothing was written, so the desk would press again. The time is
+    // the service's own, so it is never a slot taken.
+    const url = `${urls.API_URL}/organizations/${NORTHWIND_ORG}/services/${service.id}/bookings`;
+    const book = () => request.post(url, { headers: nw.headers, data: body });
+    let res = await book();
+    for (let tries = 1; res.status() === 409 && tries < 4; tries++) {
+        if (!(await res.text()).includes("Try again")) break;
+        res = await book();
+    }
+    expect(res.ok(), `${res.url()}: ${await res.text()}`).toBe(true);
+    const made = (await res.json()) as { id: string };
     return { id: made.id, startAt };
 }

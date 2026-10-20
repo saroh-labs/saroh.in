@@ -92,12 +92,37 @@ async function ownRow(page: Page, who: string): Promise<Locator> {
     return rows.filter({ visible: true }).filter({ hasText: who }).first();
 }
 
+/**
+ * The test's own row says `text`. At a desk, a group whose every row was
+ * acted on here folds to "All done" as the hold starts (`need-groups.tsx`,
+ * so the count drops at once); opened again, the row is there with what
+ * it says and its Undo. Other tests' bookings may keep it open, or not.
+ */
+async function expectRowSays(
+    page: Page,
+    row: Locator,
+    text: string,
+    timeout = 15_000,
+): Promise<void> {
+    await expect(async () => {
+        if (!onPhone(page)) {
+            const show = needsYou(page)
+                .locator('[data-need-group="AWAITING_PAYMENT"]')
+                .getByRole("button", { name: "Show the rows" });
+            if ((await show.count()) > 0) await show.click();
+        }
+        await expect(row).toContainText(text, { timeout: 2_000 });
+    }).toPass({ timeout });
+}
+
 test.describe("Needs you groups: a booking awaiting payment (U7)", () => {
     test("Turn down is held with Undo, and Undo leaves the booking as it was", async ({
         page,
-        request,
     }, testInfo) => {
         test.setTimeout(90_000);
+        // Signed in first: the API calls below are the owner's.
+        await openNorthwindAs(page, "owner");
+        const request = page.request;
         const service = await ownService(request, testInfo, "Turn down");
         const who = `Turn ${stamp(testInfo)}`;
         let bookingId: string | null = null;
@@ -106,7 +131,6 @@ test.describe("Needs you groups: a booking awaiting payment (U7)", () => {
             test.skip(!made, "Northwind can't make a payment link here");
             bookingId = made?.id ?? null;
 
-            await openNorthwindAs(page, "owner");
             await page.goto("/");
             const row = await ownRow(page, who);
             test.skip(
@@ -121,9 +145,10 @@ test.describe("Needs you groups: a booking awaiting payment (U7)", () => {
                     '[data-need-group="AWAITING_PAYMENT"]',
                 );
                 await expect(group).toContainText(/bookings? awaiting payment/);
-                await expect(group.locator("[data-need-row]")).toContainText(
-                    who,
-                );
+                // Other tests' bookings may wait beside it: its own row.
+                await expect(
+                    group.locator("[data-need-row]").filter({ hasText: who }),
+                ).toHaveCount(1);
             }
 
             await row
@@ -134,7 +159,7 @@ test.describe("Needs you groups: a booking awaiting payment (U7)", () => {
             await confirm
                 .getByRole("button", { name: "Turn down", exact: true })
                 .click();
-            await expect(row).toContainText("Turning down in 10 seconds");
+            await expectRowSays(page, row, "Turning down in 10 seconds");
 
             // Undo inside the ten seconds: nothing was written.
             await row.getByRole("button", { name: "Undo" }).click();
@@ -152,9 +177,11 @@ test.describe("Needs you groups: a booking awaiting payment (U7)", () => {
 
     test("Turn down left to run cancels the booking", async ({
         page,
-        request,
     }, testInfo) => {
         test.setTimeout(90_000);
+        // Signed in first: the API calls below are the owner's.
+        await openNorthwindAs(page, "owner");
+        const request = page.request;
         const service = await ownService(request, testInfo, "Turned down");
         const who = `Gone ${stamp(testInfo)}`;
         let bookingId: string | null = null;
@@ -163,7 +190,6 @@ test.describe("Needs you groups: a booking awaiting payment (U7)", () => {
             test.skip(!made, "Northwind can't make a payment link here");
             bookingId = made?.id ?? null;
 
-            await openNorthwindAs(page, "owner");
             await page.goto("/");
             const row = await ownRow(page, who);
             test.skip(
@@ -177,9 +203,7 @@ test.describe("Needs you groups: a booking awaiting payment (U7)", () => {
                 .getByRole("alertdialog")
                 .getByRole("button", { name: "Turn down", exact: true })
                 .click();
-            await expect(row).toContainText("Turned down", {
-                timeout: 20_000,
-            });
+            await expectRowSays(page, row, "Turned down", 20_000);
             await expect
                 .poll(
                     async () =>
@@ -194,9 +218,11 @@ test.describe("Needs you groups: a booking awaiting payment (U7)", () => {
 
     test("Send payment link is held with Undo, then gives the new link to copy", async ({
         page,
-        request,
     }, testInfo) => {
         test.setTimeout(90_000);
+        // Signed in first: the API calls below are the owner's.
+        await openNorthwindAs(page, "owner");
+        const request = page.request;
         const service = await ownService(request, testInfo, "Pay link");
         const who = `Link ${stamp(testInfo)}`;
         let bookingId: string | null = null;
@@ -205,7 +231,6 @@ test.describe("Needs you groups: a booking awaiting payment (U7)", () => {
             test.skip(!made, "Northwind can't make a payment link here");
             bookingId = made?.id ?? null;
 
-            await openNorthwindAs(page, "owner");
             await page.goto("/");
             const row = await ownRow(page, who);
             test.skip(
@@ -230,7 +255,7 @@ test.describe("Needs you groups: a booking awaiting payment (U7)", () => {
             await confirm
                 .getByRole("button", { name: "Make the link" })
                 .click();
-            await expect(row).toContainText("Making the link in 10 seconds");
+            await expectRowSays(page, row, "Making the link in 10 seconds");
             await row.getByRole("button", { name: "Undo" }).click();
             await expect(send).toBeVisible();
 
@@ -240,9 +265,7 @@ test.describe("Needs you groups: a booking awaiting payment (U7)", () => {
                 .getByRole("alertdialog")
                 .getByRole("button", { name: "Make the link" })
                 .click();
-            await expect(row).toContainText("Payment link ready", {
-                timeout: 20_000,
-            });
+            await expectRowSays(page, row, "Payment link ready", 20_000);
             await expect(
                 row.getByRole("button", { name: /Copy/ }),
             ).toBeVisible();
