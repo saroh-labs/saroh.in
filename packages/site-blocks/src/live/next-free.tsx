@@ -144,7 +144,10 @@ export function HeroNextFree({
         <LiveFact
             read={read}
             pick={pickNext}
-            reserve="min-h-[64px]"
+            // The fresh line (20px, held to it: its mixed faces would make
+            // the line box 21px), the 2px gap and the 44px link, so the
+            // slot is as tall waiting as it is when the time lands.
+            reserve="min-h-[66px]"
             className={cn(
                 "flex w-full min-w-0 flex-col justify-center gap-0.5",
                 look === "quiet" && "min-[700px]:items-center",
@@ -190,7 +193,7 @@ function SlotLine({
         <>
             <p
                 data-live-value=""
-                className="text-site-body w-full truncate text-[14.5px] tabular-nums leading-5 min-[700px]:w-auto"
+                className="text-site-body h-5 w-full truncate text-[14.5px] tabular-nums leading-5 min-[700px]:w-auto"
             >
                 <span className="text-site-muted mr-3 text-[12px] font-semibold uppercase tracking-[0.18em]">
                     Next free
