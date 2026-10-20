@@ -324,7 +324,8 @@ test.describe("invoice details: Northwind, own invoices", () => {
         await openList(page, NORTHWIND_ORG, "?invoice=no-such-invoice");
         const open = page.getByRole("dialog");
         await expect(open).toContainText("Couldn't load this invoice");
-        await expect(open).toContainText("Nothing has changed");
+        // The house words for a failed read (`NOTHING_CHANGED`, @saroh/ui/lib/state-copy).
+        await expect(open).toContainText("Nothing has been changed.");
         await expect(
             open.getByRole("button", { name: "Try again" }),
         ).toBeVisible();

@@ -5,6 +5,7 @@ import { DatePicker } from "@saroh/ui/date-picker";
 import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
+import { couldntLoadLine, nothingChanged } from "@saroh/ui/lib/state-copy";
 import { MoneyInput } from "@saroh/ui/money-input";
 import { Notice } from "@saroh/ui/notice";
 import { Skeleton } from "@saroh/ui/skeleton";
@@ -217,7 +218,7 @@ function RecordPaymentDraft({
                             </Button>
                         }
                     >
-                        Couldn&apos;t load this invoice. Nothing has changed.
+                        {`${couldntLoadLine("this invoice")} ${nothingChanged()}`}
                     </Notice>
                 )}
             </FormSheet>

@@ -489,7 +489,7 @@ describe("Record payment", () => {
         drawSheet({ id: "inv_106", who: "Vivek Nair" });
         await settle();
         expect(text()).toContain(
-            "Couldn't load this invoice. Nothing has changed.",
+            "Couldn't load this invoice. Nothing has been changed.",
         );
         actions.readInvoice.mockResolvedValueOnce({
             ok: true,
