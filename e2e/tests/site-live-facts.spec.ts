@@ -273,8 +273,11 @@ test.describe("live facts on cached pages", { tag: "@serial" }, () => {
                 const heroLanded = await page
                     .locator(`[data-site-look-hero="${id}"]`)
                     .boundingBox();
-                expect(landed?.height).toBe(waiting?.height);
-                expect(heroLanded?.height).toBe(heroWaiting?.height);
+                // To the nearest pixel: a phone's 2.625 scale draws 66 as
+                // 66.00003 on one read and 66 on the next.
+                const px = (n: number | undefined) => Math.round(n ?? -1);
+                expect(px(landed?.height)).toBe(px(waiting?.height));
+                expect(px(heroLanded?.height)).toBe(px(heroWaiting?.height));
                 expect(await cls(page)).toBeLessThanOrEqual(0.1);
 
                 // Fresh: the time and a small true count.
