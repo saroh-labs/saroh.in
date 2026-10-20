@@ -184,6 +184,10 @@ the `@serial` tests one at a time. Every new spec follows these rules:
   first Preparing order". An order's line is `ORDER_LINE`, an untracked
   product the setup project makes once, so no order holds stock another
   test counts.
+- **Sign in before making data.** `northwind(page.request)` carries the
+  page's cookies, so `useSession(page)` comes first; the `request`
+  fixture has none (`check:e2e-signed-in-request`). An overdue invoice
+  of your own is `issueOverdue`: the API never issues one already late.
 - **Unique stamps.** Names, emails and notes carry `stamp(testInfo)` —
   project, worker, time and a random tail — never a bare `Date.now()`,
   which desk and phone can hit in the same millisecond. A phone number is

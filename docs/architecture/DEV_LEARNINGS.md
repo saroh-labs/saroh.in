@@ -12,6 +12,43 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Invoices gate — 30 browser failures, two of them the app
+
+**Symptom**: 20 Oct 2026, the invoices release gate again. Bulk remind and
+Share failed in ~90ms with 401 "Invalid or expired session"; once signed
+in, with 400 "The due date has passed". Cancel and write a correct one
+left the page on the cancelled invoice. A phone's Style sheet on the paper
+closed by itself. The journey's "Owed to you" dropped by ₹1,00,000 for a
+₹1,000 payment.
+**Cause and fix**, each:
+
+- **A helper used `page.request` before the page was signed in**
+  (`ownThree`, `ownInvoice`); a test passed the signed-out `request`
+  fixture although the last entry below already said so. Helpers that make
+  data call `useSession(page)` first. `pnpm run check:e2e-signed-in-request`
+  (prepush and CI) now fails a test that signs its page in and passes the
+  `request` fixture on, and `northwind()`'s 401 says to sign in.
+- **An invoice is never born overdue**: the API refuses to issue one past
+  its due date, and nothing moves a due date after issue, so a spec can't
+  make one "13 days late". `issueOverdue` (`fixtures/own-data.ts`) issues
+  with the due time a few seconds ahead and waits for Overdue.
+- **`pressUntil` answered by the wrong thing.** Its answer was any
+  `listbox`; the one for "Who it's for" was still closing, so the product
+  pick was never pressed. An answer names what this press opens.
+- **`innerText` runs inline spans together**: "Owed to you₹1,18,50019
+  invoices", so `₹([\d,]+)` read the count into the amount. Read the
+  amount's own element.
+- **The app (1): any revalidation re-reads the page the router is on.**
+  After the draft's address became `/<id>/edit`, the next save's
+  `revalidatePath` drew the edit page in place of `/new`, throwing the
+  editor away. The editor's later saves revalidate nothing
+  (`lib/invoices/actions.ts`).
+- **The app (2): an `onDone={() => onDone()}` dropped the sheet's
+  outcome**, so the corrected draft never opened from the details
+  (`details/flows.tsx`). Pass the outcome through.
+
+---
+
 ## Next router — an address written in place went back to the old one
 
 **Symptom**: 20 Oct 2026, the invoices release gate. New invoice saved its
