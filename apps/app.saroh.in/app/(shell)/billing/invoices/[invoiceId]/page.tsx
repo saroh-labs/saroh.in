@@ -136,6 +136,14 @@ export default async function InvoicePage({
                     who: who.name,
                     total: money(invoice.total),
                     updatedAt: invoice.updatedAt,
+                    // Cancel or correct says a partly paid one can't be
+                    // cancelled yet, and a void one offers Write again (U13).
+                    partlyPaid: invoice.partlyPaid === true,
+                    paidSoFar:
+                        invoice.paidSoFar !== undefined
+                            ? money(invoice.paidSoFar)
+                            : null,
+                    reissuedAsId: invoice.reissuedAsId,
                 }}
                 pill={invoicePill(invoice)}
                 subline={

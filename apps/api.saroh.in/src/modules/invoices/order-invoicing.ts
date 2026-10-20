@@ -10,7 +10,7 @@ import { assertRatesSet } from "./gst-rate-required";
 import { stateName } from "./gst-states";
 import { CAPTURED_NEEDS_REFUND, ONLINE_PAYMENT_METHOD } from "./invoice-state";
 import type { InvoiceKind } from "./numbering";
-import { nextInvoiceNumber, seriesFor } from "./numbering";
+import { nextInvoiceNumber, peekInvoiceNumber, seriesFor } from "./numbering";
 import type {
     BillTo,
     BuiltDocument,
@@ -621,6 +621,43 @@ async function ensureTreatmentBalanceInvoice(
         reference: opts.reference ?? null,
         note: "Balance of the treatment",
     });
+}
+
+/**
+ * What a credit note for all that is left of an invoice would be, before
+ * it is made (DEC-173, U13): the number it would most likely take in its
+ * own series (`peekInvoiceNumber`: nothing is taken) and the amount, in
+ * minor units. The same series and cap {@link issueCreditNote} uses, so
+ * the preview and the paper agree. Null when the invoice isn't there.
+ */
+export async function previewCreditNote(
+    tx: Tx,
+    invoiceId: string,
+): Promise<{ number: string; amountCents: number; currency: string } | null> {
+    const original = await tx.invoice.findUnique({
+        where: { id: invoiceId },
+        select: ORIGINAL_SELECT,
+    });
+    if (!original) return null;
+    const profile = await loadTaxProfile(tx, original.organizationId);
+    const number = await peekInvoiceNumber(
+        tx,
+        original.organizationId,
+        seriesFor({
+            // The series follows the business now; the paper, the original.
+            registered: original.sellerGstin !== null,
+            prefix: profile.prefix,
+            kind: "CREDIT_NOTE",
+            at: new Date(),
+            timezone: profile.timezone,
+            format: profile.numberFormat,
+        }),
+    );
+    return {
+        number,
+        amountCents: Math.max(0, await creditable(tx, original)),
+        currency: original.currency,
+    };
 }
 
 /**

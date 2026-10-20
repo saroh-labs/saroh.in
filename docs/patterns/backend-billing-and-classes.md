@@ -17,6 +17,22 @@
   never set by hand: a removed payment or a bounced cheque takes a PAID
   invoice back to ISSUED. "Partly paid" is derived like Overdue (ISSUED
   with `paidCents > 0`, `isPartlyPaid`), never a status.
+- **Cancel or correct** (DEC-173, U13 #1125): one sheet in the app
+  (`components/invoices/cancel-or-correct-sheet.tsx`) for every way an
+  unpaid issued invoice is taken back. A registered business credits all
+  of it (`POST :id/credit`) or credits it and writes a correct one
+  (`POST :id/credit-and-rewrite`: the credit note and a draft with the same
+  lines in **one transaction**, so a failure leaves neither; a PAID invoice
+  is refused, it is refunded instead). One not registered voids it, or
+  voids and writes again (`reissue`). The credit note is previewed before
+  it is made (`GET :id/credit-preview`, `peekInvoiceNumber`: the number it
+  would most likely take, nothing taken), refused as the credit itself
+  would be. A void invoice nobody wrote again gets **Write again**
+  (`POST :id/write-again`): the same draft, once, under the row lock, and
+  never beside a live invoice for the same subscription period. Every
+  draft made this way points back with `reissuedFromId`. A partly paid
+  invoice is refused everywhere until its payments are removed; Refund…
+  on a paid one is unchanged (`RefundInvoiceDialog`).
 - **Numbers** come from `InvoiceSequence` inside the caller's transaction
   (`nextInvoiceNumber`), so a rolled-back caller leaves no gap. Another module
   issues through `InvoicesService.issueInTx(tx, organizationId, input)`, never

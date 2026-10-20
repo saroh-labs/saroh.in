@@ -501,7 +501,7 @@ export async function getInvoice(id: string): Promise<Invoice | null> {
 
 async function send<T>(
     path: string,
-    method: "POST" | "PATCH" | "DELETE",
+    method: "GET" | "POST" | "PATCH" | "DELETE",
     body: unknown,
     fallback: string,
 ): Promise<ApiResult<T>> {
@@ -555,6 +555,57 @@ export function creditInvoice(id: string, reason: string) {
         "POST",
         { reason },
         "Couldn't cancel that invoice.",
+    );
+}
+
+/** The credit note "Cancel all of it" would issue (DEC-173, U13); nothing is taken. */
+export interface CreditPreview {
+    /** Most likely its number: a credit note issued meanwhile moves it on. */
+    number: string;
+    amount: string;
+    currency: string;
+}
+
+/**
+ * What "Cancel all of it" would issue, read when the sheet opens: the
+ * credit note's likely number and amount. Refused as the credit would be
+ * (a partly paid invoice, one already credited), with the API's words.
+ */
+export function readCreditPreview(id: string) {
+    return send<CreditPreview>(
+        `${at(id)}/credit-preview`,
+        "GET",
+        undefined,
+        "Couldn't load the credit note.",
+    );
+}
+
+/** "Cancel and write a correct one" (U13): what was made, in one step. */
+export interface CreditAndRewrite {
+    creditNote: { id: string; number: string | null };
+    draft: Invoice;
+}
+
+/**
+ * The credit note for all of it and a draft with the same lines, in one
+ * transaction on the API: a failure leaves neither.
+ */
+export function creditAndRewriteInvoice(id: string, reason: string) {
+    return send<CreditAndRewrite>(
+        `${at(id)}/credit-and-rewrite`,
+        "POST",
+        { reason },
+        "Couldn't cancel that invoice.",
+    );
+}
+
+/** "Write again" on a void invoice nobody wrote again (U13): the draft. */
+export function writeInvoiceAgain(id: string) {
+    return send<Invoice>(
+        `${at(id)}/write-again`,
+        "POST",
+        {},
+        "Couldn't write that invoice again.",
     );
 }
 

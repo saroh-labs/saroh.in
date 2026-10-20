@@ -11,12 +11,13 @@ import { useId, useReducer, useState } from "react";
 
 import { refusedResult } from "@/components/billing/plan-refusal";
 import { EmailNoteText } from "@/components/communications/email-note";
+import { CancelOrCorrectSheet } from "@/components/invoices/cancel-or-correct-sheet";
 import type { InvoiceRef } from "@/components/invoices/invoice-actions";
 import {
-    CancelInvoiceDialog,
     DeleteDraftDialog,
     IssueDialog,
     RecordPaymentDialog,
+    RefundInvoiceDialog,
 } from "@/components/invoices/invoice-actions";
 import { OfflinePayHint } from "@/components/invoices/offline-pay-hint";
 import { useInvoiceSend } from "@/components/invoices/send-dialog";
@@ -24,6 +25,7 @@ import {
     NewLinkConfirm,
     UnseenLinkNote,
 } from "@/components/invoices/unseen-link";
+import { useWriteAgain } from "@/components/invoices/use-write-again";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { QrButton } from "@/components/qr/qr-button";
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
@@ -104,6 +106,12 @@ export function InvoiceDetail({
 }: {
     invoice: InvoiceRef & {
         kind: string;
+        /** Issued, some paid, some left (DEC-173): not cancelled yet. */
+        partlyPaid?: boolean;
+        /** What has come in so far, as shown: "₹1,000". */
+        paidSoFar?: string | null;
+        /** The draft it was written again as, if any (a void one's Write again). */
+        reissuedAsId?: string | null;
         /**
          * When it last changed: a link made here is forgotten once it
          * changes again, since a send, a view link or the customer's own
@@ -173,6 +181,7 @@ export function InvoiceDetail({
     const [, redraw] = useReducer((n: number) => n + 1, 0);
     const [busy, setBusy] = useState(false);
     const [downloading, setDownloading] = useState(false);
+    const writing = useWriteAgain();
     const s = invoice.standing;
     // A payment link made for it earlier in this tab, shown again (UX-048): its
     // address can't be read back from the API. Not once it is paid or void,
@@ -289,6 +298,7 @@ export function InvoiceDetail({
         cancel: { onClick: () => setOpen("cancel") },
         refund: { onClick: () => setOpen("refund") },
         refundOrder: { href: orderHref ?? undefined },
+        writeAgain: { onClick: () => void writing.run(invoice) },
     };
     const readOnlyId = useId();
     /** The link made in this tab, to copy again from the Payment panel. */
@@ -342,6 +352,7 @@ export function InvoiceDetail({
         // one, confirmed first (UX-048).
         linkUnseen: !!online?.payLinkActive && !(payUrl && !viewUrl),
         pdfBusy: downloading,
+        writeAgain: invoice.kind === "INVOICE" && !invoice.reissuedAsId,
     }).map((a) => ({ ...a, ...does[a.id] }));
 
     return (
@@ -515,18 +526,16 @@ export function InvoiceDetail({
                 onOpenChange={dialog("pay")}
                 invoice={invoice}
             />
-            <CancelInvoiceDialog
+            <CancelOrCorrectSheet
                 open={open === "cancel"}
                 onOpenChange={dialog("cancel")}
                 invoice={invoice}
                 registered={registered}
             />
-            <CancelInvoiceDialog
+            <RefundInvoiceDialog
                 open={open === "refund"}
                 onOpenChange={dialog("refund")}
                 invoice={invoice}
-                registered={registered}
-                refund
             />
             <NewLinkConfirm
                 open={open === "newLink"}

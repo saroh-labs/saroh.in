@@ -108,6 +108,25 @@ export async function reissueInvoice(id: string, reason: string) {
     return res;
 }
 
+/** The sheet's preview of the credit note: a read, nothing revalidated. */
+export async function readCreditPreview(id: string) {
+    return api.readCreditPreview(id);
+}
+
+/** Cancel and write a correct one: the invoice, its credit note and the draft. */
+export async function creditAndRewriteInvoice(id: string, reason: string) {
+    const res = await api.creditAndRewriteInvoice(id, reason);
+    if (res.ok) refresh(id);
+    return res;
+}
+
+/** Write a void invoice again: a draft with its lines. */
+export async function writeInvoiceAgain(id: string) {
+    const res = await api.writeInvoiceAgain(id);
+    if (res.ok) refresh(id);
+    return res;
+}
+
 export async function recordPayment(id: string, input: PaymentInput) {
     const res = await api.recordPayment(id, input);
     if (res.ok) refresh(id);

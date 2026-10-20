@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { DatePicker } from "@saroh/ui/date-picker";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
@@ -22,9 +21,7 @@ import {
     deleteInvoice,
     issueInvoice,
     recordPayment,
-    reissueInvoice,
     setInvoiceLineRates,
-    voidInvoice,
 } from "@/lib/invoices/actions";
 import { sendLabel } from "@/lib/invoices/send";
 import type { InvoiceStanding, PaymentMethod } from "@/lib/invoices/service";
@@ -277,67 +274,46 @@ export function RecordPaymentDialog({
 }
 
 /**
- * Cancel an issued invoice, or refund a paid one that no order owns.
+ * Refund a paid invoice that no order owns: a credit note for all of it
+ * (ADR-008), exactly as the Cancel invoice dialog's refund always was. The
+ * invoice keeps its number and lines and reads Cancelled; Saroh records the
+ * credit note only, and the business pays the customer back itself. It
+ * asks why, says it cannot be undone, and has one destructive button.
  *
- * A GST-registered business never voids an issued invoice (ADR-008): it
- * issues a credit note for all of it, and the invoice keeps its number and
- * reads Cancelled. A business that is not registered voids it instead, and
- * may open a corrected draft in its place. Either way the dialog asks why
- * and says it cannot be undone; neither moves any money.
+ * An unpaid invoice is cancelled or corrected in `CancelOrCorrectSheet`
+ * (DEC-173, U13). What a credit note on paid money does — refund or keep
+ * as credit — is a decision still to come, so Refund… stays as it is.
  */
-export function CancelInvoiceDialog({
+export function RefundInvoiceDialog({
     open,
     onOpenChange,
     invoice,
-    registered,
-    refund = false,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     invoice: InvoiceRef;
-    /** Its paper is a tax invoice: cancel by credit note, never void. */
-    registered: boolean;
-    /** A paid invoice being refunded, rather than an unpaid one cancelled. */
-    refund?: boolean;
 }) {
     const router = useRouter();
     const reasonId = useId();
     const [reason, setReason] = useState("");
     const [tried, setTried] = useState(false);
-    const [busy, setBusy] = useState<"credit" | "void" | "reissue" | null>(
-        null,
-    );
-    const byCredit = registered || refund;
+    const [busy, setBusy] = useState(false);
     const missing = tried && !reason.trim();
 
-    async function run(kind: "credit" | "void" | "reissue") {
+    async function run() {
         setTried(true);
         if (!reason.trim()) return;
         const res = await runAction(
-            () =>
-                kind === "credit"
-                    ? creditInvoice(invoice.id, reason.trim())
-                    : kind === "void"
-                      ? voidInvoice(invoice.id, reason.trim())
-                      : reissueInvoice(invoice.id, reason.trim()),
-            { setBusy: (on) => setBusy(on ? kind : null) },
+            () => creditInvoice(invoice.id, reason.trim()),
+            { setBusy },
         );
         if (!res) return;
         if (!res.ok) return showError(res.error);
         onOpenChange(false);
         setReason("");
         setTried(false);
-        if (kind === "reissue") {
-            showSuccess(
-                `${invoice.number ?? "Invoice"} voided. A corrected draft is open.`,
-            );
-            router.push(`/billing/invoices/${res.data.id}/edit`);
-            return;
-        }
         showSuccess(
-            kind === "credit"
-                ? `${`${invoice.number ?? "Invoice"} cancelled with credit note ${res.data.number ?? ""}`.trim()}.`
-                : `${invoice.number ?? "Invoice"} voided.`,
+            `${`${invoice.number ?? "Invoice"} cancelled with credit note ${res.data.number ?? ""}`.trim()}.`,
         );
         router.refresh();
     }
@@ -346,50 +322,18 @@ export function CancelInvoiceDialog({
         <FormDialog
             open={open}
             size="md"
-            title={
-                refund
-                    ? `Refund ${invoice.number} with a credit note?`
-                    : `Cancel ${invoice.number}?`
-            }
-            description={`${
-                byCredit
-                    ? `A credit note for ${invoice.total} cancels it. ${invoice.number} keeps its number and its lines, and nothing more is owed on it. This cannot be undone.`
-                    : `It keeps its number and stays in the list, marked void, so ${invoice.number} always means the same thing. This cannot be undone.`
-            }${
-                refund
-                    ? ` Saroh records the credit note only. Pay ${invoice.who} back yourself.`
-                    : ""
-            }`}
-            pending={busy !== null}
+            title={`Refund ${invoice.number} with a credit note?`}
+            description={`A credit note for ${invoice.total} cancels it. ${invoice.number} keeps its number and its lines, and nothing more is owed on it. This cannot be undone. Saroh records the credit note only. Pay ${invoice.who} back yourself.`}
+            pending={busy}
             tone="destructive"
             cancelLabel="Keep invoice"
-            saveLabel={
-                byCredit
-                    ? refund
-                        ? "Issue the credit note"
-                        : "Cancel with a credit note"
-                    : "Void and write again"
-            }
-            savingLabel={
-                busy === "credit" ? "Issuing the credit note…" : "Voiding…"
-            }
-            extra={
-                byCredit ? null : (
-                    <Button
-                        type="button"
-                        variant="outline"
-                        disabled={busy !== null}
-                        onClick={() => void run("void")}
-                    >
-                        Void invoice
-                    </Button>
-                )
-            }
+            saveLabel="Issue the credit note"
+            savingLabel="Issuing the credit note…"
             onClose={() => {
                 setTried(false);
                 onOpenChange(false);
             }}
-            onSubmit={() => run(byCredit ? "credit" : "reissue")}
+            onSubmit={run}
         >
             <div className="grid gap-1.5">
                 <Label htmlFor={reasonId}>Why</Label>
@@ -410,15 +354,11 @@ export function CancelInvoiceDialog({
                         role="alert"
                         className="text-[12.5px] font-medium text-destructive-subtle-foreground"
                     >
-                        {byCredit
-                            ? "Say why it is being cancelled."
-                            : "Say why it is being voided."}
+                        Say why it is being cancelled.
                     </p>
                 ) : null}
                 <p className="text-[12px] text-muted-foreground">
-                    {byCredit
-                        ? "Printed on the credit note."
-                        : "Kept on the invoice, for whoever reads it later."}
+                    Printed on the credit note.
                 </p>
             </div>
         </FormDialog>
