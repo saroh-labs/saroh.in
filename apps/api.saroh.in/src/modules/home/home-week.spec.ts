@@ -615,7 +615,8 @@ describe("HomeService: This week", () => {
             db({ ...waiting, bookings: [3, 2] }),
         ).build(member);
         expect(forMember.week?.chequesWaiting).toBeNull();
-        // Waiting and not removed: a cleared or bounced cheque isn't.
+        // Waiting and not removed: a cleared or bounced cheque isn't, nor
+        // one on a credited or void invoice (#5).
         const client = db(waiting);
         await home(client).build(owner);
         expect(client.invoicePayment.groupBy).toHaveBeenCalledWith(
@@ -624,6 +625,7 @@ describe("HomeService: This week", () => {
                     organizationId: "org_1",
                     removedAt: null,
                     bankStatus: "WAITING",
+                    invoice: { status: { in: ["ISSUED", "PAID"] } },
                 },
             }),
         );

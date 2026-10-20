@@ -155,6 +155,7 @@ describe("the pay page's payments (real database)", () => {
                     number: "004512",
                     bank: "HDFC Bank",
                     status: "WAITING",
+                    returnedAfterBanking: false,
                 },
             },
         ]);
@@ -189,10 +190,31 @@ describe("the pay page's payments (real database)", () => {
                     number: "004513",
                     bank: "HDFC Bank",
                     status: "BOUNCED",
+                    returnedAfterBanking: false,
                 },
             }),
         ]);
         expect(JSON.stringify(page)).not.toContain("Insufficient");
+    });
+
+    it("says a cheque the bank returned after it was banked (#7)", async () => {
+        const { id, token } = await issued(rye);
+        const recorded = await ledger.record(rye, id, {
+            method: "CHEQUE",
+            receivedAt: ON_19_OCT,
+            chequeNumber: "004514",
+            chequeBank: "HDFC Bank",
+        });
+        await ledger.cleared(rye, id, recorded.recorded.paymentId, {});
+        await ledger.bounced(rye, id, recorded.recorded.paymentId, {});
+        const page = await publicInvoices.read(token);
+        expect(page).toMatchObject({ status: "ISSUED", leftToPay: "8400.00" });
+        expect(page.payments?.[0]?.cheque).toEqual({
+            number: "004514",
+            bank: "HDFC Bank",
+            status: "BOUNCED",
+            returnedAfterBanking: true,
+        });
     });
 
     it("leaves a payment removed by mistake off the page, oldest first otherwise", async () => {

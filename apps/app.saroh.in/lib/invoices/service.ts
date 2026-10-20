@@ -414,10 +414,21 @@ export interface PaymentInput {
     /** A cheque only. */
     chequeNumber?: string;
     chequeBank?: string;
+    /**
+     * One key per opening of Record payment (#6 review): a retry with it
+     * answers with the payment already written, never a second one.
+     */
+    idempotencyKey?: string;
 }
 
-/** What recording a payment answers (DEC-173): the invoice, and what Undo removes. */
-export type RecordedPayment = Invoice & { recorded?: { paymentId: string } };
+/**
+ * What recording a payment answers (DEC-173): the invoice, and what Undo
+ * removes. `replayed`: a retry of a record already made; nothing new was
+ * written, so there is nothing to Undo.
+ */
+export type RecordedPayment = Invoice & {
+    recorded?: { paymentId: string; replayed?: boolean };
+};
 
 /** How an invoice is shared by hand (DEC-173, `POST :id/share`). */
 export interface ShareAsk {
@@ -605,11 +616,26 @@ export function issueInvoice(id: string) {
  * (ADR-008) — how a GST-registered business undoes one. Answers with the
  * credit note.
  */
-export function creditInvoice(id: string, reason: string) {
+/**
+ * What the screen showed when Cancel opened (#2 review): the API checks it
+ * again under the ledger's lock and refuses ("This invoice was just paid.
+ * Reload it.") when the invoice changed meanwhile.
+ */
+export interface CreditExpect {
+    expectStatus: "ISSUED" | "OVERDUE" | "PAID";
+    /** Paid so far, as a money string ("0.00"); an older API sends none. */
+    expectPaidSoFar?: string;
+}
+
+export function creditInvoice(
+    id: string,
+    reason: string,
+    expect?: CreditExpect,
+) {
     return send<Invoice>(
         `${at(id)}/credit`,
         "POST",
-        { reason },
+        { reason, ...expect },
         "Couldn't cancel that invoice.",
     );
 }
@@ -646,11 +672,15 @@ export interface CreditAndRewrite {
  * The credit note for all of it and a draft with the same lines, in one
  * transaction on the API: a failure leaves neither.
  */
-export function creditAndRewriteInvoice(id: string, reason: string) {
+export function creditAndRewriteInvoice(
+    id: string,
+    reason: string,
+    expect?: CreditExpect,
+) {
     return send<CreditAndRewrite>(
         `${at(id)}/credit-and-rewrite`,
         "POST",
-        { reason },
+        { reason, ...expect },
         "Couldn't cancel that invoice.",
     );
 }

@@ -192,13 +192,21 @@ export function paymentEvents(
                     : `Cheque received · ${money}`,
             struck: gone,
         });
-        if (p.bankStatus === "CLEARED" && p.clearedAt) {
-            events.push({ at: p.clearedAt, text: `${no} is in the bank` });
+        // A cheque marked as in the bank keeps that line when the bank
+        // returns it later (#7), so the history shows both.
+        const banked =
+            (p.bankStatus === "CLEARED" || p.bankStatus === "BOUNCED") &&
+            p.clearedAt;
+        if (banked) {
+            events.push({
+                at: banked,
+                text: `${no} ${p.bankStatus === "CLEARED" ? "is" : "went"} in the bank`,
+            });
         }
         if (p.bankStatus === "BOUNCED" && p.bouncedAt) {
             events.push({
                 at: p.bouncedAt,
-                text: `${no} bounced · ${money} owed again${
+                text: `${no} bounced${banked ? " after it was banked" : ""} · ${money} owed again${
                     p.bounceReason ? ` · ${p.bounceReason}` : ""
                 }`,
             });

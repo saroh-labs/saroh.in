@@ -10,7 +10,7 @@ import { renderInvoiceReceipt } from "../communications/transactional";
 import { isLive } from "./invoice-ledger";
 import { receiptCanGo, receiptPaymentIdOf } from "./invoice-receipt";
 import { firstNameOf, paymentMethodWords } from "./invoice-share-words";
-import { paidSoFarCents } from "./invoice-state";
+import { CHEQUE_PAYMENT_METHOD, paidSoFarCents } from "./invoice-state";
 
 type Tx = Prisma.TransactionClient;
 
@@ -134,12 +134,24 @@ export class InvoiceReceiptHandler {
                 select: {
                     organizationId: true,
                     invoiceId: true,
+                    method: true,
                     removedAt: true,
                     bankStatus: true,
                     receiptMessageId: true,
+                    invoice: { select: { status: true } },
                 },
             });
             if (!payment || payment.receiptMessageId || !isLive(payment)) {
+                return;
+            }
+            // A cheque's receipt waits for the bank, and a credited or void
+            // invoice sends no "paid" receipt (#5, #9).
+            if (
+                (payment.method === CHEQUE_PAYMENT_METHOD &&
+                    payment.bankStatus === "WAITING") ||
+                (payment.invoice.status !== "ISSUED" &&
+                    payment.invoice.status !== "PAID")
+            ) {
                 return;
             }
             if (

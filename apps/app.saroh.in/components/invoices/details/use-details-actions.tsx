@@ -90,6 +90,8 @@ export function useDetailsActions({
     charging: { at: string } | null;
     /** "Remove this payment", from the payment's own line in the history. */
     removePayment: (payment: InvoicePayment) => void;
+    /** A cheque in the bank that came back (#7): opens Bounced on it. */
+    bouncePayment: (payment: InvoicePayment) => void;
     overlays: ReactNode;
 } {
     const { invoice: i, can, registered } = details;
@@ -405,6 +407,7 @@ export function useDetailsActions({
         sendable,
         charging,
         removePayment: (p) => setPayment({ dialog: "remove", payment: p }),
+        bouncePayment: (p) => setPayment({ dialog: "bounced", payment: p }),
         overlays,
     };
 }

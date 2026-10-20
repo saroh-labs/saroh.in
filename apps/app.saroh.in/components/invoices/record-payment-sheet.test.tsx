@@ -421,6 +421,65 @@ describe("Record payment", () => {
         expect(toast.showUndo).not.toHaveBeenCalled();
     });
 
+    it("sends one key per opening: a retry keeps it, a new opening makes a new one (#6)", async () => {
+        drawSheet();
+        await settle();
+        actions.recordPayment.mockResolvedValue({
+            ok: false,
+            error: "Couldn't record that payment.",
+        });
+        await press(button("Record ₹8,400"));
+        await settle();
+        await press(button("Record ₹8,400"));
+        await settle();
+        const keyOf = (n: number) =>
+            (
+                actions.recordPayment.mock.calls[n]?.[1] as {
+                    idempotencyKey?: string;
+                }
+            ).idempotencyKey;
+        expect(keyOf(0)).toMatch(/^[A-Za-z0-9_-]{8,80}$/);
+        expect(keyOf(1)).toBe(keyOf(0));
+
+        // Closed and opened again: a second payment of its own.
+        act(() =>
+            root.render(
+                <RecordPaymentSheet
+                    open={false}
+                    onOpenChange={vi.fn()}
+                    invoice={VIVEK}
+                />,
+            ),
+        );
+        drawSheet();
+        await settle();
+        await press(button("Record ₹8,400"));
+        await settle();
+        expect(keyOf(2)).toMatch(/^[A-Za-z0-9_-]{8,80}$/);
+        expect(keyOf(2)).not.toBe(keyOf(0));
+    });
+
+    it("a retry the API already recorded says so, with no Undo (#6)", async () => {
+        const onOpenChange = drawSheet();
+        await settle();
+        actions.recordPayment.mockResolvedValue({
+            ok: true,
+            data: {
+                ...answer().data,
+                recorded: { paymentId: "pay_first", replayed: true },
+            },
+        });
+        await press(button("Record ₹8,400"));
+        await settle();
+        expect(onOpenChange).toHaveBeenCalledWith(false);
+        expect(toast.showSuccess).toHaveBeenCalledWith(
+            "Already recorded",
+            "This payment was recorded a moment ago, so nothing new was added.",
+        );
+        expect(toast.showUndo).not.toHaveBeenCalled();
+        expect(wa.offerWhatsAppReceipt).not.toHaveBeenCalled();
+    });
+
     it("refuses nothing typed", async () => {
         drawSheet();
         await settle();

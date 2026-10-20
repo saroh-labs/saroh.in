@@ -75,6 +75,7 @@ const INVOICE: CancelOrCorrectInvoice = {
     standing: "OVERDUE",
     who: "Vivek Nair",
     total: "₹8,400",
+    expect: { expectStatus: "OVERDUE", expectPaidSoFar: "0.00" },
 };
 const PREVIEW = {
     ok: true,
@@ -261,9 +262,11 @@ describe("Cancel or correct, GST-registered", () => {
         await draw();
         type("Wrong amount");
         await press("Issue credit note ₹8,400");
+        // What the screen showed goes too: the API refuses a stale one (#2).
         expect(actions.creditInvoice).toHaveBeenCalledWith(
             "inv_106",
             "Wrong amount",
+            { expectStatus: "OVERDUE", expectPaidSoFar: "0.00" },
         );
         expect(toast.showSuccess).toHaveBeenCalledWith(
             "RC/26-27/0106 cancelled with credit note RCCN/26-27/0002.",
@@ -288,6 +291,7 @@ describe("Cancel or correct, GST-registered", () => {
         expect(actions.creditAndRewriteInvoice).toHaveBeenCalledWith(
             "inv_106",
             "Wrong person",
+            { expectStatus: "OVERDUE", expectPaidSoFar: "0.00" },
         );
         expect(actions.creditInvoice).not.toHaveBeenCalled();
         expect(toast.showSuccess).toHaveBeenCalledWith(
@@ -525,6 +529,7 @@ describe("cancelTargetOf", () => {
             total: expect.stringContaining("8,400") as string,
             partlyPaid: true,
             paidSoFar: expect.stringContaining("1,000") as string,
+            expect: { expectStatus: "ISSUED", expectPaidSoFar: "1000.00" },
         });
     });
 });
@@ -541,6 +546,10 @@ describe("Refund… on a paid invoice, unchanged", () => {
                     open
                     onOpenChange={onOpenChange}
                     invoice={{ ...INVOICE, standing: "PAID" }}
+                    expect={{
+                        expectStatus: "PAID",
+                        expectPaidSoFar: "8400.00",
+                    }}
                 />,
             );
             await flush();
@@ -561,6 +570,7 @@ describe("Refund… on a paid invoice, unchanged", () => {
         expect(actions.creditInvoice).toHaveBeenCalledWith(
             "inv_106",
             "Returned",
+            { expectStatus: "PAID", expectPaidSoFar: "8400.00" },
         );
         expect(toast.showSuccess).toHaveBeenCalledWith(
             "RC/26-27/0106 cancelled with credit note RCCN/26-27/0005.",

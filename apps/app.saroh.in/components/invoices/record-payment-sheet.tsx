@@ -50,6 +50,18 @@ import { offerWhatsAppReceipt } from "./whatsapp-share";
 /** The reason a payment taken back by Undo is kept with in the history. */
 export const UNDONE_REASON = "Undone straight after recording";
 
+/** A retry of a record already made (#6): said, with no Undo. */
+export const ALREADY_RECORDED = "Already recorded";
+export const ALREADY_RECORDED_NOTE =
+    "This payment was recorded a moment ago, so nothing new was added.";
+
+/** A fresh key for one opening of the sheet. */
+function newRecordKey(): string {
+    return typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `rp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
 /** What opens the sheet: an invoice read in full, or one to read on opening. */
 export type RecordPaymentInvoice = PaymentTarget | { id: string; who: string };
 
@@ -312,6 +324,10 @@ function RecordPaymentForm({
     const [picked, setPicked] = useState<Date | undefined>(undefined);
     const [note, setNote] = useState("");
     const [busy, setBusy] = useState(false);
+    // One key per opening (each opening mounts this form afresh): a retry
+    // of this record answers with the payment already written, while a
+    // second real payment, recorded from a fresh opening, counts (#6).
+    const [idempotencyKey] = useState(newRecordKey);
     const [problems, setProblems] = useState<
         Partial<Record<FieldName, ReactNode>>
     >({});
@@ -370,6 +386,7 @@ function RecordPaymentForm({
             () =>
                 recordPayment(target.id, {
                     method,
+                    idempotencyKey,
                     amount: fromPaise(check.paise),
                     receivedAt: receivedAt.toISOString(),
                     ...(reference.trim()
@@ -412,6 +429,13 @@ function RecordPaymentForm({
         const recorded = res.data;
         onRecorded?.(recorded);
         router.refresh();
+
+        // A retry of a record already made: nothing new was written, so
+        // there is nothing to Undo and no receipt to offer again.
+        if (recorded.recorded?.replayed) {
+            showSuccess(ALREADY_RECORDED, ALREADY_RECORDED_NOTE);
+            return;
+        }
 
         // Where the receipt can't be emailed, it is offered on WhatsApp
         // once Undo has passed; a cheque's waits for the bank.

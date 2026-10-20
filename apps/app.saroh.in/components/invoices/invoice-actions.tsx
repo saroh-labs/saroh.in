@@ -20,7 +20,7 @@ import {
     setInvoiceLineRates,
 } from "@/lib/invoices/actions";
 import { sendLabel } from "@/lib/invoices/send";
-import type { InvoiceStanding } from "@/lib/invoices/service";
+import type { CreditExpect, InvoiceStanding } from "@/lib/invoices/service";
 
 export interface InvoiceRef {
     id: string;
@@ -165,11 +165,14 @@ export function RefundInvoiceDialog({
     open,
     onOpenChange,
     invoice,
+    expect,
     onDone,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     invoice: InvoiceRef;
+    /** What the screen showed, checked again by the API (#2 review). */
+    expect?: CreditExpect;
     /** It was refunded: the details sheet reads it again (U9). */
     onDone?: () => void;
 }) {
@@ -184,7 +187,7 @@ export function RefundInvoiceDialog({
         setTried(true);
         if (!reason.trim()) return;
         const res = await runAction(
-            () => creditInvoice(invoice.id, reason.trim()),
+            () => creditInvoice(invoice.id, reason.trim(), expect),
             { setBusy },
         );
         if (!res) return;

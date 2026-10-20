@@ -10,6 +10,7 @@ import { runAction } from "@/lib/api/run-action";
 import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import {
+    chequeBounced,
     chequeCleared,
     recordPayment,
     removePayment,
@@ -27,7 +28,8 @@ import { paymentWay, toCollect } from "@/lib/invoices/words";
  * comes off, with an optional why, and stays in the history struck
  * through. It can be put back by recording it again, so it asks nothing
  * more than the why and offers Undo, which records it again as it was (a
- * cheque already in the bank is marked so again).
+ * cheque already in the bank is marked so again, and a bounced one bounced
+ * again, so Undo never brings back a live cheque the bank returned).
  */
 export function RemovePaymentDialog({
     invoice,
@@ -113,7 +115,7 @@ export function RemovePaymentDialog({
 }
 
 /** Record a removed payment again as it was: Undo's way back. */
-async function putBack(
+export async function putBack(
     invoiceId: string,
     p: InvoicePayment,
 ): Promise<{ ok: boolean; error?: string }> {
@@ -129,13 +131,26 @@ async function putBack(
     });
     if (!res.ok) return { ok: false, error: res.error };
     const again = res.data.recorded?.paymentId;
-    if (p.bankStatus === "CLEARED" && again) {
+    if (!again) return { ok: true };
+    // In the bank before: marked so again, also when it then bounced (#7).
+    if (
+        p.bankStatus === "CLEARED" ||
+        (p.bankStatus === "BOUNCED" && p.clearedAt)
+    ) {
         const cleared = await chequeCleared(
             invoiceId,
             again,
             p.clearedAt ?? undefined,
         );
         if (!cleared.ok) return { ok: false, error: cleared.error };
+    }
+    // A bounced cheque comes back bounced, never live and waiting (#10).
+    if (p.bankStatus === "BOUNCED") {
+        const bounced = await chequeBounced(invoiceId, again, {
+            ...(p.bouncedAt ? { bouncedAt: p.bouncedAt } : {}),
+            ...(p.bounceReason ? { reason: p.bounceReason } : {}),
+        });
+        if (!bounced.ok) return { ok: false, error: bounced.error };
     }
     return { ok: true };
 }

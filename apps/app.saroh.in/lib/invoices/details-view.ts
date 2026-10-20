@@ -26,6 +26,11 @@ export interface HistoryLine {
     struck?: boolean;
     /** The live payment this line records, which may be removed. */
     removable?: InvoicePayment;
+    /**
+     * A cheque already in the bank, which the bank may still return (#7):
+     * "Bounced" is offered beside it.
+     */
+    bounceable?: InvoicePayment;
 }
 
 /**
@@ -76,6 +81,10 @@ export function historyLines(
                         : "ok",
                 struck: e.struck,
                 removable: first && p.canRemove ? p : undefined,
+                bounceable:
+                    first && p.canRemove && p.bankStatus === "CLEARED"
+                        ? p
+                        : undefined,
             });
         });
     }

@@ -100,10 +100,28 @@ requireProvider: false })`), the email says "view it and download a copy",
   answers `recorded.paymentId` for Undo), `DELETE
 :invoiceId/payments/:paymentId` (soft: `removedAt`, who, a reason,
   "Recorded by mistake" by default; an ONLINE payment is refunded, never
-  removed), `POST …/cleared` and `POST …/bounced` (a WAITING cheque only;
-  a bounce reopens what it paid, with no charge). A repeat of the same
-  record (method, reference, cheque number, amount) within ten minutes
-  answers with the first payment (`recorded.replayed`), the desk-take rule.
+  removed), `POST …/cleared` (a WAITING cheque) and `POST …/bounced` (a
+  WAITING cheque, or one already CLEARED: banks return cheques days later,
+  and it keeps its `clearedAt` so the history and the pay page say it was
+  returned after it was banked; a bounce reopens what it paid, with no
+  charge). Neither moves money on a CREDITED or VOID invoice. **Retries are
+  keyed, never matched on fields** (review #6, 20 Oct): Record payment
+  sends an `idempotencyKey`, one per opening of the sheet, stored on the
+  row under a unique `(invoiceId, idempotencyKey)`; a retry with it answers
+  with the first payment (`recorded.replayed`), and the app says "Already
+  recorded" with no Undo. Two real payments of the same amount carry two
+  keys and both count; a record with no key is always a payment of its
+  own. Record payment is refused while an autopay charge is under way on
+  the invoice (`chargeUnderWayOn`, 409 "Autopay charge in progress"), as
+  Pay, Remind and the desk are. A bounced cheque is never removable
+  (`canRemove` false); it already doesn't count.
+- **A receipt is never for a cheque not in the bank** (review #9): Email
+  receipt and the WhatsApp RECEIPT text thank the last live payment that
+  isn't a WAITING cheque, and answer 409 "This cheque isn't in the bank
+  yet." when that is all there is. The `invoice.receipt` handler also
+  sends nothing for a waiting cheque or on an invoice no longer ISSUED or
+  PAID. "Cheques not in the bank" (`WAITING_CHEQUE_WHERE`) leaves out a
+  credited or void invoice's cheque.
 - **Every write is an event** on the invoice's history: an audit row in
   the same transaction (`invoice.payment.recorded`, `.removed`,
   `.cheque_cleared`, `.cheque_bounced`; `invoice-payment-events.ts`),
@@ -128,7 +146,15 @@ requireProvider: false })`), the email says "view it and download a copy",
   unchanged: they count paid invoices.
 - **A partly paid invoice isn't voided or credited** until its payments
   are removed (409); the void is fenced on `paidCents = 0` and the credit
-  checks again under the ledger lock.
+  checks again under the ledger lock. **A credit checks what the merchant
+  saw** (review #2): Cancel and Refund send `expectStatus` and
+  `expectPaidSoFar` from the screen (the API's own read before stands in
+  when they don't), and `creditInTx` compares them with the invoice under
+  `lockInvoiceForLedger`: paid meanwhile is 409 "This invoice was just
+  paid. Reload it.", any other payment change 409 "A payment on this
+  invoice just changed. Reload it." Nothing is credited and no draft is
+  written. **Nor while a cheque waits** (review #5): 409 "Wait for the
+  cheque to clear or bounce.", from the preview too.
 - **The read** serves `paidSoFar`, `leftToPay`, `partlyPaid` and
   `chequeWaiting` on every invoice, and `payments[]` (each with
   `bankStatus`, `removed` and `canRemove`) on the detail. A PAID invoice

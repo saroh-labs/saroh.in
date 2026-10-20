@@ -31,6 +31,11 @@ export interface PayLinkPayment {
         number: string | null;
         bank: string | null;
         status: BankStatus;
+        /**
+         * A bounced cheque that had been marked as in the bank first (#7):
+         * the page says it was returned after it was banked.
+         */
+        returnedAfterBanking: boolean;
     } | null;
 }
 
@@ -56,6 +61,7 @@ export async function payLinkPayments(
             chequeNumber: true,
             chequeBank: true,
             bankStatus: true,
+            clearedAt: true,
         },
     });
     return rows.reverse().map((r) => ({
@@ -68,6 +74,8 @@ export async function payLinkPayments(
                       number: r.chequeNumber,
                       bank: r.chequeBank,
                       status: bankStatusOf(r.bankStatus),
+                      returnedAfterBanking:
+                          r.bankStatus === "BOUNCED" && r.clearedAt !== null,
                   }
                 : null,
     }));

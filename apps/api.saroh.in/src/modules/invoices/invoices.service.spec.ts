@@ -41,6 +41,8 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn().mockResolvedValue([]),
         },
         invoiceSequence: { upsert: jest.fn() },
+        // No cheque waits unless a test says so (#5).
+        invoicePayment: { count: jest.fn().mockResolvedValue(0) },
         contact: { findFirst: jest.fn() },
         businessProfile: { findUnique: jest.fn() },
         // The seller's name, frozen on issue (DEC-082).
@@ -1352,6 +1354,18 @@ describe("GST (ADR-008)", () => {
             row({ status: "ISSUED", number: "RC/26-27/0004" }),
         );
         registered();
+        // The ledger's lock and read, as the merchant saw it (#2).
+        tx.$queryRaw!.mockResolvedValueOnce([{ id: "inv_1" }]);
+        tx.invoice!.findFirst!.mockResolvedValueOnce({
+            id: "inv_1",
+            organizationId: "org_1",
+            status: "ISSUED",
+            kind: "INVOICE",
+            currency: "INR",
+            total: decimal("2360"),
+            paidCents: 0,
+            order: null,
+        });
         // The original's read; the number the credit note takes is free.
         tx.invoice!.findUnique!.mockResolvedValue(null).mockResolvedValueOnce({
             id: "inv_1",
