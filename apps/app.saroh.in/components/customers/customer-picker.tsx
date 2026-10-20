@@ -32,6 +32,16 @@ import { DuplicateWarning, NewCustomerForm, WalkInForm } from "./picker-forms";
 const SETTLE_MS = 200;
 /** How many people are shown at once (the design). */
 const SHOWN = 8;
+/**
+ * A chip holding a person's name or email, or what was typed: it wraps,
+ * and breaks an address with nowhere to break, so a long one never sets
+ * the sheet's width. The chip's own `whitespace-nowrap` and `shrink-0`
+ * let "Aishwarya Lakshmi Venkataraman-Subramaniam" widen a phone's New
+ * order sheet past the screen, and a tap then scrolled the whole form
+ * sideways (DEV_LEARNINGS, 20 Oct 2026).
+ */
+const PERSON_CHIP =
+    "h-auto min-h-8 max-w-full whitespace-normal py-1 text-left [overflow-wrap:anywhere] coarse:h-auto coarse:min-h-11";
 
 /**
  * The shared customer picker (E4): search by name or phone, most recent
@@ -259,12 +269,17 @@ export function CustomerPicker({
                         key={r.id}
                         on={pickedId === r.id}
                         onClick={() => pick(pickOf(r))}
+                        className={PERSON_CHIP}
                     >
                         {resultLabel(r)}
                     </Chip>
                 ))}
                 {pickedShown ? (
-                    <Chip on onClick={() => pick(pickedShown)}>
+                    <Chip
+                        on
+                        onClick={() => pick(pickedShown)}
+                        className={PERSON_CHIP}
+                    >
                         {pickName(pickedShown)}
                         {pickedShown.kind === "new"
                             ? " · new"
@@ -292,7 +307,7 @@ export function CustomerPicker({
                             setWalkIn(false);
                             setAdding(draftFromTyped(query));
                         }}
-                        className="h-8 rounded-full border border-dashed border-border-strong bg-transparent px-[11px] text-[12.5px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active coarse:h-11"
+                        className="min-h-8 max-w-full rounded-full border border-dashed border-border-strong bg-transparent px-[11px] py-1 text-left text-[12.5px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast [overflow-wrap:anywhere] hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active coarse:min-h-11"
                     >
                         {addLabel(query)}
                     </button>

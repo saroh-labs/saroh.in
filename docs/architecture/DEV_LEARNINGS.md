@@ -12,6 +12,31 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## New order — the sheet scrolled sideways on a phone, only in the full gate
+
+**Symptom**: 20 Oct 2026. `phone-reflow.spec.ts` "the New order sheet keeps
+its create button on the screen" failed at 320px in 4 of 5 local gates and
+on every retry ("Northwind Supply Store [-5–169 of 320]": the Taken at chip
+moved ~30px left), but passed alone, on CI on development, and by hand.
+**Cause**: the customer picker shows the 8 most recently seen customers
+before anything is typed, as `Chip`s, which are `whitespace-nowrap
+shrink-0`. The release's invoice specs record payments for customers like
+"Vivek Pay phone0-mvgpdxmd70h1-bounce", whose paid invoice made them
+recent; that one chip, wider than the sheet, set the sheet body's grid
+column to its width (317px in a 279px body). The body is `overflow-y-auto`,
+so it scrolled sideways, and a tap's scroll-into-view moved the whole form
+27px left. Which customers are recent depended on what else had run, so
+the spec alone never saw it.
+**Fix**: the picker's chips for a person or what was typed wrap, and break
+an address with nowhere to break (`PERSON_CHIP` in
+`components/customers/customer-picker.tsx`). The spec now finds a long-named
+customer of its own in the sheet before measuring, so the chip is always
+there. `overflow-x-hidden` on the sheet body was not added: an
+`overflow: hidden` box still scrolls for focus and scroll-into-view, so it
+would only hide the next overflow from this spec.
+**Rule**: a chip whose words come from a merchant or a customer (a name, an
+email, a product) wraps; `Chip`'s nowrap is for Saroh's own short words.
+
 ## Invoices gate — 30 browser failures, two of them the app
 
 **Symptom**: 20 Oct 2026, the invoices release gate again. Bulk remind and
