@@ -20,6 +20,7 @@ import { stateCode } from "./gst-states";
 export const GST_RATES = [
     "0",
     "0.25",
+    "1.5",
     "3",
     "5",
     "12",
@@ -46,6 +47,17 @@ export function bpsToRate(bps: number): string {
     return frac === 0
         ? String(whole)
         : `${whole}.${String(frac).padStart(2, "0").replace(/0$/, "")}`;
+}
+
+/**
+ * What a rate GST does not have is told, the rates listed from
+ * {@link GST_RATES} so the message never drifts from the list:
+ * "7% is not a GST rate. Use 0, 0.25, 1.5, 3, 5, 12, 18, 28 or 40."
+ */
+export function notGstRateMessage(rate: string): string {
+    const head = GST_RATES.slice(0, -1).join(", ");
+    const last = GST_RATES[GST_RATES.length - 1];
+    return `${rate}% is not a GST rate. Use ${head} or ${last}.`;
 }
 
 export function isGstRate(rate: string): boolean {

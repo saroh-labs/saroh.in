@@ -310,6 +310,37 @@ describe("focusFirstError", () => {
         expect(screen.getByLabelText("Email")).toHaveFocus();
         vi.unstubAllGlobals();
     });
+
+    it("puts it on a set of chips' one tab stop, not the group", () => {
+        vi.stubGlobal("requestAnimationFrame", (fn: () => void) => {
+            fn();
+            return 0;
+        });
+        render(
+            <div role="radiogroup" aria-label="GST rate" aria-invalid="true">
+                <button
+                    type="button"
+                    role="radio"
+                    aria-checked={false}
+                    tabIndex={0}
+                >
+                    0%
+                </button>
+                <button
+                    type="button"
+                    role="radio"
+                    aria-checked={false}
+                    tabIndex={-1}
+                >
+                    5%
+                </button>
+            </div>,
+        );
+        Element.prototype.scrollIntoView = vi.fn();
+        focusFirstError();
+        expect(screen.getByRole("radio", { name: "0%" })).toHaveFocus();
+        vi.unstubAllGlobals();
+    });
 });
 
 describe("MoneyInput", () => {

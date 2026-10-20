@@ -137,6 +137,19 @@ describe("one of each small piece", () => {
         ).toEqual([]);
     });
 
+    it("a GST rate is chosen with GstRatePicker, never a box (DEC-176)", () => {
+        // The rate lists are read by the picker (through `MAIN_GST_RATES`
+        // and `OTHER_GST_RATE_CHOICES`) and nowhere else: a screen that
+        // takes `GST_RATE_OPTIONS` or `GST_RATE_CHOICES` is drawing the
+        // rates its own way, a dropdown or chips of its own.
+        const allow = {
+            "lib/invoices/gst.ts": "where the one list of rates is written",
+        };
+        const pattern = /\bGST_RATE_(?:OPTIONS|CHOICES)\b/;
+        expect(offenders(pattern, allow)).toEqual([]);
+        expect(stale(pattern, allow)).toEqual([]);
+    });
+
     it("the old pill, tab and segmented pieces stay deleted", () => {
         expect(
             offenders(

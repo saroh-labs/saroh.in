@@ -12,6 +12,12 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+    pickRate,
+    ratePicker,
+    rateShown,
+} from "@/components/shared/gst-rate-picker.testing";
+
 import { IssueDialog } from "./invoice-actions";
 
 const actions = { issueInvoice: vi.fn(), setInvoiceLineRates: vi.fn() };
@@ -166,18 +172,9 @@ describe("issuing a draft with a line that has no GST rate", () => {
         );
         expect(toast.showError).not.toHaveBeenCalled();
 
-        const box = document.querySelector<HTMLSelectElement>(
-            'select[aria-label="GST rate for Catering, Saturday"]',
-        );
-        if (!box) throw new Error("No GST rate box");
-        expect(box.value).toBe("");
-        act(() => {
-            Object.getOwnPropertyDescriptor(
-                HTMLSelectElement.prototype,
-                "value",
-            )?.set?.call(box, "0");
-            box.dispatchEvent(new Event("change", { bubbles: true }));
-        });
+        const picker = ratePicker("GST rate for Catering, Saturday");
+        expect(rateShown(picker)).toBe("");
+        pickRate(picker, "0");
         await press("Save and issue");
 
         // Exempt is a rate: 0 is saved on the line, by its place.

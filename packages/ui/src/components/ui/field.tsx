@@ -259,7 +259,12 @@ function focusFirstError(root?: ParentNode | null) {
             '[aria-invalid="true"]:not([disabled])',
         );
         if (!first) return;
-        first.focus({ preventScroll: true });
+        // A set of chips is a radio group: the keyboard goes to its one tab
+        // stop (the chosen chip, else the first), which a group can't take.
+        const target = first.matches('[role="radiogroup"]')
+            ? (first.querySelector<HTMLElement>('[tabindex="0"]') ?? first)
+            : first;
+        target.focus({ preventScroll: true });
         first.scrollIntoView({ block: "center", behavior: "auto" });
     };
     if (typeof requestAnimationFrame === "function") {

@@ -14,14 +14,7 @@ import {
     rateHint,
     SAME_AS_BUSINESS,
 } from "@/lib/gst/price-mode";
-import type { GstRateValue } from "@/lib/invoices/gst";
-import {
-    GST_RATE_CHOICES,
-    GST_RATE_NEEDED,
-    GST_RATE_OPTIONS,
-    GST_RATE_PLACEHOLDER,
-    isHsnSac,
-} from "@/lib/invoices/gst";
+import { GST_RATE_NEEDED, isHsnSac } from "@/lib/invoices/gst";
 import { patchProduct } from "@/lib/products/actions";
 import type { BasicsValues } from "@/lib/products/editor-sections";
 import {
@@ -40,6 +33,10 @@ import {
 import type { ProductDetail } from "@/lib/products/service";
 import { OptionSelect } from "@saroh/ui/option-select";
 
+import {
+    GstRatePicker,
+    pickerWiring,
+} from "@/components/shared/gst-rate-picker";
 import { Field } from "@saroh/ui/field";
 import { MoneyInput } from "@saroh/ui/money-input";
 import { TextLink } from "@saroh/ui/text-link";
@@ -434,7 +431,7 @@ export function BasicsSection({
                 already saved stays in view either way. It sits with the
                 price it is part of, and a registered business's priced
                 product can't be saved without one (12 Oct 2026): 0% is a
-                choice, and the box's placeholder is the only "not set". */}
+                choice, and no chip pressed is the only "not set". */}
             {gstRegistered || v.gstRate !== "" || v.hsnCode.trim() !== "" ? (
                 <div className="mt-4 flex flex-wrap gap-3.5">
                     <Field
@@ -442,7 +439,7 @@ export function BasicsSection({
                         // carries GST.
                         holdsData={false}
                         label="GST rate"
-                        className="flex-[1_1_150px]"
+                        className="flex-[1_1_100%]"
                         error={
                             errors.gstRate?.message ??
                             (rateMissing && (rateAsked || !creating || tried)
@@ -455,26 +452,21 @@ export function BasicsSection({
                             "Included in the price.",
                         )}
                     >
-                        <OptionSelect<GstRateValue>
-                            id="pe-gst"
-                            value={v.gstRate as GstRateValue}
-                            onValueChange={(rate) => {
-                                setRateAsked(true);
-                                form.setValue("gstRate", rate, {
-                                    shouldDirty: true,
-                                    shouldValidate: true,
-                                });
-                            }}
-                            options={
-                                gstRateNeeded
-                                    ? GST_RATE_CHOICES
-                                    : GST_RATE_OPTIONS
-                            }
-                            placeholder={
-                                gstRateNeeded ? GST_RATE_PLACEHOLDER : undefined
-                            }
-                            disabled={ro}
-                        />
+                        {(control) => (
+                            <GstRatePicker
+                                {...pickerWiring(control)}
+                                value={v.gstRate}
+                                optional={!gstRateNeeded}
+                                onChange={(rate) => {
+                                    setRateAsked(true);
+                                    form.setValue("gstRate", rate, {
+                                        shouldDirty: true,
+                                        shouldValidate: true,
+                                    });
+                                }}
+                                disabled={ro}
+                            />
+                        )}
                     </Field>
                     {/* Only a business known to be registered chooses how
                         a price carries GST (12 Oct 2026); most leave it as
