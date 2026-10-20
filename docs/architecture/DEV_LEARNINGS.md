@@ -12,6 +12,36 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Home — Turn down's Undo was drawn and pulled away in the same moment
+
+**Symptom**: 20 Oct 2026. `home-needs-groups.spec.ts` "Turn down is held
+with Undo" (desk) failed on both tries in two local gates in a row, and
+passed on CI and alone. The row said "Turning down in 10 seconds", then the
+Undo click timed out: "element is not stable", then "element was detached
+from the DOM". Looped alone it failed in 33 of 36 runs.
+**Cause**: a Needs you group whose every row is done here folds to "All
+done", and `need-groups.tsx` folded it in a `useEffect`. An effect runs
+after paint, so the screen first drew the open group with the held row and
+its Undo, then closed it and unmounted the row. The spec read that one
+frame ("Turning down…" was there, so the group needed no re-opening),
+pressed Undo, and the row was gone, closed for good. It only folds when
+the test's booking is the group's only row. On CI and in short runs, the
+spec's two sibling tests ran on other workers at the same moment, and
+their bookings kept the group from folding. In the full gate they rarely
+overlapped. Nothing refreshed Home.
+**Fix**: the fold is decided while rendering, in the same render that
+marks the last row done (React's "adjust state while rendering":
+`foldedKey` state, compared with `emptiedKey`, then `setOpen`). React
+re-renders before committing, so no frame shows the row it is folding
+away. `need-groups.test.tsx` watches the DOM with a MutationObserver and
+fails if the held row is ever inserted into the group that folds. It also
+checks that a re-opened group stays open with its Undo when Home is read
+again.
+**Rule**: state that follows from props or other state on the same screen
+(open, folded, selected) is set during render or derived, never in a
+`useEffect` after paint. An effect leaves a frame where a control is drawn
+and then taken away.
+
 ## New order — the sheet scrolled sideways on a phone, only in the full gate
 
 **Symptom**: 20 Oct 2026. `phone-reflow.spec.ts` "the New order sheet keeps

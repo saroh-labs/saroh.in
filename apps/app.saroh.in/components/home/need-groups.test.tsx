@@ -298,6 +298,63 @@ describe("NeedGroups", () => {
         act(() => toggleOf("ORDERS")?.click());
         expect(groupEl("ORDERS")?.textContent).toContain("Marked sent");
     });
+
+    it("folds in the same render as the hold: the open group never draws the held row and its Undo first", async () => {
+        calls.moveStage.mockResolvedValue({
+            ok: true,
+            data: { eventId: "e2" },
+        });
+        const one = { ...ORDERS, count: 1, more: 0 };
+        draw({ groups: [one, REVIEWS], total: 2 });
+        const press = (name: string) =>
+            Array.from(groupEl("ORDERS")?.querySelectorAll("button") ?? [])
+                .find((b) => b.textContent === name)
+                ?.click();
+        act(() => press("Mark sent"));
+        // Every node the DOM is given from the confirm on: an Undo drawn
+        // and then folded away is a button a press can land on and lose.
+        const added: string[] = [];
+        const seen = new MutationObserver((records) => {
+            for (const r of records)
+                for (const n of Array.from(r.addedNodes))
+                    added.push(n.textContent ?? "");
+        });
+        seen.observe(host, {
+            childList: true,
+            subtree: true,
+            characterData: true,
+        });
+        act(() => {
+            groupEl("ORDERS")
+                ?.querySelector('[role="alertdialog"]')
+                ?.querySelector("button")
+                ?.click();
+        });
+        await act(async () => {
+            for (let i = 0; i < 5; i++) await Promise.resolve();
+        });
+        await Promise.resolve();
+        for (const r of seen.takeRecords())
+            for (const n of Array.from(r.addedNodes))
+                added.push(n.textContent ?? "");
+        seen.disconnect();
+        expect(groupEl("ORDERS")?.textContent).toContain("All done");
+        expect(toggleOf("ORDERS")?.getAttribute("aria-expanded")).toBe("false");
+        expect(added.some((t) => t.includes("Marked sent"))).toBe(false);
+
+        // Opened again, it stays open with the Undo while Home is read
+        // again: new groups, the same things in them.
+        act(() => toggleOf("ORDERS")?.click());
+        draw({
+            groups: [structuredClone(one), structuredClone(REVIEWS)],
+            total: 2,
+        });
+        expect(toggleOf("ORDERS")?.getAttribute("aria-expanded")).toBe("true");
+        const undo = Array.from(
+            groupEl("ORDERS")?.querySelectorAll("button") ?? [],
+        ).find((b) => b.textContent === "Undo");
+        expect(undo).toBeTruthy();
+    });
 });
 
 const ENQUIRIES: HomeNeedGroup = {
