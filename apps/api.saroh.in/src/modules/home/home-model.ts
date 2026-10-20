@@ -292,9 +292,10 @@ export interface HomeWeek {
     owed?: HomeWeekOwed;
     /**
      * Cheques received and not in the bank yet (DEC-173, invoices U4),
-     * from `home/home-cheques.ts`. Null while none waits, and null for a
-     * viewer without `payment:read`. `href` is
-     * `/billing/invoices?view=cheques`.
+     * from `home/home-cheques.ts`, read on its own beside the week. Null
+     * while none waits, when that read failed (`unavailable` then names
+     * "Cheques"), and for a viewer without `payment:read` and
+     * `invoice:read`. `href` is `/billing/invoices?view=cheques`.
      */
     chequesWaiting?: HomeChequesWaiting | null;
 }

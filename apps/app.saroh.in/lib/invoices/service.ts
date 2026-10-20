@@ -3,7 +3,7 @@ import { apiFetch, getJson, orgBase } from "@/lib/api/http";
 import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
 import type { CappedList } from "@/lib/lists/capped";
-import { withLive } from "@/lib/lists/capped";
+import { LIST_LIMIT, withLive } from "@/lib/lists/capped";
 import type { PayInstructionsSettings } from "@/lib/organizations/pay-instructions";
 import type { OnlineBlocker } from "@/lib/staff/types";
 
@@ -12,6 +12,7 @@ import type {
     ReminderPreview,
     ReminderSendResult,
 } from "./remind-all";
+import type { InvoiceSummary } from "./summary-types";
 
 /**
  * Invoices a business issues (ADR-007) — read and written through the
@@ -395,6 +396,56 @@ export async function listInvoices(): Promise<CappedList<Invoice>> {
         getJson<Invoice[]>(`${base}/invoices?view=overdue`),
     ]);
     return withLive(newest ?? [], issued ?? [], overdue ?? []);
+}
+
+/** What the API narrows the list by (DEC-173, U4): `GET invoices?…`. */
+export interface InvoiceListAsk {
+    /** A name, part of a number, or an amount. */
+    q?: string;
+    /** Only a cheque not in the bank: the cheques line. */
+    view?: "cheques";
+    /** Money received from this day on: the strip's Paid this month. */
+    paidFrom?: string;
+    /** One pack's or course's, as `listInvoicesIn` reads them (D18). */
+    packId?: string;
+    courseId?: string;
+}
+
+/**
+ * The list as the API narrows it (DEC-173, U8): a search, the cheques
+ * waiting, or what was paid this month, found on the server however old,
+ * where the newest page would miss them. A failed read throws, as every
+ * list read does: never an empty list.
+ */
+export async function listInvoicesBy(
+    ask: InvoiceListAsk,
+): Promise<CappedList<Invoice>> {
+    const base = await orgBase();
+    if (!base) return { rows: [], truncated: false };
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(ask)) {
+        if (typeof value === "string" && value !== "") query.set(key, value);
+    }
+    const rows = (await getJson<Invoice[]>(`${base}/invoices?${query}`)) ?? [];
+    return { rows, truncated: rows.length >= LIST_LIMIT };
+}
+
+/**
+ * The money strip's one read (`GET invoices/summary`, DEC-173 U4). Null
+ * when it couldn't be read: the strip then says "Couldn't load totals"
+ * with Try again, and the list below still loads. Never a row of zeros.
+ */
+export async function readInvoiceSummary(): Promise<InvoiceSummary | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    try {
+        const res = await apiFetch(`${base}/invoices/summary`);
+        if (!res.ok) return null;
+        return (await res.json()) as InvoiceSummary;
+    } catch {
+        // Logged by the API; here it is the strip's own failed state.
+        return null;
+    }
 }
 
 /**

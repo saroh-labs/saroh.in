@@ -229,7 +229,8 @@ describe("weekScope", () => {
             bookings: false,
             orders: false,
             owed: false,
-            cheques: true,
+            // The line opens the invoices, which this role can't read.
+            cheques: false,
             takingsIn: "calendar",
         });
         expect(
@@ -373,56 +374,12 @@ describe("readWeek", () => {
                 overdue: 1,
                 href: "/billing/invoices?view=overdue",
             },
-            // Not asked for in this scope (DEC-173): null.
-            chequesWaiting: null,
         });
+        // The cheques line is HomeService's own read, never the week's.
+        expect(week).not.toHaveProperty("chequesWaiting");
     });
 
-    it("sends the cheques not in the bank, in minor units, linked to the list", async () => {
-        const client = db({
-            cheques: [
-                {
-                    currency: "INR",
-                    _sum: { amountCents: 1_400_000 },
-                    _count: { _all: 2 },
-                },
-            ],
-        });
-        const week = await readWeek(
-            client as never,
-            "org_1",
-            { ...EVERY, cheques: true },
-            clock,
-        );
-        expect(week.chequesWaiting).toEqual({
-            count: 2,
-            totals: [{ currency: "INR", amountMinor: 1_400_000 }],
-            href: "/billing/invoices?view=cheques",
-        });
-        // Waiting and not removed: a cleared or bounced cheque isn't.
-        expect(client.invoicePayment.groupBy).toHaveBeenCalledWith(
-            expect.objectContaining({
-                where: {
-                    organizationId: "org_1",
-                    removedAt: null,
-                    bankStatus: "WAITING",
-                },
-            }),
-        );
-    });
-
-    it("sends no cheques line while none waits", async () => {
-        const client = db();
-        const week = await readWeek(
-            client as never,
-            "org_1",
-            { ...EVERY, cheques: true },
-            clock,
-        );
-        expect(week.chequesWaiting).toBeNull();
-    });
-
-    it("never reads the cheques for a scope without money", async () => {
+    it("never reads the cheques, even for a scope that may see them", async () => {
         const client = db({
             cheques: [
                 {
@@ -435,10 +392,11 @@ describe("readWeek", () => {
         const week = await readWeek(
             client as never,
             "org_1",
-            { ...EVERY, cheques: false },
+            { ...EVERY, cheques: true },
             clock,
         );
-        expect(week.chequesWaiting).toBeNull();
+        // Read on its own by HomeService, so its failure is its own.
+        expect(week).not.toHaveProperty("chequesWaiting");
         expect(client.invoicePayment.groupBy).not.toHaveBeenCalled();
     });
 
@@ -657,6 +615,68 @@ describe("HomeService: This week", () => {
             db({ ...waiting, bookings: [3, 2] }),
         ).build(member);
         expect(forMember.week?.chequesWaiting).toBeNull();
+        // Waiting and not removed: a cleared or bounced cheque isn't.
+        const client = db(waiting);
+        await home(client).build(owner);
+        expect(client.invoicePayment.groupBy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId: "org_1",
+                    removedAt: null,
+                    bankStatus: "WAITING",
+                },
+            }),
+        );
+    });
+
+    it("sends no cheques line while none waits", async () => {
+        const model = await home(db()).build(owner);
+        expect(model.week?.chequesWaiting).toBeNull();
+    });
+
+    it("asks no cheques of money without invoices, nor of invoices without money", async () => {
+        const waiting = {
+            cheques: [
+                {
+                    currency: "INR",
+                    _sum: { amountCents: 840_000 },
+                    _count: { _all: 1 },
+                },
+            ],
+        };
+        for (const actions of [
+            ["payment:read", "booking:read"],
+            ["invoice:read", "booking:read"],
+        ] as OrgAction[][]) {
+            const client = db({ ...waiting, bookings: [3, 2] });
+            const model = await home(client).build(holding(actions));
+            expect(model.week?.chequesWaiting ?? null).toBeNull();
+            expect(client.invoicePayment.groupBy).not.toHaveBeenCalled();
+        }
+    });
+
+    it("names Cheques when their read fails, and keeps the rest of the week", async () => {
+        const client = db({
+            paid: [[{ currency: "INR", total: "500", count: 1 }], []],
+            bookings: [3, 2],
+        });
+        client.invoicePayment.groupBy = jest
+            .fn()
+            .mockRejectedValue(new Error("relation is being migrated"));
+        const model = await home(client).build(owner);
+        expect(model.unavailable).toContainEqual({
+            moduleKey: "PAYMENTS",
+            label: "Cheques",
+        });
+        // Not "This week": the week itself was read and is all there.
+        expect(model.unavailable).not.toContainEqual(
+            expect.objectContaining({ label: "This week" }),
+        );
+        expect(model.week).toMatchObject({
+            takings: [expect.objectContaining({ amountMinor: 50_000 })],
+            bookings: { count: 3, lastWeek: 2 },
+            chequesWaiting: null,
+        });
     });
 
     it("sends a Member no takings figure at all, and their bookings still", async () => {

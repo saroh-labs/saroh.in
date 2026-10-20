@@ -56,6 +56,42 @@ describe("PageHeader", () => {
         expect(screen.queryByRole("navigation")).toBeNull();
     });
 
+    it("is the compact bar on a phone when asked: no crumbs, actions on the title's line", () => {
+        const { container } = render(
+            <PageHeader
+                compactOnPhone
+                title="Invoices"
+                count="146 invoices"
+                breadcrumb={["Payments", "Invoices"]}
+                actions={<button type="button">New</button>}
+            />,
+        );
+        // The crumbs are there for the desk and hidden below `sm`.
+        const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+        expect(nav.className).toContain("max-sm:hidden");
+        // The title is smaller on a phone, and as large as ever at a desk.
+        const h1 = screen.getByRole("heading", { level: 1 });
+        expect(h1.className).toContain("max-sm:text-[24px]");
+        expect(h1.className).toContain("text-[30px]");
+        // One row at every width, the button beside the title.
+        const row = h1.closest("div.flex.gap-3");
+        expect(row?.className).toContain("flex-row");
+        expect(row?.className).not.toContain("flex-col");
+        expect(
+            container.querySelector('[data-slot="page-side"]')?.className,
+        ).toContain("max-sm:shrink-0");
+    });
+
+    it("keeps every phone the same without it", () => {
+        render(<PageHeader title="Orders" breadcrumb={["Sell", "Orders"]} />);
+        expect(
+            screen.getByRole("navigation", { name: "Breadcrumb" }).className,
+        ).not.toContain("max-sm:hidden");
+        expect(screen.getByRole("heading").className).not.toContain(
+            "max-sm:text-[24px]",
+        );
+    });
+
     it("puts the count beside the title, outside the heading", () => {
         const { container } = render(
             <PageHeader title="Bookings" count="3 bookings" />,

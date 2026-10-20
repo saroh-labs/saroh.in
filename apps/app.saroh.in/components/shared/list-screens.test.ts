@@ -148,6 +148,8 @@ describe("a list draws the one toolbar", () => {
             {
                 "components/commerce/orders/order-search.tsx":
                     "the Orders search field itself; orders-screen draws it in ListToolbar's search slot",
+                "components/invoices/invoice-search.tsx":
+                    "the Invoices search field itself; invoices-screen draws it in ListToolbar's search slot",
                 "components/stores/catalogue/catalogue-toolbar.tsx":
                     "the Products search field itself; catalogue-screen hands it to DataView's toolbarSearch",
                 "components/commerce/product-editor-v2/find-row.tsx":

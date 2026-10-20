@@ -12,8 +12,10 @@ export const CHEQUES_WAITING_HREF = "/billing/invoices?view=cheques";
  * Home's "Cheques not in the bank" (DEC-173, invoices U4): how many
  * cheques were received and wait for the bank, and what they add up to
  * per currency, in minor units. Null while none waits, so the line is
- * shown only then. The caller reads it only for `payment:read`
- * (`WeekScope.cheques`, DEC-098); for anyone else it is null.
+ * shown only then. `HomeService` reads it only for someone who holds
+ * `payment:read` and `invoice:read` (`WeekScope.cheques`, DEC-098), in a
+ * guarded read of its own: a failure is named "Cheques" in Home's
+ * `unavailable`, and the rest of the week still comes.
  *
  * The same read as the Invoices money strip's (`readChequesWaiting`), so
  * Home and the list never disagree. The Home plan (DEC-171) draws it.

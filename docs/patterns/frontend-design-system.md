@@ -427,6 +427,26 @@
     - **A notice about the page sits under its header**, above the
       toolbar, never above the title.
     - **A time never wraps** (see Numbers and dates).
+    - **Figures over a list are filters, said once** (DEC-173, Invoices
+      U8 #1120). A strip of figures above the toolbar (Invoices' Owed,
+      Overdue, Paid this month, Drafts) takes the place of a header
+      summary and a banner saying the same thing: each figure is a button
+      with `aria-pressed`, pressing it sets the list's filter (the one the
+      API named, never one the app builds), pressing it again shows
+      everything, and an on figure has a thicker Ink edge as well as its
+      word. A figure that is also a status sets the same `?tab=` as the
+      status dropdown, so the two never disagree. A role without money
+      sees counts; a strip whose read failed says "Couldn't load totals"
+      with Try again (`FailedRead`) and never a row of ₹0, and the list
+      under it still loads. On a phone the strip sits in a bare `ScrollX`,
+      two in view.
+    - **A list's phone screen may take the compact bar**:
+      `PageHeader compactOnPhone` hides the breadcrumb below `sm`, sets
+      the title at 24px and keeps the primary on the title's line
+      ("New", with the desk's words as its accessible name). Phone rows
+      are cards of 64 to 72px: two lines that never wrap (who, then
+      "0106 · 13 days late"), the figure on the right, and what the desk's
+      other columns say given to a screen reader.
 
     Hand-built before this, and on the shared classes now: Stock (Levels
     and Log), Customers, Invoices, Subscriptions, Team and its

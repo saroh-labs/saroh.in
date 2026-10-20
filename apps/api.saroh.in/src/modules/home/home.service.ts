@@ -12,6 +12,7 @@ import { accountAreaOn } from "../site-accounts/account-area";
 import { ThreadsService } from "../site-accounts/threads.service";
 import { StockChecksService } from "../stock/stock-checks.service";
 import { businessDetailsGap } from "./home-business-details";
+import { readHomeCheques } from "./home-cheques";
 import { overdueFollowUps } from "./home-crm-sources";
 import { noEmailProvider } from "./home-email-setup";
 import { groupNeeds } from "./home-groups";
@@ -596,6 +597,17 @@ export class HomeService {
             today: scope,
             week,
         });
+        // "Cheques not in the bank" (DEC-173, Home U18): read on its own, so
+        // a failure is named "Cheques" ("Couldn't check cheques just now")
+        // and the week's other figures still come. Only for someone who
+        // reads both money and invoices (`weekScope`).
+        const chequesRead = week?.cheques
+            ? guard(
+                  { moduleKey: "PAYMENTS", label: "Cheques" },
+                  () => readHomeCheques(this.db, input.organizationId),
+                  null,
+              )
+            : skip(null);
         const [
             overdue,
             open,
@@ -618,6 +630,7 @@ export class HomeService {
             noEmail,
         ] = await reads;
         const [awaiting, low, moneyIn, going] = await todayFirst;
+        const cheques = await chequesRead;
         const unavailable = slots.flat();
 
         if (overdue.count > 0) {
@@ -792,7 +805,12 @@ export class HomeService {
             ordersInProgress: active.has("COMMERCE") ? open.later : 0,
             today,
             lastDay,
-            week: thisWeek,
+            // The cheques line rides on the week (`week.chequesWaiting`):
+            // null while none waits, when its read failed, and for a
+            // viewer without both reads.
+            week: thisWeek
+                ? { ...thisWeek, chequesWaiting: cheques }
+                : thisWeek,
             tiles,
             ...grouped,
             going,

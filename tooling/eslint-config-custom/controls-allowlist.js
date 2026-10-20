@@ -153,10 +153,14 @@ export const RAW_ALLOWED = {
     // button: an age of "Who owes me?", a row that is one button (U12)
     "components/insights/owed-by-age.tsx": ["button"],
     "components/insights/period-control.tsx": ["button"],
+    // button: "Cheques not in the bank", a line that is one pressed filter (DEC-173)
+    "components/invoices/cheques-line.tsx": ["button"],
     // button: a control styled by its screen's own helper
     "components/invoices/invoice-form.tsx": ["button"],
     // button: a row or card that is one button
     "components/invoices/invoice-row.tsx": ["button"],
+    // button: a figure of the money strip, a card that is one pressed filter (DEC-173)
+    "components/invoices/money-strip.tsx": ["button"],
     // button: a row or card that is one button
     "components/organizations/organization-switcher.tsx": ["button"],
     // button: a row that opens its role

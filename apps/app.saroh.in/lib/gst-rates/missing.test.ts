@@ -13,6 +13,7 @@ import {
     membersChange,
     membersLines,
     missingLine,
+    missingShort,
     rateItemsOf,
     rateKey,
     rowName,
@@ -236,6 +237,28 @@ describe("the notice's line", () => {
         expect(missingLine(missing([PT, SERUM], { more: true }))).toBe(
             "More than 1 service and 1 product have no GST rate. Until you choose one, their tax invoices show no GST.",
         );
+    });
+
+    describe("missingShort (the Invoices list's GST line, DEC-173)", () => {
+        it("says nothing when nothing is missing", () => {
+            expect(missingShort(null)).toBeNull();
+            expect(missingShort(missing([]))).toBeNull();
+            expect(
+                missingShort(missing([PT], { registered: false })),
+            ).toBeNull();
+        });
+
+        it("counts by kind, the verb agreeing", () => {
+            expect(missingShort(missing([PT]))).toBe(
+                "1 service needs a GST rate",
+            );
+            expect(
+                missingShort(missing([PT, SERUM, { ...SERUM, id: "p_2" }])),
+            ).toBe("1 service and 2 products need a GST rate");
+            expect(missingShort(missing([PT], { more: true }))).toBe(
+                "More than 1 service need a GST rate",
+            );
+        });
     });
 });
 

@@ -144,7 +144,12 @@ requireProvider: false })`), the email says "view it and download a copy",
   are no `totals` (DEC-098). Home's `week.chequesWaiting`
   (`home/home-cheques.ts`, `{ count, totals, href }`, href
   `/billing/invoices?view=cheques`) reads the same `readChequesWaiting`,
-  and is null without `payment:read` or while none waits.
+  and is null without `payment:read` and `invoice:read` (the line opens the
+  invoices) or while none waits. `HomeService` reads it in a guarded read
+  of its own beside the week, never inside `readWeek`: a failure is named
+  "Cheques" in `unavailable` (the phone says "Couldn't check cheques just
+  now") and the week's other figures still come (Home U18, invoices U8
+  #1120).
 - **Overdue bills have one definition** (`invoices/overdue-bills.ts`,
   `overdueBillsWhere`): issued, past due, not an order's or a credit note,
   not a live subscription's latest period invoice, not a cancelled

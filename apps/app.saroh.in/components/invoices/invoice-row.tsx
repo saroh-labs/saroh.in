@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@saroh/ui/lib/utils";
+import type { ReactNode } from "react";
 
 import { listTable } from "@/components/shared/list-toolbar";
 
@@ -19,20 +20,46 @@ const money = (amount: string | number, currency: string) =>
     formatMoneyMajor(amount, currency);
 
 /**
- * One row of the Invoices list, after the design: number and when it was
- * issued, who it is billed to and what it was for, its standing, and the
- * total. The whole row opens the quick look. A correction sits indented
- * under the invoice it corrects.
+ * The list's columns at a desk, after INVListAC: who it is billed to (and
+ * what it was for), the invoice's number and day, its standing, the total.
+ * The head and every row share them, so they line up.
  */
-/** The list's columns: number, billed to, status, total. */
 export const INVOICE_GRID =
-    "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-2 md:grid-cols-[minmax(120px,1fr)_minmax(0,2fr)_minmax(0,1.6fr)_96px]";
+    "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-2 md:grid-cols-[minmax(0,2fr)_minmax(120px,1fr)_minmax(0,1.6fr)_96px]";
 
+/**
+ * The number's last part, which is what tells two apart in one series:
+ * "0106" for "RC/26-27/0106". The phone's row says this; the whole number
+ * is on the desk and in the details.
+ */
+export function shortNumber(number: string | null): string {
+    if (!number) return "Draft";
+    const tail = number.split("/").at(-1)?.trim();
+    return tail && tail.length > 0 ? tail : number;
+}
+
+/**
+ * One row of the Invoices list (DEC-173, U8 #1120). The whole row opens
+ * the invoice (`onOpen`): today the quick look, and the details side
+ * sheet once U9 lands, through the screen's one `openInvoice`.
+ *
+ * - **At a desk**, the board's columns: who and what it was for, the
+ *   number and day, the pill and the when line, the total.
+ * - **On a phone**, a card 64 to 72px tall (the audit's 130px rows were
+ *   the cramped phone): who, then "0106 · 13 days late", and the total,
+ *   red while it is late. What it was for is still said to a screen
+ *   reader.
+ *
+ * A correction sits indented under the invoice it corrects. `after` is a
+ * slot beside the row for its own action (U11's Remind), outside the
+ * button so it is a control of its own.
+ */
 export function InvoiceRow({
     invoice: i,
     selected,
     onOpen,
     timeZone,
+    after,
 }: {
     /**
      * The business's zone, which the invoice's dates are written in
@@ -42,27 +69,75 @@ export function InvoiceRow({
     invoice: Invoice;
     selected: boolean;
     onOpen: () => void;
+    after?: ReactNode;
 }) {
     const pill = invoicePill(i);
     const when = whenLine(i);
     const credit = i.kind === "CREDIT_NOTE";
     const nested = credit || i.kind === "SUPPLEMENTARY";
-    return (
+    const who = billedTo(i).name;
+    const total = `${credit ? "−" : ""}${money(i.total, i.currency)}`;
+    const whenWords = (
+        <>
+            {when.before}
+            {when.date ? (
+                <ViewerDate
+                    iso={when.date}
+                    variant="dayMonth"
+                    timeZone={timeZone}
+                />
+            ) : null}
+            {when.after}
+        </>
+    );
+    const button = (
         <button
             type="button"
             aria-haspopup="dialog"
+            data-invoice-row={i.id}
             onClick={onOpen}
             className={cn(
                 "w-full text-left",
                 INVOICE_GRID,
                 listTable.rowInner,
                 listTable.pressable,
+                // The phone's card: 64px at least, two lines that never
+                // wrap, so it stays under 72.
+                "max-md:min-h-16 max-md:px-3 max-md:py-2",
                 selected && listTable.selected,
             )}
         >
-            {/* A correction is indented under its invoice, inside the
-                first column, so every column still lines up. */}
-            <span className={cn("min-w-0", nested && "md:pl-6")}>
+            {/* Who, and what it was for. A correction is indented under
+                its invoice, inside the first column, so every column
+                still lines up. */}
+            <span className={cn("min-w-0", nested && "pl-6")}>
+                <span className="block truncate text-[14.5px] font-semibold text-foreground md:text-[14px]">
+                    {who}
+                </span>
+                <span className="mt-0.5 block truncate text-[12.5px] text-muted-foreground max-md:hidden md:text-[12px]">
+                    {sourceLine(i)}
+                </span>
+                {/* The phone's second line: which one, and how it stands. */}
+                <span
+                    className={cn(
+                        "mt-px block truncate text-[12.5px] md:hidden",
+                        when.late
+                            ? "text-destructive-subtle-foreground"
+                            : "text-muted-foreground",
+                    )}
+                >
+                    {/* The tail for the eye; the whole number for a screen
+                        reader, and for whoever finds the row by it. */}
+                    <span aria-hidden className="font-mono">
+                        {shortNumber(i.number)}
+                    </span>
+                    <span className="sr-only">{i.number ?? "Draft"}</span>
+                    {" · "}
+                    {phoneStanding(i, pill.label, when.late, whenWords)}
+                    <span className="sr-only">, {sourceLine(i)}</span>
+                </span>
+            </span>
+            <span className="min-w-0 max-md:hidden">
                 <span className="block font-mono text-[12.5px] font-medium text-foreground">
                     {i.number ?? "Draft"}
                 </span>
@@ -78,15 +153,7 @@ export function InvoiceRow({
                     )}
                 </span>
             </span>
-            <span className="min-w-0 text-right md:text-left">
-                <span className="block truncate text-[14px] font-semibold text-foreground">
-                    {billedTo(i).name}
-                </span>
-                <span className="mt-0.5 block truncate text-[12px] text-muted-foreground">
-                    {sourceLine(i)}
-                </span>
-            </span>
-            <span className="min-w-0">
+            <span className="min-w-0 max-md:hidden">
                 <StatusBadge tone={pill.variant}>{pill.label}</StatusBadge>
                 <span
                     className={cn(
@@ -96,21 +163,48 @@ export function InvoiceRow({
                             : "text-muted-foreground",
                     )}
                 >
-                    {when.before}
-                    {when.date ? (
-                        <ViewerDate
-                            iso={when.date}
-                            variant="dayMonth"
-                            timeZone={timeZone}
-                        />
-                    ) : null}
-                    {when.after}
+                    {whenWords}
                 </span>
             </span>
-            <span className="text-right font-display text-[14px] font-semibold tabular-nums text-foreground">
-                {credit ? "−" : ""}
-                {money(i.total, i.currency)}
+            <span
+                className={cn(
+                    "whitespace-nowrap text-right font-display text-[14px] font-semibold tabular-nums",
+                    when.late
+                        ? "max-md:text-destructive-subtle-foreground md:text-foreground"
+                        : "text-foreground",
+                )}
+            >
+                {total}
             </span>
         </button>
     );
+    if (!after) return button;
+    return (
+        <div className="flex min-w-0 items-center">
+            <div className="min-w-0 flex-1">{button}</div>
+            <div className="flex shrink-0 items-center gap-1.5 pr-3">
+                {after}
+            </div>
+        </div>
+    );
+}
+
+/**
+ * The phone's standing words: "13 days late" while late, "Due 22 Sep",
+ * "Paid 18 Sep", "Not issued yet" for a draft, or the pill's own word
+ * ("Partly paid", "Void", "Credit note").
+ */
+function phoneStanding(
+    i: Invoice,
+    pill: string,
+    late: boolean,
+    when: ReactNode,
+): ReactNode {
+    if (late) return when;
+    if (i.kind === "CREDIT_NOTE") return pill;
+    // "Draft" is already where the number would be.
+    if (i.standing === "DRAFT") return "Not issued yet";
+    if (i.partlyPaid || i.chequeWaiting) return pill;
+    if (i.standing === "ISSUED" || i.standing === "PAID") return when;
+    return pill;
 }

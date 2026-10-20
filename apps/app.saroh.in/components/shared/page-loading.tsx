@@ -17,7 +17,8 @@ export type PageShape =
     | "dashboard"
     | "answers"
     | "settings"
-    | "home";
+    | "home"
+    | "money-list";
 
 export interface PageLoadingProps {
     shape: PageShape;
@@ -53,6 +54,8 @@ export interface PageLoadingProps {
     bare?: boolean;
     /** The body's own measure, when the page caps it (Settings' rows). */
     bodyClassName?: string;
+    /** The page's header is the compact bar on a phone (`PageHeader`). */
+    compactOnPhone?: boolean;
 }
 
 /**
@@ -78,6 +81,7 @@ export function PageLoading({
     rows,
     bare = false,
     bodyClassName,
+    compactOnPhone = false,
 }: PageLoadingProps) {
     const body = (
         <div
@@ -96,6 +100,7 @@ export function PageLoading({
         <PageContainer width={width}>
             <PageHeader
                 holdsData={false}
+                compactOnPhone={compactOnPhone}
                 breadcrumb={breadcrumb}
                 title={title ?? <TitleBar label={label} />}
                 description={description}
@@ -193,6 +198,36 @@ function ListBody(rows = 6) {
                     </div>
                 ))}
             </div>
+        </div>
+    );
+}
+
+/**
+ * A list under a strip of figures (Invoices, DEC-173): a status line, four
+ * figure cards (two in view on a phone, as the strip scrolls), then the
+ * list's search and rows.
+ */
+function MoneyListBody(rows = 6) {
+    return (
+        <div className="space-y-3.5">
+            <Skeleton className="h-3 w-72 max-w-full" />
+            <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+                {Array.from({ length: 4 }, (_, i) => (
+                    <div
+                        key={i}
+                        className={cn(
+                            CARD,
+                            "space-y-2 px-3.5 py-3",
+                            i > 1 && "max-sm:hidden",
+                        )}
+                    >
+                        <Skeleton className="h-3 w-20" />
+                        <Skeleton className="h-5 w-24" />
+                        <Skeleton className="h-3 w-16" />
+                    </div>
+                ))}
+            </div>
+            {ListBody(rows)}
         </div>
     );
 }
@@ -423,4 +458,5 @@ const BODY: Record<PageShape, (rows?: number) => ReactNode> = {
     answers: AnswersBody,
     settings: SettingsBody,
     home: HomeBody,
+    "money-list": MoneyListBody,
 };

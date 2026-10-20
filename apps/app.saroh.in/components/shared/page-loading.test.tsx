@@ -19,6 +19,7 @@ const SHAPES: PageShape[] = [
     "dashboard",
     "settings",
     "home",
+    "money-list",
 ];
 
 const count = (html: string, needle: string) => html.split(needle).length - 1;

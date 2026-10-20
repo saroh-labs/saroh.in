@@ -3,14 +3,19 @@ import { PaymentsLocked } from "@/components/invoices/payments-locked";
 import { PageContainer } from "@/components/shared/page-container";
 import { readMissingRates } from "@/lib/gst-rates/service";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
+import { listQueryFrom, readsOnServer } from "@/lib/invoices/list-view";
 import {
     listInvoicesIn,
     scopeFromQuery,
     scopeWithName,
 } from "@/lib/invoices/scope";
-import { listInvoices, listInvoicesPaidSince } from "@/lib/invoices/service";
+import {
+    listInvoices,
+    listInvoicesBy,
+    listInvoicesPaidSince,
+    readInvoiceSummary,
+} from "@/lib/invoices/service";
 import { chipFromQuery } from "@/lib/invoices/sources";
-import { tabFromView } from "@/lib/invoices/status";
 import { getInvoiceBusiness } from "@/lib/invoices/tax";
 import { invoiceZone } from "@/lib/invoices/zone";
 import { permits } from "@/lib/organizations/permits";
@@ -21,10 +26,16 @@ import { sinceParam } from "@/lib/views/since";
 export const metadata = { title: "Invoices" };
 
 /**
- * Payments → Invoices. The newest and every unpaid one; the tabs and the
- * source chips filter in the browser, and `?view=` and `?source=` keep
- * them in the address. `?pack=` or `?course=` (Pack and Course Detail)
- * asks the API for that one's invoices instead (D18).
+ * Payments → Invoices (DEC-173, U8 #1120). The newest and every unpaid
+ * one; the status and the source filter in the browser, and `?tab=` and
+ * `?source=` keep them in the address. The API answers what the newest
+ * page can't (`readsOnServer`): a search (`?q=`), the cheques not in the
+ * bank (`?view=cheques`, Home's link) and Paid this month (`?paidFrom=`),
+ * however old the invoice. `?pack=` or `?course=` (Pack and Course
+ * Detail) asks for that one's invoices (D18).
+ *
+ * The money strip is its own read (`GET invoices/summary`): when it
+ * fails, the strip says so and the list still loads.
  *
  * A role without the read gets the design's locked card before anything
  * is read (D18), rather than the generic denial a 403 brings.
@@ -34,16 +45,18 @@ export default async function InvoicesPage({
 }: {
     searchParams: Promise<{
         tab?: string;
-        /** The tab's name before every screen's tabs became `?tab=`. */
+        /** The status's name before `?tab=`, and the strip's `owed`/`cheques`. */
         view?: string;
         since?: string;
         source?: string;
         pack?: string;
         course?: string;
+        q?: string;
+        paidFrom?: string;
     }>;
 }) {
     await requireSession();
-    const [query, organization] = await Promise.all([
+    const [params, organization] = await Promise.all([
         searchParams,
         resolveActiveOrganization(),
     ]);
@@ -52,20 +65,37 @@ export default async function InvoicesPage({
             <PaymentsLocked {...paymentsLockedCopy(organization, "invoices")} />
         );
     }
-    const { tab, view, since } = query;
-    const paidSince = sinceParam({ since });
-    const only = scopeFromQuery(query);
-    const [{ rows: invoices, truncated }, business, paid, scope, missingRates] =
-        await Promise.all([
-            only ? listInvoicesIn(only) : listInvoices(),
-            getInvoiceBusiness(),
-            // Asked of the API (H-7): an old invoice paid today is past the
-            // newest page `listInvoices` reads.
-            paidSince ? listInvoicesPaidSince(paidSince) : null,
-            only ? scopeWithName(only) : null,
-            // What is on sale with no GST rate; null draws no notice.
-            readMissingRates(),
-        ]);
+    const query = listQueryFrom(params);
+    const paidSince = sinceParam({ since: params.since });
+    const only = scopeFromQuery(params);
+    const narrowedRead = readsOnServer(query)
+        ? listInvoicesBy({
+              q: query.q,
+              view: query.cheques ? "cheques" : undefined,
+              paidFrom: query.paidFrom ?? undefined,
+              ...(only?.kind === "pack" ? { packId: only.id } : {}),
+              ...(only?.kind === "course" ? { courseId: only.id } : {}),
+          })
+        : null;
+    const [
+        { rows: invoices, truncated },
+        business,
+        paid,
+        scope,
+        missingRates,
+        summary,
+    ] = await Promise.all([
+        narrowedRead ?? (only ? listInvoicesIn(only) : listInvoices()),
+        getInvoiceBusiness(),
+        // Asked of the API (H-7): an old invoice paid today is past the
+        // newest page `listInvoices` reads.
+        paidSince ? listInvoicesPaidSince(paidSince) : null,
+        only ? scopeWithName(only) : null,
+        // What is on sale with no GST rate; null says nothing of it.
+        readMissingRates(),
+        // The money strip; null when it couldn't be read.
+        readInvoiceSummary(),
+    ]);
     const canWrite = permits(organization, "invoice:write");
 
     return (
@@ -83,8 +113,8 @@ export default async function InvoicesPage({
                           }
                         : null
                 }
-                initialTab={tabFromView(tab ?? view)}
-                initialChip={chipFromQuery(query.source)}
+                query={query}
+                initialChip={chipFromQuery(params.source)}
                 scope={scope}
                 // From Home's "Last 24 hours" (F6): the invoices paid since.
                 paidSince={paidSince}
@@ -92,6 +122,7 @@ export default async function InvoicesPage({
                 // Dates as the paper prints them: the business's zone (#836).
                 timeZone={invoiceZone(business)}
                 missingRates={missingRates}
+                summary={summary}
             />
         </PageContainer>
     );
