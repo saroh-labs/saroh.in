@@ -147,7 +147,7 @@ export function AccountLookBar({
     const bar = BAR[look];
     return (
         <nav
-            aria-label="Your account"
+            aria-label="Account pages"
             data-site-chrome-bar="account"
             data-account-bar={look}
             data-site-rise=""
@@ -265,7 +265,7 @@ export function AccountLookTabs({
     const side = SIDE[look];
     return (
         <nav
-            aria-label="Your account"
+            aria-label="Account pages"
             data-account-tabs={look}
             className={cn(
                 "min-w-0",

@@ -134,7 +134,7 @@ describe("the account's tabs in each look", () => {
                 frame(look);
                 const tabs = tabRow();
                 expect(tabs.tagName).toBe("NAV");
-                expect(tabs).toHaveAttribute("aria-label", "Your account");
+                expect(tabs).toHaveAttribute("aria-label", "Account pages");
                 expect(screen.queryByRole("tablist")).toBeNull();
                 expect(screen.queryByRole("tab")).toBeNull();
                 const links = within(tabs).getAllByRole("link");
@@ -229,7 +229,7 @@ describe("the account's tabs in each look", () => {
             expect(bars).toHaveLength(1);
             const bar = bars[0] as HTMLElement;
             expect(bar.tagName).toBe("NAV");
-            expect(bar).toHaveAttribute("aria-label", "Your account");
+            expect(bar).toHaveAttribute("aria-label", "Account pages");
             expect(bar).toHaveAttribute("data-account-bar", look);
             expect(bar.className).toContain("fixed");
             // A phone's only: a desk has the row (or the column).

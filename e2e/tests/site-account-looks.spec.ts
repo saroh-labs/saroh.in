@@ -73,10 +73,10 @@ function sideways(page: Page): Promise<number> {
 
 /** The account's tabs as this width shows them: one nav, never a tablist. */
 function tabs(page: Page): Locator {
-    // By its own label: the footer's "Your account" column is a nav named
-    // by its heading too, and is no tab.
+    // "Account pages": the footer's "Your account" column is another nav,
+    // and no tab.
     return page
-        .locator('nav[aria-label="Your account"]')
+        .locator('nav[aria-label="Account pages"]')
         .filter({ visible: true });
 }
 

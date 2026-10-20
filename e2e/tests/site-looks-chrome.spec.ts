@@ -299,7 +299,7 @@ test.describe("each look's chrome", { tag: "@serial" }, () => {
                 .getByLabel("Code", { exact: true })
                 .fill(await readSiteCode(email, before));
             await expect(
-                page.locator('nav[aria-label="Your account"]').filter({
+                page.locator('nav[aria-label="Account pages"]').filter({
                     visible: true,
                 }),
             ).toHaveCount(1, { timeout: 15_000 });
