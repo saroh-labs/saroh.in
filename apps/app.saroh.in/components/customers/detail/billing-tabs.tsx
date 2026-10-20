@@ -5,8 +5,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useState } from "react";
 
-import type { InvoiceRef } from "@/components/invoices/invoice-actions";
-import { RecordPaymentDialog } from "@/components/invoices/invoice-actions";
+import { RecordPaymentSheet } from "@/components/invoices/record-payment-sheet";
 import type {
     DetailInvoice,
     DetailSubscription,
@@ -101,7 +100,9 @@ export function InvoicesTab({
      */
     payer?: string | null;
 }) {
-    const [paying, setPaying] = useState<InvoiceRef | null>(null);
+    const [paying, setPaying] = useState<{ id: string; who: string } | null>(
+        null,
+    );
     return (
         <>
             {owed ? (
@@ -165,13 +166,7 @@ export function InvoicesTab({
                                     size="sm"
                                     variant="outline"
                                     onClick={() =>
-                                        setPaying({
-                                            id: v.id,
-                                            number: v.number,
-                                            standing: v.standing,
-                                            who: payer,
-                                            total: r.total,
-                                        })
+                                        setPaying({ id: v.id, who: payer })
                                     }
                                 >
                                     Record payment
@@ -182,7 +177,7 @@ export function InvoicesTab({
                 })}
             </div>
             {paying ? (
-                <RecordPaymentDialog
+                <RecordPaymentSheet
                     open
                     onOpenChange={(o) => {
                         if (!o) setPaying(null);

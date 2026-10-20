@@ -1,9 +1,7 @@
 "use client";
 
-import { DatePicker } from "@saroh/ui/date-picker";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
-import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { FileCheck2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -14,23 +12,15 @@ import { useBusinessDetailsStep } from "@/components/organizations/use-business-
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { FormDialog } from "@/components/shared/form-dialog";
-import { FormSheet } from "@/components/shared/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import {
     creditInvoice,
     deleteInvoice,
     issueInvoice,
-    recordPayment,
     setInvoiceLineRates,
 } from "@/lib/invoices/actions";
 import { sendLabel } from "@/lib/invoices/send";
-import type { InvoiceStanding, PaymentMethod } from "@/lib/invoices/service";
-import { RECORD_PAYMENT } from "@/lib/invoices/words";
-import { PAID_HOW } from "@/lib/orders/paid-how";
-import { OptionSelect } from "@saroh/ui/option-select";
-
-// The ways an order's Record as paid offers too (#834).
-const METHODS = PAID_HOW;
+import type { InvoiceStanding } from "@/lib/invoices/service";
 
 export interface InvoiceRef {
     id: string;
@@ -157,136 +147,6 @@ export function DeleteDraftDialog({
             keepLabel="Keep draft"
             onConfirm={remove}
         />
-    );
-}
-
-/**
- * Record money already taken: at the counter, by UPI, by bank transfer.
- * A side sheet (four fields): how it was paid, a reference, the day, a
- * note. Nothing is charged and nobody is contacted, and the sheet says so.
- */
-export function RecordPaymentDialog({
-    open,
-    onOpenChange,
-    invoice,
-    onDone,
-}: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    invoice: InvoiceRef;
-    /** It was recorded: the details sheet reads it again (U9). */
-    onDone?: () => void;
-}) {
-    const router = useRouter();
-    const ids = { method: useId(), ref: useId(), on: useId(), note: useId() };
-    const [method, setMethod] = useState<PaymentMethod>("UPI");
-    const [reference, setReference] = useState("");
-    const [paidOn, setPaidOn] = useState<Date | undefined>(new Date());
-    const [note, setNote] = useState("");
-    const [busy, setBusy] = useState(false);
-
-    // The dialog stays mounted, so each opening starts fresh: paid today,
-    // not on the day the page was loaded.
-    const [wasOpen, setWasOpen] = useState(open);
-    if (open !== wasOpen) {
-        setWasOpen(open);
-        if (open) {
-            setMethod("UPI");
-            setReference("");
-            setPaidOn(new Date());
-            setNote("");
-        }
-    }
-
-    async function save() {
-        const res = await runAction(
-            () =>
-                recordPayment(invoice.id, {
-                    method,
-                    ...(reference.trim()
-                        ? { reference: reference.trim() }
-                        : {}),
-                    ...(note.trim() ? { note: note.trim() } : {}),
-                    ...(paidOn ? { paidAt: paidOn.toISOString() } : {}),
-                }),
-            { setBusy },
-        );
-        if (!res) return;
-        if (!res.ok) return showError(res.error);
-        showSuccess(`Payment recorded on ${invoice.number ?? "the invoice"}.`);
-        onOpenChange(false);
-        router.refresh();
-        onDone?.();
-    }
-
-    return (
-        <FormSheet
-            open={open}
-            title={RECORD_PAYMENT}
-            description={`${invoice.number ?? "Invoice"} · ${invoice.total} from ${invoice.who}`}
-            pending={busy}
-            saveLabel="Record payment"
-            savingLabel="Recording…"
-            fieldsClassName="gap-4"
-            footNote={
-                <p className="text-[12.5px] leading-[1.55] text-muted-foreground">
-                    This records money you have already taken. Nothing is
-                    charged and nobody is contacted.
-                </p>
-            }
-            onClose={() => onOpenChange(false)}
-            onSubmit={save}
-        >
-            <div className="grid gap-1.5">
-                <Label htmlFor={ids.method}>How it was paid</Label>
-                <OptionSelect
-                    id={ids.method}
-                    value={method}
-                    onValueChange={(v) => setMethod(v)}
-                    options={METHODS}
-                />
-            </div>
-            <div className="grid gap-1.5">
-                <Label htmlFor={ids.ref}>
-                    Reference{" "}
-                    <span className="font-normal text-muted-foreground">
-                        (optional)
-                    </span>
-                </Label>
-                <Input
-                    id={ids.ref}
-                    value={reference}
-                    maxLength={120}
-                    placeholder="A UPI or bank reference"
-                    onChange={(e) => setReference(e.target.value)}
-                />
-            </div>
-            <div className="grid gap-1.5">
-                <Label htmlFor={ids.on}>Paid on</Label>
-                <DatePicker
-                    id={ids.on}
-                    value={paidOn}
-                    onValueChange={setPaidOn}
-                    disabledDays={{ after: new Date() }}
-                    className="w-full"
-                />
-            </div>
-            <div className="grid gap-1.5">
-                <Label htmlFor={ids.note}>
-                    Note{" "}
-                    <span className="font-normal text-muted-foreground">
-                        (optional)
-                    </span>
-                </Label>
-                <Textarea
-                    id={ids.note}
-                    value={note}
-                    maxLength={500}
-                    rows={2}
-                    onChange={(e) => setNote(e.target.value)}
-                />
-            </div>
-        </FormSheet>
     );
 }
 

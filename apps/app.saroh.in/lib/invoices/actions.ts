@@ -16,6 +16,16 @@ function refresh(id?: string) {
     revalidatePath("/billing/subscriptions");
 }
 
+/**
+ * Money on an invoice moved: Home's owed figures and cheques line, and the
+ * customer's page, read it too.
+ */
+function refreshMoney(id: string) {
+    refresh(id);
+    revalidatePath("/");
+    revalidatePath("/contacts", "layout");
+}
+
 export async function createInvoice(input: InvoiceInput) {
     const res = await api.createInvoice(input);
     if (res.ok) refresh();
@@ -106,9 +116,32 @@ export async function writeInvoiceAgain(id: string) {
     return res;
 }
 
+/**
+ * One invoice, for Record payment opened with only its id (the customer's
+ * Invoices tab). A read, so nothing is revalidated; a failure comes back as
+ * a message to show.
+ */
+export async function readInvoice(id: string) {
+    try {
+        const invoice = await api.getInvoice(id);
+        return invoice
+            ? ({ ok: true, data: invoice } as const)
+            : ({
+                  ok: false,
+                  error: "That invoice is not here any more.",
+              } as const);
+    } catch {
+        return {
+            ok: false,
+            error: "That invoice could not be loaded.",
+        } as const;
+    }
+}
+
+/** Record money taken by hand: all that is left, part of it, or a cheque. */
 export async function recordPayment(id: string, input: PaymentInput) {
     const res = await api.recordPayment(id, input);
-    if (res.ok) refresh(id);
+    if (res.ok) refreshMoney(id);
     return res;
 }
 
@@ -119,7 +152,7 @@ export async function removePayment(
     reason?: string,
 ) {
     const res = await api.removePayment(id, paymentId, reason);
-    if (res.ok) refresh(id);
+    if (res.ok) refreshMoney(id);
     return res;
 }
 
@@ -130,7 +163,7 @@ export async function chequeCleared(
     clearedAt?: string,
 ) {
     const res = await api.chequeCleared(id, paymentId, clearedAt);
-    if (res.ok) refresh(id);
+    if (res.ok) refreshMoney(id);
     return res;
 }
 
@@ -141,7 +174,7 @@ export async function chequeBounced(
     input: { bouncedAt?: string; reason?: string } = {},
 ) {
     const res = await api.chequeBounced(id, paymentId, input);
-    if (res.ok) refresh(id);
+    if (res.ok) refreshMoney(id);
     return res;
 }
 

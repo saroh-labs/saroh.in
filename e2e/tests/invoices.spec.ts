@@ -141,9 +141,11 @@ test.describe("invoices", () => {
         // 4. The money arrives, and is recorded.
         await page.getByRole("button", { name: "Record payment" }).click();
         const dialog = page.getByRole("dialog", { name: "Record payment" });
-        await dialog.getByRole("button", { name: "Record payment" }).click();
+        await dialog.getByRole("button", { name: "Record ₹1,350" }).click();
         await expect(
-            page.getByText(`Payment recorded on ${number}`).first(),
+            page
+                .getByText(`₹1,350 recorded on ${number}. Paid in full.`)
+                .first(),
         ).toBeVisible();
         await expect(
             page.getByText("Paid", { exact: true }).first(),

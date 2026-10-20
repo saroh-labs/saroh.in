@@ -190,13 +190,8 @@ test.describe("invoices without Payments (DEC-070)", { tag: "@serial" }, () => {
             const dialog = page.getByRole("dialog", {
                 name: "Record payment",
             });
-            await dialog
-                .getByRole("combobox", { name: "How it was paid" })
-                .click();
-            await page.getByRole("option", { name: "Cash" }).click();
-            await dialog
-                .getByRole("button", { name: "Record payment" })
-                .click();
+            await dialog.getByRole("radio", { name: "Cash" }).click();
+            await dialog.getByRole("button", { name: /^Record ₹/ }).click();
             await expect
                 .poll(
                     async () =>

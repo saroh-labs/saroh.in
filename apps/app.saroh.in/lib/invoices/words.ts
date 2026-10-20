@@ -31,6 +31,8 @@ export const ISSUE_AND_SHARE = "Issue and share";
 export const ISSUE_IT = "Issue it";
 export const SHARE_RECEIPT = "Share receipt";
 export const SHARE_ON_WHATSAPP = "Share on WhatsApp";
+/** With no email provider, the receipt is shared by hand (owner, 20 Oct). */
+export const SHARE_RECEIPT_ON_WHATSAPP = "Share receipt on WhatsApp";
 export const SEND_BY_EMAIL = "Send by email";
 export const MARK_IN_BANK = "Mark as in the bank";
 export const BOUNCED = "Bounced";

@@ -6,12 +6,16 @@ import { Input } from "@saroh/ui/input";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState } from "react";
 
+import { CheckRow } from "@/components/shared/check-row";
 import { FormDialog } from "@/components/shared/form-dialog";
 import { runAction } from "@/lib/api/run-action";
 import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { chequeBounced, chequeCleared } from "@/lib/invoices/actions";
 import type { Invoice, InvoicePayment } from "@/lib/invoices/service";
+import { SHARE_RECEIPT_ON_WHATSAPP } from "@/lib/invoices/words";
+
+import { openWhatsAppShare } from "./whatsapp-share";
 
 /**
  * A waiting cheque's two endings (DEC-173, INVRecordPlus): it is in the
@@ -21,7 +25,8 @@ import type { Invoice, InvoicePayment } from "@/lib/invoices/service";
  * - In the bank: the day it cleared, then the invoice reads plain "Paid",
  *   and its receipt goes then (a cheque's receipt waits for the bank).
  * - Bounced: the API has no way back, so this is the one question, "Keep
- *   the payment" or "Mark as bounced", with an optional why. What it paid
+ *   the payment" or "Mark as bounced", with an optional why and "Tell
+ *   Vivek on WhatsApp after" (click-to-chat, U10 #1122). What it paid
  *   is owed again, and overdue once past its due date. No bounce charge.
  */
 
@@ -66,11 +71,21 @@ export function ChequeClearedDialog({
         if (!res.ok) return showError(res.error);
         onClose();
         onChanged(res.data);
+        if (emailsReceipt) {
+            showSuccess(
+                `${chequeName(p)} is in the bank.`,
+                `The invoice reads Paid. Its receipt goes to ${first} by email.`,
+            );
+            return;
+        }
+        // No email of its own: the receipt is shared by hand (owner, 20 Oct).
         showSuccess(
             `${chequeName(p)} is in the bank.`,
-            emailsReceipt
-                ? `The invoice reads Paid. Its receipt goes to ${first} by email.`
-                : "The invoice reads Paid.",
+            "The invoice reads Paid.",
+            {
+                label: SHARE_RECEIPT_ON_WHATSAPP,
+                onClick: () => void openWhatsAppShare(invoice.id, "RECEIPT"),
+            },
         );
     }
 
@@ -138,11 +153,13 @@ export function ChequeBouncedDialog({
     onChanged: (fresh: Invoice) => void;
 }) {
     const [reason, setReason] = useState("");
+    const [tell, setTell] = useState(false);
     const [busy, setBusy] = useState(false);
     const [was, setWas] = useState(payment?.id ?? null);
     if ((payment?.id ?? null) !== was) {
         setWas(payment?.id ?? null);
         setReason("");
+        setTell(false);
     }
     const p = payment;
     const money = p ? formatMoneyMajor(p.amount, p.currency) : "";
@@ -155,6 +172,9 @@ export function ChequeBouncedDialog({
 
     async function bounce() {
         if (!p) return;
+        // Opened by the press itself, so the browser lets it open; pointed
+        // at WhatsApp once the cheque is marked, closed if it isn't.
+        const tab = tell ? window.open("", "_blank") : null;
         const res = await runAction(
             () =>
                 chequeBounced(invoice.id, p.id, {
@@ -162,11 +182,19 @@ export function ChequeBouncedDialog({
                 }),
             { setBusy },
         );
-        if (!res) return;
-        if (!res.ok) return showError(res.error);
+        if (!res) {
+            tab?.close();
+            return;
+        }
+        if (!res.ok) {
+            tab?.close();
+            showError(res.error);
+            return;
+        }
         onClose();
         onChanged(res.data);
         showSuccess(`${chequeName(p)} bounced.`, `${money} is owed again.`);
+        if (tell) void openWhatsAppShare(invoice.id, "REMINDER", tab);
     }
 
     return (
@@ -195,6 +223,9 @@ export function ChequeBouncedDialog({
                     onChange={(e) => setReason(e.target.value)}
                 />
             </Field>
+            <CheckRow checked={tell} onChange={setTell}>
+                Tell {who.split(" ")[0] || who} on WhatsApp after
+            </CheckRow>
         </FormDialog>
     );
 }

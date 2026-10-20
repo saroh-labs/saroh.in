@@ -8,12 +8,11 @@ import { useState } from "react";
 import type { CancelOrCorrectInvoice } from "@/components/invoices/cancel-or-correct-sheet";
 import { CancelOrCorrectSheet } from "@/components/invoices/cancel-or-correct-sheet";
 import type { InvoiceRef } from "@/components/invoices/invoice-actions";
-import {
-    RecordPaymentDialog,
-    RefundInvoiceDialog,
-} from "@/components/invoices/invoice-actions";
+import { RefundInvoiceDialog } from "@/components/invoices/invoice-actions";
+import { RecordPaymentSheet } from "@/components/invoices/record-payment-sheet";
 import type { ShareMessageKind } from "@/lib/invoices/detail-actions";
 import { shareWithLink } from "@/lib/invoices/link-actions";
+import type { PaymentTarget } from "@/lib/invoices/record-payment";
 
 /*
  * The seams the details view opens other units' flows through (DEC-173,
@@ -39,19 +38,29 @@ export interface Flow<A extends unknown[] = []> {
 }
 
 /**
- * Record payment (U10 #1122 replaces this with its sheet: amounts, part
- * payments, cheques, Undo). Today: the four-field sheet.
+ * Record payment (U10 #1122): the sheet with all of what is left or part
+ * of it, cheques, Undo and the receipt. It gets the invoice's figures
+ * (`paymentTargetOf`) so it opens without a read. A cheque's in the bank
+ * and bounced, and Remove payment, are the details' own dialogs
+ * (`cheque-dialogs.tsx`, `remove-payment-dialog.tsx`).
  */
-export function useRecordPaymentFlow({ invoice, onDone }: FlowProps): Flow {
+export function useRecordPaymentFlow({
+    invoice,
+    target,
+    onDone,
+}: FlowProps & {
+    /** What is left and where the receipt goes; else read on opening. */
+    target?: PaymentTarget;
+}): Flow {
     const [open, setOpen] = useState(false);
     return {
         open: () => setOpen(true),
         overlays: (
-            <RecordPaymentDialog
+            <RecordPaymentSheet
                 open={open}
                 onOpenChange={setOpen}
-                invoice={invoice}
-                onDone={onDone}
+                invoice={target ?? { id: invoice.id, who: invoice.who }}
+                onRecorded={() => onDone()}
             />
         ),
     };

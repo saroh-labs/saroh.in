@@ -179,6 +179,28 @@ has no way back in the API but need not be final is **held**: gone at once,
 written when its ten seconds are up (`useHold`, an invitation cancelled, a
 course session removed). See `frontend-error-feedback.md`.
 
+**Current** — **Money recorded by hand is one sheet, written at once
+with Undo** (DEC-173, U10 #1122). Record payment
+(`components/invoices/record-payment-sheet.tsx`) is the one way an
+invoice's payment is written down, opened from the page, the details
+sheet, the list and the customer's Invoices tab; it takes an invoice
+already read (`PaymentTarget`, `paymentTargetOf`) or an id, and reads the
+rest on opening. The amount starts at what is left; less is a part
+payment and says what stays to pay; more is refused on Record with what
+was typed kept and the way out beside it ("Record ₹8,400"). The button
+names the amount. The write happens at once and `showUndo` removes it;
+the receipt is held by the API past the Undo window (`RECEIPT_HOLD_MS`),
+so the sheet never holds it. It opens through the details' seam
+(`useRecordPaymentFlow` in `components/invoices/details/flows.tsx`). A
+cheque's next steps are `cheque-dialogs.tsx`: in the bank is a
+`FormDialog` (with no email provider its toast offers the receipt on
+WhatsApp), Bounced is the one confirm, since the API can't take it back,
+with "Tell Vivek on WhatsApp after"; Remove payment is the details'
+`remove-payment-dialog.tsx`, whose Undo records it again. WhatsApp is opened on the
+press (`whatsapp-share.ts`), so a tab is never blocked; Saroh sends
+nothing itself. The words and rules are pure, in
+`lib/invoices/record-payment.ts`.
+
 **Current** — **Nobody is sent away from an overlay.** A task finishes in
 the sheet or dialog that opened. Add a lead and Add contact stay on the
 list, and the toast has the way to the new record

@@ -45,6 +45,7 @@ import {
 import { invoiceHref } from "@/lib/invoices/links";
 import { mintedLink } from "@/lib/invoices/minted-links";
 import { downloadInvoicePdf } from "@/lib/invoices/pdf";
+import { paymentTargetOf } from "@/lib/invoices/record-payment";
 import { canSend, paysOnline } from "@/lib/invoices/send";
 import type { InvoicePayment } from "@/lib/invoices/service";
 import { billedTo } from "@/lib/invoices/status";
@@ -130,7 +131,11 @@ export function useDetailsActions({
         onSent: () => setViewUrl(null),
         onDone: onChanged,
     });
-    const record = useRecordPaymentFlow({ invoice: ref, onDone: onChanged });
+    const record = useRecordPaymentFlow({
+        invoice: ref,
+        target: paymentTargetOf(i, who),
+        onDone: onChanged,
+    });
     const share = useShareFlow({ invoice: ref, onDone: onChanged });
     const cancel = useCancelFlow({
         invoice: ref,
