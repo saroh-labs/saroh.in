@@ -264,11 +264,49 @@ describe("the Product grid's fields (G12)", () => {
 
     it("never offers a product's name, price or photo as a field", () => {
         render({});
-        // The title, and the button's words (G16): never a product's own.
-        expect(host.querySelectorAll("input")).toHaveLength(2);
+        // The title, the button's words (G16) and the owner's own cut-off
+        // line (U11): never a product's own.
+        expect(host.querySelectorAll("input")).toHaveLength(3);
         expect(host.textContent).toContain(
             "Each card uses that product's own photo",
         );
+    });
+});
+
+describe("the owner's cut-off line (DEC-172, U11)", () => {
+    const field = () => {
+        const input = host.querySelector<HTMLInputElement>(
+            'input[placeholder="Order by 9 pm"]',
+        );
+        if (!input) throw new Error("No cut-off field");
+        return input;
+    };
+    const type = (input: HTMLInputElement, value: string) => {
+        const descriptor = Object.getOwnPropertyDescriptor(
+            HTMLInputElement.prototype,
+            "value",
+        );
+        act(() => {
+            descriptor?.set?.call(input, value);
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+    };
+
+    it("is optional, the owner's words, and says Saroh doesn't check it", () => {
+        render({ cutOff: "Order by 9 pm" });
+        expect(field().value).toBe("Order by 9 pm");
+        expect(field().maxLength).toBe(80);
+        expect(host.textContent).toContain(
+            "Saroh doesn't check orders against it.",
+        );
+    });
+
+    it("saves what they write, and nothing when they clear it", () => {
+        const onChange = render({ cutOff: "Order by 9 pm" });
+        type(field(), "Order by 6 pm");
+        expect(lastContent(onChange).cutOff).toBe("Order by 6 pm");
+        type(field(), "");
+        expect(lastContent(onChange).cutOff).toBeUndefined();
     });
 });
 

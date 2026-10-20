@@ -321,6 +321,9 @@ export default async function SiteLayout({
                     savedAddress: savedDeliveryAddress,
                 }}
                 apiUrl={publicApiUrl()}
+                // A look's bag holds the lines only and leads to the
+                // checkout page (DEC-172, U11); absent, Classic's bag.
+                look={lookOf(snapshot.site.look)}
                 account={{
                     customer,
                     options: signInOptions ?? {

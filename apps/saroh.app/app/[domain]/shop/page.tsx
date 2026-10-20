@@ -3,16 +3,19 @@ import { notFound } from "next/navigation";
 
 import {
     lookOf,
+    LookShopListing,
     modulePageTopOf,
     ModulePageUnavailable,
     NotTakingOrders,
     reachOf,
+    shopFactsLine,
     shopLeadLine,
     ShopListing,
     ShopUnavailable,
 } from "@saroh/site-blocks";
 
 import { PublishedPage } from "@/components/published-page";
+import { publicApiUrl } from "@/lib/api-url";
 import { getCatalogue } from "@/lib/catalogue";
 import {
     findModulePage,
@@ -26,6 +29,8 @@ import { dontCachePage, listsProducts } from "@/lib/page-cache/site-rules";
 import type { PublicationSnapshot } from "@/lib/publication";
 import { findPageByPath, getSiteForHost, postsPrefix } from "@/lib/publication";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
+import { enquiryPagePath } from "@/lib/shop-checkout-shape";
+import { shopCutOff } from "@/lib/shop-cut-off";
 import { getSiteContact } from "@/lib/site-contact";
 import { canonical, shopDescription } from "@/lib/site-meta";
 import { shareable } from "@/lib/test-metadata";
@@ -207,6 +212,34 @@ export default async function ShopPage({
     // Each card's Add to bag (the design's shop), only where the site takes
     // online orders now; otherwise the cards open the product, whose page
     // offers "Ask about ordering".
+    const reach =
+        lookup.data.products.length === 0
+            ? reachOf(await getSiteContact(siteId))
+            : null;
+    // Folio, Quiet or Live (DEC-172, U11): the look's shop, with the
+    // owner's own cut-off line and what an order costs to receive, said
+    // once. Absent: Classic's shop, exactly as before.
+    const look = lookOf(snapshot.site.look);
+    if (look) {
+        return (
+            <main className="w-full">
+                {checkout?.notTakingOrders ? <NotTakingOrders banner /> : null}
+                <LookShopListing
+                    look={look}
+                    title={moduleLabel(snapshot.pages, "SHOP", "Shop")}
+                    products={lookup.data.products}
+                    bagSite={checkout?.canOrder ? siteId : null}
+                    lead={shopLeadLine(checkout)}
+                    facts={checkout?.canOrder ? shopFactsLine(checkout) : null}
+                    cutOff={checkout?.canOrder ? shopCutOff(snapshot) : null}
+                    askHref={enquiryPagePath(snapshot)}
+                    apiUrl={publicApiUrl()}
+                    business={snapshot.site.name}
+                    reach={reach}
+                />
+            </main>
+        );
+    }
     return (
         <main className="w-full">
             {checkout?.notTakingOrders ? <NotTakingOrders banner /> : null}
@@ -218,11 +251,7 @@ export default async function ShopPage({
                 lead={shopLeadLine(checkout)}
                 business={snapshot.site.name}
                 // The ways to reach the business, where nothing is on sale.
-                reach={
-                    lookup.data.products.length === 0
-                        ? reachOf(await getSiteContact(siteId))
-                        : null
-                }
+                reach={reach}
             />
         </main>
     );

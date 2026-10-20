@@ -310,6 +310,8 @@ export interface ProductGridContent {
     showAvailability?: boolean;
     /** A line under the products. */
     note?: string;
+    /** The owner's own cut-off line, "Order by 9 pm" (DEC-172, U11). */
+    cutOff?: string;
     /** `bare`: the even grid without a card. Absent: the card. */
     cardStyle?: "card" | "bare";
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import type { LookId } from "@saroh/block-contract";
 import { useCallback, useEffect, useState } from "react";
 
 import type {
@@ -33,6 +34,7 @@ import {
     STANDING_POLL_MS,
     STANDING_POLL_TRIES,
 } from "./checkout-sheet";
+import { LookBagSheet } from "./look-bag";
 import { readPendingCheckout, writePendingCheckout } from "./pending-checkout";
 
 /**
@@ -91,6 +93,15 @@ export interface ShopBagProps {
      * order is placed without waiting for the webhook.
      */
     apiUrl?: string;
+    /**
+     * Folio, Quiet or Live (DEC-172, U11): the bag is a look's drawer that
+     * holds the lines only, and its Check out leads to the checkout page,
+     * where pick-up or delivery is asked once. Absent: Classic's bag, which
+     * asks it here and pays from the sheet, exactly as before.
+     */
+    look?: LookId;
+    /** Where a look's Check out leads. */
+    checkoutHref?: string;
 }
 
 export function ShopBag({
@@ -101,6 +112,8 @@ export function ShopBag({
     account,
     openCheckout,
     apiUrl,
+    look,
+    checkoutHref = "/checkout",
 }: ShopBagProps) {
     const items = useBag(site);
     const count = bagCount(items);
@@ -135,7 +148,16 @@ export function ShopBag({
         message: string;
     } | null>(null);
 
-    useEffect(() => onOpenBag(() => setStep({ kind: "bag" })), []);
+    useEffect(
+        () =>
+            onOpenBag(() => {
+                // A look's checkout page keeps the way and the address in
+                // the visit's draft: the bag opens on what it holds now.
+                if (look) setDraft(readBagDraft(site));
+                setStep({ kind: "bag" });
+            }),
+        [look, site],
+    );
     // Whoever said "added to your bag" takes it down once the bag is open.
     const open = step.kind !== "closed";
     useEffect(() => {
@@ -264,7 +286,10 @@ export function ShopBag({
             {count > 0 ? (
                 <button
                     type="button"
-                    onClick={() => setStep({ kind: "bag" })}
+                    onClick={() => {
+                        if (look) setDraft(readBagDraft(site));
+                        setStep({ kind: "bag" });
+                    }}
                     aria-label={`Your bag, ${count} ${count === 1 ? "item" : "items"}`}
                     className={cn(
                         "border-site-border bg-site-surface text-site-fg relative flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full border transition-transform duration-100 hover:opacity-90 active:scale-95",
@@ -295,7 +320,18 @@ export function ShopBag({
                 </button>
             ) : null}
 
-            {step.kind === "bag" ? (
+            {step.kind === "bag" && look ? (
+                <LookBagSheet
+                    look={look}
+                    site={site}
+                    items={items}
+                    api={api}
+                    draft={draft}
+                    onDraft={setDraft}
+                    checkoutHref={checkoutHref}
+                    onClose={close}
+                />
+            ) : step.kind === "bag" ? (
                 <BagSheet
                     site={site}
                     businessName={businessName}

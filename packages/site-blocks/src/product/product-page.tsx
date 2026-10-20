@@ -1,5 +1,6 @@
 "use client";
 
+import type { LookId } from "@saroh/block-contract";
 import type { ReactNode } from "react";
 import { createContext, useContext, useState } from "react";
 
@@ -228,6 +229,13 @@ export interface ProductSelection {
     left?: number | null;
 }
 
+/** A look's product name, in its display face (VA13, VD13, VB13). */
+const LOOK_NAME: Record<LookId, string> = {
+    folio: "font-light text-[calc(clamp(2.25rem,6vw,4.5rem)*var(--site-heading-scale,1))] leading-[1.02] tracking-[-0.03em]",
+    quiet: "font-normal text-[calc(clamp(2rem,5vw,3.5rem)*var(--site-heading-scale,1))]",
+    live: "font-extrabold text-[calc(clamp(2rem,5vw,3.25rem)*var(--site-heading-scale,1))] tracking-[-0.035em]",
+};
+
 const SelectionContext = createContext<ProductSelection | null>(null);
 
 /**
@@ -347,6 +355,7 @@ export default function ProductPage({
     action,
     facts = null,
     back = null,
+    look,
 }: {
     product: ProductPageData;
     /** Staff notes' numbered badges: the workspace preview only. */
@@ -368,6 +377,12 @@ export default function ProductPage({
      * page's own name). Null, and in the preview, draws none.
      */
     back?: { href: string; label: string } | null;
+    /**
+     * Folio, Quiet or Live (DEC-172, U11): the name in the look's display
+     * face, the photo in the look's photo corner and the options as a real
+     * radio group. Absent: Classic, exactly as before.
+     */
+    look?: LookId;
 }) {
     // The live page never draws staff notes, whatever it is handed.
     const markers = preview && markersAsked;
@@ -449,13 +464,20 @@ export default function ProductPage({
                 </p>
             ) : null}
             <h1
-                className={cn(
-                    "font-site-heading text-site-fg mt-1.5 font-semibold leading-[1.08] tracking-[-0.025em] [overflow-wrap:anywhere] [text-wrap:balance]",
-                    // With no photo the name is the page's picture.
-                    hasPhotos
-                        ? "text-[calc(clamp(1.625rem,4.2vw,2.25rem)*var(--site-heading-scale,1))]"
-                        : "text-[calc(clamp(1.875rem,5.4vw,2.875rem)*var(--site-heading-scale,1))]",
-                )}
+                className={
+                    look
+                        ? cn(
+                              "font-site-heading text-site-fg mt-1.5 leading-[1.08] [overflow-wrap:anywhere] [text-wrap:balance]",
+                              LOOK_NAME[look],
+                          )
+                        : cn(
+                              "font-site-heading text-site-fg mt-1.5 font-semibold leading-[1.08] tracking-[-0.025em] [overflow-wrap:anywhere] [text-wrap:balance]",
+                              // With no photo the name is the page's picture.
+                              hasPhotos
+                                  ? "text-[calc(clamp(1.625rem,4.2vw,2.25rem)*var(--site-heading-scale,1))]"
+                                  : "text-[calc(clamp(1.875rem,5.4vw,2.875rem)*var(--site-heading-scale,1))]",
+                          )
+                }
             >
                 {product.name}
             </h1>
@@ -570,13 +592,26 @@ export default function ProductPage({
                             ) : null}
                         </span>
                     </legend>
-                    <div className="mt-2.5 flex flex-wrap gap-2">
+                    <div
+                        className="mt-2.5 flex flex-wrap gap-2"
+                        {...(look
+                            ? {
+                                  role: "radiogroup",
+                                  "aria-label": product.optionName ?? "Choose",
+                              }
+                            : {})}
+                    >
                         {product.variants.map((v) => (
                             <button
                                 key={v.id}
                                 type="button"
                                 onClick={() => pick(v)}
-                                aria-pressed={v.id === variantId}
+                                {...(look
+                                    ? {
+                                          role: "radio",
+                                          "aria-checked": v.id === variantId,
+                                      }
+                                    : { "aria-pressed": v.id === variantId })}
                                 className={cn(
                                     "min-h-11 min-w-11 max-w-full cursor-pointer rounded-[calc(var(--site-radius,2px)+6px)] border px-3.5 py-1.5 text-sm font-medium transition-[color,background-color,border-color,transform] duration-100 ease-out [overflow-wrap:anywhere] active:scale-[0.97]",
                                     focusRing,
@@ -799,7 +834,13 @@ export default function ProductPage({
                     second column. */}
                 {hasPhotos ? (
                     <div className="min-w-0">
-                        <div className="border-site-border bg-site-surface relative overflow-hidden rounded-[calc(var(--site-radius,2px)+8px)] border">
+                        <div
+                            className={
+                                look
+                                    ? "bg-site-surface rounded-site-photo relative overflow-hidden"
+                                    : "border-site-border bg-site-surface relative overflow-hidden rounded-[calc(var(--site-radius,2px)+8px)] border"
+                            }
+                        >
                             {shown?.kind === "video" ? (
                                 <ProductVideo
                                     key={shown.id}

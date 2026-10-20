@@ -374,6 +374,8 @@ const renderedProductGrid = z.object({
     buttonLabel: z.string().optional(),
     showAvailability: z.boolean().optional(),
     note: z.string().optional(),
+    // The owner's own cut-off line (DEC-172, U11); absent, none.
+    cutOff: z.string().optional(),
     // A card style this build does not know draws as the card.
     cardStyle: z.string().optional(),
     // A count this build does not draw falls back to filling the row.

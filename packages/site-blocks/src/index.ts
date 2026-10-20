@@ -222,6 +222,9 @@ export type { ShopListingCard } from "./product/shop-listing";
 // ordering" in the product page's action slot, and the header's bag with
 // its sheets. The site's server actions arrive as a `ShopCheckoutApi`.
 export { AddToBag } from "./shop/add-to-bag";
+// The shop under a look (DEC-172, U11, #1102). Classic keeps the above.
+export { pickupReadyWords } from "./lib/shop-facts";
+export { LookShopListing } from "./product/shop-listing-look";
 export { SHOP_OFFLINE } from "./shop/api";
 export type {
     CheckoutQuote,
@@ -242,6 +245,9 @@ export type {
 } from "./shop/api";
 export { AskAboutOrdering, askAboutHref } from "./shop/ask-about-ordering";
 export { ShopBag } from "./shop/bag";
+export { LookAddToBag } from "./shop/look-add-to-bag";
+export { LookCheckout } from "./shop/look-checkout";
+export { LookOrderPlaced } from "./shop/look-placed";
 export {
     NOT_TAKING_ORDERS_TEXT,
     NotTakingOrders,

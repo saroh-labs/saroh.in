@@ -159,3 +159,61 @@ export async function setNorthwindLook(
         },
     };
 }
+
+/**
+ * Turn one rollout flag on for Northwind alone, as Sam does in admin →
+ * Flags (a per-business override), and give back how to put it as it was.
+ * The shop's per-look spec turns `SITE_SHOP` on with it (plan U11), rather
+ * than skipping where the stack wasn't prepared like `site-shop.spec.ts`.
+ */
+export async function overrideNorthwindFlag(
+    browser: Browser,
+    flagName: string,
+    testInfo: TestInfo,
+): Promise<{ restore: () => Promise<void> }> {
+    const key = (what: string) => `flag-${flagName}-${what}-${stamp(testInfo)}`;
+    const reason = `Browser test: ${flagName} on Northwind`;
+    const context = await browser.newContext({
+        baseURL: urls.APP_URL,
+        ignoreHTTPSErrors,
+    });
+    const page = await context.newPage();
+    await useSession(page, "staff");
+    const admin = page.request;
+    const headers = { origin: urls.APP_URL };
+    const flagUrl = `${urls.API_URL}/admin/flags/${flagName}`;
+    const overrideUrl = `${flagUrl}/organizations/${NORTHWIND_ORG}`;
+
+    const explained = await admin.get(
+        `${flagUrl}/explain?organizationId=${NORTHWIND_ORG}`,
+        { headers },
+    );
+    expect(explained.ok(), await explained.text()).toBe(true);
+    const before = (await explained.json()) as FlagExplanation;
+    const on = await admin.put(overrideUrl, {
+        headers,
+        data: { enabled: true, reason, idempotencyKey: key("on") },
+    });
+    expect(on.ok(), await on.text()).toBe(true);
+
+    return {
+        restore: async () => {
+            const back =
+                before.source === "OVERRIDE"
+                    ? await admin.put(overrideUrl, {
+                          headers,
+                          data: {
+                              enabled: before.value,
+                              reason,
+                              idempotencyKey: key("back"),
+                          },
+                      })
+                    : await admin.delete(overrideUrl, {
+                          headers,
+                          data: { reason, idempotencyKey: key("clear") },
+                      });
+            expect(back.ok(), await back.text()).toBe(true);
+            await context.close();
+        },
+    };
+}

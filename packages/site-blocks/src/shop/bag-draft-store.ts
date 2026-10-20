@@ -112,6 +112,23 @@ export function readBagDraft(site: string): BagDraft {
 
 /** Keep the draft for the visit; an empty one clears what was kept. */
 export function writeBagDraft(site: string, draft: BagDraft): void {
+    writeStored(site, draft);
+    // A look's checkout page and the header's bag both hold the draft: each
+    // hears the other's change (`onBagDraft`).
+    draftListeners.forEach((heard) => heard(site));
+}
+
+const draftListeners = new Set<(site: string) => void>();
+
+/** Hear the visit's draft change for a site; returns how to stop. */
+export function onBagDraft(heard: (site: string) => void): () => void {
+    draftListeners.add(heard);
+    return () => {
+        draftListeners.delete(heard);
+    };
+}
+
+function writeStored(site: string, draft: BagDraft): void {
     try {
         // The note stays in the page's memory: "no nuts", "after my
         // surgery" may say something about someone's health, and nothing
