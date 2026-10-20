@@ -1,12 +1,14 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
 import Link from "next/link";
 import type { RefObject } from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 
+import { formatNumber } from "@/lib/format/money";
 import {
     replyLabel,
     replyMax,
@@ -16,7 +18,7 @@ import {
 import type { HomeInline, HomeNeed, HomeRowLink } from "@/lib/home/service";
 
 import { ShareLink } from "@saroh/ui/copy-button";
-import type { DoneRow, InlineActions } from "./use-inline-actions";
+import type { DoneRow, InlineActions, InlineWhich } from "./use-inline-actions";
 
 /**
  * A Needs-you row's inline action, as the Home design draws it (round 2,
@@ -49,21 +51,26 @@ export function InlineLink({ link }: { link: HomeRowLink }) {
     );
 }
 
-/** The row's button: the design's quiet 34px outline. */
+/**
+ * The row's button: the design's quiet 34px outline; `quiet` is the
+ * borderless one beside it (A7's Turn down beside Send payment link).
+ */
 export function InlineButton({
     inline,
     busy,
     onOpen,
     buttonRef,
+    quiet = false,
 }: {
     inline: HomeInline;
     busy: boolean;
     onOpen: () => void;
     buttonRef: RefObject<HTMLButtonElement | null>;
+    quiet?: boolean;
 }) {
     return (
         <Button
-            variant="outline"
+            variant={quiet ? "ghost" : "outline"}
             size="sm"
             ref={buttonRef}
             type="button"
@@ -77,11 +84,16 @@ export function InlineButton({
     );
 }
 
-/** What the row says once done, with Undo or the new link beside it. */
+/**
+ * What the row says once done, with Undo or the new link beside it:
+ * "Marked sent 2:14 pm · Undo" (`HAInlineD`).
+ */
 export function InlineDone({ row }: { row: DoneRow }) {
     return (
         <span className="flex flex-wrap items-center gap-2.5 text-[12.5px] font-semibold text-success-subtle-foreground">
-            <span role="status">{row.text}</span>
+            <span role="status">
+                {row.at ? `${row.text} ${row.at}` : row.text}
+            </span>
             {row.undo ? (
                 <Button
                     variant="link"
@@ -120,17 +132,23 @@ export function InlineConfirm({
     inline,
     actions,
     onClose,
+    which = "inline",
 }: {
     need: HomeNeed;
     inline: HomeInline;
     actions: InlineActions;
     onClose: () => void;
+    /** The row's own action, or the quiet one beside it. */
+    which?: InlineWhich;
 }) {
     const yesRef = useRef<HTMLButtonElement>(null);
     const boxRef = useRef<HTMLTextAreaElement>(null);
+    const boxId = useId();
+    const countId = useId();
     const isReply = writesReply(inline);
     const draft = actions.drafts[need.id] ?? "";
-    const off = isReply && !replyReady(draft, replyMax(inline));
+    const max = replyMax(inline);
+    const off = isReply && !replyReady(draft, max);
 
     useEffect(() => {
         (isReply ? boxRef.current : yesRef.current)?.focus();
@@ -151,19 +169,37 @@ export function InlineConfirm({
             }}
         >
             {isReply ? (
-                <div className="mt-2.5 grid gap-2">
+                <div className="mt-2.5 grid gap-1.5">
+                    {/* Named as the design names it, "Reply to Rohan"; a
+                        screen reader hears what the reply is to. */}
+                    <Label
+                        htmlFor={boxId}
+                        data-ph-mask=""
+                        className="text-[13px] font-semibold text-foreground"
+                    >
+                        {inline.person
+                            ? `Reply to ${inline.person}`
+                            : replyLabel(need)}
+                    </Label>
                     <Textarea
+                        id={boxId}
                         ref={boxRef}
-                        rows={2}
+                        rows={3}
                         value={draft}
-                        maxLength={replyMax(inline)}
+                        maxLength={max}
                         onChange={(e) =>
                             actions.setDraft(need.id, e.target.value)
                         }
-                        aria-label={replyLabel(need)}
+                        aria-describedby={countId}
                         placeholder="Write your reply"
                         className="w-full resize-y"
                     />
+                    <p
+                        id={countId}
+                        className="text-right text-xs tabular-nums text-muted-foreground"
+                    >
+                        {formatNumber(draft.length)} of {formatNumber(max)}
+                    </p>
                 </div>
             ) : null}
             <div
@@ -178,7 +214,7 @@ export function InlineConfirm({
                     size="sm"
                     ref={yesRef}
                     type="button"
-                    onClick={() => actions.confirm(need)}
+                    onClick={() => actions.confirm(need, which)}
                     disabled={off}
                 >
                     {inline.yes}

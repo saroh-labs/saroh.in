@@ -347,6 +347,63 @@ describe("the answer", () => {
         expect(emails[0]!.mail.body).toMatch(/No reason was given\.$/);
     });
 
+    it.each([
+        [
+            "its person's rules changed directly",
+            () => rules.update(owner, arjun, { latestBookingMinutes: 60 }),
+            "15 min between bookings. Your booking rules were changed directly, so nothing in it was applied.",
+        ],
+        [
+            "approval switched off",
+            () =>
+                staff.updateBookingRules(owner, {
+                    memberRuleChangesNeedApproval: false,
+                }),
+            "15 min between bookings. Changes to your own rules no longer need approval, so nothing in it was applied. You can change them yourself now.",
+        ],
+    ] as const)(
+        "replaced by a newer change (%s), tells the Member in the app and by email",
+        async (_, newer, body) => {
+            const requestId = await ask();
+            await newer();
+
+            const answer = await prisma.notification.findFirstOrThrow({
+                where: { organizationId: orgId, type: "hours.rule-answer" },
+            });
+            expect(answer).toMatchObject({
+                userId: arjunCtx.userId,
+                staffId: arjun,
+                title: "Your booking rules change was replaced by a newer change",
+                body,
+            });
+            const jobs = await alertJobs();
+            expect(jobs[1]!.payload).toMatchObject({
+                requestId,
+                step: "answered",
+                notificationId: answer.id,
+            });
+            // The request's own job, run late, asks nothing any more.
+            expect(await run(jobs[0]!)).toEqual([]);
+            const emails = await run(jobs[1]!);
+            expect(emails.map((e) => e.to)).toEqual([email.Arjun]);
+            expect(emails[0]!.mail).toMatchObject({
+                subject:
+                    "Kaya Physio: Your booking rules change was replaced by a newer change",
+                body: "You asked for: 15 min between bookings. A newer change closed it before anyone decided, so nothing in it was applied. See your booking rules as they are now, and change them again if you still need to.",
+                cta: "Open your hours and time off",
+            });
+            // Arjun's own alerts hold it (`notification:read-own`); the
+            // owner's inbox doesn't.
+            expect((await inbox.list(arjunCtx)).map((n) => n.id)).toContain(
+                answer.id,
+            );
+            expect((await inbox.list(owner)).map((n) => n.id)).not.toContain(
+                answer.id,
+            );
+            expect(await run(jobs[1]!)).toEqual([]);
+        },
+    );
+
     it("withdrawn, tells nobody", async () => {
         const requestId = await ask();
         await rules.withdraw(arjunCtx, requestId);

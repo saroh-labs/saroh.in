@@ -5,6 +5,8 @@ import { recordOrderPaidInTx } from "../analytics/order-events";
 import { suggestFromBookingNoteInTx } from "../customer-workspace/attention-suggest";
 import { rateToBps } from "../invoices/gst";
 import type { GstPriceMode } from "../invoices/gst-price";
+import type { OnlinePayment } from "../invoices/invoice-ledger";
+import { payIssuedDraftOnlineInTx } from "../invoices/invoice-ledger";
 import { buildManualInvoice } from "../invoices/order-invoice";
 import {
     documentColumns,
@@ -367,7 +369,10 @@ async function placeStillFree(
 /**
  * Money arrived for a hold's draft invoice (the webhook, under the invoice's
  * row lock). The booking is confirmed — paid online — and the invoice takes
- * its number and is written PAID, its number and date those of the payment.
+ * its number and is issued, its number and date those of the payment, then
+ * paid through its ledger (`payIssuedDraftOnlineInTx`, DEC-173): one ONLINE
+ * payment for the intent. A treatment's hold invoice names its order, which
+ * is its ledger (ADR-008), and is stamped paid there instead.
  *
  * A payment after the hold ran out still confirms it when the place is free;
  * when someone else has it now, the hold is released and the caller records
@@ -379,11 +384,7 @@ export async function confirmHoldInTx(
         invoiceId: string;
         organizationId: string;
         now: Date;
-        payment: {
-            paymentMethod: string;
-            paymentReference: string | null;
-            paymentNote: string;
-        };
+        payment: OnlinePayment;
     },
 ): Promise<"confirmed" | "released"> {
     const { now } = input;
@@ -466,15 +467,14 @@ export async function confirmHoldInTx(
     );
     await tx.invoice.update({
         where: { id: invoice.id },
-        data: {
-            status: "PAID",
-            number,
-            issuedAt: now,
-            dueAt: now,
-            paidAt: now,
-            ...input.payment,
-        },
+        data: { status: "ISSUED", number, issuedAt: now, dueAt: now },
     });
+    await payIssuedDraftOnlineInTx(
+        tx,
+        input.organizationId,
+        invoice.id,
+        input.payment,
+    );
     // A treatment paid in full at booking (E9): its order is paid. A
     // deposit leaves the rest due on the order.
     if (invoice.orderId) {

@@ -179,7 +179,7 @@ test.describe("the person page", () => {
 
         await page.goto(`/contacts/${who.id}?tab=inv`);
         await page.getByRole("button", { name: "Record payment" }).click();
-        const dialog = page.getByRole("dialog", { name: "Record a payment" });
+        const dialog = page.getByRole("dialog", { name: "Record payment" });
         await expect(dialog).toContainText(who.name);
         await dialog.getByRole("combobox", { name: "How it was paid" }).click();
         await page.getByRole("option", { name: "Cash" }).click();

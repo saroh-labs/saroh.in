@@ -2,6 +2,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { pressUntil } from "../fixtures/press";
 import { useSession } from "../fixtures/sessions";
 
 /**
@@ -26,12 +27,23 @@ async function signIn(page: Page, org = PULSE) {
     await page.goto(`/open/${org}`);
 }
 
+/**
+ * Nothing wider than the width set: polled, as a slow runner can measure
+ * before the month has drawn, and against the viewport, since a phone's
+ * `innerWidth` grows to fit what overflows (saroh-browser-tests).
+ */
 async function noSideways(page: Page) {
-    const doc = await page.evaluate(() => ({
-        vw: window.innerWidth,
-        sw: document.documentElement.scrollWidth,
-    }));
-    expect(doc.sw).toBeLessThanOrEqual(doc.vw);
+    const width = page.viewportSize()?.width ?? 0;
+    await expect
+        .poll(() =>
+            page.evaluate(() =>
+                Math.max(
+                    window.innerWidth,
+                    document.documentElement.scrollWidth,
+                ),
+            ),
+        )
+        .toBeLessThanOrEqual(width);
 }
 
 test.describe("calendar month on the desk", () => {
@@ -47,8 +59,8 @@ test.describe("calendar month on the desk", () => {
         const filter = page.getByRole("button", { name: /^What to show/ });
         await expect(filter).toBeVisible();
         await expect(filter).toHaveText(/^Everyone · /);
-        await filter.click();
         const box = page.getByRole("dialog", { name: "What to show" });
+        await pressUntil(filter, box);
         await expect(box.getByText("On the calendar")).toBeVisible();
         await expect(
             box.getByRole("radiogroup", { name: "Whose" }),
@@ -94,9 +106,8 @@ test.describe("calendar month on a phone", () => {
         await page.goto("/calendar");
         await expect(page.locator("#calendar-day")).toBeHidden();
         const day = page.locator(`#calendar-grid [data-day="${today()}"]`);
-        await day.click();
         const sheet = page.getByRole("dialog");
-        await expect(sheet).toBeVisible();
+        await pressUntil(day, sheet);
         await expect(sheet.getByText(/ · today$/)).toBeVisible();
         await page.keyboard.press("Escape");
         await expect(sheet).toHaveCount(0);
@@ -107,8 +118,11 @@ test.describe("calendar month on a phone", () => {
         page,
     }) => {
         await page.goto("/calendar");
-        await page.getByRole("button", { name: /^What to show/ }).click();
         const box = page.getByRole("dialog", { name: "What to show" });
+        await pressUntil(
+            page.getByRole("button", { name: /^What to show/ }),
+            box,
+        );
         await expect(box.getByRole("switch").first()).toBeVisible();
         await page.keyboard.press("Escape");
         await expect(box).toHaveCount(0);

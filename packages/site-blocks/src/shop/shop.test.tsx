@@ -1727,112 +1727,132 @@ describe("the bag's delivery fields on a phone", () => {
     });
 });
 
-describe("the bag through a reload (the email code is read in another app)", () => {
-    const BOTH = quoteOf({
-        ways: [
-            { type: "PICKUP", label: "Pick-up", fee: null },
-            { type: "LOCAL_DELIVERY", label: "Local delivery", fee: "60.00" },
-        ],
-        fulfilment: "LOCAL_DELIVERY",
-        discount: { code: "SAVE10", applied: true, amount: "50.00" },
-    });
-    const TYPED = [
-        ["Name", "Kavya Iyer"],
-        ["Phone", "98450 12345"],
-        ["Address", "12 Hill Road"],
-        ["Town or city", "Mumbai"],
-        ["PIN code", "400050"],
-        ["State", "Maharashtra"],
-    ] as const;
-
-    async function fillTheBag() {
-        fireEvent.click(screen.getByRole("radio", { name: /Local delivery/ }));
-        for (const [label, value] of TYPED) {
-            fireEvent.change(
-                await screen.findByLabelText(new RegExp(`^${label}`)),
-                { target: { value } },
-            );
-        }
-        fireEvent.click(screen.getByRole("button", { name: "Have a code?" }));
-        fireEvent.change(screen.getByLabelText("Discount code"), {
-            target: { value: "save10" },
-        });
-        fireEvent.click(screen.getByRole("button", { name: "Apply" }));
-        await screen.findByText("SAVE10 applied.");
-    }
-
-    it("finds the way, the address, the code and the checkout's key as they were", async () => {
-        const first = setup({ quote: { ok: true, data: BOTH } });
-        await openTheBag();
-        await fillTheBag();
-        // On to the email code, where the customer leaves for their inbox.
-        fireEvent.click(
-            await screen.findByRole("button", { name: /^Sign in and pay/ }),
-        );
-        await screen.findByLabelText("Email");
-        expect(first.start).not.toHaveBeenCalled();
-        const kept = readBagDraft(SITE);
-        expect(kept.checkout?.key).toMatch(/^[A-Za-z0-9_-]+$/);
-
-        // The page loads again: a new page, the same tab. (`setup` puts
-        // the same two loaves in the bag, so it is emptied first.)
-        cleanup();
-        window.localStorage.clear();
-        const second = setup({
-            signedIn: true,
-            quote: { ok: true, data: BOTH },
-        });
-        await openTheBag();
-        expect(
-            await screen.findByRole("radio", { name: /Local delivery/ }),
-        ).toHaveAttribute("aria-checked", "true");
-        for (const [label, value] of TYPED) {
-            expect(screen.getByLabelText(new RegExp(`^${label}`))).toHaveValue(
-                value,
-            );
-        }
-        expect(screen.getByLabelText("Discount code")).toHaveValue("SAVE10");
-        expect(await screen.findByText("SAVE10 applied.")).toBeInTheDocument();
-
-        // The same bag placed is the same order: the key came back too.
-        fireEvent.click(screen.getByRole("button", { name: /^Place order/ }));
-        await screen.findByRole("heading", { name: "Order placed" });
-        expect(second.start.mock.calls[0][0]).toMatchObject({
-            key: kept.checkout?.key,
+// Each test fills the bag, reloads and checks out in jsdom: 2-3.5s on a
+// busy CI runner, one past 5s.
+describe(
+    "the bag through a reload (the email code is read in another app)",
+    { timeout: 15_000 },
+    () => {
+        const BOTH = quoteOf({
+            ways: [
+                { type: "PICKUP", label: "Pick-up", fee: null },
+                {
+                    type: "LOCAL_DELIVERY",
+                    label: "Local delivery",
+                    fee: "60.00",
+                },
+            ],
             fulfilment: "LOCAL_DELIVERY",
-            discountCode: "SAVE10",
-            address: { line1: "12 Hill Road", postalCode: "400050" },
+            discount: { code: "SAVE10", applied: true, amount: "50.00" },
         });
-    });
+        const TYPED = [
+            ["Name", "Kavya Iyer"],
+            ["Phone", "98450 12345"],
+            ["Address", "12 Hill Road"],
+            ["Town or city", "Mumbai"],
+            ["PIN code", "400050"],
+            ["State", "Maharashtra"],
+        ] as const;
 
-    it("forgets it all once the order is placed", async () => {
-        setup({ signedIn: true, quote: { ok: true, data: BOTH } });
-        await openTheBag();
-        await fillTheBag();
-        expect(readBagDraft(SITE).address.line1).toBe("12 Hill Road");
-        fireEvent.click(
-            await screen.findByRole("button", { name: /^Place order/ }),
-        );
-        await screen.findByRole("heading", { name: "Order placed" });
-        expect(readBagDraft(SITE)).toEqual(EMPTY_DRAFT);
-        expect(window.sessionStorage.getItem(`saroh.bag-draft.${SITE}`)).toBe(
-            null,
-        );
-    });
+        async function fillTheBag() {
+            fireEvent.click(
+                screen.getByRole("radio", { name: /Local delivery/ }),
+            );
+            for (const [label, value] of TYPED) {
+                fireEvent.change(
+                    await screen.findByLabelText(new RegExp(`^${label}`)),
+                    { target: { value } },
+                );
+            }
+            fireEvent.click(
+                screen.getByRole("button", { name: "Have a code?" }),
+            );
+            fireEvent.change(screen.getByLabelText("Discount code"), {
+                target: { value: "save10" },
+            });
+            fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+            await screen.findByText("SAVE10 applied.");
+        }
 
-    it("keeps it in the tab only: no cookie, nothing in localStorage but the bag", async () => {
-        setup({ quote: { ok: true, data: BOTH } });
-        await openTheBag();
-        await fillTheBag();
-        expect(document.cookie).toBe("");
-        expect(JSON.stringify({ ...window.localStorage })).not.toContain(
-            "Hill Road",
-        );
-        expect(Object.keys(window.sessionStorage)).toEqual([
-            `saroh.bag-draft.${SITE}`,
-        ]);
-    });
-});
+        it("finds the way, the address, the code and the checkout's key as they were", async () => {
+            const first = setup({ quote: { ok: true, data: BOTH } });
+            await openTheBag();
+            await fillTheBag();
+            // On to the email code, where the customer leaves for their inbox.
+            fireEvent.click(
+                await screen.findByRole("button", { name: /^Sign in and pay/ }),
+            );
+            await screen.findByLabelText("Email");
+            expect(first.start).not.toHaveBeenCalled();
+            const kept = readBagDraft(SITE);
+            expect(kept.checkout?.key).toMatch(/^[A-Za-z0-9_-]+$/);
+
+            // The page loads again: a new page, the same tab. (`setup` puts
+            // the same two loaves in the bag, so it is emptied first.)
+            cleanup();
+            window.localStorage.clear();
+            const second = setup({
+                signedIn: true,
+                quote: { ok: true, data: BOTH },
+            });
+            await openTheBag();
+            expect(
+                await screen.findByRole("radio", { name: /Local delivery/ }),
+            ).toHaveAttribute("aria-checked", "true");
+            for (const [label, value] of TYPED) {
+                expect(
+                    screen.getByLabelText(new RegExp(`^${label}`)),
+                ).toHaveValue(value);
+            }
+            expect(screen.getByLabelText("Discount code")).toHaveValue(
+                "SAVE10",
+            );
+            expect(
+                await screen.findByText("SAVE10 applied."),
+            ).toBeInTheDocument();
+
+            // The same bag placed is the same order: the key came back too.
+            fireEvent.click(
+                screen.getByRole("button", { name: /^Place order/ }),
+            );
+            await screen.findByRole("heading", { name: "Order placed" });
+            expect(second.start.mock.calls[0][0]).toMatchObject({
+                key: kept.checkout?.key,
+                fulfilment: "LOCAL_DELIVERY",
+                discountCode: "SAVE10",
+                address: { line1: "12 Hill Road", postalCode: "400050" },
+            });
+        });
+
+        it("forgets it all once the order is placed", async () => {
+            setup({ signedIn: true, quote: { ok: true, data: BOTH } });
+            await openTheBag();
+            await fillTheBag();
+            expect(readBagDraft(SITE).address.line1).toBe("12 Hill Road");
+            fireEvent.click(
+                await screen.findByRole("button", { name: /^Place order/ }),
+            );
+            await screen.findByRole("heading", { name: "Order placed" });
+            expect(readBagDraft(SITE)).toEqual(EMPTY_DRAFT);
+            expect(
+                window.sessionStorage.getItem(`saroh.bag-draft.${SITE}`),
+            ).toBe(null);
+        });
+
+        it("keeps it in the tab only: no cookie, nothing in localStorage but the bag", async () => {
+            setup({ quote: { ok: true, data: BOTH } });
+            await openTheBag();
+            await fillTheBag();
+            expect(document.cookie).toBe("");
+            expect(JSON.stringify({ ...window.localStorage })).not.toContain(
+                "Hill Road",
+            );
+            expect(Object.keys(window.sessionStorage)).toEqual([
+                `saroh.bag-draft.${SITE}`,
+            ]);
+        });
+    },
+);
 
 describe("parseBagDraft", () => {
     it("reads nothing kept, and anything strange, as an empty draft", () => {

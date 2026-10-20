@@ -1,4 +1,4 @@
-import { webImageUrl } from "@saroh/ui/share-cards";
+import { webImageUrl } from "@saroh/ui/lib/share-facts";
 import { ImageIcon } from "lucide-react";
 
 /** The share image, small: in its row, and in its sheet as it is chosen. */

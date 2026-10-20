@@ -10,7 +10,15 @@ export type PageWidth = "form" | "default" | "wide" | "full";
 
 /** What the page is made of, so the grey stands where the content will. */
 export type PageShape =
-    "list" | "detail" | "form" | "editor" | "dashboard" | "settings";
+    | "list"
+    | "detail"
+    | "form"
+    | "editor"
+    | "dashboard"
+    | "answers"
+    | "settings"
+    | "home"
+    | "money-list";
 
 export interface PageLoadingProps {
     shape: PageShape;
@@ -46,6 +54,8 @@ export interface PageLoadingProps {
     bare?: boolean;
     /** The body's own measure, when the page caps it (Settings' rows). */
     bodyClassName?: string;
+    /** The page's header is the compact bar on a phone (`PageHeader`). */
+    compactOnPhone?: boolean;
 }
 
 /**
@@ -71,6 +81,7 @@ export function PageLoading({
     rows,
     bare = false,
     bodyClassName,
+    compactOnPhone = false,
 }: PageLoadingProps) {
     const body = (
         <div
@@ -89,6 +100,7 @@ export function PageLoading({
         <PageContainer width={width}>
             <PageHeader
                 holdsData={false}
+                compactOnPhone={compactOnPhone}
                 breadcrumb={breadcrumb}
                 title={title ?? <TitleBar label={label} />}
                 description={description}
@@ -190,6 +202,36 @@ function ListBody(rows = 6) {
     );
 }
 
+/**
+ * A list under a strip of figures (Invoices, DEC-173): a status line, four
+ * figure cards (two in view on a phone, as the strip scrolls), then the
+ * list's search and rows.
+ */
+function MoneyListBody(rows = 6) {
+    return (
+        <div className="space-y-3.5">
+            <Skeleton className="h-3 w-72 max-w-full" />
+            <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+                {Array.from({ length: 4 }, (_, i) => (
+                    <div
+                        key={i}
+                        className={cn(
+                            CARD,
+                            "space-y-2 px-3.5 py-3",
+                            i > 1 && "max-sm:hidden",
+                        )}
+                    >
+                        <Skeleton className="h-3 w-20" />
+                        <Skeleton className="h-5 w-24" />
+                        <Skeleton className="h-3 w-16" />
+                    </div>
+                ))}
+            </div>
+            {ListBody(rows)}
+        </div>
+    );
+}
+
 /** A record: stacked panels, and its side column from the desk up. */
 function DetailBody(panels = 3) {
     return (
@@ -276,6 +318,119 @@ function DashboardBody(rows = 3) {
     );
 }
 
+/**
+ * Home A (DEC-171, `HALoadingD`): the tiles, then Needs you's groups with
+ * Today beside them from a wide desk. Below 640px it stands for the
+ * phone's Home until U17 draws that shape.
+ */
+function HomeBody(groups = 5) {
+    const group = (i: number) => (
+        <div
+            key={i}
+            className="grid gap-2 border-b border-border/70 p-4 last:border-b-0"
+        >
+            <Skeleton className="h-3.5 w-3/5" />
+            <Skeleton className="h-3 w-2/5" />
+        </div>
+    );
+    return (
+        <>
+            {/* The phone's Home (U17, `HPStates` loading): three figures
+                in one card, the Next band, and five group lines. */}
+            <div
+                data-loading-home="phone"
+                className="grid gap-[18px] sm:hidden"
+            >
+                <div className={cn(CARD, "grid grid-cols-3 overflow-hidden")}>
+                    {Array.from({ length: 3 }, (_, i) => (
+                        <div
+                            key={i}
+                            className={cn(
+                                "grid min-h-16 content-center gap-1.5 px-3 py-2.5",
+                                i > 0 && "border-l border-border/70",
+                            )}
+                        >
+                            <Skeleton className="h-6 w-[70%]" />
+                        </div>
+                    ))}
+                </div>
+                <Skeleton className="h-14 rounded-[14px]" />
+                <div className="grid gap-2">
+                    <Skeleton className="h-[18px] w-[140px]" />
+                    <div className={CARD}>
+                        {Array.from({ length: groups }, (_, i) => (
+                            <div
+                                key={i}
+                                className="border-b border-border/70 px-3.5 py-4 last:border-b-0"
+                            >
+                                <Skeleton className="h-3.5 w-3/5" />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+            <div className="hidden gap-[22px] sm:grid">
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    {Array.from({ length: 4 }, (_, i) => (
+                        <div
+                            key={i}
+                            className={cn(
+                                CARD,
+                                "grid min-h-[104px] content-center gap-2.5 px-4 py-3.5",
+                            )}
+                        >
+                            <Skeleton className="h-3 w-[110px] max-w-full" />
+                            <Skeleton className="h-6 w-[70px]" />
+                            <Skeleton className="h-[11px] w-[150px] max-w-full" />
+                        </div>
+                    ))}
+                </div>
+                <div className="grid items-start gap-[22px] min-[1100px]:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
+                    <div className="grid gap-2.5">
+                        <Skeleton className="h-[18px] w-[140px]" />
+                        <div className={CARD}>
+                            {Array.from({ length: groups }, (_, i) => group(i))}
+                        </div>
+                    </div>
+                    <div className="grid gap-2.5">
+                        <Skeleton className="h-[18px] w-[140px]" />
+                        <div className={CARD}>
+                            {Array.from({ length: 4 }, (_, i) => group(i))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </>
+    );
+}
+
+/**
+ * Insights' Overview (`IBLoadingD`, `IBLoadingP`): the suggestion's band,
+ * then three answers, each a question, its sentence and a picture.
+ */
+function AnswersBody(cards = 3) {
+    return (
+        <div className="max-w-[1160px] space-y-5">
+            <div className="space-y-3 rounded-[14px] bg-muted px-5 py-[18px]">
+                <Skeleton className="h-3.5 w-3/5" />
+                <Skeleton className="h-3 w-2/5" />
+            </div>
+            <div className="grid items-start gap-4 lg:grid-cols-3">
+                {Array.from({ length: cards }, (_, i) => (
+                    <div
+                        key={i}
+                        className="space-y-3 rounded-[14px] border border-border bg-card px-5 py-[18px]"
+                    >
+                        <Skeleton className="h-3.5 w-3/5" />
+                        <Skeleton className="h-3 w-2/5" />
+                        <Skeleton className="h-[120px] w-full" />
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 /** A Settings section: rows of a label, what is saved, and Edit. */
 function SettingsBody(rows = 5) {
     return (
@@ -300,5 +455,8 @@ const BODY: Record<PageShape, (rows?: number) => ReactNode> = {
     form: FormBody,
     editor: EditorBody,
     dashboard: DashboardBody,
+    answers: AnswersBody,
     settings: SettingsBody,
+    home: HomeBody,
+    "money-list": MoneyListBody,
 };

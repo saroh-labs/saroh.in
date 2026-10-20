@@ -247,6 +247,8 @@ describe("HomeService degrades one source at a time (#177, §30)", () => {
             { moduleKey: "APPOINTMENTS", label: "Today" },
             { moduleKey: "HOME", label: "This week" },
             { moduleKey: "COMMERCE", label: "Uncollected orders" },
+            // Home A's How it's going counts the last 7 days' orders.
+            { moduleKey: "HOME", label: "How it's going" },
         ]);
         // The schedule survived, which is the whole point.
         expect(home.upcoming).toHaveLength(1);
@@ -260,6 +262,10 @@ describe("HomeService degrades one source at a time (#177, §30)", () => {
             { moduleKey: "APPOINTMENTS", label: "Schedule" },
             { moduleKey: "APPOINTMENTS", label: "Today" },
             { moduleKey: "HOME", label: "This week" },
+            // Home A's bookings awaiting payment, and How it's going's
+            // bookings (DEC-171).
+            { moduleKey: "APPOINTMENTS", label: "Bookings awaiting payment" },
+            { moduleKey: "HOME", label: "How it's going" },
         ]);
         expect(home.upcoming).toEqual([]);
         // Today failed with it: never shown as an empty day.
@@ -798,5 +804,164 @@ describe("soonCutoff (DEC-163)", () => {
         expect(soonCutoff(now, "Pacific/Auckland").toISOString()).toBe(
             "2026-10-18T11:00:00.000Z",
         );
+    });
+});
+
+/**
+ * Home A's fields on the whole read (DEC-171, Home plan U1): the tiles, the
+ * groups and How it's going come beside today's fields, which read as
+ * before; amounts only with `payment:read`; a failing source leaves its
+ * group out and names it, and the rest still return.
+ */
+describe("HomeService: Home A (DEC-171)", () => {
+    const VIEWS: View[] = [
+        { key: "COMMERCE", label: "Sell", readiness: "ACTIVE" },
+        { key: "APPOINTMENTS", label: "Appointments", readiness: "ACTIVE" },
+        { key: "PAYMENTS", label: "Payments", readiness: "ACTIVE" },
+    ];
+
+    it("sends the tiles, the groups and How it's going beside today's fields", async () => {
+        const home = await build(VIEWS, { orders: [OPEN_ORDER] }).build(INPUT);
+        expect(home.needs.length).toBeGreaterThan(0);
+        expect(home.needGroups?.map((g) => g.kind)).toEqual(["ORDERS"]);
+        expect(home.needGroupsTotal).toBe(
+            home.needGroups?.reduce((n, g) => n + g.count, 0),
+        );
+        expect(home.needGroupsTotal).toBe(home.needsTotal);
+        expect(home.tiles?.toPack).toMatchObject({ count: 1 });
+        expect(home.tiles?.moneyIn).toMatchObject({ totals: [], payments: 0 });
+        expect(home.going).toMatchObject({ bookings: { count: 0, before: 0 } });
+        // The rows keep the order's amount for the owner.
+        expect(home.needGroups?.[0].rows[0].amountMinor).toBe(125_050);
+        expect(home.week?.chequesWaiting).toBeNull();
+    });
+
+    it("gives a role without payment:read counts and no amounts", async () => {
+        const home = await build(VIEWS, { orders: [OPEN_ORDER] }).build({
+            ...INPUT,
+            organizationRole: "MEMBER",
+            organizationActions: new Set([
+                "order:read",
+                "booking:read",
+                "invoice:read",
+                "store:read",
+            ] as const),
+        });
+        expect(home.tiles?.moneyIn).toBeUndefined();
+        expect(home.going?.sales).toBeUndefined();
+        expect(home.going?.bookings).toBeDefined();
+        const orders = home.needGroups?.find((g) => g.kind === "ORDERS");
+        expect(orders?.count).toBe(1);
+        expect(orders?.totals).toBeNull();
+        expect(orders?.oldest?.amountMinor).toBeNull();
+        expect(orders?.rows[0].amountMinor).toBeNull();
+        // Today's flat list is as it was (an order's money is order:read's).
+        expect(home.needs[0].amountMinor).toBe(125_050);
+    });
+
+    it("leaves out the bills group when the invoices read fails, and keeps the rest", async () => {
+        const service = build(VIEWS, { orders: [OPEN_ORDER] });
+        const db = (
+            service as unknown as {
+                db: Record<string, Record<string, jest.Mock>>;
+            }
+        ).db;
+        const boom = new Error("invoices are being migrated");
+        db.invoice.count.mockRejectedValue(boom);
+        db.invoice.findMany.mockRejectedValue(boom);
+        const home = await service.build(INPUT);
+        expect(home.unavailable).toContainEqual({
+            moduleKey: "PAYMENTS",
+            label: "Overdue invoices",
+        });
+        expect(home.needGroups?.some((g) => g.kind === "BILLS")).toBe(false);
+        expect(home.needGroups?.map((g) => g.kind)).toContain("ORDERS");
+        expect(home.tiles?.toPack).toBeDefined();
+    });
+
+    describe("Remind all's bills (U8)", () => {
+        const BILL = {
+            id: "inv_1",
+            number: "RC/0056",
+            status: "ISSUED",
+            total: "1800.00",
+            paidCents: 0,
+            currency: "INR",
+            dueAt: new Date("2026-09-22T00:00:00.000Z"),
+            billToName: "Arjun Mehta",
+            subscriptionId: null,
+            contact: null,
+            lines: [],
+        };
+        function withBill() {
+            const service = build(VIEWS);
+            const db = (
+                service as unknown as {
+                    db: Record<string, Record<string, jest.Mock>>;
+                }
+            ).db;
+            db.invoice.count.mockResolvedValue(1);
+            db.invoice.findMany.mockImplementation(
+                (args: { where?: { status?: unknown; dueAt?: unknown } }) =>
+                    Promise.resolve(
+                        args.where?.status === "ISSUED" && args.where.dueAt
+                            ? [BILL]
+                            : [],
+                    ),
+            );
+            db.message = { findMany: jest.fn().mockResolvedValue([]) };
+            db.customerThreadMessage = {
+                findMany: jest.fn().mockResolvedValue([]),
+            };
+            db.invoiceShare = { findMany: jest.fn().mockResolvedValue([]) };
+            return service;
+        }
+
+        it("hands the bills group its overdue bills for someone who may send a reminder", async () => {
+            const home = await withBill().build(INPUT);
+            const bills = home.needGroups?.find((g) => g.kind === "BILLS");
+            expect(bills?.remind).toEqual({
+                invoiceIds: ["inv_1"],
+                quietDays: 3,
+            });
+        });
+
+        it("sends no Remind all to a role without invoice:write", async () => {
+            const home = await withBill().build({
+                ...INPUT,
+                organizationRole: "MEMBER",
+                organizationActions: new Set([
+                    "invoice:read",
+                    "payment:read",
+                ] as const),
+            });
+            const bills = home.needGroups?.find((g) => g.kind === "BILLS");
+            expect(bills).toBeDefined();
+            expect(bills?.remind).toBeUndefined();
+        });
+    });
+
+    it("sends no To pack tile when the open orders read failed", async () => {
+        const service = build(VIEWS, { orders: [OPEN_ORDER] });
+        const db = (
+            service as unknown as {
+                db: Record<string, Record<string, jest.Mock>>;
+            }
+        ).db;
+        db.order.count.mockRejectedValue(new Error("down"));
+        db.order.findMany.mockRejectedValue(new Error("down"));
+        const home = await service.build(INPUT);
+        expect(home.tiles?.toPack).toBeUndefined();
+        expect(home.needGroups?.some((g) => g.kind === "ORDERS")).toBe(false);
+    });
+
+    it("sends a Reviewer none of it", async () => {
+        const home = await build(VIEWS).build({
+            ...INPUT,
+            organizationRole: "REVIEWER",
+        });
+        expect(home.tiles).toBeUndefined();
+        expect(home.needGroups).toBeUndefined();
+        expect(home.going).toBeUndefined();
     });
 });

@@ -1,136 +1,152 @@
-import { formatDay } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import {
+    ABOUT_SAME_PERCENT,
+    countChangeLine,
+    daysLabel,
+    moneyChangeLine,
+    moneyFell,
+} from "@/lib/insights/compare-words";
 
-import type {
-    HomeWeek,
-    HomeWeekChange,
-    HomeWeekOwed,
-    HomeWeekTakings,
-} from "./service";
+import type { HomeGoing, HomeGoingOwed, HomeMoneyTotal } from "./service";
 
 /**
- * Home's "This week" (round 2, F7), in words, as the Home design writes
- * them: "Sales so far · ₹18,450 · Up 12% on the same days last week".
- * The API sends each figure only to someone who may read it, and decides
- * the comparison; this says it. Pure, so it is tested without a page.
+ * Home's "How it's going" (DEC-171, Home plan U6), in words, as the Home A
+ * boards write them: "Sales · ₹48,250 · Up 12% on the 7 days before".
+ * It replaced "This week", which set a week that had just started against
+ * a whole one, so every Monday read "0 bookings · 19 fewer than last week".
+ *
+ * The API decides the figures and the change, the last 7 days against the
+ * 7 before (`home-going.ts`), and sends each only to someone who may read
+ * it; the words are U4's (`lib/insights/compare-words.ts`). Pure, so it is
+ * tested without a page.
  */
 
-export interface WeekRow {
+/** How a card's line reads: good news, bad news, or neither. */
+export type GoingTone = "up" | "bad" | "plain";
+
+export interface GoingCard {
     key: string;
     label: string;
     value: string;
     sub: string;
-    /** Said in the danger colour: takings down, or a bill overdue. */
-    bad: boolean;
+    tone: GoingTone;
     href: string;
 }
 
-/** "Up 12% on the same days last week", or why there's no comparing. */
-export function changeLine(change: HomeWeekChange): string {
-    switch (change.kind) {
-        case "THIN":
-            return "Not enough last week to compare";
-        case "LEVEL":
-            return "Level with last week";
-        case "UP":
-            return `Up ${change.percent}% on the same days last week`;
-        case "DOWN":
-            return `Down ${change.percent}% on the same days last week`;
-    }
+/**
+ * "The last 7 days, 13 to 19 Oct, compared with the 7 days before": which
+ * days the figures are, said once above them.
+ */
+export function goingIntro(going: Pick<HomeGoing, "from" | "to">): string {
+    const days = daysLabel(going.from, going.to);
+    return days
+        ? `The last 7 days, ${days}, compared with the 7 days before`
+        : "The last 7 days, compared with the 7 days before";
 }
 
-/** "3 more than last week", "Same as last week". */
-export function bookingsLine(count: number, lastWeek: number): string {
-    if (lastWeek === 0) return "Nothing booked last week to compare";
-    const d = count - lastWeek;
-    if (d === 0) return "Same as last week";
-    return `${Math.abs(d)} ${d > 0 ? "more" : "fewer"} than last week`;
+function moneyWords(totals: readonly HomeMoneyTotal[]): string {
+    return totals
+        .map((t) => formatMoney(t.amountMinor, t.currency))
+        .join(" + ");
 }
 
-/** "Since Monday 14 Sep", from the business's Monday (`2026-09-14`). */
-export function sinceMonday(startDate: string): string {
-    return /^\d{4}-\d{2}-\d{2}$/.test(startDate)
-        ? `Since Monday ${formatDay(startDate, { year: "never" })}`
-        : "Since Monday";
-}
-
-/** "3 bills · 1 overdue", or "Nothing unpaid". */
-export function owedLine(owed: HomeWeekOwed): string {
-    if (owed.bills === 0) return "Nothing unpaid";
+/** "16 bills · 10 overdue", "1 bill", or "All bills paid". */
+export function owedLine(
+    owed: Pick<HomeGoingOwed, "bills" | "overdue">,
+): string {
+    if (owed.bills === 0) return "All bills paid";
     const bills = count(owed.bills, "bill", "bills");
     return owed.overdue > 0 ? `${bills} · ${owed.overdue} overdue` : bills;
 }
 
-function takingsRow(t: HomeWeekTakings): WeekRow {
-    return {
-        key: `takings:${t.currency}`,
-        label: "Sales so far",
-        value: formatMoney(t.amountMinor, t.currency),
-        sub: changeLine(t.change),
-        bad: t.change.kind === "DOWN",
-        href: t.href,
-    };
+/** The owed card's figure: the money, or the bills without it, or "Nothing". */
+function owedValue(owed: HomeGoingOwed): string {
+    if (owed.bills === 0) return "Nothing";
+    const totals = (owed.totals ?? []).filter((t) => t.amountMinor > 0);
+    return totals.length > 0
+        ? moneyWords(totals)
+        : count(owed.bills, "bill", "bills");
 }
 
 /**
- * The panel's rows in the design's order: takings, bookings, orders, owed.
- * The design draws takings only once money has come in this week, and
- * orders only once one is placed; bookings and owed show at zero, since
- * "0 bookings, 3 fewer than last week" is itself the news.
+ * The cards in the boards' order: sales, bookings, orders, owed. Sales are
+ * one card per currency that moved; a role without `payment:read` gets no
+ * sales and an owed card in bills, never an amount (DEC-098).
  */
-export function weekRows(week: HomeWeek | null): WeekRow[] {
-    if (!week) return [];
-    const rows: WeekRow[] = [];
-    for (const t of week.takings ?? []) {
-        if (t.amountMinor > 0) rows.push(takingsRow(t));
+export function goingCards(going: HomeGoing | null): GoingCard[] {
+    if (!going) return [];
+    const cards: GoingCard[] = [];
+    for (const s of going.sales ?? []) {
+        // A currency that moved only in the 7 days before still says so.
+        const m = {
+            nowMinor: s.amountMinor,
+            beforeMinor: s.beforeMinor,
+            currency: s.currency,
+            change: s.change,
+        };
+        const fell = moneyFell(m);
+        const rose =
+            s.amountMinor > 0 &&
+            s.beforeMinor > 0 &&
+            s.change.kind === "UP" &&
+            s.change.percent > ABOUT_SAME_PERCENT;
+        cards.push({
+            key: `sales:${s.currency}`,
+            label: "Sales",
+            value:
+                s.amountMinor > 0
+                    ? formatMoney(s.amountMinor, s.currency)
+                    : "Nothing",
+            sub: moneyChangeLine(m),
+            tone: fell ? "bad" : rose ? "up" : "plain",
+            href: s.href,
+        });
     }
-    if (week.bookings) {
-        rows.push({
+    if (going.bookings) {
+        const { count: n, before } = going.bookings;
+        cards.push({
             key: "bookings",
-            label: "Bookings this week",
-            value: String(week.bookings.count),
-            sub: bookingsLine(week.bookings.count, week.bookings.lastWeek),
-            bad: false,
-            href: week.bookings.href,
+            label: "Bookings",
+            value: n > 0 ? String(n) : "None",
+            sub: countChangeLine(n, before),
+            tone: before > 0 && n > before ? "up" : "plain",
+            href: going.bookings.href,
         });
     }
-    if (week.orders && week.orders.count > 0) {
-        rows.push({
+    if (going.orders) {
+        const { count: n, before } = going.orders;
+        cards.push({
             key: "orders",
-            label: "Orders this week",
-            value: String(week.orders.count),
-            sub: sinceMonday(week.startDate),
-            bad: false,
-            href: week.orders.href,
+            label: "Orders",
+            value: n > 0 ? String(n) : "None",
+            sub: countChangeLine(n, before),
+            tone: before > 0 && n > before ? "up" : "plain",
+            href: going.orders.href,
         });
     }
-    if (week.owed) {
-        const { owed } = week;
-        rows.push({
+    if (going.owed) {
+        const { owed } = going;
+        cards.push({
             key: "owed",
             label: "Owed to you",
-            value:
-                owed.totals.length > 0
-                    ? owed.totals
-                          .map((t) => formatMoney(t.amountMinor, t.currency))
-                          .join(" + ")
-                    : // Invoices only: a booking paid at the desk is no
-                      // invoice until it's taken (UX-083).
-                      "All invoices paid",
+            value: owedValue(owed),
             sub: owedLine(owed),
-            bad: owed.overdue > 0,
+            tone: owed.overdue > 0 ? "bad" : "plain",
             href: owed.href,
         });
     }
-    return rows;
+    return cards;
 }
 
 /**
- * Whether Home draws the panel: never for a business with nothing sold,
- * booked or paid yet (it has "Get ready to take money" instead), nor when
- * there's no row to show.
+ * Whether Home draws How it's going: never for a business with nothing
+ * sold, booked or paid yet (it has "Finish setup" instead), nor when there
+ * is no card to show.
  */
-export function showsWeek(week: HomeWeek | null, fresh: boolean): boolean {
-    return !fresh && weekRows(week).length > 0;
+export function showsGoing(going: HomeGoing | null, fresh: boolean): boolean {
+    return !fresh && goingCards(going).length > 0;
 }
+
+/** Where "See how the month went" goes: Insights on its 4 weeks (A10). */
+export const MONTH_HREF = "/analytics?period=4w";

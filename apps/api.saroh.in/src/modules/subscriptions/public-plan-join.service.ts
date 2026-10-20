@@ -341,6 +341,8 @@ export class PublicPlanJoinService {
                 id: draft.id,
                 organizationId,
                 total: draft.total,
+                // A draft: nothing is paid on it yet.
+                paidCents: 0,
                 currency: draft.currency,
             },
             { idempotencyKey, provider: provider.provider },

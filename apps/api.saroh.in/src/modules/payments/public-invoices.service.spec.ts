@@ -114,6 +114,7 @@ const STORED = {
     dueAt: new Date("2999-01-01T10:00:00Z"),
     tax: dec("200.00"),
     total: dec("1400.00"),
+    paidCents: 0,
     currency: "INR",
     billToName: "Asha Rao",
     organization: { name: "Lotus Yoga" },
@@ -169,6 +170,16 @@ describe("PublicInvoicesService.read", () => {
         );
     });
 
+    it("says what is paid so far and what is left on a partly paid invoice (DEC-173)", async () => {
+        invoiceFindFirst.mockResolvedValue({ ...STORED, paidCents: 40_000 });
+        const view = await makeService().service.read(TOKEN);
+        expect(view).toMatchObject({
+            total: "1400.00",
+            paidSoFar: "400.00",
+            leftToPay: "1000.00",
+        });
+    });
+
     it("answers with exactly the allow-listed fields", async () => {
         invoiceFindFirst.mockResolvedValue(STORED);
         const view = await makeService().service.read(TOKEN);
@@ -193,6 +204,9 @@ describe("PublicInvoicesService.read", () => {
                 "tax",
                 "theme",
                 "total",
+                // DEC-173: paid so far and what is left to pay.
+                "paidSoFar",
+                "leftToPay",
             ].sort(),
         );
         expect(view).toEqual({
@@ -214,6 +228,8 @@ describe("PublicInvoicesService.read", () => {
             ],
             tax: "200.00",
             total: "1400.00",
+            paidSoFar: "0.00",
+            leftToPay: "1400.00",
             currency: "INR",
             status: "ISSUED",
             billedTo: "Asha Rao",
@@ -569,8 +585,23 @@ describe("PublicInvoicesService.createIntent", () => {
         organizationId: "org_1",
         status: "ISSUED",
         total: dec("1400.00"),
+        paidCents: 0,
         currency: "INR",
     };
+
+    it("charges what is left on a partly paid invoice, never its whole total (DEC-173)", async () => {
+        const { service, fake } = makeService();
+        invoiceFindFirst.mockResolvedValue({ ...PAYABLE, paidCents: 40_000 });
+        providerFindFirst.mockResolvedValue(connectedRow());
+        intentCreate.mockResolvedValue({ id: "pi_1" });
+
+        await service.createIntent(TOKEN, { amount: 1400 });
+
+        expect(fake.calls[0]?.amountCents).toBe(100_000);
+        expect(intentCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({ amountCents: 100_000 }),
+        });
+    });
 
     it("charges the stored total and ignores an amount in the body", async () => {
         const { service, fake } = makeService();
@@ -844,6 +875,7 @@ describe("PublicInvoicesService on a plan without online payments", () => {
         organizationId: "org_1",
         status: "ISSUED",
         total: dec("1400.00"),
+        paidCents: 0,
         currency: "INR",
         subscriptionId: null,
     };
@@ -897,6 +929,7 @@ describe("PublicInvoicesService.createIntent — a pay-now hold (U19)", () => {
         status: "DRAFT",
         source: "BOOKING",
         total: dec("800.00"),
+        paidCents: 0,
         currency: "INR",
     };
 

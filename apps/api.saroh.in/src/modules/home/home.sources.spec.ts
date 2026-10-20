@@ -31,6 +31,7 @@ function periodInvoice(over: Partial<Record<string, unknown>> = {}) {
         status: "ISSUED",
         subscriptionId: "sub_1",
         total: "1200",
+        paidCents: 0,
         currency: "INR",
         issuedAt: ago(9 * DAY),
         dueAt: ago(2 * DAY + 60 * 60 * 1000),
@@ -60,6 +61,10 @@ function moneyDb(opts: {
         subscriptionEvent: { findMany: jest.fn().mockResolvedValue([]) },
         // D13: no autopay charge under way.
         paymentIntent: { findMany: jest.fn().mockResolvedValue([]) },
+        // U8: no bill reminded this week.
+        message: { findMany: jest.fn().mockResolvedValue([]) },
+        customerThreadMessage: { findMany: jest.fn().mockResolvedValue([]) },
+        invoiceShare: { findMany: jest.fn().mockResolvedValue([]) },
         invoice: {
             findMany,
             count: jest
@@ -310,6 +315,7 @@ describe("overdueInvoices", () => {
         id: "inv_1",
         number: "INV-0007",
         total: "4000",
+        paidCents: 0,
         currency: "INR",
         dueAt: ago(2 * DAY + 60_000),
         billToName: "Café Mocha",
@@ -610,6 +616,7 @@ const handOverdue = () => ({
     id: "inv_1",
     number: "INV-0007",
     total: "4000",
+    paidCents: 0,
     currency: "INR",
     dueAt: ago(2 * DAY + 3600_000, new Date()),
     billToName: "Café Mocha",

@@ -306,6 +306,8 @@ describe("Home F7 This week (DB)", () => {
             { takings: false, bookings: true, orders: false, owed: false },
             clock,
         );
+        // The cheques line (DEC-173) is HomeService's own read, beside the
+        // week, never part of it (`home.cheques.db.spec.ts`).
         expect(Object.keys(week).sort()).toEqual([
             "bookings",
             "startDate",

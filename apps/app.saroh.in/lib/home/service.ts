@@ -2,97 +2,28 @@ import { cache } from "react";
 
 import { apiFetch, orgBase } from "@/lib/api/http";
 
+import type { HomeNeed, HomeSeverity, HomeWeekChange } from "./need-model";
+import type {
+    HomeChequesWaiting,
+    HomeGoing,
+    HomeNeedGroup,
+    HomeTiles,
+} from "./today-first-model";
+
+export type {
+    HomeInline,
+    HomeNeed,
+    HomeRowLink,
+    HomeSeverity,
+    HomeTone,
+    HomeWeekChange,
+} from "./need-model";
+
 /**
  * Home read-model access (#119). One aggregated call to api.saroh.in returns the
  * ranked next-actions for the active Organization, so the page never fans out.
  * Server-only.
  */
-export type HomeSeverity = "ATTENTION" | "SETUP" | "OVERDUE" | "SUGGESTION";
-
-/**
- * A Needs-you tag's colour, as the design names them: `bad` for something
- * already wrong, `due` for something to do soon, `info` for something to
- * know. The tag's words always say it too.
- */
-export type HomeTone = "bad" | "due" | "info";
-
-/**
- * What an inline action on a Needs-you row will do (F4). The API sends one
- * only to a viewer who may do it, only when the write can take it, with
- * words that say who is told and how (`home-inline.ts`). Each calls its
- * target's own endpoint; see `lib/home/inline-actions.ts` for how it runs.
- */
-export interface HomeInline {
-    kind:
-        | "MARK_SENT"
-        | "RETRY"
-        | "SEND_REMINDER"
-        | "REPLY"
-        | "REVIEW_REPLY"
-        | "REFUND";
-    /** The row's button. */
-    label: string;
-    /** What will happen, and who is told. */
-    confirm: string;
-    /** The confirm's button. */
-    yes: string;
-    /** What the row says once done. */
-    done: string;
-    /** A message leaves the business: held ten seconds first. */
-    sends: boolean;
-    /** Whether Undo is offered (never once a message has left). */
-    undoable: boolean;
-    /**
-     * The order, subscription, invoice, contact or review it acts on; for
-     * REFUND, the payment taken at the wrong amount.
-     */
-    target: string;
-    /** The customer's first name, for the words after; null without one. */
-    person: string | null;
-    /** MARK_SENT: the step it moves the order to. */
-    stage?: string;
-    /**
-     * RETRY: how — a new payment link, or a new charge on their autopay (D13).
-     * The API offers no Retry while an autopay charge is under way.
-     */
-    via?: "PAY_LINK" | "MANDATE";
-}
-
-/**
- * A step a Needs-you row opens where it is taken, beside its inline action
- * (D14): "Send a set-up link" on a renewal whose autopay limit is too low
- * opens Subscription Detail's own set-up sheet. Sent only to someone who may
- * take it, while the business offers autopay.
- */
-export interface HomeRowLink {
-    label: string;
-    href: string;
-}
-
-/**
- * One row of Needs you (F3), flat and already ranked by the API.
- *
- * Money travels in minor units beside the words, and `amountIn` says where
- * it goes: "₹4,800 overdue from Farah Khan" is the title "overdue from Farah
- * Khan" with `amountIn: "title"`. See `lib/home/needs.ts`.
- */
-export interface HomeNeed {
-    id: string;
-    code: string;
-    severity: HomeSeverity;
-    title: string;
-    sub: string | null;
-    amountMinor: number | null;
-    currency: string | null;
-    amountIn: "title" | "sub" | null;
-    tag: string | null;
-    tone: HomeTone;
-    href: string;
-    moduleKey?: string;
-    inline?: HomeInline;
-    link?: HomeRowLink;
-}
-
 /**
  * One concrete row behind an action's count.
  *
@@ -211,13 +142,6 @@ export interface HomeLastDay {
     items: HomeSinceItem[];
 }
 
-/**
- * This week's takings against the same days last week (F7): up, down or
- * level by a whole percent, or `THIN` — too little last week to compare.
- */
-export type HomeWeekChange =
-    { kind: "UP" | "DOWN" | "LEVEL"; percent: number } | { kind: "THIN" };
-
 /** Takings so far this week in one currency (F7), net of refunds. */
 export interface HomeWeekTakings {
     currency: string;
@@ -239,7 +163,8 @@ export interface HomeWeekOwed {
 /**
  * This week (F7). The API sends each figure only to a viewer who holds its
  * read, so a missing figure is one this viewer may not see — never zero.
- * See `lib/home/week.ts` for the words.
+ * Home no longer draws it: How it's going (`going`, `lib/home/week.ts`)
+ * replaced it (DEC-171); U17 drops the field.
  */
 export interface HomeWeek {
     zone: string;
@@ -249,6 +174,12 @@ export interface HomeWeek {
     bookings?: { count: number; lastWeek: number; href: string };
     orders?: { count: number; href: string };
     owed?: HomeWeekOwed;
+    /**
+     * Cheques not in the bank (DEC-173): null while none waits, and
+     * absent without `payment:read` or from an API before invoices U4.
+     * Needs you's money group draws it (Home plan U18, `lib/home/cheques.ts`).
+     */
+    chequesWaiting?: HomeChequesWaiting | null;
 }
 
 /**
@@ -327,7 +258,37 @@ export interface HomeModel {
     lastDay: HomeLastDay | null;
     /** This week (F7); null when none of it may be read, it failed, or from an older API. */
     week: HomeWeek | null;
+    /** Home A's tiles (DEC-171); null from an API before U1, or a Reviewer's. */
+    tiles: HomeTiles | null;
+    /**
+     * Needs you grouped by kind (DEC-171); null from an API before U1, when
+     * the desk falls back to the flat list.
+     */
+    needGroups: HomeNeedGroup[] | null;
+    /** The sum of every group's `count`. */
+    needGroupsTotal: number;
+    /** How it's going (DEC-171); null when none of it may be read or it failed. */
+    going: HomeGoing | null;
 }
+
+export type {
+    HomeChequesWaiting,
+    HomeGoing,
+    HomeGoingOwed,
+    HomeGoingSales,
+    HomeMoneyToday,
+    HomeMoneyTotal,
+    HomeNeedGroup,
+    HomeNeedKind,
+    HomeNeedOldest,
+    HomeOwedBucket,
+    HomeTileBookings,
+    HomeTileCame,
+    HomeTileMoneyIn,
+    HomeTileNext,
+    HomeTiles,
+    HomeTileToPack,
+} from "./today-first-model";
 
 const EMPTY: HomeModel = {
     view: "business",
@@ -342,6 +303,10 @@ const EMPTY: HomeModel = {
     today: null,
     lastDay: null,
     week: null,
+    tiles: null,
+    needGroups: null,
+    needGroupsTotal: 0,
+    going: null,
 };
 
 /**
@@ -360,8 +325,19 @@ async function readHome(projectId?: string): Promise<HomeModel> {
     if (!res.ok) {
         throw new Error(`GET home failed: ${res.status}`);
     }
-    const read = (await res.json()) as Omit<HomeModel, "ordersInProgress"> & {
+    const read = (await res.json()) as Omit<
+        HomeModel,
+        | "ordersInProgress"
+        | "tiles"
+        | "needGroups"
+        | "needGroupsTotal"
+        | "going"
+    > & {
         ordersInProgress?: number;
+        tiles?: HomeTiles;
+        needGroups?: HomeNeedGroup[];
+        needGroupsTotal?: number;
+        going?: HomeGoing | null;
     };
     // An API from before F5 sends no `today`: no column, not an empty day.
     // One from before F6 sends no `lastDay`: a plain greeting, no strip.
@@ -380,6 +356,12 @@ async function readHome(projectId?: string): Promise<HomeModel> {
         today: read.today ?? null,
         lastDay: read.lastDay ?? null,
         week: read.week ?? null,
+        // One from before Home A (U1) sends none of these: the desk then
+        // draws the flat list and no tiles, never zeros.
+        tiles: read.tiles ?? null,
+        needGroups: Array.isArray(read.needGroups) ? read.needGroups : null,
+        needGroupsTotal: read.needGroupsTotal ?? 0,
+        going: read.going ?? null,
     };
     // An API from before F3 sends no `needs`. Say the list couldn't be read,
     // never "Nothing needs you", while the two deploys cross.

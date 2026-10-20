@@ -16,7 +16,8 @@ import type { DiaryState, LocalDate } from "@/lib/services/diary";
 import { addDays } from "@/lib/services/diary";
 
 /** Where the quick look is: the booking, or one of its panel steps. */
-export type QuickLookStep = "look" | "choose" | "move" | "cancel" | "next";
+export type QuickLookStep =
+    "look" | "choose" | "move" | "who" | "cancel" | "next";
 
 /** The one main button, by what has happened so far. */
 export type PrimaryAction =
@@ -47,6 +48,13 @@ export interface QuickLookFacts {
     held: boolean;
     /** Their customer page exists. */
     hasPerson: boolean;
+    /**
+     * Who it's with can be changed (#1157): a one-to-one. Left out: not
+     * offered.
+     */
+    canReassign?: boolean;
+    /** It has someone on it: "Change who it's with", else "Assign someone". */
+    hasStaff?: boolean;
 }
 
 export function primaryAction(f: QuickLookFacts): PrimaryAction | null {
@@ -77,6 +85,7 @@ export type MoreAction =
     | "full"
     | "next"
     | "move"
+    | "who"
     | "cancel";
 
 export interface MoreItem {
@@ -126,6 +135,13 @@ export function moreItems(
                 full,
                 canNext && next,
                 f.canBook && { action: "move", label: "Move to another time" },
+                f.canBook &&
+                    f.canReassign === true && {
+                        action: "who",
+                        label: f.hasStaff
+                            ? "Change who it's with"
+                            : "Assign someone",
+                    },
                 f.canBook && {
                     action: "cancel",
                     label: "Cancel booking",

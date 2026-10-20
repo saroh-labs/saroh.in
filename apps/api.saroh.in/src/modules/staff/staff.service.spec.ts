@@ -30,6 +30,9 @@ jest.mock("@saroh/database", () => {
         bookingRules: { findUnique: jest.fn(), upsert: jest.fn() },
         // A change to the business's rules, in its history (#1038).
         auditEvent: { create: jest.fn() },
+        // Switching approval off locks the requests still waiting, to close
+        // them (DEC-170, 20 Oct): none wait here (staff-rules.db.spec.ts).
+        $queryRaw: jest.fn().mockResolvedValue([]),
         // Whether online payment can be taken (DEC-088).
         organizationModule: { findFirst: jest.fn() },
         merchantPaymentProvider: { findFirst: jest.fn() },

@@ -1,29 +1,36 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { EmptyState } from "@saroh/ui/empty-state";
 import { countLabel, PageHeader } from "@saroh/ui/page-header";
-import { useLocalPages } from "@saroh/ui/page-sizes";
-import { ReceiptText } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 
-import { MissingRatesNotice } from "@/components/gst-rates/missing-rates-notice";
+import { ChequesLine } from "@/components/invoices/cheques-line";
+import type { InvoiceBusinessTax } from "@/components/invoices/gst-status-line";
+import { GstStatusLine } from "@/components/invoices/gst-status-line";
+import type { ListEmpty } from "@/components/invoices/invoice-list-body";
+import { InvoiceListBody } from "@/components/invoices/invoice-list-body";
 import { InvoiceQuickLook } from "@/components/invoices/invoice-quick-look";
-import { INVOICE_GRID, InvoiceRow } from "@/components/invoices/invoice-row";
+import { InvoiceSearch } from "@/components/invoices/invoice-search";
+import { MoneyStrip } from "@/components/invoices/money-strip";
 import { ScopeNotice, SourceFilter } from "@/components/invoices/source-filter";
-import {
-    ListFilter,
-    ListTable,
-    listTable,
-    ListTableHead,
-    ListToolbar,
-} from "@/components/shared/list-toolbar";
+import { ListFilter, ListToolbar } from "@/components/shared/list-toolbar";
 import { SinceNotice } from "@/components/shared/since-notice";
-import { formatMoneyMajor } from "@/lib/format/money";
+import { formatDay } from "@/lib/format/datetime";
 import type { MissingRates } from "@/lib/gst-rates/missing";
 import { invoicesHref } from "@/lib/invoices/links";
+import type { ListQuery } from "@/lib/invoices/list-view";
+import {
+    figureEmptyLine,
+    hrefOf,
+    narrowed,
+    readsOnServer,
+    shownRows,
+    withFigure,
+    withSearch,
+    withTab,
+} from "@/lib/invoices/list-view";
 import { exemptNote } from "@/lib/invoices/paper-title";
 import type { Invoice } from "@/lib/invoices/service";
 import type { InvoiceScope, SourceChip } from "@/lib/invoices/sources";
@@ -35,44 +42,33 @@ import {
     scopeLine,
 } from "@/lib/invoices/sources";
 import type { InvoiceTab } from "@/lib/invoices/status";
-import {
-    inTab,
-    INVOICE_TABS,
-    owedSummary,
-    paidSinceRows,
-    withCorrectionsUnder,
-} from "@/lib/invoices/status";
-import { LIST_LIMIT } from "@/lib/lists/capped";
+import { inTab, INVOICE_TABS, paidSinceRows } from "@/lib/invoices/status";
+import type { InvoiceSummary, SummaryFilter } from "@/lib/invoices/summary";
 import { withoutSince } from "@/lib/views/since";
-import { cn } from "@saroh/ui/lib/utils";
-import { Notice } from "@saroh/ui/notice";
 
-/** The business's GST standing, for the line under the title. */
-export interface InvoiceBusinessTax {
-    registered: boolean;
-    gstin: string | null;
-}
-
-const money = (amount: string | number, currency: string) =>
-    formatMoneyMajor(amount, currency);
-
-/** "₹35,400", or "₹35,400 + $120" when a business bills in two currencies. */
-function sums(list: { currency: string; cents: number }[]): string {
-    if (list.length === 0) return money(0, "INR");
-    return list.map((s) => money(s.cents / 100, s.currency)).join(" + ");
-}
+export type { InvoiceBusinessTax } from "@/components/invoices/gst-status-line";
 
 /**
- * Payments → Invoices, after the "Saroh Invoices" design: every invoice the
- * business has — made by orders, by subscription renewals, or written by
- * hand — in tabs with counts, what is owed, a banner while any are overdue,
- * and a quick look on each row. Chips narrow it by what each was for
- * (`?source=`, D18); from Pack or Course Detail it holds one pack's or
- * course's only (`?pack=`, `?course=`), and says so.
+ * Payments → Invoices (DEC-173, U8 #1120, INVListAC and INVListACPhone):
+ * every invoice the business has — made by orders, by subscription
+ * renewals, or written by hand.
  *
- * Overdue is worked out from the due date by the API, never stored. A credit
- * note sits under the invoice it corrects and never counts as owed; an
- * order's own paper is owed on the order, so it never counts here either.
+ * From the top: the title (on a phone a compact bar: no breadcrumb, the
+ * count and New on one line), one GST line, the money strip (Owed,
+ * Overdue, Paid this month, Drafts, each a filter), the cheques line while
+ * a cheque waits, then the one toolbar (search, the status, what it was
+ * for) and the rows. The old header's owed figure and the red overdue
+ * banner are the strip now: the money is said once.
+ *
+ * Kept from before (§15): the status filter with its counts (`?tab=`),
+ * "What it was for" (`?source=`) and one pack's or course's invoices
+ * (`?pack=`, `?course=`), Home's "Last 24 hours" (`?since=`), corrections
+ * under their invoice, paging, "Showing the newest N", both empty states,
+ * and the quick look on every row.
+ *
+ * Overdue is worked out from the due date by the API, never stored. A
+ * credit note sits under the invoice it corrects and never counts as
+ * owed; an order's own paper is owed on the order.
  */
 export function InvoicesScreen({
     invoices,
@@ -80,18 +76,19 @@ export function InvoicesScreen({
     canWrite,
     businessName,
     tax,
-    initialTab,
+    query,
     initialChip = "all",
     scope = null,
     paidSince = null,
     paidSinceInvoices = null,
     timeZone,
     missingRates = null,
+    summary,
 }: {
     /**
      * What is on sale with a price and no GST rate, for a GST-registered
      * business: a tax invoice for one shows no GST. Null when it couldn't
-     * be told, which draws nothing.
+     * be told, which says nothing of it.
      */
     missingRates?: MissingRates | null;
     /**
@@ -106,12 +103,13 @@ export function InvoicesScreen({
     canWrite: boolean;
     /** Null when the business's tax settings could not be read. */
     tax: InvoiceBusinessTax | null;
-    initialTab: InvoiceTab;
-    /** The source chip `?source=` chose (D18). */
+    /** What the address narrows the list to (`listQueryFrom`). */
+    query: ListQuery;
+    /** The source `?source=` chose (D18). */
     initialChip?: SourceChip;
     /**
      * One pack's or course's invoices (D18): `invoices` holds only theirs,
-     * read so by the API, and the chips give way to the pill.
+     * read so by the API, and the source filter gives way to the pill.
      */
     scope?: InvoiceScope | null;
     /**
@@ -125,135 +123,223 @@ export function InvoicesScreen({
      * hand is filtered instead.
      */
     paidSinceInvoices?: Invoice[] | null;
+    /** The money strip's read; null when it couldn't be read. */
+    summary: InvoiceSummary | null;
 }) {
     const router = useRouter();
     const pathname = usePathname();
     const params = useSearchParams();
-    const [tab, setTab] = useState<InvoiceTab>(initialTab);
+    const [busy, start] = useTransition();
+    // What the list is showing: the address's, and what was just picked
+    // before the address catches up, so a figure or a status answers at
+    // once.
+    const [picked, setPicked] = useState<ListQuery | null>(null);
     const [chip, setChip] = useState<SourceChip>(initialChip);
     const [peek, setPeek] = useState<Invoice | null>(null);
+    // A new address from the server is the truth again: what was picked
+    // has arrived (or a link moved the list), so it gives way.
+    const [arrived, setArrived] = useState({ query, initialChip });
+    if (arrived.query !== query || arrived.initialChip !== initialChip) {
+        setArrived({ query, initialChip });
+        setPicked(null);
+        setChip(initialChip);
+    }
+    const shownQuery = picked ?? query;
 
-    // The tab and the chip are part of the address, so a reload or a shared
-    // link keeps them.
-    function remember(key: "tab" | "source", value: string | null) {
-        const q = new URLSearchParams(params.toString());
-        if (value === null) q.delete(key);
-        else q.set(key, value);
-        const s = q.toString();
-        router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false });
+    const go = (next: URLSearchParams) =>
+        start(() => router.replace(hrefOf(pathname, next), { scroll: false }));
+    const here = () => new URLSearchParams(params.toString());
+
+    /** The status dropdown: a figure of its own goes. */
+    function pickTab(tab: InvoiceTab) {
+        setPicked({
+            ...shownQuery,
+            tab,
+            owed: false,
+            cheques: false,
+            paidFrom: null,
+        });
+        go(withTab(here(), tab));
     }
 
-    function pick(next: InvoiceTab) {
-        setTab(next);
-        remember("tab", next === "all" ? null : next);
+    /** A figure of the strip, or the cheques line; null shows them all. */
+    function pickFigure(filter: SummaryFilter | null) {
+        setPicked({
+            ...shownQuery,
+            tab:
+                filter?.view === "overdue"
+                    ? "overdue"
+                    : filter?.view === "draft"
+                      ? "draft"
+                      : "all",
+            owed: filter?.view === "owed",
+            cheques: filter?.view === "cheques",
+            paidFrom: filter?.paidFrom ?? null,
+        });
+        setPeek(null);
+        go(withFigure(here(), filter));
     }
 
     function pickChip(next: SourceChip) {
         setChip(next);
         setPeek(null);
-        remember("source", next === "all" ? null : next);
+        const q = here();
+        if (next === "all") q.delete("source");
+        else q.set("source", next);
+        go(q);
     }
 
-    // Everything below — the tabs, their counts, what is owed — reads the
-    // chip's rows.
+    function search(term: string) {
+        if (term === shownQuery.q) return;
+        setPeek(null);
+        go(withSearch(here(), term));
+    }
+
+    function clearAll() {
+        setPicked({
+            tab: "all",
+            owed: false,
+            cheques: false,
+            paidFrom: null,
+            q: "",
+        });
+        setChip("all");
+        setPeek(null);
+        const q = withFigure(withSearch(here(), ""), null);
+        q.delete("source");
+        go(q);
+    }
+
+    /**
+     * The one seam a row opens through: today the quick look, and the
+     * details side sheet once U9 lands (`?invoice=` keeps it open).
+     */
+    const openInvoice = (invoice: Invoice) => setPeek(invoice);
+
+    // Everything below — the counts, the rows — reads the chosen source's.
     const chips = scope ? [] : chipsFor(invoices, chip);
     const mine = scope ? invoices : inChip(invoices, chip);
-    const { owed, overdue, overdueCount } = owedSummary(mine);
-    const rows = withCorrectionsUnder(
+    const rows = shownRows(
         paidSinceRows(
             mine,
             paidSinceInvoices && inChip(paidSinceInvoices, chip),
             paidSince,
         ),
+        shownQuery,
     );
-    const shown = rows.filter((i) => {
-        if (inTab(i, tab)) return true;
-        // A correction follows its invoice into whichever tab shows it.
-        const parent = i.related
-            ? mine.find((p) => p.id === i.related?.id)
-            : undefined;
-        return tab !== "all" && parent !== undefined && inTab(parent, tab);
-    });
-    // A page of them at a time, at the size this list was last shown at.
-    const { rows: paged, paging } = useLocalPages("invoices", shown, {
-        label: "Pages of invoices",
-        resetOn: `${tab}|${chip}`,
-    });
-    const tabLabel = INVOICE_TABS.find((t) => t.id === tab)?.label ?? "";
+    const onServer = readsOnServer(query);
+    const tabLabel =
+        INVOICE_TABS.find((t) => t.id === shownQuery.tab)?.label ?? "";
+    const day = (key: string) => formatDay(key);
+    const somethingNarrows = narrowed(shownQuery) || (!scope && chip !== "all");
+
+    const empty: ListEmpty | null =
+        invoices.length === 0 && !scope && !onServer
+            ? { kind: "first-run" }
+            : rows.length > 0
+              ? null
+              : shownQuery.q
+                ? {
+                      kind: "no-results",
+                      cause: "search",
+                      query: shownQuery.q,
+                      onClear: () => search(""),
+                  }
+                : {
+                      kind: "no-results",
+                      cause: "view",
+                      title: (
+                          figureEmptyLine(shownQuery, day) ??
+                          (scope && mine.length === 0
+                              ? scopeEmptyLine(scope)
+                              : chipEmptyLine(tabLabel, scope ? "all" : chip))
+                      ).replace(/\.$/, ""),
+                      onClear: somethingNarrows ? clearAll : undefined,
+                  };
+
     // Every issued paper a bill of supply (D15): the line says so, rather
     // than "GST tax invoices".
     const exempt = exemptNote(invoices);
+    const chequesOn = shownQuery.cheques;
 
     return (
         // One block: the page container spaces its children apart, and the
-        // design sets the title, note and tabs close together.
+        // design sets the title, the lines and the strip close together.
         <div>
             <PageHeader
+                compactOnPhone
                 breadcrumb={["Payments", "Invoices"]}
                 title="Invoices"
-                count={countLabel(mine.length, {
-                    one: "invoice",
-                    other: "invoices",
-                })}
-                className="mb-1.5"
-                // A summary, not a count of the list: before the button.
-                meta={
-                    mine.length > 0 ? (
-                        <span>
-                            {sums(owed)} owed to you · {overdueCount} overdue
-                        </span>
-                    ) : undefined
+                // How many are on hand, until a search or a figure asks
+                // the API: then the rows are the answer, not the business.
+                count={
+                    onServer
+                        ? undefined
+                        : countLabel(mine.length, {
+                              one: "invoice",
+                              other: "invoices",
+                          })
                 }
+                className="mb-1"
                 actions={
                     canWrite ? (
                         <Button asChild>
-                            <Link href="/billing/invoices/new">
-                                New invoice
+                            <Link
+                                href="/billing/invoices/new"
+                                aria-label="New invoice"
+                            >
+                                <span className="sm:hidden">New</span>
+                                <span className="max-sm:hidden">
+                                    New invoice
+                                </span>
                             </Link>
                         </Button>
                     ) : undefined
                 }
             />
-            <p className="mb-3 text-[12px] text-muted-foreground">
-                Orders and subscription renewals make their invoice themselves.
-                {exempt
-                    ? ` ${exempt}`
-                    : tax
-                      ? tax.registered
-                          ? ` GST tax invoices${tax.gstin ? `, GSTIN ${tax.gstin}` : ""}.`
-                          : " Not GST-registered. No tax is charged."
-                      : null}
-            </p>
-            <MissingRatesNotice missing={missingRates} className="mb-3" />
+            <GstStatusLine
+                tax={tax}
+                exempt={exempt}
+                missing={missingRates}
+                className="mb-3.5 text-[12.5px] leading-relaxed text-muted-foreground max-sm:mb-3"
+            />
 
-            {/* The one list toolbar, in one row: an invoice's standing and
-                what it was for are its two dropdown filters. */}
+            <MoneyStrip
+                summary={summary}
+                query={shownQuery}
+                onPick={pickFigure}
+                className="mb-2.5"
+            />
+            <ChequesLine
+                summary={summary}
+                on={chequesOn}
+                onPick={pickFigure}
+                className="mb-2.5"
+            />
+
+            {/* The one list toolbar, in one row: the search, then an
+                invoice's standing and what it was for. */}
             <ListToolbar
-                onClear={
-                    tab !== "all" || (!scope && chip !== "all")
-                        ? () => {
-                              setTab("all");
-                              setChip("all");
-                              setPeek(null);
-                              const q = new URLSearchParams(params.toString());
-                              q.delete("tab");
-                              q.delete("source");
-                              const s = q.toString();
-                              router.replace(
-                                  s ? `${pathname}?${s}` : pathname,
-                                  {
-                                      scroll: false,
-                                  },
-                              );
-                          }
-                        : undefined
+                className="mt-3.5"
+                search={
+                    <InvoiceSearch
+                        term={shownQuery.q}
+                        searching={busy && shownQuery.q !== query.q}
+                        onSearch={search}
+                    />
+                }
+                onClear={somethingNarrows ? clearAll : undefined}
+                clearLabel={
+                    shownQuery.q && !narrowed({ ...shownQuery, q: "" })
+                        ? "Clear search"
+                        : "Clear filters"
                 }
                 filters={
                     <>
                         <ListFilter<InvoiceTab>
                             label="Invoice status"
-                            value={tab}
-                            onValueChange={pick}
+                            value={shownQuery.tab}
+                            onValueChange={pickTab}
                             options={INVOICE_TABS.map((t) => ({
                                 value: t.id,
                                 label:
@@ -278,11 +364,20 @@ export function InvoicesScreen({
                 }
             />
 
-            <div className="flex flex-col pb-[26px] pt-4">
-                {paidSince ? (
-                    <div className="mb-3.5">
+            <InvoiceListBody
+                rows={rows}
+                empty={empty}
+                resetOn={`${shownQuery.tab}|${chip}|${shownQuery.owed}|${shownQuery.cheques}|${shownQuery.paidFrom}|${shownQuery.q}`}
+                selectedId={peek?.id ?? null}
+                onOpen={openInvoice}
+                timeZone={timeZone}
+                truncated={truncated && !onServer}
+                canWrite={canWrite}
+                busy={busy}
+                notice={
+                    paidSince ? (
                         <SinceNotice
-                            count={shown.length}
+                            count={rows.length}
                             noun={{ one: "invoice", other: "invoices" }}
                             verb="paid"
                             clearHref={withoutSince(
@@ -290,95 +385,9 @@ export function InvoicesScreen({
                                 Object.fromEntries(params.entries()),
                             )}
                         />
-                    </div>
-                ) : null}
-                {overdueCount > 0 && tab !== "overdue" ? (
-                    <Notice tone="error" className="mb-3.5" align="center">
-                        <div className="flex flex-wrap items-center gap-3">
-                            <span className="flex-[1_1_260px] text-[13px] font-semibold text-destructive-subtle-foreground">
-                                {overdueCount} overdue · {sums(overdue)}, worked
-                                out from the due date.
-                            </span>
-                            <Button
-                                size="sm"
-                                type="button"
-                                variant="outline"
-                                onClick={() => pick("overdue")}
-                                className="border-destructive-subtle-foreground"
-                            >
-                                Show them
-                            </Button>
-                        </div>
-                    </Notice>
-                ) : null}
-
-                {invoices.length === 0 && !scope ? (
-                    <EmptyState
-                        icon={<ReceiptText />}
-                        title="No invoices yet"
-                        description="Orders and renewals are invoiced for you, and you can write one by hand."
-                        action={
-                            canWrite ? (
-                                <Button asChild>
-                                    <Link href="/billing/invoices/new">
-                                        New invoice
-                                    </Link>
-                                </Button>
-                            ) : undefined
-                        }
-                    />
-                ) : shown.length === 0 ? (
-                    <EmptyState
-                        kind="no-results"
-                        things="invoices"
-                        cause="view"
-                        icon={<ReceiptText />}
-                        title={(scope && mine.length === 0
-                            ? scopeEmptyLine(scope)
-                            : chipEmptyLine(tabLabel, scope ? "all" : chip)
-                        ).replace(/\.$/, "")}
-                        onClear={
-                            tab !== "all"
-                                ? () => pick("all")
-                                : !scope && chip !== "all"
-                                  ? () => pickChip("all")
-                                  : undefined
-                        }
-                    />
-                ) : (
-                    <ListTable>
-                        <ListTableHead
-                            className={cn(INVOICE_GRID, "max-md:hidden")}
-                        >
-                            <span>Invoice</span>
-                            <span>Billed to</span>
-                            <span>Status</span>
-                            <span className="text-right">Total</span>
-                        </ListTableHead>
-                        <ul aria-label="Invoices">
-                            {paged.map((i) => (
-                                <li key={i.id} className={listTable.rule}>
-                                    <InvoiceRow
-                                        invoice={i}
-                                        selected={peek?.id === i.id}
-                                        onOpen={() => setPeek(i)}
-                                        timeZone={timeZone}
-                                    />
-                                </li>
-                            ))}
-                        </ul>
-                    </ListTable>
-                )}
-                {shown.length > 0 ? paging : null}
-
-                {truncated ? (
-                    <p className="mt-3 max-w-[68ch] text-[12px] text-muted-foreground">
-                        Showing the newest {LIST_LIMIT} invoices and every
-                        unpaid one. Older paid and cancelled invoices are not
-                        listed.
-                    </p>
-                ) : null}
-            </div>
+                    ) : null
+                }
+            />
 
             <InvoiceQuickLook
                 invoice={peek}

@@ -34,17 +34,23 @@ import { exemptInvoiceIds } from "./exempt-invoices";
 import { isGstRate, rateToBps } from "./gst";
 import { assertRatesSet } from "./gst-rate-required";
 import { gstinProblem, stateCode } from "./gst-states";
+import { lockInvoiceForLedger } from "./invoice-ledger";
+import type { RecordedPaymentView } from "./invoice-payments.service";
+import { InvoicePaymentsService } from "./invoice-payments.service";
 import type { InvoiceSource } from "./invoice-state";
 import {
     CAPTURED_NEEDS_REFUND,
     DEFAULT_DUE_DAYS,
     isPastDue,
+    leftToPayCents,
     NOT_A_BOOKING_HOLD,
     OWED_WHERE,
     paidSinceFilter,
     viewWhere,
 } from "./invoice-state";
-import { listFilterWhere } from "./list-filter";
+import { invoiceZoneOf, startOfDayIn } from "./invoice-summary.service";
+import { listFilterWhere, paidFromWhere, searchWhere } from "./list-filter";
+import { moneyQueryCents } from "./money-query";
 import type { BuiltDocument, TaxProfile } from "./order-invoice";
 import { buildManualInvoice } from "./order-invoice";
 import {
@@ -100,6 +106,10 @@ const VIEW_LINK: LinkOptions = { requireProvider: false, allowPaid: true };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LIST_LIMIT = 500;
+
+/** Why a partly paid invoice isn't voided or credited (DEC-173). */
+const PAID_IN_PART =
+    "Part of this invoice is paid. Remove its payments before cancelling it.";
 
 /** A refusal the form can put on the field it is about. */
 function fieldError(message: string, field: string): never {
@@ -162,15 +172,42 @@ interface BillToGst {
  */
 @Injectable()
 export class InvoicesService {
+    // The ledger (DEC-173). Defaulted so a spec or another module's own
+    // `new InvoicesService()` records through the same path; it holds no
+    // state.
+    constructor(
+        private readonly payments: InvoicePaymentsService = new InvoicePaymentsService(),
+    ) {}
+
     async list(
         ctx: OrganizationContext,
         query: ListInvoicesQueryDto,
     ): Promise<InvoiceViewModel[]> {
         authorize(ctx, "invoice:read");
         const now = new Date();
+        const organizationId = ctx.organizationId;
+        const { q, paidFrom: paidFromDay } = query;
+        const [search, paidFrom] = await Promise.all([
+            q ? this.searchFor(organizationId, q) : null,
+            paidFromDay
+                ? invoiceZoneOf(prisma, organizationId).then((zone) =>
+                      startOfDayIn(paidFromDay, zone),
+                  )
+                : null,
+        ]);
+        // What it was for (D18), then search and Paid this month (DEC-173,
+        // U4), all ANDed on: each brings its own OR, and hidden drafts stay
+        // hidden. Searched on the server, so an invoice older than the
+        // newest page is found.
+        const narrowed = listFilterWhere(query);
+        const and = [
+            ...((narrowed.AND as Prisma.InvoiceWhereInput[] | undefined) ?? []),
+            ...(search ? [search] : []),
+            ...(paidFrom ? [paidFromWhere(paidFrom)] : []),
+        ];
         const rows = await prisma.invoice.findMany({
             where: {
-                organizationId: ctx.organizationId,
+                organizationId,
                 ...NOT_A_BOOKING_HOLD,
                 ...(query.view ? viewWhere(query.view, now) : {}),
                 ...(query.contactId ? { contactId: query.contactId } : {}),
@@ -180,19 +217,45 @@ export class InvoicesService {
                 ...(query.paidSince
                     ? paidSinceFilter(new Date(query.paidSince))
                     : {}),
-                // What it was for (D18); ANDed on, so hidden drafts stay hidden.
-                ...listFilterWhere(query),
+                ...(and.length > 0 ? { AND: and } : {}),
             },
             orderBy: { createdAt: "desc" },
             take: LIST_LIMIT,
             select: INVOICE_LIST_SELECT,
         });
-        const exempt = await exemptInvoiceIds(prisma, ctx.organizationId, rows);
+        const exempt = await exemptInvoiceIds(prisma, organizationId, rows);
         return rows.map((r) =>
             serializeInvoice(r as InvoiceRow, now, {
                 exempt: exempt.has(r.id),
             }),
         );
+    }
+
+    /**
+     * The search's where (DEC-173, U4). When `q` reads as an amount, the
+     * partly paid invoices whose left to pay is that amount are found
+     * here, through `leftToPayCents`, the one place it is worked out:
+     * there are few of them, so they are read and folded rather than
+     * worked out again in SQL.
+     */
+    private async searchFor(
+        organizationId: string,
+        q: string,
+    ): Promise<Prisma.InvoiceWhereInput> {
+        const cents = moneyQueryCents(q);
+        if (cents === null) return searchWhere(q, null);
+        const partlyPaid = await prisma.invoice.findMany({
+            where: {
+                organizationId,
+                status: "ISSUED",
+                paidCents: { gt: 0 },
+            },
+            select: { id: true, total: true, paidCents: true },
+        });
+        const leftIds = partlyPaid
+            .filter((inv) => leftToPayCents(inv) === cents)
+            .map((inv) => inv.id);
+        return searchWhere(q, cents, leftIds);
     }
 
     /**
@@ -369,8 +432,9 @@ export class InvoicesService {
     }
 
     /**
-     * What a person, or one subscription, still owes: issued and unpaid.
-     * Totals are kept per currency rather than added across them.
+     * What a person, or one subscription, still owes: issued and unpaid,
+     * each invoice counted at what is left to pay on it (DEC-173). Totals
+     * are kept per currency rather than added across them.
      */
     async owed(
         ctx: OrganizationContext,
@@ -403,14 +467,21 @@ export class InvoicesService {
                     ? { subscriptionId: who.subscriptionId }
                     : {}),
             },
-            select: { status: true, currency: true, total: true, dueAt: true },
+            select: {
+                status: true,
+                currency: true,
+                total: true,
+                paidCents: true,
+                dueAt: true,
+            },
         });
         const byCurrency = new Map<string, number>();
         let overdueCount = 0;
         for (const r of rows) {
+            // What is left to pay on it (DEC-173), not its whole total.
             byCurrency.set(
                 r.currency,
-                (byCurrency.get(r.currency) ?? 0) + toCents(r.total.toString()),
+                (byCurrency.get(r.currency) ?? 0) + leftToPayCents(r),
             );
             if (isPastDue(r, now)) overdueCount += 1;
         }
@@ -702,7 +773,18 @@ export class InvoicesService {
                       : "A void invoice cannot be credited.",
             );
         }
+        this.assertNothingPaid(current);
         const noteId = await prisma.$transaction(async (tx) => {
+            // Again under the ledger's lock: a payment recorded since the
+            // read above holds the cancel back.
+            const locked = await lockInvoiceForLedger(
+                tx,
+                ctx.organizationId,
+                id,
+            );
+            if (locked?.status === "ISSUED" && locked.paidCents > 0) {
+                throw new ConflictException(PAID_IN_PART);
+            }
             const note = await issueCreditNote(tx, {
                 invoiceId: id,
                 amountCents: MAX_CENTS,
@@ -806,34 +888,16 @@ export class InvoicesService {
 
     /**
      * Money taken outside Saroh — cash, UPI, a bank transfer, a card at the
-     * counter — written down. Nothing is charged. An order's invoice is paid
-     * on the order.
+     * counter, a cheque — written down, in full or in part. Nothing is
+     * charged. It goes on the invoice's ledger (DEC-173), which settles the
+     * status; an order's invoice is paid on the order.
      */
-    async recordPayment(
+    recordPayment(
         ctx: OrganizationContext,
         id: string,
         dto: RecordPaymentDto,
-    ): Promise<InvoiceViewModel> {
-        authorize(ctx, "invoice:write");
-        const current = await this.read(ctx.organizationId, id);
-        this.assertOwnPaper(current, "paid here");
-        if (current.status !== "ISSUED") {
-            throw new ConflictException(this.notIssued(current.status, "paid"));
-        }
-        const { count } = await prisma.invoice.updateMany({
-            where: { id, organizationId: ctx.organizationId, status: "ISSUED" },
-            data: {
-                status: "PAID",
-                paidAt: dto.paidAt ? new Date(dto.paidAt) : new Date(),
-                paymentMethod: dto.method,
-                paymentReference: dto.reference ?? null,
-                paymentNote: dto.note ?? null,
-            },
-        });
-        if (count === 0) {
-            throw new ConflictException("This invoice changed. Reload it.");
-        }
-        return this.read(ctx.organizationId, id);
+    ): Promise<RecordedPaymentView> {
+        return this.payments.record(ctx, id, dto);
     }
 
     /**
@@ -1006,6 +1070,7 @@ export class InvoicesService {
                 orderId: true,
                 bookingId: true,
                 sellerGstin: true,
+                paidCents: true,
             },
         });
         if (!row) notFound();
@@ -1024,6 +1089,7 @@ export class InvoicesService {
         if (row.status !== "ISSUED") {
             throw new ConflictException(this.notIssued(row.status, "voided"));
         }
+        if (row.paidCents > 0) throw new ConflictException(PAID_IN_PART);
         // A GST-registered business never voids an issued invoice: a void
         // leaves a hole in the series. It credits it instead (ADR-008).
         const profile = await loadTaxProfile(tx, organizationId);
@@ -1033,8 +1099,9 @@ export class InvoicesService {
             );
         }
         // A void invoice is not to be paid, so its pay link stops working.
+        // Fenced on nothing paid, too: a payment recorded meanwhile wins.
         const { count } = await tx.invoice.updateMany({
-            where: { id, organizationId, status: "ISSUED" },
+            where: { id, organizationId, status: "ISSUED", paidCents: 0 },
             data: {
                 status: "VOID",
                 voidedAt: new Date(),
@@ -1166,6 +1233,18 @@ export class InvoicesService {
         }
         if (invoice.kind === "CREDIT_NOTE") {
             throw new ConflictException(`A credit note is not ${verb}.`);
+        }
+    }
+
+    /**
+     * A partly paid invoice isn't cancelled while money stands on it
+     * (DEC-173): its payments are removed first. What a credit note does to
+     * money paid is the owner's decision still to come; a PAID invoice keeps
+     * today's Refund….
+     */
+    private assertNothingPaid(invoice: InvoiceViewModel): void {
+        if (invoice.status === "ISSUED" && invoice.partlyPaid) {
+            throw new ConflictException(PAID_IN_PART);
         }
     }
 

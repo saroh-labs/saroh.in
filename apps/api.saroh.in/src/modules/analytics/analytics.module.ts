@@ -24,6 +24,8 @@ import {
     AnalyticsController,
     AnalyticsPublicController,
 } from "./analytics.controller";
+import { SellsService } from "./sells.service";
+import { SuggestionsService } from "./suggestions.service";
 import { TakingsService } from "./takings.service";
 
 /** How often a stopped rollup or retention chain is looked for and restarted. */
@@ -67,6 +69,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AnalyticsRetentionHandler,
         OrganizationGuard,
         TakingsService,
+        SellsService,
+        SuggestionsService,
     ],
     // Re-exported so existing consumers of AnalyticsModule are unaffected by
     // the extraction; new consumers should import AnalyticsCoreModule directly.

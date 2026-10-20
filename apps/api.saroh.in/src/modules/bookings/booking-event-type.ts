@@ -10,6 +10,9 @@ export const BookingEventType = {
     NoShow: "NO_SHOW",
     // Payment taken at the desk (P2): the history says who took it.
     PaidAtDesk: "PAID_AT_DESK",
+    // Given to someone else, or to someone when it had nobody (#1157):
+    // the line names both people, and the time when it moved too.
+    Reassigned: "REASSIGNED",
 } as const;
 
 export type BookingEventType =

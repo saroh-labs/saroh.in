@@ -111,6 +111,9 @@ const CASES = [
             "availability",
             "bookByHand",
             "rescheduleBooking",
+            // Change who it's with (#1157), and who could take it.
+            "reassignBooking",
+            "reassignCandidates",
             "recordOutcome",
             "payLink",
             "takeDeskPayment",

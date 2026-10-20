@@ -540,7 +540,7 @@ function payLine(i: Invoice, money: (a: string) => string) {
         default:
             // No online payment (DEC-070): there is no payment link to send.
             return paysOnline(i.send, i.online)
-                ? "Not paid. Send the payment link, or mark it paid when the money arrives."
-                : "Not paid. Send it, or mark it paid when the money arrives.";
+                ? "Not paid yet. Send the payment link. When the money comes in, record it."
+                : "Not paid yet. Send it. When the money comes in, record it.";
     }
 }

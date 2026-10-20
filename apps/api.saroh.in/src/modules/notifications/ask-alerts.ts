@@ -19,8 +19,9 @@ import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
  * Permission requests to the people who may answer them, and the answers
  * back (DEC-170, owner 19 Oct: "Rule requests are told by email and in the
  * app"). Owners and admins hear of a request in the inbox AND by email;
- * the person who asked hears the outcome — approved, or turned down with
- * the reason — in their own alerts AND by email.
+ * the person who asked hears the outcome — approved, turned down with
+ * the reason, or replaced by a newer change (owner, 20 Oct 2026) — in
+ * their own alerts AND by email.
  *
  * The mechanism is the request's, not the rules': a request writes its
  * bell notice on its own transaction (the business's, for whoever may
@@ -44,6 +45,12 @@ type AskPayload = Extract<TeamAlertPayload, { event: "ask" }>;
 /** The bell's notice types (`notice-target.ts`). */
 export const RULE_REQUEST_NOTIFICATION_TYPE = "hours.rule-request" as const;
 export const RULE_ANSWER_NOTIFICATION_TYPE = "hours.rule-answer" as const;
+
+/**
+ * How a request ended, as its asker is told: approved, turned down, or
+ * closed by a newer change (`staff/rule-request-close.ts`).
+ */
+export type AnswerOutcome = "APPROVED" | "TURNED_DOWN" | "REPLACED";
 
 /** How much of a turn-down's reason the email carries. */
 export const REASON_MAX = 280;
@@ -85,7 +92,6 @@ const ORDER = [
     "latestBookingMinutes",
     "bookAheadDays",
     "gapMinutes",
-    "freeCancelHours",
 ] as const satisfies readonly PersonRuleField[];
 
 /** Words joined as one plain sentence's list. */
@@ -108,14 +114,21 @@ export function askedMail(
 }
 
 /**
- * The email to whoever asked: approved, or turned down with the reason
- * (already cleaned; null when none was given).
+ * The email to whoever asked: approved, turned down with the reason
+ * (already cleaned; null when none was given), or replaced by a newer
+ * change.
  */
 export function answeredMail(
-    outcome: "APPROVED" | "TURNED_DOWN",
+    outcome: AnswerOutcome,
     asked: readonly string[],
     reason: string | null,
 ): WordedAlert["mail"] {
+    if (outcome === "REPLACED") {
+        return {
+            heading: answerTitle(outcome),
+            body: `You asked for: ${listed(asked)}. A newer change closed it before anyone decided, so nothing in it was applied. See your booking rules as they are now, and change them again if you still need to.`,
+        };
+    }
     if (outcome === "APPROVED") {
         return {
             heading: "Your booking rules change was approved",
@@ -172,7 +185,6 @@ async function wordRulesAsk(
                     name: true,
                     bookAheadDays: true,
                     latestBookingMinutes: true,
-                    freeCancelHours: true,
                     gapMinutes: true,
                 },
             },
@@ -212,7 +224,11 @@ async function wordRulesAsk(
         };
     }
 
-    if (request.status !== "APPROVED" && request.status !== "TURNED_DOWN") {
+    if (
+        request.status !== "APPROVED" &&
+        request.status !== "TURNED_DOWN" &&
+        request.status !== "REPLACED"
+    ) {
         return null;
     }
     const words = askedAndNow(asked, personRulesOf(request.staff)).asked;
@@ -232,10 +248,15 @@ async function wordRulesAsk(
 }
 
 /** The answer's title, in the asker's inbox and email alike. */
-export function answerTitle(status: "APPROVED" | "TURNED_DOWN"): string {
-    return status === "APPROVED"
-        ? "Your booking rules change was approved"
-        : "Your booking rules change was turned down";
+export function answerTitle(status: AnswerOutcome): string {
+    switch (status) {
+        case "APPROVED":
+            return "Your booking rules change was approved";
+        case "TURNED_DOWN":
+            return "Your booking rules change was turned down";
+        case "REPLACED":
+            return "Your booking rules change was replaced by a newer change";
+    }
 }
 
 /**

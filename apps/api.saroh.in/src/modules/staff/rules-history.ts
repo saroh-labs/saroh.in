@@ -98,6 +98,11 @@ export type PersonRulesEvent =
           action: typeof AuditAction.StaffRulesWithdrawn;
           requestId: string;
           replaced?: true;
+      }
+    | {
+          action: typeof AuditAction.StaffRulesReplaced;
+          requestId: string;
+          because: "rules-changed" | "approval-off";
       };
 
 /** One move on a person's rules, with the person as the target. */

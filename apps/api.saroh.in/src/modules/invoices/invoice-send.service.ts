@@ -11,7 +11,11 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { dayWords, moneyWords, whenWords } from "../../common/words-format";
+import {
+    dayWords,
+    moneyWordsMinor,
+    whenWords,
+} from "../../common/words-format";
 import type { AccountThreadPoster } from "../communications/account-thread";
 import {
     ACCOUNT_THREAD_POSTER,
@@ -30,13 +34,14 @@ import {
     chargeUnderWayOn,
 } from "../payments/charge-under-way";
 import { assertBusinessDetails } from "./business-details";
-import { isPastDue } from "./invoice-state";
+import { isPastDue, leftToPayCents } from "./invoice-state";
 import { InvoicesService } from "./invoices.service";
 import { payLinkUrlFor } from "./pay-link-url";
 import { invoicePayOnline } from "./pay-online";
 import type {
     InvoiceSendView,
     InvoiceSentView,
+    InvoiceSharedView,
     SendBlocker,
     SendChannel,
 } from "./send-view";
@@ -59,7 +64,7 @@ const INVOICE_TEMPLATES: InvoiceTemplate[] = [
 /** A send that went, or is going: a failed or suppressed one doesn't count. */
 const WENT = ["QUEUED", "SENT"];
 
-const SEND_SELECT = {
+export const SEND_SELECT = {
     id: true,
     number: true,
     status: true,
@@ -72,11 +77,36 @@ const SEND_SELECT = {
     billToName: true,
     currency: true,
     total: true,
+    // What is left to pay is what the message asks for (DEC-173).
+    paidCents: true,
     dueAt: true,
-    contact: { select: { firstName: true, lastName: true } },
+    // The phone a WhatsApp share opens a chat with (DEC-173).
+    contact: { select: { firstName: true, lastName: true, phone: true } },
 } as const;
 
-type SendRow = Prisma.InvoiceGetPayload<{ select: typeof SEND_SELECT }>;
+/** The WhatsApp shares that ask to be paid: they count as a send (DEC-173). */
+const WHATSAPP_ASKS = ["NEW", "REMINDER"];
+
+/**
+ * Why an invoice's email can't go, for the share sheet and the bulk
+ * reminder: no provider, no address, or the customer turned email off.
+ */
+export type EmailBlocker =
+    "NO_EMAIL_PROVIDER" | "NO_EMAIL_ADDRESS" | "EMAIL_OFF";
+
+/** How an invoice can reach its customer, for Share and Remind many. */
+export interface InvoiceReach {
+    /** The address an email would go to, when one can go. */
+    emailTo: string | null;
+    /** Why no email can go; null when one can. */
+    emailBlocked: EmailBlocker | null;
+    /** The contact's phone (E.164), for WhatsApp; null when there's none. */
+    phone: string | null;
+    /** The send flag, as `sendChannels` reads it. */
+    send: InvoiceSendView;
+}
+
+export type SendRow = Prisma.InvoiceGetPayload<{ select: typeof SEND_SELECT }>;
 
 function notFound(): never {
     throw new NotFoundException("Invoice not found");
@@ -92,7 +122,9 @@ function sendable(row: SendRow): boolean {
 /**
  * Send an invoice, or a reminder, with its pay link (round-2 D17), through
  * the business's own connected provider — Saroh's email is never used
- * (default 38), and there is no WhatsApp share (default 106). A business
+ * (default 38). WhatsApp is a click-to-chat share, never a send: the
+ * business opens it from Share (`invoice-share.service.ts`, DEC-173), and a
+ * WhatsApp reminder counts towards one reminder a day here. A business
  * that doesn't take payment online sends the same link as a view link
  * (DEC-070): the invoice and its PDF, without a Pay button. The invoice's
  * PDF is attached to the email (DEC-083), drawn by the send job where the
@@ -123,8 +155,12 @@ export class InvoiceSendService {
         organizationId: string,
         invoiceId: string,
         now = new Date(),
-    ): Promise<{ send: InvoiceSendView; sent: InvoiceSentView[] }> {
-        const [row, sent] = await Promise.all([
+    ): Promise<{
+        send: InvoiceSendView;
+        sent: InvoiceSentView[];
+        shared: InvoiceSharedView[];
+    }> {
+        const [row, sent, shared] = await Promise.all([
             prisma.invoice.findFirst({
                 where: { id: invoiceId, organizationId },
                 select: SEND_SELECT,
@@ -145,6 +181,18 @@ export class InvoiceSendService {
                     status: true,
                 },
             }),
+            prisma.invoiceShare.findMany({
+                where: { organizationId, invoiceId },
+                orderBy: { createdAt: "desc" },
+                take: 10,
+                select: {
+                    id: true,
+                    channel: true,
+                    kind: true,
+                    byUserId: true,
+                    createdAt: true,
+                },
+            }),
         ]);
         if (!row) notFound();
         return {
@@ -157,7 +205,69 @@ export class InvoiceSendService {
                 reminder: m.template === "INVOICE_REMINDER",
                 status: m.status,
             })),
+            shared: shared.map((s) => ({
+                id: s.id,
+                channel: s.channel as InvoiceSharedView["channel"],
+                kind: s.kind as InvoiceSharedView["kind"],
+                byUserId: s.byUserId,
+                at: s.createdAt.toISOString(),
+            })),
         };
+    }
+
+    /**
+     * How this invoice can reach its customer now (DEC-173): the send flag,
+     * whether an email can go and why not, and the phone WhatsApp would
+     * open. Email can go when the business's provider is connected, there
+     * is an address, and the customer hasn't turned email off; a send to
+     * someone who has would be written SUPPRESSED, so it isn't offered.
+     */
+    async channelsFor(
+        db: Db,
+        organizationId: string,
+        row: SendRow,
+        now: Date,
+    ): Promise<InvoiceReach> {
+        const [send, emailOn, to] = await Promise.all([
+            this.sendChannels(db, organizationId, row, now),
+            this.comms.emailConnected(db, organizationId),
+            this.comms.transactionalAddress(db, organizationId, {
+                kind: "INVOICE_BILL_TO",
+                invoiceId: row.id,
+            }),
+        ]);
+        const phone = row.contact?.phone ?? null;
+        if (!emailOn) {
+            return {
+                emailTo: null,
+                emailBlocked: "NO_EMAIL_PROVIDER",
+                phone,
+                send,
+            };
+        }
+        if (!to) {
+            return {
+                emailTo: null,
+                emailBlocked: "NO_EMAIL_ADDRESS",
+                phone,
+                send,
+            };
+        }
+        const consent = to.contactId
+            ? await db.consent.findUnique({
+                  where: {
+                      contactId_channel: {
+                          contactId: to.contactId,
+                          channel: "EMAIL",
+                      },
+                  },
+                  select: { status: true },
+              })
+            : null;
+        if (consent?.status === "REVOKED") {
+            return { emailTo: null, emailBlocked: "EMAIL_OFF", phone, send };
+        }
+        return { emailTo: to.address, emailBlocked: null, phone, send };
     }
 
     /**
@@ -291,7 +401,12 @@ export class InvoiceSendService {
                             business: org?.name ?? "",
                             firstName: firstName(row),
                             number: row.number ?? "",
-                            total: moneyWords(row.total, row.currency),
+                            // What is left to pay: a partly paid invoice's
+                            // reminder asks for the rest (DEC-173).
+                            total: moneyWordsMinor(
+                                leftToPayCents(row),
+                                row.currency,
+                            ),
                             dueOn: row.dueAt
                                 ? dayWords(row.dueAt, zone, { year: true })
                                 : null,
@@ -389,8 +504,13 @@ export class InvoiceSendService {
         }
     }
 
-    /** When the next reminder may go: a day after the last send that went. */
-    private async nextReminderAt(
+    /**
+     * When the next reminder may go: a day after the last send that went,
+     * by email, into the account thread, or opened on WhatsApp (DEC-173:
+     * a WhatsApp reminder counts towards one a day, whichever way the
+     * customer was asked).
+     */
+    async nextReminderAt(
         db: Db,
         invoiceId: string,
         now: Date,
@@ -398,7 +518,7 @@ export class InvoiceSendService {
         const since = new Date(now.getTime() - DAY_MS);
         // An email that went, or a post into the account thread (A13): a
         // thread-only send counts the same.
-        const [email, post] = await Promise.all([
+        const [email, post, whatsapp] = await Promise.all([
             db.message.findFirst({
                 where: {
                     invoiceId,
@@ -418,8 +538,18 @@ export class InvoiceSendService {
                 orderBy: { createdAt: "desc" },
                 select: { createdAt: true },
             }),
+            db.invoiceShare.findFirst({
+                where: {
+                    invoiceId,
+                    channel: "WHATSAPP",
+                    kind: { in: WHATSAPP_ASKS },
+                    createdAt: { gt: since },
+                },
+                orderBy: { createdAt: "desc" },
+                select: { createdAt: true },
+            }),
         ]);
-        const times = [email?.createdAt, post?.createdAt]
+        const times = [email?.createdAt, post?.createdAt, whatsapp?.createdAt]
             .filter((at): at is Date => at !== undefined)
             .map((at) => at.getTime());
         return times.length > 0
@@ -458,7 +588,7 @@ export class InvoiceSendService {
         return account > 0;
     }
 
-    private async zone(db: Db, organizationId: string): Promise<string> {
+    async zone(db: Db, organizationId: string): Promise<string> {
         const profile = await db.businessProfile.findUnique({
             where: { organizationId },
             select: { timezone: true },
@@ -481,7 +611,7 @@ export function blockerMessage(reason: SendBlocker | undefined): string {
     }
 }
 
-function firstName(row: SendRow): string | null {
+export function firstName(row: SendRow): string | null {
     const name =
         row.billToName ??
         [row.contact?.firstName, row.contact?.lastName]

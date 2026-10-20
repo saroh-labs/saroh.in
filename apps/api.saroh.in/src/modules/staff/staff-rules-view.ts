@@ -19,10 +19,13 @@ import {
  * read out with who asked and who decided, as they are now.
  */
 
-/** The timing rules, as a person's diary keeps them. */
+/**
+ * The timing rules a person may have their own of, as their diary keeps
+ * them. Free cancelling is the business's alone (owner, 20 Oct 2026).
+ */
 export type TimingRules = Pick<
     BookingRulesValue,
-    "bookAheadDays" | "latestBookingMinutes" | "freeCancelHours" | "gapMinutes"
+    "bookAheadDays" | "latestBookingMinutes" | "gapMinutes"
 >;
 
 /** Someone a request names, as they are now. */
@@ -64,8 +67,9 @@ export interface PersonRulesView {
     /** Whether a change the caller makes waits for approval. */
     needsApproval: boolean;
     /**
-     * The request waiting, or the last one decided until its person says
-     * OK to it (`dismiss`); null with neither.
+     * The request waiting, or the last one decided — approved, turned
+     * down, or replaced by a newer change — until its person says OK to it
+     * (`dismiss`); null with neither.
      */
     request: RuleRequestView | null;
 }
@@ -92,7 +96,6 @@ export function timing(rules: BookingRulesValue): TimingRules {
     return {
         bookAheadDays: rules.bookAheadDays,
         latestBookingMinutes: rules.latestBookingMinutes,
-        freeCancelHours: rules.freeCancelHours,
         gapMinutes: rules.gapMinutes,
     };
 }
@@ -145,6 +148,8 @@ export function outcomeWords(status: RuleRequestStatus): string {
             return "turned down";
         case "WITHDRAWN":
             return "withdrawn";
+        case "REPLACED":
+            return "replaced by a newer change";
         case "WAITING":
             return "sent";
     }

@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { Notice } from "@saroh/ui/notice";
 import type { CSSProperties, ReactElement } from "react";
 import { useId, useState } from "react";
 
@@ -22,6 +23,8 @@ import type { MoreRow } from "@/components/bookings/calendar/quick-look-more";
 import { ClassWaitlist } from "@/components/bookings/class-waitlist";
 import { JoinOnline } from "@/components/bookings/join-online";
 import { useNewBookingLauncher } from "@/components/bookings/new-booking/launcher";
+import type { ReassignScope } from "@/components/bookings/sheets/change-who";
+import { mayChangeWho, onlyTo } from "@/components/bookings/sheets/change-who";
 import { TreatmentVisits } from "@/components/bookings/treatment-visits";
 import { PageContainer } from "@/components/shared/page-container";
 import { useHold } from "@/components/shared/use-hold";
@@ -37,6 +40,7 @@ import {
     pageBadge,
     pageCanCancel,
     pageCanMove,
+    pageCanReassign,
     pageHeading,
     pageMain,
     pageMoreItems,
@@ -74,6 +78,7 @@ export function BookingDetailView({
     desk,
     waitlist,
     person = null,
+    reassign,
 }: {
     booking: PageBooking;
     /** Whether the slot has ended. Read by the page so "now" stays out of render. */
@@ -112,6 +117,11 @@ export function BookingDetailView({
     waitlist?: ClassWaitlistRow[] | null;
     /** Their phone, Needs attention and how a change reaches them. */
     person?: PeekPerson | null;
+    /**
+     * Who the viewer may give bookings to (#1157); left out, anyone's to
+     * anyone (the API still decides).
+     */
+    reassign?: ReassignScope;
 }) {
     const launcher = useNewBookingLauncher();
     const ids = { frontDesk: useId() };
@@ -157,6 +167,9 @@ export function BookingDetailView({
         canTake: desk ? desk.canTake : null,
         ended: past,
         retired: service.status !== "ACTIVE",
+        oneToOne:
+            service.capacity <= 1 &&
+            mayChangeWho(reassign, booking.staff?.id ?? null),
     };
     const main = pageMain(facts);
     const canMove = pageCanMove(facts);
@@ -182,6 +195,7 @@ export function BookingDetailView({
     const moreRows: MoreRow[] = pageMoreItems(facts, {
         first,
         hasPerson: contact !== null,
+        hasStaff: Boolean(booking.staff),
     }).map((item) => ({
         key: item.action,
         label: item.label,
@@ -198,7 +212,10 @@ export function BookingDetailView({
                         item.action === "next"
                             ? book(true)
                             : setOpen(
-                                  item.action === "move" ? "move" : "cancel",
+                                  item.action === "move" ||
+                                      item.action === "who"
+                                      ? item.action
+                                      : "cancel",
                               ),
                 }),
     }));
@@ -257,6 +274,29 @@ export function BookingDetailView({
     const note = !canWrite ? "read-only" : frontDesk ? "front-desk" : null;
     if (note) {
         before.push(<PageNote key={note} id={ids.frontDesk} kind={note} />);
+    }
+    if (pageCanReassign(facts) && !booking.staff) {
+        // Nobody on it (#1157): say so where it's seen, with the way out.
+        before.push(
+            <Notice
+                key="nobody"
+                tone="info"
+                role="note"
+                className="flex flex-wrap items-center gap-x-3 gap-y-2"
+            >
+                <span className="min-w-0 flex-1">
+                    Nobody is on this booking yet.
+                </span>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setOpen("who")}
+                >
+                    Assign someone
+                </Button>
+            </Notice>,
+        );
     }
     if (facts.retired && !cancelled && !past && canWrite) {
         // A missing Move with no explanation reads as a bug.
@@ -389,6 +429,8 @@ export function BookingDetailView({
                 timezone={timezone}
                 now={nowProp}
                 canMove={canMove}
+                canReassign={pageCanReassign(facts)}
+                reassignOnly={onlyTo(reassign, booking.staff?.id ?? null)}
                 canCancel={pageCanCancel(facts)}
                 canRefund={canRefund}
                 canReadOrder={canReadOrder}

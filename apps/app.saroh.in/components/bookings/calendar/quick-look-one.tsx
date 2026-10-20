@@ -15,9 +15,11 @@ import {
     Mail,
     Phone,
     Plus,
+    UserRound,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { mayChangeWho } from "@/components/bookings/sheets/change-who";
 import { FailedRead } from "@/components/shared/failed-read";
 import { personHref } from "@/lib/contacts/person-href";
 import { formatMoney } from "@/lib/format/money";
@@ -112,6 +114,11 @@ export function oneFacts(
         canNext: ctx.canBook && canBookNext(b),
         held,
         hasPerson: b.contact !== null,
+        canReassign:
+            ctx.canBook &&
+            b.service.capacity <= 1 &&
+            mayChangeWho(ctx.reassign, b.staff?.id ?? null),
+        hasStaff: b.staff !== null,
     };
 }
 
@@ -124,6 +131,7 @@ const MORE_ICON: Record<MoreAction, MoreRow["icon"]> = {
     full: "full",
     next: "next",
     move: "move",
+    who: "who",
     cancel: "cancel",
 };
 
@@ -168,7 +176,7 @@ export function OneLook({
     const rawPhone =
         [b.bookerPhone, read?.phone].map((p) => p?.trim()).find(Boolean) ??
         null;
-    const rule = freeCancelOf(ctx, b.staff?.id);
+    const rule = freeCancelOf(ctx);
     const help =
         state === "cancelled"
             ? `Cancelled${b.cancelledLate ? " late" : ""}.`
@@ -200,6 +208,8 @@ export function OneLook({
                                 return onStep("next");
                             case "move":
                                 return onStep("move");
+                            case "who":
+                                return onStep("who");
                             case "cancel":
                                 return onStep("cancel");
                         }
@@ -302,6 +312,39 @@ export function OneLook({
                             person: read ?? undefined,
                         })}
                     </Fact>
+                    {facts.canReassign && open ? (
+                        <Fact
+                            icon={
+                                <UserRound
+                                    aria-hidden
+                                    className="size-[18px]"
+                                />
+                            }
+                            label="With"
+                            aside={
+                                <Button
+                                    type="button"
+                                    data-ph-mask=""
+                                    variant="ghost"
+                                    className="min-h-11 px-2 text-[12.5px] text-muted-foreground min-[760px]:text-[13.5px] min-[760px]:font-semibold min-[760px]:text-foreground"
+                                    onClick={() => onStep("who")}
+                                >
+                                    {b.staff ? "Change" : "Assign someone"}
+                                    <span className="sr-only">
+                                        {b.staff
+                                            ? ` who ${first || "this booking"} is with`
+                                            : ` to ${first ? `${first}'s booking` : "this booking"}`}
+                                    </span>
+                                </Button>
+                            }
+                        >
+                            {b.staff?.name ?? (
+                                <span className="text-muted-foreground">
+                                    Nobody yet
+                                </span>
+                            )}
+                        </Fact>
+                    ) : null}
                     <Fact
                         icon={<Mail aria-hidden className="size-[18px]" />}
                         label="Email"

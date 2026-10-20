@@ -9,10 +9,12 @@ import {
 
 /**
  * Each person's own booking rules (DEC-170, #1038): the timing rules of
- * their diary — notice needed, how far ahead, the gap between bookings and
- * free cancelling — each falling back to the business's when it is null
- * ("same as the business"). How customers pay and refunds stay
- * business-wide, so they have no column here.
+ * their diary — notice needed, how far ahead and the gap between bookings
+ * — each falling back to the business's when it is null ("same as the
+ * business"). How customers pay, refunds and the free-cancel window stay
+ * business-wide, so they have no column here: free cancelling always
+ * follows the business's refund policy (DEC-170, owner 20 Oct 2026), and a
+ * person's own is refused ({@link PERSON_FREE_CANCEL_REFUSAL}).
  *
  * A person's rules apply to the one-to-ones they take, where each person
  * is their own diary. A class keeps the business's rules: its sessions are
@@ -30,10 +32,16 @@ import {
 export const PERSON_RULE_FIELDS = [
     "bookAheadDays",
     "latestBookingMinutes",
-    "freeCancelHours",
     "gapMinutes",
 ] as const;
 export type PersonRuleField = (typeof PERSON_RULE_FIELDS)[number];
+
+/**
+ * Why a person's own free-cancel window is refused (DEC-170, owner 20 Oct
+ * 2026): it follows the business's refund policy, for everyone.
+ */
+export const PERSON_FREE_CANCEL_REFUSAL =
+    "Free cancelling follows the business's refund policy, so it can't be set for one person. Change it in the business's booking rules.";
 
 /** A person's own rules; a null is "same as the business". */
 export type PersonRules = Record<PersonRuleField, number | null>;
@@ -44,7 +52,6 @@ export type RuleChanges = Partial<PersonRules>;
 export const SAME_AS_BUSINESS: PersonRules = {
     bookAheadDays: null,
     latestBookingMinutes: null,
-    freeCancelHours: null,
     gapMinutes: null,
 };
 
@@ -53,14 +60,14 @@ export function personRulesOf(row: PersonRules): PersonRules {
     return {
         bookAheadDays: row.bookAheadDays,
         latestBookingMinutes: row.latestBookingMinutes,
-        freeCancelHours: row.freeCancelHours,
         gapMinutes: row.gapMinutes,
     };
 }
 
 /**
  * The rules a person's diary keeps: theirs where they have one, the
- * business's where they don't, field by field.
+ * business's where they don't, field by field. Free cancelling is always
+ * the business's.
  */
 export function rulesForPerson(
     business: BookingRulesValue,
@@ -72,7 +79,6 @@ export function rulesForPerson(
         bookAheadDays: own.bookAheadDays ?? business.bookAheadDays,
         latestBookingMinutes:
             own.latestBookingMinutes ?? business.latestBookingMinutes,
-        freeCancelHours: own.freeCancelHours ?? business.freeCancelHours,
         gapMinutes: own.gapMinutes ?? business.gapMinutes,
     };
 }
@@ -230,16 +236,24 @@ export const RULE_REQUEST_STATUSES = [
     "APPROVED",
     "TURNED_DOWN",
     "WITHDRAWN",
+    "REPLACED",
 ] as const;
 export type RuleRequestStatus = (typeof RULE_REQUEST_STATUSES)[number];
 
-/** What can happen to a request: decided, withdrawn, or asked again. */
-export type RuleRequestMove = "approve" | "turn-down" | "withdraw" | "replace";
+/**
+ * What can happen to a request: decided, withdrawn, asked again, or
+ * closed by a newer change (`supersede`).
+ */
+export type RuleRequestMove =
+    "approve" | "turn-down" | "withdraw" | "replace" | "supersede";
 
 /**
  * Where a request goes on `move`, or null when it can't: only a waiting
  * request moves, and once decided it stays decided. Asking again replaces
- * a waiting request, which reads as withdrawn.
+ * a waiting request, which reads as withdrawn. A newer change closes it as
+ * "Replaced by a newer change" (DEC-170, owner 20 Oct 2026): the person's
+ * rules changed directly by someone allowed to, or the business switching
+ * approval off.
  */
 export function nextRequestStatus(
     current: string,
@@ -254,6 +268,8 @@ export function nextRequestStatus(
         case "withdraw":
         case "replace":
             return "WITHDRAWN";
+        case "supersede":
+            return "REPLACED";
     }
 }
 
@@ -287,7 +303,6 @@ const FIELD_NAMES: Record<PersonRuleField, string> = {
     latestBookingMinutes: "Booking late",
     bookAheadDays: "Booking ahead",
     gapMinutes: "Gap between bookings",
-    freeCancelHours: "Cancelling",
 };
 
 /** One rule as the boards say it; null is "same as the business". */
@@ -307,10 +322,6 @@ export function ruleWords(
             return value === 0
                 ? "No gap needed between bookings"
                 : `${value} min between bookings`;
-        case "freeCancelHours":
-            return value === 0
-                ? "Free to cancel any time before"
-                : `Free to cancel up to ${describeMinutes(value * 60)} before`;
     }
 }
 
@@ -320,7 +331,6 @@ export function changesWords(changes: RuleChanges): string[] {
         "latestBookingMinutes",
         "bookAheadDays",
         "gapMinutes",
-        "freeCancelHours",
     ];
     return order
         .filter((field) => changes[field] !== undefined)
@@ -335,7 +345,6 @@ const PERSON_RULES_SELECT = {
     id: true,
     bookAheadDays: true,
     latestBookingMinutes: true,
-    freeCancelHours: true,
     gapMinutes: true,
 } as const;
 

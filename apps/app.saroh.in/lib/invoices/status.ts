@@ -1,3 +1,5 @@
+import { formatDate } from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
 import { METHOD_WORD } from "@/lib/payments/method-words";
 import { isSince } from "@/lib/views/since";
@@ -5,9 +7,22 @@ import { isSince } from "@/lib/views/since";
 import type {
     Invoice,
     InvoiceKind,
+    InvoicePayment,
     InvoiceSource,
     InvoiceStanding,
 } from "./service";
+import {
+    CHEQUE_NOT_IN_BANK,
+    DRAFT_NOTE,
+    NOT_PAID_YET,
+    PAID_CHEQUE_WAITING,
+    PARTLY_PAID,
+    daysLate as daysLateWords,
+    leftToPayLine,
+    paymentWay,
+    toCollect,
+    unpaidLine,
+} from "./words";
 
 /**
  * How an invoice's status is said, and in what shape (ADR-007).
@@ -137,6 +152,10 @@ type ListInvoice = Pick<
     | "voidedAt"
     | "issuedAt"
     | "total"
+    | "leftToPay"
+    | "paidSoFar"
+    | "partlyPaid"
+    | "chequeWaiting"
     | "currency"
     | "order"
     | "related"
@@ -149,11 +168,15 @@ export type PillVariant = "success" | "active" | "error" | "neutral";
 
 /**
  * The word on an invoice's pill. Issued reads "Due" — the design's word for
- * money not yet late. An order's credited invoice was refunded on the order;
- * any other credited one was cancelled with a credit note.
+ * money not yet late — or "Partly paid" once some of it is (DEC-173). An
+ * overdue one stays "Overdue" however much is paid: lateness is the news.
+ * A paid one whose cheque hasn't cleared reads "Paid · cheque not in the
+ * bank", still yours to follow up. An order's credited invoice was refunded
+ * on the order; any other credited one was cancelled with a credit note.
  */
 export function invoicePill(
-    i: Pick<ListInvoice, "standing" | "source" | "kind">,
+    i: Pick<ListInvoice, "standing" | "source" | "kind"> &
+        Partial<Pick<ListInvoice, "partlyPaid" | "chequeWaiting">>,
 ): {
     label: string;
     variant: PillVariant;
@@ -165,11 +188,15 @@ export function invoicePill(
         case "DRAFT":
             return { label: "Draft", variant: "neutral" };
         case "ISSUED":
-            return { label: "Due", variant: "active" };
+            return i.partlyPaid
+                ? { label: PARTLY_PAID, variant: "active" }
+                : { label: "Due", variant: "active" };
         case "OVERDUE":
             return { label: "Overdue", variant: "error" };
         case "PAID":
-            return { label: "Paid", variant: "success" };
+            return i.chequeWaiting
+                ? { label: PAID_CHEQUE_WAITING, variant: "active" }
+                : { label: "Paid", variant: "success" };
         case "CREDITED":
             return {
                 label: i.source === "ORDER" ? "Refunded" : "Cancelled",
@@ -243,7 +270,13 @@ const cents = (amount: string) => Math.round(Number(amount) * 100);
 export function owedSummary(
     invoices: Pick<
         ListInvoice,
-        "standing" | "kind" | "order" | "source" | "total" | "currency"
+        | "standing"
+        | "kind"
+        | "order"
+        | "source"
+        | "total"
+        | "leftToPay"
+        | "currency"
     >[],
 ): {
     owed: { currency: string; cents: number }[];
@@ -255,13 +288,12 @@ export function owedSummary(
     let overdueCount = 0;
     for (const i of invoices) {
         if (!isOwed(i)) continue;
-        owed.set(i.currency, (owed.get(i.currency) ?? 0) + cents(i.total));
+        // What is left to pay on it (DEC-173), not its whole total.
+        const left = cents(i.leftToPay ?? i.total);
+        owed.set(i.currency, (owed.get(i.currency) ?? 0) + left);
         if (i.standing === "OVERDUE") {
             overdueCount += 1;
-            overdue.set(
-                i.currency,
-                (overdue.get(i.currency) ?? 0) + cents(i.total),
-            );
+            overdue.set(i.currency, (overdue.get(i.currency) ?? 0) + left);
         }
     }
     const list = (m: Map<string, number>) =>
@@ -309,6 +341,8 @@ const PAID_BY: Record<string, string> = {
     // An order's paper records how the order was paid, not a method.
     ORDER: "With the order",
     RECORDED: "Recorded by hand",
+    // Only an invoice takes a cheque (DEC-173), so it isn't a picker word.
+    CHEQUE: "Cheque",
     // One word each, as every picker says them (UX-078).
     ...METHOD_WORD,
 };
@@ -337,6 +371,8 @@ export function paidHow(method: string): string {
             return "another way";
         case "UPI":
             return "by UPI";
+        case "CHEQUE":
+            return "by cheque";
     }
     return `by ${paidBy(method).toLowerCase()}`;
 }
@@ -456,4 +492,298 @@ export function spacedCode(code: string | null | undefined): string {
     if (!code) return "";
     const c = code.replace(/\s+/g, "");
     return [c.slice(0, 4), c.slice(4, 6), c.slice(6)].filter(Boolean).join(" ");
+}
+
+/* ------------------------------------------------------------------------
+ * The ledger's states (DEC-173): what the details sheet, the page, the list
+ * and the phone all say, worked out from what the API sent. Partly paid and
+ * a waiting cheque are derived, like Overdue, never stored.
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Which of the screens' states an invoice is in: one per row of U7's table.
+ * `paidChequeWaiting` is paid in full with a cheque still to clear; a part
+ * paid by a waiting cheque is `partlyPaid`, and says so on its cheque.
+ */
+export type InvoiceState =
+    | "draft"
+    | "due"
+    | "overdue"
+    | "partlyPaid"
+    | "paidChequeWaiting"
+    | "paid"
+    | "void"
+    | "credited"
+    | "creditNote";
+
+export function invoiceState(
+    i: Pick<Invoice, "standing" | "kind"> &
+        Partial<Pick<Invoice, "partlyPaid" | "chequeWaiting">>,
+): InvoiceState {
+    if (i.kind === "CREDIT_NOTE") return "creditNote";
+    switch (i.standing) {
+        case "DRAFT":
+            return "draft";
+        case "ISSUED":
+        case "OVERDUE":
+            if (i.partlyPaid) return "partlyPaid";
+            return i.standing === "OVERDUE" ? "overdue" : "due";
+        case "PAID":
+            return i.chequeWaiting ? "paidChequeWaiting" : "paid";
+        case "VOID":
+            return "void";
+        case "CREDITED":
+            return "credited";
+    }
+}
+
+/** Whole days past its due date: 0 when it isn't late, at least 1 when it is. */
+export function lateBy(
+    i: Pick<Invoice, "standing" | "dueAt">,
+    now: Date = new Date(),
+): number {
+    if (i.standing !== "OVERDUE") return 0;
+    return i.dueAt ? Math.max(1, daysLate(i.dueAt, now)) : 1;
+}
+
+const centsOf = (amount: string | undefined) =>
+    amount === undefined ? null : Math.round(Number(amount) * 100);
+
+/**
+ * What is left to pay, in paise: the API's `leftToPay`, or, from an API
+ * before the ledger, the whole total while it is owed. Nothing on paper
+ * that isn't owed.
+ */
+export function leftCents(
+    i: Pick<Invoice, "standing" | "kind" | "total"> &
+        Partial<Pick<Invoice, "leftToPay">>,
+): number {
+    if (i.kind === "CREDIT_NOTE") return 0;
+    if (i.standing !== "ISSUED" && i.standing !== "OVERDUE") return 0;
+    return centsOf(i.leftToPay) ?? centsOf(i.total) ?? 0;
+}
+
+/**
+ * What has come in, in paise: the API's `paidSoFar`, or, from an API before
+ * the ledger, the total once paid and nothing before.
+ */
+export function paidCents(
+    i: Pick<Invoice, "standing" | "total"> &
+        Partial<Pick<Invoice, "paidSoFar">>,
+): number {
+    const paid = centsOf(i.paidSoFar);
+    if (paid !== null) return paid;
+    return i.standing === "PAID" ? (centsOf(i.total) ?? 0) : 0;
+}
+
+/**
+ * The header's pill, with how late: "Overdue · 13 days" (INVPageA). Every
+ * other state reads as `invoicePill` does.
+ */
+export function headerPill(
+    i: Pick<Invoice, "standing" | "source" | "kind" | "dueAt"> &
+        Partial<Pick<Invoice, "partlyPaid" | "chequeWaiting">>,
+    now: Date = new Date(),
+): { label: string; variant: PillVariant } {
+    const pill = invoicePill(i);
+    if (i.kind === "CREDIT_NOTE" || i.standing !== "OVERDUE") return pill;
+    return { ...pill, label: `Overdue · ${count(lateBy(i, now), "day")}` };
+}
+
+/**
+ * The one line that says what is unpaid on a late invoice: "₹2,500 unpaid ·
+ * 13 days late", what is left rather than the total. Null on one that
+ * isn't late.
+ */
+export function overdueLine(
+    i: Pick<Invoice, "standing" | "kind" | "total" | "currency" | "dueAt"> &
+        Partial<Pick<Invoice, "leftToPay">>,
+    now: Date = new Date(),
+): string | null {
+    if (i.kind === "CREDIT_NOTE" || i.standing !== "OVERDUE") return null;
+    const money = formatMoneyMajor(leftCents(i) / 100, i.currency);
+    return unpaidLine(money, lateBy(i, now));
+}
+
+export type MoneyTone = "neutral" | "owed" | "late" | "paid" | "waiting";
+
+/**
+ * The details' money card (INVPageA, INVRecordPlus): one message per state,
+ * said once. `title` is the figure that matters, `detail` the line under it.
+ * Dates are the business's (`timeZone`), as the paper prints them.
+ */
+export interface MoneyMessage {
+    title: string;
+    detail: string | null;
+    tone: MoneyTone;
+}
+
+/** The newest payment that still counts: what "cash on 12 Oct" is about. */
+export function lastLivePayment(
+    payments: InvoicePayment[] | undefined,
+): InvoicePayment | null {
+    const live = (payments ?? []).filter(
+        (p) => !p.removed && p.bankStatus !== "BOUNCED",
+    );
+    return live.at(-1) ?? null;
+}
+
+/** The cheque waiting for the bank, if one is. */
+export function waitingCheque(
+    payments: InvoicePayment[] | undefined,
+): InvoicePayment | null {
+    return (
+        (payments ?? []).find(
+            (p) => !p.removed && p.bankStatus === "WAITING",
+        ) ?? null
+    );
+}
+
+/** "By bank transfer", "In cash", "Online": the start of the paid line. */
+function paidByStart(method: string): string {
+    switch (method) {
+        case "CASH":
+            return "In cash";
+        case "ONLINE":
+            return "Online";
+        case "OTHER":
+            return "Recorded by hand";
+    }
+    return `By ${paymentWay(method)}`;
+}
+
+export function moneyMessage(
+    i: Pick<
+        Invoice,
+        | "standing"
+        | "kind"
+        | "total"
+        | "currency"
+        | "dueAt"
+        | "paidAt"
+        | "payment"
+        | "order"
+        | "related"
+    > &
+        Partial<
+            Pick<
+                Invoice,
+                | "leftToPay"
+                | "paidSoFar"
+                | "partlyPaid"
+                | "chequeWaiting"
+                | "payments"
+            >
+        >,
+    { timeZone, now = new Date() }: { timeZone: string; now?: Date },
+): MoneyMessage {
+    const money = (cents: number) => formatMoneyMajor(cents / 100, i.currency);
+    const day = (iso: string) => formatDate(iso, timeZone, { now });
+    const total = money(centsOf(i.total) ?? 0);
+    const last = lastLivePayment(i.payments);
+    // "cash on 12 Oct": how and when the last money that counts came in.
+    const how = (p: InvoicePayment | null) =>
+        p ? `${paymentWay(p.method)} on ${day(p.receivedAt)}` : null;
+
+    switch (invoiceState(i)) {
+        case "creditNote":
+            return {
+                title: `Credit note · ${total}`,
+                detail: `Nothing is owed on it. It cancels ${i.related?.number ?? "an invoice"}.`,
+                tone: "neutral",
+            };
+        case "draft":
+            return {
+                title: `Draft · ${total}`,
+                detail: DRAFT_NOTE,
+                tone: "neutral",
+            };
+        case "void":
+            return {
+                title: "Void",
+                detail: "Nothing is owed.",
+                tone: "neutral",
+            };
+        case "credited":
+            return {
+                title: i.order ? "Refunded on the order" : "Cancelled",
+                detail: "A credit note cancels it. Nothing is owed.",
+                tone: "neutral",
+            };
+        case "partlyPaid": {
+            const paid = money(paidCents(i));
+            const late = lateBy(i, now);
+            return {
+                title: leftToPayLine(money(leftCents(i))),
+                detail: [
+                    `Paid ${paid} of ${total}`,
+                    how(last),
+                    late ? daysLateWords(late) : null,
+                ]
+                    .filter(Boolean)
+                    .join(" · "),
+                tone: late ? "late" : "owed",
+            };
+        }
+        case "overdue": {
+            const due = i.dueAt ? `due ${day(i.dueAt)}` : null;
+            return {
+                title: toCollect(money(leftCents(i))),
+                detail: [daysLateWords(lateBy(i, now)), due]
+                    .filter(Boolean)
+                    .join(" · "),
+                tone: "late",
+            };
+        }
+        case "due":
+            return {
+                title: toCollect(money(leftCents(i))),
+                detail: i.dueAt
+                    ? `Due ${day(i.dueAt)}. ${NOT_PAID_YET}`
+                    : NOT_PAID_YET,
+                tone: "owed",
+            };
+        case "paidChequeWaiting": {
+            const cheque = waitingCheque(i.payments);
+            const parts = [
+                cheque?.cheque?.number
+                    ? `Cheque ${cheque.cheque.number}`
+                    : "Cheque",
+                cheque?.cheque?.bank ?? null,
+                cheque ? `received ${day(cheque.receivedAt)}` : null,
+            ];
+            return {
+                title: CHEQUE_NOT_IN_BANK,
+                detail: `Paid ${total} · ${parts.filter(Boolean).join(" · ")}`,
+                tone: "waiting",
+            };
+        }
+        case "paid": {
+            if (i.order) {
+                return {
+                    title: `Paid ${total}`,
+                    detail: "With the order. Its payments and refunds are made on the order.",
+                    tone: "paid",
+                };
+            }
+            const p = last;
+            const method = p ? p.method : (i.payment?.method ?? null);
+            const at = p ? p.receivedAt : i.paidAt;
+            // The ledger's own payment when there is one; the row's (an API
+            // before the ledger) otherwise, never a mix of the two.
+            const ref = p ? p.reference : (i.payment?.reference ?? null);
+            const by = method ? paidByStart(method) : "Paid";
+            const detail = [
+                at ? `${by} on ${day(at)}` : method ? by : null,
+                ref ? `ref ${ref}` : null,
+            ]
+                .filter(Boolean)
+                .join(" · ");
+            return {
+                title: `Paid ${total}`,
+                detail: detail || null,
+                tone: "paid",
+            };
+        }
+    }
 }

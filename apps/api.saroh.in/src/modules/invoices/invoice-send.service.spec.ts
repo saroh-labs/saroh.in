@@ -37,6 +37,8 @@ jest.mock("@saroh/database", () => {
             count: jest.fn(),
         },
         customerThreadMessage: { findFirst: jest.fn(), count: jest.fn() },
+        // DEC-173: a WhatsApp reminder counts towards one a day.
+        invoiceShare: { findFirst: jest.fn(), findMany: jest.fn() },
         merchantPaymentProvider: { findFirst: jest.fn() },
         // DEC-070: Payments on or off decides a pay link or a view link.
         organizationModule: { findFirst: jest.fn() },
@@ -93,6 +95,7 @@ function row(over: Record<string, unknown> = {}) {
         billToName: "Asha Rao",
         currency: "INR",
         total: decimal("2400"),
+        paidCents: 0,
         dueAt: null,
         contact: { firstName: "Asha", lastName: "Rao" },
         ...over,
@@ -122,6 +125,8 @@ beforeEach(() => {
     db.message!.count!.mockResolvedValue(0);
     db.customerThreadMessage!.findFirst!.mockResolvedValue(null);
     db.customerThreadMessage!.count!.mockResolvedValue(0);
+    db.invoiceShare!.findFirst!.mockResolvedValue(null);
+    db.invoiceShare!.findMany!.mockResolvedValue([]);
     db.merchantPaymentProvider!.findFirst!.mockResolvedValue({ id: "mpp_1" });
     db.organizationModule!.findFirst!.mockResolvedValue(null);
     db.paymentIntent!.findMany!.mockResolvedValue([]);
@@ -351,6 +356,23 @@ describe("the invoice PDF goes with the email (DEC-083)", () => {
             });
         },
     );
+});
+
+describe("a partly paid invoice's reminder (DEC-173)", () => {
+    it("asks for what is left to pay, not the whole total", async () => {
+        db.invoice!.findFirst!.mockResolvedValue(row({ paidCents: 100_000 }));
+        comms.queueTransactional.mockResolvedValue({
+            id: "m_1",
+            status: "QUEUED",
+            toAddress: "asha@example.com",
+        });
+        db.organization!.findUnique!.mockResolvedValue({ name: "Rye & Co." });
+        await service().remind(owner, "inv_1");
+        expect(comms.queueTransactional.mock.calls[0][2]).toMatchObject({
+            template: "INVOICE_REMINDER",
+            vars: { total: "₹1,400" },
+        });
+    });
 });
 
 describe("the link on the business's own address (DEC-069, L7)", () => {

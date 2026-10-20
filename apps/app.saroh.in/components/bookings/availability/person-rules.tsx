@@ -7,6 +7,7 @@ import { count } from "@/lib/format/plural";
 import { firstName } from "@/lib/names";
 import {
     askedWords,
+    replacedLine,
     requestLine,
     rulesSummary,
     turnedDownLine,
@@ -58,7 +59,8 @@ export function RuleRequestLine({ pr }: { pr: PersonRulesState }) {
  * Time off and More: one row saying how many of their rules are their own,
  * which opens them. Over it, a Member's own request while it waits (with
  * Withdraw), and the outcome once decided (with OK; a turn-down says the
- * reason and offers Change it again). Under it, for someone who may only
+ * reason and offers Change it again; one closed by a newer change says
+ * "Replaced by a newer change"). Under it, for someone who may only
  * read them, who can change them.
  */
 export function PersonRulesSection({ pr }: { pr: PersonRulesState }) {
@@ -180,6 +182,31 @@ export function PersonRulesSection({ pr }: { pr: PersonRulesState }) {
                         <strong>Approved{decider}</strong> ·{" "}
                         {upperFirst(askedWords(request.changes))} is your rule
                         now.
+                    </span>
+                </Notice>
+            ) : null}
+
+            {request?.status === "REPLACED" ? (
+                <Notice
+                    tone="neutral"
+                    className="mb-2"
+                    data-rule-request="replaced"
+                    action={
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            busy={pr.busy === "dismiss"}
+                            busyLabel="Clearing…"
+                            onClick={() => void pr.dismiss()}
+                        >
+                            OK
+                        </Button>
+                    }
+                >
+                    <span data-ph-mask="">
+                        <strong>Replaced by a newer change</strong> ·{" "}
+                        {replacedLine(request.changes)}
                     </span>
                 </Notice>
             ) : null}

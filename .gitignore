@@ -66,6 +66,9 @@ docs/plans/*
 !docs/plans/2026-10-04-001-feat-resources-pages-plan.md
 !docs/plans/2026-10-05-001-fix-env-config-plan.md
 !docs/plans/2026-10-19-001-feat-bookings-phone-ux-plan.md
+!docs/plans/2026-10-19-003-feat-site-templates-v2-plan.md
+!docs/plans/2026-10-20-001-feat-invoices-rebuild-plan.md
+!docs/plans/2026-10-20-002-feat-automatic-notices-plan.md
 # The tour film and its poster ship with the repo; the rest of docs/demos
 # is working notes and stays out.
 !docs/demos/

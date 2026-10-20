@@ -61,6 +61,7 @@ import type {
     InvoiceMailVars,
     InvoiceTemplate,
     NoticeTemplate,
+    ReceiptTemplate,
     RenderedMessage,
     ReviewTemplate,
 } from "./transactional";
@@ -96,7 +97,11 @@ export type TransactionalRecipient =
 export type TransactionalWords =
     | { template: InvoiceTemplate; vars: InvoiceMailVars }
     | {
-          template: NoticeTemplate | AutopayTemplate | ReviewTemplate;
+          template:
+              | NoticeTemplate
+              | AutopayTemplate
+              | ReviewTemplate
+              | ReceiptTemplate;
           rendered: RenderedMessage;
       }
     | {

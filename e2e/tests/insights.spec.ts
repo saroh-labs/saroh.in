@@ -7,24 +7,26 @@ import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
 
 /**
- * Insights' takings (DEC-075): the answers in words on top, the figures
- * under them, then the website.
+ * Insights' Money tab (DEC-171, #1093: the page's period, rolling weeks)
+ * and the website's figures on Where customers come from (#1089: one
+ * period for the page, tabs in the address). The Money tab's own spec,
+ * bars, sheets and periods, is `insights-money.spec.ts`.
  *
  * Read only. Northwind Supply has twelve weeks of paid orders behind the
  * seed; how much each week took depends on the day the seed was made, so
  * this reads the shape and the words' windows, not the amounts (those are
- * `takings-words.test.ts` and `takings.db.spec.ts`). Trade Counter
- * Whitefield has Insights on and has never taken money: one honest
- * sentence and "No takings yet", never a ₹0 chart.
+ * `money-words.test.ts` and `money.db.spec.ts`). Trade Counter Whitefield
+ * has Insights on and has never taken money: one honest sentence, never a
+ * ₹0 chart.
  */
 
 const NORTHWIND = "seed_org";
 const WHITEFIELD = "seed_org_whitefield";
 
-async function openInsights(page: Page, org: string) {
+async function openInsights(page: Page, org: string, query = "") {
     await useSession(page);
     await page.goto(`${urls.APP_URL}/open/${org}`);
-    await page.goto(`${urls.APP_URL}/analytics`);
+    await page.goto(`${urls.APP_URL}/analytics${query}`);
     await expect(
         page.getByRole("heading", { level: 1, name: "Insights" }),
     ).toBeVisible();
@@ -50,75 +52,62 @@ async function expectNoSidewaysScroll(page: Page) {
 test("a business that has sold reads its answers, then the figures behind them", async ({
     page,
 }) => {
-    await openInsights(page, NORTHWIND);
+    await openInsights(page, NORTHWIND, "?tab=money");
+    await expect(
+        page
+            .getByRole("navigation", { name: "Insights" })
+            .getByRole("link", { name: "Money" }),
+    ).toHaveAttribute("aria-current", "page");
 
-    const answers = page.getByTestId("takings-answers");
-    await expect(answers).toBeVisible();
-    // This week first, against the same days of last week, never as a whole week.
+    const answer = page.getByRole("region", {
+        name: "Am I making more money?",
+    });
+    await expect(answer).toBeVisible();
+    // The last 7 days, never "this week so far" against a whole week.
     await expect(
-        answers.getByRole("heading", { name: "How is this week going?" }),
-    ).toBeVisible();
-    await expect(answers).toContainText(/(since |today \()\w+day \d+ \w+/);
-    await expect(
-        answers.getByRole("heading", { name: "How was the last month?" }),
-    ).toBeVisible();
-    // Whatever it took, the sentence names its window.
-    await expect(answers).toContainText(
-        /the last four weeks \(\d+ \w+ to \d+ \w+\)/,
-    );
+        page.getByRole("region", { name: "How were the last 7 days?" }),
+    ).toContainText(/\d+ (\w{3} )?to \d+ \w{3}/);
     // What the figures were counted from, and how, in the merchant's words.
-    await expect(answers).toContainText(
-        /From \d[\d,]* payments? in the last four weeks|No payments in the last four weeks/,
+    await expect(page.locator("main")).toContainText(
+        /From \d[\d,]* payments?:|No payments in the last 4 weeks/,
     );
-    await answers.getByText("How sales are counted").click();
-    await expect(answers).toContainText(
-        "A sale counts in the week it was paid, Monday to Sunday in your business's time zone.",
+    await page.getByText("How these are counted").click();
+    await expect(page.locator("main")).toContainText(
+        "The weekly bars are seven days at a time, back from today",
     );
-    await expect(
-        answers.getByRole("img", { name: /^Sales for the twelve weeks/ }),
-    ).toBeVisible();
-    // The best week opens its orders.
-    await expect(
-        answers
-            .getByRole("link", { name: "See the orders placed that week" })
-            .first(),
-    ).toHaveAttribute(
-        "href",
-        /^\/commerce\/orders\?date=custom&from=\d{4}-\d{2}-\d{2}&to=\d{4}-\d{2}-\d{2}&payment=paid$/,
-    );
-
-    const figures = page.getByTestId("takings-figures");
-    await expect(figures).toBeVisible();
+    const tiles = page.getByTestId("money-tiles");
     for (const label of [
-        "Sales, 4 weeks",
-        "Orders, 4 weeks",
+        "Money in",
+        "Paid orders and bills",
+        "An order is usually",
         "Best week",
-        "Average order, 4 weeks",
     ]) {
         // Each figure opens the orders behind it.
         await expect(
-            figures.getByRole("link", { name: new RegExp(`^${label}`) }),
+            tiles.getByRole("link", { name: new RegExp(`^${label}`) }),
         ).toHaveAttribute("href", /^\/commerce\/orders\?/);
     }
-    // Twelve weeks and this week so far, each bar read by tapping it.
-    const chart = figures.getByRole("group", {
-        name: /^Sales for the twelve weeks/,
+    // Twelve rolling weeks, each bar read by focusing it.
+    const chart = answer.getByRole("group", {
+        name: /^Money in each of the last 12 weeks/,
     });
-    await expect(chart.getByRole("button")).toHaveCount(13);
-    await chart.getByRole("button").first().click();
-    await expect(figures).toContainText(
-        /Week of \d+ \w+ · ₹[\d,]+ · \d+ paid orders?/,
+    await expect(chart.getByRole("button")).toHaveCount(12);
+    await chart.getByRole("button").first().focus();
+    await expect(page.getByTestId("money-readout")).toHaveText(
+        /^Week of \d+ \w{3} · (₹[\d,]+ · \d+ payments?|nothing came in)$/,
     );
-    await chart.getByRole("button").last().click();
-    await expect(figures).toContainText(/This week so far \(/);
-    await expect(
-        figures.getByRole("link", { name: "This week's orders" }),
-    ).toBeVisible();
 
     // Merchants read "location", never "storefront" (DEC-069).
     await expect(page.locator("main")).not.toContainText(/storefront/i);
-    // The website's figures stay, under the takings, in the same language:
-    // days written "4 Sep", read by tapping, enquiries opening Leads.
+    await expectNoSidewaysScroll(page);
+
+    // The website's figures, on their own tab, in the same language: days
+    // written "4 Sep", read by tapping, enquiries opening Leads.
+    await page
+        .getByRole("navigation", { name: "Insights" })
+        .getByRole("link", { name: /^Where customers come from/ })
+        .click();
+    await expect(page).toHaveURL(/[?&]tab=from/);
     await expect(
         page.getByRole("heading", { level: 2, name: "Your website" }),
     ).toBeVisible();
@@ -150,13 +139,24 @@ test("a business that has sold reads its answers, then the figures behind them",
 test("a business that has never taken money is told so, not shown ₹0", async ({
     page,
 }) => {
+    // The Overview says it once, with the two ways to take money.
     await openInsights(page, WHITEFIELD);
-
-    // Said once, with what to do.
     await expect(
-        page.getByRole("heading", { name: "No takings yet" }),
+        page.getByRole("heading", {
+            name: "Your first sale shows here the week it's paid",
+        }),
     ).toBeVisible();
-    await expect(page.getByTestId("takings-answers")).toHaveCount(0);
+    await expect(page.getByTestId("answer-money")).toHaveCount(0);
+    await expect(page.locator("main")).not.toContainText("₹0");
+    await expectNoSidewaysScroll(page);
+
+    // So does the Money tab.
+    await openInsights(page, WHITEFIELD, "?tab=money");
+    await expect(
+        page.getByRole("heading", {
+            name: "Your first sale shows here the week it's paid",
+        }),
+    ).toBeVisible();
     await expect(
         page.getByRole("link", { name: "Take an order" }),
     ).toHaveAttribute("href", "/commerce/orders/new");
@@ -164,17 +164,19 @@ test("a business that has never taken money is told so, not shown ₹0", async (
         page.getByRole("link", { name: "Send an invoice" }),
     ).toHaveAttribute("href", "/billing/invoices/new");
     // No chart and no figures for weeks that never took anything.
-    await expect(page.getByTestId("takings-figures")).toHaveCount(0);
+    await expect(page.getByTestId("money-tiles")).toHaveCount(0);
     await expect(
-        page.getByRole("img", { name: /^Sales for the twelve weeks/ }),
+        page.getByRole("group", { name: /^Money in each of the last/ }),
     ).toHaveCount(0);
-    // The website's Orders says none were paid, never just a bare 0 (#919).
+    // The website's Orders says none were paid, never just a bare 0 (#919),
+    // for the page's period.
+    await openInsights(page, WHITEFIELD, "?tab=from");
     const website = page.getByRole("region", { name: "Your website" });
     await expect(
         website.getByRole("link", { name: /^Orders\s*0$/ }),
     ).toBeVisible();
     await expect(website.getByTestId("website-orders-note")).toContainText(
-        /^No paid orders (recorded )?in the last 30 days\./,
+        /^No paid orders (recorded )?in the last 4 weeks\./,
     );
     await expectNoSidewaysScroll(page);
 });

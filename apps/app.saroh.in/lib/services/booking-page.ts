@@ -98,6 +98,11 @@ export interface PageFacts {
     ended: boolean;
     /** The service is archived: its bookings can't be moved. */
     retired: boolean;
+    /**
+     * A one-to-one, so who it is with can be changed (#1157); a class's
+     * instructor is changed on the class. Left out: not offered.
+     */
+    oneToOne?: boolean;
 }
 
 /** The one pinned action. */
@@ -131,6 +136,14 @@ export function pageCanMove(f: PageFacts): boolean {
         f.outcome === null &&
         !f.retired
     );
+}
+
+/**
+ * Change who it's with, or Assign someone (#1157): wherever it can be
+ * moved, on a one-to-one.
+ */
+export function pageCanReassign(f: PageFacts): boolean {
+    return pageCanMove(f) && f.oneToOne === true;
 }
 
 /** Cancel, last in More: anything not cancelled and not yet marked. */
@@ -274,7 +287,7 @@ export function bookerPick(
 
 /** A row of More, in the boards' order. */
 export interface PageMoreItem {
-    action: "day" | "next" | "person" | "move" | "cancel";
+    action: "day" | "next" | "person" | "move" | "who" | "cancel";
     label: string;
     /** Red: Cancel, always last. */
     danger?: boolean;
@@ -287,7 +300,7 @@ export interface PageMoreItem {
  */
 export function pageMoreItems(
     f: PageFacts,
-    words: { first: string; hasPerson: boolean },
+    words: { first: string; hasPerson: boolean; hasStaff?: boolean },
 ): PageMoreItem[] {
     const items: (PageMoreItem | false)[] = [
         { action: "day", label: "See the day" },
@@ -302,6 +315,10 @@ export function pageMoreItems(
                 : "Open their page",
         },
         pageCanMove(f) && { action: "move", label: "Move to another time" },
+        pageCanReassign(f) && {
+            action: "who",
+            label: words.hasStaff ? "Change who it's with" : "Assign someone",
+        },
         pageCanCancel(f) && {
             action: "cancel",
             label: "Cancel booking",

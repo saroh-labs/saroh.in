@@ -6,6 +6,8 @@ import { resolveContact } from "../customer-workspace/resolve-contact";
 import { rateToBps } from "../invoices/gst";
 import type { GstPriceMode } from "../invoices/gst-price";
 import { isGstPriceMode } from "../invoices/gst-price";
+import type { OnlinePayment } from "../invoices/invoice-ledger";
+import { payIssuedDraftOnlineInTx } from "../invoices/invoice-ledger";
 import { buildManualInvoice } from "../invoices/order-invoice";
 import {
     documentColumns,
@@ -260,7 +262,8 @@ export async function createPackDraftInTx(
  * invoice's row lock, after the intent's). The purchase is made from the
  * snapshot — the credits, the price and the validity shown when the
  * customer started paying, counted from now — and the invoice takes its
- * number and is written PAID, naming the purchase.
+ * number, names the purchase and is issued, then paid through its ledger
+ * (`payIssuedDraftOnlineInTx`, DEC-173): one ONLINE payment for the intent.
  *
  * "gone" when it can't be bought any more: the draft is no longer a draft
  * (paid by another intent, or discarded), its snapshot or pack is missing,
@@ -275,11 +278,7 @@ export async function completePackDraftInTx(
         invoiceId: string;
         organizationId: string;
         now: Date;
-        payment: {
-            paymentMethod: string;
-            paymentReference: string | null;
-            paymentNote: string;
-        };
+        payment: OnlinePayment;
     },
 ): Promise<"bought" | "gone"> {
     const { now, organizationId } = input;
@@ -338,16 +337,15 @@ export async function completePackDraftInTx(
     await tx.invoice.update({
         where: { id: draft.id },
         data: {
-            status: "PAID",
+            status: "ISSUED",
             number,
             issuedAt: now,
             dueAt: now,
-            paidAt: now,
             contactId: buyer.id,
             packPurchaseId: purchase.id,
-            ...input.payment,
         },
     });
+    await payIssuedDraftOnlineInTx(tx, organizationId, draft.id, input.payment);
     return "bought";
 }
 

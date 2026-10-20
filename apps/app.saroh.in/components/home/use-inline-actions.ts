@@ -10,12 +10,15 @@ import {
 } from "@saroh/ui/toast";
 import { useEffect, useRef, useState } from "react";
 
+import { makePayLink } from "@/components/bookings/pay-link-panel";
 import { runAction } from "@/lib/api/run-action";
 import { replyAction } from "@/lib/customer-workspace/actions";
+import { formatTime, viewerTimeZone } from "@/lib/format/datetime";
 import type { HoldSlot, HoldState } from "@/lib/hold-undo";
 import { createHoldSlot, HOLD_UNDO_MS } from "@/lib/hold-undo";
 import {
     failedText,
+    heldText,
     keepsUndo,
     replyMax,
     replyReady,
@@ -23,13 +26,24 @@ import {
     undoneText,
     writesReply,
 } from "@/lib/home/inline-actions";
+import type { RemindAllPick, RemindAllState } from "@/lib/home/remind-all";
+import {
+    fromResult,
+    heldToast,
+    REMIND_ALL_KEY,
+    resultWords,
+} from "@/lib/home/remind-all";
 import type { HomeInline, HomeNeed } from "@/lib/home/service";
+import { sendReminders } from "@/lib/invoices/actions";
 import { remindWithLink } from "@/lib/invoices/link-actions";
+import { forgetLink } from "@/lib/invoices/minted-links";
 import { sendOutcome } from "@/lib/invoices/send";
 import { moveStage, undoStage } from "@/lib/orders/actions";
 import type { KitchenStage } from "@/lib/orders/read";
 import { refundMismatch } from "@/lib/payments/actions";
 import { replyToReview } from "@/lib/product-reviews/actions";
+import { cancelBooking } from "@/lib/services/actions";
+import { cancelledMessage } from "@/lib/services/booking-money";
 import { retrySubscription } from "@/lib/subscriptions/actions";
 
 /** A row once its action has run here. */
@@ -37,8 +51,41 @@ export interface DoneRow {
     text: string;
     /** Undo, while it can still be undone. */
     undo?: () => void;
-    /** Retry by payment link: the new link, to copy. */
+    /** Retry by payment link, Send payment link: the new link, to copy. */
     link?: string;
+    /** When it was done here, "2:14 pm": "Marked sent 2:14 pm". */
+    at?: string;
+    /** Remind all on the bills group (U8): waiting, or sent. */
+    remind?: RemindAllState;
+}
+
+/** Which of a row's actions: its own, or the quiet one beside it (A7). */
+export type InlineWhich = "inline" | "second";
+
+/**
+ * The key a row's open confirm is kept under: the row's id for its own
+ * action, and the id with `#second` for the quiet one beside it, so only
+ * one confirm is ever open on Home.
+ */
+export function confirmKey(id: string, which: InlineWhich = "inline"): string {
+    return which === "second" ? `${id}#second` : id;
+}
+
+/** The row's action of that kind. */
+export function inlineOf(
+    need: HomeNeed,
+    which: InlineWhich = "inline",
+): HomeInline | undefined {
+    return which === "second" ? need.second : need.inline;
+}
+
+/** "2:14 pm", now, on the viewer's clock. */
+function nowWords(): string {
+    try {
+        return formatTime(new Date(), viewerTimeZone());
+    } catch {
+        return "";
+    }
 }
 
 /**
@@ -88,8 +135,12 @@ export function useInlineActions() {
             commit?: () => Promise<void>;
             undo?: () => Promise<void>;
             settled: (state: HoldState) => void;
+            /** What the row and the toast say while it waits. */
+            text?: string;
+            at?: string;
         },
     ) {
+        const text = options.text ?? inline.done;
         let toastId: ToastId | null = null;
         const held = slot().start({
             commit: options.commit,
@@ -102,8 +153,12 @@ export function useInlineActions() {
                 options.settled(state);
             },
         });
-        setDone(need.id, { text: inline.done, undo: () => void held.undo() });
-        toastId = showUndo(inline.done, () => void held.undo(), {
+        setDone(need.id, {
+            text,
+            undo: () => void held.undo(),
+            ...(options.at ? { at: options.at } : {}),
+        });
+        toastId = showUndo(text, () => void held.undo(), {
             duration: HOLD_UNDO_MS,
         });
     }
@@ -122,6 +177,7 @@ export function useInlineActions() {
             return;
         }
         const eventId = res.data.eventId;
+        const at = nowWords();
         let told = false;
         const takeBack = async () => {
             const back = await undoStage(inline.target, eventId);
@@ -130,6 +186,7 @@ export function useInlineActions() {
         };
         hold(need, inline, {
             undo: takeBack,
+            at,
             settled: (state) => {
                 if (state.status === "undone") {
                     setDone(need.id, null);
@@ -139,16 +196,17 @@ export function useInlineActions() {
                         "That couldn't be undone.",
                         errorOf(state) ?? "The order stays marked sent.",
                     );
-                    setDone(need.id, { text: inline.done });
+                    setDone(need.id, { text: inline.done, at });
                 } else if (keepsUndo(inline)) {
                     // Nothing was sent: the stage's own Undo stays on the
                     // row for its own window, which the API enforces.
                     setDone(need.id, {
                         text: inline.done,
+                        at,
                         undo: () => void undoQuietly(need, inline, takeBack),
                     });
                 } else {
-                    setDone(need.id, { text: inline.done });
+                    setDone(need.id, { text: inline.done, at });
                 }
             },
         });
@@ -228,6 +286,90 @@ export function useInlineActions() {
         });
     }
 
+    /**
+     * Turn down a booking awaiting payment (A7): held ten seconds with Undo,
+     * then the booking's own cancel (`DELETE bookings/:id`), which tells the
+     * customer where the API says it does. Undo in the ten seconds leaves
+     * the booking exactly as it was.
+     */
+    function turnDown(need: HomeNeed, inline: HomeInline) {
+        let refused: string | null = null;
+        let said = false;
+        let result = inline.done;
+        hold(need, inline, {
+            text: heldText(inline),
+            commit: async () => {
+                const res = await cancelBooking(inline.target, {});
+                if (!res.ok) {
+                    refused = res.error;
+                    throw new Error(res.error);
+                }
+                const message = cancelledMessage(res.data.money);
+                if (message.tone === "error") {
+                    // Cancelled, but its money needs a hand: said as the
+                    // booking's own cancel says it.
+                    showError(message.title, message.body);
+                    said = true;
+                }
+                result = inline.done;
+            },
+            settled: (state) => {
+                if (state.status === "undone") {
+                    setDone(need.id, null);
+                    showSuccess(undoneText(inline, false));
+                } else if (state.status === "failed") {
+                    setDone(need.id, null);
+                    showError(failedText(inline), refused ?? undefined);
+                } else {
+                    setDone(need.id, { text: result });
+                    if (!said) showSuccess(result);
+                }
+            },
+        });
+    }
+
+    /**
+     * Send payment link on a booking awaiting payment (DEC-171): held ten
+     * seconds, since the new link stops the one sent before; then the
+     * booking's own pay link (`POST bookings/:id/pay-link`), handed back to
+     * copy. Saroh doesn't send it.
+     */
+    function payLink(need: HomeNeed, inline: HomeInline) {
+        let refused: string | null = null;
+        let url: string | null = null;
+        hold(need, inline, {
+            text: heldText(inline),
+            commit: async () => {
+                const res = await makePayLink(inline.target);
+                if (!res.ok) {
+                    // The plan's own notice has already been shown.
+                    refused = res.plan ? null : res.error;
+                    throw new Error(res.error);
+                }
+                url = res.url;
+            },
+            settled: (state) => {
+                if (state.status === "undone") {
+                    setDone(need.id, null);
+                    showSuccess(undoneText(inline, false));
+                } else if (state.status === "failed") {
+                    setDone(need.id, null);
+                    if (refused !== null)
+                        showError(failedText(inline), refused || undefined);
+                } else {
+                    setDone(need.id, {
+                        text: inline.done,
+                        ...(url ? { link: url } : {}),
+                    });
+                    showSuccess(
+                        inline.done,
+                        "Copy it and send it yourself. Saroh doesn't send it.",
+                    );
+                }
+            },
+        });
+    }
+
     async function retry(need: HomeNeed, inline: HomeInline) {
         const res = await runAction(
             () => retrySubscription(inline.target, inline.via ?? "PAY_LINK"),
@@ -280,9 +422,77 @@ export function useInlineActions() {
         );
     }
 
-    /** The confirm's button: run the row's action. */
-    function confirm(need: HomeNeed) {
-        const inline = need.inline;
+    /**
+     * Remind all on the bills group (DEC-171, U8): held ten seconds with
+     * Undo, on the same one slot as every other held action, then one call
+     * sends them (`POST invoices/reminders`, U5), which reads each bill again:
+     * one reminded elsewhere meanwhile, or paid, is skipped and named. Undo
+     * in the ten seconds sends nothing; leaving Home sends them, as asked.
+     */
+    function remindAll(pick: RemindAllPick) {
+        let refused: string | null = null;
+        let toastId: ToastId | null = null;
+        const text = heldToast(pick.invoiceIds.length, pick.skipped);
+        const remind: RemindAllState = {
+            phase: "held",
+            people: pick.people,
+            skipped: pick.skipped,
+            reasons: pick.reasons,
+        };
+        const held = slot().start({
+            commit: async () => {
+                const res = await sendReminders({
+                    invoiceIds: pick.invoiceIds,
+                    ...(pick.quietDays ? { quietDays: pick.quietDays } : {}),
+                });
+                if (!res.ok) {
+                    refused = res.error;
+                    throw new Error(res.error);
+                }
+                const result = fromResult(res.data);
+                // A reminder mints a fresh link: the one this tab kept is gone.
+                for (const s of result.sent) forgetLink(s.invoiceId);
+                const said = resultWords(result);
+                setDone(REMIND_ALL_KEY, {
+                    text: said.title,
+                    remind: {
+                        ...remind,
+                        phase: "sent",
+                        sent: result.sent.length,
+                    },
+                });
+                showSuccess(said.title, said.body);
+            },
+            onChange: (state) => {
+                if (state.status === "held") return;
+                if (state.status === "committing" || state.status === "undoing")
+                    return;
+                if (toastId !== null) dismissToast(toastId);
+                if (state.status === "undone") {
+                    setDone(REMIND_ALL_KEY, null);
+                    showSuccess("Nothing was sent.");
+                } else if (state.status === "failed") {
+                    setDone(REMIND_ALL_KEY, null);
+                    showError(
+                        "Those reminders weren't sent.",
+                        refused ?? "Try again.",
+                    );
+                }
+            },
+        });
+        setDone(REMIND_ALL_KEY, {
+            text,
+            undo: () => void held.undo(),
+            remind,
+        });
+        toastId = showUndo(text, () => void held.undo(), {
+            duration: HOLD_UNDO_MS,
+        });
+    }
+
+    /** The confirm's button: run the row's action, or the one beside it. */
+    function confirm(need: HomeNeed, which: InlineWhich = "inline") {
+        const inline = inlineOf(need, which);
         if (!inline) return;
         if (
             writesReply(inline) &&
@@ -299,7 +509,9 @@ export function useInlineActions() {
                 else void retry(need, inline);
                 return;
             case "held":
-                sendHeld(need, inline);
+                if (inline.kind === "TURN_DOWN") turnDown(need, inline);
+                else if (inline.kind === "SEND_PAY_LINK") payLink(need, inline);
+                else sendHeld(need, inline);
         }
     }
 
@@ -313,6 +525,7 @@ export function useInlineActions() {
         setDraft: (id: string, text: string) =>
             setDrafts((all) => ({ ...all, [id]: text })),
         confirm,
+        remindAll,
     };
 }
 

@@ -17,7 +17,7 @@ import { resolveContact } from "../customer-workspace/resolve-contact";
 import { assertBusinessDetails } from "../invoices/business-details";
 import type { GstOnPrice, PriceTerms } from "../invoices/gst-price";
 import { assertSaleRated } from "../invoices/gst-rate-required";
-import { isPastDue } from "../invoices/invoice-state";
+import { isPastDue, leftToPayCents } from "../invoices/invoice-state";
 import { InvoicesService } from "../invoices/invoices.service";
 import { assertPaymentsOn, paymentsOn } from "../invoices/payments-on";
 import { loadPriceTerms } from "../invoices/price-terms";
@@ -409,6 +409,8 @@ interface InvoiceRowLite {
     status: string;
     subscriptionId: string | null;
     total: { toString(): string };
+    /** The ledger's paid so far (DEC-173). */
+    paidCents: number;
     dueAt: Date | null;
     paidAt: Date | null;
     issuedAt: Date | null;
@@ -2541,6 +2543,7 @@ export class SubscriptionsService {
                 status: true,
                 subscriptionId: true,
                 total: true,
+                paidCents: true,
                 dueAt: true,
                 paidAt: true,
                 issuedAt: true,
@@ -2639,8 +2642,9 @@ export class SubscriptionsService {
             overdue: pastDue > 0,
             overdueCount: pastDue,
             unpaidCount: unpaid.length,
+            // What is left to pay on them (DEC-173).
             unpaidTotal: fromCents(
-                unpaid.reduce((sum, u) => sum + toCents(u.total.toString()), 0),
+                unpaid.reduce((sum, u) => sum + leftToPayCents(u), 0),
             ),
             oldestUnpaid: oldest
                 ? {

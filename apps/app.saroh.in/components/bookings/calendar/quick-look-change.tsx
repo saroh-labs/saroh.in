@@ -5,7 +5,7 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
 import { showUndo } from "@saroh/ui/toast";
-import { ArrowRightLeft } from "lucide-react";
+import { ArrowRightLeft, UserRoundCog } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -51,6 +51,7 @@ export function ChooseStep({
     paid,
     reach,
     onMove,
+    onWho,
     onCancel,
     onBack,
     onClose,
@@ -64,11 +65,14 @@ export function ChooseStep({
     paid: string | null;
     reach: NoticeReach | null | undefined;
     onMove: () => void;
+    /** Change who it's with (#1157); left out on a class. */
+    onWho?: () => void;
     onCancel: () => void;
     onBack: () => void;
     onClose: () => void;
 }) {
     const who = whoFor(b);
+    const whoLabel = b.staff ? "Change who it's with" : "Assign someone";
     const first = firstName(who);
     const keepsPaid =
         b.paidWith === "PAID" ||
@@ -114,6 +118,7 @@ export function ChooseStep({
                 <div className="mt-1 hidden gap-2 min-[760px]:grid">
                     <ChoiceButtons
                         onMove={onMove}
+                        who={onWho ? { label: whoLabel, run: onWho } : null}
                         onCancel={onCancel}
                         onBack={onBack}
                     />
@@ -122,6 +127,7 @@ export function ChooseStep({
             <StepFoot className="min-[760px]:hidden">
                 <ChoiceButtons
                     onMove={onMove}
+                    who={onWho ? { label: whoLabel, run: onWho } : null}
                     onCancel={onCancel}
                     onBack={onBack}
                 />
@@ -132,10 +138,12 @@ export function ChooseStep({
 
 function ChoiceButtons({
     onMove,
+    who,
     onCancel,
     onBack,
 }: {
     onMove: () => void;
+    who: { label: string; run: () => void } | null;
     onCancel: () => void;
     onBack: () => void;
 }) {
@@ -149,6 +157,18 @@ function ChoiceButtons({
                 <ArrowRightLeft aria-hidden className="size-[18px]" />
                 Move to another time
             </Button>
+            {who ? (
+                <Button
+                    type="button"
+                    data-ph-mask=""
+                    variant="outline"
+                    className={cn(QL_BTN, "w-full gap-2")}
+                    onClick={who.run}
+                >
+                    <UserRoundCog aria-hidden className="size-[18px]" />
+                    {who.label}
+                </Button>
+            ) : null}
             <Button
                 type="button"
                 variant="outline"
@@ -273,7 +293,7 @@ export function MoveStep({
                     Only times{" "}
                     {b.staff ? firstName(b.staff.name) : "the service"}{" "}
                     {b.staff ? "is" : "has"} free and nobody has taken.
-                    {freeCancelOf(ctx, b.staff?.id) !== null
+                    {freeCancelOf(ctx) !== null
                         ? " Moving keeps the free-cancel time from when it was booked."
                         : ""}
                 </p>

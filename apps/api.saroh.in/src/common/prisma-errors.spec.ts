@@ -24,6 +24,23 @@ describe("prisma errors (#106)", () => {
         ).toBe(true);
     });
 
+    it("reads one a raw query raised as P2010", () => {
+        const message =
+            "Raw query failed. Code: `40001`. Message: `could not serialize access due to read/write dependencies among transactions`";
+        expect(isSerializationFailure({ code: "P2010", message })).toBe(true);
+        expect(prismaErrorCode({ code: "P2010", message })).toBe("P2034");
+        expect(
+            isSerializationFailure({ code: "P2010", meta: { code: "40001" } }),
+        ).toBe(true);
+        // Any other raw query failure is still its own.
+        expect(
+            prismaErrorCode({
+                code: "P2010",
+                message: "Raw query failed. Code: `42P01`.",
+            }),
+        ).toBe("P2010");
+    });
+
     it("leaves every other error as it was", () => {
         expect(prismaErrorCode({ code: "P2002" })).toBe("P2002");
         expect(isSerializationFailure({ code: "P2002" })).toBe(false);

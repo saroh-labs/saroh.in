@@ -412,10 +412,13 @@ async function toCheck() {
     await press(foot());
 }
 
+// Each test walks the whole sheet in jsdom: about a second locally, past
+// 5s on a busy CI runner. A timed-out test leaves its act() running and
+// fails every test after it, so the whole file gets the same headroom.
 describe.each([
     ["a phone", true],
     ["a desk", false],
-])("New booking on %s", (_where, phone) => {
+])("New booking on %s", { timeout: 15_000 }, (_where, phone) => {
     beforeEach(() => size(phone));
 
     it("opens on Who is it for?, as the screen on a phone and a wide panel at a desk", async () => {
@@ -543,7 +546,7 @@ describe.each([
     });
 });
 
-describe("New booking, each state", () => {
+describe("New booking, each state", { timeout: 15_000 }, () => {
     it("finds an existing customer by phone and shows their Needs attention", async () => {
         readCustomerAttention.mockResolvedValue({
             entries: [

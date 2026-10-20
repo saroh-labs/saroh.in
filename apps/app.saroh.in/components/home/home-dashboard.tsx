@@ -12,48 +12,40 @@ import {
     mayManageModules,
     onButNotOpen,
 } from "@/lib/home/first-run";
-import { formatList, nextLine } from "@/lib/home/needs";
+import { formatList } from "@/lib/home/needs";
 import type { HomeModel } from "@/lib/home/service";
-import { showsWeek, weekRows } from "@/lib/home/week";
 import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
-import type { ReadyChecklist } from "@/lib/settings/ready";
 
 import { PlanLockedCard } from "@/components/billing/plan-way";
 import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
 import { FirstRunJobs } from "./first-run-jobs";
-import { NeedsYou } from "./needs-you";
+import { HomeDesk } from "./home-desk";
+import type { HomeSetup } from "./home-setup";
+import { PhoneHome } from "./phone/phone-home";
 import { TakeMoneyChecklist } from "./take-money-checklist";
-import { ThisWeek } from "./this-week";
-import { Today } from "./today";
 
-/** "Finish setup", for someone who may change the business. */
-export interface HomeSetup {
-    list: ReadyChecklist;
-    businessId: string;
-}
+export type { HomeSetup } from "./home-setup";
 
 /**
- * Home as a dashboard rather than a menu (#119, redesign step 3).
+ * Home as a dashboard rather than a menu (#119), and since DEC-171 Home A,
+ * "Today first". Two layouts over the same parts, chosen at 640px by CSS
+ * (never a script reading the width, which would draw the desk first on
+ * every phone):
  *
- * Two bands, in the order a merchant opening the app actually asks:
+ * - **From 640px, Home A** (`home-desk.tsx`, plan U6): the tiles, Needs
+ *   you grouped by kind with Today beside it, How it's going, and setup in
+ *   one line once most of it is done.
+ * - **Below 640px, the simplified phone Home** (`phone/phone-home.tsx`,
+ *   plan U17, `HPHome`): three figures, the Next line, Needs you as one
+ *   line per group, How it's going in a sentence, setup in one line; each
+ *   line opens its sheet.
  *
- * 1. **Needs you** — one flat, ranked list, a row per thing to do with a tag
- *    that says what is wrong (F3), so the decision is made here rather than
- *    two clicks later.
- * 2. **Today** — the business's day in time order, with who has arrived
- *    (F5). Days after today are the calendar's.
- *
- * Beside them, **This week** (F7): takings against the same days last week,
- * the week's bookings and orders, and what is owed — each figure only for
- * whoever may read it, which the API decides.
- *
- * The counts that used to close the page as a band of tiles folded into the
- * header's "Last 24 hours" (F6, `home-header.tsx`): what changed since
- * yesterday, each a link to its rows. The standing totals they showed are the
- * work itself now — open orders are Needs you's rows, today's bookings are
- * Today's — and the rest are a click away in the rail.
+ * Above both, drawn once: "Finish setup" when it has just finished, and
+ * while it leads (fewer than half its steps done) at a desk; the phone
+ * draws its own card for that. What couldn't be read is one notice at a
+ * desk; on a phone it is the first line of Needs you, with Try again.
  *
  * `now` is captured once and threaded down so every relative time on the page
  * ("3 days overdue", "Today") is measured from the same instant. Letting each
@@ -66,6 +58,7 @@ export function HomeDashboard({
     setup = null,
     kind,
     invoicing,
+    insights = false,
 }: {
     home: HomeModel;
     /** Read only for a business with nothing on — the first-run question. */
@@ -80,6 +73,8 @@ export function HomeDashboard({
     kind?: string;
     /** For "Invoice a client"; absent, it isn't offered. */
     invoicing?: InvoiceJobFacts;
+    /** Whether Insights is open to them: "See how the month went". */
+    insights?: boolean;
 }) {
     // Nothing on yet: ask what the business wants to do, on Home itself,
     // rather than an empty dashboard whose every band says "nothing yet".
@@ -95,62 +90,47 @@ export function HomeDashboard({
     }
 
     const now = new Date();
-    // A business with nothing sold, booked or paid yet gets no week (F7).
-    const week = showsWeek(home.week, home.lastDay?.fresh ?? false)
-        ? weekRows(home.week)
-        : [];
 
     return (
-        <div className="space-y-6">
+        <div className="grid gap-[22px]">
             {/* Say what is missing BEFORE the bands, not after: a merchant who
                 scans the top of Home and leaves must not carry away a picture
                 they think is complete (§30). Naming the parts is the point —
                 "something went wrong" would not tell them whether the thing
                 they came to check is the thing that is missing. */}
             {home.unavailable.length > 0 ? (
-                <PartialRead
-                    things={formatList(
-                        home.unavailable.map((part) => part.label),
-                    )}
-                    so="This is not the whole picture."
-                />
+                <div className="hidden sm:block">
+                    <PartialRead
+                        things={formatList(
+                            home.unavailable.map((part) => part.label),
+                        )}
+                        so="Everything else is here, so there may be more to do."
+                    />
+                </div>
             ) : null}
 
-            {/* The design's row: the work column, and beside it This week
-                (F7); it wraps under below 1100px. */}
-            <div className="flex flex-wrap items-start gap-5">
-                {/* `min-w-0` is required, not tidiness: a flex item defaults
-                    to `min-width: auto`, so this column refused to shrink below
-                    its content's min-content width and pushed the whole page
-                    into a horizontal scroll at 320px (#178, §18). */}
-                <div className="grid min-w-0 flex-[1_1_520px] content-start gap-5">
-                    {/* "Finish setup" leads while fewer than half
-                        its steps are done, and moves to the foot of the
-                        column once more are; each slot draws only when it's
-                        the checklist's place (F8). */}
-                    {setup ? (
-                        <TakeMoneyChecklist {...setup} slot="first" />
-                    ) : null}
-                    <NeedsYou
-                        needs={home.needs}
-                        total={home.needsTotal}
-                        inProgress={home.ordersInProgress}
-                        unavailable={home.unavailable}
-                        next={nextLine(home.upcoming, now)}
-                    />
-                    {/* Under Needs you, as the design stacks them: the work
-                        first, then the day it happens in. The API sends no
-                        block to someone who reads neither bookings nor
-                        orders, so the column never advertises a module
-                        that is off. */}
-                    {home.today ? (
-                        <Today today={home.today} now={now.toISOString()} />
-                    ) : null}
-                    {setup ? (
-                        <TakeMoneyChecklist {...setup} slot="late" />
-                    ) : null}
-                </div>
-                <ThisWeek rows={week} />
+            {/* "Finish setup" leads while fewer than half its steps are
+                done, and has its last word here once they all are (F8);
+                drawn once for both layouts. */}
+            {setup ? (
+                <TakeMoneyChecklist {...setup} slot="first" phoneOwnCard />
+            ) : null}
+
+            <div data-home-layout="desk" className="hidden sm:block">
+                <HomeDesk
+                    home={home}
+                    setup={setup}
+                    now={now}
+                    insights={insights}
+                />
+            </div>
+            <div data-home-layout="phone" className="sm:hidden">
+                <PhoneHome
+                    home={home}
+                    setup={setup}
+                    now={now}
+                    insights={insights}
+                />
             </div>
         </div>
     );

@@ -15,6 +15,7 @@ import {
     Rows3,
     Undo2,
     User,
+    UserRoundCog,
     XCircle,
 } from "lucide-react";
 import Link from "next/link";
@@ -45,7 +46,8 @@ export type MoreIcon =
     | "move"
     | "cancel"
     | "edit"
-    | "day";
+    | "day"
+    | "who";
 
 const ICONS: Record<MoreIcon, ReactNode> = {
     take: <IndianRupee aria-hidden className="size-[18px]" />,
@@ -59,6 +61,7 @@ const ICONS: Record<MoreIcon, ReactNode> = {
     cancel: <XCircle aria-hidden className="size-[18px]" />,
     edit: <Pencil aria-hidden className="size-[18px]" />,
     day: <Rows3 aria-hidden className="size-[18px]" />,
+    who: <UserRoundCog aria-hidden className="size-[18px]" />,
 };
 
 const ROW =

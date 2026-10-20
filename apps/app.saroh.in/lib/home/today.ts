@@ -1,4 +1,5 @@
 import { formatClock } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 import type { HomeToday, HomeTodayItem } from "./service";
 
 /**
@@ -40,6 +41,29 @@ export interface TodayView {
     visible: boolean;
     /** "Nothing booked today.": only when bookings were read. */
     empty: boolean;
+    /** The day had bookings, but none is left to show: "Nothing more today." */
+    dayDone: boolean;
+    /** Rows still to come past the ones shown: "3 more later today". */
+    laterToday: number;
+    /** The whole day, for Home A's heading: "6 bookings, 3 pick-ups". */
+    dayCount: string;
+}
+
+/** "6 bookings, 3 pick-ups", "1 booking", or "" for an empty day. */
+export function dayCountLabel(items: readonly HomeTodayItem[]): string {
+    const pickups = items.filter((i) => i.kind === "PICKUP").length;
+    const bookings = items.length - pickups;
+    return [
+        bookings > 0 ? count(bookings, "booking") : "",
+        pickups > 0 ? count(pickups, "pick-up") : "",
+    ]
+        .filter(Boolean)
+        .join(", ");
+}
+
+/** "3 more later today": what Today leaves to the calendar. */
+export function laterTodayLabel(n: number): string {
+    return n > 0 ? `${n} more later today` : "";
 }
 
 /** "Came at 9:32 am", or "Came" when the time ("09:32") wasn't sent. */
@@ -61,16 +85,30 @@ function stateOf(item: HomeTodayItem, started: boolean, next: boolean): string {
 
 /**
  * What Today shows at `now`: the rows that started in the last ninety
- * minutes (still to be marked), then the next five, in time order.
+ * minutes, any booking from earlier today nobody has marked yet (so the
+ * desk can still say who came), then the next five, in time order.
  */
 export function todayView(today: HomeToday | null, now: Date): TodayView {
-    if (!today) return { rows: [], count: "", visible: false, empty: false };
+    if (!today) {
+        return {
+            rows: [],
+            count: "",
+            visible: false,
+            empty: false,
+            dayDone: false,
+            laterToday: 0,
+            dayCount: "",
+        };
+    }
     const t = now.getTime();
     const startOf = (item: HomeTodayItem) => Date.parse(item.startAt);
 
     const upcoming = today.items.filter((i) => startOf(i) >= t);
     const recent = today.items.filter(
-        (i) => startOf(i) < t && t - startOf(i) <= RECENT_MINUTES * MINUTE_MS,
+        (i) =>
+            startOf(i) < t &&
+            (t - startOf(i) <= RECENT_MINUTES * MINUTE_MS ||
+                (i.kind === "BOOKING" && i.markable && i.outcome === null)),
     );
     const shown = [...recent, ...upcoming.slice(0, UPCOMING_SHOWN)];
 
@@ -90,7 +128,7 @@ export function todayView(today: HomeToday | null, now: Date): TodayView {
     const waiting = recent.filter(
         (i) => i.kind === "BOOKING" && i.outcome === null,
     ).length;
-    const count = [
+    const said = [
         upcoming.length > 0 ? `${upcoming.length} still to come` : "",
         arrived > 0 ? `${arrived} came` : "",
         waiting > 0 ? `${waiting} not here yet` : "",
@@ -100,8 +138,11 @@ export function todayView(today: HomeToday | null, now: Date): TodayView {
 
     return {
         rows,
-        count,
+        count: said,
         visible: today.bookings || rows.length > 0,
-        empty: today.bookings && rows.length === 0,
+        empty: today.bookings && rows.length === 0 && today.items.length === 0,
+        dayDone: rows.length === 0 && today.items.length > 0,
+        laterToday: Math.max(0, upcoming.length - UPCOMING_SHOWN),
+        dayCount: dayCountLabel(today.items),
     };
 }

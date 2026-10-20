@@ -37,15 +37,17 @@ import type {
  * `actions`.
  */
 
-type Rank = 1 | 2 | 3 | 4;
+export type Rank = 1 | 2 | 3 | 4;
 
 /** A row before it is sorted: the need, and where it sorts. */
-interface Ranked {
+export interface Ranked {
     need: HomeNeed;
     rank: Rank;
     source: number;
     /** How many things it stands for: 1, or a "N more" row's N. */
     things: number;
+    /** A "N more" row, standing for what the source didn't send. */
+    more?: boolean;
 }
 
 /**
@@ -70,9 +72,12 @@ const SOURCE_ORDER = [
     "COMMUNICATIONS_NO_EMAIL",
     "COMMERCE_LOW_STAR_REVIEWS",
     "COMMUNICATIONS_NO_EMAIL_PLAN",
+    // Needs you's groups only (DEC-171); never in the flat list.
+    "APPOINTMENTS_AWAITING_PAYMENT",
+    "COMMERCE_STOCK_LOW",
 ] as const;
 
-function sourceIndex(code: string): number {
+export function sourceIndex(code: string): number {
     const i = (SOURCE_ORDER as readonly string[]).indexOf(code);
     // Module blockers, then anything a later unit adds without a place yet.
     if (i >= 0) return i;
@@ -152,6 +157,7 @@ function fromEvidence(
         // F4: the action the row offers in place, when it offers one.
         ...(ev.inline ? { inline: ev.inline } : {}),
         ...(ev.link ? { link: ev.link } : {}),
+        ...(ev.second ? { second: ev.second } : {}),
     };
 }
 
@@ -194,7 +200,13 @@ const ROWERS: Partial<Record<string, Rower>> = {
         row: (action, ev, zone) => ({
             ...fromEvidence(action, ev),
             title: `overdue from ${ev.subtitle ?? "a customer"}`,
-            sub: joined(ev.title, ev.detail, wasDue(ev.at, zone)),
+            sub: joined(
+                ev.title,
+                ev.detail,
+                wasDue(ev.at, zone),
+                // "reminded yesterday" (U8): said on the row it concerns.
+                ev.reminded ? ev.reminded.toLowerCase() : null,
+            ),
             amountIn: "title",
         }),
         more: (n) => `${n} more overdue invoice${n === 1 ? "" : "s"}`,
@@ -296,6 +308,30 @@ const ROWERS: Partial<Record<string, Rower>> = {
         }),
         more: (n) => `${n} more low-rated review${n === 1 ? "" : "s"}`,
     },
+    // DEC-171, groups only: "Kavya Iyer · Cake tasting", then "Wed 21 Oct,
+    // 12:00 pm" with its amount, tagged Awaiting payment.
+    APPOINTMENTS_AWAITING_PAYMENT: {
+        rank: () => 3,
+        row: (action, ev) => ({
+            ...fromEvidence(action, ev),
+            title: ev.subtitle ? `${ev.subtitle} · ${ev.title}` : ev.title,
+            sub: ev.detail ?? null,
+            amountIn: ev.amountMinor === null ? null : "sub",
+        }),
+        more: (n) => `${n} more booking${n === 1 ? "" : "s"} awaiting payment`,
+    },
+    // A14, groups only: "Seeded multigrain loaf", "3 left · sells about 9
+    // a day", and the storefront when the business has several.
+    COMMERCE_STOCK_LOW: {
+        rank: () => 3,
+        row: (action, ev) => ({
+            ...fromEvidence(action, ev),
+            title: ev.title,
+            sub: joined(ev.detail, ev.subtitle),
+            amountIn: null,
+        }),
+        more: (n) => `${n} more product${n === 1 ? "" : "s"} running low`,
+    },
 };
 
 /** Sources shown as one row whatever their evidence, with their own words. */
@@ -363,7 +399,8 @@ function actionRow(action: HomeAction, rank: Rank, sub: string | null) {
     };
 }
 
-function rowsOf(action: HomeAction, zone: string): Ranked[] {
+/** One action's rows, each ranked, with its "N more" row last. */
+export function rowsOf(action: HomeAction, zone: string): Ranked[] {
     const source = sourceIndex(action.code);
     const single = SINGLE[action.code];
     if (single) {
@@ -423,6 +460,7 @@ function rowsOf(action: HomeAction, zone: string): Ranked[] {
             rank: action.moreTone ? rower.rank({ tone }) : last.rank,
             source,
             things: hidden,
+            more: true,
         });
     }
     return rows;

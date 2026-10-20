@@ -108,6 +108,8 @@ const CASES = [
             "deleteRule",
             "bookByHand",
             "rescheduleBooking",
+            // A booking given to someone else is a new commitment (#1157).
+            "reassignBooking",
             "bookVisit",
         ],
     },
@@ -195,6 +197,16 @@ const CASES = [
             "send",
             "remind",
             "recordPayment",
+            // The ledger (DEC-173): a closing business still puts its
+            // money records right.
+            "removePayment",
+            "chequeCleared",
+            "chequeBounced",
+            // Share and Remind many (DEC-173, U5): a closing business still
+            // asks to be paid for what it already invoiced.
+            "share",
+            "remindersPreview",
+            "remindMany",
         ],
         refused: ["create", "update", "remove", "issue", "reissue"],
     },

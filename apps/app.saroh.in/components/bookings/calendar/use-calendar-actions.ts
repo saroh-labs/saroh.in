@@ -15,8 +15,8 @@ import type {
 } from "@/lib/services/booking-calendar";
 import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import { localMinuteOf, whoFor } from "@/lib/services/diary";
-import { freeCancelHoursFor, pastFreeCancel } from "@/lib/staff/free-cancel";
-import type { BookingRules, StaffView } from "@/lib/staff/types";
+import { pastFreeCancel } from "@/lib/staff/free-cancel";
+import type { BookingRules } from "@/lib/staff/types";
 import { showError } from "@saroh/ui/toast";
 
 import type { HeldFor, QuickLookActions } from "./quick-look-types";
@@ -66,14 +66,13 @@ export function useCalendarActions({
     timezone,
     money,
     rules,
-    staffById,
 }: {
     now: number;
     timezone: string;
     /** The viewer reads money: the Came toast can say what to take. */
     money: boolean;
+    /** The business's: its free-cancel window is everyone's (DEC-170). */
     rules: BookingRules | null;
-    staffById: ReadonlyMap<string, StaffView>;
 }) {
     const router = useRouter();
     const { hold, undo, pending } = useHold();
@@ -109,8 +108,6 @@ export function useCalendarActions({
 
     const firstName = (b: DiaryBooking) => firstNameOf(whoFor(b));
     const isClassSeat = (b: DiaryBooking) => b.service.capacity > 1;
-    const freeCancelFor = (staffId: string | null | undefined) =>
-        freeCancelHoursFor(rules, staffId ? staffById.get(staffId) : null);
 
     const act: QuickLookActions = {
         checkIn(b) {
@@ -137,7 +134,7 @@ export function useCalendarActions({
             );
         },
         cancel(b) {
-            const hours = freeCancelFor(b.staff?.id);
+            const hours = rules?.freeCancelHours ?? null;
             const late = pastFreeCancel(hours, b.startAt, now);
             const prepaid =
                 b.paidWith === "PACK" || b.paidWith === "MEMBERSHIP";
@@ -219,5 +216,5 @@ export function useCalendarActions({
         return key ? () => undo(key) : null;
     };
 
-    return { overrides, act, heldFor, freeCancelFor };
+    return { overrides, act, heldFor };
 }

@@ -11,6 +11,7 @@ import {
     SettingsPanel,
     SettingsPanelHeader,
 } from "@/components/settings/settings-panel";
+import { ShowSetupOnHome } from "@/components/settings/show-setup-on-home";
 import { SettingsColumns } from "@/components/shared/settings-columns";
 import { mayChangePlan } from "@/lib/billing/plan-access";
 import { kindWords } from "@/lib/organizations/kind";
@@ -110,11 +111,18 @@ export default async function OrganizationSettingsPage() {
                 beside
                 aside={
                     ready && readyHasCard(ready) ? (
-                        <ReadyChecklist
-                            list={ready}
-                            businessId={organization?.id}
-                            canChangePlan={mayChangePlan(organization)}
-                        />
+                        <div className="grid gap-2.5">
+                            <ReadyChecklist
+                                list={ready}
+                                businessId={organization?.id}
+                                canChangePlan={mayChangePlan(organization)}
+                            />
+                            {/* Hidden on Home: the way back (A4). Home
+                                keeps it by the settings read's id. */}
+                            {settings ? (
+                                <ShowSetupOnHome businessId={settings.id} />
+                            ) : null}
+                        </div>
                     ) : undefined
                 }
             >

@@ -287,6 +287,21 @@
 
 - `Decimal` with explicit precision (`@db.Decimal(10, 2)`, `@db.Decimal(12, 2)`);
   never `Float` or `Int` for currency.
+- **The invoice ledger counts in integer paise** (DEC-173, #1113): the one
+  exception to "never `Int` for currency", as `PaymentIntent.amountCents`
+  already was. `InvoicePayment.amountCents` is one payment;
+  `Invoice.paidCents` caches the sum of the live ones (not removed, not
+  bounced), is recomputed from the rows in the same transaction as every
+  ledger write, and is written nowhere else (the showcase check pins it).
+  The invoice's own money columns stay `Decimal(12,2)` and amounts still
+  travel as strings. What is left to pay is `leftToPayCents`
+  (`invoices/invoice-state.ts`), the one place it is worked out. A payment
+  is never deleted: one recorded by mistake is removed softly
+  (`removedAt`). An order's invoice has no rows; the order is its ledger
+  (ADR-008). The migration's CHECKs hold the shape (an amount above 0, a
+  known method, a bank status only and always on a cheque); they exist
+  only where migrations ran, so prove them under `TEST_RLS=on`
+  (`rls/invoice-payments-rls.db.spec.ts`).
 - **Strings across the wire.** Frontend types say `price: string`, and
   `common/money.ts` `toMoneyString` formats with string operations only.
 - **The API computes.** Order totals are summed in integer cents server-side

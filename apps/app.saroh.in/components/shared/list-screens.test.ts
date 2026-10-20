@@ -111,6 +111,8 @@ describe("a list draws the one table", () => {
                     "kitchen tickets as they print on paper: a ruled table per ticket, not a list on a screen",
                 "components/commerce/product-page/orders-tab.tsx":
                     "a real <table> for its caption and column headers, drawn with listTable's band and rows",
+                "components/insights/busiest-grid.tsx":
+                    "Insights' busiest grid as a table (Show as a table): a real <table> so each number is read with its day and time, drawn with listTable's band and rows",
             },
         );
         // The one hand-written table that is a list still takes the look.
@@ -146,6 +148,8 @@ describe("a list draws the one toolbar", () => {
             {
                 "components/commerce/orders/order-search.tsx":
                     "the Orders search field itself; orders-screen draws it in ListToolbar's search slot",
+                "components/invoices/invoice-search.tsx":
+                    "the Invoices search field itself; invoices-screen draws it in ListToolbar's search slot",
                 "components/stores/catalogue/catalogue-toolbar.tsx":
                     "the Products search field itself; catalogue-screen hands it to DataView's toolbarSearch",
                 "components/commerce/product-editor-v2/find-row.tsx":
@@ -229,6 +233,8 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
             "Levels, Log and Checks: three views of stock with different columns",
         "components/customers/detail/header.tsx":
             "a person's sections: Overview, Orders, Bookings and the rest",
+        "components/insights/insights-tabs.tsx":
+            "Insights' answers: Overview, Money, What sells, Where customers come from",
         "components/leads/leads-tabs.tsx":
             "Leads and Follow-ups: the leads, and the tasks set on them",
         "components/organizations/organization-settings-form.tsx":

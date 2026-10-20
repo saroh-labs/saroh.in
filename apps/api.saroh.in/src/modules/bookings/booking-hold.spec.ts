@@ -1,6 +1,7 @@
 // DB-free unit tests for the booking page's pay-now hold (U19). The
 // transaction client is a plain object of jest mocks, so every read and write
 // the hold makes is asserted in the one transaction it was handed.
+import { payIssuedDraftOnlineInTx } from "../invoices/invoice-ledger";
 import { hashPayToken } from "../invoices/pay-token";
 import {
     confirmHoldInTx,
@@ -15,6 +16,13 @@ import {
     releaseHoldInTx,
     renewHoldTokenInTx,
 } from "./booking-hold";
+
+// The ledger write itself is the db specs' (`invoice-payments.db.spec.ts`,
+// `invoice-other-writers.db.spec.ts`); here, only that the hold hands its
+// payment to it.
+jest.mock("../invoices/invoice-ledger", () => ({
+    payIssuedDraftOnlineInTx: jest.fn().mockResolvedValue(undefined),
+}));
 
 const NOW = new Date("2026-09-18T09:30:00.000Z");
 const LATER = new Date(NOW.getTime() + 5 * 60_000);
@@ -307,9 +315,11 @@ describe("releaseHoldInTx", () => {
 
 describe("confirmHoldInTx — the money arrived", () => {
     const payment = {
-        paymentMethod: "ONLINE",
-        paymentReference: "pay_1",
-        paymentNote: "Paid online through Razorpay",
+        paymentIntentId: "pi_1",
+        amountCents: 150_000,
+        reference: "pay_1",
+        note: "Paid online through Razorpay",
+        receivedAt: NOW,
     };
     const heldBooking = (over: Record<string, unknown> = {}) => ({
         id: "bk_1",
@@ -338,7 +348,7 @@ describe("confirmHoldInTx — the money arrived", () => {
         );
     }
 
-    it("confirms a hold paid in time, and numbers the invoice PAID", async () => {
+    it("confirms a hold paid in time, numbers the invoice and pays it on its ledger", async () => {
         const tx = makeTx();
         wire(tx, heldBooking());
 
@@ -358,17 +368,23 @@ describe("confirmHoldInTx — the money arrived", () => {
                 paidWith: "PAID",
             },
         });
+        // Issued with its number, then paid through the ledger (DEC-173):
+        // never written PAID here.
         expect(tx.invoice.update).toHaveBeenCalledWith({
             where: { id: "inv_1" },
             data: {
-                status: "PAID",
+                status: "ISSUED",
                 number: "INV-0007",
                 issuedAt: NOW,
                 dueAt: NOW,
-                paidAt: NOW,
-                ...payment,
             },
         });
+        expect(payIssuedDraftOnlineInTx).toHaveBeenCalledWith(
+            tx,
+            "org_1",
+            "inv_1",
+            payment,
+        );
         // Paid in time: nothing needed counting.
         expect(tx.booking.count).not.toHaveBeenCalled();
         // No note, no suggestion.

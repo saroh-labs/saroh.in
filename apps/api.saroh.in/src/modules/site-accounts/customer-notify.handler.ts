@@ -3,6 +3,7 @@ import type { Job, Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
 import { lockMeter } from "../billing/metering.service";
+import { BookingEventType } from "../bookings/booking-event-type";
 import { CommunicationsService } from "../communications/communications.service";
 import { SAROH_EMAILS_KEY } from "../communications/saroh-delivery";
 import { emailRoute } from "../communications/saroh-may-send";
@@ -305,12 +306,19 @@ async function loadBooking(
         ? await tx.bookingEvent.findFirst({
               where: { id: payload.bookingEventId, bookingId: booking.id },
               select: {
+                  type: true,
                   actorUserId: true,
                   fromStartAt: true,
                   toStartAt: true,
+                  fromStaffId: true,
+                  toStaff: { select: { name: true } },
               },
           })
         : null;
+    // Given to someone else (#1157): who it is with now is the news, and
+    // the time only when it moved too.
+    const reassigned =
+        kind === "BOOKING_MOVED" && event?.type === BookingEventType.Reassigned;
     const startAt =
         kind === "BOOKING_CANCELLED"
             ? (event?.fromStartAt ?? booking.startAt)
@@ -328,12 +336,15 @@ async function loadBooking(
                     firstWord(booking.contact?.firstName) ??
                     firstWord(booking.bookerName),
                 service: booking.service.name,
-                staff: booking.staff?.name ?? null,
+                staff: reassigned
+                    ? (event.toStaff?.name ?? booking.staff?.name ?? null)
+                    : (booking.staff?.name ?? null),
                 startAt,
                 fromStartAt:
                     kind === "BOOKING_MOVED"
                         ? (event?.fromStartAt ?? null)
                         : null,
+                ...(reassigned ? { reassigned: true } : {}),
                 timeZone: booking.timezone,
                 byCustomer: event ? event.actorUserId === null : false,
             },

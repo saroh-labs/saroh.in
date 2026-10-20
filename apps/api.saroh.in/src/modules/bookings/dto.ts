@@ -576,6 +576,30 @@ export class RescheduleBookingDto {
 }
 
 /**
+ * Change who a booking is with, or give one that has nobody a person
+ * (#1157); `startAt` moves it in the same step. Only the person and the
+ * time: its terms, money and links stay.
+ */
+export class ReassignBookingDto {
+    @IsString()
+    @MaxLength(64)
+    staffId!: string;
+
+    /** ISO-8601 absolute instant of a new start; left out, it keeps its time. */
+    @IsOptional()
+    @IsISO8601()
+    startAt?: string;
+}
+
+/** Who could take a booking at a time (#1157's picker). */
+export class ReassignCandidatesQueryDto {
+    /** ISO-8601; left out, the booking's own start. */
+    @IsOptional()
+    @IsISO8601()
+    startAt?: string;
+}
+
+/**
  * Record how an appointment went (#241). Only a person sets this — nothing
  * derives it from time passing.
  */

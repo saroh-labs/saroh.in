@@ -4,12 +4,18 @@ import { prisma } from "@saroh/database";
 import { planConnectsOwnAccounts } from "../billing/online-payments-plan";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
+import {
+    overdueBillIds,
+    REMIND_ALL_QUIET_DAYS,
+} from "../invoices/overdue-bills";
 import { accountAreaOn } from "../site-accounts/account-area";
 import { ThreadsService } from "../site-accounts/threads.service";
 import { StockChecksService } from "../stock/stock-checks.service";
 import { businessDetailsGap } from "./home-business-details";
+import { readHomeCheques } from "./home-cheques";
 import { overdueFollowUps } from "./home-crm-sources";
 import { noEmailProvider } from "./home-email-setup";
+import { groupNeeds } from "./home-groups";
 import { HomeInlineService } from "./home-inline";
 import { lastDayHeader, readLastDay } from "./home-last-day";
 import {
@@ -50,20 +56,27 @@ import type { HomeSchedule } from "./home-schedule";
 import { NO_SCHEDULE, readSchedule } from "./home-schedule";
 import { sitesNotLive, stockShort } from "./home-site-stock-sources";
 import { isStaffView, readStaffNarrow, WHOLE_BUSINESS } from "./home-staff";
+import { buildTiles } from "./home-tiles";
 import { readToday, todayScope } from "./home-today";
+import { readTodayFirst } from "./home-today-first";
 import { uncollectedOrders } from "./home-uncollected";
 import { readWeek, weekScope } from "./home-week";
 
 export type {
     HomeAction,
     HomeBooking,
+    HomeChequesWaiting,
     HomeEvidence,
+    HomeGoing,
+    HomeGoingOwed,
     HomeInline,
     HomeInlineKind,
     HomeInput,
     HomeLastDay,
     HomeModel,
     HomeNeed,
+    HomeNeedGroup,
+    HomeNeedKind,
     HomeRetryVia,
     HomeReviewPage,
     HomeReviewSite,
@@ -71,6 +84,7 @@ export type {
     HomeSinceItem,
     HomeStaff,
     HomeStaffStore,
+    HomeTiles,
     HomeToday,
     HomeTodayItem,
     HomeTone,
@@ -300,27 +314,7 @@ export class HomeService {
         const scope = todayScope(input, available);
         const week = weekScope(input, available);
 
-        const [
-            overdue,
-            open,
-            schedule,
-            today,
-            lastDay,
-            owed,
-            renewals,
-            waiting,
-            overdueInvoiceAction,
-            short,
-            notLive,
-            thisWeek,
-            reviews,
-            notes,
-            messages,
-            refundsFailed,
-            detailsGap,
-            uncollected,
-            noEmail,
-        ] = await Promise.all([
+        const reads = Promise.all([
             active.has("CRM") && canReadLeads
                 ? guard(
                       { moduleKey: "CRM", label: "Overdue follow-ups" },
@@ -446,7 +440,13 @@ export class HomeService {
             canReadInvoices
                 ? guard(
                       { moduleKey: "PAYMENTS", label: "Overdue invoices" },
-                      () => overdueInvoices(this.db, input.organizationId, now),
+                      () =>
+                          overdueInvoices(
+                              this.db,
+                              input.organizationId,
+                              now,
+                              zone,
+                          ),
                       null,
                   )
                 : skip(null),
@@ -586,6 +586,51 @@ export class HomeService {
                   )
                 : skip(null),
         ]);
+        // Home A's sources (DEC-171), asked at once with the rest; their
+        // slots come after today's, so `unavailable` keeps its order.
+        const todayFirst = readTodayFirst(this.db, guard, {
+            input,
+            available,
+            now,
+            zone,
+            narrow,
+            today: scope,
+            week,
+        });
+        // "Cheques not in the bank" (DEC-173, Home U18): read on its own, so
+        // a failure is named "Cheques" ("Couldn't check cheques just now")
+        // and the week's other figures still come. Only for someone who
+        // reads both money and invoices (`weekScope`).
+        const chequesRead = week?.cheques
+            ? guard(
+                  { moduleKey: "PAYMENTS", label: "Cheques" },
+                  () => readHomeCheques(this.db, input.organizationId),
+                  null,
+              )
+            : skip(null);
+        const [
+            overdue,
+            open,
+            schedule,
+            today,
+            lastDay,
+            owed,
+            renewals,
+            waiting,
+            overdueInvoiceAction,
+            short,
+            notLive,
+            thisWeek,
+            reviews,
+            notes,
+            messages,
+            refundsFailed,
+            detailsGap,
+            uncollected,
+            noEmail,
+        ] = await reads;
+        const [awaiting, low, moneyIn, going] = await todayFirst;
+        const cheques = await chequesRead;
         const unavailable = slots.flat();
 
         if (overdue.count > 0) {
@@ -690,6 +735,61 @@ export class HomeService {
         // What each row offers in place (F4), for whoever may do it.
         await this.inline?.decorate(actions, input, now);
 
+        // Home A (DEC-171): Needs you grouped, with the two sources only
+        // the groups carry, and the tiles. Amounts only with `payment:read`.
+        const money = holds(input, "payment:read");
+        const grouped = groupNeeds(
+            [
+                ...actions,
+                ...(awaiting ? [awaiting] : []),
+                ...(low ? [low] : []),
+            ],
+            zone,
+            {
+                money,
+                extra: {
+                    bills: going?.owed
+                        ? { totals: going.owed.totals, all: going.owed.bills }
+                        : null,
+                    awaiting: awaiting?.totals ?? null,
+                },
+            },
+        );
+        // Remind all (DEC-171, U8): the bills it reminds, for someone who
+        // may send a reminder. A failed read leaves the group without the
+        // button, never Home without its groups.
+        const bills = grouped.needGroups.find((g) => g.kind === "BILLS");
+        if (bills && holds(input, "invoice:write")) {
+            try {
+                const invoiceIds = await overdueBillIds(
+                    this.db,
+                    input.organizationId,
+                    now,
+                );
+                if (invoiceIds.length > 0) {
+                    bills.remind = {
+                        invoiceIds,
+                        quietDays: REMIND_ALL_QUIET_DAYS,
+                    };
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `Remind all's bills couldn't be read: ${(error as Error).message}`,
+                );
+            }
+        }
+        const openRead =
+            available.has("COMMERCE") &&
+            (holds(input, "order:read") || holds(input, "order:stage")) &&
+            !unavailable.some((u) => u.label === "Open orders");
+        const tiles = buildTiles({
+            now,
+            today,
+            upcoming,
+            open: openRead ? open : null,
+            moneyIn,
+        });
+
         return {
             // A staff member's Home is the business's rows, narrowed (F11).
             ...(staffView
@@ -705,7 +805,15 @@ export class HomeService {
             ordersInProgress: active.has("COMMERCE") ? open.later : 0,
             today,
             lastDay,
-            week: thisWeek,
+            // The cheques line rides on the week (`week.chequesWaiting`):
+            // null while none waits, when its read failed, and for a
+            // viewer without both reads.
+            week: thisWeek
+                ? { ...thisWeek, chequesWaiting: cheques }
+                : thisWeek,
+            tiles,
+            ...grouped,
+            going,
         };
     }
 

@@ -5343,3 +5343,49 @@ rule stands for the profile's own fields.
 - **Symptom:** `profile-list.test.tsx` (accounts) timed out at 5s on CI; 1s locally.
 - **Cause:** the first sheet open in jsdom loads the shared phone field's country picker; CI runners are several times slower.
 - **Fix:** `testTimeout: 15_000` in `apps/accounts.saroh.in/vitest.config.ts`.
+
+### Two phone specs on development after #1039: a press before hydration, and a business picked by name (19 Oct 2026)
+
+- **Symptom:** development CI (run 39274313584, shard 3/4) failed `bookings-desk.spec.ts` "a booking paid online is cancelled with the refund choice" on the phone, first try and retry (`Cancel booking` never showed after More), and `calendar-month.spec.ts` "What to show rises from the foot" once (no dialog). Both had passed on the PR and in the local gate.
+- **Cause:** (1) #846's lost click again. In both traces the press landed on the server-drawn button before the page's own client components had hydrated: the shell's links prefetched before the click, the page's own (`/bookings/all`, `/calendar?month=…`) only after it. On a slow runner, a page's own content can hydrate well after the shell. (2) The refund spec read the first showcase business, by name, with an upcoming booking paid online. That day it was CarePoint Clinic, where the demo user is a Member (front desk), not the owner whose refund choice the spec reads.
+- **Fix:** `e2e/fixtures/press.ts` `pressUntil(button, answer)` presses until a Locator shows or a check holds, and never presses again once it has (a toggle or a late sheet isn't pressed shut). Both specs use it for every first press after a load: More, New booking, Came, What to show, a day. The refund spec reads only businesses where the demo user holds `payment:manage` and `booking:write`. `calendar-month.spec.ts`'s sideways check polls, and measures against the width set, not `innerWidth`.
+- **Rule:** the first press on a page after `goto` or `reload` goes through `pressUntil` (`saroh-browser-tests` → Waiting). A spec that reads a showcase business it doesn't name picks it by what the session may do there, never by list order. No lint catches a bare first click, because a click after an awaited state change is fine. The older specs' inline `toPass` loops do the same job; new code uses the helper.
+
+### Insights drew money from before the period as the period (20 Oct 2026)
+
+**Symptom**: Northwind, Insights › Overview, Last 4 weeks (22 Sep to 19 Oct):
+the sentence said "₹5,48,284 came in over the last 4 weeks", and the chart's
+"Last 4 weeks" bar for the week of 21 Sep read ₹8.3L, more than the whole
+period.
+**Cause**: the twelve bars were calendar weeks (Monday to Sunday), each marked
+PERIOD when four of its days fell inside the window. The 21 Sep week held one
+day from before the period and all of its money was drawn as "now"; the dark
+bars never added up to the sentence.
+**Fix**: the bars are rolling weeks ending today (`moneyBuckets`,
+`apps/api.saroh.in/src/modules/analytics/period.ts`): each window's bars hold
+exactly its days (a 3-month window's oldest bar holds the days over whole
+weeks, and is never "best week"), so the PERIOD bars add up to money in and
+the BEFORE bars to the period before.
+**Rule**: a picture of a window is cut on that window's own days.
+`money.db.spec.ts` asserts the PERIOD and BEFORE bars sum to `moneyIn` for
+7 days, 4 weeks and 3 months, and that the day before the period sits in a
+BEFORE bar; `period.spec.ts` checks the bars cover each window exactly.
+
+### The Home and Insights release gate: four app bugs no spec had reached (20 Oct 2026)
+
+**Symptom.** The first `pnpm prepush --all` on batch-2026-10-20-1 failed 34 browser tests. Most were the new specs' own mistakes (below), but four were the app: What sells answered "Couldn't load Insights" on every business; Calendar only's New on Home named only "Sending invoices" as outside their role; Needs you's "24 more orders" link was 17px tall on a phone; a phone's Bookings opened from Home's Book someone dropped `?new=1` from the address under the open flow; and a booking made by hand beside another answered 500 under load.
+
+**Cause.** (1) `best-customers.tsx`, a server component, called `avatarInitials()` from `@saroh/ui/avatar`, a "use client" module: on the server that import is a client reference and calling it throws. Its unit test renders it in jsdom, where it is a plain function. (2) Home's New dropped every module whose readiness read DISABLED, and readiness is DISABLED for a role the module doesn't reach (`UNAUTHORIZED`) as well as for a module the business has off. (3) `coarse:min-h-11` on a `TextLink` inside a `<p>`: an inline `<a>` ignores min-height. (4) `useOpeningView` replaced the address with List's and kept nothing else. (5) A serialization failure inside a `$queryRaw` arrives as `P2010` "Raw query failed. Code: `40001`", which `isSerializationFailure` did not read, so `reserve` threw it as a 500 instead of "That changed while you were booking. Try again."
+
+**Fix.** (1) `initials` from `@/lib/names` (`@saroh/ui/lib/names` underneath); `share-image-thumb.tsx` takes `webImageUrl` from `@saroh/ui/lib/share-facts` too. (2) `homeNewModuleKeys` counts a module that is on for the business but closed to the role only by `UNAUTHORIZED`, so the role line names it. (3) `coarse:inline-flex coarse:items-center` beside the min height. (4) `withArrival` carries `new` and `contactId` onto the List address. (5) `prisma-errors.ts` reads P2010 with 40001 (in `meta` or the message) as P2034.
+
+The specs' own mistakes, for the next unit that writes one: Insights specs read Rye & Co., which has no Insights module (now Pulse Fitness, read only); `home-needs-groups` made its records with the bare `request` fixture, which carries no session (401), and asserted on every row of a group other tests share; geometry of a sheet or the phone's + was measured while it slid in (poll the box); Home's `<main>` is one when settled, but while it streams the loading frame's `<main>` sits beside it, so wait for the greeting, not `locator("main")`; `.or()` of two parts of the same card matches both; a stretched link's own box is its line of text, its target the row; a group of Needs you whose last row is acted on folds to "All done" while the hold runs (by design, `need-groups.test.tsx`), so a spec opens it again to reach the row's Undo; and `bookings.spec`'s "Book on this day" looked for the day's number in the whole New booking sheet, which matched a recent customer's phone number on some days and nothing on others.
+
+**Rule.** A server component calls no function from a "use client" module (`pnpm run check:client-calls`, in prepush and CI). A module's readiness says what this person can do, not what the business does: read `lifecycle` and the blockers when the question is the business's. `min-h` on a link needs a block or flex box. A page that rewrites its own address keeps the arrival's parameters. Every Postgres 40001 is a lost race, whichever Prisma code carries it.
+
+### PR #1159's first CI run: a replayed Enter, and two jsdom files past 5s (20 Oct 2026)
+
+- **Symptom:** run 39383484916 failed `home-new-menu.spec.ts` "Enter opens it on the first row…" (desk, first try and retry: the menu was open, its first row never focused), `shop.test.tsx` "the bag through a reload … finds the way…" (5088ms) and `new-booking-flow.test.tsx` "books a caller…" (5103ms) with the 29 tests after it. All passed in the local gate; this branch touched none of the unit-tested code.
+- **Cause:** (1) The trace has one Enter, ~250ms after the page loaded, while the page's own routes still prefetched. React replayed the pre-hydration keydown on the trigger, which opened the menu, but Radix's document-level keydown listener (attached in an effect) had not seen it, so it treated the open as a pointer's and left focus on the menu, not its first row. The spec's `toPass` only waited for the menu to show. (2) Both files walk whole sheets in jsdom with real settle waits, ~2s a test locally. A test that times out leaves its `act()` running ("overlapping act() calls"), which fails every later test in the file.
+- **Fix:** the spec presses Escape and Enter again until the first row holds focus (`toBeFocused` inside `toPass`). Both New booking describes and the bag-through-a-reload describe get `{ timeout: 15_000 }`.
+- **Rule:** a keyboard spec's first press after a load waits for the focus it expects, not only for the menu or sheet to show: a replayed press can open it in pointer mode. A jsdom file whose tests take over a second locally sets a describe timeout, so one slow test can't fail the file.

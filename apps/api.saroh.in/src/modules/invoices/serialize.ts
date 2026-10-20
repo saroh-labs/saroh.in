@@ -4,11 +4,18 @@ import type { AddedLine } from "./added-line";
 import { addedLine } from "./added-line";
 import { stateName } from "./gst-states";
 import type { InvoiceStanding } from "./invoice-state";
-import { invoiceStanding } from "./invoice-state";
+import {
+    invoiceStanding,
+    isPartlyPaid,
+    ONLINE_PAYMENT_METHOD,
+    owedNowCents,
+    paidSoFarCents,
+} from "./invoice-state";
 import type { InvoiceTitle } from "./invoice-title";
 import { invoiceTitle, isExemptSupply } from "./invoice-title";
 import type { InvoiceOnlineBlocker } from "./pay-online";
 import type { InvoiceSendView, InvoiceSentView } from "./send-view";
+import { fromCents } from "./totals";
 
 interface Money {
     toString(): string;
@@ -37,6 +44,8 @@ export const INVOICE_SELECT = {
     paymentMethod: true,
     paymentReference: true,
     paymentNote: true,
+    // The live sum of the ledger (DEC-173): paid so far, left to pay.
+    paidCents: true,
     source: true,
     subscriptionId: true,
     periodStart: true,
@@ -88,7 +97,38 @@ export const INVOICE_LIST_SELECT = {
         select: { description: true, quantity: true },
     },
     _count: { select: { lines: true } },
+    // A cheque waiting for the bank (DEC-173): the row reads "Paid · cheque
+    // not in the bank". Only whether there is one.
+    payments: {
+        where: { removedAt: null, bankStatus: "WAITING" },
+        take: 1,
+        select: { bankStatus: true, removedAt: true },
+    },
 } as const;
+
+/** Every payment on the ledger, removed and bounced ones included. */
+export const INVOICE_PAYMENTS_SELECT = {
+    // Mutable: Prisma's orderBy takes no readonly array.
+    orderBy: [{ receivedAt: "asc" as const }, { createdAt: "asc" as const }],
+    select: {
+        id: true,
+        amountCents: true,
+        currency: true,
+        method: true,
+        reference: true,
+        note: true,
+        receivedAt: true,
+        createdAt: true,
+        chequeNumber: true,
+        chequeBank: true,
+        bankStatus: true,
+        clearedAt: true,
+        bouncedAt: true,
+        bounceReason: true,
+        removedAt: true,
+        removedReason: true,
+    } as const,
+};
 
 export const INVOICE_DETAIL_SELECT = {
     ...INVOICE_SELECT,
@@ -114,6 +154,7 @@ export const INVOICE_DETAIL_SELECT = {
             orderItemId: true,
         },
     },
+    payments: INVOICE_PAYMENTS_SELECT,
 } as const;
 
 interface ContactRow {
@@ -143,6 +184,16 @@ export interface InvoiceRow {
     paymentMethod: string | null;
     paymentReference: string | null;
     paymentNote: string | null;
+    /**
+     * The ledger's live sum (DEC-173). Absent on a row read without it,
+     * which then reads as unpaid unless PAID.
+     */
+    paidCents?: number;
+    /**
+     * The ledger's rows: all of them on a detail read, only a waiting
+     * cheque's on a list row.
+     */
+    payments?: PaymentRow[];
     source: string;
     subscriptionId: string | null;
     periodStart: Date | null;
@@ -198,6 +249,56 @@ export interface InvoiceRow {
         orderItemId?: string | null;
     }[];
     _count?: { lines: number };
+}
+
+/** One ledger row as read for an invoice (DEC-173). */
+export interface PaymentRow {
+    id?: string;
+    amountCents?: number;
+    currency?: string;
+    method?: string;
+    reference?: string | null;
+    note?: string | null;
+    receivedAt?: Date;
+    createdAt?: Date;
+    chequeNumber?: string | null;
+    chequeBank?: string | null;
+    bankStatus: string | null;
+    clearedAt?: Date | null;
+    bouncedAt?: Date | null;
+    bounceReason?: string | null;
+    removedAt: Date | null;
+    removedReason?: string | null;
+}
+
+/** One payment on the invoice's ledger, as the details sheet reads it. */
+export interface InvoicePaymentView {
+    id: string;
+    /** Major units, as a string. */
+    amount: string;
+    currency: string;
+    /** CASH | UPI | BANK_TRANSFER | CARD | OTHER | CHEQUE | ONLINE. */
+    method: string;
+    reference: string | null;
+    note: string | null;
+    /** When the money came in. */
+    receivedAt: string;
+    /** When it was written down. */
+    recordedAt: string;
+    /** A cheque's number and bank; null for anything else. */
+    cheque: { number: string | null; bank: string | null } | null;
+    /** WAITING, CLEARED or BOUNCED on a cheque; null otherwise. */
+    bankStatus: string | null;
+    clearedAt: string | null;
+    bouncedAt: string | null;
+    bounceReason: string | null;
+    /** Removed by mistake: when and why. It no longer counts. */
+    removed: { at: string; reason: string | null } | null;
+    /**
+     * Whether Remove is offered: not already removed, not an online
+     * payment (refunded instead), and the invoice ISSUED or PAID.
+     */
+    canRemove: boolean;
 }
 
 export interface InvoiceLineView {
@@ -311,6 +412,20 @@ export interface InvoiceViewModel {
         reference: string | null;
         note: string | null;
     } | null;
+    /**
+     * The ledger (DEC-173): what has come in (live payments: not removed,
+     * not bounced; a waiting cheque counts) and what is left, as Decimal
+     * strings. A PAID invoice has paid its total; only an ISSUED one has
+     * anything left.
+     */
+    paidSoFar: string;
+    leftToPay: string;
+    /** ISSUED with some paid and some left: derived, never a status. */
+    partlyPaid: boolean;
+    /** A live cheque is waiting for the bank: "cheque not in the bank". */
+    chequeWaiting: boolean;
+    /** On a detail read only: every payment, removed and bounced too. */
+    payments?: InvoicePaymentView[];
     source: string;
     subscriptionId: string | null;
     periodStart: string | null;
@@ -398,6 +513,35 @@ export function contactName(c: {
 }
 
 const iso = (d: Date | null) => (d ? d.toISOString() : null);
+
+function paymentView(p: PaymentRow, status: string): InvoicePaymentView {
+    const removed = p.removedAt
+        ? { at: p.removedAt.toISOString(), reason: p.removedReason ?? null }
+        : null;
+    return {
+        id: p.id ?? "",
+        amount: fromCents(p.amountCents ?? 0),
+        currency: p.currency ?? "",
+        method: p.method ?? "",
+        reference: p.reference ?? null,
+        note: p.note ?? null,
+        receivedAt: (p.receivedAt ?? new Date(0)).toISOString(),
+        recordedAt: (p.createdAt ?? p.receivedAt ?? new Date(0)).toISOString(),
+        cheque:
+            p.method === "CHEQUE"
+                ? { number: p.chequeNumber ?? null, bank: p.chequeBank ?? null }
+                : null,
+        bankStatus: p.bankStatus,
+        clearedAt: iso(p.clearedAt ?? null),
+        bouncedAt: iso(p.bouncedAt ?? null),
+        bounceReason: p.bounceReason ?? null,
+        removed,
+        canRemove:
+            !removed &&
+            p.method !== ONLINE_PAYMENT_METHOD &&
+            (status === "ISSUED" || status === "PAID"),
+    };
+}
 
 export function serializeInvoice(
     row: InvoiceRow,
@@ -504,6 +648,19 @@ export function serializeInvoice(
                   note: row.paymentNote,
               }
             : null,
+        paidSoFar: fromCents(
+            paidSoFarCents({ ...row, paidCents: row.paidCents ?? 0 }),
+        ),
+        leftToPay: fromCents(
+            owedNowCents({ ...row, paidCents: row.paidCents ?? 0 }),
+        ),
+        partlyPaid: isPartlyPaid({ ...row, paidCents: row.paidCents ?? 0 }),
+        chequeWaiting: (row.payments ?? []).some(
+            (p) => p.removedAt === null && p.bankStatus === "WAITING",
+        ),
+        ...(detail && row.payments
+            ? { payments: row.payments.map((p) => paymentView(p, row.status)) }
+            : {}),
         source: row.source,
         subscriptionId: row.subscriptionId,
         periodStart: iso(row.periodStart),

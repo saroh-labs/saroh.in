@@ -12,6 +12,7 @@ import {
     socialLinkItems,
     socialLinkShown,
     socialLinksSummary,
+    whatsappChatLink,
     whatsappLinkFromPhone,
 } from "./social-links";
 
@@ -360,5 +361,41 @@ describe("normaliseMapLink (DEC-128)", () => {
         ]) {
             expect(mapLinkOrNull(junk)).toBeNull();
         }
+    });
+});
+
+describe("whatsappChatLink", () => {
+    it("opens a chat with the message typed in, the number read as it is said", () => {
+        expect(whatsappChatLink("+91 98450 11234", "Hi Vivek")).toBe(
+            "https://wa.me/919845011234?text=Hi%20Vivek",
+        );
+        expect(whatsappChatLink("+919845011234", "Hi Vivek")).toBe(
+            "https://wa.me/919845011234?text=Hi%20Vivek",
+        );
+        expect(whatsappChatLink("98450 11234", "Hi")).toBe(
+            "https://wa.me/919845011234?text=Hi",
+        );
+    });
+
+    it("encodes everything a message carries: lines, ₹, & and a link", () => {
+        const text =
+            "Rye & Co.\nYour invoice for ₹8,400: https://rye.example/pay/abc?x=1";
+        const link = whatsappChatLink("+919845011234", text);
+        expect(link).toBe(
+            `https://wa.me/919845011234?text=${encodeURIComponent(text)}`,
+        );
+        expect(new URL(link ?? "").searchParams.get("text")).toBe(text);
+    });
+
+    it("is the plain chat link with no message", () => {
+        expect(whatsappChatLink("+919845011234", "  ")).toBe(
+            "https://wa.me/919845011234",
+        );
+    });
+
+    it("is null for a number that can't be dialled", () => {
+        expect(whatsappChatLink("abc", "Hi Vivek")).toBeNull();
+        expect(whatsappChatLink("", "Hi Vivek")).toBeNull();
+        expect(whatsappChatLink("+91 98450", "Hi Vivek")).toBeNull();
     });
 });

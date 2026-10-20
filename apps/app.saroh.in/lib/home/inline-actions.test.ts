@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
     failedText,
+    heldText,
     keepsUndo,
     openTotal,
     REPLY_MAX,
@@ -177,5 +178,46 @@ describe("Refund on a payment taken at the wrong amount (PAY-06)", () => {
 
     it("says nothing went back when the refund is refused", () => {
         expect(failedText(refund)).toBe("Nothing was refunded.");
+    });
+});
+
+describe("a booking awaiting payment's actions (DEC-171, A7)", () => {
+    const turnDown = inline({
+        kind: "TURN_DOWN",
+        label: "Turn down",
+        done: "Turned down",
+        undoable: false,
+    });
+    const payLink = inline({
+        kind: "SEND_PAY_LINK",
+        label: "Send payment link",
+        done: "Payment link ready",
+        sends: false,
+        undoable: false,
+    });
+
+    it("both are held ten seconds, whether or not a message leaves", () => {
+        expect(runOf(turnDown)).toBe("held");
+        expect(runOf({ ...turnDown, sends: false })).toBe("held");
+        expect(runOf(payLink)).toBe("held");
+        expect(keepsUndo(turnDown)).toBe(false);
+    });
+
+    it("say what is about to happen while held, never that it has", () => {
+        expect(heldText(turnDown)).toBe("Turning down in 10 seconds");
+        expect(heldText(payLink)).toBe("Making the link in 10 seconds");
+        // Every other held action keeps the words it had.
+        expect(heldText(inline())).toBe("Reminder sent to Farah");
+    });
+
+    it("say what Undo left, and what a refusal did not do", () => {
+        expect(undoneText(turnDown, false)).toBe(
+            "Not turned down. The booking stands.",
+        );
+        expect(undoneText(payLink, false)).toBe(
+            "No new link was made. The one sent before still works.",
+        );
+        expect(failedText(turnDown)).toBe("The booking wasn't turned down.");
+        expect(failedText(payLink)).toBe("No payment link was made.");
     });
 });

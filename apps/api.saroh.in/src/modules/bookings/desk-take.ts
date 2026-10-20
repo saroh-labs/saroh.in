@@ -31,6 +31,8 @@ export const BOOKING_PAPER_SELECT = {
     status: true,
     paymentMethod: true,
     total: true,
+    // Part of it recorded by hand on its ledger (DEC-173).
+    paidCents: true,
     paidAt: true,
     // A payment going through online right now: a charge in progress.
     paymentIntents: {
@@ -45,6 +47,11 @@ export interface BookingPaperRow {
     status: string;
     paymentMethod: string | null;
     total: { toString(): string };
+    /**
+     * What its ledger holds as paid (DEC-173): part of an issued invoice
+     * recorded by hand. Absent reads as nothing.
+     */
+    paidCents?: number;
     paidAt: Date | null;
     /** Its payments going through online right now; absent reads as none. */
     paymentIntents?: readonly unknown[];
@@ -181,10 +188,15 @@ export function deskTake(
         return { refusal: DESK_REFUSED.charging };
     }
     const own = money.paper.filter((p) => p.kind === "INVOICE");
-    // A pay link is out: the desk takes what that invoice asks.
+    // A pay link is out: the desk takes what that invoice still asks, its
+    // total less anything recorded on it by hand (DEC-173).
     const issued = own.find((p) => p.status === "ISSUED");
     if (issued) {
-        return { cents: toCents(issued.total.toString()), byLink: true };
+        const left = Math.max(
+            0,
+            toCents(issued.total.toString()) - (issued.paidCents ?? 0),
+        );
+        return { cents: left, byLink: true };
     }
     const paidOwn = own.some((p) => p.status === "PAID");
     if (!paidOwn && own.some((p) => p.status !== "DRAFT")) {

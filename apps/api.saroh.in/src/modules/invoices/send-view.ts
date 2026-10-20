@@ -50,3 +50,17 @@ export interface InvoiceSentView {
     /** QUEUED | SENT | FAILED | SUPPRESSED (the customer turned email off). */
     status: string;
 }
+
+/**
+ * One time the invoice was shared by hand (DEC-173): opened on WhatsApp,
+ * its link copied, its PDF downloaded or printed. On WhatsApp Saroh only
+ * knows it was opened, never that it was sent: "shared on WhatsApp".
+ */
+export interface InvoiceSharedView {
+    id: string;
+    channel: "WHATSAPP" | "LINK" | "PDF" | "PRINT";
+    kind: "NEW" | "REMINDER" | "RECEIPT";
+    /** Who shared it; null if they have since been removed. */
+    byUserId: string | null;
+    at: string;
+}

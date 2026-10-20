@@ -1,7 +1,13 @@
 // @covers app:/open app:/ app:/settings/providers api:communications api:home api:organizations api:capabilities api:billing
-import type { Page, TestInfo } from "@playwright/test";
+import type { Locator, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import {
+    needRows,
+    needsYou,
+    openPhoneGroup,
+    phoneHome,
+} from "../fixtures/home";
 import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
 
@@ -95,13 +101,25 @@ async function noSideways(page: Page) {
         .toBeLessThanOrEqual(width);
 }
 
+/**
+ * Home's Needs you, every group open (Home A groups it at a desk); on a
+ * phone (U17), the setup group's sheet, where the prompt's row is.
+ */
 async function openHome(page: Page, org: string) {
     await page.goto(`/open/${org}`);
     await page.goto("/");
-    const needs = page.getByRole("region", { name: "Needs you" });
-    await expect(needs).toBeVisible();
-    return needs;
+    if (phoneHome(page)) {
+        return (await openPhoneGroup(page, "SETUP")) ?? needsYou(page);
+    }
+    await needRows(page);
+    return needsYou(page);
 }
+
+/** The prompt's own row, not the group line that names it. */
+const promptRow = (needs: Locator) =>
+    needs
+        .locator("[data-need-row]")
+        .getByRole("link", { name: new RegExp(TITLE) });
 
 async function openProviders(page: Page) {
     await page.goto("/settings/providers");
@@ -126,7 +144,7 @@ test("with no email provider, the owner is asked to connect one on Home and Prov
 
         // Home: one row in Needs you, saying what the customers miss.
         const needs = await openHome(page, org);
-        const row = needs.getByRole("link", { name: new RegExp(TITLE) });
+        const row = promptRow(needs);
         await expect(row).toBeVisible();
         await expect(row).toContainText(MISSED);
         await expect(row).toHaveAttribute("href", "/settings/providers");
@@ -178,7 +196,7 @@ test("on a plan that can't connect one, it says a paid plan brings it, with See 
     });
 
     const needs = await openHome(page, org);
-    const row = needs.getByRole("link", { name: new RegExp(TITLE) });
+    const row = promptRow(needs);
     await expect(row).toContainText(`${MISSED} ${PLAN}`);
     await expect(row).toHaveAttribute("href", "/settings/billing/plans");
     await expect(needs).toContainText("Paid plans");

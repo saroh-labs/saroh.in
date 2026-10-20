@@ -17,7 +17,7 @@
 
 import type { Prisma } from "@saroh/database";
 
-import type { PaymentMethod } from "../invoices/invoice-state";
+import type { HandPaymentMethod } from "../invoices/invoice-state";
 import type { CounterPayment } from "./new-order.dto";
 import { orderMoneyIntents } from "./treatment-ledger";
 
@@ -80,7 +80,7 @@ export const DIFFERENCE_PAID_NOTE: Record<CounterPayment, string> = {
  * timeline, by how the business says it was paid. No amount, as above.
  * An app that sends no way says only that it was marked paid.
  */
-export const MARKED_PAID_NOTE: Record<PaymentMethod, string> = {
+export const MARKED_PAID_NOTE: Record<HandPaymentMethod, string> = {
     CASH: "Marked paid · cash",
     UPI: "Marked paid · UPI",
     BANK_TRANSFER: "Marked paid · bank transfer",
@@ -88,7 +88,7 @@ export const MARKED_PAID_NOTE: Record<PaymentMethod, string> = {
     OTHER: "Marked paid · another way",
 };
 
-export function markedPaidNote(how: PaymentMethod | undefined): string {
+export function markedPaidNote(how: HandPaymentMethod | undefined): string {
     return how ? MARKED_PAID_NOTE[how] : "Marked paid by hand";
 }
 
@@ -131,7 +131,7 @@ export async function recordPaidByHandInTx(
  * on the order's timeline, by how it went back. No amount in the note, as
  * above; the step's amount says it to a money reader.
  */
-export const REFUNDED_BY_HAND_NOTE: Record<PaymentMethod, string> = {
+export const REFUNDED_BY_HAND_NOTE: Record<HandPaymentMethod, string> = {
     CASH: "Handed back in cash",
     UPI: "Handed back by UPI",
     BANK_TRANSFER: "Handed back by bank transfer",
@@ -139,7 +139,7 @@ export const REFUNDED_BY_HAND_NOTE: Record<PaymentMethod, string> = {
     OTHER: "Handed back another way",
 };
 
-export function refundedByHandNote(how: PaymentMethod | undefined): string {
+export function refundedByHandNote(how: HandPaymentMethod | undefined): string {
     return how ? REFUNDED_BY_HAND_NOTE[how] : "Recorded as refunded by hand";
 }
 

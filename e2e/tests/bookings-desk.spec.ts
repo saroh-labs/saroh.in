@@ -5,6 +5,7 @@ import { expect, test } from "@playwright/test";
 import { northwind, phone, stamp } from "../fixtures/own-data";
 import type { OwnService } from "../fixtures/own-service";
 import { bookOnOwn, ownService, STEP_MS } from "../fixtures/own-service";
+import { pressUntil } from "../fixtures/press";
 import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
 
@@ -92,6 +93,20 @@ const more = (page: Page) =>
         .filter({ visible: true })
         .first();
 
+/** Whether a toggle reads pressed. */
+const pressed = (toggle: Locator) => async () =>
+    (await toggle.getAttribute("aria-pressed")) === "true";
+
+/**
+ * More, then Cancel booking. More is the page's first press after a load,
+ * so it is pressed until its sheet or menu shows Cancel booking.
+ */
+async function openCancel(page: Page) {
+    const cancel = page.getByRole("button", { name: "Cancel booking" });
+    await pressUntil(more(page), cancel);
+    await cancel.click();
+}
+
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 test.describe("the desk's money and attendance (#1016)", () => {
@@ -104,9 +119,8 @@ test.describe("the desk's money and attendance (#1016)", () => {
         let bookingId: string | null = null;
         try {
             await page.goto("/bookings");
-            await newBooking(page).click();
             const sheet = page.getByRole("dialog", { name: "New booking" });
-            await expect(sheet).toBeVisible();
+            await pressUntil(newBooking(page), sheet);
 
             // Who: a caller by name and phone alone (DEC-170).
             await sheet.getByLabel("Find the customer").fill(name);
@@ -221,7 +235,7 @@ test.describe("the desk's money and attendance (#1016)", () => {
                 exact: true,
             });
             await expect(came).toHaveAttribute("aria-pressed", "false");
-            await came.click();
+            await pressUntil(came, pressed(came));
             // Shown at once; nothing is written for ten seconds.
             await expect(came).toHaveAttribute("aria-pressed", "true");
             expect((await readBooking(page.request, booked.id)).outcome).toBe(
@@ -264,7 +278,7 @@ test.describe("the desk's money and attendance (#1016)", () => {
                 name: "Came",
                 exact: true,
             });
-            await came.click();
+            await pressUntil(came, pressed(came));
             await expect(came).toHaveAttribute("aria-pressed", "true");
             // The card's own Undo, beside Came (the toast has one too).
             await page
@@ -319,8 +333,7 @@ test.describe("the desk's money and attendance (#1016)", () => {
                     ?.paidAtDeskCents,
             ).toBe(service.priceCents);
             await page.goto(`/bookings/${booked.id}`);
-            await more(page).click();
-            await page.getByRole("button", { name: "Cancel booking" }).click();
+            await openCancel(page);
             const sheet = page.getByRole("dialog", {
                 name: /^Cancel .+'s booking\?$/,
             });
@@ -368,8 +381,7 @@ test.describe("the desk's money and attendance (#1016)", () => {
         if (!found) return;
         await page.goto(`/open/${found.org}`);
         await page.goto(`/bookings/${found.id}`);
-        await more(page).click();
-        await page.getByRole("button", { name: "Cancel booking" }).click();
+        await openCancel(page);
         const sheet = page.getByRole("dialog", {
             name: /^Cancel .+ booking\?$/,
         });
@@ -403,14 +415,24 @@ test.describe("the desk's money and attendance (#1016)", () => {
 
 /**
  * An upcoming booking paid online, with money still to refund, on one of
- * the showcase businesses the demo owner runs: read only.
+ * the showcase businesses the demo owner may refund on: read only.
+ *
+ * Only where the demo user holds `payment:manage` and `booking:write`, so
+ * the choice read is an owner's: at CarePoint Clinic the demo user is a
+ * Member (its front desk), and a Member's Refund is turned off once the
+ * free-cancel time has passed.
  */
 async function paidOnlineBooking(
     request: APIRequestContext,
 ): Promise<{ org: string; id: string } | null> {
-    const orgs = (await (
+    const listed = (await (
         await request.get(`${urls.API_URL}/organizations`)
-    ).json()) as { id: string }[];
+    ).json()) as { id: string; actions: string[] }[];
+    const orgs = listed.filter(
+        (o) =>
+            o.actions.includes("payment:manage") &&
+            o.actions.includes("booking:write"),
+    );
     const from = new Date(Date.now() + 2 * 3_600_000).toISOString();
     const to = new Date(Date.now() + 21 * 86_400_000).toISOString();
     for (const { id: org } of orgs.filter((o) => o.id.startsWith("seed_sc_"))) {

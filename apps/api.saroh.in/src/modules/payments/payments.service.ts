@@ -1767,13 +1767,19 @@ export class PaymentsService {
      *
      * SECURITY: the amount and currency are the stored invoice's — the
      * request carries only a provider and an idempotency key — and the
-     * provider must be one the business itself connected.
+     * provider must be one the business itself connected. The amount is
+     * what is left to pay (DEC-173): the total less the ledger's
+     * `paidCents`, so a partly paid invoice is charged its balance, never
+     * its whole total. A draft (a hold, a pack or a plan bought online) has
+     * paid nothing, so it is its total.
      */
     async createIntentForInvoicePublic(
         invoice: {
             id: string;
             organizationId: string;
             total: Prisma.Decimal | string;
+            /** The ledger's paid so far, in paise. */
+            paidCents: number;
             currency: string;
         },
         options: { idempotencyKey?: string; provider?: string } = {},
@@ -1783,7 +1789,10 @@ export class PaymentsService {
             {
                 kind: "invoice",
                 id: invoice.id,
-                amountCents: totalToCents(invoice.total),
+                amountCents: Math.max(
+                    0,
+                    totalToCents(invoice.total) - invoice.paidCents,
+                ),
                 currency: invoice.currency,
             },
             options.idempotencyKey,

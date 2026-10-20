@@ -1,6 +1,8 @@
 import type { Prisma } from "@saroh/database";
 
 import type { InvoiceSource } from "./invoice-state";
+import { LIVE_PAYMENT_WHERE } from "./invoice-state";
+import { fromCents } from "./totals";
 
 /**
  * What the Invoices list is narrowed to by what the paper was for (round-2
@@ -58,4 +60,72 @@ export function listFilterWhere(
         parts.push({ orderId: filter.orderId });
     }
     return parts.length > 0 ? { AND: parts } : {};
+}
+
+/** The longest search the list takes (the DTO refuses more). */
+export const SEARCH_MAX = 80;
+
+/**
+ * The list's search (DEC-173, U4), ORed together:
+ *
+ * - **a name:** the bill-to name or the contact's, case-insensitively and
+ *   anywhere in it. Several words ("vivek nair") each match the contact's
+ *   first or last name, so a draft (whose bill-to name is copied only on
+ *   issue) is found by its full name too.
+ * - **a number:** anywhere in it, so "0106" finds RC/26-27/0106.
+ * - **an amount**, when `q` reads as one (`money-query.ts`): the total to
+ *   the paisa, or one of `leftToPayIds`, the invoices whose left to pay
+ *   (`leftToPayCents`, worked out by the caller) is that amount.
+ */
+export function searchWhere(
+    q: string,
+    cents: number | null,
+    leftToPayIds: readonly string[] = [],
+): Prisma.InvoiceWhereInput {
+    const text = q.trim();
+    const like = { contains: text, mode: "insensitive" as const };
+    const words = text.split(/\s+/).filter(Boolean);
+    const any: Prisma.InvoiceWhereInput[] = [
+        { billToName: like },
+        { number: like },
+        { contact: { firstName: like } },
+        { contact: { lastName: like } },
+    ];
+    if (words.length > 1) {
+        any.push({
+            AND: words.map((word) => {
+                const w = { contains: word, mode: "insensitive" as const };
+                return {
+                    contact: { OR: [{ firstName: w }, { lastName: w }] },
+                };
+            }),
+        });
+    }
+    if (cents !== null) {
+        any.push({ total: fromCents(cents) });
+        if (leftToPayIds.length > 0)
+            any.push({ id: { in: [...leftToPayIds] } });
+    }
+    return { OR: any };
+}
+
+/**
+ * Money received from `from` on (DEC-173, U4): the money strip's "Paid this
+ * month". An invoice with a payment that counts (`LIVE_PAYMENT_WHERE`)
+ * received since, part payments included; or an order's paper paid since,
+ * since the order is its ledger (ADR-008) and it has no payment rows. A
+ * credit note never.
+ */
+export function paidFromWhere(from: Date): Prisma.InvoiceWhereInput {
+    return {
+        kind: { not: "CREDIT_NOTE" },
+        OR: [
+            {
+                payments: {
+                    some: { ...LIVE_PAYMENT_WHERE, receivedAt: { gte: from } },
+                },
+            },
+            { orderId: { not: null }, paidAt: { gte: from } },
+        ],
+    };
 }

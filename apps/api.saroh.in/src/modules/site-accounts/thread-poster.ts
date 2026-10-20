@@ -1,13 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
-import { dayWords, moneyWords } from "../../common/words-format";
+import { dayWords, moneyWordsMinor } from "../../common/words-format";
 import type {
     AccountThreadPost,
     AccountThreadPoster,
 } from "../communications/account-thread";
 import { resolveContact } from "../customer-workspace/resolve-contact";
-import { isPastDue } from "../invoices/invoice-state";
+import { isPastDue, leftToPayCents } from "../invoices/invoice-state";
 import { appendMessage } from "./thread-store";
 
 /** Home's default zone, for a business that never set one (as D17). */
@@ -48,6 +48,7 @@ export class AccountThreadPosterService implements AccountThreadPoster {
                 select: {
                     number: true,
                     total: true,
+                    paidCents: true,
                     currency: true,
                     dueAt: true,
                     status: true,
@@ -88,6 +89,8 @@ export function invoiceSentence(
     invoice: {
         number: string | null;
         total: { toString(): string };
+        /** Part paid already (DEC-173); absent reads as none. */
+        paidCents?: number;
         currency: string;
         dueAt: Date | null;
         status: string;
@@ -96,7 +99,14 @@ export function invoiceSentence(
     now: Date,
 ): string {
     const what = `invoice ${invoice.number ?? ""}`.trim();
-    const amount = moneyWords(invoice.total, invoice.currency);
+    // What is left to pay: a partly paid invoice asks for the rest.
+    const amount = moneyWordsMinor(
+        leftToPayCents({
+            total: invoice.total,
+            paidCents: invoice.paidCents ?? 0,
+        }),
+        invoice.currency,
+    );
     const overdue = isPastDue(invoice, now);
     const due = invoice.dueAt
         ? overdue

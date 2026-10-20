@@ -135,10 +135,32 @@ export const RAW_ALLOWED = {
     "components/customers/detail/overview.tsx": ["button"],
     // button: a row or card that is one button
     "components/home/first-run-jobs.tsx": ["button"],
+    // button: Home's + on a phone, the 56px square floating over the tab bar
+    // that opens the New sheet (DEC-171); no Button size is that shape
+    "components/home/new-sheet.tsx": ["button"],
+    // button: the phone Home's Next line, a row that is one button (U17)
+    "components/home/phone/phone-next-line.tsx": ["button"],
+    // button: each Needs you group's line on a phone, a row that is one
+    // button, its Show N more, and the line naming what couldn't be checked
+    "components/home/phone/phone-needs-list.tsx": ["button"],
+    // button: the phone's setup line, a row that is one button, and See all
+    // steps, a link that opens the setup sheet
+    "components/home/phone/setup-sheet.tsx": ["button"],
+    // button: Insights' period on a phone, the board's 40px white button
+    // with the period's name that opens its sheet (DEC-171, IBPeriodP)
+    // button: a week's bar of Money's chart, pressed to read and open it (U12)
+    "components/insights/money-chart.tsx": ["button"],
+    // button: an age of "Who owes me?", a row that is one button (U12)
+    "components/insights/owed-by-age.tsx": ["button"],
+    "components/insights/period-control.tsx": ["button"],
+    // button: "Cheques not in the bank", a line that is one pressed filter (DEC-173)
+    "components/invoices/cheques-line.tsx": ["button"],
     // button: a control styled by its screen's own helper
     "components/invoices/invoice-form.tsx": ["button"],
     // button: a row or card that is one button
     "components/invoices/invoice-row.tsx": ["button"],
+    // button: a figure of the money strip, a card that is one pressed filter (DEC-173)
+    "components/invoices/money-strip.tsx": ["button"],
     // button: a row or card that is one button
     "components/organizations/organization-switcher.tsx": ["button"],
     // button: a row that opens its role

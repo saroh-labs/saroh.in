@@ -31,10 +31,3 @@ export function permitsFor(
  * disabled, with why — never a missing button.
  */
 export const CANT_TAKE_PAYMENTS = `Your role can't take payments. ${WHO_CAN_CHANGE}`;
-
-/**
- * The same, for an invoice's Mark paid. Said in the invoice's read-only
- * note, which adds who can change what a role reaches.
- */
-export const CANT_MARK_PAID =
-    "Your role can read this invoice but can't mark it paid.";

@@ -39,6 +39,12 @@ const holding = (actions: OrgAction[]): HomeInput => ({
 });
 
 type Sum = { currency: string; total: string; count: number };
+type Bill = {
+    currency: string;
+    total: string;
+    paidCents: number;
+    dueAt: Date | null;
+};
 const grouped = (rows: Sum[]) =>
     rows.map((r) => ({
         currency: r.currency,
@@ -199,6 +205,7 @@ describe("weekScope", () => {
             bookings: true,
             orders: true,
             owed: true,
+            cheques: true,
         });
     });
 
@@ -208,6 +215,8 @@ describe("weekScope", () => {
             bookings: true,
             orders: true,
             owed: false,
+            // No money, so no cheques line (DEC-098).
+            cheques: false,
         });
     });
 
@@ -220,6 +229,8 @@ describe("weekScope", () => {
             bookings: false,
             orders: false,
             owed: false,
+            // The line opens the invoices, which this role can't read.
+            cheques: false,
             takingsIn: "calendar",
         });
         expect(
@@ -229,6 +240,7 @@ describe("weekScope", () => {
             bookings: false,
             orders: false,
             owed: true,
+            cheques: true,
         });
     });
 
@@ -238,7 +250,16 @@ describe("weekScope", () => {
             bookings: true,
             orders: false,
             owed: false,
+            // Cheques are recorded by hand on an invoice, which needs no
+            // module (DEC-070): the line doesn't wait for Payments.
+            cheques: true,
         });
+    });
+
+    it("never makes a week for the cheques line alone", () => {
+        // payment:read with Payments off: no figure but the cheques, and a
+        // "This week" with only that line in it is not one.
+        expect(weekScope(holding(["payment:read"]), new Set())).toBeNull();
     });
 
     it("gives no block to a Reviewer, or to someone who reads none of it", () => {
@@ -258,9 +279,15 @@ function db(
         refunded?: Sum[][];
         bookings?: number[];
         orders?: number;
-        owed?: Sum[];
-        overdue?: number;
+        /** The unpaid bills, each read with what is paid on it (DEC-173). */
+        owed?: Bill[];
         billed?: boolean;
+        /** Cheques waiting for the bank, grouped per currency (DEC-173). */
+        cheques?: {
+            currency: string;
+            _sum: { amountCents: number | null };
+            _count: { _all: number };
+        }[];
     } = {},
 ) {
     const paid = [...(over.paid ?? [[], []])];
@@ -272,12 +299,9 @@ function db(
                 if (args.where.kind === "CREDIT_NOTE") {
                     return Promise.resolve(grouped(refunded.shift() ?? []));
                 }
-                if ((args.where as { status?: unknown }).status === "ISSUED") {
-                    return Promise.resolve(grouped(over.owed ?? []));
-                }
                 return Promise.resolve(grouped(paid.shift() ?? []));
             }),
-            count: jest.fn().mockResolvedValue(over.overdue ?? 0),
+            findMany: jest.fn().mockResolvedValue(over.owed ?? []),
             findFirst: jest
                 .fn()
                 .mockResolvedValue(over.billed ? { id: "inv_1" } : null),
@@ -292,6 +316,9 @@ function db(
             ),
         },
         order: { count: jest.fn().mockResolvedValue(over.orders ?? 0) },
+        invoicePayment: {
+            groupBy: jest.fn().mockResolvedValue(over.cheques ?? []),
+        },
     };
 }
 
@@ -308,8 +335,21 @@ describe("readWeek", () => {
             refunded: [[], []],
             bookings: [14, 11],
             orders: 23,
-            owed: [{ currency: "INR", total: "6400", count: 3 }],
-            overdue: 1,
+            owed: [
+                { currency: "INR", total: "3000", paidCents: 0, dueAt: null },
+                {
+                    currency: "INR",
+                    total: "2000",
+                    paidCents: 0,
+                    dueAt: new Date(NOW.getTime() - 86_400_000),
+                },
+                {
+                    currency: "INR",
+                    total: "1400",
+                    paidCents: 0,
+                    dueAt: new Date(NOW.getTime() + 86_400_000),
+                },
+            ],
             billed: true,
         });
         const week = await readWeek(client as never, "org_1", EVERY, clock);
@@ -335,6 +375,29 @@ describe("readWeek", () => {
                 href: "/billing/invoices?view=overdue",
             },
         });
+        // The cheques line is HomeService's own read, never the week's.
+        expect(week).not.toHaveProperty("chequesWaiting");
+    });
+
+    it("never reads the cheques, even for a scope that may see them", async () => {
+        const client = db({
+            cheques: [
+                {
+                    currency: "INR",
+                    _sum: { amountCents: 840_000 },
+                    _count: { _all: 1 },
+                },
+            ],
+        });
+        const week = await readWeek(
+            client as never,
+            "org_1",
+            { ...EVERY, cheques: true },
+            clock,
+        );
+        // Read on its own by HomeService, so its failure is its own.
+        expect(week).not.toHaveProperty("chequesWaiting");
+        expect(client.invoicePayment.groupBy).not.toHaveBeenCalled();
     });
 
     it("lowers takings by a refund made this week", async () => {
@@ -405,6 +468,31 @@ describe("readWeek", () => {
         expect(week).not.toHaveProperty("owed");
     });
 
+    it("owes what is left to pay on a partly paid bill, not its total (DEC-173)", async () => {
+        const week = await readWeek(
+            db({
+                billed: true,
+                owed: [
+                    {
+                        currency: "INR",
+                        total: "2500",
+                        paidCents: 100_000,
+                        dueAt: null,
+                    },
+                ],
+            }) as never,
+            "org_1",
+            EVERY,
+            clock,
+        );
+        expect(week.owed).toEqual({
+            totals: [{ currency: "INR", amountMinor: 150_000 }],
+            bills: 1,
+            overdue: 0,
+            href: "/billing/invoices?view=issued",
+        });
+    });
+
     it("links owed to the issued bills when none is overdue", async () => {
         const week = await readWeek(
             db({ billed: true }) as never,
@@ -429,7 +517,7 @@ describe("readWeek", () => {
             clock,
         );
         expect(client.invoice.groupBy).not.toHaveBeenCalled();
-        expect(client.invoice.count).not.toHaveBeenCalled();
+        expect(client.invoice.findMany).not.toHaveBeenCalled();
         expect(client.invoice.findFirst).not.toHaveBeenCalled();
         expect(week).not.toHaveProperty("takings");
         expect(week).not.toHaveProperty("owed");
@@ -473,6 +561,7 @@ describe("HomeService: This week", () => {
             activity: empty,
             paymentIntent: empty,
             site: empty,
+            invoicePayment: { ...empty, ...client.invoicePayment },
             $queryRaw: jest.fn().mockResolvedValue([]),
             businessProfile: {
                 findUnique: jest.fn().mockResolvedValue({ timezone: ZONE }),
@@ -503,6 +592,90 @@ describe("HomeService: This week", () => {
             takings: [expect.objectContaining({ amountMinor: 50_000 })],
             bookings: { count: 3, lastWeek: 2 },
             orders: { count: 5 },
+        });
+    });
+
+    it("sends an owner the cheques waiting, and a Member none (DEC-098)", async () => {
+        const waiting = {
+            cheques: [
+                {
+                    currency: "INR",
+                    _sum: { amountCents: 1_400_000 },
+                    _count: { _all: 2 },
+                },
+            ],
+        };
+        const forOwner = await home(db(waiting)).build(owner);
+        expect(forOwner.week?.chequesWaiting).toEqual({
+            count: 2,
+            totals: [{ currency: "INR", amountMinor: 1_400_000 }],
+            href: "/billing/invoices?view=cheques",
+        });
+        const forMember = await home(
+            db({ ...waiting, bookings: [3, 2] }),
+        ).build(member);
+        expect(forMember.week?.chequesWaiting).toBeNull();
+        // Waiting and not removed: a cleared or bounced cheque isn't.
+        const client = db(waiting);
+        await home(client).build(owner);
+        expect(client.invoicePayment.groupBy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId: "org_1",
+                    removedAt: null,
+                    bankStatus: "WAITING",
+                },
+            }),
+        );
+    });
+
+    it("sends no cheques line while none waits", async () => {
+        const model = await home(db()).build(owner);
+        expect(model.week?.chequesWaiting).toBeNull();
+    });
+
+    it("asks no cheques of money without invoices, nor of invoices without money", async () => {
+        const waiting = {
+            cheques: [
+                {
+                    currency: "INR",
+                    _sum: { amountCents: 840_000 },
+                    _count: { _all: 1 },
+                },
+            ],
+        };
+        for (const actions of [
+            ["payment:read", "booking:read"],
+            ["invoice:read", "booking:read"],
+        ] as OrgAction[][]) {
+            const client = db({ ...waiting, bookings: [3, 2] });
+            const model = await home(client).build(holding(actions));
+            expect(model.week?.chequesWaiting ?? null).toBeNull();
+            expect(client.invoicePayment.groupBy).not.toHaveBeenCalled();
+        }
+    });
+
+    it("names Cheques when their read fails, and keeps the rest of the week", async () => {
+        const client = db({
+            paid: [[{ currency: "INR", total: "500", count: 1 }], []],
+            bookings: [3, 2],
+        });
+        client.invoicePayment.groupBy = jest
+            .fn()
+            .mockRejectedValue(new Error("relation is being migrated"));
+        const model = await home(client).build(owner);
+        expect(model.unavailable).toContainEqual({
+            moduleKey: "PAYMENTS",
+            label: "Cheques",
+        });
+        // Not "This week": the week itself was read and is all there.
+        expect(model.unavailable).not.toContainEqual(
+            expect.objectContaining({ label: "This week" }),
+        );
+        expect(model.week).toMatchObject({
+            takings: [expect.objectContaining({ amountMinor: 50_000 })],
+            bookings: { count: 3, lastWeek: 2 },
+            chequesWaiting: null,
         });
     });
 

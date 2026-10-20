@@ -89,6 +89,9 @@ model User {
   // Sign-in email changes staff made for them (admin console U9).
   signInEmailChanges SignInEmailChange[]
 
+  // Insights suggestions this person put off with Not now (DEC-171).
+  insightSuggestionsNotNow InsightSuggestionNotNow[]
+
   @@index([email])
 }
 
@@ -328,6 +331,7 @@ model Organization {
   // Stage 7 — analytics (S7-001)
   analyticsEvents          AnalyticsEvent[]
   analyticsDailyAggregates AnalyticsDailyAggregate[]
+  insightSuggestionsNotNow InsightSuggestionNotNow[]
 
   // Stage 7 — SaaS billing (S7-005). One current subscription per org.
   subscription Subscription?
@@ -347,6 +351,8 @@ model Organization {
   invoices              Invoice[]
   invoiceLines          InvoiceLine[]
   invoiceSequences      InvoiceSequence[]
+  invoicePayments       InvoicePayment[]
+  invoiceShares         InvoiceShare[]
   courses               Course[]
   courseSessions        CourseSession[]
   courseEnrollments     CourseEnrollment[]
@@ -5191,21 +5197,24 @@ model StaffMember {
   status     String    @default("ACTIVE") // ACTIVE | ARCHIVED — archived take no new bookings
   archivedAt DateTime?
 
-  services    StaffService[]
-  hours       StaffHours[]
-  timeOff     StaffTimeOff[]
-  extraHours  StaffExtraHours[]
-  bookings    Booking[]
+  services          StaffService[]
+  hours             StaffHours[]
+  timeOff           StaffTimeOff[]
+  extraHours        StaffExtraHours[]
+  bookings          Booking[]
+  // The history lines that handed a booking from or to them (#1157).
+  bookingEventsFrom BookingEvent[]           @relation("BookingEventFromStaff")
+  bookingEventsTo   BookingEvent[]           @relation("BookingEventToStaff")
   // Invites that would give them a login (#868).
-  invitations OrganizationInvitation[]
+  invitations       OrganizationInvitation[]
 
   // Their own timing rules for their diary (DEC-170, #1038), each one
   // falling back to the business's (`BookingRules`) when null — "same as
-  // the business". Paying and refunds stay business-wide. CHECKed to the
-  // business rules' own ranges.
+  // the business". Paying, refunds and the free-cancel window stay
+  // business-wide: free cancelling follows the business's refund policy
+  // (owner, 20 Oct 2026). CHECKed to the business rules' own ranges.
   bookAheadDays        Int? // how far ahead a customer may book them, in days
   latestBookingMinutes Int? // the notice they need before a start
-  freeCancelHours      Int? // free to cancel up to this long before
   gapMinutes           Int? // kept clear between their bookings
   ruleRequests         StaffRuleRequest[]
 
@@ -5359,7 +5368,10 @@ model BookingRules {
 /// A change someone asked for to their own booking rules while "Members'
 /// rule changes need approval" is on (DEC-170, #1038). It changes nothing
 /// until an owner or admin approves it. WAITING → APPROVED | TURNED_DOWN |
-/// WITHDRAWN, CHECKed; one WAITING per person (a new ask replaces it).
+/// WITHDRAWN | REPLACED, CHECKed; one WAITING per person (a new ask
+/// replaces it, as WITHDRAWN). REPLACED is "Replaced by a newer change":
+/// the person's rules changed directly, or approval switched off (owner,
+/// 20 Oct 2026); `decidedByUserId` is who made that change.
 model StaffRuleRequest {
   id             String       @id @default(cuid())
   organizationId String
@@ -5373,7 +5385,7 @@ model StaffRuleRequest {
   // "same as the business" (`bookings/person-rules.ts`).
   changes           Json
 
-  status String @default("WAITING") // WAITING | APPROVED | TURNED_DOWN | WITHDRAWN
+  status String @default("WAITING") // WAITING | APPROVED | TURNED_DOWN | WITHDRAWN | REPLACED
 
   // Turned down: the optional words the person reads.
   reason          String?
@@ -5419,10 +5431,21 @@ model BookingEvent {
   fromStartAt DateTime?
   toStartAt   DateTime?
 
+  // Who it was with, and who it is with now, on REASSIGNED (#1157): the
+  // booking given to someone else, or to someone when it had nobody
+  // (`fromStaffId` null). SetNull keeps the line if a person goes; the
+  // history then reads "someone".
+  fromStaffId String?
+  fromStaff   StaffMember? @relation("BookingEventFromStaff", fields: [fromStaffId], references: [id], onDelete: SetNull)
+  toStaffId   String?
+  toStaff     StaffMember? @relation("BookingEventToStaff", fields: [toStaffId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
 
   @@index([bookingId, createdAt])
   @@index([organizationId])
+  @@index([fromStaffId])
+  @@index([toStaffId])
 }
 
 // ============================================================================
@@ -5500,6 +5523,9 @@ model PaymentIntent {
 
   attempts PaymentAttempt[]
   refunds  PaymentRefund[]
+
+  // The invoice ledger row this payment wrote (DEC-173), if any.
+  invoicePayment InvoicePayment?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -5925,6 +5951,27 @@ model AnalyticsDailyAggregate {
 
   @@unique([organizationId, siteId, date, type, dimension, dimensionValue])
   @@index([organizationId, type, date])
+}
+
+/// Insights' "Not now" on a suggestion (DEC-171, #1087): one person put off
+/// one suggestion in one business until `hiddenUntil`, 7 days on. Per
+/// person, kept on the server so it holds on every device; one row per key,
+/// written again (not added) each time. Past `hiddenUntil` the suggestion
+/// comes back. `key` names the rule and its subject, `class-full:<serviceId>`,
+/// `late-bill:<invoiceId>` or `selling-less:<productId>` (`suggestions.ts`).
+model InsightSuggestionNotNow {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key            String
+  hiddenUntil    DateTime
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, userId, key])
+  @@index([userId])
 }
 
 // Plan — the VERSIONED catalog of Saroh subscription plans sold to
@@ -6774,6 +6821,19 @@ model Invoice {
   lines          InvoiceLine[]
   paymentIntents PaymentIntent[]
 
+  // The payments on it (DEC-173): one row per payment, in integer paise. The
+  // order is the ledger for an order's invoice (ADR-008), which has none.
+  // `paidCents` is a cache of the live payments (not removed, not bounced),
+  // recomputed from them in the same transaction as every ledger write and
+  // never written anywhere else. "Partly paid" is ISSUED with paidCents > 0,
+  // derived like Overdue, never stored as a status.
+  payments  InvoicePayment[]
+  paidCents Int              @default(0)
+
+  // How it was shared by hand (DEC-173, U5): on WhatsApp, as a link, a PDF
+  // or printed. Emails are the Message rows; this is everything else.
+  shares InvoiceShare[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -6808,6 +6868,9 @@ model Invoice {
   // the payment reconciliation. Corrections are other kinds.
   @@unique([orderId], map: "Invoice_one_per_order", where: raw("kind = 'INVOICE'"))
   @@unique([bookingId], map: "Invoice_one_per_booking", where: raw("kind = 'INVOICE'"))
+  // The ledger's composite key: a payment can't name another business's
+  // invoice.
+  @@unique([id, organizationId])
   @@index([organizationId, status])
   @@index([contactId])
   @@index([subscriptionId])
@@ -6824,6 +6887,85 @@ model Invoice {
   @@index([createdAt], map: "Invoice_open_pack_drafts_idx", where: raw("status = 'DRAFT' AND source = 'PACK'"))
   // The sweep that discards online plan joins nobody paid (G20).
   @@index([createdAt], map: "Invoice_open_plan_joins_idx", where: raw("status = 'DRAFT' AND source = 'SUBSCRIPTION'"))
+}
+
+/// One payment on an invoice (DEC-173): the ledger the invoice's status and
+/// `paidCents` are worked out from. Never deleted: a payment recorded by
+/// mistake is removed softly (`removedAt`) and stays in the history.
+model InvoicePayment {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoiceId      String
+  invoice        Invoice      @relation(fields: [invoiceId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // Integer paise: the ledger's exception to "never Int for currency"
+  // (DEC-173), as `PaymentIntent.amountCents` is. Always more than 0.
+  amountCents Int
+  currency    String
+  // CASH | UPI | BANK_TRANSFER | CARD | OTHER | CHEQUE, or ONLINE (written
+  // only for money that came through the pay link).
+  method      String
+  reference   String?
+  note        String?
+  receivedAt  DateTime
+
+  // A cheque: its number and bank, and where it is. `bankStatus` is WAITING,
+  // then CLEARED (`clearedAt`) or BOUNCED (`bouncedAt`, an optional
+  // reason); null for anything but a cheque. A waiting cheque counts as
+  // received; a bounced one doesn't count.
+  chequeNumber String?
+  chequeBank   String?
+  bankStatus   String?
+  clearedAt    DateTime?
+  bouncedAt    DateTime?
+  bounceReason String?
+
+  // Removed by mistake: when, by whom and why. A removed payment doesn't
+  // count, and the row stays.
+  removedAt     DateTime?
+  removedById   String?
+  removedReason String?
+
+  // Who recorded it; null when Saroh did (the webhook, a backfill).
+  recordedById    String?
+  // The online payment it came from, if any: one row per intent.
+  paymentIntentId String?        @unique
+  paymentIntent   PaymentIntent? @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
+
+  // The receipt emailed for it (DEC-173, owner 20 Oct): the Message the
+  // `invoice.receipt` job queued, set in the same transaction under this
+  // row's lock, so a job run twice emails it once. Null until it goes, and
+  // forever when there was no email provider or the payment was removed.
+  receiptMessageId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([invoiceId])
+  @@index([organizationId, receivedAt])
+  @@index([organizationId, bankStatus])
+}
+
+/// One time an invoice was shared by hand (DEC-173, U5 #1117): opened on
+/// WhatsApp (click-to-chat; Saroh sends nothing and can't know it went), its
+/// link copied, its PDF downloaded or the paper printed. The one-reminder-a-
+/// day rule reads the WhatsApp ones beside the email Messages.
+model InvoiceShare {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoiceId      String
+  invoice        Invoice      @relation(fields: [invoiceId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // WHATSAPP | LINK | PDF | PRINT
+  channel   String
+  // NEW | REMINDER | RECEIPT: what the message said.
+  kind      String
+  // Who shared it; null if the person was since deleted.
+  byUserId  String?
+  createdAt DateTime @default(now())
+
+  @@index([invoiceId, createdAt])
 }
 
 model InvoiceLine {

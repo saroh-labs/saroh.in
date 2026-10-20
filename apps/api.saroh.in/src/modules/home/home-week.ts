@@ -3,6 +3,7 @@ import { DateTime } from "luxon";
 
 import { toMinor } from "../../common/money";
 import {
+    leftToPayCents,
     NOT_A_BOOKING_HOLD,
     OWED_WHERE,
     refundedBetweenWhere,
@@ -35,6 +36,10 @@ import { onOneStore, seesBusinessBookings, storeWhere } from "./home-staff";
  *   placed since Monday.
  * - **Owed to you** (`invoice:read`): issued, unpaid invoices that aren't an
  *   order's own (`OWED_WHERE`), with how many are overdue.
+ * - **Cheques not in the bank** (`payment:read` and `invoice:read`,
+ *   DEC-173): `chequesWaiting`, null while none waits. Read on its own by
+ *   `HomeService` (`home-cheques.ts`), not here, so a failure there is
+ *   named "Cheques" and takes nothing else of the week down.
  *
  * No payout figure (default 52). The week is the business's (DEC-033): it
  * starts Monday at midnight in the business's zone. The words are the
@@ -64,6 +69,15 @@ export interface WeekScope {
     orders: boolean;
     owed: boolean;
     /**
+     * Cheques not in the bank (DEC-173): an amount, so `payment:read`'s
+     * (DEC-098), and on invoices, so `invoice:read`'s too: the line opens
+     * the invoices list. Hand-recorded, so not behind Payments (DEC-070).
+     * It never makes a week on its own: a viewer with no other figure has
+     * no "This week" to put the line in. `HomeService` reads it, on its
+     * own (`home-cheques.ts`), never `readWeek`.
+     */
+    cheques?: boolean;
+    /**
      * Takings read by someone who may not open the invoices behind them:
      * the figure links to the Calendar's money instead (F11).
      */
@@ -90,7 +104,11 @@ export function weekScope(
             ? { takingsIn: "calendar" as const }
             : {}),
     };
-    return Object.values(scope).some(Boolean) ? scope : null;
+    if (!Object.values(scope).some(Boolean)) return null;
+    return {
+        ...scope,
+        cheques: holds(input, "payment:read") && holds(input, "invoice:read"),
+    };
 }
 
 /** The instants the week's figures are measured between. */
@@ -243,7 +261,8 @@ export const WEEK_PATHS = {
     OVERDUE: "/billing/invoices?view=overdue",
 } as const;
 
-async function readMoney(
+/** Paid in less handed back in `[from, to)`, per currency. */
+export async function readMoney(
     db: Db,
     organizationId: string,
     from: Date,
@@ -264,7 +283,7 @@ async function readMoney(
     return windowMoney(paid, refunded);
 }
 
-async function readOwed(
+export async function readOwed(
     db: Db,
     organizationId: string,
     now: Date,
@@ -274,15 +293,19 @@ async function readOwed(
         ...OWED_WHERE,
         status: "ISSUED",
     } satisfies Prisma.InvoiceWhereInput;
-    const [sums, overdue, ever] = await Promise.all([
-        db.invoice.groupBy({
-            by: ["currency"],
+    // What is left to pay on each bill (DEC-173), folded through
+    // `leftToPayCents`, the one place it is worked out, as Insights'
+    // owed-by-age does.
+    const [bills, ever] = await Promise.all([
+        db.invoice.findMany({
             where: unpaid,
-            _sum: { total: true },
-            _count: { _all: true },
-            orderBy: { currency: "asc" },
+            select: {
+                currency: true,
+                total: true,
+                paidCents: true,
+                dueAt: true,
+            },
         }),
-        db.invoice.count({ where: { ...unpaid, dueAt: { lt: now } } }),
         // A business that has never billed anyone outside an order has
         // nothing to be owed: no "₹0" row for a shop.
         db.invoice.findFirst({
@@ -291,12 +314,20 @@ async function readOwed(
         }),
     ]);
     if (!ever) return null;
+    const byCurrency = new Map<string, number>();
+    let overdue = 0;
+    for (const bill of bills) {
+        byCurrency.set(
+            bill.currency,
+            (byCurrency.get(bill.currency) ?? 0) + leftToPayCents(bill),
+        );
+        if (bill.dueAt !== null && bill.dueAt < now) overdue += 1;
+    }
     return {
-        totals: sums.map((row) => ({
-            currency: row.currency,
-            amountMinor: toMinor(row._sum.total ?? 0),
-        })),
-        bills: sums.reduce((n, row) => n + row._count._all, 0),
+        totals: [...byCurrency.entries()]
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([currency, amountMinor]) => ({ currency, amountMinor })),
+        bills: bills.length,
         overdue,
         href: overdue > 0 ? WEEK_PATHS.OVERDUE : WEEK_PATHS.OWED,
     };
@@ -305,7 +336,8 @@ async function readOwed(
 /**
  * The whole block for one viewer: only the figures their reads allow, the
  * rest absent (never zero). Throws when a read fails; `HomeService` names
- * "This week" and sends none. A staff member's orders are their
+ * "This week" and sends none. The cheques line is not read here
+ * (`readHomeCheques`, its own guarded read). A staff member's orders are their
  * storefronts' (F11, `storeIds`); the money is the business's, and isn't
  * narrowed.
  */

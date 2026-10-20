@@ -11,10 +11,12 @@ import type { PageBooking } from "@/lib/services/booking-page";
 import type { DeskTake } from "@/lib/services/desk-pay";
 import type { PeekPerson } from "@/lib/services/peek";
 
+import { ChangeWhoSheet } from "@/components/bookings/sheets/change-who";
+
 import { MoveSheet } from "./move-sheet";
 
 /** Which of the page's sheets is open. */
-export type PageSheet = "move" | "cancel" | "take" | null;
+export type PageSheet = "move" | "who" | "cancel" | "take" | null;
 
 /**
  * The sheets a booking's page opens (U12): Move (U3's time picker),
@@ -30,6 +32,8 @@ export function PageOverlays({
     timezone,
     now,
     canMove,
+    canReassign = false,
+    reassignOnly = null,
     canCancel,
     canRefund,
     canReadOrder,
@@ -45,6 +49,10 @@ export function PageOverlays({
     timezone: string;
     now?: number;
     canMove: boolean;
+    /** Change who it's with, or Assign someone (#1157). */
+    canReassign?: boolean;
+    /** The one person it may go to; null: anyone free. */
+    reassignOnly?: string | null;
     canCancel: boolean;
     canRefund: boolean;
     canReadOrder: boolean;
@@ -75,6 +83,25 @@ export function PageOverlays({
                     timezone={timezone}
                     reach={person?.reach ?? null}
                     now={now}
+                    onClose={close}
+                />
+            ) : null}
+            {canReassign ? (
+                <ChangeWhoSheet
+                    open={open === "who"}
+                    target={{
+                        id: booking.id,
+                        serviceId: booking.service.id,
+                        serviceName: booking.service.name,
+                        startAt: booking.startAt,
+                        who,
+                        staff: booking.staff ?? null,
+                    }}
+                    timezone={timezone}
+                    reach={person?.reach ?? null}
+                    now={now}
+                    send={send}
+                    only={reassignOnly}
                     onClose={close}
                 />
             ) : null}

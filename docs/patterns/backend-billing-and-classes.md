@@ -13,6 +13,10 @@
   Overdue is derived — `isPastDue` in `modules/invoices/invoice-state.ts` is the
   one rule, used by the invoice's standing, the owed sums and subscriptions.
   Never store it.
+  ISSUED and PAID are worked out from the invoice's payment ledger (below),
+  never set by hand: a removed payment or a bounced cheque takes a PAID
+  invoice back to ISSUED. "Partly paid" is derived like Overdue (ISSUED
+  with `paidCents > 0`, `isPartlyPaid`), never a status.
 - **Numbers** come from `InvoiceSequence` inside the caller's transaction
   (`nextInvoiceNumber`), so a rolled-back caller leaves no gap. Another module
   issues through `InvoicesService.issueInTx(tx, organizationId, input)`, never
@@ -55,6 +59,174 @@ requireProvider: false })`), the email says "view it and download a copy",
   and the pay page's payment-intent and autopay answer 409 "This business
   doesn't take payment online." Automatic invoicing (renewals, packs,
   courses, subscribe) still stops with Payments off (`payments-on.ts`).
+
+## Payments on an invoice are a ledger — **Current** (DEC-173, #1113, #1114, #1115)
+
+- **One row per payment** (`InvoicePayment`, integer paise): cash, UPI, a
+  bank transfer, a card, other, a cheque, or ONLINE (the webhook's alone).
+  An order's invoice has none: the order is its ledger (ADR-008).
+- **One write path:** `modules/invoices/invoice-ledger.ts`. Lock the
+  invoice with `lockInvoiceForLedger` (FOR NO KEY UPDATE: no key column
+  changes), then write with `recordLedgerPaymentInTx`, or change a row and
+  call `settleFromLedger`. Settling, in the same transaction, sets
+  `paidCents` to the live sum (not removed, not bounced; a waiting cheque
+  counts), the status to PAID when it reaches the total and ISSUED
+  otherwise, and the legacy `paidAt` / `paymentMethod` /
+  `paymentReference` / `paymentNote` from the last live payment while
+  PAID (null while owed, so their readers keep meaning "paid, and how").
+  Nothing else writes `paidCents` or sets a non-order invoice PAID.
+- **Refused by the ledger, whoever calls it:** an order's invoice or a
+  credit note (409), an invoice not ISSUED (409; PAID takes nothing more),
+  an amount of 0 (400), more than is left (422 with `details.leftToPay`;
+  no advances yet), one payment over the `Int` range (400).
+- **The hand routes** (`InvoicePaymentsService`, `invoice:write` on each,
+  DEC-098): `POST :invoiceId/payments` (`amount` defaults to what is left;
+  answers `recorded.paymentId` for Undo), `DELETE
+:invoiceId/payments/:paymentId` (soft: `removedAt`, who, a reason,
+  "Recorded by mistake" by default; an ONLINE payment is refunded, never
+  removed), `POST …/cleared` and `POST …/bounced` (a WAITING cheque only;
+  a bounce reopens what it paid, with no charge). A repeat of the same
+  record (method, reference, cheque number, amount) within ten minutes
+  answers with the first payment (`recorded.replayed`), the desk-take rule.
+- **Every write is an event** on the invoice's history: an audit row in
+  the same transaction (`invoice.payment.recorded`, `.removed`,
+  `.cheque_cleared`, `.cheque_bounced`; `invoice-payment-events.ts`),
+  ids, amounts and the method only. The automatic receipt (owner, 20 Oct)
+  hangs from `paymentRecordedInTx` (below, U5 #1117).
+- **Every other path that pays an invoice writes the ledger** (U3, #1115),
+  in its own transaction: the webhook, a mandate charge found by a look-up
+  (`settleCapturedChargeInTx`) and a pay-now hold, a pack or a plan bought
+  online (numbered, issued, then `payIssuedDraftOnlineInTx`) all go through
+  `recordOnlinePaymentInTx`; the desk (`booking-desk-pay.ts`) issues its
+  paper and records its one payment with `recordLedgerPaymentInTx`. An
+  order's paper is stamped paid by `stampOrderPaperPaidInTx` or
+  `order-invoicing.ts`, with no row. `invoice-ledger.guard.spec.ts` reads the
+  sources and fails a write anywhere else that sets an invoice PAID or
+  writes `paidCents`.
+- **Owed is what is left to pay** everywhere money is owed:
+  `leftToPayCents` (`invoice-state.ts`) is the one place it is worked out,
+  and every owed figure folds its bills through it (Home's week and how
+  late, the overdue and failed-renewal rows, awaiting payment, a customer's
+  Owed, `GET /owed`, a subscription's unpaid total, the calendar's due
+  amounts, the reminder email and thread message). Takings and spent are
+  unchanged: they count paid invoices.
+- **A partly paid invoice isn't voided or credited** until its payments
+  are removed (409); the void is fenced on `paidCents = 0` and the credit
+  checks again under the ledger lock.
+- **The read** serves `paidSoFar`, `leftToPay`, `partlyPaid` and
+  `chequeWaiting` on every invoice, and `payments[]` (each with
+  `bankStatus`, `removed` and `canRemove`) on the detail. A PAID invoice
+  reads its total as paid, so an order's invoice reads right with no rows.
+- **Tests:** `invoice-ledger.spec.ts` (the settle rules) and
+  `invoice-payments.db.spec.ts` (every refusal, repeats, two payments
+  racing on the row lock, one business never reaching another's), plain
+  and under `TEST_RLS=on`.
+- **The list's search, views and money strip** (U4, #1116). `GET /`
+  takes `q` (trimmed, at most 80 characters): a name (bill-to, or the
+  contact's first and last name, so a draft is found too), part of a
+  number, or an amount (`money-query.ts`: "₹8,400", "8400", "8,400.00";
+  "8,40" is not one) matching the total or what is left to pay. What is
+  left is found by folding the partly paid invoices through
+  `leftToPayCents`, never worked out again in SQL. Searched on the server,
+  so the 500 cap never hides an older invoice. New views: `owed`
+  (`OWED_VIEW_WHERE`: issued, overdue included, not an order's paper or a
+  credit note) and `cheques` (`WAITING_CHEQUE_WHERE`); `paidFrom`
+  (`YYYY-MM-DD` in the business's zone) is money received since that day,
+  part payments included (`LIVE_PAYMENT_WHERE`), or an order's paper paid
+  since. New parts are ANDed on, so no part's `OR` overwrites another's.
+- **`GET invoices/summary`** (`InvoiceSummaryService`, `invoice:read`):
+  Owed and Overdue (left to pay, `isPastDue`), Paid this month (ledger
+  payments that count from the 1st in the business's zone, plus an order's
+  paper paid this month, each rupee once), Drafts, and `chequesWaiting`
+  (null while none waits). Each figure is `{ count, totals?, filter }`,
+  totals per currency in minor units (`amountMinor`, as Home's), and
+  `filter` is the list query it stands for. Without `payment:read` there
+  are no `totals` (DEC-098). Home's `week.chequesWaiting`
+  (`home/home-cheques.ts`, `{ count, totals, href }`, href
+  `/billing/invoices?view=cheques`) reads the same `readChequesWaiting`,
+  and is null without `payment:read` and `invoice:read` (the line opens the
+  invoices) or while none waits. `HomeService` reads it in a guarded read
+  of its own beside the week, never inside `readWeek`: a failure is named
+  "Cheques" in `unavailable` (the phone says "Couldn't check cheques just
+  now") and the week's other figures still come (Home U18, invoices U8
+  #1120).
+- **Overdue bills have one definition** (`invoices/overdue-bills.ts`,
+  `overdueBillsWhere`): issued, past due, not an order's or a credit note,
+  not a live subscription's latest period invoice, not a cancelled
+  booking's paid link. Home's bills group (`home-money-sources.ts`) and
+  Remind all both read it, so "10 overdue" and the people Remind all
+  lists never disagree. Never write a second where for "overdue bills".
+- **Remind all** (DEC-171, Home plan U8 #1085) is Remind many with
+  `quietDays: 3`, never a route of its own. Home's bills group carries
+  `remind: { invoiceIds, quietDays }` (the 100 oldest overdue,
+  `overdueBillIds`) only for `invoice:write`; the sheet posts them to
+  `POST invoices/reminders/preview` and, after the ten-second hold with
+  Undo on Home's one hold (`useInlineActions().remindAll`), the EMAIL ones
+  to `POST invoices/reminders` with the same `quietDays`, which reads every
+  bill again. "Heard from" is `lastHeardFrom`: an email that went, an
+  account-thread post or a WhatsApp NEW or REMINDER share, the three
+  things one reminder a day counts. On a phone it is the bills sheet's
+  foot, beside See bills, with the hold's Undo in the sheet.
+- **Search speed:** a business's invoices are filtered after the
+  `organizationId` index; 5,000 invoices (among 55,000) search in about
+  4 ms, so there is no trigram index. `list-filter.db.spec.ts` times 1,500.
+
+## Sharing an invoice, reminding many, and the receipt — **Current** (DEC-173, U5 #1117)
+
+- **WhatsApp is a link, never a sender.** `POST :invoiceId/share`
+  (`InvoiceShareService`, `invoice:write`) with `channel` WHATSAPP, LINK,
+  PDF or PRINT and an optional `kind` (NEW, REMINDER, RECEIPT; by default
+  a receipt once paid, a reminder once overdue, else new). WHATSAPP and
+  LINK mint a fresh link as a send does (a pay link while the invoice is
+  owed and payable online, else a view link; the old link stops, DEC-110)
+  and answer `{ url, text, phone, whatsappUrl }`; PDF and PRINT mint
+  nothing. The words are `invoice-share-words.ts`, in the business's voice,
+  asking for what is left on a partly paid invoice. The app opens
+  `whatsappChatLink(phone, text)` (`@saroh/block-contract`); the API
+  answers the same link so the bulk flow needs no second rule. Saroh can't
+  know a WhatsApp message went: words say "shared on WhatsApp".
+- **The share log** is `InvoiceShare` (channel, kind, who, when; its own
+  RLS policy and CHECKs), served as `shared[]` on the invoice read. Emails
+  aren't in it: their `Message` rows are the record.
+- **One reminder a day, whichever way:** `nextReminderAt`
+  (`invoice-send.service.ts`) reads email Messages, account-thread posts
+  and WhatsApp NEW or REMINDER shares together, so a WhatsApp reminder
+  after an email one (or the other way) is a 429 with `retryAt`. Link, PDF
+  and print don't count.
+- **Remind many:** `POST invoices/reminders/preview` and `POST
+invoices/reminders` (`InvoiceRemindersService`, `invoice:write`, at most
+  100 ids, duplicates once). Each invoice is EMAIL when an email can go
+  (`channelsFor`: provider connected, an address, email not turned off),
+  else WHATSAPP with a phone, else NONE with why (`UNREACHABLE` with
+  `emailBlocked`; `DRAFT`, `PAID`, `ORDER`, `NOT_OWED`, `AUTOPAY_PENDING`,
+  `NOT_FOUND` for an id that isn't the business's); one reminded today is
+  WAIT with `retryAt`; with `quietDays` (1 to 14) one sent or reminded
+  inside them is WAIT `REMINDED_RECENTLY` with `lastAt`, `lastWords`
+  ("Reminded 2 days ago") and `retryAt`, read again at Send. Each row has
+  `dueAt` and `lateDays`; `leftToPay` only with `payment:read`. The
+  preview's `message` is the first EMAIL row's reminder email as words
+  (`invoice-reminder-sample.ts`), null without `payment:read`. Send emails the EMAIL ones, each through `remind`
+  (its own transaction and checks), and sends nothing else: the business
+  opens each WhatsApp one through the share route. Never a failure for
+  the lot.
+- **The receipt is automatic** (owner, 20 Oct). `paymentRecordedInTx`
+  queues `invoice.receipt` (`invoice-receipt.ts`) at
+  `now + RECEIPT_HOLD_MS`, for every payment the ledger records, by hand,
+  online, by autopay or at the desk; a cheque's goes when it is marked in
+  the bank. It is queued only when it can go (`receiptCanGo`: the
+  business's email provider connected, an address, email not turned off),
+  so with no provider nothing is queued or sent; Saroh's address never
+  carries it. Removing a payment (Undo) deletes its waiting job. The
+  handler (`invoice-receipt.handler.ts`) locks the payment row, sends
+  nothing for one removed, bounced or already receipted, and records the
+  Message on `InvoicePayment.receiptMessageId` in the same transaction, so
+  a retry never emails twice. The email (`INVOICE_PAYMENT_RECEIVED`) says
+  the payment, paid so far and left to pay, with the PDF attached and no
+  link. `share` with `channel: EMAIL` (receipts only) sends it now, and a
+  409 with no provider.
+- **Tests:** `invoice-share-words.spec.ts`, `invoice-share.db.spec.ts`,
+  `invoice-reminders.db.spec.ts`, `invoice-receipt.db.spec.ts` and
+  `rls/invoice-shares-rls.db.spec.ts`, plain and under `TEST_RLS=on`.
 
 ## Saroh's own invoices — **Current** (pricing catalogue U17)
 
@@ -1021,19 +1193,28 @@ options, items, more }` and a sentence with the count, the first
   a new link replaces the old, and voiding the invoice or deleting its contact
   clears it. Never log `/public/invoices/<token>` — the request log redacts it.
 - **The public read is an allow-list** (business name, number, dates, lines,
-  tax, total, currency, status, billed-to name, `payOnline`, and on an owed
+  tax, total, `paidSoFar` and `leftToPay` (DEC-173), currency, status,
+  billed-to name, `payOnline`, and on an owed
   view-only invoice `payInstructions`, R32) served
   server-to-server to `saroh.app/pay/<token>`; reads and payment starts are
   rate-limited per link. With `payOnline` false (DEC-070) the page shows the
   invoice with no Pay button, only "Print or save as PDF", and starting a payment or autopay
   is a 409 (`assertPaysOnline`). An older API without the field means "as
   before": show Pay.
-- **The amount is the stored invoice's.** A payment request carries only a
-  provider and an idempotency key; anything else is ignored.
+- **The amount is what is left to pay** (DEC-173, #1115): the stored total
+  less the ledger's `paidCents`, worked out by the API
+  (`createIntentForInvoicePublic`), so a partly paid invoice is charged its
+  balance and still has a working link. A payment request carries only a
+  provider and an idempotency key; anything else is ignored. An autopay
+  charge and autopay's first payment charge what is left too.
 - **`PaymentIntent` pays an Order or an Invoice** — exactly one (a CHECK in the
   migration). Webhooks find the intent by provider id or by the invoice id
-  echoed back as the merchant reference. Success on an ISSUED invoice marks it
-  PAID (`ONLINE`) under its row lock; success on one already PAID or VOID is
+  echoed back as the merchant reference. Success on an ISSUED invoice writes
+  one `ONLINE` payment on its ledger for the intent's amount
+  (`recordOnlinePaymentInTx`, linked by `paymentIntentId`, unique, so a
+  replay never doubles it): PAID when that settles it, partly paid when not.
+  Success on one already PAID or VOID, or for more than is left (part was
+  paid by hand while the checkout was open: `MORE_THAN_LEFT`), is
   `CAPTURED_NEEDS_REFUND`, raised on Home until the provider's refund webhook
   clears it. A refund never changes an invoice's status.
 

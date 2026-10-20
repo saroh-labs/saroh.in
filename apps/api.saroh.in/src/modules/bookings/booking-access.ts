@@ -24,7 +24,8 @@ import { allows } from "../organizations/organization-policy";
  * | GET services/bookings, bookings/:id, :id/bookings,        | `booking:read`  |
  * | :id/waitlist                                              |                 |
  * | POST :id/bookings, PATCH/DELETE bookings/:id, outcome,    | `booking:write` |
- * | pay link, treatment visits                                |                 |
+ * | pay link, treatment visits, bookings/:id/reassign and its |                 |
+ * | people (#1157; someone else's booking: `service:write`)   |                 |
  * | GET class-packs, selling, purchases, :id and its tabs,    | `pack:read`     |
  * | draft                                                     |                 |
  * | POST class-packs/:id/sell; booking with a pack; POST and  | `pack:sell`     |

@@ -29,7 +29,8 @@ export interface BookingNotifyPayload {
     bookingId: string;
     serviceId?: string;
     contactId?: string | null;
-    reason?: "booked" | "rescheduled" | "cancelled" | "confirmed";
+    reason?:
+        "booked" | "rescheduled" | "reassigned" | "cancelled" | "confirmed";
     eventId?: string;
 }
 
@@ -88,9 +89,14 @@ function noticeKind(
     "BOOKING_CONFIRMED" | "BOOKING_MOVED" | "BOOKING_CANCELLED"
 > {
     if (eventType === BookingEventType.Rescheduled) return "BOOKING_MOVED";
+    // Given to someone else (#1157): the customer hears it as a change to
+    // their booking, "now with Meera", through the same notice.
+    if (eventType === BookingEventType.Reassigned) return "BOOKING_MOVED";
     if (eventType === BookingEventType.Cancelled) return "BOOKING_CANCELLED";
     if (eventType === BookingEventType.Booked) return "BOOKING_CONFIRMED";
-    if (reason === "rescheduled") return "BOOKING_MOVED";
+    if (reason === "rescheduled" || reason === "reassigned") {
+        return "BOOKING_MOVED";
+    }
     if (reason === "cancelled") return "BOOKING_CANCELLED";
     return "BOOKING_CONFIRMED";
 }

@@ -57,6 +57,8 @@ const NOT_FORMS: Record<string, string> = {
     "components/commerce/product-page/variant-drawer.tsx":
         "a read-only quick look",
     "components/calendar/day-sheet.tsx": "a read-only list of a day",
+    "components/insights/week-sheet.tsx":
+        "a read-only quick look of a week's orders, opening the list",
     // Hours and time off's sheets (U17, DEC-170): what they hold saves as
     // it is changed, with Undo, so there is no Save or Cancel, only Done.
     "components/bookings/availability/hours-panel.tsx":
@@ -64,6 +66,20 @@ const NOT_FORMS: Record<string, string> = {
     "components/qr/qr-button.tsx": "a code to scan, download and copy",
     // Navigation and pickers.
     "components/shared/tab-bar-sheet.tsx": "the phone's menu",
+    "components/insights/period-control.tsx":
+        "a picker: choosing Insights' period goes there",
+    "components/home/new-sheet.tsx":
+        "Home's New on a phone: a menu of starts, each going to its flow",
+    // The phone Home's sheets (U17, DEC-171): what is done inside is done
+    // row by row with its own confirm, hold and Undo, so only Close.
+    "components/home/phone/home-sheet.tsx":
+        "the phone Home's frame: a group's rows, the day, or setup, each row acting for itself",
+    "components/home/phone/need-sheet.tsx":
+        "a Needs you group's rows and inline actions, in the phone Home's frame",
+    "components/home/phone/day-sheet.tsx":
+        "the day's rows with Mark arrived and Didn't come, in the phone Home's frame",
+    "components/home/phone/setup-sheet.tsx":
+        "the setup checklist, each step its own link, in the phone Home's frame",
     "components/sites/editor/editor-sheet.tsx": "the site editor's panels",
     "components/sites/add-section-dialog.tsx":
         "a picker: choosing a section adds it",

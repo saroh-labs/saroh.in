@@ -1,7 +1,14 @@
 import { apiFetch, getActiveOrgId } from "@/lib/api/http";
 
+import type { InsightsPeriod } from "@/lib/insights/period";
+import type {
+    MoneyRead,
+    SellsRead,
+    SuggestionsRead,
+} from "@/lib/insights/reads";
+
 import type { AnalyticsAggregateRow } from "./summary";
-import type { SourceRead, TakingsRead } from "./takings";
+import type { SourceRead } from "./takings";
 
 /**
  * Analytics dashboard data access for app.saroh.in (S7-003). Backed by the
@@ -55,13 +62,48 @@ async function readSource<T>(path: string): Promise<SourceRead<T>> {
 }
 
 /**
- * Twelve whole weeks of takings for the active organization (DEC-075),
- * read by the Insights page beside the website's figures.
+ * Insights' Money for one period (DEC-171, #1079): money in against the
+ * same number of days before, the twelve weeks marked by window, and each
+ * day of the period. `payment:read`: a role without it reads `denied`.
  */
-export async function readTakings(): Promise<SourceRead<TakingsRead> | null> {
+export async function readMoney(
+    period: InsightsPeriod,
+): Promise<SourceRead<MoneyRead> | null> {
     const orgId = await getActiveOrgId();
     if (!orgId) return null;
-    return readSource<TakingsRead>(`/organizations/${orgId}/analytics/takings`);
+    return readSource<MoneyRead>(
+        `/organizations/${orgId}/analytics/money?period=${period}`,
+    );
+}
+
+/**
+ * Insights' What sells for one period (DEC-171, #1080): best sellers and
+ * what is booked most, counts for anyone with Insights, amounts only with
+ * `payment:read` (`money` says which).
+ */
+export async function readSells(
+    period: InsightsPeriod,
+): Promise<SourceRead<SellsRead> | null> {
+    const orgId = await getActiveOrgId();
+    if (!orgId) return null;
+    return readSource<SellsRead>(
+        `/organizations/${orgId}/analytics/sells?period=${period}`,
+    );
+}
+
+/**
+ * Insights' suggestions for the person asking (DEC-171, #1087): ranked,
+ * less what they put off with Not now. A failure is `failed`, said on the
+ * card by name; the rest of the Overview still shows.
+ */
+export async function readSuggestions(
+    period: InsightsPeriod,
+): Promise<SourceRead<SuggestionsRead> | null> {
+    const orgId = await getActiveOrgId();
+    if (!orgId) return null;
+    return readSource<SuggestionsRead>(
+        `/organizations/${orgId}/analytics/suggestions?period=${period}`,
+    );
 }
 
 /**

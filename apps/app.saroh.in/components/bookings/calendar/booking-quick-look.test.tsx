@@ -405,6 +405,7 @@ describe.each([
             "The full booking and its history",
             "Book their next visit",
             "Move to another time",
+            "Change who it's with",
             "Cancel booking",
         ]);
     });

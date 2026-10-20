@@ -207,6 +207,56 @@ export function refundMismatchWords(
     };
 }
 
+/**
+ * Send payment link (SEND_PAY_LINK, DEC-171): the booking's own pay link
+ * (`POST bookings/:id/pay-link`), which makes a new link on its invoice;
+ * the one sent before stops working. Saroh sends nothing: the link is
+ * handed back to share on WhatsApp or SMS, as the booking's page does.
+ */
+export function payLinkWords(first: string | null, service: string): Words {
+    const whose = first ? `${first}'s` : "this";
+    return {
+        label: "Send payment link",
+        confirm: `This makes a new payment link for ${whose} ${service}, and the link sent before stops working. Saroh doesn't send it: share it with ${first ?? "them"} on WhatsApp or SMS.`,
+        yes: "Make the link",
+        done: "Payment link ready",
+        sends: false,
+    };
+}
+
+/**
+ * Turn down (TURN_DOWN, A7): the booking's own cancel
+ * (`DELETE bookings/:id`). A booking with a link sent is cancelled: the
+ * customer is told, as a cancel from the booking's page tells them, its
+ * link stops and the time opens up. A booking still being paid for on the
+ * booking page (a hold) is let go: nothing was booked yet, so nothing is
+ * sent, and their payment page stops working.
+ */
+export function turnDownWords(
+    first: string | null,
+    service: string,
+    when: string,
+    held: boolean,
+): Words {
+    const whose = first ? `${first}'s` : "this";
+    if (held) {
+        return {
+            label: "Turn down",
+            confirm: `${capital(first ?? "the customer")} is paying for ${service} on ${when} on your booking page right now. Turning it down lets the place go and their payment page stops working. Nothing is sent.`,
+            yes: "Turn down",
+            done: "Turned down",
+            sends: false,
+        };
+    }
+    return {
+        label: "Turn down",
+        confirm: `This cancels ${whose} ${service} on ${when}. ${first ? `${first} is` : "They're"} told, the payment link stops working, and the time opens up for someone else.`,
+        yes: "Turn down",
+        done: "Turned down",
+        sends: true,
+    };
+}
+
 function capital(text: string): string {
     return text.charAt(0).toUpperCase() + text.slice(1);
 }

@@ -1,6 +1,7 @@
 import {
     Body,
     Controller,
+    Delete,
     Get,
     HttpCode,
     Ip,
@@ -23,8 +24,14 @@ import {
 } from "../capabilities/require-module.decorator";
 import type { IngestResult } from "./analytics.service";
 import { AnalyticsService } from "./analytics.service";
-import { IngestAnalyticsEventDto } from "./dto";
-import type { TakingsRead } from "./takings";
+import { IngestAnalyticsEventDto, InsightsPeriodQueryDto } from "./dto";
+import type { MoneyRead } from "./money";
+import { DEFAULT_PERIOD } from "./period";
+import type { SellsRead } from "./sells";
+import { SellsService } from "./sells.service";
+import type { SuggestionsRead } from "./suggestions";
+import type { NotNowResult } from "./suggestions.service";
+import { SuggestionsService } from "./suggestions.service";
 import { TakingsService } from "./takings.service";
 
 /**
@@ -87,16 +94,74 @@ export class AnalyticsController {
     constructor(
         private readonly analytics: AnalyticsService,
         private readonly takings: TakingsService,
+        private readonly sells: SellsService,
+        private readonly suggestions: SuggestionsService,
     ) {}
 
     /**
-     * Twelve whole weeks of takings (DEC-075, `takings.ts`): money taken,
-     * where it was sold and the orders, per week in the business's zone.
-     * Needs `payment:read` beside `analytics:read`.
+     * Insights' Money for one period (DEC-171, `money.ts`): money in against
+     * the same number of days before, the usual order, twelve weekly bars
+     * marked by window, this week and today so far, places with their
+     * change, and who owes by how late. `?period=7d|4w|3m`, 4 weeks when
+     * absent. Needs `payment:read` beside `analytics:read`.
      */
-    @Get("takings")
-    getTakings(@OrgContext() ctx: OrganizationContext): Promise<TakingsRead> {
-        return this.takings.read(ctx);
+    @Get("money")
+    getMoney(
+        @OrgContext() ctx: OrganizationContext,
+        @Query() query: InsightsPeriodQueryDto,
+    ): Promise<MoneyRead> {
+        return this.takings.money(ctx, query.period ?? DEFAULT_PERIOD);
+    }
+
+    /**
+     * Insights' What sells for one period (DEC-171, `sells.ts`): best
+     * sellers, booked most and how full, the busiest days and times, and
+     * the best customers. `?period=7d|4w|3m`, 4 weeks when absent. Needs
+     * `analytics:read`; amounts only with `payment:read` and customers'
+     * names only with `contact:read`.
+     */
+    @Get("sells")
+    getSells(
+        @OrgContext() ctx: OrganizationContext,
+        @Query() query: InsightsPeriodQueryDto,
+    ): Promise<SellsRead> {
+        return this.sells.read(ctx, query.period ?? DEFAULT_PERIOD);
+    }
+
+    /**
+     * Insights' suggestions for the person asking (DEC-171,
+     * `suggestions.ts`): a class nearly always full, a bill more than 3
+     * weeks late, something selling less, ranked, less what they put off
+     * with Not now; the first-sale suggestion before any sale.
+     * `?period=7d|4w|3m` is what selling less compares, 4 weeks when
+     * absent. Needs `analytics:read`; the money rules need `payment:read`.
+     */
+    @Get("suggestions")
+    getSuggestions(
+        @OrgContext() ctx: OrganizationContext,
+        @Query() query: InsightsPeriodQueryDto,
+    ): Promise<SuggestionsRead> {
+        return this.suggestions.read(ctx, query.period ?? DEFAULT_PERIOD);
+    }
+
+    /** Not now: hide one suggestion from this person for 7 days. */
+    @Post("suggestions/:key/not-now")
+    @HttpCode(200)
+    notNow(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("key") key: string,
+    ): Promise<NotNowResult> {
+        return this.suggestions.notNow(ctx, key);
+    }
+
+    /** Undo Not now: the suggestion shows again at once. */
+    @Delete("suggestions/:key/not-now")
+    @HttpCode(204)
+    undoNotNow(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("key") key: string,
+    ): Promise<void> {
+        return this.suggestions.undoNotNow(ctx, key);
     }
 
     @Get()

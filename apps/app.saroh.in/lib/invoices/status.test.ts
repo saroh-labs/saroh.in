@@ -1,19 +1,29 @@
 import { describe, expect, it } from "vitest";
 
-import type { Invoice } from "./service";
+import type { Invoice, InvoicePayment } from "./service";
 import {
     billedTo,
+    headerPill,
     inTab,
     invoicePill,
+    invoiceState,
     invoiceStatus,
     isOwed,
+    lastLivePayment,
+    lateBy,
+    leftCents,
+    moneyMessage,
+    overdueLine,
     owedSummary,
+    paidBy,
+    paidCents,
     paidHow,
     paidSinceRows,
     sourceLabel,
     sourceLine,
     spacedCode,
     tabFromView,
+    waitingCheque,
     whenLine,
     withCorrectionsUnder,
 } from "./status";
@@ -331,6 +341,15 @@ describe("owed", () => {
         expect(s.overdueCount).toBe(1);
     });
 
+    it("counts a partly paid invoice at what is left to pay (DEC-173)", () => {
+        const s = owedSummary([
+            inv({ total: "2500.00", leftToPay: "1500.00" }),
+            inv({ standing: "OVERDUE", total: "1000.00", leftToPay: "400.00" }),
+        ]);
+        expect(s.owed).toEqual([{ currency: "INR", cents: 190000 }]);
+        expect(s.overdue).toEqual([{ currency: "INR", cents: 40000 }]);
+    });
+
     it("never counts a credit note or an order's paper as owed", () => {
         expect(isOwed(inv({ kind: "CREDIT_NOTE" }))).toBe(false);
         expect(
@@ -426,5 +445,376 @@ describe("paidHow", () => {
         expect(paidHow("CASH")).toBe("by cash");
         expect(paidHow("BANK_TRANSFER")).toBe("by bank transfer");
         expect(paidHow("ORDER")).toBe("with the order");
+    });
+});
+
+/* ------------------------------------------------------------------------
+ * The ledger's states (DEC-173, U7 #1119)
+ * ---------------------------------------------------------------------- */
+
+const ZONE = "Asia/Kolkata";
+/** 20 Oct 2026, mid-morning in India: Vivek's invoice is 13 days late. */
+const OCT20 = new Date("2026-10-20T05:00:00Z");
+const VIVEK = {
+    number: "RC/26-27/0106",
+    total: "8400.00",
+    issuedAt: "2026-09-22T05:37:00Z",
+    // The end of 7 Oct in India.
+    dueAt: "2026-10-07T18:29:59.999Z",
+};
+
+function pay(over: Partial<InvoicePayment> = {}): InvoicePayment {
+    return {
+        id: "p1",
+        amount: "4000.00",
+        currency: "INR",
+        method: "CASH",
+        reference: null,
+        note: null,
+        receivedAt: "2026-10-12T06:00:00Z",
+        recordedAt: "2026-10-12T06:00:00Z",
+        cheque: null,
+        bankStatus: null,
+        clearedAt: null,
+        bouncedAt: null,
+        bounceReason: null,
+        removed: null,
+        canRemove: true,
+        ...over,
+    };
+}
+
+const CHEQUE = pay({
+    id: "chq",
+    amount: "8400.00",
+    method: "CHEQUE",
+    cheque: { number: "004512", bank: "HDFC Bank" },
+    bankStatus: "WAITING",
+    receivedAt: "2026-10-19T06:00:00Z",
+});
+
+/** Each state, as the detail read sends it. */
+const S = {
+    draft: inv({
+        ...VIVEK,
+        standing: "DRAFT",
+        status: "DRAFT",
+        number: null,
+        total: "7500.00",
+        issuedAt: null,
+    }),
+    due: inv({
+        ...VIVEK,
+        dueAt: "2026-10-27T18:29:59.999Z",
+        leftToPay: "8400.00",
+        paidSoFar: "0.00",
+    }),
+    overdue: inv({
+        ...VIVEK,
+        standing: "OVERDUE",
+        leftToPay: "8400.00",
+        paidSoFar: "0.00",
+    }),
+    partlyPaid: inv({
+        ...VIVEK,
+        dueAt: "2026-10-27T18:29:59.999Z",
+        partlyPaid: true,
+        leftToPay: "4400.00",
+        paidSoFar: "4000.00",
+        payments: [pay()],
+    }),
+    partlyPaidLate: inv({
+        ...VIVEK,
+        standing: "OVERDUE",
+        partlyPaid: true,
+        leftToPay: "4400.00",
+        paidSoFar: "4000.00",
+        payments: [pay()],
+    }),
+    paid: inv({
+        ...VIVEK,
+        standing: "PAID",
+        status: "PAID",
+        paidAt: "2026-10-15T06:00:00Z",
+        leftToPay: "0.00",
+        paidSoFar: "8400.00",
+        payment: {
+            method: "BANK_TRANSFER",
+            reference: "UTR 4581 2290",
+            note: null,
+        },
+        payments: [
+            pay({
+                amount: "8400.00",
+                method: "BANK_TRANSFER",
+                reference: "UTR 4581 2290",
+                receivedAt: "2026-10-15T06:00:00Z",
+            }),
+        ],
+    }),
+    paidChequeWaiting: inv({
+        ...VIVEK,
+        standing: "PAID",
+        status: "PAID",
+        chequeWaiting: true,
+        paidAt: "2026-10-19T06:00:00Z",
+        leftToPay: "0.00",
+        paidSoFar: "8400.00",
+        payments: [CHEQUE],
+    }),
+    void: inv({
+        ...VIVEK,
+        standing: "VOID",
+        status: "VOID",
+        leftToPay: "0.00",
+    }),
+    credited: inv({ ...VIVEK, standing: "CREDITED", leftToPay: "0.00" }),
+    orderInvoice: inv({
+        ...VIVEK,
+        standing: "PAID",
+        status: "PAID",
+        source: "ORDER",
+        order: { id: "o1", number: "1020" },
+        paidAt: "2026-10-15T06:00:00Z",
+        payment: { method: "ORDER", reference: null, note: null } as never,
+    }),
+    creditNote: inv({
+        ...VIVEK,
+        number: "RCCN/26-27/0002",
+        kind: "CREDIT_NOTE",
+        related: { id: "i0", number: "RC/26-27/0106" },
+    }),
+};
+
+describe("invoiceState: one per row of U7's table", () => {
+    it("names each state", () => {
+        expect(invoiceState(S.draft)).toBe("draft");
+        expect(invoiceState(S.due)).toBe("due");
+        expect(invoiceState(S.overdue)).toBe("overdue");
+        expect(invoiceState(S.partlyPaid)).toBe("partlyPaid");
+        expect(invoiceState(S.partlyPaidLate)).toBe("partlyPaid");
+        expect(invoiceState(S.paid)).toBe("paid");
+        expect(invoiceState(S.paidChequeWaiting)).toBe("paidChequeWaiting");
+        expect(invoiceState(S.void)).toBe("void");
+        expect(invoiceState(S.credited)).toBe("credited");
+        expect(invoiceState(S.orderInvoice)).toBe("paid");
+        expect(invoiceState(S.creditNote)).toBe("creditNote");
+    });
+
+    it("reads an API before the ledger: no partlyPaid or chequeWaiting", () => {
+        expect(invoiceState({ standing: "ISSUED", kind: "INVOICE" })).toBe(
+            "due",
+        );
+        expect(invoiceState({ standing: "PAID" })).toBe("paid");
+    });
+});
+
+describe("invoicePill with the ledger", () => {
+    it("Partly paid, and Paid · cheque not in the bank", () => {
+        expect(invoicePill(S.partlyPaid)).toEqual({
+            label: "Partly paid",
+            variant: "active",
+        });
+        expect(invoicePill(S.paidChequeWaiting)).toEqual({
+            label: "Paid · cheque not in the bank",
+            variant: "active",
+        });
+    });
+
+    it("a late invoice stays Overdue however much is paid", () => {
+        expect(invoicePill(S.partlyPaidLate).label).toBe("Overdue");
+    });
+
+    it("the header says how late: Overdue · 13 days", () => {
+        expect(headerPill(S.overdue, OCT20).label).toBe("Overdue · 13 days");
+        expect(headerPill(S.due, OCT20).label).toBe("Due");
+        expect(headerPill(S.creditNote, OCT20).label).toBe("Credit note");
+    });
+});
+
+describe("what is unpaid on a late invoice", () => {
+    it("₹8,400 unpaid · 13 days late", () => {
+        expect(overdueLine(S.overdue, OCT20)).toBe(
+            "₹8,400 unpaid · 13 days late",
+        );
+    });
+
+    it("says what is left, not the total", () => {
+        expect(overdueLine(S.partlyPaidLate, OCT20)).toBe(
+            "₹4,400 unpaid · 13 days late",
+        );
+    });
+
+    it("one day late, in the singular", () => {
+        expect(overdueLine(S.overdue, new Date("2026-10-08T05:00:00Z"))).toBe(
+            "₹8,400 unpaid · 1 day late",
+        );
+    });
+
+    it("nothing on one that isn't late", () => {
+        expect(overdueLine(S.due, OCT20)).toBeNull();
+        expect(overdueLine(S.paid, OCT20)).toBeNull();
+    });
+
+    it("lateBy counts whole days, and never 0 on an overdue one", () => {
+        expect(lateBy(S.overdue, OCT20)).toBe(13);
+        expect(lateBy({ standing: "OVERDUE", dueAt: null }, OCT20)).toBe(1);
+        expect(lateBy(S.due, OCT20)).toBe(0);
+    });
+});
+
+describe("leftCents and paidCents", () => {
+    it("read the API's ledger fields", () => {
+        expect(leftCents(S.partlyPaid)).toBe(440_000);
+        expect(paidCents(S.partlyPaid)).toBe(400_000);
+    });
+
+    it("from an API before the ledger: the total while owed, all once paid", () => {
+        const old = inv({ total: "118.00" });
+        expect(leftCents(old)).toBe(11_800);
+        expect(paidCents(old)).toBe(0);
+        expect(paidCents(inv({ standing: "PAID", total: "118.00" }))).toBe(
+            11_800,
+        );
+    });
+
+    it("nothing is left on paper that isn't owed", () => {
+        expect(leftCents(S.paid)).toBe(0);
+        expect(leftCents(S.void)).toBe(0);
+        expect(leftCents(S.creditNote)).toBe(0);
+    });
+});
+
+describe("the ledger's payments", () => {
+    it("the last one that counts: not removed, not bounced", () => {
+        const kept = pay({ id: "a" });
+        const removed = pay({
+            id: "b",
+            removed: { at: "2026-10-13T06:00:00Z", reason: null },
+        });
+        const bounced = pay({ ...CHEQUE, id: "c", bankStatus: "BOUNCED" });
+        expect(lastLivePayment([kept, removed, bounced])?.id).toBe("a");
+        expect(lastLivePayment(undefined)).toBeNull();
+    });
+
+    it("the cheque waiting for the bank", () => {
+        expect(waitingCheque([pay(), CHEQUE])?.id).toBe("chq");
+        expect(
+            waitingCheque([{ ...CHEQUE, bankStatus: "CLEARED" }]),
+        ).toBeNull();
+        expect(
+            waitingCheque([
+                { ...CHEQUE, removed: { at: CHEQUE.receivedAt, reason: null } },
+            ]),
+        ).toBeNull();
+    });
+
+    it("a cheque is paid by cheque", () => {
+        expect(paidBy("CHEQUE")).toBe("Cheque");
+        expect(paidHow("CHEQUE")).toBe("by cheque");
+    });
+});
+
+describe("moneyMessage: one message per state (INVPageA, INVRecordPlus)", () => {
+    const say = (i: Invoice) => moneyMessage(i, { timeZone: ZONE, now: OCT20 });
+
+    it("overdue: ₹8,400 to collect · 13 days late · due 7 Oct", () => {
+        expect(say(S.overdue)).toEqual({
+            title: "₹8,400 to collect",
+            detail: "13 days late · due 7 Oct",
+            tone: "late",
+        });
+    });
+
+    it("due: to collect, and Not paid yet", () => {
+        expect(say(S.due)).toEqual({
+            title: "₹8,400 to collect",
+            detail: "Due 27 Oct. Not paid yet. When the money comes in, record it.",
+            tone: "owed",
+        });
+    });
+
+    it("partly paid: what is left, and what came in how", () => {
+        expect(say(S.partlyPaid)).toEqual({
+            title: "₹4,400 left to pay",
+            detail: "Paid ₹4,000 of ₹8,400 · cash on 12 Oct",
+            tone: "owed",
+        });
+        expect(say(S.partlyPaidLate)).toEqual({
+            title: "₹4,400 left to pay",
+            detail: "Paid ₹4,000 of ₹8,400 · cash on 12 Oct · 13 days late",
+            tone: "late",
+        });
+    });
+
+    it("paid: by bank transfer, with its reference", () => {
+        expect(say(S.paid)).toEqual({
+            title: "Paid ₹8,400",
+            detail: "By bank transfer on 15 Oct · ref UTR 4581 2290",
+            tone: "paid",
+        });
+    });
+
+    it("paid, from an API before the ledger: the row's own payment", () => {
+        expect(say({ ...S.paid, payments: undefined }).detail).toBe(
+            "By bank transfer on 15 Oct · ref UTR 4581 2290",
+        );
+    });
+
+    it("paid in cash, or online", () => {
+        const cash = {
+            ...S.paid,
+            payments: [
+                pay({ amount: "8400.00", receivedAt: "2026-10-15T06:00:00Z" }),
+            ],
+        };
+        expect(say(cash).detail).toBe("In cash on 15 Oct");
+        const online = {
+            ...S.paid,
+            payments: [
+                pay({
+                    amount: "8400.00",
+                    method: "ONLINE",
+                    receivedAt: "2026-10-15T06:00:00Z",
+                }),
+            ],
+        };
+        expect(say(online).detail).toBe("Online on 15 Oct");
+    });
+
+    it("a cheque not in the bank", () => {
+        expect(say(S.paidChequeWaiting)).toEqual({
+            title: "Cheque not in the bank",
+            detail: "Paid ₹8,400 · Cheque 004512 · HDFC Bank · received 19 Oct",
+            tone: "waiting",
+        });
+    });
+
+    it("a draft", () => {
+        expect(say(S.draft)).toEqual({
+            title: "Draft · ₹7,500",
+            detail: "No number yet. Issuing numbers it and locks the lines.",
+            tone: "neutral",
+        });
+    });
+
+    it("void, credited, an order's paper and a credit note owe nothing", () => {
+        expect(say(S.void).title).toBe("Void");
+        expect(say(S.credited)).toMatchObject({
+            title: "Cancelled",
+            detail: "A credit note cancels it. Nothing is owed.",
+        });
+        expect(
+            say({ ...S.credited, order: { id: "o", number: "1" } }).title,
+        ).toBe("Refunded on the order");
+        expect(say(S.orderInvoice)).toMatchObject({
+            title: "Paid ₹8,400",
+            detail: "With the order. Its payments and refunds are made on the order.",
+        });
+        expect(say(S.creditNote)).toEqual({
+            title: "Credit note · ₹8,400",
+            detail: "Nothing is owed on it. It cancels RC/26-27/0106.",
+            tone: "neutral",
+        });
     });
 });

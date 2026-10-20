@@ -443,3 +443,29 @@ test.describe("dark is a surface, not an inversion", () => {
         expect(background).not.toBe("transparent");
     });
 });
+
+test.describe("Home on a phone, simplified (U17)", () => {
+    test("every line, figure and button is a thumb's height, and nothing hides sideways", async ({
+        page,
+    }, testInfo) => {
+        test.skip(
+            !testInfo.project.name.startsWith("phone"),
+            "The phone's Home",
+        );
+        await signIn(page);
+        await page.goto("/");
+        const home = page.locator(
+            '[data-home-layout="phone"] [data-phone-home]',
+        );
+        await expect(home).toBeVisible();
+        const short = await home
+            .locator("a, button")
+            .evaluateAll((els) =>
+                els
+                    .map((el) => Math.round(el.getBoundingClientRect().height))
+                    .filter((h) => h > 2 && h < 44),
+            );
+        expect(short).toEqual([]);
+        await expectNothingHiddenSideways(page);
+    });
+});

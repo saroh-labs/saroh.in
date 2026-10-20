@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { linesWithRates } from "./line-rates";
+import type { ReminderAsk } from "./remind-all";
 import type { InvoiceInput, PaymentInput } from "./service";
 import * as api from "./service";
 
@@ -134,5 +135,20 @@ export async function sendInvoice(id: string) {
 export async function remindInvoice(id: string) {
     const res = await api.remindInvoice(id);
     if (res.ok) refresh(id);
+    return res;
+}
+
+/** Remind all's list (Home plan U8): a read, through an action for the sheet. */
+export async function previewReminders(ask: ReminderAsk) {
+    return api.previewReminders(ask);
+}
+
+/** Remind all: Home and the invoices read again, with the reminders sent. */
+export async function sendReminders(ask: ReminderAsk) {
+    const res = await api.sendReminders(ask);
+    if (res.ok) {
+        refresh();
+        revalidatePath("/");
+    }
     return res;
 }

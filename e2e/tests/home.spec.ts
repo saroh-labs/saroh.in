@@ -2,6 +2,8 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import type { NeedKind } from "../fixtures/home";
+import { needRows, needsYou } from "../fixtures/home";
 import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
 
@@ -24,13 +26,17 @@ async function signIn(page: Page) {
     await page.goto(`${urls.APP_URL}/open/${NORTHWIND}`);
 }
 
-/** Every row, opened past the first twelve when there are more. */
-async function allRows(page: Page) {
-    const needs = page.getByRole("region", { name: "Needs you" });
-    await expect(needs).toBeVisible();
-    const seeAll = needs.getByRole("button", { name: /^See all \d+$/ });
+/**
+ * Every row: at a desk with every group of Home A open (DEC-171); on a
+ * phone (U17), the rows in `kind`'s sheet.
+ */
+async function allRows(page: Page, kind: NeedKind = "ORDERS") {
+    const rows = await needRows(page, kind);
+    const seeAll = needsYou(page).getByRole("button", {
+        name: /^See all \d+$/,
+    });
     if ((await seeAll.count()) > 0) await seeAll.click();
-    return needs.getByRole("listitem");
+    return rows;
 }
 
 test.describe("Home's inline actions (F4)", () => {
@@ -109,7 +115,7 @@ test.describe("Home's inline actions (F4)", () => {
     }) => {
         await signIn(page);
         await page.goto("/");
-        const rows = await allRows(page);
+        const rows = await allRows(page, "BILLS");
         const row = rows
             .filter({
                 has: page.getByRole("button", {

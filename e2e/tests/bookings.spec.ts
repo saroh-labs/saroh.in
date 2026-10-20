@@ -11,6 +11,7 @@ import {
     northwind,
     stamp as ownStamp,
 } from "../fixtures/own-data";
+import { pressUntil } from "../fixtures/press";
 import { asOwner, openNorthwindAs } from "../fixtures/roles";
 import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
@@ -810,11 +811,46 @@ test.describe("the List (U6)", () => {
                     name: "Book on this day",
                 });
                 await expect(book).toBeVisible();
-                await book.click();
-                await expect(page.getByRole("dialog")).toContainText(
-                    day.slice(8, 10).replace(/^0/, ""),
+                await pressUntil(
+                    book,
+                    page.getByRole("dialog", { name: "New booking" }),
                 );
-                await page.keyboard.press("Escape");
+                // New booking opens on Who; its day is the one pressed, as
+                // its When step shows: walked to, and that day picked.
+                const sheet = page.getByRole("dialog", { name: "New booking" });
+                const foot = sheet.locator(
+                    '[data-overlay-foot] button[type="submit"]',
+                );
+                await sheet
+                    .getByRole("list", { name: "Recent customers" })
+                    .getByRole("button")
+                    .first()
+                    .click();
+                await foot.click();
+                await sheet
+                    .getByRole("radiogroup", { name: "Service" })
+                    .getByRole("radio")
+                    .first()
+                    .click();
+                await foot.click();
+                const when = sheet
+                    .getByText("Step 4 of 5 · Day and time")
+                    .filter({ visible: true })
+                    .first();
+                const withWho = sheet
+                    .getByText(/^Step 3 of 5/)
+                    .filter({ visible: true })
+                    .first();
+                await expect(when.or(withWho)).toBeVisible();
+                if (await withWho.isVisible()) await foot.click();
+                await expect(when).toBeVisible();
+                const n = Number(day.slice(8, 10));
+                await expect(
+                    sheet.getByRole("radio", {
+                        checked: true,
+                        name: new RegExp(`^\\w{3} ${n} \\w{3}\\b`),
+                    }),
+                ).toBeVisible();
             }
         }
     });

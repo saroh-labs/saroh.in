@@ -3,9 +3,16 @@ import { apiFetch, getJson, orgBase } from "@/lib/api/http";
 import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
 import type { CappedList } from "@/lib/lists/capped";
-import { withLive } from "@/lib/lists/capped";
+import { LIST_LIMIT, withLive } from "@/lib/lists/capped";
 import type { PayInstructionsSettings } from "@/lib/organizations/pay-instructions";
 import type { OnlineBlocker } from "@/lib/staff/types";
+
+import type {
+    ReminderAsk,
+    ReminderPreview,
+    ReminderSendResult,
+} from "./remind-all";
+import type { InvoiceSummary } from "./summary-types";
 
 /**
  * Invoices a business issues (ADR-007) — read and written through the
@@ -26,11 +33,65 @@ export type InvoiceSource =
     "MANUAL" | "SUBSCRIPTION" | "COURSE" | "PACK" | "ORDER" | "BOOKING";
 export type PaymentMethod = "CASH" | "UPI" | "BANK_TRANSFER" | "CARD" | "OTHER";
 /**
+ * The ways an invoice's payment is recorded by hand (DEC-173): an order's
+ * five, and a cheque, which only an invoice takes.
+ */
+export type InvoicePaymentMethod = PaymentMethod | "CHEQUE";
+/**
  * How a payment is stored: one of the ways it is recorded by hand, or ONLINE
  * — paid through the invoice's payment link, written by the payment webhook and
- * never offered in Record a payment.
+ * never offered in Record payment.
  */
-export type StoredPaymentMethod = PaymentMethod | "ONLINE";
+export type StoredPaymentMethod = InvoicePaymentMethod | "ONLINE";
+
+/** A cheque's place on its way to the bank (DEC-173). */
+export type ChequeBankStatus = "WAITING" | "CLEARED" | "BOUNCED";
+
+/**
+ * One payment in the invoice's ledger (DEC-173), on the detail read only:
+ * every one, removed and bounced too, so the history keeps the line.
+ */
+export interface InvoicePayment {
+    id: string;
+    /** Major units, as a string ("4000.00"). */
+    amount: string;
+    currency: string;
+    method: StoredPaymentMethod;
+    reference: string | null;
+    note: string | null;
+    /** When the money came in. */
+    receivedAt: string;
+    /** When it was written down. */
+    recordedAt: string;
+    /** A cheque's number and bank; null for anything else. */
+    cheque: { number: string | null; bank: string | null } | null;
+    /** On a cheque only; null otherwise. */
+    bankStatus: ChequeBankStatus | null;
+    clearedAt: string | null;
+    bouncedAt: string | null;
+    bounceReason: string | null;
+    /** Removed by mistake: when and why. It no longer counts. */
+    removed: { at: string; reason: string | null } | null;
+    /**
+     * Whether Remove is offered: not removed already, not an online payment
+     * (that is refunded instead), and the invoice issued or paid.
+     */
+    canRemove: boolean;
+}
+
+/**
+ * One time the invoice was shared by hand (DEC-173): opened on WhatsApp,
+ * its link copied, its PDF downloaded or printed. On WhatsApp Saroh only
+ * knows it was opened, never that it was sent.
+ */
+export interface InvoiceShared {
+    id: string;
+    channel: "WHATSAPP" | "LINK" | "PDF" | "PRINT";
+    kind: "NEW" | "REMINDER" | "RECEIPT";
+    /** Who shared it; null once they have left the business. */
+    byUserId: string | null;
+    at: string;
+}
 
 /** One payment taken online through the invoice's payment link. */
 export interface InvoiceOnlinePayment {
@@ -235,6 +296,24 @@ export interface Invoice {
     subtotal: string;
     tax: string;
     total: string;
+    /**
+     * What is left to pay (DEC-173): the total less the payments recorded
+     * so far while it is owed, "0.00" once paid or void. Absent from an API
+     * older than the payments ledger: read the total.
+     */
+    leftToPay?: string;
+    /**
+     * What has come in so far (DEC-173): live payments, a waiting cheque
+     * included, a removed or bounced one not. Absent from an older API:
+     * read "0.00", or the total once paid.
+     */
+    paidSoFar?: string;
+    /** Issued, with some paid and some left: derived, never a status. */
+    partlyPaid?: boolean;
+    /** A live cheque on it is waiting for the bank. */
+    chequeWaiting?: boolean;
+    /** On the detail read only: the ledger, oldest first as the API sends it. */
+    payments?: InvoicePayment[];
     issuedAt: string | null;
     dueAt: string | null;
     paidAt: string | null;
@@ -270,6 +349,8 @@ export interface Invoice {
     /** On the detail read only; absent from an API before D17: no Send. */
     send?: InvoiceSend;
     sent?: InvoiceSent[];
+    /** On the detail read only: every share by hand, newest first. */
+    shared?: InvoiceShared[];
     /**
      * "How to pay us" (R32, #833), on the detail read of an unpaid invoice:
      * the paper prints it, as the PDF does. Null when none is set; absent
@@ -315,6 +396,56 @@ export async function listInvoices(): Promise<CappedList<Invoice>> {
         getJson<Invoice[]>(`${base}/invoices?view=overdue`),
     ]);
     return withLive(newest ?? [], issued ?? [], overdue ?? []);
+}
+
+/** What the API narrows the list by (DEC-173, U4): `GET invoices?…`. */
+export interface InvoiceListAsk {
+    /** A name, part of a number, or an amount. */
+    q?: string;
+    /** Only a cheque not in the bank: the cheques line. */
+    view?: "cheques";
+    /** Money received from this day on: the strip's Paid this month. */
+    paidFrom?: string;
+    /** One pack's or course's, as `listInvoicesIn` reads them (D18). */
+    packId?: string;
+    courseId?: string;
+}
+
+/**
+ * The list as the API narrows it (DEC-173, U8): a search, the cheques
+ * waiting, or what was paid this month, found on the server however old,
+ * where the newest page would miss them. A failed read throws, as every
+ * list read does: never an empty list.
+ */
+export async function listInvoicesBy(
+    ask: InvoiceListAsk,
+): Promise<CappedList<Invoice>> {
+    const base = await orgBase();
+    if (!base) return { rows: [], truncated: false };
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(ask)) {
+        if (typeof value === "string" && value !== "") query.set(key, value);
+    }
+    const rows = (await getJson<Invoice[]>(`${base}/invoices?${query}`)) ?? [];
+    return { rows, truncated: rows.length >= LIST_LIMIT };
+}
+
+/**
+ * The money strip's one read (`GET invoices/summary`, DEC-173 U4). Null
+ * when it couldn't be read: the strip then says "Couldn't load totals"
+ * with Try again, and the list below still loads. Never a row of zeros.
+ */
+export async function readInvoiceSummary(): Promise<InvoiceSummary | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    try {
+        const res = await apiFetch(`${base}/invoices/summary`);
+        if (!res.ok) return null;
+        return (await res.json()) as InvoiceSummary;
+    } catch {
+        // Logged by the API; here it is the strip's own failed state.
+        return null;
+    }
 }
 
 /**
@@ -504,5 +635,29 @@ export function remindInvoice(id: string) {
         "POST",
         {},
         "Couldn't send that reminder.",
+    );
+}
+
+/**
+ * Remind many (DEC-173, U5): how each picked invoice's reminder would go,
+ * and the words the first email one gets. Home's Remind all asks it with
+ * `quietDays` (DEC-171, U8).
+ */
+export function previewReminders(ask: ReminderAsk) {
+    return send<ReminderPreview>(
+        "/reminders/preview",
+        "POST",
+        ask,
+        "Couldn't read who owes you.",
+    );
+}
+
+/** Send them: the email ones go, each read again as Send reminder does. */
+export function sendReminders(ask: ReminderAsk) {
+    return send<ReminderSendResult>(
+        "/reminders",
+        "POST",
+        ask,
+        "Couldn't send those reminders.",
     );
 }

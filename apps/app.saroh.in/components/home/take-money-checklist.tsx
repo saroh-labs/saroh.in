@@ -1,18 +1,12 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-
 import { useCanChangePlan } from "@/components/billing/plan-way";
 import { PlanAsides, readyRows } from "@/components/settings/ready-rows";
 import { SetupChecklist } from "@/components/shared/setup-checklist";
 import type { ReadyChecklist } from "@/lib/settings/ready";
-import {
-    checklistWords,
-    readSetupHidden,
-    SETUP_HIDDEN_KEY,
-    takeMoneyPlace,
-    writeSetupHidden,
-} from "@/lib/settings/ready";
+import { checklistWords, takeMoneyPlace } from "@/lib/settings/ready";
+
+import { setSetupHidden, useSetupHidden } from "./use-setup-hidden";
 
 /**
  * "Finish setup" on Home ("Saroh Home" design, F8): the same steps Settings
@@ -37,59 +31,38 @@ import {
  *
  * Hide is per person, per business, in this browser (default 123): there is
  * no per-person preference store on the server to keep it in. Both slots
- * read one store so hiding in one moves the other at once; a browser that
- * won't store it still hides it for this visit.
+ * read one store (`use-setup-hidden.ts`) so hiding in one moves the other
+ * at once, and Settings › Business's "Show setup on Home" brings it back
+ * (A4).
+ *
+ * At a desk, Home A draws the foot's checklist as one line (`compact`,
+ * `HAPageD`): the next step and "Show the 5 done steps".
  */
 
 type Slot = "first" | "late";
-
-const HIDE_EVENT = "saroh:setup-hidden";
-/** This visit's choice, for a browser whose storage refused it. */
-const remembered = new Map<string, boolean>();
-
-const storage = () => window.localStorage;
-
-function subscribe(onChange: () => void) {
-    const onStorage = (e: StorageEvent) => {
-        if (e.key === SETUP_HIDDEN_KEY) onChange();
-    };
-    window.addEventListener(HIDE_EVENT, onChange);
-    window.addEventListener("storage", onStorage);
-    return () => {
-        window.removeEventListener(HIDE_EVENT, onChange);
-        window.removeEventListener("storage", onStorage);
-    };
-}
-
-function isHidden(businessId: string) {
-    return remembered.get(businessId) ?? readSetupHidden(storage, businessId);
-}
-
-function setHidden(businessId: string, hidden: boolean) {
-    if (writeSetupHidden(storage, businessId, hidden)) {
-        remembered.delete(businessId);
-    } else {
-        remembered.set(businessId, hidden);
-    }
-    window.dispatchEvent(new Event(HIDE_EVENT));
-}
 
 export function TakeMoneyChecklist({
     list,
     businessId,
     slot,
+    compact = false,
+    phoneOwnCard = false,
 }: {
     list: ReadyChecklist;
     businessId: string;
     slot: Slot;
+    /**
+     * One line rather than the card, while steps are left (Home A at a
+     * desk, `HAPageD`): the next step, and the done ones folded.
+     */
+    compact?: boolean;
+    /**
+     * Below 640px the phone Home draws its own card while setup leads
+     * (U17, `HPStates`): this one is then the desk's alone.
+     */
+    phoneOwnCard?: boolean;
 }) {
-    // The server can't see the browser's storage, so it draws the checklist
-    // shown; a hidden one steps aside right after hydration.
-    const hidden = useSyncExternalStore(
-        subscribe,
-        () => isHidden(businessId),
-        () => false,
-    );
+    const hidden = useSetupHidden(businessId);
     // A step that is the way to another plan is a plan prompt.
     const canChangePlan = useCanChangePlan();
     const place = takeMoneyPlace(list, hidden);
@@ -110,10 +83,14 @@ export function TakeMoneyChecklist({
             rows={readyRows(list.steps, canChangePlan)}
             hide={{
                 hidden,
-                onHide: () => setHidden(businessId, true),
-                onShow: () => setHidden(businessId, false),
-                said: "Setup hidden. Show it again from the bottom of Home.",
+                onHide: () => setSetupHidden(businessId, true),
+                onShow: () => setSetupHidden(businessId, false),
+                said: "Setup hidden. Show it again from the bottom of Home or Settings › Business.",
             }}
+            compact={compact}
+            className={
+                phoneOwnCard && place === "first" ? "max-sm:hidden" : undefined
+            }
             // One line on the next visit, then Home is left to the work.
             fold="once"
             foldKey={`home:${businessId}`}

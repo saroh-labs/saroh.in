@@ -1,174 +1,182 @@
 import { describe, expect, it } from "vitest";
 
-import type { HomeWeek } from "./service";
+import type { HomeGoing } from "./service";
 import {
-    bookingsLine,
-    changeLine,
+    goingCards,
+    goingIntro,
+    MONTH_HREF,
     owedLine,
-    showsWeek,
-    sinceMonday,
-    weekRows,
+    showsGoing,
 } from "./week";
 
-const MONDAY = "2026-09-13T18%3A30%3A00.000Z";
-
-function week(over: Partial<HomeWeek> = {}): HomeWeek {
-    return { zone: "Asia/Kolkata", startDate: "2026-09-14", ...over };
+/** Rye & Co. on a Monday, 19 Oct (board `HAPageD`). */
+function going(over: Partial<HomeGoing> = {}): HomeGoing {
+    return {
+        zone: "Asia/Kolkata",
+        from: "2026-10-13",
+        to: "2026-10-19",
+        beforeFrom: "2026-10-06",
+        beforeTo: "2026-10-12",
+        ...over,
+    };
 }
 
-describe("the words", () => {
-    it("says how the takings compare", () => {
-        expect(changeLine({ kind: "UP", percent: 12 })).toBe(
-            "Up 12% on the same days last week",
-        );
-        expect(changeLine({ kind: "DOWN", percent: 8 })).toBe(
-            "Down 8% on the same days last week",
-        );
-        expect(changeLine({ kind: "LEVEL", percent: 0 })).toBe(
-            "Level with last week",
-        );
-        expect(changeLine({ kind: "THIN" })).toBe(
-            "Not enough last week to compare",
-        );
-    });
+const SALES = {
+    currency: "INR",
+    amountMinor: 4_825_000,
+    beforeMinor: 4_308_000,
+    change: { kind: "UP" as const, percent: 12 },
+    href: "/billing/invoices?since=x",
+};
 
-    it("compares the bookings by how many more or fewer", () => {
-        expect(bookingsLine(14, 11)).toBe("3 more than last week");
-        expect(bookingsLine(9, 11)).toBe("2 fewer than last week");
-        expect(bookingsLine(4, 4)).toBe("Same as last week");
-        expect(bookingsLine(4, 0)).toBe("Nothing booked last week to compare");
-    });
+const OWED = {
+    totals: [{ currency: "INR", amountMinor: 3_297_000 }],
+    bills: 16,
+    overdue: 10,
+    byAge: {
+        notDue: { count: 6, totals: null, href: "/a" },
+        late1to30: { count: 7, totals: null, href: "/b" },
+        lateOver30: { count: 3, totals: null, href: "/c" },
+    },
+    href: "/billing/invoices?view=unpaid",
+};
 
-    it("dates the orders from the business's Monday", () => {
-        expect(sinceMonday("2026-09-14")).toBe("Since Monday 14 Sep");
-        expect(sinceMonday("2026-12-28")).toBe("Since Monday 28 Dec");
-        // A date it can't read still says what the count is since.
-        expect(sinceMonday("")).toBe("Since Monday");
+describe("How it's going's words", () => {
+    it("names the days it compares", () => {
+        expect(goingIntro(going())).toBe(
+            "The last 7 days, 13 to 19 Oct, compared with the 7 days before",
+        );
+        // Across a month end.
+        expect(
+            goingIntro(going({ from: "2026-09-28", to: "2026-10-04" })),
+        ).toBe(
+            "The last 7 days, 28 Sep to 4 Oct, compared with the 7 days before",
+        );
+        // Days it can't read still say what it compares.
+        expect(goingIntro(going({ from: "", to: "" }))).toBe(
+            "The last 7 days, compared with the 7 days before",
+        );
     });
 
     it("counts the bills owed and the overdue among them", () => {
-        const owed = { totals: [], href: "/x" };
-        expect(owedLine({ ...owed, bills: 3, overdue: 1 })).toBe(
-            "3 bills · 1 overdue",
+        expect(owedLine({ bills: 16, overdue: 10 })).toBe(
+            "16 bills · 10 overdue",
         );
-        expect(owedLine({ ...owed, bills: 1, overdue: 0 })).toBe("1 bill");
-        expect(owedLine({ ...owed, bills: 0, overdue: 0 })).toBe(
-            "Nothing unpaid",
-        );
+        expect(owedLine({ bills: 1, overdue: 0 })).toBe("1 bill");
+        expect(owedLine({ bills: 0, overdue: 0 })).toBe("All bills paid");
     });
 });
 
-describe("weekRows", () => {
-    it("draws the design's rows for Rye, in its order", () => {
-        const rows = weekRows(
-            week({
-                takings: [
-                    {
-                        currency: "INR",
-                        amountMinor: 1_845_000,
-                        lastWeekMinor: 1_647_000,
-                        change: { kind: "UP", percent: 12 },
-                        href: `/billing/invoices?since=${MONDAY}`,
-                    },
-                ],
-                orders: {
-                    count: 23,
-                    href: `/commerce/orders?since=${MONDAY}`,
-                },
-                owed: {
-                    totals: [{ currency: "INR", amountMinor: 640_000 }],
-                    bills: 3,
-                    overdue: 1,
-                    href: "/billing/invoices?view=overdue",
-                },
+describe("goingCards", () => {
+    it("draws the busy day's four cards, in the board's order", () => {
+        const cards = goingCards(
+            going({
+                sales: [SALES],
+                bookings: { count: 22, before: 18, href: "/bookings" },
+                orders: { count: 41, before: 35, href: "/commerce/orders" },
+                owed: OWED,
             }),
         );
-        expect(rows.map((r) => [r.label, r.value, r.sub, r.bad])).toEqual([
-            [
-                "Sales so far",
-                "₹18,450",
-                "Up 12% on the same days last week",
-                false,
-            ],
-            ["Orders this week", "23", "Since Monday 14 Sep", false],
-            ["Owed to you", "₹6,400", "3 bills · 1 overdue", true],
+        expect(cards.map((c) => [c.label, c.value, c.sub, c.tone])).toEqual([
+            ["Sales", "₹48,250", "Up 12% on the 7 days before", "up"],
+            ["Bookings", "22", "4 more than the 7 days before", "up"],
+            ["Orders", "41", "6 more than the 7 days before", "up"],
+            ["Owed to you", "₹32,970", "16 bills · 10 overdue", "bad"],
         ]);
-        expect(rows.map((r) => r.href)).toEqual([
-            `/billing/invoices?since=${MONDAY}`,
-            `/commerce/orders?since=${MONDAY}`,
-            "/billing/invoices?view=overdue",
+        expect(cards.map((c) => c.href)).toEqual([
+            SALES.href,
+            "/bookings",
+            "/commerce/orders",
+            OWED.href,
         ]);
     });
 
-    it("says takings down in the danger colour", () => {
-        const [row] = weekRows(
-            week({
-                takings: [
-                    {
-                        currency: "INR",
-                        amountMinor: 500_000,
-                        lastWeekMinor: 800_000,
-                        change: { kind: "DOWN", percent: 38 },
-                        href: "/x",
-                    },
-                ],
-            }),
+    it("on a Monday compares 7 days with 7, never a week just started", () => {
+        // A Monday morning with a busy last week: the last 7 days run
+        // Tuesday to Monday, so nothing reads "0 · 19 fewer".
+        const [bookings] = goingCards(
+            going({ bookings: { count: 22, before: 18, href: "/b" } }),
         );
-        expect(row.bad).toBe(true);
+        expect(bookings.value).toBe("22");
+        expect(bookings.sub).not.toMatch(/last week|0 ·/);
     });
 
-    it("leaves out takings before any money has come in, and orders before any is placed", () => {
-        const rows = weekRows(
-            week({
-                takings: [
+    it("says a quiet week plainly (board `HAQuietD`)", () => {
+        const cards = goingCards(
+            going({
+                sales: [
                     {
-                        currency: "INR",
+                        ...SALES,
+                        amountMinor: 986_000,
+                        beforeMinor: 980_000,
+                        change: { kind: "LEVEL", percent: 1 },
+                    },
+                ],
+                bookings: { count: 9, before: 9, href: "/b" },
+                orders: { count: 12, before: 14, href: "/o" },
+                owed: { ...OWED, totals: [], bills: 0, overdue: 0 },
+            }),
+        );
+        expect(cards.map((c) => [c.value, c.sub, c.tone])).toEqual([
+            ["₹9,860", "About the same as the 7 days before", "plain"],
+            ["9", "Same as the 7 days before", "plain"],
+            ["12", "2 fewer than the 7 days before", "plain"],
+            ["Nothing", "All bills paid", "plain"],
+        ]);
+    });
+
+    it("says nothing came in, in words, and marks the fall", () => {
+        const [sales] = goingCards(
+            going({
+                sales: [
+                    {
+                        ...SALES,
                         amountMinor: 0,
-                        lastWeekMinor: 0,
-                        change: { kind: "THIN" },
-                        href: "/x",
+                        change: { kind: "DOWN", percent: 100 },
                     },
                 ],
-                orders: { count: 0, href: "/y" },
-                bookings: { count: 0, lastWeek: 3, href: "/bookings" },
             }),
         );
-        expect(rows.map((r) => [r.label, r.value, r.sub])).toEqual([
-            ["Bookings this week", "0", "3 fewer than last week"],
-        ]);
+        expect(sales.value).toBe("Nothing");
+        expect(sales.sub).toBe("Down from ₹43,080 in the 7 days before");
+        expect(sales.sub).not.toContain("100%");
+        expect(sales.tone).toBe("bad");
     });
 
-    it("shows a Member only what the API sent them: bookings, no money", () => {
-        const rows = weekRows(
-            week({ bookings: { count: 6, lastWeek: 6, href: "/bookings" } }),
+    it("gives a role without money counts only (board `HAMemberD`)", () => {
+        // The API sends no sales and no owed amounts without `payment:read`.
+        const cards = goingCards(
+            going({
+                bookings: { count: 22, before: 18, href: "/b" },
+                orders: { count: 41, before: 35, href: "/o" },
+            }),
         );
-        expect(rows.map((r) => r.key)).toEqual(["bookings"]);
+        expect(cards.map((c) => c.label)).toEqual(["Bookings", "Orders"]);
+        expect(cards.some((c) => c.value.includes("₹"))).toBe(false);
     });
 
-    it("says all paid rather than inventing a currency for nothing owed", () => {
-        const [row] = weekRows(
-            week({ owed: { totals: [], bills: 0, overdue: 0, href: "/x" } }),
-        );
-        expect(row).toMatchObject({
-            value: "All invoices paid",
-            sub: "Nothing unpaid",
-            bad: false,
-        });
+    it("says what is owed in bills when the amounts are not theirs", () => {
+        const [owed] = goingCards(going({ owed: { ...OWED, totals: null } }));
+        expect(owed.value).toBe("16 bills");
+        expect(owed.value).not.toContain("₹");
+    });
+
+    it("draws nothing it wasn't sent", () => {
+        expect(goingCards(null)).toEqual([]);
+        expect(goingCards(going())).toEqual([]);
     });
 });
 
-describe("showsWeek", () => {
-    const some = week({
-        bookings: { count: 2, lastWeek: 1, href: "/bookings" },
+describe("showsGoing", () => {
+    it("is left out for a business with nothing yet, or nothing to show", () => {
+        const g = going({ bookings: { count: 1, before: 0, href: "/b" } });
+        expect(showsGoing(g, false)).toBe(true);
+        expect(showsGoing(g, true)).toBe(false);
+        expect(showsGoing(going(), false)).toBe(false);
+        expect(showsGoing(null, false)).toBe(false);
     });
 
-    it("draws the panel when there's a row to show", () => {
-        expect(showsWeek(some, false)).toBe(true);
-    });
-
-    it("draws nothing for a new business, an older API, or an empty week", () => {
-        expect(showsWeek(some, true)).toBe(false);
-        expect(showsWeek(null, false)).toBe(false);
-        expect(showsWeek(week(), false)).toBe(false);
+    it("leads into Insights on 4 weeks (A10)", () => {
+        expect(MONTH_HREF).toBe("/analytics?period=4w");
     });
 });

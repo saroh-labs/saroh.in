@@ -14,10 +14,11 @@ import {
     NotFoundException,
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
-import { prisma } from "@saroh/database";
+import { backfillInvoicePayments, prisma } from "@saroh/database";
 
 import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { InvoicesService } from "../invoices/invoices.service";
 import { hashPayToken } from "../invoices/pay-token";
 import { BookingsService } from "./bookings.service";
 import { DESK_REFUSED } from "./desk-take";
@@ -236,6 +237,29 @@ describe("taking payment at the desk (P2, real database)", () => {
         // At the price it was booked at, not the service's price now.
         expect(invoices[0]!.total.toString()).toBe("500");
         expect(invoices[0]!.paidAt).toEqual(NOW);
+        // One Cash payment on its ledger (DEC-173), by the person at the
+        // desk; the invoice is PAID because of it.
+        expect(invoices[0]!.paidCents).toBe(50_000);
+        await expect(
+            prisma.invoicePayment.findMany({
+                where: { invoiceId: paid.invoiceId },
+                select: {
+                    amountCents: true,
+                    method: true,
+                    note: true,
+                    receivedAt: true,
+                    recordedById: true,
+                },
+            }),
+        ).resolves.toEqual([
+            {
+                amountCents: 50_000,
+                method: "CASH",
+                note: "Taken at the desk",
+                receivedAt: NOW,
+                recordedById: owner.userId,
+            },
+        ]);
 
         const after = await bookings.getBooking(owner, booking.id);
         expect(after.money).toMatchObject({
@@ -311,6 +335,13 @@ describe("taking payment at the desk (P2, real database)", () => {
         expect(balance.number).toBeTruthy();
         expect(balance.number).not.toBe(deposit.number);
         expect(balance.lines[0]?.description).toBe("Balance for Check-up");
+        // The balance's one payment, on its own ledger (DEC-173).
+        await expect(
+            prisma.invoicePayment.findMany({
+                where: { invoiceId: balance.id },
+                select: { amountCents: true, method: true },
+            }),
+        ).resolves.toEqual([{ amountCents: 40_000, method: "CARD" }]);
         // The deposit's invoice is never touched (DEC-023).
         await expect(
             prisma.invoice.findUnique({ where: { id: deposit.id } }),
@@ -415,6 +446,41 @@ describe("taking payment at the desk (P2, real database)", () => {
         await expect(bookings.payLink(owner, booking.id, NOW)).rejects.toThrow(
             "already paid",
         );
+        await expect(
+            prisma.invoicePayment.count({ where: { invoiceId: issued!.id } }),
+        ).resolves.toBe(1);
+    });
+
+    it("a pay link out on an invoice part paid by hand: the desk takes only what is left (DEC-173)", async () => {
+        const booking = await book({ paidWith: null });
+        await bookings.payLink(owner, booking.id, NOW);
+        const [issued] = await prisma.invoice.findMany({
+            where: { bookingId: booking.id },
+        });
+        await new InvoicesService().recordPayment(owner, issued!.id, {
+            method: "UPI",
+            amount: "200.00",
+        });
+        const before = await bookings.getBooking(owner, booking.id);
+        expect(before.money.take).toEqual({ cents: 30_000, byLink: true });
+
+        await take(owner, booking.id, { method: "CASH", amountCents: 30_000 });
+        await expect(
+            prisma.invoicePayment.findMany({
+                where: { invoiceId: issued!.id },
+                orderBy: { createdAt: "asc" },
+                select: { amountCents: true, method: true },
+            }),
+        ).resolves.toEqual([
+            { amountCents: 20_000, method: "UPI" },
+            { amountCents: 30_000, method: "CASH" },
+        ]);
+        await expect(
+            prisma.invoice.findUniqueOrThrow({
+                where: { id: issued!.id },
+                select: { status: true, paidCents: true },
+            }),
+        ).resolves.toEqual({ status: "PAID", paidCents: 50_000 });
     });
 
     it("a double click takes it once, and answers the second the same", async () => {
@@ -612,5 +678,43 @@ describe("taking payment at the desk (P2, real database)", () => {
             amountCents: 50_000,
         });
         expect(paid.amountCents).toBe(50_000);
+    });
+});
+
+describe("the ledger backfill after desk payments (DEC-173)", () => {
+    it("finds every booking invoice the desk paid already has its payment, and writes nothing", async () => {
+        const desk = await prisma.invoice.count({
+            where: {
+                organizationId: owner.organizationId,
+                status: "PAID",
+                paymentNote: "Taken at the desk",
+            },
+        });
+        expect(desk).toBeGreaterThan(0);
+        const report = await backfillInvoicePayments(prisma, {
+            organizationIds: [owner.organizationId],
+            dryRun: true,
+        });
+        // Only paper paid before the ledger reached its writer would be
+        // filled: the deposits these cases wrote straight to the table.
+        const filled = report.written;
+        const legacy = await prisma.invoice.count({
+            where: {
+                organizationId: owner.organizationId,
+                status: "PAID",
+                orderId: null,
+                kind: { not: "CREDIT_NOTE" },
+                payments: { none: {} },
+            },
+        });
+        expect(filled).toBe(legacy);
+        const deskWithout = await prisma.invoice.count({
+            where: {
+                organizationId: owner.organizationId,
+                paymentNote: "Taken at the desk",
+                payments: { none: {} },
+            },
+        });
+        expect(deskWithout).toBe(0);
     });
 });

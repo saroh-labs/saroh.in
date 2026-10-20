@@ -1,5 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
+import { toMinor } from "../../common/money";
+
 /**
  * What an invoice is, as the merchant reads it.
  *
@@ -40,20 +42,51 @@ export const INVOICE_VIEWS = [
     "overdue",
     "paid",
     "void",
+    // DEC-173 (U4): due and overdue together, as the money strip's Owed
+    // counts them; and invoices with a cheque not in the bank yet.
+    "owed",
+    "cheques",
 ] as const;
 export type InvoiceView = (typeof INVOICE_VIEWS)[number];
 
 export type InvoiceStanding =
     "DRAFT" | "ISSUED" | "OVERDUE" | "PAID" | "VOID" | "CREDITED";
 
-export const PAYMENT_METHODS = [
+/**
+ * The ways money is taken by hand that need nothing more than a word: what
+ * an order is marked paid or refunded with, and what an invoice's Record
+ * payment takes until the ledger API (DEC-173, U2) adds cheques to it. A
+ * cheque needs a bank status, which only the invoice ledger keeps.
+ */
+export const HAND_PAYMENT_METHODS = [
     "CASH",
     "UPI",
     "BANK_TRANSFER",
     "CARD",
     "OTHER",
 ] as const;
+export type HandPaymentMethod = (typeof HAND_PAYMENT_METHODS)[number];
+
+/** A cheque on an invoice (DEC-173): recorded as received, with a bank status. */
+export const CHEQUE_PAYMENT_METHOD = "CHEQUE";
+
+/**
+ * Every way a payment is recorded by hand on an invoice's ledger (DEC-173):
+ * the hand methods and a cheque. ONLINE is never one of them.
+ */
+export const PAYMENT_METHODS = [
+    ...HAND_PAYMENT_METHODS,
+    CHEQUE_PAYMENT_METHOD,
+] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+/**
+ * Where a cheque is (DEC-173). WAITING counts as received; CLEARED is in
+ * the bank; BOUNCED leaves the money owed again (no bounce charge). Null
+ * on every payment that isn't a cheque.
+ */
+export const BANK_STATUSES = ["WAITING", "CLEARED", "BOUNCED"] as const;
+export type BankStatus = (typeof BANK_STATUSES)[number];
 
 /**
  * How an invoice paid through its pay link (U13) is recorded. Written only by
@@ -61,6 +94,15 @@ export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
  * it is not one of {@link PAYMENT_METHODS}.
  */
 export const ONLINE_PAYMENT_METHOD = "ONLINE";
+
+/**
+ * Every method a ledger row can hold (the migration's
+ * `InvoicePayment_method_check`).
+ */
+export const LEDGER_PAYMENT_METHODS = [
+    ...PAYMENT_METHODS,
+    ONLINE_PAYMENT_METHOD,
+] as const;
 
 /**
  * The attempt the webhook writes when money arrives for an invoice that was
@@ -168,16 +210,40 @@ export const OWED_WHERE = {
     kind: { not: "CREDIT_NOTE" },
 } as const;
 
+/**
+ * A payment that counts (DEC-173): not removed, and not a bounced cheque.
+ * A cheque still waiting for the bank counts as received. The where-form
+ * of `isLive` (`invoice-ledger.ts`); `bankStatus` is null on anything but
+ * a cheque, and SQL's `<>` would drop those, hence the OR.
+ */
+export const LIVE_PAYMENT_WHERE = {
+    removedAt: null,
+    OR: [{ bankStatus: null }, { bankStatus: { not: "BOUNCED" } }],
+} satisfies Prisma.InvoicePaymentWhereInput;
+
+/**
+ * A cheque received and not in the bank yet (DEC-173): waiting, and not
+ * removed. "Cheques not in the bank" on the list and on Home counts these.
+ */
+export const WAITING_CHEQUE_WHERE = {
+    removedAt: null,
+    bankStatus: "WAITING",
+} satisfies Prisma.InvoicePaymentWhereInput;
+
+/**
+ * Owed, as the money strip and Home count it: issued, not an order's own
+ * paper and not a credit note (`OWED_WHERE`), overdue ones included.
+ */
+export const OWED_VIEW_WHERE = {
+    status: "ISSUED",
+    ...OWED_WHERE,
+} satisfies Prisma.InvoiceWhereInput;
+
 /** The `where` for one list view. `now` splits Issued from Overdue. */
 export function viewWhere(
     view: InvoiceView,
     now: Date,
-): {
-    status: InvoiceStatus;
-    OR?: object[];
-    dueAt?: object;
-    kind?: object;
-} {
+): Prisma.InvoiceWhereInput {
     switch (view) {
         case "draft":
             return { status: "DRAFT" };
@@ -194,5 +260,65 @@ export function viewWhere(
             return { status: "PAID" };
         case "void":
             return { status: "VOID" };
+        case "owed":
+            return { ...OWED_VIEW_WHERE };
+        case "cheques":
+            return { payments: { some: WAITING_CHEQUE_WHERE } };
     }
+}
+
+/**
+ * What is left to pay on an invoice, in paise (DEC-173): its total less
+ * the live payments cached in `paidCents`. Never below 0. The one place
+ * this is worked out; every owed sum reads it.
+ */
+export function leftToPayCents(invoice: {
+    total: { toString(): string };
+    paidCents: number;
+}): number {
+    return Math.max(0, toMinor(invoice.total) - invoice.paidCents);
+}
+
+/**
+ * Partly paid (DEC-173): issued, with some money in and some still to pay.
+ * Derived like Overdue, never stored as a status.
+ */
+export function isPartlyPaid(invoice: {
+    status: string;
+    total: { toString(): string };
+    paidCents: number;
+}): boolean {
+    return (
+        invoice.status === "ISSUED" &&
+        invoice.paidCents > 0 &&
+        leftToPayCents(invoice) > 0
+    );
+}
+
+/**
+ * Paid so far on an invoice, in paise, as every read says it (DEC-173):
+ * the ledger's cache, except that a PAID invoice has paid its total. That
+ * covers an order's invoice (the order is its ledger, so it has no rows)
+ * and one paid before the ledger reached its writer.
+ */
+export function paidSoFarCents(invoice: {
+    status: string;
+    total: { toString(): string };
+    paidCents: number;
+}): number {
+    if (invoice.status === "PAID") return toMinor(invoice.total);
+    return invoice.paidCents;
+}
+
+/**
+ * What is still to pay on an invoice now, in paise: what is left on an
+ * issued invoice, and nothing on any other (paid, void, credited, a
+ * draft). What a pay link charges and the public read's `leftToPay`.
+ */
+export function owedNowCents(invoice: {
+    status: string;
+    total: { toString(): string };
+    paidCents: number;
+}): number {
+    return invoice.status === "ISSUED" ? leftToPayCents(invoice) : 0;
 }

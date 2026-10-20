@@ -33,7 +33,9 @@ export function shellLoadingWords(pathname: string): ShellLoadingWords {
     if (pathname === "/") {
         return {
             breadcrumb: ["Home"],
-            shape: "dashboard",
+            // Home's own shape (DEC-171, `HALoadingD`): tiles, then Needs
+            // you with Today beside it.
+            shape: "home",
             label: "Loading Home",
         };
     }

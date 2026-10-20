@@ -8,14 +8,18 @@ import {
 } from "@nestjs/common";
 import { prisma, runInOrgContext } from "@saroh/database";
 
-import { toMoneyString } from "../../common/money";
+import { fromMinor, toMoneyString } from "../../common/money";
 import { holdState } from "../bookings/booking-hold";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { addedLine } from "../invoices/added-line";
 import type { GstOnPrice } from "../invoices/gst-price";
 import { printedSeller } from "../invoices/invoice-paper-view";
 import type { InvoiceStanding } from "../invoices/invoice-state";
-import { invoiceStanding } from "../invoices/invoice-state";
+import {
+    invoiceStanding,
+    owedNowCents,
+    paidSoFarCents,
+} from "../invoices/invoice-state";
 import { isBillOfSupply } from "../invoices/invoice-title";
 import { invoiceLineGst } from "../invoices/line-gst-words";
 import { payLinkUrlFor } from "../invoices/pay-link-url";
@@ -89,6 +93,14 @@ export interface PublicInvoiceView {
     }[];
     tax: string;
     total: string;
+    /**
+     * Paid so far and what is left to pay (DEC-173), as money strings:
+     * "1000.00" and "1500.00" on a ₹2,500 invoice part paid. A paid
+     * invoice has paid its total and has nothing left; a void one has
+     * nothing left. A pay link charges `leftToPay`.
+     */
+    paidSoFar: string;
+    leftToPay: string;
     currency: string;
     /** Overdue is derived, as in the workspace. Void means not payable. */
     status: Exclude<InvoiceStanding, "DRAFT">;
@@ -188,6 +200,7 @@ export async function invoicePaper(
             dueAt: true,
             tax: true,
             total: true,
+            paidCents: true,
             currency: true,
             billToName: true,
             kind: true,
@@ -249,6 +262,8 @@ export async function invoicePaper(
         }),
         tax: toMoneyString(invoice.tax),
         total: toMoneyString(invoice.total),
+        paidSoFar: fromMinor(paidSoFarCents(invoice)),
+        leftToPay: fromMinor(owedNowCents(invoice)),
         currency: invoice.currency,
         status: invoiceStanding(invoice, new Date()) as Exclude<
             InvoiceStanding,
@@ -539,7 +554,8 @@ export class PublicInvoicesService {
     }
 
     /**
-     * Start paying: an intent for the invoice's own total, through the
+     * Start paying: an intent for what is left to pay on the invoice
+     * (DEC-173; its total, until part of it is paid), through the
      * business's own connected provider. `body` is read by hand, not by a
      * DTO, so anything but `provider` and `idempotencyKey` — an `amount`,
      * say — is ignored rather than refused.
@@ -570,6 +586,9 @@ export class PublicInvoicesService {
                     organizationId: true,
                     status: true,
                     total: true,
+                    // What was paid so far (DEC-173): the intent is for
+                    // what is left.
+                    paidCents: true,
                     currency: true,
                     source: true,
                     subscriptionId: true,
