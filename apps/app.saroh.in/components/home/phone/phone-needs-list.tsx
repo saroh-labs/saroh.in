@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { ComponentPropsWithRef } from "react";
 import { useId, useState, useTransition } from "react";
 
+import { phoneChequesAt, totalWithCheques } from "@/lib/home/cheques";
 import type { GroupLine } from "@/lib/home/group-words";
 import {
     groupsCountLabel,
@@ -13,9 +14,18 @@ import {
     phoneGroupTitle,
 } from "@/lib/home/group-words";
 import { openTotal } from "@/lib/home/inline-actions";
-import { couldntCheckLine, phoneLines } from "@/lib/home/phone-home";
-import type { HomeNeedGroup, HomeUnavailable } from "@/lib/home/service";
+import {
+    couldntCheckLine,
+    PHONE_LINES,
+    phoneLines,
+} from "@/lib/home/phone-home";
+import type {
+    HomeChequesWaiting,
+    HomeNeedGroup,
+    HomeUnavailable,
+} from "@/lib/home/service";
 
+import { PhoneChequesLine } from "../cheques-line";
 import { GROUP_ICONS } from "../need-group";
 import { useInlineActions } from "../use-inline-actions";
 import { NeedSheet } from "./need-sheet";
@@ -28,6 +38,10 @@ import { NeedSheet } from "./need-sheet";
  * groups, less what was done here; with a part that couldn't be read it
  * says "13 we could check", and the first line says what couldn't be
  * checked, with Try again: one message, not a banner and a line.
+ *
+ * "Cheques not in the bank" (plan U18) is one of the five while a cheque
+ * waits: a money line, under the bills line or in its place, counted as
+ * one thing, opening the invoices list filtered to those cheques.
  */
 export function PhoneNeeds({
     groups,
@@ -36,6 +50,7 @@ export function PhoneNeeds({
     unavailable,
     fresh = false,
     dueToday = 0,
+    cheques = null,
 }: {
     groups: readonly HomeNeedGroup[];
     total: number;
@@ -45,6 +60,8 @@ export function PhoneNeeds({
     fresh?: boolean;
     /** Orders due today, for the orders line's tag when none is late. */
     dueToday?: number;
+    /** Cheques not in the bank (U18); null while none waits. */
+    cheques?: HomeChequesWaiting | null;
 }) {
     const headingId = useId();
     const actions = useInlineActions();
@@ -54,9 +71,13 @@ export function PhoneNeeds({
         .flatMap((g) => g.rows)
         .filter((n) => n.id in actions.done).length;
     const partial = unavailable.length > 0;
-    const said = groupsCountLabel(openTotal(total, doneHere), partial);
-    const lines = phoneLines(groups);
+    const open = openTotal(totalWithCheques(total, cheques), doneHere);
+    const said = groupsCountLabel(open, partial);
+    // The cheques line takes one of the five places.
+    const lines = phoneLines(groups, cheques ? PHONE_LINES - 1 : PHONE_LINES);
     const shown = all ? [...lines.shown, ...lines.folded] : lines.shown;
+    const chequesAt = phoneChequesAt(lines.shown);
+    const any = groups.length > 0 || cheques !== null;
     const couldnt = couldntCheckLine(unavailable);
 
     return (
@@ -78,12 +99,12 @@ export function PhoneNeeds({
                         data-needs-count=""
                         className="inline-flex h-5 min-w-[22px] items-center justify-center rounded-full bg-primary px-[7px] text-[11.5px] font-bold tabular-nums text-primary-foreground"
                     >
-                        {partial ? said : openTotal(total, doneHere)}
+                        {partial ? said : open}
                     </span>
                 ) : null}
             </div>
 
-            {groups.length === 0 && !couldnt ? (
+            {!any && !couldnt ? (
                 <p className="rounded-[14px] border border-border bg-card p-4 text-sm text-neutral-700 dark:text-muted-foreground">
                     {fresh
                         ? "New orders, bookings and enquiries show here."
@@ -91,37 +112,16 @@ export function PhoneNeeds({
                 </p>
             ) : null}
 
-            {groups.length > 0 || couldnt ? (
+            {any || couldnt ? (
                 <ul className="overflow-hidden rounded-[14px] border border-border bg-card">
                     {couldnt ? (
                         <li>
                             <CouldntCheck text={couldnt} />
                         </li>
                     ) : null}
-                    {shown.map((group) => (
-                        <li
-                            key={group.kind}
-                            className="border-t border-border first:border-t-0"
-                        >
-                            <NeedSheet
-                                group={group}
-                                actions={actions}
-                                inProgress={inProgress}
-                                trigger={
-                                    <PhoneNeedLine
-                                        group={group}
-                                        tag={phoneGroupTag(
-                                            group,
-                                            now,
-                                            group.kind === "ORDERS"
-                                                ? dueToday
-                                                : 0,
-                                        )}
-                                    />
-                                }
-                            />
-                        </li>
-                    ))}
+                    {shown.slice(0, chequesAt).map(drawLine)}
+                    {cheques ? <PhoneChequesLine cheques={cheques} /> : null}
+                    {shown.slice(chequesAt).map(drawLine)}
                     {lines.more && !all ? (
                         <li className="border-t border-border">
                             <button
@@ -137,6 +137,31 @@ export function PhoneNeeds({
             ) : null}
         </section>
     );
+
+    function drawLine(group: HomeNeedGroup) {
+        return (
+            <li
+                key={group.kind}
+                className="border-t border-border first:border-t-0"
+            >
+                <NeedSheet
+                    group={group}
+                    actions={actions}
+                    inProgress={inProgress}
+                    trigger={
+                        <PhoneNeedLine
+                            group={group}
+                            tag={phoneGroupTag(
+                                group,
+                                now,
+                                group.kind === "ORDERS" ? dueToday : 0,
+                            )}
+                        />
+                    }
+                />
+            </li>
+        );
+    }
 }
 
 const LINE =

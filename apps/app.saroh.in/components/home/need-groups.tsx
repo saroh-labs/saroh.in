@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { count } from "@/lib/format/plural";
+import { deskChequesAt, totalWithCheques } from "@/lib/home/cheques";
 import type { GroupOneAction } from "@/lib/home/group-body";
 import {
     emptiedLine,
@@ -22,11 +23,13 @@ import {
 import { openTotal } from "@/lib/home/inline-actions";
 import { formatList, IN_PROGRESS_HREF } from "@/lib/home/needs";
 import type {
+    HomeChequesWaiting,
     HomeNeedGroup,
     HomeNeedKind,
     HomeUnavailable,
 } from "@/lib/home/service";
 
+import { DeskChequesLine } from "./cheques-line";
 import { NeedGroup } from "./need-group";
 import { NeedGroupBody } from "./need-group-body";
 import { confirmKey, useInlineActions } from "./use-inline-actions";
@@ -51,6 +54,11 @@ const OPEN_FIRST: readonly HomeNeedKind[] = ["ORDERS"];
  * "Nothing needs you." is said only when every source was read; with a
  * part missing the list says what it couldn't check, and the count says
  * "7 things we could check".
+ *
+ * "Cheques not in the bank" (plan U18, DEC-173) is one line in the money
+ * group, under the bills group or in its place, only while a cheque
+ * waits; it counts as one thing and opens the invoices list filtered to
+ * those cheques. Home never marks a cheque.
  */
 export function NeedGroups({
     groups,
@@ -62,6 +70,7 @@ export function NeedGroups({
     dueToday = 0,
     defaultOpen = OPEN_FIRST,
     remindAll,
+    cheques = null,
 }: {
     groups: readonly HomeNeedGroup[];
     /** The sum of every group's count. */
@@ -79,6 +88,8 @@ export function NeedGroups({
     defaultOpen?: readonly HomeNeedKind[];
     /** The bills group's Remind all (U8), drawn before See bills. */
     remindAll?: (group: HomeNeedGroup) => ReactNode;
+    /** Cheques not in the bank (U18); null while none waits. */
+    cheques?: HomeChequesWaiting | null;
 }) {
     const headingId = useId();
     const [open, setOpen] = useState<ReadonlySet<HomeNeedKind>>(
@@ -129,7 +140,15 @@ export function NeedGroups({
         actions.openFor(confirmKey(rowId));
     };
 
-    const said = groupsCountLabel(openTotal(total, doneHere), partial);
+    const said = groupsCountLabel(
+        openTotal(totalWithCheques(total, cheques), doneHere),
+        partial,
+    );
+    const lines = groups.length > 0 || cheques !== null;
+    const chequesAt = deskChequesAt(groups);
+    const chequesLine = cheques ? (
+        <DeskChequesLine key="cheques" cheques={cheques} />
+    ) : null;
     const onItsWay = onItsWayLabel(inProgress);
 
     return (
@@ -153,14 +172,14 @@ export function NeedGroups({
                         tone="muted"
                         className="text-[12.5px] coarse:min-h-11"
                     >
-                        {groups.length > 0
+                        {lines
                             ? onItsWay
                             : `${count(inProgress, "order")} in progress`}
                     </TextLink>
                 ) : null}
             </div>
 
-            {groups.length === 0 && !partial ? (
+            {!lines && !partial ? (
                 <EmptyState
                     size="inline"
                     className="rounded-xl border border-border bg-card px-4 py-3.5"
@@ -175,7 +194,7 @@ export function NeedGroups({
                 />
             ) : null}
 
-            {groups.length === 0 && partial ? (
+            {!lines && partial ? (
                 <p className="rounded-xl border border-border bg-card px-4 py-3.5 text-sm text-neutral-700 dark:text-muted-foreground">
                     <strong className="font-semibold text-foreground">
                         Nothing else we could check needs you.
@@ -185,55 +204,55 @@ export function NeedGroups({
                 </p>
             ) : null}
 
-            {groups.length > 0 ? (
+            {lines ? (
                 <ul className="overflow-hidden rounded-xl border border-border bg-card">
-                    {groups.map((group) => {
-                        const isOpen = open.has(group.kind);
-                        const gone = emptied.includes(group.kind);
-                        return (
-                            <NeedGroup
-                                key={group.kind}
-                                kind={group.kind}
-                                line={
-                                    gone
-                                        ? emptiedLine(group.kind)
-                                        : groupLine(
-                                              group,
-                                              now,
-                                              group.kind === "ORDERS"
-                                                  ? dueToday
-                                                  : 0,
-                                          )
-                                }
-                                href={group.href}
-                                open={isOpen}
-                                onToggle={() => toggle(group.kind)}
-                                actions={
-                                    gone ? null : (
-                                        <GroupActions
-                                            group={group}
-                                            open={isOpen}
-                                            one={groupOneAction(group, doneIds)}
-                                            onStart={(rowId) =>
-                                                start(group.kind, rowId)
-                                            }
-                                            remindAll={remindAll}
-                                        />
-                                    )
-                                }
-                            >
-                                <NeedGroupBody
-                                    group={group}
-                                    actions={actions}
-                                    className="mb-1.5 border-t border-dashed border-border pl-3.5 pr-3 sm:ml-[62px] sm:pl-0 sm:pr-2.5"
-                                />
-                            </NeedGroup>
-                        );
-                    })}
+                    {groups.slice(0, chequesAt).map(drawGroup)}
+                    {chequesLine}
+                    {groups.slice(chequesAt).map(drawGroup)}
                 </ul>
             ) : null}
         </section>
     );
+
+    function drawGroup(group: HomeNeedGroup) {
+        const isOpen = open.has(group.kind);
+        const gone = emptied.includes(group.kind);
+        return (
+            <NeedGroup
+                key={group.kind}
+                kind={group.kind}
+                line={
+                    gone
+                        ? emptiedLine(group.kind)
+                        : groupLine(
+                              group,
+                              now,
+                              group.kind === "ORDERS" ? dueToday : 0,
+                          )
+                }
+                href={group.href}
+                open={isOpen}
+                onToggle={() => toggle(group.kind)}
+                actions={
+                    gone ? null : (
+                        <GroupActions
+                            group={group}
+                            open={isOpen}
+                            one={groupOneAction(group, doneIds)}
+                            onStart={(rowId) => start(group.kind, rowId)}
+                            remindAll={remindAll}
+                        />
+                    )
+                }
+            >
+                <NeedGroupBody
+                    group={group}
+                    actions={actions}
+                    className="mb-1.5 border-t border-dashed border-border pl-3.5 pr-3 sm:ml-[62px] sm:pl-0 sm:pr-2.5"
+                />
+            </NeedGroup>
+        );
+    }
 }
 
 /**

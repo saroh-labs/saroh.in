@@ -3,7 +3,12 @@ import { formatMoney } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
 
 import { needTitle } from "./needs";
-import type { HomeNeedGroup, HomeNeedKind, HomeTone } from "./service";
+import type {
+    HomeChequesWaiting,
+    HomeNeedGroup,
+    HomeNeedKind,
+    HomeTone,
+} from "./service";
 
 /**
  * The line each Needs you group draws on Home A (DEC-171, Home plan U6,
@@ -324,4 +329,30 @@ export function phoneGroupName(
         case "SETUP":
             return "setup";
     }
+}
+
+/*
+ * "Cheques not in the bank" (DEC-173, Home plan U18, boards `HAPageD`,
+ * `HPHome`): one line in Needs you's money group while a cheque waits,
+ * the same words at a desk and on a phone. "2 cheques not in the bank ·
+ * ₹14,000", every currency said once. The amounts come only with
+ * `payment:read`, as the line itself does.
+ */
+
+/** "2 cheques not in the bank · ₹14,000". */
+export function chequesTitle(cheques: HomeChequesWaiting): string {
+    const what = `${count(cheques.count, "cheque")} not in the bank`;
+    const amount = money(cheques);
+    return amount ? `${what} · ${amount}` : what;
+}
+
+/** The desk's line under it, as the invoices list says it. */
+export const CHEQUES_SUB = "Received, waiting to clear";
+
+/** The line's button: the invoices with those cheques. */
+export const CHEQUES_ACTION = "See cheques";
+
+/** The cheques line as a desk group's line: no tag, nothing late. */
+export function chequesLine(cheques: HomeChequesWaiting): GroupLine {
+    return { title: chequesTitle(cheques), sub: CHEQUES_SUB, tag: null };
 }

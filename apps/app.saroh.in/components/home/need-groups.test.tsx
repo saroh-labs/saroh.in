@@ -349,3 +349,103 @@ const BILLS: HomeNeedGroup = {
     href: "/billing/invoices?view=overdue",
     codes: ["PAYMENTS_OVERDUE_INVOICES"],
 };
+
+/** Two cheques waiting, ₹8,400 and ₹5,600 (plan U18's happy path). */
+const CHEQUES = {
+    count: 2,
+    totals: [{ currency: "INR", amountMinor: 1_400_000 }],
+    href: "/billing/invoices?view=cheques",
+};
+
+const chequesEl = () => host.querySelector<HTMLElement>("[data-cheques-line]");
+const lineOrder = () =>
+    Array.from(host.querySelectorAll<HTMLElement>("section > ul > li")).map(
+        (li) =>
+            li.dataset.needGroup ??
+            (li.dataset.chequesLine === "" ? "CHEQUES" : "?"),
+    );
+
+describe("NeedGroups: cheques not in the bank (plan U18)", () => {
+    it("draws one line with the count and total, under the bills, counted as one thing", () => {
+        draw({ groups: [ORDERS, BILLS, REVIEWS], total: 18, cheques: CHEQUES });
+        const line = chequesEl();
+        expect(line?.textContent).toContain(
+            "2 cheques not in the bank · ₹14,000",
+        );
+        expect(line?.textContent).toContain("Received, waiting to clear");
+        expect(lineOrder()).toEqual(["ORDERS", "BILLS", "CHEQUES", "REVIEWS"]);
+        // 18 in the groups, and the cheques line is one more.
+        expect(host.textContent).toContain("19 things");
+        // It opens the invoices list filtered to those cheques.
+        const links = Array.from(
+            line?.querySelectorAll<HTMLAnchorElement>("a") ?? [],
+        );
+        expect(links.length).toBeGreaterThan(0);
+        for (const a of links) {
+            expect(a.getAttribute("href")).toBe(
+                "/billing/invoices?view=cheques",
+            );
+        }
+        expect(links.some((a) => a.textContent === "See cheques")).toBe(true);
+    });
+
+    it("never marks a cheque on Home: no button but the link", () => {
+        draw({ groups: [BILLS], total: 10, cheques: CHEQUES });
+        expect(chequesEl()?.querySelectorAll("button")).toHaveLength(0);
+        expect(chequesEl()?.textContent).not.toMatch(/in the bank$|Bounced/);
+    });
+
+    it("says one cheque in the singular", () => {
+        draw({
+            cheques: {
+                ...CHEQUES,
+                count: 1,
+                totals: [{ currency: "INR", amountMinor: 840_000 }],
+            },
+        });
+        expect(chequesEl()?.textContent).toContain(
+            "1 cheque not in the bank · ₹8,400",
+        );
+    });
+
+    it("says every currency once", () => {
+        draw({
+            cheques: {
+                count: 3,
+                totals: [
+                    { currency: "INR", amountMinor: 1_400_000 },
+                    { currency: "USD", amountMinor: 12_000 },
+                ],
+                href: "/billing/invoices?view=cheques",
+            },
+        });
+        const t = chequesEl()?.textContent ?? "";
+        expect(t).toContain("3 cheques not in the bank · ₹14,000 + ");
+        expect(t).toMatch(/\$120/);
+    });
+
+    it("draws nothing while no cheque waits", () => {
+        draw({ groups: [ORDERS, BILLS], total: 17, cheques: null });
+        expect(chequesEl()).toBeNull();
+        expect(host.textContent).toContain("17 things");
+    });
+
+    it("draws nothing without money access: the API sends no figure", () => {
+        // A role without payment:read gets no `chequesWaiting` at all.
+        draw({ groups: [ORDERS, BILLS], total: 17 });
+        expect(chequesEl()).toBeNull();
+        expect(host.textContent).not.toContain("cheque");
+    });
+
+    it("is the money group's one line when there are no unpaid bills", () => {
+        draw({ groups: [ORDERS, REVIEWS], total: 8, cheques: CHEQUES });
+        expect(lineOrder()).toEqual(["ORDERS", "CHEQUES", "REVIEWS"]);
+    });
+
+    it("is Needs you's only line when nothing else waits", () => {
+        draw({ groups: [], total: 0, cheques: CHEQUES });
+        expect(lineOrder()).toEqual(["CHEQUES"]);
+        expect(host.textContent).toContain("1 thing");
+        expect(host.textContent).not.toContain("Nothing needs you");
+    });
+});

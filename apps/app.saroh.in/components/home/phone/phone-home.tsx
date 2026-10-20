@@ -1,3 +1,4 @@
+import { chequesWaiting } from "@/lib/home/cheques";
 import { sinceLinks } from "@/lib/home/last-day";
 import { nextLine } from "@/lib/home/needs";
 import { phoneFigures, phoneNext } from "@/lib/home/phone-home";
@@ -94,6 +95,7 @@ export function PhoneHome({
                     unavailable={home.unavailable}
                     fresh={fresh}
                     dueToday={home.tiles?.toPack?.dueToday ?? 0}
+                    cheques={chequesWaiting(home.week)}
                 />
             ) : (
                 // An API from before Home A (U1): the flat list.

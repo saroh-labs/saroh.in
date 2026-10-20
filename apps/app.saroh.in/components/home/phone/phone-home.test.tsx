@@ -661,3 +661,95 @@ describe("Home's two layouts", () => {
         expect(phone?.textContent).toContain("Couldn't check overdue invoices");
     });
 });
+
+describe("cheques not in the bank on a phone (plan U18)", () => {
+    const CHEQUES = {
+        count: 2,
+        totals: [{ currency: "INR", amountMinor: 1_400_000 }],
+        href: "/billing/invoices?view=cheques",
+    };
+    const week = (chequesWaiting: unknown) =>
+        ({
+            zone: "Asia/Kolkata",
+            startDate: "2026-10-19",
+            ...(chequesWaiting === undefined ? {} : { chequesWaiting }),
+        }) as HomeModel["week"];
+    const cheques = () =>
+        host.querySelector<HTMLAnchorElement>("[data-cheques-line] a");
+    const order = () =>
+        Array.from(
+            host.querySelectorAll<HTMLElement>("[data-phone-needs] ul > li"),
+        ).map((li) =>
+            li.dataset.chequesLine === ""
+                ? "CHEQUES"
+                : (li.querySelector<HTMLElement>("[data-phone-line]")?.dataset
+                      .phoneLine ?? "?"),
+        );
+
+    it("is one of the five lines, under bills, counted as one thing, opening the cheques list", () => {
+        draw(home({ week: week(CHEQUES) }));
+        expect(cheques()?.textContent).toContain(
+            "2 cheques not in the bank · ₹14,000",
+        );
+        expect(cheques()?.getAttribute("href")).toBe(
+            "/billing/invoices?view=cheques",
+        );
+        expect(order()).toEqual([
+            "ORDERS",
+            "BILLS",
+            "CHEQUES",
+            "AWAITING_PAYMENT",
+            "PAYMENTS",
+            "?",
+        ]);
+        expect(host.querySelector("[data-needs-count]")?.textContent).toBe(
+            "25",
+        );
+        expect(text()).toContain("Show 3 more · enquiries, review, low stock");
+        expect(cheques()?.className).toMatch(/min-h-\[54px\]/);
+    });
+
+    it("is the money line when there are no unpaid bills", () => {
+        draw(
+            home({
+                week: week(CHEQUES),
+                needGroups: [ORDERS, group("REVIEWS")],
+                needGroupsTotal: 8,
+            }),
+        );
+        expect(order()).toEqual(["ORDERS", "CHEQUES", "REVIEWS"]);
+    });
+
+    it("says every currency once", () => {
+        draw(
+            home({
+                week: week({
+                    ...CHEQUES,
+                    totals: [
+                        { currency: "INR", amountMinor: 1_400_000 },
+                        { currency: "USD", amountMinor: 12_000 },
+                    ],
+                }),
+            }),
+        );
+        expect(cheques()?.textContent).toMatch(
+            /^2 cheques not in the bank · ₹14,000 \+ .*120/,
+        );
+    });
+
+    it("draws nothing while none waits", () => {
+        draw(home({ week: week(null) }));
+        expect(cheques()).toBeNull();
+        expect(host.querySelector("[data-needs-count]")?.textContent).toBe(
+            "24",
+        );
+    });
+
+    it("draws nothing without money access: no figure is sent", () => {
+        draw(home({ week: week(undefined) }));
+        expect(cheques()).toBeNull();
+        draw(home({ week: null }));
+        expect(cheques()).toBeNull();
+        expect(text()).not.toContain("cheque");
+    });
+});

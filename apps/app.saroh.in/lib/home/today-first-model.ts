@@ -170,3 +170,17 @@ export interface HomeGoing {
     orders?: { count: number; before: number; href: string };
     owed?: HomeGoingOwed;
 }
+
+/**
+ * "Cheques not in the bank" (DEC-173, Home plan U18): cheques received and
+ * waiting to clear, how many and what they add up to per currency. Sent
+ * on `week.chequesWaiting`, only to someone who holds `payment:read`, and
+ * null while none waits. Home shows it; marking a cheque in the bank or
+ * bounced stays on the invoice.
+ */
+export interface HomeChequesWaiting {
+    count: number;
+    totals: HomeMoneyTotal[];
+    /** `/billing/invoices?view=cheques`. */
+    href: string;
+}

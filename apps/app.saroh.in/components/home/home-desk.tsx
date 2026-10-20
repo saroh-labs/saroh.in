@@ -1,3 +1,4 @@
+import { chequesWaiting } from "@/lib/home/cheques";
 import { nextLine } from "@/lib/home/needs";
 import type { HomeModel } from "@/lib/home/service";
 import { nextBookingSentence, tileViews } from "@/lib/home/tiles";
@@ -77,6 +78,7 @@ export function HomeDesk({
                             next={next}
                             fresh={fresh}
                             dueToday={home.tiles?.toPack?.dueToday ?? 0}
+                            cheques={chequesWaiting(home.week)}
                         />
                     ) : (
                         // An API from before Home A (U1): the flat list.

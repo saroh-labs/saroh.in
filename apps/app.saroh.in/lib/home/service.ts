@@ -3,7 +3,12 @@ import { cache } from "react";
 import { apiFetch, orgBase } from "@/lib/api/http";
 
 import type { HomeNeed, HomeSeverity, HomeWeekChange } from "./need-model";
-import type { HomeGoing, HomeNeedGroup, HomeTiles } from "./today-first-model";
+import type {
+    HomeChequesWaiting,
+    HomeGoing,
+    HomeNeedGroup,
+    HomeTiles,
+} from "./today-first-model";
 
 export type {
     HomeInline,
@@ -169,6 +174,12 @@ export interface HomeWeek {
     bookings?: { count: number; lastWeek: number; href: string };
     orders?: { count: number; href: string };
     owed?: HomeWeekOwed;
+    /**
+     * Cheques not in the bank (DEC-173): null while none waits, and
+     * absent without `payment:read` or from an API before invoices U4.
+     * Needs you's money group draws it (Home plan U18, `lib/home/cheques.ts`).
+     */
+    chequesWaiting?: HomeChequesWaiting | null;
 }
 
 /**
@@ -261,6 +272,7 @@ export interface HomeModel {
 }
 
 export type {
+    HomeChequesWaiting,
     HomeGoing,
     HomeGoingOwed,
     HomeGoingSales,
