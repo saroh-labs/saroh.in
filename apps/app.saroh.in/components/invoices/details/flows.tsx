@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
@@ -134,6 +135,7 @@ export function useCancelFlow({
     const [open, setOpen] = useState<"cancel" | "refund" | null>(null);
     const to = (v: "cancel" | "refund") => (o: boolean) =>
         setOpen(o ? v : null);
+    const router = useRouter();
     return {
         open: (refund) => setOpen(refund ? "refund" : "cancel"),
         overlays: (
@@ -143,7 +145,15 @@ export function useCancelFlow({
                     onOpenChange={to("cancel")}
                     invoice={target}
                     registered={registered}
-                    onDone={() => onDone()}
+                    // A corrected draft opens in the editor, as its toast
+                    // says; anything else comes back to the details.
+                    onDone={(outcome) =>
+                        outcome.kind === "draft"
+                            ? router.push(
+                                  `/billing/invoices/${outcome.draftId}/edit`,
+                              )
+                            : onDone()
+                    }
                 />
                 <RefundInvoiceDialog
                     open={open === "refund"}
