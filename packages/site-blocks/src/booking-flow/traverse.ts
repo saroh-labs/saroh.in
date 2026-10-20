@@ -9,10 +9,14 @@ import type { PendingStart, Times } from "./use-times";
 /** A booking made on this page, kept while they go Back from it. */
 export type Finished = Extract<Phase, { kind: "done" | "waitlisted" }>;
 
-/** The step a choosing page can stand on. */
+/**
+ * The step a choosing page can stand on. `pay` is one only where the page
+ * asks how to pay as a step of its own (a look's frames, U10); Classic
+ * asks it on the details step, and its `pay` is the hold being paid.
+ */
 export type ChooseStep = Extract<
     BookingStep,
-    "what" | "who" | "when" | "details"
+    "what" | "who" | "when" | "details" | "pay"
 >;
 
 /**
@@ -47,6 +51,8 @@ export function traverseTo(
         resetAttempt: () => void;
         /** Read one of their bookings by reference, when the app can. */
         lookup?: (ref: string) => Promise<BookingLookup>;
+        /** "How would you like to pay?" is a step of its own (U10). */
+        payStep?: boolean;
     },
 ): void {
     const { phase, times } = ctx;
@@ -62,6 +68,7 @@ export function traverseTo(
         isClass: service?.kind === "class",
         hold: held !== null,
         finished: done !== null,
+        payStep: ctx.payStep === true,
     });
     ctx.sayError(null);
 
@@ -118,7 +125,7 @@ export function traverseTo(
             ? { serviceId: id, date: url.date, time: url.start }
             : null,
     );
-    ctx.setStep(step === "pay" ? "when" : step);
+    ctx.setStep(step === "pay" && ctx.payStep !== true ? "when" : step);
 }
 
 function doneRef(done: Finished): string | null {

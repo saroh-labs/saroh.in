@@ -7,6 +7,7 @@ import {
     BookingUnavailable,
     initialDateOf,
     initialTimeOf,
+    lookOf,
     modulePageTopOf,
     ModulePageUnavailable,
     MoveClass,
@@ -82,6 +83,10 @@ import {
  * opens on that step or the earliest one it can stand on. A booked step is
  * read again through the customer's own session (`getBooking`), and that
  * page is never kept by the page cache.
+ *
+ * **Under a look** (DEC-172, U10) the same steps are drawn one question
+ * at a time in the look's frame — Folio's panel, Quiet's page, Live's
+ * sheets — with the code asked inside Your details; Classic is today's.
  *
  * `?move=<ref>` (round-2 A6, behind the account area's switch) moves one
  * of the signed-in customer's classes instead: "Moving: ‹class›", its other
@@ -324,6 +329,9 @@ export default async function BookPage({
                 initialStep={opened.step}
                 initialRef={bookedRef}
                 booked={booked}
+                // The site's look frames the same steps (U10); none is
+                // Classic, today's page.
+                look={lookOf(resolved.snapshot.site.look)}
             />
         </>
     );

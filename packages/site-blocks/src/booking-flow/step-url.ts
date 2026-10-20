@@ -144,6 +144,12 @@ export interface StepFacts {
     hold: boolean;
     /** A booking made on this page is in its memory. */
     finished: boolean;
+    /**
+     * The page draws "How would you like to pay?" as a step of its own
+     * (a look's frames, U10): `pay` with a time and no hold is that step.
+     * Absent (Classic): `pay` needs a hold, as before.
+     */
+    payStep?: boolean;
 }
 
 /** The step a link to no step means: the furthest its choices reach. */
@@ -167,7 +173,8 @@ export function asksWho(facts: Pick<StepFacts, "people" | "isClass">) {
  * - `who` is only for a service with a choice of person.
  * - `details` needs a time.
  * - `pay` needs a hold in memory; a link or a reload has none, so the
- *   times are checked again (`when`).
+ *   times are checked again (`when`). Where the page asks how to pay as
+ *   a step of its own (`payStep`), `pay` with a time is that step.
  */
 export function resolveStep(url: StepUrl, facts: StepFacts): BookingStep {
     const asked = url.step ?? impliedStep(url);
@@ -181,7 +188,11 @@ export function resolveStep(url: StepUrl, facts: StepFacts): BookingStep {
         case "details":
             return url.date && url.start ? "details" : "when";
         case "pay":
-            return facts.hold && url.date && url.start ? "pay" : "when";
+            return (facts.hold || facts.payStep === true) &&
+                url.date &&
+                url.start
+                ? "pay"
+                : "when";
         default:
             return "when";
     }

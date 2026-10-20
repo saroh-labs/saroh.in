@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { useBookReturnFocus } from "./booking-flow/book-return";
 import { BarNextFree } from "./live/next-free";
 import type { DockTab } from "./look-chrome";
 import { lookHasBookBar } from "./look-chrome";
@@ -110,6 +111,8 @@ export function StickyActions({
 }) {
     const pathname = usePathname();
     const path = useCurrentPath();
+    // Closing a look's booking lands back on the link that opened it (U10).
+    useBookReturnFocus(path);
     const [primaryShown, setPrimaryShown] = useState<boolean | null>(null);
     const [taken, setTaken] = useState(false);
 

@@ -192,6 +192,23 @@ describe("the step a link can stand on", () => {
     });
 });
 
+describe("a look's own pay step (U10)", () => {
+    it("is pay with a time where the page asks how to pay as a step", () => {
+        const pay = { ...FULL, step: "pay" as const };
+        expect(resolveStep(pay, { ...FACTS, payStep: true })).toBe("pay");
+        expect(
+            resolveStep({ ...pay, start: null }, { ...FACTS, payStep: true }),
+        ).toBe("when");
+    });
+
+    it("leaves Classic's pay needing a hold, as before", () => {
+        const pay = { ...FULL, step: "pay" as const };
+        expect(resolveStep(pay, FACTS)).toBe("when");
+        expect(resolveStep(pay, { ...FACTS, payStep: false })).toBe("when");
+        expect(resolveStep(pay, { ...FACTS, hold: true })).toBe("pay");
+    });
+});
+
 describe("closing the booking (U10's frames)", () => {
     const ORIGIN = "https://prana.saroh.app";
 

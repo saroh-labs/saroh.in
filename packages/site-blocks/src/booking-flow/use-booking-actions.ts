@@ -161,6 +161,34 @@ export function useBookingActions(ctx: FlowActionsContext) {
         void submit(who, true);
     };
 
+    /**
+     * Signed in by the code inside Your details (a look's frames, U10):
+     * who they are, and a class credit of theirs offered — and nothing
+     * booked. The step's own button goes on from here.
+     */
+    const signedInHere = async (who: SignedInCustomer) => {
+        ctx.s.setCustomer(who);
+        ctx.s.sayError(null);
+        if (!ctx.s.phoneNo.trim()) ctx.s.setPhoneNo(accountPhone(who));
+        if (
+            ctx.waitMode !== "join" &&
+            service &&
+            chosenStart &&
+            ctx.pay !== "CREDIT"
+        ) {
+            const offered = await ctx.askCredit(
+                who.email,
+                service.id,
+                chosenStart.startAt,
+            );
+            if (offered) {
+                ctx.keys.attemptKey.current = null;
+                ctx.s.setPayChoice("CREDIT");
+                ctx.s.sayNotice(CREDIT_FOUND);
+            }
+        }
+    };
+
     /** "Not you?": sign out, and ask again at the last step. */
     const notYou = async () => {
         if (ctx.s.signingOut) return;
@@ -307,6 +335,7 @@ export function useBookingActions(ctx: FlowActionsContext) {
     return {
         confirm,
         signedIn,
+        signedInHere,
         notYou,
         leaveHold,
         backToChoosing,

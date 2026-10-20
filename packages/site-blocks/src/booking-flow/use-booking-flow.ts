@@ -30,6 +30,7 @@ const STEP_HEAD: Record<ChooseStep, number> = {
     who: 2,
     when: 2,
     details: 3,
+    pay: 4,
 };
 
 /**
@@ -118,6 +119,14 @@ export function useBookingFlow(
         waitMode,
     });
 
+    // A look asks how to pay as a step of its own (U10, KD8): only where
+    // there is a way to pay to choose. Classic asks it on the details step.
+    const lookPay =
+        !!props.look &&
+        !words.waiting &&
+        !words.unpayable &&
+        words.choices.length > 0;
+
     const asks = asksWhere(service);
     // A time only one way can have (DEC-087) settles Where.
     const onlyWhere = asks ? (chosenStart?.only ?? null) : null;
@@ -163,14 +172,24 @@ export function useBookingFlow(
     const { phase } = s;
     const chooseStep: ChooseStep = !service
         ? "what"
-        : s.stepState === "details"
-          ? chosenStart || pending
-              ? "details"
-              : "when"
-          : s.stepState === "who" &&
-              asksWho({ people: service.staff.length, isClass })
-            ? "who"
-            : "when";
+        : // A look asks one question at a time, so What can be gone back
+          // to with a service chosen; Classic always shows it.
+          s.stepState === "what" && !!props.look
+          ? "what"
+          : s.stepState === "pay" && lookPay
+            ? chosenStart || pending
+                ? s.customer
+                    ? "pay"
+                    : "details"
+                : "when"
+            : s.stepState === "details" || s.stepState === "pay"
+              ? chosenStart || pending
+                  ? "details"
+                  : "when"
+              : s.stepState === "who" &&
+                  asksWho({ people: service.staff.length, isClass })
+                ? "who"
+                : "when";
     const step: BookingStep =
         phase.kind === "done" ||
         phase.kind === "waitlisted" ||
@@ -221,6 +240,7 @@ export function useBookingFlow(
                 sayError: s.sayError,
                 resetAttempt: keys.resetAttempt,
                 lookup: account.booking,
+                payStep: lookPay,
             });
             focusAfter.current = true;
         },
@@ -237,12 +257,17 @@ export function useBookingFlow(
     useEffect(() => {
         if (!focusAfter.current) return;
         focusAfter.current = false;
+        // A look's step names itself (`data-look-step`, U10); Classic's
+        // steps are numbered.
         const heading =
             phase.kind !== "choose"
                 ? headingRef.current
-                : rootRef.current?.querySelector<HTMLElement>(
+                : (rootRef.current?.querySelector<HTMLElement>(
+                      `[data-look-step="${chooseStep}"]`,
+                  ) ??
+                  rootRef.current?.querySelector<HTMLElement>(
                       `[data-step="${STEP_HEAD[chooseStep]}"] h2`,
-                  );
+                  ));
         heading?.focus();
     });
     // Each new screen puts focus on its heading, so a screen reader hears it.
@@ -351,6 +376,9 @@ export function useBookingFlow(
         placeOf: waitlist.placeOf,
         waitMode,
         words,
+        lookPay,
+        pending,
+        testRelease,
         asks,
         onlyWhere,
         whereNow,

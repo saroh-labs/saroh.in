@@ -16,6 +16,7 @@ import { FlowOutcome } from "./flow-outcome";
 import { BookingHeader, ClosedCard } from "./flow-parts";
 import type { Phase } from "./flow-state";
 import { NAME_LEFT } from "./flow-words";
+import { LookBookingFlow } from "./look-flow";
 import { visitsOf } from "./model";
 import { PhoneBar, SummaryAside } from "./summary";
 import { useBookingFlow } from "./use-booking-flow";
@@ -52,6 +53,16 @@ export type { BookingAccount, BookingFlowProps } from "./booking-account";
  */
 
 export default function BookingFlow(props: BookingFlowProps) {
+    // A look draws the same steps in its own frame (DEC-172, U10).
+    return props.look ? (
+        <LookBookingFlow {...props} look={props.look} />
+    ) : (
+        <ClassicBookingFlow {...props} />
+    );
+}
+
+/** Classic: today's booking page, every step reached drawn one under another. */
+function ClassicBookingFlow(props: BookingFlowProps) {
     const { page, account, visit = null, soldBy = null, reach = null } = props;
     const apiUrl = props.apiUrl ?? DEFAULT_API_URL;
     const ids = useId();

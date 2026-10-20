@@ -1,3 +1,4 @@
+import type { LookId } from "@saroh/block-contract";
 import { phoneNumberProblem } from "@saroh/block-contract";
 
 import type {
@@ -86,4 +87,11 @@ export interface BookingFlowProps {
     soldBy?: string | null;
     /** A call and a WhatsApp message, offered where no time can be found. */
     reach?: BusinessReach | null;
+    /**
+     * The site's look (DEC-172, U10): the same steps in its frame — a
+     * panel (Folio), a page a question at a time (Quiet) or sheets (Live),
+     * with the code asked inside Your details. Absent: Classic, today's
+     * page, unchanged.
+     */
+    look?: LookId;
 }
