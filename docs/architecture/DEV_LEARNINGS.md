@@ -166,6 +166,7 @@ from paying landed on When, not Your details).
   **Rule**: the saroh-browser-tests skill's Traps. A spec is not done until
   it has run once against the stack; an agent that cannot run Playwright says
   so in its hand-off and the spec is marked unrun.
+
 ## E2E — the product editor's Sections strip and a long field value failed a new phone check
 
 **Symptom**: 21 Oct 2026. The new `gst-rate-picker.spec.ts` failed on
@@ -5736,3 +5737,10 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** the site's reservation tried once more after a lost serializable race, with no wait; two losses in a row threw the race's message, "fully booked", though no try had seen the time full.
 - **Fix:** `reserve` takes `tries` (the site's is 3), 20 to 80 ms apart (`RACE_RETRY_WAIT_MS`), and `busy`, said when every try lost: "Lots of people are booking right now. Try again." A full time is still refused by the capacity check, with its own words.
 - **Rule:** a lost race is not an answer: retry with jitter, and when the tries run out say it is busy, never what no read saw.
+
+### Account specs had never run, and a refused form said nothing under the React Compiler (review #25; 20 Oct 2026)
+
+- **Symptom:** the first gate with `SITE_ACCOUNT_AREA=on` failed ten tests. Most were stale specs: an email matched twice on Your details (the emails card says it in a sentence), the Move sheet's first radio was a disabled day, the header's account link had gained "My account", and a DONE data request no longer names anyone (#19). One was a real bug: pressing Close request with no reason showed no "Say why you're closing it", though the jsdom test saw it.
+- **Cause:** the specs skipped themselves on every stack without the flag, so they drifted with the screens. The bug: the app builds with `reactCompiler: true`, and the shadcn `useFormField` read errors from the context's `formState`, which only updates when the form's owner re-renders into the field. The compiler memoizes a field whose JSX doesn't change, so after a refused submit React Hook Form held the error and nothing drew it. Vitest runs without the compiler, so the unit test passed.
+- **Fix:** `useFormField` (`packages/ui/src/components/ui/form.tsx`) subscribes to its own field with `useFormState({ name })`, as current shadcn does. The specs scope to the region they mean, pick a time by its name, and tell a done request apart by count.
+- **Rule:** a spec behind a flag runs on a stack with the flag, or it is not a test; a form's error state comes from a subscription the field owns, never from a parent re-render the compiler can skip. Only a production build (the e2e stack) shows compiler-only bugs.
