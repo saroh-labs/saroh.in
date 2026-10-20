@@ -105,9 +105,11 @@ test.describe("the account area (A5)", () => {
             .click();
         await expect(page).toHaveURL(new RegExp(`^${SITE}/?$`));
         await expect(page.getByRole("contentinfo")).toBeVisible();
+        // Their initials, and "My account" beside them (a screen reader's
+        // only, on a phone).
         await expect(
             page.getByRole("banner").getByRole("link", { name: "My account" }),
-        ).toHaveText("AR");
+        ).toHaveText(/^AR\s*My account$/);
     });
 
     test("changes the sign-in email with a code to the new address", async ({
