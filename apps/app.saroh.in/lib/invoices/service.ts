@@ -32,11 +32,65 @@ export type InvoiceSource =
     "MANUAL" | "SUBSCRIPTION" | "COURSE" | "PACK" | "ORDER" | "BOOKING";
 export type PaymentMethod = "CASH" | "UPI" | "BANK_TRANSFER" | "CARD" | "OTHER";
 /**
+ * The ways an invoice's payment is recorded by hand (DEC-173): an order's
+ * five, and a cheque, which only an invoice takes.
+ */
+export type InvoicePaymentMethod = PaymentMethod | "CHEQUE";
+/**
  * How a payment is stored: one of the ways it is recorded by hand, or ONLINE
  * — paid through the invoice's payment link, written by the payment webhook and
- * never offered in Record a payment.
+ * never offered in Record payment.
  */
-export type StoredPaymentMethod = PaymentMethod | "ONLINE";
+export type StoredPaymentMethod = InvoicePaymentMethod | "ONLINE";
+
+/** A cheque's place on its way to the bank (DEC-173). */
+export type ChequeBankStatus = "WAITING" | "CLEARED" | "BOUNCED";
+
+/**
+ * One payment in the invoice's ledger (DEC-173), on the detail read only:
+ * every one, removed and bounced too, so the history keeps the line.
+ */
+export interface InvoicePayment {
+    id: string;
+    /** Major units, as a string ("4000.00"). */
+    amount: string;
+    currency: string;
+    method: StoredPaymentMethod;
+    reference: string | null;
+    note: string | null;
+    /** When the money came in. */
+    receivedAt: string;
+    /** When it was written down. */
+    recordedAt: string;
+    /** A cheque's number and bank; null for anything else. */
+    cheque: { number: string | null; bank: string | null } | null;
+    /** On a cheque only; null otherwise. */
+    bankStatus: ChequeBankStatus | null;
+    clearedAt: string | null;
+    bouncedAt: string | null;
+    bounceReason: string | null;
+    /** Removed by mistake: when and why. It no longer counts. */
+    removed: { at: string; reason: string | null } | null;
+    /**
+     * Whether Remove is offered: not removed already, not an online payment
+     * (that is refunded instead), and the invoice issued or paid.
+     */
+    canRemove: boolean;
+}
+
+/**
+ * One time the invoice was shared by hand (DEC-173): opened on WhatsApp,
+ * its link copied, its PDF downloaded or printed. On WhatsApp Saroh only
+ * knows it was opened, never that it was sent.
+ */
+export interface InvoiceShared {
+    id: string;
+    channel: "WHATSAPP" | "LINK" | "PDF" | "PRINT";
+    kind: "NEW" | "REMINDER" | "RECEIPT";
+    /** Who shared it; null once they have left the business. */
+    byUserId: string | null;
+    at: string;
+}
 
 /** One payment taken online through the invoice's payment link. */
 export interface InvoiceOnlinePayment {
@@ -247,6 +301,18 @@ export interface Invoice {
      * older than the payments ledger: read the total.
      */
     leftToPay?: string;
+    /**
+     * What has come in so far (DEC-173): live payments, a waiting cheque
+     * included, a removed or bounced one not. Absent from an older API:
+     * read "0.00", or the total once paid.
+     */
+    paidSoFar?: string;
+    /** Issued, with some paid and some left: derived, never a status. */
+    partlyPaid?: boolean;
+    /** A live cheque on it is waiting for the bank. */
+    chequeWaiting?: boolean;
+    /** On the detail read only: the ledger, oldest first as the API sends it. */
+    payments?: InvoicePayment[];
     issuedAt: string | null;
     dueAt: string | null;
     paidAt: string | null;
@@ -282,6 +348,8 @@ export interface Invoice {
     /** On the detail read only; absent from an API before D17: no Send. */
     send?: InvoiceSend;
     sent?: InvoiceSent[];
+    /** On the detail read only: every share by hand, newest first. */
+    shared?: InvoiceShared[];
     /**
      * "How to pay us" (R32, #833), on the detail read of an unpaid invoice:
      * the paper prints it, as the PDF does. Null when none is set; absent

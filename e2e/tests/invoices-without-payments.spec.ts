@@ -170,8 +170,8 @@ test.describe("invoices without Payments (DEC-070)", { tag: "@serial" }, () => {
                 )
                 .toBe("ISSUED");
 
-            // Unpaid: no payment link to copy, and Mark paid is there.
-            const pay = action(page, "Mark paid");
+            // Unpaid: no payment link to copy, and Record payment is there.
+            const pay = action(page, "Record payment");
             await expect(pay).toBeVisible();
             await expect(pay).toHaveCSS("cursor", "pointer");
             await expect(
@@ -184,7 +184,7 @@ test.describe("invoices without Payments (DEC-070)", { tag: "@serial" }, () => {
             // Money taken in cash.
             await pay.click();
             const dialog = page.getByRole("dialog", {
-                name: "Record a payment",
+                name: "Record payment",
             });
             await dialog
                 .getByRole("combobox", { name: "How it was paid" })

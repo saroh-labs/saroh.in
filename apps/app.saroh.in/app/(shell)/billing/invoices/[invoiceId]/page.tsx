@@ -30,6 +30,7 @@ import {
     whenLine,
 } from "@/lib/invoices/status";
 import { getInvoiceBusiness } from "@/lib/invoices/tax";
+import { NOT_PAID_YET } from "@/lib/invoices/words";
 import { invoiceZone } from "@/lib/invoices/zone";
 import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
@@ -244,14 +245,14 @@ function payLine(i: Invoice, who: string, canWrite: boolean) {
             if (!paysOnline(i.send, i.online)) {
                 // No online payment (DEC-070): the link only shows it.
                 return canWrite && canSend(i.send)
-                    ? `Not paid. Send it to ${first}, and mark it paid when the money arrives.`
-                    : `Not paid. Mark it paid when the money arrives.`;
+                    ? `Not paid yet. Send it to ${first}. When the money comes in, record it.`
+                    : NOT_PAID_YET;
             }
             if (canWrite && canSend(i.send)) {
-                return `Not paid. ${first} can pay by UPI or card from the payment link. Send it to them, or mark it paid when the money arrives.`;
+                return `Not paid yet. ${first} can pay by UPI or card from the payment link. Send it to them. When the money comes in, record it.`;
             }
             return i.online?.providerConnected
-                ? `Not paid. ${first} can pay online from the payment link. Copy it and send it, or mark it paid when the money arrives.`
-                : `Not paid. Mark it paid when the money arrives.`;
+                ? `Not paid yet. ${first} can pay online from the payment link. Copy it and send it. When the money comes in, record it.`
+                : NOT_PAID_YET;
     }
 }

@@ -28,6 +28,7 @@ import {
 } from "@/lib/invoices/actions";
 import { sendLabel } from "@/lib/invoices/send";
 import type { InvoiceStanding, PaymentMethod } from "@/lib/invoices/service";
+import { RECORD_PAYMENT } from "@/lib/invoices/words";
 import { PAID_HOW } from "@/lib/orders/paid-how";
 import { OptionSelect } from "@saroh/ui/option-select";
 
@@ -199,7 +200,7 @@ export function RecordPaymentDialog({
         );
         if (!res) return;
         if (!res.ok) return showError(res.error);
-        showSuccess(`${invoice.number ?? "Invoice"} marked paid.`);
+        showSuccess(`Payment recorded on ${invoice.number ?? "the invoice"}.`);
         onOpenChange(false);
         router.refresh();
     }
@@ -207,7 +208,7 @@ export function RecordPaymentDialog({
     return (
         <FormSheet
             open={open}
-            title="Record a payment"
+            title={RECORD_PAYMENT}
             description={`${invoice.number ?? "Invoice"} · ${invoice.total} from ${invoice.who}`}
             pending={busy}
             saveLabel="Record payment"

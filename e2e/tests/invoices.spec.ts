@@ -119,7 +119,7 @@ test.describe("invoices", () => {
         // Issued: the draft's actions are gone, the unpaid ones are here.
         await expect(page.getByRole("button", { name: "Edit" })).toHaveCount(0);
         await expect(
-            page.getByRole("button", { name: "Mark paid" }),
+            page.getByRole("button", { name: "Record payment" }),
         ).toBeVisible();
 
         // 3. The customer opens the link.
@@ -135,11 +135,11 @@ test.describe("invoices", () => {
         await customer.close();
 
         // 4. The money arrives, and is recorded.
-        await page.getByRole("button", { name: "Mark paid" }).click();
-        const dialog = page.getByRole("dialog", { name: "Record a payment" });
+        await page.getByRole("button", { name: "Record payment" }).click();
+        const dialog = page.getByRole("dialog", { name: "Record payment" });
         await dialog.getByRole("button", { name: "Record payment" }).click();
         await expect(
-            page.getByText(`${number} marked paid`).first(),
+            page.getByText(`Payment recorded on ${number}`).first(),
         ).toBeVisible();
         await expect(
             page.getByText("Paid", { exact: true }).first(),
