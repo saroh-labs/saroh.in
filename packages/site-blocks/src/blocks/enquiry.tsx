@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState } from "react";
 
-import type { RenderedEnquiry } from "@saroh/block-contract";
+import type { LookId, RenderedEnquiry } from "@saroh/block-contract";
 import { NO_CAPTURE_ATTRS, NO_CAPTURE_CLASS } from "../consent-events";
 import { cn } from "../lib/utils";
 import { SitePhoneInput } from "../phone-input";
@@ -16,6 +16,7 @@ import { useTestRelease } from "../test-release/context";
 import { TestReleaseStop } from "../test-release/test-release-stop";
 import { isTestReleaseRefusal } from "../test-release/words";
 import { ctaClasses } from "./cta";
+import { FRONT_TYPE, frontButton } from "./look-front";
 
 /**
  * `enquiry` v1 — the PUBLIC enquiry form (S3-004). It renders the fields
@@ -156,6 +157,7 @@ export default function EnquirySection({
     content,
     apiUrl = DEFAULT_API_URL,
     thread = null,
+    look,
 }: LookProps & {
     content: RenderedEnquiry;
     /** Base URL of the public API. See {@link DEFAULT_API_URL}. */
@@ -164,18 +166,21 @@ export default function EnquirySection({
     thread?: EnquiryThread | null;
 }) {
     return thread && content.formId ? (
-        <ThreadForm content={content} thread={thread} />
+        <ThreadForm content={content} thread={thread} look={look} />
     ) : (
-        <EnquiryForm content={content} apiUrl={apiUrl} />
+        <EnquiryForm content={content} apiUrl={apiUrl} look={look} />
     );
 }
 
 function EnquiryForm({
     content,
     apiUrl,
+    look,
 }: {
     content: RenderedEnquiry;
     apiUrl: string;
+    /** The site's look (DEC-172, U7); absent is Classic. */
+    look?: LookId;
 }) {
     // A stable id per mount for accessible label ids.
     const baseId = useId();
@@ -271,7 +276,9 @@ function EnquiryForm({
     if (state.kind === "success") {
         return (
             <section className="mx-auto w-full max-w-2xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
-                <div className="border-site-border bg-site-surface rounded-[var(--site-radius)] border p-8 text-center">
+                <div
+                    className={`border-site-border bg-site-surface ${corners(look)} border p-8 text-center`}
+                >
                     <p className="text-site-fg text-lg font-medium">
                         {content.successMessage ??
                             "Thanks, we'll be in touch soon."}
@@ -289,7 +296,11 @@ function EnquiryForm({
             {content.title ? (
                 <h2
                     data-site-title=""
-                    className="font-site-heading text-site-fg text-3xl font-bold tracking-tight"
+                    className={
+                        look
+                            ? FRONT_TYPE[look].h2
+                            : "font-site-heading text-site-fg text-3xl font-bold tracking-tight"
+                    }
                 >
                     {content.title}
                 </h2>
@@ -325,8 +336,7 @@ function EnquiryForm({
                     };
                     // `text-base`: under 16px, iOS Safari zooms the page
                     // when a field takes focus.
-                    const controlClasses =
-                        "w-full max-w-full rounded-[var(--site-radius)] border border-site-border bg-site-surface px-3 py-2 text-base text-site-fg outline-none focus:border-site-border focus:ring-2 focus:ring-site-border ";
+                    const controlClasses = `w-full max-w-full ${corners(look)} border border-site-border bg-site-surface px-3 py-2 text-base text-site-fg outline-none focus:border-site-border focus:ring-2 focus:ring-site-border `;
                     return (
                         <div key={i} className="grid gap-1.5">
                             <label
@@ -391,10 +401,9 @@ function EnquiryForm({
                 <button
                     type="submit"
                     disabled={submitting}
-                    className={cn(
-                        ctaClasses("primary"),
-                        "w-fit disabled:cursor-not-allowed disabled:opacity-60",
-                    )}
+                    className={submitClasses(look)}
+                    // The form's Send is the page's own action (U7).
+                    {...(look ? { "data-site-primary": "" } : {})}
                 >
                     {submitting ? "Sending…" : (content.submitLabel ?? "Send")}
                 </button>
@@ -422,9 +431,12 @@ function said(value: string | null | undefined): string | null {
 function ThreadForm({
     content,
     thread,
+    look,
 }: {
     content: RenderedEnquiry;
     thread: EnquiryThread;
+    /** The site's look (DEC-172, U7); absent is Classic. */
+    look?: LookId;
 }) {
     const fieldId = useId();
     const [text, setText] = useState("");
@@ -489,7 +501,7 @@ function ThreadForm({
             >
                 <div
                     role="status"
-                    className="border-site-border bg-site-surface grid justify-items-center gap-4 rounded-[var(--site-radius)] border p-8 text-center"
+                    className={`border-site-border bg-site-surface grid justify-items-center gap-4 ${corners(look)} border p-8 text-center`}
                 >
                     <p className="text-site-fg text-lg font-medium">
                         Sent. {thread.businessName} will reply in your Messages.
@@ -513,7 +525,11 @@ function ThreadForm({
             {content.title ? (
                 <h2
                     data-site-title=""
-                    className="font-site-heading text-site-fg text-3xl font-bold tracking-tight"
+                    className={
+                        look
+                            ? FRONT_TYPE[look].h2
+                            : "font-site-heading text-site-fg text-3xl font-bold tracking-tight"
+                    }
                 >
                     {content.title}
                 </h2>
@@ -552,7 +568,7 @@ function ThreadForm({
                                 setState({ kind: "idle" });
                             }
                         }}
-                        className="border-site-border bg-site-surface text-site-fg focus:border-site-border focus:ring-site-border w-full max-w-full rounded-[var(--site-radius)] border px-3 py-2 text-base outline-none focus:ring-2"
+                        className={`border-site-border bg-site-surface text-site-fg focus:border-site-border focus:ring-site-border w-full max-w-full ${corners(look)} border px-3 py-2 text-base outline-none focus:ring-2`}
                     />
                 </div>
 
@@ -568,14 +584,30 @@ function ThreadForm({
                 <button
                     type="submit"
                     disabled={submitting}
-                    className={cn(
-                        ctaClasses("primary"),
-                        "w-fit disabled:cursor-not-allowed disabled:opacity-60",
-                    )}
+                    className={submitClasses(look)}
+                    // The form's Send is the page's own action (U7).
+                    {...(look ? { "data-site-primary": "" } : {})}
                 >
                     {submitting ? "Sending…" : (content.submitLabel ?? "Send")}
                 </button>
             </form>
         </section>
     );
+}
+
+/**
+ * A card's or a field's corners: the site's radius on Classic, as always;
+ * under a look the small radius (`rounded-site-s`), never the button's
+ * pill (DEC-172, U7).
+ */
+function corners(look?: LookId): string {
+    return look ? "rounded-site-s" : "rounded-[var(--site-radius)]";
+}
+
+/** Send: Classic's primary button, or the look's one filled button. */
+function submitClasses(look?: LookId): string {
+    const disabled = "w-fit disabled:cursor-not-allowed disabled:opacity-60";
+    return look
+        ? frontButton(look, "fill", disabled)
+        : cn(ctaClasses("primary"), disabled);
 }

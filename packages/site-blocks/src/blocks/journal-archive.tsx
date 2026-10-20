@@ -1,4 +1,7 @@
+import type { LookId } from "@saroh/block-contract";
+
 import { cn } from "../lib/utils";
+import { FRONT_RING, FRONT_TYPE } from "./look-front";
 
 /**
  * The Journal's `archive` look (industry templates U2): every published post
@@ -24,7 +27,15 @@ export interface ArchiveRow {
 const focusRing =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent focus-visible:ring-offset-2 focus-visible:ring-offset-site-bg";
 
-export function JournalArchive({ rows }: { rows: ArchiveRow[] }) {
+export function JournalArchive({
+    rows,
+    look,
+}: {
+    rows: ArchiveRow[];
+    /** The site's look (DEC-172, U7): the rows in its type. */
+    look?: LookId;
+}) {
+    if (look) return <LookArchive rows={rows} look={look} />;
     return (
         <ol className="border-site-border border-t">
             {rows.map((row) => (
@@ -78,7 +89,30 @@ export interface ArchiveYear {
  * year sits above its posts. Each year is a list of its own, labelled by
  * the year, so a screen reader hears where it is.
  */
-export function JournalArchiveByYear({ years }: { years: ArchiveYear[] }) {
+export function JournalArchiveByYear({
+    years,
+    look,
+}: {
+    years: ArchiveYear[];
+    /** The site's look (DEC-172, U7): each year's rows in its type. */
+    look?: LookId;
+}) {
+    if (look) {
+        return (
+            <div className="grid gap-8">
+                {years.map((group) => (
+                    <section
+                        key={group.year}
+                        aria-label={group.year}
+                        className="grid gap-3 min-[700px]:grid-cols-[6rem_minmax(0,1fr)] min-[700px]:gap-x-8"
+                    >
+                        <p className={FRONT_TYPE[look].eyebrow}>{group.year}</p>
+                        <LookArchive rows={group.rows} look={look} />
+                    </section>
+                ))}
+            </div>
+        );
+    }
     return (
         <div className="border-site-border border-t">
             {years.map((group) => (
@@ -128,5 +162,62 @@ export function JournalArchiveByYear({ years }: { years: ArchiveYear[] }) {
                 </section>
             ))}
         </div>
+    );
+}
+
+/**
+ * The archive's rows under a look (DEC-172, U7; Folio's Journal default):
+ * a hairline between each, the date in a column on a desk and over the
+ * title on a phone, the title in the look's display face, its line under
+ * it. The whole row is the post's link. Labels are 12px at least.
+ */
+function LookArchive({ rows, look }: { rows: ArchiveRow[]; look: LookId }) {
+    const type = FRONT_TYPE[look];
+    return (
+        <ol className="border-site-border border-t">
+            {rows.map((row) => (
+                <li key={row.key} className="border-site-border border-b">
+                    <a
+                        href={row.href}
+                        className={cn(
+                            "text-site-fg group grid min-h-11 gap-x-8 gap-y-1.5 py-5 min-[700px]:grid-cols-[10rem_minmax(0,1fr)]",
+                            FRONT_RING,
+                        )}
+                    >
+                        <span className="text-site-muted text-[13px] tabular-nums min-[700px]:pt-1.5">
+                            {row.date ? (
+                                row.dateTime ? (
+                                    <time dateTime={row.dateTime}>
+                                        {row.date}
+                                    </time>
+                                ) : (
+                                    row.date
+                                )
+                            ) : null}
+                        </span>
+                        <span className="grid min-w-0 gap-1.5">
+                            <span
+                                className={cn(
+                                    type.name,
+                                    "underline-offset-4 [overflow-wrap:anywhere] group-hover:underline group-hover:decoration-1",
+                                )}
+                            >
+                                {row.title}
+                            </span>
+                            {row.excerpt ? (
+                                <span
+                                    className={cn(
+                                        type.meta,
+                                        "[text-wrap:pretty]",
+                                    )}
+                                >
+                                    {row.excerpt}
+                                </span>
+                            ) : null}
+                        </span>
+                    </a>
+                </li>
+            ))}
+        </ol>
     );
 }

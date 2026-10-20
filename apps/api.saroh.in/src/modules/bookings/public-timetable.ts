@@ -8,10 +8,13 @@ import {
 import { prisma, runInOrgContext } from "@saroh/database";
 import { DateTime } from "luxon";
 
+import type { GstOnPrice } from "../invoices/gst-price";
+import { loadPriceTerms } from "../invoices/price-terms";
 import { appointmentsOpen } from "./appointments-open";
 import type { PublicDays } from "./public-booking-page";
 import { offeredOnSite, publicDays } from "./public-booking-page";
 import { FixedWindowRateLimiter } from "./rate-limiter";
+import { serviceCharge } from "./service-price";
 import { businessTimezone } from "./staff-availability";
 
 /**
@@ -25,9 +28,10 @@ import { businessTimezone } from "./staff-availability";
  * included, so a time on the timetable is always one the booking page
  * offers and "Full" is the booking page's answer.
  *
- * An explicit allow-list, like every public read: a class's name and length,
- * a start, who takes it by DISPLAY name (ADR-008) and its places left.
- * Never who is off, or why, or anything about other bookers.
+ * An explicit allow-list, like every public read: a class's name, length
+ * and price (the services list's own: the price typed and the GST in or on
+ * it, DEC-172 U7), a start, who takes it by DISPLAY name (ADR-008) and its
+ * places left. Never who is off, or why, or anything about other bookers.
  */
 
 /** How many days the timetable shows: a week, from today. */
@@ -56,6 +60,14 @@ export interface TimetableSession {
     placesLeft: number;
     /** How many the class takes, for "nearly full". */
     capacity: number;
+    /**
+     * The class's price as the business typed it (x 100), and its currency,
+     * as the services list serves them; null for none (never "0").
+     */
+    priceCents: number | null;
+    currency: string | null;
+    /** The GST in or on that price; null for none. */
+    gst: GstOnPrice | null;
 }
 
 /** What the Timetable block reads. */
@@ -72,6 +84,9 @@ interface ClassRow {
     id: string;
     name: string;
     durationMinutes: number;
+    priceCents: number | null;
+    currency: string | null;
+    gst: GstOnPrice | null;
 }
 
 /** Every miss looks the same. */
@@ -127,6 +142,9 @@ export function timetableRows(
                 staffName: start.staffName,
                 placesLeft: Math.max(0, start.placesLeft ?? 0),
                 capacity: days.capacity,
+                priceCents: service.priceCents,
+                currency: service.currency,
+                gst: service.gst,
             };
         }),
     );
@@ -189,7 +207,7 @@ export class PublicTimetableService {
                 (_, i) => first.plus({ days: i }).toISODate() ?? "",
             );
             const open = await appointmentsOpen(organizationId);
-            const classes: ClassRow[] = open
+            const found = open
                 ? await prisma.service.findMany({
                       where: {
                           ...offeredOnSite(organizationId, siteId),
@@ -200,9 +218,30 @@ export class PublicTimetableService {
                               : {}),
                       },
                       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-                      select: { id: true, name: true, durationMinutes: true },
+                      select: {
+                          id: true,
+                          name: true,
+                          durationMinutes: true,
+                          priceCents: true,
+                          currency: true,
+                          gstRate: true,
+                          gstPriceMode: true,
+                      },
                   })
                 : [];
+            // Each row's price as the services list says it (DEC-172 U7).
+            const terms =
+                found.length > 0
+                    ? await loadPriceTerms(prisma, organizationId)
+                    : null;
+            const classes: ClassRow[] = found.map((row) => ({
+                id: row.id,
+                name: row.name,
+                durationMinutes: row.durationMinutes,
+                priceCents: row.priceCents,
+                currency: row.currency,
+                gst: terms ? serviceCharge(row, terms).gst : null,
+            }));
 
             // A class the booking page would refuse (no one takes it, say)
             // leaves the timetable without it, not without the week.

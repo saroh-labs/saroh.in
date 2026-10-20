@@ -191,5 +191,26 @@ ${block}
                     --site-page-margin: ${px(tokens.pageMargin.desk)};
                     --site-section-padding: ${px(tokens.sectionPadding.desk)};
                 }
-            }${fonts && lookNeedsRupee(look) ? rupeeFaceRules() : ""}`;
+            }${cardCorners(at)}${fonts && lookNeedsRupee(look) ? rupeeFaceRules() : ""}`;
+}
+
+/**
+ * The corners of the blocks a look restyles by tokens alone (DEC-172, U7:
+ * hours, FAQ, projects, rich text and the editor's notes). Their cards
+ * and photos are rounded from the BUTTON's radius on Classic, a step
+ * rounder for a card; under Quiet that radius is a pill, so a card would
+ * be a capsule. Here a card takes the look's small radius and a photo its
+ * photo radius, one rule for every such block, without touching their
+ * Classic markup. A block drawn for the look names `rounded-site-s` or
+ * `rounded-site-photo` itself and is not matched.
+ */
+function cardCorners(at: string): string {
+    return `
+            ${at} [class*="rounded-[calc(var(--site-radius)*1.4)]"],
+            ${at} [class*="rounded-[calc(var(--site-radius)*1.6)]"] {
+                border-radius: var(--site-radius-s);
+            }
+            ${at} img[class*="rounded-[var(--site-radius)]"] {
+                border-radius: var(--site-radius-photo);
+            }`;
 }

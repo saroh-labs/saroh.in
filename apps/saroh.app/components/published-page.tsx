@@ -19,6 +19,7 @@ import {
     packPayment,
     planJoinStanding,
 } from "@/app/[domain]/account/plan/actions";
+import { creditFor } from "@/app/[domain]/book/actions";
 import { accountAreaOn } from "@/lib/account-area";
 import { publicApiUrl } from "@/lib/api-url";
 import { getSignedInCustomer } from "@/lib/customer-session";
@@ -98,6 +99,16 @@ export async function PublishedPage({
             siteName={snapshot.site.name}
             look={snapshot.site.look}
             frontDoor={frontDoor}
+            // Under a look, a Timetable's "1 pack class" (U7): the booking
+            // page's own credit read, called from the browser with the
+            // visitor's session, so this page's HTML stays the same for
+            // everyone. Classic's timetable never asks.
+            credit={
+                snapshot.site.look &&
+                page.sections.some((s) => s.type === "timetable")
+                    ? creditFor
+                    : undefined
+            }
             // A customer's page: never the owner's preview, so nothing that
             // speaks to the owner ("No photo yet") is ever drawn here.
             isOwnerPreview={false}

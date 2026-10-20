@@ -55,6 +55,7 @@ import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
 import TimetableSection from "./blocks/timetable";
 import VisitUsSection from "./blocks/visit-us";
+import type { CreditFor } from "./booking-flow/api";
 import type { LookProps } from "./look-context";
 import { lookOf } from "./look-context";
 import type { ModulePageTopContent } from "./module-page-top";
@@ -112,8 +113,15 @@ export default function SectionRenderer({
     isOwnerPreview = false,
     frontDoor = null,
     proof = null,
+    credit,
 }: LookProps & {
     section: Section;
+    /**
+     * Under a look, the signed-in customer's class credit (the booking
+     * page's own read, through the site's server with their session), for
+     * the Timetable's "1 pack class" (U7). Called only in the browser.
+     */
+    credit?: CreditFor;
     /**
      * Under a look, for the page's first hero: its way in beside its
      * button (the booking page or the shop) and the page's proof line
@@ -332,6 +340,7 @@ export default function SectionRenderer({
                 <PacksSection
                     {...site}
                     content={content as RenderedPacks}
+                    plansOnPage={(plans?.plans.length ?? 0) > 0}
                     feed={packs}
                     prices={prices}
                     apiUrl={apiUrl}
@@ -364,6 +373,7 @@ export default function SectionRenderer({
                     siteId={siteId}
                     bookHref={bookHref}
                     timetable={fixtures?.timetable}
+                    credit={site.look ? credit : undefined}
                 />
             );
         case "hours":
@@ -490,8 +500,11 @@ export function PageSections({
     look,
     isOwnerPreview = false,
     frontDoor = null,
+    credit,
 }: LookProps & {
     sections: Section[];
+    /** The signed-in customer's class credit, for a look's Timetable (U7). */
+    credit?: CreditFor;
     /**
      * Under a look: the way in the page's first hero offers beside its
      * button (U6), worked out by the live site from what it serves now
@@ -597,6 +610,7 @@ export function PageSections({
                         siteName={siteName}
                         look={look}
                         isOwnerPreview={isOwnerPreview}
+                        credit={credit}
                         {...(i === opener ? { frontDoor, proof } : {})}
                     />
                 );

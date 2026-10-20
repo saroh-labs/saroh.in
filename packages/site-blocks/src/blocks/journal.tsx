@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import type { RenderedJournal } from "@saroh/block-contract";
+import type { LookId, RenderedJournal } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
@@ -12,6 +12,13 @@ import type { LookProps } from "../look-context";
 import type { ArchiveYear } from "./journal-archive";
 import { JournalArchive, JournalArchiveByYear } from "./journal-archive";
 import { JournalLead } from "./journal-lead";
+import type { LookPostCard } from "./journal-look";
+import {
+    LookAllPosts,
+    LookJournalFrame,
+    LookLead,
+    LookPostCards,
+} from "./journal-look";
 import type { JournalFeed, JournalPost } from "./journal-posts";
 import { JOURNAL_DEFAULT_COUNT, journalCardPosts } from "./journal-posts";
 import { cardLink, listCard, listPhoto } from "./list-layout";
@@ -247,11 +254,17 @@ function inlineText(html: string): string {
  * polish); null when there is no body to count, so nothing is claimed.
  */
 export function readingTime(html: string | null | undefined): string | null {
+    const minutes = readingMinutes(html);
+    if (minutes === null) return null;
+    return `About ${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+}
+
+/** The minutes `readingTime` says, as a number; null with no body. */
+export function readingMinutes(html: string | null | undefined): number | null {
     const text = decoded(withoutTags(withoutScriptsAndStyles(html ?? "")));
     if (text === "") return null;
     const words = text.split(" ").length;
-    const minutes = Math.max(1, Math.round(words / 230));
-    return `About ${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+    return Math.max(1, Math.round(words / 230));
 }
 
 /**
@@ -313,6 +326,7 @@ export default function JournalSection({
     siteId,
     apiUrl = DEFAULT_API_URL,
     now,
+    look,
 }: LookProps & {
     content: RenderedJournal;
     /** The posts, read by the page that serves the site (live or preview). */
@@ -379,6 +393,7 @@ export default function JournalSection({
                 title={title}
                 feed={feed}
                 now={now}
+                look={look}
             />
         );
     }
@@ -432,6 +447,7 @@ export default function JournalSection({
             title={title}
             feed={state.feed}
             now={now}
+            look={look}
         />
     );
 }
@@ -500,17 +516,20 @@ function JournalCards({
     title,
     feed,
     now,
+    look: siteLook,
 }: {
     content: RenderedJournal;
     title: string;
     feed: JournalFeed;
     /** The moment "this year" is read against. Tests pin it. */
     now?: Date;
+    /** The site's look (DEC-172, U7); absent is Classic. */
+    look?: LookId;
 }) {
     const look = resolveVariant("journal", content);
     // The lead look (template polish): the newest post, in depth.
     if (look === "lead") {
-        return <LeadSection content={content} feed={feed} />;
+        return <LeadSection content={content} feed={feed} look={siteLook} />;
     }
     // The archive look (U2): every post, dated, whatever the count says.
     const archive = look === "archive";
@@ -545,10 +564,16 @@ function JournalCards({
         });
         const total = feed.posts.length;
         const more = limit ? (
-            <a href={index || "/"} className={cn(textButton, "shrink-0")}>
-                All {total} {total === 1 ? "entry" : "entries"}{" "}
-                <span aria-hidden="true">→</span>
-            </a>
+            siteLook ? (
+                <LookAllPosts look={siteLook} href={index || "/"}>
+                    All {total} {total === 1 ? "entry" : "entries"}
+                </LookAllPosts>
+            ) : (
+                <a href={index || "/"} className={cn(textButton, "shrink-0")}>
+                    All {total} {total === 1 ? "entry" : "entries"}{" "}
+                    <span aria-hidden="true">→</span>
+                </a>
+            )
         ) : content.showTotal ? (
             <span
                 data-journal-total=""
@@ -566,10 +591,24 @@ function JournalCards({
                 if (last?.year === year) last.rows.push(row);
                 else years.push({ year, rows: [row] });
             }
+            if (siteLook) {
+                return (
+                    <LookJournalFrame look={siteLook} title={title} more={more}>
+                        <JournalArchiveByYear years={years} look={siteLook} />
+                    </LookJournalFrame>
+                );
+            }
             return (
                 <JournalFrame title={title} more={more}>
                     <JournalArchiveByYear years={years} />
                 </JournalFrame>
+            );
+        }
+        if (siteLook) {
+            return (
+                <LookJournalFrame look={siteLook} title={title} more={more}>
+                    <JournalArchive rows={rows} look={siteLook} />
+                </LookJournalFrame>
             );
         }
         return (
@@ -584,6 +623,44 @@ function JournalCards({
     // "Show as" and "Button" (G16). Absent: cards, and no words of their own.
     const list = content.layout === "list";
     const label = said(content.buttonLabel);
+
+    // Under a look (DEC-172, U7): the look's cards, a text card for a post
+    // with no photo, and who wrote it with how long it takes to read.
+    if (siteLook) {
+        const cards: LookPostCard[] = posts.map((post) => {
+            const live = post.live !== false && post.publishedAt !== null;
+            const minutes = readingMinutes(post.content);
+            return {
+                key: post.slug,
+                href: `${base}/${encodeURIComponent(post.slug)}`,
+                title: post.title,
+                image: showImages ? said(post.image) : null,
+                excerpt: showExcerpts ? postExcerpt(post) : null,
+                meta:
+                    [
+                        said(post.author),
+                        live ? null : "Not published",
+                        minutes ? `${minutes} min` : null,
+                    ]
+                        .filter((part): part is string => Boolean(part))
+                        .join(" · ") || null,
+                label,
+            };
+        });
+        return (
+            <LookJournalFrame
+                look={siteLook}
+                title={title}
+                more={
+                    <LookAllPosts look={siteLook} href={base || "/"}>
+                        All posts
+                    </LookAllPosts>
+                }
+            >
+                <LookPostCards look={siteLook} posts={cards} list={list} />
+            </LookJournalFrame>
+        );
+    }
 
     return (
         <JournalFrame
@@ -709,15 +786,45 @@ function JournalCards({
 function LeadSection({
     content,
     feed,
+    look,
 }: {
     content: RenderedJournal;
     feed: JournalFeed;
+    /** The site's look (DEC-172, U7); absent is Classic. */
+    look?: LookId;
 }) {
     if (feed.posts.length === 0) return null;
     const post = feed.posts[0];
     const own = said(content.title);
     const live = post.live !== false && post.publishedAt !== null;
     const index = trimTrailingSlashes(feed.basePath);
+    if (look) {
+        return (
+            <LookJournalFrame look={look} title={own}>
+                <LookLead
+                    look={look}
+                    titled={own !== null}
+                    post={{
+                        href: `${index}/${encodeURIComponent(post.slug)}`,
+                        title: post.title,
+                        image:
+                            content.showImages !== false
+                                ? said(post.image)
+                                : null,
+                        date: live
+                            ? postDay(post.publishedAt ?? "")
+                            : "Not published",
+                        dateTime: live
+                            ? (post.publishedAt ?? "").slice(0, 10)
+                            : null,
+                        dek: said(post.excerpt),
+                        minutes: readingTime(post.content),
+                        paragraphs: openingParagraphs(post.content),
+                    }}
+                />
+            </LookJournalFrame>
+        );
+    }
     const lead = (
         <JournalLead
             titled={own !== null}

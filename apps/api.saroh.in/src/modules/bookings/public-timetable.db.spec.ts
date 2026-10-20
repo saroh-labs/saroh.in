@@ -51,6 +51,7 @@ async function classOn(
     dayOfWeek: number,
     hour: number,
     capacity = 8,
+    priceCents: number | null = null,
 ) {
     return (
         await prisma.service.create({
@@ -59,6 +60,8 @@ async function classOn(
                 name,
                 durationMinutes: 60,
                 capacity,
+                priceCents,
+                currency: priceCents === null ? null : "INR",
                 timezone: "UTC",
                 availabilityRules: {
                     create: {
@@ -80,7 +83,14 @@ let pt: string;
 
 beforeAll(async () => {
     gym = await business("Iron Room");
-    strength = await classOn(gym.organizationId, "Strength", MONDAY, 7);
+    strength = await classOn(
+        gym.organizationId,
+        "Strength",
+        MONDAY,
+        7,
+        8,
+        70_000,
+    );
     yoga = await classOn(gym.organizationId, "Yoga", WEDNESDAY, 18);
     // A one-to-one: never on a timetable.
     pt = await classOn(gym.organizationId, "Personal training", MONDAY, 9, 1);
@@ -106,6 +116,24 @@ describe("Timetable (real database)", () => {
         const starts = read.sessions.map((s) => s.startAt);
         expect([...starts].sort()).toEqual(starts);
         expect(JSON.stringify(read)).not.toMatch(/organizationId|staffId/);
+    });
+
+    it("says each class's price as the services list does, and none as none (DEC-172 U7)", async () => {
+        const read = await timetable.read(
+            gym.siteId,
+            [],
+            "visitor",
+            nextMonday(5),
+        );
+        const priced = read.sessions.find((s) => s.serviceId === strength);
+        const free = read.sessions.find((s) => s.serviceId === yoga);
+        expect(priced).toMatchObject({
+            priceCents: 70_000,
+            currency: "INR",
+            gst: null,
+        });
+        // No price typed: null, never "0".
+        expect(free).toMatchObject({ priceCents: null, currency: null });
     });
 
     it("lists only sessions the booking page itself offers", async () => {

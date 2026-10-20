@@ -6,6 +6,8 @@
  *   GET ${apiUrl}/public/sites/:siteId/timetable[?services=a,b]
  */
 
+import type { GstOnPrice } from "./gst-price";
+
 /** One class session, as the public read returns it. */
 export interface TimetableSession {
     serviceId: string;
@@ -19,6 +21,15 @@ export interface TimetableSession {
     staffName: string | null;
     placesLeft: number;
     capacity: number;
+    /**
+     * The class's price as the services list serves it (DEC-172 U7): the
+     * amount typed x 100 and its currency, null for none. Absent from an
+     * older API, where a row shows no price rather than a wrong one.
+     */
+    priceCents?: number | null;
+    currency?: string | null;
+    /** The GST in or on the price; null for none. Absent from an older API. */
+    gst?: GstOnPrice | null;
 }
 
 /** What the public timetable read returns. */

@@ -3,6 +3,7 @@ import {
     plansAutopayMethods,
     plansNotTakingOrders,
     plansOf,
+    plansPauseWeeks,
     plansPayOnline,
 } from "@saroh/site-blocks";
 
@@ -31,6 +32,8 @@ export async function getPublicPlans(siteId: string): Promise<PlansRead> {
         autopayMethods: plansAutopayMethods(body),
         // #800: a website its plan paused takes no orders.
         ...(plansNotTakingOrders(body) ? { notTakingOrders: true } : {}),
+        // DEC-172 U7: how long members may pause; none from an older API.
+        pauseWeeks: plansPauseWeeks(body),
     };
 }
 

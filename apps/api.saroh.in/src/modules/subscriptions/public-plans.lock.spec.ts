@@ -26,6 +26,8 @@ jest.mock("@saroh/database", () => {
                 findFirst: jest.fn().mockResolvedValue({ id: "m_1" }),
             },
             subscriptionPlan: { findMany: jest.fn() },
+            // Members may pause unless the business says not (U7).
+            businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
         },
     };
 });
@@ -91,6 +93,7 @@ describe("the site's plans and the business's Saroh plan", () => {
             payOnline: false,
             autopayMethods: [],
             offered: false,
+            pauseWeeks: [],
         });
         expect(findMany).not.toHaveBeenCalled();
     });

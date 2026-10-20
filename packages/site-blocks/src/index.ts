@@ -117,6 +117,7 @@ export {
     plansAutopayMethods,
     plansNotTakingOrders,
     plansOf,
+    plansPauseWeeks,
     plansPayOnline,
 } from "./lib/plans-read";
 // Called by saroh.app's server: from a module with no "use client".

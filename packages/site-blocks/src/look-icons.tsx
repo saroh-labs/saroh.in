@@ -17,7 +17,8 @@ export type LookIconName =
     | "you"
     | "page"
     | "call"
-    | "chat";
+    | "chat"
+    | "pin";
 
 const PATHS: Record<LookIconName, string> = {
     menu: "M4 7h16M4 12h16M4 17h16",
@@ -30,6 +31,8 @@ const PATHS: Record<LookIconName, string> = {
     page: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
     call: "M6.5 3.5h3l1.5 4-2 1.5a11 11 0 0 0 6 6l1.5-2 4 1.5v3a2 2 0 0 1-2 2A16 16 0 0 1 4.5 5.5a2 2 0 0 1 2-2z",
     chat: "M4 5h16v11H9l-5 4z",
+    // Get directions (U7): a map pin, never a refresh arrow.
+    pin: "M12 21s-6.5-5.9-6.5-11a6.5 6.5 0 0 1 13 0c0 5.1-6.5 11-6.5 11zM12 12.25a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5z",
 };
 
 /** Quiet's menu is two lines (VDHeader); the others draw three. */

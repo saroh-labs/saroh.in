@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import type { RenderedPlans } from "@saroh/block-contract";
+import type { LookId, RenderedPlans } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
 import type { AutopayMethod } from "../autopay/api";
@@ -25,6 +25,14 @@ import { JoinSheet } from "../prices/join-sheet";
 import { planBrowsePrice, planEvery, planPrice } from "../prices/plan-words";
 import { askAboutHref } from "../shop/ask-about-ordering";
 import { NotTakingOrders } from "../shop/not-taking-orders";
+import {
+    PriceFrame,
+    PriceParts,
+    priceButton,
+    priceColumn,
+    priceList,
+    weeksWords,
+} from "./prices-look";
 
 /**
  * `plans` v1 — the business's subscription plans on sale, read live (G9).
@@ -97,6 +105,12 @@ export interface PlansFeed {
      * plans show, with no button, and the section says so.
      */
     notTakingOrders?: boolean;
+    /**
+     * How long a member may pause, in weeks (DEC-172 U7), from the read:
+     * said beside the plans under a look. Absent or empty: pausing isn't
+     * offered, and nothing is said about it.
+     */
+    pauseWeeks?: number[];
 }
 
 /** What the section is called when the merchant left the title empty. */
@@ -140,6 +154,7 @@ export default function PlansSection({
     prices = null,
     siteId,
     apiUrl = DEFAULT_API_URL,
+    look,
 }: LookProps & {
     content: RenderedPlans;
     /** The plans, read by the page that serves the site (live or preview). */
@@ -202,6 +217,7 @@ export default function PlansSection({
                 feed={feed}
                 prices={prices}
                 apiUrl={apiUrl}
+                look={look}
             />
         );
     }
@@ -279,6 +295,7 @@ export default function PlansSection({
                 payOnline: state.payOnline,
             }}
             canvas
+            look={look}
         />
     );
 }
@@ -359,6 +376,7 @@ function PlanCards({
     prices = null,
     canvas = false,
     apiUrl,
+    look,
 }: {
     content: RenderedPlans;
     title: string;
@@ -368,6 +386,8 @@ function PlanCards({
     apiUrl?: string;
     /** Drawn in the editor: the button shows its words but goes nowhere. */
     canvas?: boolean;
+    /** The site's look (DEC-172, U7); absent is Classic. */
+    look?: LookId;
 }) {
     // Not taking orders (#800): nothing to click that cannot work, not even
     // "Ask about joining".
@@ -392,6 +412,125 @@ function PlanCards({
         flow.signedIn(
             () => setJoining(plan),
             `the customer signs in here and pays ${planPrice(plan)} to join ${plan.name}`,
+        );
+    }
+
+    // Join's sheets, the same under every look.
+    const sheets = joins ? (
+        <>
+            {flow.sheet}
+            {flow.customer ? (
+                <JoinSheet
+                    plan={joining}
+                    onClose={() => setJoining(null)}
+                    businessName={prices.businessName}
+                    customer={flow.customer}
+                    api={prices.join}
+                    apiUrl={apiUrl}
+                    autopayMethods={feed.autopayMethods ?? []}
+                    onJoined={(message) => {
+                        setJoining(null);
+                        setDone(message);
+                    }}
+                    onSignedOut={() => {
+                        const plan = joining;
+                        setJoining(null);
+                        flow.signInAgain(() => setJoining(plan));
+                    }}
+                />
+            ) : null}
+        </>
+    ) : null;
+
+    // Under a look (DEC-172, U7): the look's columns, the highlighted
+    // plan's Join the one filled button, and how long a member may pause
+    // as the business allows it.
+    if (look) {
+        const pause = weeksWords(feed.pauseWeeks ?? []);
+        return (
+            <PriceFrame look={look} title={title} intro={said(content.intro)}>
+                {done && prices ? (
+                    <PricesDone
+                        message={done}
+                        accountHref={prices.accountHref}
+                    />
+                ) : null}
+                {stopped ? <NotTakingOrders /> : null}
+                <ul className={priceList(look, content.layout === "list")}>
+                    {feed.plans.map((plan, index) => {
+                        const highlighted = highlightFirst && index === 0;
+                        const classes = priceButton(look, highlighted);
+                        const primary = highlighted
+                            ? { "data-site-primary": "" }
+                            : {};
+                        const action = canvas ? (
+                            <span className={classes}>{label}</span>
+                        ) : joins ? (
+                            <button
+                                type="button"
+                                onClick={() => join(plan)}
+                                aria-label={`${label}: ${plan.name}`}
+                                className={classes}
+                                {...primary}
+                            >
+                                {label}
+                            </button>
+                        ) : feed.joinHref && !stopped ? (
+                            <a
+                                href={joinHref(feed.joinHref, plan.name)}
+                                aria-label={`${label}: ${plan.name}`}
+                                className={classes}
+                                {...primary}
+                            >
+                                {label}
+                            </a>
+                        ) : null;
+                        return (
+                            <li
+                                key={plan.id}
+                                data-plan-column=""
+                                className={priceColumn(look, highlighted)}
+                            >
+                                <PriceParts
+                                    look={look}
+                                    eyebrow={planEvery(plan)}
+                                    badge={
+                                        highlighted && plan.mostChosen
+                                            ? MOST_CHOSEN
+                                            : null
+                                    }
+                                    name={plan.name}
+                                    price={
+                                        showPrices
+                                            ? paying
+                                                ? planPrice(plan)
+                                                : planBrowsePrice(plan)
+                                            : null
+                                    }
+                                    gst={
+                                        showPrices && paying
+                                            ? gstUnderWords(
+                                                  plan.gst,
+                                                  plan.currency,
+                                              )
+                                            : null
+                                    }
+                                    lines={[
+                                        showDescriptions
+                                            ? said(plan.description)
+                                            : null,
+                                    ]}
+                                    rules={[
+                                        pause ? `Pause for ${pause}` : null,
+                                    ]}
+                                    action={action}
+                                />
+                            </li>
+                        );
+                    })}
+                </ul>
+                {sheets}
+            </PriceFrame>
         );
     }
 
@@ -500,31 +639,7 @@ function PlanCards({
                     );
                 })}
             </ul>
-            {joins ? (
-                <>
-                    {flow.sheet}
-                    {flow.customer ? (
-                        <JoinSheet
-                            plan={joining}
-                            onClose={() => setJoining(null)}
-                            businessName={prices.businessName}
-                            customer={flow.customer}
-                            api={prices.join}
-                            apiUrl={apiUrl}
-                            autopayMethods={feed.autopayMethods ?? []}
-                            onJoined={(message) => {
-                                setJoining(null);
-                                setDone(message);
-                            }}
-                            onSignedOut={() => {
-                                const plan = joining;
-                                setJoining(null);
-                                flow.signInAgain(() => setJoining(plan));
-                            }}
-                        />
-                    ) : null}
-                </>
-            ) : null}
+            {sheets}
         </PlansFrame>
     );
 }

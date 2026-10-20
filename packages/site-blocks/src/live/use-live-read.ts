@@ -208,6 +208,16 @@ export function useLiveRead<T>(
     return { status, data, fetchedAt: snap.fetchedAt };
 }
 
+/**
+ * Read `url` again now, for a fact's Try again (U7): every fact sharing
+ * the read hears the answer. Nothing while no fact reads it.
+ */
+export function refreshLiveRead(url: string | null): void {
+    if (!url) return;
+    const source = sources.get(url);
+    if (source) void readOnce(url, source);
+}
+
 /** For tests: forget every source, as a fresh page would. */
 export function resetLiveReads(): void {
     sources.forEach((source) => {

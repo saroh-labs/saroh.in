@@ -21,6 +21,7 @@ vi.mock("@/app/[domain]/account/actions", () => ({
 vi.mock("@/app/[domain]/account/messages/actions", () => ({
     sendMessage: vi.fn(),
 }));
+vi.mock("@/app/[domain]/book/actions", () => ({ creditFor: vi.fn() }));
 vi.mock("@/app/[domain]/account/plan/actions", () => ({
     buyPack: vi.fn(),
     joinPlan: vi.fn(),
@@ -54,11 +55,19 @@ vi.mock("@/lib/site-product-grids", () => ({
 }));
 
 interface Drawn {
-    props: { isOwnerPreview?: boolean; look?: unknown; frontDoor?: unknown };
+    props: {
+        isOwnerPreview?: boolean;
+        look?: unknown;
+        frontDoor?: unknown;
+        credit?: unknown;
+    };
 }
 
-async function draw(look?: string): Promise<Drawn> {
-    const page = { path: "/", kind: "PAGE", sections: [] };
+async function draw(
+    look?: string,
+    sections: { type: string; content: unknown }[] = [],
+): Promise<Drawn> {
+    const page = { path: "/", kind: "PAGE", sections };
     const snapshot = {
         site: { name: "Kiln", ...(look ? { look } : {}) },
         pages: [page],
@@ -84,5 +93,15 @@ describe("a published page", () => {
         expect(drawn.props.isOwnerPreview).toBe(false);
         expect(drawn.props.look).toBeUndefined();
         expect(drawn.props.frontDoor).toBeNull();
+    });
+
+    it("hands a look's Timetable the credit read for '1 pack class', and only then (U7)", async () => {
+        const timetable = [{ type: "timetable", content: {} }];
+        expect((await draw("quiet", timetable)).props.credit).toBeTypeOf(
+            "function",
+        );
+        // No timetable on the page, or Classic: nothing to ask.
+        expect((await draw("quiet")).props.credit).toBeUndefined();
+        expect((await draw(undefined, timetable)).props.credit).toBeUndefined();
     });
 });

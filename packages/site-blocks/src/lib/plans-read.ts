@@ -84,3 +84,18 @@ export function plansAutopayMethods(body: unknown): AutopayMethod[] {
         (body as { autopayMethods?: unknown } | null)?.autopayMethods,
     );
 }
+
+/**
+ * How long a member may pause, in weeks (DEC-172 U7): the read's own list
+ * while the business lets members pause from their account. None when the
+ * read doesn't say (an older API) or says anything strange: the site then
+ * says nothing about pausing, rather than a rule a template typed.
+ */
+export function plansPauseWeeks(body: unknown): number[] {
+    const weeks = (body as { pauseWeeks?: unknown } | null)?.pauseWeeks;
+    if (!Array.isArray(weeks)) return [];
+    return weeks.filter(
+        (w): w is number =>
+            typeof w === "number" && Number.isInteger(w) && w > 0,
+    );
+}
