@@ -2197,3 +2197,14 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **Defaults taken while open** (the plan's Assumptions A1–A17): D1 has no switch of its own; a renewal with live autopay isn't sent as a pay request; the refund notice goes when the provider accepts it; "Tell the customer" on an order cancel starts ticked; a team reply is held 60 s and coalesced; one enquiry auto-reply per address per day; Delivered, Sent and later tracking share one switch; the pack receipt is DEC-173's receipt with a pack line; staff alerts reach only staff with a login; overdue reminders count only automatic ones; a back-in-stock opt-in makes no contact and is no marketing consent.
 - Rules: added when built (`docs/patterns/backend-jobs.md` → Customer notices and Team alerts; `docs/patterns/saroh-product.md` → Communications).
 - Rules: `docs/patterns/backend-data-and-money.md` → Money (the ledger in integer paise, U1 #1113); the rest added as each unit is built.
+
+## DEC-176 The GST rate is chosen with buttons: 0, 5, 18 and 40%, with the rest behind Other rate
+
+**Status: Accepted — 2026-10-20, to build** · owner. Plan: `docs/plans/2026-10-20-003-feat-gst-rate-picker-plan.md`, issue #1160.
+
+- One shared picker, shown as buttons, everywhere a GST rate is asked. It replaces the dropdowns and the paper editor's own chips.
+- **Main buttons** are the slabs since GST 2.0 (22 Sep 2025): 0% (nil-rated or exempt), 5%, 18% and 40%. **Other rate** opens 0.25%, 1.5%, 3%, 12% and 28% in place.
+- **1.5% is added** to the rates GST has, for cut and polished diamonds.
+- **Nothing saved changes:** a rate saved at 12% or 28% keeps it and opens with Other shown; issued invoices are never touched.
+- Not set stays only where a field may be left empty today. There is no new business "usual rate" setting.
+- Rules: added when built (`docs/patterns/frontend-forms.md`).
