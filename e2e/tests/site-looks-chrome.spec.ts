@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test";
 import { phone as aPhone } from "../fixtures/own-data";
 import { setNorthwindLook } from "../fixtures/site-look";
 import { urls } from "../playwright.config";
-import { asNewVisitor, signInOnSheet } from "./site-codes";
+import { asNewVisitor, lastCode, readSiteCode } from "./site-codes";
 
 /**
  * Each look's chrome in a browser (DEC-172, plan U5, #1092): the header,
@@ -287,9 +287,22 @@ test.describe("each look's chrome", { tag: "@serial" }, () => {
                 account.getByRole("link", { name: "Sign in" }),
             ).toBeVisible();
 
+            // Under a look, /account signed out is the sign-in page itself,
+            // with the code asked inline (U12), not Classic's sheet.
             await page.goto(`${SITE}/account`);
-            await page.getByRole("button", { name: "Sign in" }).first().click();
-            await signInOnSheet(page, `u5-${Date.now()}@example.com`);
+            const email = `u5-${Date.now()}@example.com`;
+            const frame = page.locator('[data-account-look="folio"]');
+            const before = lastCode(email);
+            await frame.getByLabel("Email").fill(email);
+            await frame.getByRole("button", { name: "Send me a code" }).click();
+            await frame
+                .getByLabel("Code", { exact: true })
+                .fill(await readSiteCode(email, before));
+            await expect(
+                page.locator('nav[aria-label="Your account"]').filter({
+                    visible: true,
+                }),
+            ).toHaveCount(1, { timeout: 15_000 });
             await expect(page).toHaveURL(/\/account$/);
 
             await page.goto(fresh());

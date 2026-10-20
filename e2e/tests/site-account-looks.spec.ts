@@ -73,8 +73,10 @@ function sideways(page: Page): Promise<number> {
 
 /** The account's tabs as this width shows them: one nav, never a tablist. */
 function tabs(page: Page): Locator {
+    // By its own label: the footer's "Your account" column is a nav named
+    // by its heading too, and is no tab.
     return page
-        .getByRole("navigation", { name: "Your account" })
+        .locator('nav[aria-label="Your account"]')
         .filter({ visible: true });
 }
 
@@ -166,7 +168,9 @@ test.describe("the customer's account in each look", { tag: "@serial" }, () => {
                 await expect(
                     page.getByRole("heading", { level: 1 }),
                 ).toHaveText("Your details");
-                await expect(page.getByText(email)).toBeVisible();
+                await expect(
+                    page.getByText(email, { exact: true }),
+                ).toBeVisible();
                 // Every look keeps the data-removal request (U14).
                 await expect(
                     page.getByRole("button", { name: "Ask to remove my data" }),
