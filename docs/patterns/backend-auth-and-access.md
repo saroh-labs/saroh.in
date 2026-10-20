@@ -526,6 +526,26 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   existing things stay readable and editable; only adding is refused. A
   new write that adds a metered thing, or a new switch row, gets its call
   and a row in `billing/plan-limits.db.spec.ts`.
+- **Current** (20 Oct 2026, DEC-177) — **A look, typeface or colourway is
+  free or paid, and the catalogue says which.** The live catalogue's
+  `freeStyles` (`{ looks, fontPairs, colourways }`, ids only, a colourway as
+  `template:colourway`; `freeStylesOf` in `@saroh/pricing-catalog`) lists the
+  free ones, ticked in admin › Plans and modules (`FreeStyles`, under the
+  modules matrix) and published like any other change. A style save
+  (`SitesService.updateStyle`) asks `assertStyleChoicesAllowed`
+  (`sites/site-style-free.ts`): every part it changes must be free, or the
+  plan must include `themes`, else the plan's 403 `MODULE_LOCKED`. Always
+  free, whatever the catalogue says: the system font, the site's own
+  template typefaces and the colourway it was made in, Classic, and
+  whatever the draft (or, for a look, the live site) already has. Swatches
+  and sliders are never paid. It reads the live version, not the business's
+  own, so a published list applies to everyone at once; a save of free parts
+  reads no catalogue and no plan. The editor's read serves the same answer
+  as `styleAccess`, so the panel refuses in place what the save would.
+  Publishing refuses a free id the build has no style for
+  (`pricing/free-style-choices.ts`, which also serves admin its choices). It
+  sits beside `assertLookAllowed` (`SITE_LOOKS`), which is unchanged. The
+  `themes` row still guards picking another template.
 - **Current** (plan shape of 5 Oct) — **A plan without online payments
   stops new money online, never what a business already has.** The
   `payments` and `subscriptions` rows (registry PAYMENTS) are asked where a

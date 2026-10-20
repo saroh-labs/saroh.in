@@ -1,5 +1,5 @@
 import { showError } from "@saroh/ui/toast";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { lookName } from "@/components/sites/look-picker";
@@ -153,9 +153,17 @@ export function useEditorStyle({
         setStyle(inLook(defaults, look));
     }
 
+    // The style the server holds: its own choices stay open to the site
+    // whatever its plan (DEC-177).
+    const savedStyle = useMemo(
+        () => JSON.parse(savedStyleJson) as SiteStyle,
+        [savedStyleJson],
+    );
+
     return {
         style,
         setStyle,
+        savedStyle,
         styleSaving,
         styleDirty,
         resetStyle,

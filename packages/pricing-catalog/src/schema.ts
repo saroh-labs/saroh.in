@@ -183,6 +183,42 @@ export const addonSchema = z.object({
 });
 
 /**
+ * A look, a font pair or a colourway's id in `freeStyles`: a look or a pair
+ * as `@saroh/block-contract` keys it (`quiet`, `fraunces-inter-tight`); a
+ * colourway as `<template>:<colourway>` (`salon:kesar`), since a
+ * colourway's id is only unique within its template.
+ */
+const STYLE_ID = /^[a-z][a-z0-9-]{0,39}$/;
+const COLOURWAY_ID = /^[a-z][a-z0-9-]{0,39}:[a-z][a-z0-9-]{0,39}$/;
+const styleIdSchema = z
+    .string()
+    .regex(STYLE_ID, "Use lower-case letters, digits and dashes");
+const colourwayIdSchema = z
+    .string()
+    .regex(COLOURWAY_ID, "Name a colourway as template:colourway");
+
+/**
+ * Which looks, font pairs and colourways every business may choose
+ * (DEC-177). Free ones work on every plan; the rest need the plan's
+ * `themes` row. Kept here, never in code, so making one free (or paid) is
+ * publishing a version, not a release. A free/paid mark, not a price.
+ *
+ * Absent (every version before DEC-177) or an empty list: none of that kind
+ * is free beyond what a site is always allowed (the visitor's system font,
+ * its own template's fonts and colourway, Classic and what it already has),
+ * which the API decides (`site-style-free.ts`).
+ */
+export const freeStylesSchema = z.object({
+    looks: z.array(styleIdSchema).default([]),
+    fontPairs: z.array(styleIdSchema).default([]),
+    colourways: z.array(colourwayIdSchema).default([]),
+});
+
+/** The three kinds `freeStyles` lists, in the order the admin shows them. */
+export const FREE_STYLE_KINDS = ["looks", "fontPairs", "colourways"] as const;
+export type FreeStyleKind = (typeof FREE_STYLE_KINDS)[number];
+
+/**
  * A snapshot's rows, less the ones the product has retired
  * (`RETIRED_MODULE_IDS`): a version published while one was sold still
  * reads, without it. An add-on that only switched such a row on goes too.
@@ -210,6 +246,7 @@ const catalogShape = z.object({
                     ),
             ),
         ),
+    freeStyles: freeStylesSchema.optional(),
 });
 
 function duplicates(ids: readonly string[]): string[] {
@@ -232,6 +269,12 @@ export const catalogSchema = catalogShape.superRefine((c, ctx) => {
     ] as const) {
         for (const d of duplicates(list))
             issue(`Two ${label} share the id "${d}"`, [label]);
+    }
+
+    for (const kind of FREE_STYLE_KINDS) {
+        for (const d of duplicates(c.freeStyles?.[kind] ?? [])) {
+            issue(`"${d}" is listed as free twice`, ["freeStyles", kind]);
+        }
     }
 
     const featured = c.plans.filter((p) => p.featured);
@@ -354,6 +397,7 @@ export type Addon = z.infer<typeof addonSchema>;
 export type Yearly = z.infer<typeof yearlySchema>;
 export type Trial = z.infer<typeof trialSchema>;
 export type Autopay = z.infer<typeof autopaySchema>;
+export type FreeStyles = z.infer<typeof freeStylesSchema>;
 
 /** A cell the snapshot leaves out reads as excluded and locked. */
 export const MISSING_CELL: ExcludedCell = { inc: false, off: "locked" };
@@ -376,6 +420,22 @@ export function autopayCharges(
     catalog: { autopay?: { charges?: number } } | null | undefined,
 ): number {
     return catalog?.autopay?.charges ?? AUTOPAY_CHARGES_DEFAULT;
+}
+
+/**
+ * The looks, font pairs and colourways a catalogue makes free (DEC-177),
+ * every list present. Tolerates a snapshot or draft read without the schema,
+ * or one published before DEC-177: none is free then.
+ */
+export function freeStylesOf(
+    catalog: { freeStyles?: Partial<FreeStyles> } | null | undefined,
+): FreeStyles {
+    const f = catalog?.freeStyles;
+    return {
+        looks: [...(f?.looks ?? [])],
+        fontPairs: [...(f?.fontPairs ?? [])],
+        colourways: [...(f?.colourways ?? [])],
+    };
 }
 
 /** Whether an add-on is offered on a plan: every plan unless it names some. */

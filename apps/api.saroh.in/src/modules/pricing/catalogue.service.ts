@@ -12,6 +12,8 @@ import {
 } from "@saroh/database";
 import type { Catalog } from "@saroh/pricing-catalog";
 import { diff, planPriceOf, validateCatalog } from "@saroh/pricing-catalog";
+import type { FreeStyleChoices } from "./free-style-choices";
+import { freeStyleChoices } from "./free-style-choices";
 
 import type { Impact, ModuleUsage } from "./impact";
 import { moduleUsage } from "./impact";
@@ -114,6 +116,11 @@ export interface AdminPricing {
     usage: Record<string, ModuleUsage[]>;
     /** Businesses counted, and the modules whose usage is counted at all. */
     businesses: { total: number; measured: string[] };
+    /**
+     * The looks, typefaces and colourways that can be marked free
+     * (DEC-177), as this build has them.
+     */
+    styles: FreeStyleChoices;
 }
 
 /** `GET /admin/pricing/impact`. */
@@ -440,6 +447,7 @@ export class CatalogueService {
             plans,
             usage,
             businesses: { total: businesses.length, measured: [...measured] },
+            styles: freeStyleChoices(),
         };
     }
 

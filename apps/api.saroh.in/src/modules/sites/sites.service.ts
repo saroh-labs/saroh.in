@@ -19,7 +19,6 @@ import { isDeepStrictEqual } from "node:util";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
 import { EntitlementService } from "../billing/entitlement.service";
-import { planMeter } from "../billing/metering.service";
 import { keptPostsOnSite } from "../content/post-paused";
 import { parsePostsPrefix } from "../content/posts-prefix";
 import {
@@ -139,6 +138,8 @@ import {
     siteStyleOptions,
     siteStyleVariables,
 } from "./site-style";
+import type { SiteStyleAccess } from "./site-style-free";
+import { assertStyleChoicesAllowed, siteStyleAccess } from "./site-style-free";
 import {
     assertSiteLookOffered,
     recordedTemplate,
@@ -551,6 +552,13 @@ export interface SiteDetailView {
      * has one keeps the row with it and Classic (plan U16).
      */
     looksAvailable: boolean;
+    /**
+     * Which looks, typefaces and colourways this site may choose for
+     * nothing, and whether the plan opens the rest (DEC-177): the Style
+     * panel marks a paid one and refuses it in place on a plan without
+     * `themes`, as the save would.
+     */
+    styleAccess: SiteStyleAccess;
     /**
      * The look the live site is in (DEC-172, U16): null for Classic or a
      * site never published. The editor says "Not published yet" while the
@@ -1091,6 +1099,11 @@ export class SitesService {
             navigation: parseSiteNavigation(navigation),
             sellsFrom,
             looksAvailable: await looksRolloutOn(ctx.organizationId),
+            styleAccess: await siteStyleAccess(ctx.organizationId, {
+                templateId,
+                templateVersion,
+                templateStyleId,
+            }),
             liveLook: pending.get(site.id)?.liveLook ?? null,
             // Asked only when it could be true: Commerce's gate is a read.
             shopAwaitsSellsFrom:
@@ -1250,9 +1263,9 @@ export class SitesService {
         // Setting or changing a look needs `SITE_LOOKS` (DEC-172); keeping
         // the one the draft has, or going back to Classic, never does.
         await assertLookAllowed(ctx.organizationId, siteId, style);
-        // Changing the theme and fonts is a plan row (U13); a site keeps the
-        // look it has where the plan leaves it off.
-        await planMeter.assertIncluded(ctx.organizationId, "themes");
+        // A paid look, typeface or colourway needs the plan's `themes` row
+        // (DEC-177); free ones, and what the site already has, never do.
+        await assertStyleChoicesAllowed(ctx.organizationId, siteId, style);
 
         await prisma.site.update({
             where: { id: siteId },

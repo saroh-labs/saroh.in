@@ -13,7 +13,8 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  * put back by `fixtures/site-look.ts`), picks Quiet in the editor's Brand
  * panel: the canvas draws Quiet at once, the draft saves it, publishing
  * puts it on the live site, and choosing Classic brings the site back,
- * the row saying it isn't published yet.
+ * the row saying it isn't published yet. Each look's Preview (DEC-177)
+ * draws the home page in it and closes back to the look as it was.
  *
  * @serial: it changes and publishes Northwind's site style.
  */
@@ -160,6 +161,61 @@ test.describe("the Look row", { tag: "@serial" }, () => {
         } finally {
             // Northwind's style and its flag override as they were, and
             // the live site republished from them.
+            await look.restore();
+        }
+    });
+
+    test("previews Folio and closes, the site still Classic (DEC-177)", async ({
+        browser,
+        page,
+    }, testInfo) => {
+        test.setTimeout(120_000);
+        const phone = testInfo.project.name.startsWith("phone");
+        const look = await setNorthwindLook(browser, null, testInfo);
+        try {
+            await useSession(page, "owner");
+            await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
+            await page.goto(`${urls.APP_URL}/sites/${look.siteId}`);
+            await openBrand(page, phone);
+
+            const row = page.getByRole("radiogroup", { name: "Look" });
+            await expect(row).toBeVisible();
+            const open = page.getByRole("button", { name: "Preview Folio" });
+            await open.click();
+
+            // A large dialog on a desk, a full-height sheet on a phone:
+            // the home page in Folio, its name and what it suits.
+            const preview = page.getByRole("dialog", { name: "Folio" });
+            await expect(preview).toBeVisible();
+            await expect(
+                preview.getByText(/Suits classes and yoga/),
+            ).toBeVisible();
+            const drawn = preview.locator('[data-look-preview="folio"]');
+            await expect(drawn).toBeVisible({ timeout: 15_000 });
+            // The desk and phone switch keeps working.
+            await preview.getByRole("radio", { name: "Phone" }).click();
+            await expect(
+                drawn.locator("iframe[data-device-frame]"),
+            ).toBeVisible();
+            await preview.getByRole("radio", { name: "Desk" }).click();
+            await expect(
+                drawn.locator("iframe[data-device-frame]"),
+            ).toHaveCount(0);
+
+            await preview.getByRole("button", { name: "Close" }).last().click();
+            await expect(preview).toHaveCount(0);
+            await expect(open).toBeFocused();
+
+            // Nothing chosen and nothing saved: still Classic.
+            await expect(
+                row.locator('[data-look-choice="classic"]'),
+            ).toHaveAttribute("aria-checked", "true");
+            await expect.poll(() => canvasLook(page)).toBeNull();
+            expect(
+                (await look.owner.get<SiteView>(`/sites/${look.siteId}`)).style
+                    .look ?? null,
+            ).toBeNull();
+        } finally {
             await look.restore();
         }
     });

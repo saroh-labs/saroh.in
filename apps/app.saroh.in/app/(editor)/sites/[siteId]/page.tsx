@@ -155,6 +155,8 @@ export default async function SiteEditorPage({
             // or kept with Classic for a site that has a look already.
             looksAvailable={site.looksAvailable === true}
             liveLook={site.liveLook ?? null}
+            // Which looks, typefaces and colourways are free (DEC-177).
+            styleAccess={site.styleAccess ?? null}
             templateId={site.template?.id ?? null}
             address={
                 siteAddressOf(site, webAddress, RENDERER_APEX)?.host ?? null

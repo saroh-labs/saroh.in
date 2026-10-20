@@ -62,6 +62,24 @@
   Loading shapes wait 300 ms
   (`HELD_AFTER_MS`, `look-theme.ts`), then stand still. The flag and its
   rollout: `docs/architecture/runbooks/SITE_LOOKS_ROLLOUT.md`.
+- **Current** (20 Oct 2026, DEC-177) — **A paid style is refused in the
+  Style panel, and every look can be previewed.** Website › Style takes
+  `rules` (`styleChoiceRules` in `lib/sites/style-access.ts`, from the site
+  read's `styleAccess` and the style the server holds): a paid look,
+  typeface or colourway carries a small "Paid plans" tag; on a plan without
+  "Themes, fonts and templates" choosing one calls nothing, the previous
+  choice stays chosen and drawn, and one line where it was pressed says why
+  with See plans (`PaidRefusal`, `role="alert"`, never a toast). Colours
+  and spacing are never marked. Each look in the Look row has its own
+  "Preview {look}" button beside the radio, never inside it (`ChoiceGroup`'s
+  `layout`), a 44px target on a coarse pointer. It opens `LookPreview`: the
+  shared Dialog, large, on a desk; the shared Sheet from the bottom, full
+  height, on a phone (`useNarrow`). Inside, the home page in that look
+  (the editor's own sections when home is open, else its draft read by
+  `getPageSections`), inert, with a Desk and Phone switch, the look's name
+  and `suits`, Close, and "Use this look", which follows the same rule.
+  Nothing saves and the draft and canvas don't change until then; closing
+  hands the keyboard back to the Preview button.
 - **Current** — **A section's frame and the page's column** (industry
   templates, polish pass). Every section may carry `anchor`, `navLabel` and
   `band` beside its own fields (`section-frame.ts` in `@saroh/block-contract`;

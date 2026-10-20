@@ -35,8 +35,10 @@ import {
     TestReleaseSheets,
 } from "@/components/sites/test-releases/test-release-sheets";
 import { TestReleasesPanel } from "@/components/sites/test-releases/test-releases-panel";
+import { getPageSections } from "@/lib/sites/actions";
 import { flagsByScreenPosition } from "@/lib/sites/editor-positions";
 import { resolveStyleVariables } from "@/lib/sites/style";
+import { styleChoiceRules } from "@/lib/sites/style-access";
 import { publishOverScheduleWarning } from "@/lib/sites/test-releases";
 import type { LookId } from "@saroh/block-contract";
 import { useEffect, useRef, useState } from "react";
@@ -72,6 +74,7 @@ export function SiteEditor({
     styleOptions,
     looksAvailable = false,
     liveLook: initialLiveLook = null,
+    styleAccess = null,
     templateId = null,
     shopOpen = false,
     packsOpen = false,
@@ -227,6 +230,16 @@ export function SiteEditor({
             : undefined,
     });
 
+    // Free and paid looks, typefaces and colourways (DEC-177): what the
+    // server holds stays open to the site whatever its plan.
+    const styleRules = styleChoiceRules(
+        styleAccess,
+        siteStyle.savedStyle,
+        styleOptions,
+        liveLook,
+    );
+    const homePage = pages.find((p) => p.isHome) ?? pages.at(0);
+
     return (
         // The workspace's theme (#335); the page on the canvas is bright.
         <div className="flex h-dvh flex-col bg-background text-foreground">
@@ -288,7 +301,28 @@ export function SiteEditor({
                             templateId,
                             error: siteStyle.lookError,
                             onChoose: siteStyle.chooseLook,
+                            // Each look's Preview draws the home page: the
+                            // editor's own sections when it is open.
+                            preview: {
+                                siteId,
+                                address: address ?? null,
+                                pages,
+                                chrome: canvasChromeFor({
+                                    siteName: chrome.displayName,
+                                    navigation,
+                                    pages,
+                                    footer: chrome.footer,
+                                    homeSections:
+                                        homePage?.id === pageId
+                                            ? sections
+                                            : undefined,
+                                }),
+                                homeSections:
+                                    homePage?.id === pageId ? sections : null,
+                                readPage: (id) => getPageSections(siteId, id),
+                            },
                         }}
+                        styleRules={styleRules}
                     />
                 }
                 canvas={

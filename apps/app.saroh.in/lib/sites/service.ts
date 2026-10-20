@@ -3,6 +3,7 @@ import { apiFetch, getActiveOrgId, getJson, getList } from "@/lib/api/http";
 import type { PlanRefusal } from "@/lib/billing/refusal";
 import { planRefusalOf } from "@/lib/billing/refusal";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
+import type { SiteStyleAccess } from "@/lib/sites/style-access";
 
 // Re-exported so callers keep one import site for "everything about a site",
 // while the pure half stays in a module a client component can reach.
@@ -775,6 +776,12 @@ export interface SiteDetail extends SiteSummary {
      * published. Absent from an older API.
      */
     liveLook?: LookId | null;
+    /**
+     * Which looks, typefaces and colourways this site may choose for
+     * nothing, and whether its plan opens the rest (DEC-177). Absent from
+     * an older API, which reads as all free.
+     */
+    styleAccess?: SiteStyleAccess;
 }
 
 /** Which template a site came from: its id, version and style, if any. */

@@ -1,15 +1,21 @@
 "use client";
 
+import type { LookId } from "@saroh/block-contract";
 import { fontPairStacks } from "@saroh/site-blocks";
+import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { useState } from "react";
 
 import { ChoiceGroup } from "@/components/shared/choice-group";
 import type { LookChoices } from "@/components/sites/look-picker";
-import { LookPicker } from "@/components/sites/look-picker";
+import { LookPicker, lookName } from "@/components/sites/look-picker";
+import { PaidRefusal } from "@/components/sites/paid-refusal";
 import { useSiteFaces } from "@/components/sites/site-faces";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { activeColourway, contrastOk, inColourway } from "@/lib/sites/style";
+import type { PaidKind, StyleChoiceRules } from "@/lib/sites/style-access";
+import { ALL_FREE } from "@/lib/sites/style-access";
 import { Label } from "@saroh/ui/label";
 
 /**
@@ -37,6 +43,13 @@ import { Label } from "@saroh/ui/label";
  * The Look row leads the panel (DEC-172, U16) when `looks` is given and
  * there is a look to offer; every control below it stays, under a look
  * too, and comes back into force with Classic.
+ *
+ * Looks, typefaces and colourways are free or paid (DEC-177, `rules`): a
+ * paid one says "Paid plans", and on a plan without "Themes, fonts and
+ * templates" choosing it is refused here, before anything saves. The
+ * previous choice stays chosen and drawn, and one line where it was
+ * pressed says why, with the way to plans. Colours and spacing are never
+ * paid.
  */
 export function StylePanel({
     style,
@@ -45,6 +58,7 @@ export function StylePanel({
     onReset,
     saving,
     looks,
+    rules = ALL_FREE,
 }: {
     style: SiteStyle;
     options: SiteStyleOptions;
@@ -53,7 +67,34 @@ export function StylePanel({
     saving: boolean;
     /** The Look row's facts and its choice; absent draws no row. */
     looks?: LookChoices;
+    /** Which choices are paid, and refused on this plan (DEC-177). */
+    rules?: StyleChoiceRules;
 }) {
+    // The paid choice just refused, and where: one line, by that control.
+    const [refused, setRefused] = useState<{
+        kind: PaidKind;
+        name: string;
+    } | null>(null);
+    /** Take a choice, or refuse it in place: false when refused. */
+    function allowed(kind: PaidKind, id: string, name: string): boolean {
+        if (rules.refuses(kind, id)) {
+            setRefused({ kind, name });
+            return false;
+        }
+        setRefused(null);
+        return true;
+    }
+    const paidMark = (kind: PaidKind, id: string) =>
+        rules.isPaid(kind, id) ? (
+            <Badge variant="tag" size="sm" className="ml-auto shrink-0">
+                Paid plans
+            </Badge>
+        ) : null;
+    const refusedOf = (kind: PaidKind) =>
+        refused?.kind === kind ? refused.name : null;
+    const fontPairRefused = refusedOf("fontPair");
+    const colourwayRefused = refusedOf("colourway");
+
     const swatchesFor = (row: string) =>
         options.rows.find((r) => r.key === row)?.swatches ?? [];
     const hslOf = (row: string, key: string) =>
@@ -121,6 +162,8 @@ export function StylePanel({
     const fontPairs = options.fontPairs ?? [];
     const activePair = style.fontPair ?? fontPairs[0]?.key;
     function setFontPair(key: string) {
+        const name = fontPairs.find((p) => p.key === key)?.name ?? key;
+        if (!allowed("fontPair", key, name)) return;
         // The default pair is stored as no pair at all, as the API keeps it,
         // so choosing it back leaves nothing to publish.
         const { fontPair: _previous, ...rest } = style;
@@ -135,7 +178,23 @@ export function StylePanel({
         <div className="flex min-h-0 flex-col">
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3 [&>section+section]:border-t [&>section+section]:pt-4">
                 {looks ? (
-                    <LookPicker style={style} options={options} {...looks} />
+                    <LookPicker
+                        style={style}
+                        options={options}
+                        {...looks}
+                        rules={rules}
+                        refused={refusedOf("look")}
+                        onChoose={(look: LookId | null) => {
+                            if (
+                                look &&
+                                !allowed("look", look, lookName(look))
+                            ) {
+                                return;
+                            }
+                            if (!look) setRefused(null);
+                            looks.onChoose(look);
+                        }}
+                    />
                 ) : null}
                 {/* The pairing picker H1's note promised (DEC-046); an
                     older API that serves no pairs shows no choice. */}
@@ -149,7 +208,12 @@ export function StylePanel({
                             onChange={setFontPair}
                             choices={fontPairs.map((pair) => ({
                                 value: pair.key,
-                                label: pair.name,
+                                label: (
+                                    <>
+                                        {pair.name}
+                                        {paidMark("fontPair", pair.key)}
+                                    </>
+                                ),
                                 style: {
                                     fontFamily: fontPairStacks(pair.key, faces)
                                         ?.heading,
@@ -157,13 +221,16 @@ export function StylePanel({
                             }))}
                             itemClassName={(active) =>
                                 cn(
-                                    "flex min-h-9 w-full items-center rounded border px-2.5 py-1.5 text-left text-sm focus-visible:ring-offset-1 coarse:min-h-11",
+                                    "flex min-h-9 w-full items-center gap-2 rounded border px-2.5 py-1.5 text-left text-sm focus-visible:ring-offset-1 coarse:min-h-11",
                                     active
                                         ? "border-foreground ring-1 ring-foreground"
                                         : "border-border hover:bg-muted",
                                 )
                             }
                         />
+                        {fontPairRefused ? (
+                            <PaidRefusal name={fontPairRefused} />
+                        ) : null}
                     </section>
                 ) : null}
                 <section className="space-y-3">
@@ -175,7 +242,11 @@ export function StylePanel({
                             value={current?.id ?? null}
                             onChange={(id) => {
                                 const cw = colourways.find((c) => c.id === id);
-                                if (cw) onChange(inColourway(style, cw));
+                                if (!cw) return;
+                                if (!allowed("colourway", cw.id, cw.name)) {
+                                    return;
+                                }
+                                onChange(inColourway(style, cw));
                             }}
                             choices={colourways.map((cw) => ({
                                 value: cw.id,
@@ -196,6 +267,7 @@ export function StylePanel({
                                             ))}
                                         </span>
                                         {cw.name}
+                                        {paidMark("colourway", cw.id)}
                                     </>
                                 ),
                             }))}
@@ -208,6 +280,9 @@ export function StylePanel({
                                 )
                             }
                         />
+                    ) : null}
+                    {colourwayRefused ? (
+                        <PaidRefusal name={colourwayRefused} />
                     ) : null}
                     {paletteOn ? (
                         <p className="text-xs text-muted-foreground">

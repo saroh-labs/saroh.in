@@ -35,6 +35,25 @@ admin.saroh.in → Flags, shown as "Website looks".
 - Launch on today's data: nothing on a site promises what the product can't
   do yet.
 
+## Free and paid styles (DEC-177)
+
+Looks, typefaces and colourways are free or paid. Free ones work on every
+plan; paid ones need "Themes, fonts and templates" on the business's plan,
+which today is on no plan. Which are free is the live catalogue's, ticked in
+admin.saroh.in → Plans and modules → Modules, under the matrix ("Free looks,
+typefaces and colourways"), and published like any other catalogue change.
+
+- Always free, whatever is ticked: Classic, the visitor's system font, each
+  site's own template typefaces and the colourway it was made in, and
+  whatever a site already has.
+- The sample catalogue makes Quiet, Folio and Live free. Production's live
+  catalogue has no free list until the owner publishes one: until then
+  every look but Classic is paid there.
+- Each look in the Look row has a Preview, on every plan. "Use this look"
+  in it follows the same rule.
+- A list published in admin applies to every business at once, with no
+  deploy. Rolling it back is publishing a version without the tick.
+
 ## Before turning anything on in production
 
 What reaches every site, Classic included, ships only in a release the owner
@@ -52,6 +71,12 @@ Look code is inert for Classic: with no look, a site renders and moves as it
 did, which the `classic-pin` tests hold.
 
 Also before the first production business:
+
+- [ ] The owner ticks the free looks, typefaces and colourways in admin →
+      Plans and modules (all four looks free to start; a few typefaces and
+      colourways) and publishes the version (DEC-177). Without it, no
+      production business can choose a look on a plan without "Themes,
+      fonts and templates".
 
 - [ ] Capture the Look row's phone pictures (until then each is drawn in the
       business's colours with the look's corners and heading face):
@@ -71,7 +96,9 @@ Also before the first production business:
 2. **Production, chosen businesses (owner only).**
     - [ ] Turn on an override in admin → Flags for each business the owner
           picks. Never the global flag at this step.
-    - [ ] Their owners pick a look, preview it and publish.
+    - [ ] Their owners preview a look (its Preview button), pick it and
+          publish. A paid look on their plan says "Paid plans" and is
+          refused in the row, with See plans.
     - [ ] Watch the page cache's hit rate, the image route's errors (if
           resizing is on) and the home page's LCP for those sites.
 3. **Production, new sites (owner only).**

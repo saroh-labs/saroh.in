@@ -4,16 +4,23 @@ import type { LookId } from "@saroh/block-contract";
 import { LOOKS, lookSuggestion } from "@saroh/block-contract";
 import { fontPairStacks } from "@saroh/site-blocks";
 import { Badge } from "@saroh/ui/badge";
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Image from "next/image";
-import { useId } from "react";
+import type { KeyboardEvent } from "react";
+import { useId, useRef, useState } from "react";
 
 import { ChoiceGroup } from "@/components/shared/choice-group";
+import type { LookPreviewSource } from "@/components/sites/look-preview";
+import { LookPreview } from "@/components/sites/look-preview";
+import { PaidRefusal } from "@/components/sites/paid-refusal";
 import { useSiteFaces } from "@/components/sites/site-faces";
 import type { LookThumbnailImage } from "@/lib/sites/look-thumbnails";
 import { lookThumbnail } from "@/lib/sites/look-thumbnails";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { inLook, resolveStyleVariables } from "@/lib/sites/style";
+import type { StyleChoiceRules } from "@/lib/sites/style-access";
+import { ALL_FREE } from "@/lib/sites/style-access";
 
 /** A choice in the Look row: one of the looks, or Classic. */
 export type LookChoice = LookId | "classic";
@@ -99,6 +106,11 @@ export interface LookChoices {
     /** Why the last choice didn't save; the previous look is back. */
     error: string | null;
     onChoose: (look: LookId | null) => void;
+    /**
+     * What each look's Preview draws the home page from (DEC-177); absent
+     * draws no Preview buttons.
+     */
+    preview?: LookPreviewSource;
 }
 
 /**
@@ -121,18 +133,37 @@ export function LookPicker({
     templateId,
     error,
     onChoose,
+    preview,
+    rules = ALL_FREE,
+    refused = null,
 }: LookChoices & {
     style: SiteStyle;
     options: SiteStyleOptions;
+    /** Which looks are paid and refused on this plan (DEC-177). */
+    rules?: StyleChoiceRules;
+    /** The paid look just refused, by name: said in the row's one line. */
+    refused?: string | null;
 }) {
     const headingId = useId();
     const statusId = useId();
+    const [previewing, setPreviewing] = useState<LookChoice | null>(null);
+    // The look whose dialog is drawn: kept as it closes, so it fades out
+    // on its own content.
+    const [shown, setShown] = useState<LookChoice>("classic");
+    // Each opening mounts the dialog afresh (its device and its line).
+    const [opened, setOpened] = useState(0);
+    const previewButtons = useRef(new Map<LookChoice, HTMLButtonElement>());
     const draftLook = style.look ?? null;
     const choices = lookChoices({ available, draftLook, liveLook });
     if (choices.length === 0) return null;
 
     const suggestion = lookSuggestion(templateId);
-    const status = lookStatus({ draftLook, liveLook, published, error });
+    const status = refused
+        ? null
+        : lookStatus({ draftLook, liveLook, published, error });
+    const paid = (look: LookId | null) =>
+        look !== null && rules.isPaid("look", look);
+    const shownLook = shown === "classic" ? null : shown;
 
     return (
         <section className="space-y-3" aria-labelledby={headingId}>
@@ -141,11 +172,58 @@ export function LookPicker({
             </h3>
             <ChoiceGroup<LookChoice>
                 labelledBy={headingId}
-                describedBy={status ? statusId : undefined}
+                describedBy={status || refused ? statusId : undefined}
                 className="space-y-1.5"
                 value={draftLook ?? "classic"}
                 onChange={(choice) =>
                     onChoose(choice === "classic" ? null : choice)
+                }
+                // Each look with its Preview beside it (DEC-177): a button
+                // of its own, never inside the radio.
+                layout={
+                    preview
+                        ? (item) =>
+                              choices.map((choice) => (
+                                  <div
+                                      key={choice}
+                                      className="flex items-stretch gap-1.5"
+                                  >
+                                      <div className="min-w-0 flex-1">
+                                          {item(choice)}
+                                      </div>
+                                      <Button
+                                          ref={(el) => {
+                                              if (el) {
+                                                  previewButtons.current.set(
+                                                      choice,
+                                                      el,
+                                                  );
+                                              } else {
+                                                  previewButtons.current.delete(
+                                                      choice,
+                                                  );
+                                              }
+                                          }}
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          data-look-preview-open={choice}
+                                          aria-label={`Preview ${lookName(choice === "classic" ? null : choice)}`}
+                                          className="h-auto min-h-9 shrink-0 self-center px-2.5 coarse:min-h-11"
+                                          // The row's arrows move the look;
+                                          // on this button they do nothing.
+                                          onKeyDown={stopArrows}
+                                          onClick={() => {
+                                              setShown(choice);
+                                              setOpened((n) => n + 1);
+                                              setPreviewing(choice);
+                                          }}
+                                      >
+                                          Preview
+                                      </Button>
+                                  </div>
+                              ))
+                        : undefined
                 }
                 choices={choices.map((choice) => {
                     const look = choice === "classic" ? null : choice;
@@ -177,6 +255,11 @@ export function LookPicker({
                                                 {suggested}
                                             </Badge>
                                         ) : null}
+                                        {paid(look) ? (
+                                            <Badge variant="tag" size="sm">
+                                                Paid plans
+                                            </Badge>
+                                        ) : null}
                                     </span>
                                     <span className="block text-xs leading-snug text-muted-foreground">
                                         {look
@@ -197,7 +280,11 @@ export function LookPicker({
                     )
                 }
             />
-            {status ? (
+            {refused ? (
+                <div id={statusId}>
+                    <PaidRefusal name={refused} />
+                </div>
+            ) : status ? (
                 <p
                     id={statusId}
                     // A failed save is announced; the notes are read with
@@ -214,8 +301,33 @@ export function LookPicker({
                     {status.text}
                 </p>
             ) : null}
+            {preview ? (
+                <LookPreview
+                    key={opened}
+                    look={shownLook}
+                    open={previewing !== null}
+                    source={preview}
+                    style={style}
+                    options={options}
+                    chosen={shownLook === draftLook}
+                    paid={paid(shownLook)}
+                    refused={
+                        shownLook !== null && rules.refuses("look", shownLook)
+                    }
+                    onUse={() => onChoose(shownLook)}
+                    onClose={() => setPreviewing(null)}
+                    returnFocus={() =>
+                        previewButtons.current.get(shown) ?? null
+                    }
+                />
+            ) : null}
         </section>
     );
+}
+
+/** Arrow keys on a Preview button stay there, not the row's radios. */
+function stopArrows(e: KeyboardEvent<HTMLButtonElement>) {
+    if (e.key.startsWith("Arrow")) e.stopPropagation();
 }
 
 /**
