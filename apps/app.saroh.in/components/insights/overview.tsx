@@ -370,7 +370,7 @@ function WeekChart({ chart }: { chart: ReturnType<typeof moneyChart> }) {
     );
 }
 
-/** "What sells, who books?", also the What sells tab's until U13. */
+/** "What sells, who books?": the What sells tab says more (`sells-tab.tsx`). */
 export function SellsCard({
     sells,
     href,

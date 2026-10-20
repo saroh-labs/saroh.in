@@ -5,16 +5,13 @@ import { forbidden } from "next/navigation";
 import { AnalyticsDashboard } from "@/components/analytics/analytics-dashboard";
 import { InsightsTabs } from "@/components/insights/insights-tabs";
 import { MoneyTab } from "@/components/insights/money-tab";
-import {
-    HowCounted,
-    Overview,
-    SellsCard,
-} from "@/components/insights/overview";
+import { Overview } from "@/components/insights/overview";
 import type { PeriodChoice } from "@/components/insights/period-control";
 import {
     PeriodSegments,
     PeriodSheet,
 } from "@/components/insights/period-control";
+import { SellsTab } from "@/components/insights/sells-tab";
 import { SuggestionCard } from "@/components/insights/suggestion-card";
 import { PageContainer } from "@/components/shared/page-container";
 import {
@@ -38,6 +35,8 @@ import {
     periodWindow,
     readAddress,
 } from "@/lib/insights/period";
+import type { SellsParts } from "@/lib/insights/sells-words";
+import { listModules } from "@/lib/modules/service";
 import { permits } from "@/lib/organizations/permits";
 import { activeOrganizationOnce } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
@@ -64,11 +63,10 @@ export const metadata = { title: "Insights" };
  * page (`forbidden()`, the shell's denied page); a role with Insights and
  * without payments sees counts and is told who can show them money.
  *
- * Money reads the period (U12, #1093, `money-tab.tsx`). Until their own
- * units land, What sells is the Overview's answer at full width (U13,
- * #1095) and Where customers come from is today's website figures for the
- * chosen period (U14, #1097): nothing that Insights showed before is out
- * of reach.
+ * Money reads the period (U12, #1093, `money-tab.tsx`), and so does What
+ * sells (U13, #1095, `sells-tab.tsx`). Until its own unit lands, Where
+ * customers come from is today's website figures for the chosen period
+ * (U14, #1097): nothing that Insights showed before is out of reach.
  */
 export default async function AnalyticsPage({
     searchParams,
@@ -102,6 +100,8 @@ export default async function AnalyticsPage({
 
     const body = tabBody(address, window, {
         canRemind: permits(organization, "invoice:write"),
+        canTakeOrder: permits(organization, "order:create"),
+        canAddService: permits(organization, "service:write"),
     });
 
     return (
@@ -147,13 +147,21 @@ export default async function AnalyticsPage({
 function tabBody(
     address: InsightsAddress,
     window: PeriodWindow,
-    can: { canRemind: boolean },
+    can: { canRemind: boolean; canTakeOrder: boolean; canAddService: boolean },
 ) {
     switch (address.tab) {
         case "money":
             return <MoneyPart address={address} canRemind={can.canRemind} />;
         case "sells":
-            return <SellsTab address={address} />;
+            return (
+                <SellsPart
+                    address={address}
+                    can={{
+                        takeOrder: can.canTakeOrder,
+                        addService: can.canAddService,
+                    }}
+                />
+            );
         case "from":
             return <FromTab address={address} window={window} />;
         default:
@@ -238,23 +246,41 @@ async function MoneyPart({
     );
 }
 
-/** What sells: the Overview's answer, whole, until its tab (U13). */
-async function SellsTab({ address }: { address: InsightsAddress }) {
-    const sells = await readSells(address.period);
+/**
+ * What sells for the period (U13, #1095): best sellers only where the
+ * business sells and bookings only where it books, read from what is
+ * turned on (a failed read shows both).
+ */
+async function SellsPart({
+    address,
+    can,
+}: {
+    address: InsightsAddress;
+    can: { takeOrder: boolean; addService: boolean };
+}) {
+    const [sells, modules] = await Promise.all([
+        readSells(address.period),
+        listModules().catch(() => null),
+    ]);
     if (sells?.status === "denied") forbidden();
+    const on =
+        modules && modules.length > 0
+            ? new Set(
+                  modules
+                      .filter((m) => m.readiness !== "DISABLED")
+                      .map((m) => m.key),
+              )
+            : null;
+    const parts: SellsParts | null = on
+        ? { sells: on.has("COMMERCE"), books: on.has("APPOINTMENTS") }
+        : null;
     return (
-        <div className="flex flex-col gap-5">
-            {sells?.status === "ok" ? (
-                <SellsCard sells={sells} href={insightsHref(address)} />
-            ) : (
-                <FailedState
-                    size="panel"
-                    title={couldntLoad("what sells")}
-                    retryHref={insightsHref(address)}
-                />
-            )}
-            <HowCounted />
-        </div>
+        <SellsTab
+            sells={sells}
+            retryHref={insightsHref(address)}
+            parts={parts}
+            can={can}
+        />
     );
 }
 
