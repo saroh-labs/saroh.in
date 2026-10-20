@@ -5395,3 +5395,10 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** `Message.invoice` is `onDelete: SetNull`, so deleting a seeded invoice keeps its emails. The ledger rows and the share log cascade with the invoice; the emails don't.
 - **Fix:** both clears (`bakery.ts` `clearVolume`, `run.ts` `clearVolume`) delete `Message` rows on the business's seeded id prefix. Invoice states are planned in one place (`seed/showcase/invoice-states.ts`), and an invoice's status and paid columns come from its planned ledger through `settleLedger`, the API's settle rules, never typed beside it.
 - **Rule:** a seed that writes rows a parent's delete only unlinks (`SetNull`) clears them by its own ids. `check.ts` now fails on a status that doesn't follow the payments, a paid date that isn't the last payment's, cheque fields that don't fit, a payment, share or email out of the invoice's life, a rewrite from paper that wasn't cancelled, and a style the API wouldn't store (`backend-billing-and-classes.md` → Payments on an invoice are a ledger → Demo data).
+
+### A backfill run inside the API's container restarted it (20 Oct 2026)
+
+- **Symptom:** running the invoice-payments backfill with `docker exec` in the development API's container (saroh-api-dev) ended with exit 137, and the API restarted once.
+- **Cause:** the container has a 448 MB memory limit and the API already uses about half of it. `tsx` compiling the backfill beside it went over the limit, and Docker killed the container.
+- **Fix:** run a backfill in a one-off container from the same image: `docker run --rm --network coolify --env-file <the API container's env, written to a mode-600 temp file and removed on exit> --memory 2g -w /repo/packages/database <image> …`. `DATABASE_TARGET_CONFIRM` is read from the URL's database name inside that container, so no value is printed. Dry run first, the real run, then a dry run again that must write 0.
+- **Rule:** never run tooling inside a serving container; it shares the container's memory limit with the app.
