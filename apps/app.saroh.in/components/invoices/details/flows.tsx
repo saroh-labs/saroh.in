@@ -1,7 +1,5 @@
 "use client";
 
-import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
-import { showError, showSuccess } from "@saroh/ui/toast";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
@@ -10,9 +8,12 @@ import { CancelOrCorrectSheet } from "@/components/invoices/cancel-or-correct-sh
 import type { InvoiceRef } from "@/components/invoices/invoice-actions";
 import { RefundInvoiceDialog } from "@/components/invoices/invoice-actions";
 import { RecordPaymentSheet } from "@/components/invoices/record-payment-sheet";
+import { ShareSheet } from "@/components/invoices/share-sheet";
 import type { ShareMessageKind } from "@/lib/invoices/detail-actions";
-import { shareWithLink } from "@/lib/invoices/link-actions";
+import type { InvoiceDetails } from "@/lib/invoices/details";
 import type { PaymentTarget } from "@/lib/invoices/record-payment";
+import type { ShareTab } from "@/lib/invoices/share";
+import { invoiceZone } from "@/lib/invoices/zone";
 
 /*
  * The seams the details view opens other units' flows through (DEC-173,
@@ -48,9 +49,12 @@ export function useRecordPaymentFlow({
     invoice,
     target,
     onDone,
+    onShareReceipt,
 }: FlowProps & {
     /** What is left and where the receipt goes; else read on opening. */
     target?: PaymentTarget;
+    /** "Share receipt on WhatsApp": the share sheet on the receipt (U11). */
+    onShareReceipt?: () => void;
 }): Flow {
     const [open, setOpen] = useState(false);
     return {
@@ -61,54 +65,56 @@ export function useRecordPaymentFlow({
                 onOpenChange={setOpen}
                 invoice={target ?? { id: invoice.id, who: invoice.who }}
                 onRecorded={() => onDone()}
+                onShareReceipt={onShareReceipt}
             />
         ),
     };
 }
 
 /**
- * Share on WhatsApp (U11 #1123 replaces this with its sheet, which also
- * asks for a number when there is none). Today: the API mints a fresh link
- * and writes the message (DEC-173), and WhatsApp opens with it filled in;
- * Saroh sends nothing. With no phone on the invoice, the message is copied
- * to paste in WhatsApp.
+ * Share (U11 #1123): one sheet with WhatsApp, Email, Link and PDF, opened on
+ * the message and tab asked for. WhatsApp is click-to-chat: the API writes
+ * the message and makes a fresh link (DEC-173), and WhatsApp opens on this
+ * device with it filled in; Saroh sends nothing. With no number on the
+ * invoice the sheet asks for one. Record payment (U10) opens it too, for
+ * "Share receipt on WhatsApp".
  */
 export function useShareFlow({
-    invoice,
+    details,
     onDone,
-}: FlowProps): Flow<[kind: ShareMessageKind]> {
-    async function share(kind: ShareMessageKind) {
-        // Opened inside the press, so no popup blocker stops it; pointed
-        // at WhatsApp once the message is back.
-        const tab =
-            typeof window === "undefined"
-                ? null
-                : window.open("about:blank", "_blank");
-        const res = await shareWithLink(invoice.id, {
-            channel: "WHATSAPP",
-            kind,
-        });
-        if (!res.ok) {
-            tab?.close();
-            showError(res.error);
-            return;
-        }
-        onDone();
-        const { whatsappUrl, text } = res.data;
-        if (whatsappUrl && tab) {
-            tab.opener = null;
-            tab.location.href = whatsappUrl;
-            return;
-        }
-        tab?.close();
-        if (text && (await copyText(text))) {
-            showSuccess(
-                `Message copied. Paste it in WhatsApp to ${invoice.who}.`,
-                "There's no phone number on this invoice, so WhatsApp couldn't open on their chat.",
-            );
-        } else showError(copyFailedMessage());
-    }
-    return { open: (kind) => void share(kind), overlays: null };
+    print,
+}: {
+    details: InvoiceDetails;
+    onDone: () => void;
+    /** Prints the paper, and only the paper. */
+    print?: () => void;
+}): Flow<[kind?: ShareMessageKind, tab?: ShareTab]> {
+    const [at, setAt] = useState<{
+        kind?: ShareMessageKind;
+        tab?: ShareTab;
+    } | null>(null);
+    const [open, setOpen] = useState(false);
+    return {
+        open: (kind, tab) => {
+            setAt({ kind, tab });
+            setOpen(true);
+        },
+        overlays: (
+            <ShareSheet
+                open={open}
+                onOpenChange={setOpen}
+                invoice={details.invoice}
+                kind={at?.kind}
+                tab={at?.tab}
+                business={details.businessName}
+                can={details.can}
+                timeZone={invoiceZone(details.business)}
+                emailNote={details.emailNote}
+                onPrint={print}
+                onDone={onDone}
+            />
+        ),
+    };
 }
 
 /**

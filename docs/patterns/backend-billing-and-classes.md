@@ -201,6 +201,21 @@ requireProvider: false })`), the email says "view it and download a copy",
   `whatsappChatLink(phone, text)` (`@saroh/block-contract`); the API
   answers the same link so the bulk flow needs no second rule. Saroh can't
   know a WhatsApp message went: words say "shared on WhatsApp".
+- **The share sheet** (U11 #1123, `components/invoices/share-sheet.tsx`,
+  rules in `lib/invoices/share.ts`) is the one place an invoice is shared
+  by hand: the details open it through `useShareFlow`, and Record
+  payment's "Share receipt on WhatsApp" opens it on the receipt. Tabs
+  WhatsApp, Email, Link, PDF. The preview is drawn from the invoice before
+  anything is minted (`previewMessage`, the API's words with the link as
+  a chip); the API's text replaces it once shared. A link minted in the
+  sheet is reused by every tab while it is open (Copy message then Open
+  WhatsApp is one share, one link). The number comes from `send.phone`
+  (the contact's, on the detail read); with none, it is typed and used for
+  that message only. Each refusal mirrors the API's, said before the
+  press; a 429's `retryAt` reaches the screen as `ApiFailure.retryAt`.
+  A WhatsApp tab is opened inside the press (`about:blank`) and pointed at
+  `wa.me` once the share answers, so no popup blocker stops it. PDF and
+  print are logged quietly where a share could be, never for a reader.
 - **The share log** is `InvoiceShare` (channel, kind, who, when; its own
   RLS policy and CHECKs), served as `shared[]` on the invoice read. Emails
   aren't in it: their `Message` rows are the record.

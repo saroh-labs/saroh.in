@@ -5,12 +5,14 @@ import {
     createViewLink,
     remindInvoice,
     sendInvoice,
+    shareInvoice,
 } from "./actions";
 import {
     newPayLink,
     newViewLink,
     remindWithLink,
     sendWithLink,
+    shareWithLink,
 } from "./link-actions";
 import { forgetLinks, mintedLink, rememberLink } from "./minted-links";
 
@@ -19,6 +21,7 @@ vi.mock("./actions", () => ({
     createViewLink: vi.fn(),
     remindInvoice: vi.fn(),
     sendInvoice: vi.fn(),
+    shareInvoice: vi.fn(),
 }));
 
 /**
@@ -107,5 +110,52 @@ describe("actions that replace the link", () => {
         vi.mocked(sendInvoice).mockResolvedValue(sent as never);
         await sendWithLink("inv_1");
         expect(mintedLink("inv_2")).toBe(OLD);
+    });
+});
+
+describe("sharing by hand (DEC-173, U11)", () => {
+    const share = (over: Record<string, unknown>) =>
+        ({
+            ok: true,
+            data: {
+                channel: "LINK",
+                kind: "NEW",
+                url: "https://rye.saroh.app/pay/shared",
+                text: "Hi",
+                phone: null,
+                whatsappUrl: null,
+                payOnline: true,
+                email: null,
+                sharedAt: "2026-10-20T06:30:00.000Z",
+                ...over,
+            },
+        }) as never;
+
+    beforeEach(() => {
+        forgetLinks();
+        vi.mocked(shareInvoice).mockReset();
+    });
+
+    it("a payment link made by a share is remembered to show again", async () => {
+        rememberLink("inv_1", OLD);
+        vi.mocked(shareInvoice).mockResolvedValue(share({}));
+        await shareWithLink("inv_1", { channel: "LINK", kind: "NEW" });
+        expect(mintedLink("inv_1")).toBe("https://rye.saroh.app/pay/shared");
+    });
+
+    it("a view link made by a share ends the payment link kept here", async () => {
+        rememberLink("inv_1", OLD);
+        vi.mocked(shareInvoice).mockResolvedValue(share({ payOnline: false }));
+        await shareWithLink("inv_1", { channel: "WHATSAPP", kind: "NEW" });
+        expect(mintedLink("inv_1")).toBeNull();
+    });
+
+    it("PDF and print make no link and leave the one kept here", async () => {
+        rememberLink("inv_1", OLD);
+        vi.mocked(shareInvoice).mockResolvedValue(
+            share({ channel: "PDF", url: null, text: null }),
+        );
+        await shareWithLink("inv_1", { channel: "PDF", kind: "NEW" });
+        expect(mintedLink("inv_1")).toBe(OLD);
     });
 });

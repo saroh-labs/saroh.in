@@ -161,6 +161,11 @@ export interface InvoiceSend {
     payOnline?: boolean;
     /** Something went in the last day: the next reminder can go from here. */
     nextReminderAt: string | null;
+    /**
+     * The contact's phone (E.164), for Share's WhatsApp tab (U11); absent
+     * when there is none, or from an older API.
+     */
+    phone?: string;
 }
 
 /** One send or reminder, newest first. */
@@ -429,6 +434,9 @@ export interface ShareResult {
     email: { status: string; to: string } | null;
     sharedAt: string;
 }
+
+/** The same, by the name Record payment (U10) reads it. */
+export type InvoiceShareResult = ShareResult;
 
 /** The newest invoices, and every unpaid one however old (see `withLive`). */
 export async function listInvoices(): Promise<CappedList<Invoice>> {

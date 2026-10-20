@@ -85,6 +85,7 @@ export function RecordPaymentSheet({
     onOpenChange,
     invoice,
     onRecorded,
+    onShareReceipt,
     returnFocusTo,
 }: {
     open: boolean;
@@ -92,6 +93,11 @@ export function RecordPaymentSheet({
     invoice: RecordPaymentInvoice;
     /** The invoice as it now stands, for a screen that draws it itself. */
     onRecorded?: (invoice: Invoice) => void;
+    /**
+     * "Share receipt on WhatsApp" opens the share sheet (U11) on the
+     * receipt; without it, WhatsApp opens straight away.
+     */
+    onShareReceipt?: () => void;
     returnFocusTo?: string | (() => HTMLElement | null | undefined);
 }) {
     // Each opening is a fresh draft: paid today, all of what is left.
@@ -108,6 +114,7 @@ export function RecordPaymentSheet({
             onOpenChange={onOpenChange}
             invoice={invoice}
             onRecorded={onRecorded}
+            onShareReceipt={onShareReceipt}
             returnFocusTo={returnFocusTo}
         />
     );
@@ -123,12 +130,14 @@ function RecordPaymentDraft({
     onOpenChange,
     invoice,
     onRecorded,
+    onShareReceipt,
     returnFocusTo,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     invoice: RecordPaymentInvoice;
     onRecorded?: (invoice: Invoice) => void;
+    onShareReceipt?: () => void;
     returnFocusTo?: string | (() => HTMLElement | null | undefined);
 }) {
     const [load, setLoad] = useState<Load>(
@@ -221,6 +230,7 @@ function RecordPaymentDraft({
             onOpenChange={onOpenChange}
             target={load.target}
             onRecorded={onRecorded}
+            onShareReceipt={onShareReceipt}
             returnFocusTo={returnFocusTo}
         />
     );
@@ -233,12 +243,14 @@ function RecordPaymentForm({
     onOpenChange,
     target,
     onRecorded,
+    onShareReceipt,
     returnFocusTo,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     target: PaymentTarget;
     onRecorded?: (invoice: Invoice) => void;
+    onShareReceipt?: () => void;
     returnFocusTo?: string | (() => HTMLElement | null | undefined);
 }) {
     const router = useRouter();
@@ -369,7 +381,12 @@ function RecordPaymentForm({
         // once Undo has passed; a cheque's waits for the bank.
         const takeBackOffer =
             !cheque && !target.emailTo
-                ? offerWhatsAppReceipt(target.id, target.who, UNDO_MS)
+                ? offerWhatsAppReceipt(
+                      target.id,
+                      target.who,
+                      UNDO_MS,
+                      onShareReceipt,
+                  )
                 : () => undefined;
         const words = recordedToast({
             paise: check.paise,

@@ -131,12 +131,13 @@ export function useDetailsActions({
         onSent: () => setViewUrl(null),
         onDone: onChanged,
     });
+    const share = useShareFlow({ details, onDone: onChanged, print });
     const record = useRecordPaymentFlow({
         invoice: ref,
         target: paymentTargetOf(i, who),
         onDone: onChanged,
+        onShareReceipt: () => share.open("RECEIPT", "whatsapp"),
     });
-    const share = useShareFlow({ invoice: ref, onDone: onChanged });
     const cancel = useCancelFlow({
         invoice: ref,
         target: cancelTargetOf(i),
@@ -241,7 +242,7 @@ export function useDetailsActions({
         issue: () => setOpen("issue"),
         delete: () => setOpen("delete"),
         recordPayment: () => record.open(),
-        whatsapp: (a) => share.open(a.kind ?? "NEW"),
+        whatsapp: (a) => share.open(a.kind ?? "NEW", "whatsapp"),
         shareReceipt: () => share.open("RECEIPT"),
         send: () => sending.start(false),
         // One a day: the reason says when it is off.

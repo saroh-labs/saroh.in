@@ -293,11 +293,14 @@ export class InvoiceSendService {
             this.nextReminderAt(db, row.id, now),
             invoicePayOnline(db, organizationId, row),
         ]);
+        // Share's WhatsApp tab says who it opens a chat with (U11).
+        const phone = row.contact?.phone ? { phone: row.contact.phone } : {};
         const none = (reason: SendBlocker): InvoiceSendView => ({
             channels: [],
             reason,
             payOnline,
             nextReminderAt,
+            ...phone,
         });
         if (!sendable(row)) return none("NOT_OWED");
         if (await chargeUnderWayOn(db, organizationId, row.id)) {
@@ -326,6 +329,7 @@ export class InvoiceSendService {
                 : {}),
             payOnline,
             nextReminderAt,
+            ...phone,
         };
     }
 

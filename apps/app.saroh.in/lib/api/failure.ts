@@ -37,12 +37,25 @@ export interface ApiFailure {
     rates?: RateItem[];
     /** Refused by role: nothing broke. Shown as a notice (`reportFailure`). */
     denied?: true;
+    /**
+     * When it can be tried again (a 429's `details.retryAt`): one reminder
+     * a day (DEC-173), so the screen turns the button off until then.
+     */
+    retryAt?: string;
 }
 
 interface Envelope {
     message?: unknown;
     details?: unknown;
     error?: unknown;
+}
+
+function retryAtOf(details: unknown): string | undefined {
+    if (details && typeof details === "object" && "retryAt" in details) {
+        const at = (details as { retryAt?: unknown }).retryAt;
+        return typeof at === "string" && at ? at : undefined;
+    }
+    return undefined;
 }
 
 function fieldOf(details: unknown): string | undefined {
@@ -63,6 +76,7 @@ export function toFailure(body: unknown, fallback: string): ApiFailure {
     const missing = missingDetailsOf(inner?.details ?? b.details);
     const plan = planRefusalOf(inner?.details ?? b.details, message);
     const rates = rateItemsOf(inner?.details ?? b.details);
+    const retryAt = retryAtOf(inner?.details ?? b.details);
     const denied = roleDeniedMessage(body);
     const said = typeof message === "string" && message ? message : fallback;
     // An endpoint that words its own refusal ("Your role can't change
@@ -75,6 +89,7 @@ export function toFailure(body: unknown, fallback: string): ApiFailure {
         ...(missing ? { missing } : {}),
         ...(plan ? { plan } : {}),
         ...(rates ? { rates } : {}),
+        ...(retryAt ? { retryAt } : {}),
         ...(refused ? { denied: true as const } : {}),
     };
 }

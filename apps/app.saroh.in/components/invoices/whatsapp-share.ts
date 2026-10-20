@@ -64,17 +64,21 @@ export async function openWhatsAppShare(
 /**
  * After the Undo window, where the receipt can't be emailed (owner, 20
  * Oct): one toast with "Share receipt on WhatsApp". Returns a way to take
- * the offer back, for Undo.
+ * the offer back, for Undo. With `share`, the toast opens the share sheet
+ * on the receipt (U11), where a missing number can be typed; without it,
+ * WhatsApp opens straight away.
  */
 export function offerWhatsAppReceipt(
     invoiceId: string,
     who: string,
     afterMs: number,
+    share?: () => void,
 ): () => void {
     const timer = setTimeout(() => {
         showSuccess(`Receipt ready for ${who}.`, undefined, {
             label: SHARE_RECEIPT_ON_WHATSAPP,
-            onClick: () => void openWhatsAppShare(invoiceId, "RECEIPT"),
+            onClick: () =>
+                share ? share() : void openWhatsAppShare(invoiceId, "RECEIPT"),
         });
     }, afterMs);
     return () => clearTimeout(timer);

@@ -46,6 +46,20 @@ describe("WhatsApp receipt", () => {
         takeBack();
     });
 
+    it("opens the share sheet on the receipt when one is given (U11)", () => {
+        vi.useFakeTimers();
+        const share = vi.fn();
+        offerWhatsAppReceipt("inv_1", "Vivek Nair", 10_000, share);
+        vi.advanceTimersByTime(10_000);
+        const offer = toast.showSuccess.mock.calls.at(-1)?.[2] as {
+            onClick: () => void;
+        };
+        offer.onClick();
+        expect(share).toHaveBeenCalled();
+        expect(shareInvoice).not.toHaveBeenCalled();
+        vi.useRealTimers();
+    });
+
     it("opens the tab on the press and points it at wa.me", async () => {
         const tab = { close: vi.fn(), location: { href: "" }, opener: {} };
         vi.spyOn(window, "open").mockReturnValue(tab as unknown as Window);

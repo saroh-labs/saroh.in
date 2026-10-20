@@ -53,11 +53,22 @@ export async function remindWithLink(id: string) {
 }
 
 /**
- * Share it by hand (DEC-173): on WhatsApp the API mints a fresh link the
- * way a send does, ending the one kept here, so it is forgotten.
+ * Share it by hand (DEC-173, U11): WhatsApp and Link make a fresh link and
+ * end the one before, as a send does. A payment link made here is
+ * remembered to show again; a view link, or PDF and print, which make
+ * none, leave the memory as it is or clear it. `updatedAt`: the invoice's,
+ * as known now.
  */
-export async function shareWithLink(id: string, ask: ShareAsk) {
+export async function shareWithLink(
+    id: string,
+    ask: ShareAsk,
+    updatedAt?: string | null,
+) {
     const res = await shareInvoice(id, ask);
-    if (res.ok && res.data.url) forgetLink(id);
+    if (res.ok && res.data.url) {
+        if (res.data.payOnline) {
+            rememberLink(id, res.data.url, updatedAt);
+        } else forgetLink(id);
+    }
     return res;
 }

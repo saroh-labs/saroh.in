@@ -442,10 +442,12 @@ describe("Record payment", () => {
         actions.recordPayment.mockResolvedValue(answer({ leftToPay: "0.00" }));
         await press(button("Record ₹8,400"));
         await settle();
+        // No share sheet passed in: WhatsApp opens straight away.
         expect(wa.offerWhatsAppReceipt).toHaveBeenCalledWith(
             "inv_106",
             "Vivek Nair",
             10_000,
+            undefined,
         );
         const u = lastUndo();
         expect(u.description).toBeUndefined();

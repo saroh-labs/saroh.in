@@ -73,6 +73,30 @@ export const AUTOPAY_HOLD =
 export const NO_EMAIL_PROVIDER =
     "No email provider yet, so Saroh can't email it.";
 export const NO_EMAIL_ADDRESS = "There's no email address on this invoice.";
+/** Share's send items for a role that only reads invoices (DEC-098). */
+export const CANT_SHARE = "Sharing invoices isn't part of your role.";
+/** The API's refusals for a receipt or a request, said before the press. */
+export const NOTHING_PAID_YET = "Nothing has been paid on this invoice yet.";
+export const PAID_SHARE_RECEIPT =
+    "This invoice is paid. Share the receipt instead.";
+
+/* The share sheet (INVShareA, U11) ---------------------------------------- */
+
+export const OPEN_WHATSAPP = "Open WhatsApp";
+export const COPY_MESSAGE = "Copy message";
+/** Under the preview: Saroh opens WhatsApp and sends nothing (DEC-173). */
+export const WHATSAPP_HOW =
+    "Opens WhatsApp on this device with the message filled in. You press send there, and Saroh records that you shared it.";
+/** The Email tab with no provider of the business's own (DEC-086/091). */
+export const EMAIL_OWN_PROVIDER =
+    "Saroh sends invoices from your own email. Until you connect it, share them on WhatsApp or as a link.";
+/** One reminder a day, by email or WhatsApp: the time follows. */
+export const NEXT_REMINDER_AFTER = "One reminder a day. The next can go after";
+
+/** "Type Vivek's number to open WhatsApp." */
+export function needsNumber(first: string): string {
+    return `Type ${first}'s number to open WhatsApp.`;
+}
 
 /* Lines with figures ----------------------------------------------------- */
 
