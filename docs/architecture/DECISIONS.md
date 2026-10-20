@@ -2186,6 +2186,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Rules: `docs/patterns/backend-data-and-money.md` → Money (the ledger in integer paise, U1 #1113); `docs/patterns/backend-billing-and-classes.md` → "Payments on an invoice are a ledger" (the write path, refusals, remove, cheques, events, U2 #1114); the rest added as each unit is built.
 
 - **The customer's pay page (U16, #1128):** shows paid so far and left to pay, and each payment with its method and date. A cheque's number, bank and status are shown too. References, notes, reasons and who recorded it are never shown. A cheque waiting for the bank is "Cheque received", never "Paid". A bounced cheque says why the money is owed again. Pay, autopay's "just pay" and the UPI amount all use what's left, never the total.
+- Rules (U15 #1127): `docs/patterns/frontend-forms.md` → "A record edited on the paper is the same form, pressed where it prints" (the parts, their editors, the Rule 46 labels, settings changed in place); `docs/patterns/backend-billing-and-classes.md` → "Invoice styles" → "Chosen in the app" (the draft's own look, Use my default, Make this my default and Settings › Invoice style for `org:update`, the details paper in each style).
 
 ## DEC-174 Automatic notices: customers hear about their bookings, orders, memberships, refunds and packs by the business's own email; staff hear about their own bookings
 

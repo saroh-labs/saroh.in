@@ -317,6 +317,17 @@ style, colour }` (Owner or Admin, `org:update`) and read back as
   of supply side by side, still A4. Every style draws every Rule 46
   particular; an unregistered business's paper draws no GST in any.
   Saroh's own invoices to businesses carry no look: Classic in ink.
+- **Chosen in the app** (U15 #1127): a draft's own look is picked on the
+  paper's style rail (`paper-editor/style-panel.tsx`) and saved with the
+  draft as `paperStyle`/`paperColour` through its autosave ("" follows the
+  default; "Use my default" sends both ""). "Make this my default" and
+  Settings › Business › Tax and invoices › Invoice style
+  (`invoice-paper-sheet.tsx`) send `invoicePaper`, Owner and Admin only
+  (`org:update`; `mayUpdateBusiness` reads the resolved actions, never a
+  role name). The app's details paper (`invoice-paper.tsx`) draws the
+  invoice's `paper` in the same three styles from `paperColours`, so the
+  sheet, the PDF and the paper agree; its spec checks each style against
+  the Rule 46 particulars.
 - **Not here:** terms and a business's own signature are #1060.
 - **Tests:** `paper-styles.spec.ts`, `invoice-pdf.styles.spec.ts` (each
   style against `RULE_46_FIELDS`, no GST unregistered, a long name, pale

@@ -18,6 +18,7 @@ import type { InvoiceFormValues } from "@/lib/invoices/new-invoice";
 import type { PickRow } from "@/lib/invoices/new-invoice-lines";
 import { lineOfProduct } from "@/lib/invoices/new-invoice-lines";
 
+import { placeLine, takeLine } from "./line-ops";
 import { ProductPick } from "./product-pick";
 
 /**
@@ -65,38 +66,16 @@ export function LinesTable({
 }) {
     const ids = { lines: useId(), heading: useId() };
     const { errors } = form.formState;
-    const { fields, append, remove } = lines;
+    const { fields, append } = lines;
     const desk = registered ? DESK_ROW_GST : DESK_ROW;
     // A product fills the empty line it was picked under, else a new one.
-    function onPick(row: PickRow) {
-        const line = lineOfProduct(row, { registered, priceMode });
-        const empty = form
-            .getValues("lines")
-            .findIndex((l) => !l.description.trim() && !l.unitPrice.trim());
-        if (empty >= 0) {
-            form.setValue(`lines.${empty}`, line, {
-                shouldDirty: true,
-                shouldValidate: form.formState.isSubmitted,
-            });
-        } else {
-            append(line);
-        }
-    }
-    // The last line empties rather than goes: an invoice has one.
-    const removeLine = (i: number) =>
-        fields.length > 1
-            ? remove(i)
-            : form.setValue(
-                  "lines.0",
-                  {
-                      description: "",
-                      quantity: 1,
-                      unitPrice: "",
-                      gstRate: "",
-                      hsnSac: "",
-                  },
-                  { shouldDirty: true },
-              );
+    const onPick = (row: PickRow) =>
+        void placeLine(
+            form,
+            lines,
+            lineOfProduct(row, { registered, priceMode }),
+        );
+    const removeLine = (i: number) => takeLine(form, lines, i);
 
     return (
         <section

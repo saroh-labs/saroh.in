@@ -155,6 +155,10 @@ export const RAW_ALLOWED = {
     // button: an age of "Who owes me?", a row that is one button (U12)
     "components/insights/owed-by-age.tsx": ["button"],
     "components/insights/period-control.tsx": ["button"],
+    // button: a part of the invoice's paper, pressed to change it (U15)
+    "components/invoices/paper-editor/part-popover.tsx": ["button"],
+    // button: "Add a line" under the paper's lines, a row that is one button (U15)
+    "components/invoices/paper-editor/add-line.tsx": ["button"],
     // button: "Cheques not in the bank", a line that is one pressed filter (DEC-173)
     "components/invoices/cheques-line.tsx": ["button"],
     // button: a row or card that is one button

@@ -1,12 +1,8 @@
-import type {
-    InvoiceFormBusiness,
-    InvoiceFormValues,
-} from "@/lib/invoices/new-invoice";
-import { dueAtOf, issueLine, placeOf } from "@/lib/invoices/new-invoice";
-import type { PreviewSums } from "@/lib/invoices/new-invoice-lines";
-import type { Invoice } from "@/lib/invoices/service";
+import type { InvoiceFormBusiness } from "@/lib/invoices/new-invoice";
+import { issueLine } from "@/lib/invoices/new-invoice";
 
 import { PaperPreview } from "./paper-preview";
+import type { PaperProps } from "./paper-props";
 
 /**
  * The right column (INVNewA): "How it will look", the paper as typed, in the
@@ -16,31 +12,15 @@ import { PaperPreview } from "./paper-preview";
 export function PreviewAside({
     id,
     open,
-    values,
-    sums,
+    paper,
     business,
-    businessName,
-    buyerName,
-    registered,
-    currency,
-    zone,
-    draft,
-    now,
     withLink,
 }: {
     id: string;
     /** Opened on a phone by See how it will look. */
     open: boolean;
-    values: InvoiceFormValues;
-    sums: PreviewSums;
+    paper: PaperProps;
     business: InvoiceFormBusiness | null;
-    businessName: string;
-    buyerName: string | null;
-    registered: boolean;
-    currency: string;
-    zone: string;
-    draft?: Invoice;
-    now: Date;
     withLink: boolean;
 }) {
     return (
@@ -56,40 +36,7 @@ export function PreviewAside({
             <h2 id={`${id}-title`} className="label mb-2">
                 How it will look
             </h2>
-            <PaperPreview
-                seller={
-                    business?.seller ?? {
-                        name: businessName,
-                        address: null,
-                        gstin: null,
-                        state: null,
-                        logo: null,
-                    }
-                }
-                registered={registered}
-                currency={currency}
-                zone={zone}
-                buyer={{
-                    name: buyerName,
-                    address: values.billToAddress,
-                    gstin: values.billToGstin.trim().toUpperCase(),
-                }}
-                place={placeOf(values, business?.state ?? null)}
-                sums={sums}
-                dueAt={
-                    values.due === 0
-                        ? null
-                        : dueAtOf(values.due, draft?.dueAt, now, zone)
-                }
-                style={
-                    draft?.paper?.style ?? business?.paper.style ?? "CLASSIC"
-                }
-                colour={
-                    draft?.paper
-                        ? draft.paper.colour
-                        : (business?.paper.colour ?? null)
-                }
-            />
+            <PaperPreview {...paper} />
             <p className="mt-2 text-[12px] leading-[1.5] text-muted-foreground">
                 {issueLine(business?.nextNumber ?? null)}
                 {withLink

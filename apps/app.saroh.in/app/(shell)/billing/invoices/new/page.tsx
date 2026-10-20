@@ -6,6 +6,7 @@ import { requireCan } from "@/lib/access/require-can";
 import { canPickProducts } from "@/lib/invoices/can-pick-products";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { newInvoiceBusiness } from "@/lib/invoices/new-invoice-business";
+import { mayUpdateBusiness } from "@/lib/invoices/paper-access";
 import { payLinkPossible } from "@/lib/invoices/payments-on";
 import { listInvoices } from "@/lib/invoices/service";
 import { detailsOnFileOf } from "@/lib/organizations/business-details";
@@ -87,6 +88,8 @@ export default async function NewInvoicePage({
                     settings.ok ? settings.data : null,
                 )}
                 canPickProducts={pickable}
+                // Owner and Admin set the business's look from the paper.
+                canSetDefault={mayUpdateBusiness(organization)}
             />
         </PageContainer>
     );

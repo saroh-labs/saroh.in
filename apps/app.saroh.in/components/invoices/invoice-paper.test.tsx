@@ -1,3 +1,4 @@
+import { PAPER_STYLES, paperColours } from "@saroh/block-contract";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
@@ -394,5 +395,112 @@ describe("InvoicePaper's issue date (#836)", () => {
             ">6 Oct</time>",
         );
         expect(issued("2026-10-05T19:00:00Z", null)).toContain(">6 Oct</time>");
+    });
+});
+
+/**
+ * The look it went out in (DEC-173, U15 #1127): the details paper draws
+ * the invoice's own style and colour, as the PDF does, and no style leaves
+ * a Rule 46 particular off (`RULE_46_FIELDS`; the signature is #1060).
+ */
+describe("InvoicePaper in each style", () => {
+    const taxInvoice = (paper: Invoice["paper"]) =>
+        invoice({
+            paper,
+            sellerAddress: "3 Hill Road, Indiranagar, Bengaluru 560038",
+            billTo: {
+                name: "Vivek Nair",
+                email: "vivek@example.com",
+                address: "7 27th Main, HSR Layout, Bengaluru 560102",
+                gstin: "29ABCFB2207K1ZL",
+            },
+            lines: [
+                line({
+                    description: "Butter croissant (trade)",
+                    quantity: 20,
+                    unitPrice: "150.00",
+                    amount: "3000.00",
+                    gst: {
+                        hsnSac: "19059020",
+                        rate: "18.00",
+                        taxableValue: "2542.37",
+                        cgst: "228.81",
+                        sgst: "228.82",
+                        igst: "0.00",
+                    },
+                }),
+            ],
+            subtotal: "2542.37",
+            tax: "457.63",
+            total: "3000.00",
+        });
+
+    it.each(PAPER_STYLES)(
+        "%s prints every particular a tax invoice must carry",
+        (style) => {
+            const out = html(taxInvoice({ style, colour: "#6B3F1D" }))
+                .replace(/&amp;/g, "&")
+                .replace(/<[^>]+>/g, " ")
+                .replace(/\s+/g, " ");
+            for (const words of [
+                // 46(a) the seller: name, address, GSTIN
+                "Rye & Co.",
+                "3 Hill Road, Indiranagar",
+                "GSTIN 29AAGCR1234M1Z5",
+                // 46(b) the number, 46(c) the date
+                "RYE/26-27/0031",
+                "Issued",
+                // 46(d) the buyer: name, address, GSTIN
+                "Vivek Nair",
+                "7 27th Main, HSR Layout",
+                "GSTIN 29ABCFB2207K1ZL",
+                // 46(g) HSN, (h) description, (i) quantity
+                "1905 90 20",
+                "Butter croissant (trade)",
+                "20",
+                // 46(j) total, (k) taxable value, (l) rate, (m) the split
+                "₹3,000",
+                "Taxable value",
+                "GST 18%",
+                "CGST",
+                "SGST",
+                // 46(n) place of supply, (p) reverse charge
+                "Place of supply",
+                "Karnataka (29)",
+                "Reverse charge",
+            ]) {
+                expect(out, `${style}: ${words}`).toContain(words);
+            }
+        },
+    );
+
+    it("Band fills its head with the colour, in the text tone that reads on it", () => {
+        const out = html(taxInvoice({ style: "BAND", colour: "#1B3A5C" }));
+        expect(paperColours("BAND", "#1B3A5C").band?.tone).toBe("WHITE");
+        expect(out).toContain('data-style="BAND"');
+        expect(out).toContain('data-band="white"');
+        expect(out).toMatch(/background-color:#1B3A5C;color:#FFFFFF/i);
+    });
+
+    it("Classic carries the colour on its title and rules; Compact puts the buyer in its head", () => {
+        const classic = html(
+            taxInvoice({ style: "CLASSIC", colour: "#6B3F1D" }),
+        );
+        expect(classic).toMatch(/border-color:#6B3F1D/i);
+        expect(classic).toMatch(/color:#6B3F1D[^>]*>Tax invoice/i);
+        const compact = html(taxInvoice({ style: "COMPACT", colour: null }));
+        const head = compact.slice(
+            compact.indexOf("<header"),
+            compact.indexOf("</header>"),
+        );
+        expect(head).toContain("Vivek Nair");
+        expect(compact).not.toContain("border-color");
+    });
+
+    it("an invoice from an API older than styles is Classic in ink", () => {
+        const out = html(taxInvoice(undefined));
+        expect(out).toContain('data-style="CLASSIC"');
+        expect(out).not.toContain("data-band");
+        expect(out).not.toContain("border-color");
     });
 });

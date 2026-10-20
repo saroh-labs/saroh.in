@@ -392,6 +392,10 @@ export interface InvoiceInput {
     /** The buyer's GST state code — the place of supply. "" clears it. */
     billToState?: string;
     billToAddress?: string;
+    /** The draft's own style (DEC-173); "" follows the business's. */
+    paperStyle?: PaperStyle | "";
+    /** The draft's own colour, `#RRGGBB`; "" follows the business's. */
+    paperColour?: string;
 }
 
 export interface PaymentInput {

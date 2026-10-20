@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PageHeader } from "@saroh/ui/page-header";
+import { Segmented } from "@saroh/ui/segmented";
 import { showError } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import type { BaseSyntheticEvent, ReactNode } from "react";
@@ -19,6 +20,7 @@ import {
 import { formatMoney } from "@/lib/format/money";
 import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { PAGE_FORM, toFirstError, toFirstErrorIn } from "@/lib/hooks/page-form";
+import { useTabParam } from "@/lib/hooks/use-tab-param";
 import { rateOption } from "@/lib/invoices/gst";
 import { LINE_RATE_NEEDED, linesMissingRate } from "@/lib/invoices/line-rates";
 import type {
@@ -30,10 +32,12 @@ import {
     invoiceFormSchema,
     isGoodLine,
 } from "@/lib/invoices/new-invoice";
+import { newInvoiceBusiness } from "@/lib/invoices/new-invoice-business";
 import { previewSums } from "@/lib/invoices/new-invoice-lines";
 import type { Invoice } from "@/lib/invoices/service";
 import { ISSUE_AND_SHARE, ISSUE_IT } from "@/lib/invoices/words";
 import type { DetailsOnFile } from "@/lib/organizations/business-details";
+import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 
 import { CustomerBlock, NoContactsYet } from "./new-invoice/customer-block";
 import { DueStrip } from "./new-invoice/due-strip";
@@ -45,8 +49,15 @@ import {
     SeeItToggle,
 } from "./new-invoice/form-parts";
 import { LinesTable } from "./new-invoice/lines-table";
+import { paperPropsOf } from "./new-invoice/paper-props";
 import { PreviewAside } from "./new-invoice/preview-aside";
 import { useInvoiceDraft } from "./new-invoice/use-invoice-draft";
+import { PaperEditor } from "./paper-editor/paper-editor";
+import { SeeAsCustomer } from "./paper-editor/see-as-customer";
+
+/** How it is written: the form, or on the paper (U15), in `?mode=`. */
+const MODES = ["form", "paper"] as const;
+type Mode = (typeof MODES)[number];
 
 /**
  * New invoice (A), INVNewA and INVNewAPhone (DEC-173 U14 #1126): a
@@ -60,6 +71,10 @@ import { useInvoiceDraft } from "./new-invoice/use-invoice-draft";
  * paper at a reduced size, in the style and colour it will go out in,
  * changing as it is typed. On a phone it is one column, the paper behind
  * "See how it will look", and the buttons at the foot.
+ *
+ * "On the paper" (U15 #1127, `?mode=paper`) is the same draft written by
+ * pressing the paper itself, with the style rail beside it
+ * (`paper-editor/`). Switching keeps everything typed: one form holds both.
  *
  * It saves as it is typed (`use-invoice-draft.ts`). "Save draft" is the
  * form's one submit, so Enter keeps it a draft; issuing numbers it and
@@ -78,6 +93,7 @@ export function InvoiceForm({
     detailsOnFile = null,
     business = null,
     canPickProducts = false,
+    canSetDefault = false,
     header,
 }: {
     contacts: { id: string; name: string; email: string }[];
@@ -100,6 +116,11 @@ export function InvoiceForm({
     business?: InvoiceFormBusiness | null;
     /** The business has products this person can read. */
     canPickProducts?: boolean;
+    /**
+     * `org:update` (Owner, Admin): may make a look the business's default,
+     * and change its logo and How to pay us from the paper.
+     */
+    canSetDefault?: boolean;
     /** The page's breadcrumb and title. */
     header?: { breadcrumb: ReactNode[]; title: string };
 }) {
@@ -124,8 +145,14 @@ export function InvoiceForm({
     const [buyerOpen, setBuyerOpen] = useState(hasBuyerGst);
     // The phone's paper, behind "See how it will look".
     const [seeIt, setSeeIt] = useState(false);
+    const [mode, setMode] = useTabParam<Mode>("mode", MODES, "form");
+    // The business as the page read it, and as a save on the paper
+    // answered (its default look, logo, How to pay us).
+    const [biz, setBiz] = useState(business);
+    const onSettings = (next: OrganizationSettings) =>
+        setBiz(newInvoiceBusiness(next));
     const currency = draft?.currency ?? defaultCurrency;
-    const zone = business?.zone ?? "Asia/Kolkata";
+    const zone = biz?.zone ?? "Asia/Kolkata";
     const [now] = useState(() => new Date());
 
     const form = useForm<InvoiceFormValues>({
@@ -146,6 +173,9 @@ export function InvoiceForm({
                       hsnSac: l.gst?.hsnSac ?? "",
                   }))
                 : [EMPTY_LINE],
+            // Its own look, or "" to follow the business's (U15).
+            paperStyle: draft?.paperChoice?.style ?? "",
+            paperColour: draft?.paperChoice?.colour ?? "",
         },
     });
     const lines = useFieldArray({ control: form.control, name: "lines" });
@@ -169,8 +199,24 @@ export function InvoiceForm({
             billToGstin: values.billToGstin,
             billToState: values.billToState,
         },
-        { registered, businessState: business?.state ?? null },
+        { registered, businessState: biz?.state ?? null },
     );
+    const buyerName =
+        contacts.find((c) => c.id === values.contactId)?.name ??
+        draft?.contact?.name ??
+        null;
+    const paper = paperPropsOf({
+        values,
+        sums,
+        business: biz,
+        businessName,
+        buyerName,
+        registered,
+        currency,
+        zone,
+        draft,
+        now,
+    });
     const busy = isSubmitting || intent !== null;
 
     /** The draft as the server now has it, or null when that couldn't be. */
@@ -263,7 +309,11 @@ export function InvoiceForm({
         });
     }
 
-    const heading = (badge?: ReactNode, actions?: ReactNode) =>
+    const heading = (
+        badge?: ReactNode,
+        actions?: ReactNode,
+        meta?: ReactNode,
+    ) =>
         header ? (
             <PageHeader
                 className="mb-4"
@@ -272,11 +322,13 @@ export function InvoiceForm({
                 // "New invoice" or "Edit the draft": fixed words.
                 holdsData={false}
                 badge={badge}
+                meta={meta}
                 actions={actions}
             />
-        ) : badge || actions ? (
+        ) : badge || actions || meta ? (
             <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
                 {badge}
+                {meta}
                 {actions}
             </div>
         ) : null;
@@ -317,76 +369,104 @@ export function InvoiceForm({
                         onRetry={() => void saving.flush()}
                     />,
                     <div className="flex gap-2 max-sm:hidden">
+                        {mode === "paper" ? (
+                            <SeeAsCustomer paper={paper} />
+                        ) : null}
                         {buttons(false)}
                     </div>,
+                    <Segmented<Mode>
+                        label="How to write it"
+                        value={mode}
+                        onValueChange={setMode}
+                        options={[
+                            { value: "form", label: "Form" },
+                            { value: "paper", label: "On the paper" },
+                        ]}
+                    />,
                 )}
-                <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_440px]">
-                    {/* One column that never grows past the form: an auto
-                        track took the picker's whole "name · email" as its
-                        least width, and a long email zoomed a phone out. */}
-                    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
-                        <CustomerBlock
-                            form={form}
-                            contacts={contacts}
-                            canAdd={!draft}
-                            onContactAdded={onContactAdded}
-                            registered={registered}
-                            businessState={business?.state ?? null}
-                            buyerOpen={buyerOpen}
-                            onOpenBuyer={() => setBuyerOpen(true)}
-                            disabled={busy}
-                        />
-                        <LinesTable
-                            form={form}
-                            lines={lines}
-                            currency={currency}
-                            registered={registered}
-                            canPickProducts={canPickProducts}
-                            priceMode={business?.priceMode ?? null}
-                            disabled={busy}
-                        />
-                        <section className="rounded-[12px] border border-border bg-card px-4 py-[13px]">
-                            <h2 className="label mb-2">Due</h2>
-                            <DueStrip
-                                value={values.due}
-                                onChange={(due) =>
-                                    form.setValue("due", due, {
-                                        shouldDirty: true,
-                                    })
-                                }
-                                draftDueAt={draft?.dueAt ?? null}
-                                zone={zone}
-                                now={now}
-                            />
-                        </section>
-                        <SeeItToggle
-                            open={seeIt}
-                            controls={ids.preview}
-                            onToggle={() => setSeeIt((v) => !v)}
-                        />
-                    </div>
-
-                    <PreviewAside
-                        id={ids.preview}
-                        open={seeIt}
-                        values={values}
-                        sums={sums}
-                        business={business}
+                {mode === "paper" ? (
+                    <PaperEditor
+                        form={form}
+                        lines={lines}
+                        paper={paper}
+                        business={biz}
                         businessName={businessName}
-                        buyerName={
-                            contacts.find((c) => c.id === values.contactId)
-                                ?.name ??
-                            draft?.contact?.name ??
-                            null
-                        }
                         registered={registered}
                         currency={currency}
                         zone={zone}
-                        draft={draft}
                         now={now}
-                        withLink={withLink}
+                        draftDueAt={draft?.dueAt ?? null}
+                        customer={{
+                            contacts,
+                            canAdd: !draft,
+                            onContactAdded,
+                            registered,
+                            businessState: biz?.state ?? null,
+                            buyerOpen,
+                            onOpenBuyer: () => setBuyerOpen(true),
+                        }}
+                        canPickProducts={canPickProducts}
+                        priceMode={biz?.priceMode ?? null}
+                        disabled={busy}
+                        canSetDefault={canSetDefault && biz !== null}
+                        onSettings={onSettings}
                     />
-                </div>
+                ) : (
+                    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_440px]">
+                        {/* One column that never grows past the form: an auto
+                        track took the picker's whole "name · email" as its
+                        least width, and a long email zoomed a phone out. */}
+                        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
+                            <CustomerBlock
+                                form={form}
+                                contacts={contacts}
+                                canAdd={!draft}
+                                onContactAdded={onContactAdded}
+                                registered={registered}
+                                businessState={biz?.state ?? null}
+                                buyerOpen={buyerOpen}
+                                onOpenBuyer={() => setBuyerOpen(true)}
+                                disabled={busy}
+                            />
+                            <LinesTable
+                                form={form}
+                                lines={lines}
+                                currency={currency}
+                                registered={registered}
+                                canPickProducts={canPickProducts}
+                                priceMode={biz?.priceMode ?? null}
+                                disabled={busy}
+                            />
+                            <section className="rounded-[12px] border border-border bg-card px-4 py-[13px]">
+                                <h2 className="label mb-2">Due</h2>
+                                <DueStrip
+                                    value={values.due}
+                                    onChange={(due) =>
+                                        form.setValue("due", due, {
+                                            shouldDirty: true,
+                                        })
+                                    }
+                                    draftDueAt={draft?.dueAt ?? null}
+                                    zone={zone}
+                                    now={now}
+                                />
+                            </section>
+                            <SeeItToggle
+                                open={seeIt}
+                                controls={ids.preview}
+                                onToggle={() => setSeeIt((v) => !v)}
+                            />
+                        </div>
+
+                        <PreviewAside
+                            id={ids.preview}
+                            open={seeIt}
+                            paper={paper}
+                            business={biz}
+                            withLink={withLink}
+                        />
+                    </div>
+                )}
                 {noLine && typed ? (
                     <p
                         id={ids.why}

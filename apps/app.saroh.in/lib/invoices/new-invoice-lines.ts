@@ -105,6 +105,8 @@ export function lineOfProduct(
 /* The preview's figures ----------------------------------------------- */
 
 export interface PreviewLine {
+    /** Its place among the form's lines: the line its editor changes. */
+    index: number;
     description: string;
     quantity: number;
     unitCents: number;
@@ -157,9 +159,11 @@ export function previewSums(
     values: Pick<InvoiceFormValues, "lines" | "billToGstin" | "billToState">,
     ctx: { registered: boolean; businessState: string | null },
 ): PreviewSums {
-    const lines: PreviewLine[] = values.lines.filter(isGoodLine).map((l) => {
+    const lines: PreviewLine[] = values.lines.flatMap((l, index) => {
+        if (!isGoodLine(l)) return [];
         const unitCents = centsOf(l.unitPrice);
         return {
+            index,
             description: l.description.trim(),
             quantity: Number(l.quantity),
             unitCents,

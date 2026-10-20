@@ -10,15 +10,13 @@ import {
 } from "@saroh/ui/command";
 import { noMatchLine, TRY_AGAIN } from "@saroh/ui/lib/state-copy";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import { formatMoneyMajor } from "@/lib/format/money";
-import type {
-    PickableProduct,
-    PickRow,
-} from "@/lib/invoices/new-invoice-lines";
+import type { PickRow } from "@/lib/invoices/new-invoice-lines";
 import { lineRateWords, pickRows } from "@/lib/invoices/new-invoice-lines";
-import { findInvoiceProducts } from "@/lib/invoices/product-actions";
+
+import { useProductSearch } from "./use-product-search";
 
 /**
  * "+ Pick from your products" (INVNewA, U14 #1126): searches the catalogue
@@ -41,40 +39,7 @@ export function ProductPick({
 }) {
     const [open, setOpen] = useState(false);
     const [q, setQ] = useState("");
-    const [found, setFound] = useState<PickableProduct[] | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [searching, setSearching] = useState(false);
-    const [asks, setAsks] = useState(0);
-    const asked = useRef(0);
-
-    // Search a beat after typing stops, only while the list is open.
-    useEffect(() => {
-        if (!open) return;
-        const ticket = ++asked.current;
-        const timer = setTimeout(() => {
-            setSearching(true);
-            void findInvoiceProducts(q).then(
-                (res) => {
-                    if (ticket !== asked.current) return;
-                    setSearching(false);
-                    if (!res.ok) {
-                        setError(res.error);
-                        return;
-                    }
-                    setError(null);
-                    setFound(res.data.items);
-                },
-                () => {
-                    if (ticket !== asked.current) return;
-                    setSearching(false);
-                    setError(
-                        "Your products couldn't be searched just now. Try again.",
-                    );
-                },
-            );
-        }, 250);
-        return () => clearTimeout(timer);
-    }, [q, open, asks]);
+    const { found, error, searching, retry } = useProductSearch(open, q);
 
     const rows = found ? pickRows(found) : [];
     const money = (price: string) => formatMoneyMajor(price, currency);
@@ -116,7 +81,7 @@ export function ProductPick({
                                     variant="outline"
                                     size="sm"
                                     className="mt-2"
-                                    onClick={() => setAsks((n) => n + 1)}
+                                    onClick={retry}
                                 >
                                     {TRY_AGAIN}
                                 </Button>

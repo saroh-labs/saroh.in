@@ -1,9 +1,14 @@
 import type { PaperStyle } from "@saroh/block-contract";
+import { PAPER_STYLES } from "@saroh/block-contract";
 import { z } from "zod";
 
 import { isTimeZone, zoneParts } from "@/lib/format/datetime";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
-import type { TaxSettings } from "@/lib/organizations/settings-service";
+import type { PayInstructionsSettings } from "@/lib/organizations/pay-instructions";
+import type {
+    BusinessLogo,
+    TaxSettings,
+} from "@/lib/organizations/settings-service";
 
 import { GST_STATES, GSTIN_SHAPE, isHsnSac } from "./gst";
 import { defaultNumberFormat, nextInvoiceNumber } from "./invoice-number";
@@ -66,6 +71,18 @@ export const invoiceFormSchema = z.object({
             }),
         )
         .min(1, { message: "Add a line" }),
+    /**
+     * The draft's own look (DEC-173, U15 #1127): "" follows the business's
+     * default. Left out (a form that never offers it), nothing is sent.
+     */
+    paperStyle: z.enum(["", ...PAPER_STYLES]).optional(),
+    /** `#RRGGBB`, or "" to follow the business's colour. */
+    paperColour: z
+        .string()
+        .refine((v) => v === "" || /^#[0-9A-Fa-f]{6}$/.test(v), {
+            message: "A colour is # and six letters or digits, like #6B3F1D",
+        })
+        .optional(),
 });
 
 export type InvoiceFormValues = z.infer<typeof invoiceFormSchema>;
@@ -191,6 +208,13 @@ export function draftInput(
                   billToAddress: values.billToAddress.trim(),
               }
             : {}),
+        // The draft's own look, "" back to the business's (U15 #1127).
+        ...(values.paperStyle !== undefined
+            ? { paperStyle: values.paperStyle }
+            : {}),
+        ...(values.paperColour !== undefined
+            ? { paperColour: values.paperColour.toUpperCase() }
+            : {}),
     };
 }
 
@@ -307,4 +331,15 @@ export interface InvoiceFormBusiness {
     paper: { style: PaperStyle; colour: string | null };
     /** The number issuing will give, where the series could be read. */
     nextNumber: string | null;
+    /**
+     * "How to pay us" as unpaid paper prints it (#833), the notes the paper
+     * carries; null when nothing is set. Absent: none.
+     */
+    howToPay?: string[] | null;
+    /**
+     * What the paper's editors change for the whole business, in place
+     * (U15): the logo and How to pay us as saved. Absent: not offered.
+     */
+    logoFile?: BusinessLogo | null;
+    pay?: PayInstructionsSettings;
 }

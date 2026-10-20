@@ -101,6 +101,27 @@ A live preview beside such a form is drawn from the typed values with the
 API's rule mirrored in a pure module (`lib/invoices/new-invoice-lines.ts`
 `previewSums`), never sent.
 
+**Current** — **A record edited "on the paper" is the same form, pressed
+where it prints** (New invoice on the paper, DEC-173 U15 #1127).
+`?mode=paper` (`useTabParam`, "Form" / "On the paper" in the header) swaps
+the form's columns for `components/invoices/paper-editor/`, under the same
+`useForm` and the same autosave, so switching keeps everything typed and
+the draft's address keeps the mode. The paper (`PaperPreview`) takes an
+`editing` seam: each part is wrapped in a control laid OVER it (the words
+stay the paper's for a screen reader; the press has its own name, "Change
+line 2: Butter croissant") that opens the part's editor in a popover on
+the desk and a sheet from the foot of a phone (`HeaderOverlay`). Each
+editor writes the form's own fields (`register`, `setValue`), so the paper,
+the totals and the save follow every keystroke; a line typed but not yet
+priced is drawn as "Set its quantity and price" so it can be finished.
+What the record can't change here says where it comes from instead (the
+seller, the number). A particular the law requires (CGST Rule 46) carries
+a label on the paper ("Next in series", "Set from the customer",
+"Required") and has no way off in any style. What the paper changes for
+the whole business (the logo, How to pay us, the default look) opens that
+setting's own sheet in place, for those who may (`org:update`), and is
+never a link away mid-task.
+
 **Current** — **An editor never opens in an error state over a rule newer
 than the record** (UX audit, 12 Oct). A plan or pack published before a GST
 rate was asked for opens with a plain note beside the field ("This plan has

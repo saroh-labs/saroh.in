@@ -17,7 +17,14 @@ import { InvoiceForm } from "./invoice-form";
 const push = vi.fn();
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push, refresh: vi.fn(), replace: vi.fn() }),
+    useSearchParams: () => new URLSearchParams(window.location.search),
 }));
+// On the paper (U15), the business\'s settings save in place.
+vi.mock("@/lib/organizations/settings-actions", () => ({
+    saveOrganizationSettings: vi.fn(),
+    saveBusinessLogo: vi.fn(),
+}));
+vi.mock("@/components/shared/logo-upload", () => ({ LogoUpload: () => null }));
 const actions = vi.hoisted(() => ({
     createInvoice: vi.fn(),
     createPayLink: vi.fn(),

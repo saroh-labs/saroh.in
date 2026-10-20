@@ -38,6 +38,7 @@ export function CustomerBlock({
     buyerOpen,
     onOpenBuyer,
     disabled,
+    bare = false,
 }: {
     form: UseFormReturn<InvoiceFormValues>;
     contacts: readonly ContactOption[];
@@ -50,6 +51,11 @@ export function CustomerBlock({
     buyerOpen: boolean;
     onOpenBuyer: () => void;
     disabled: boolean;
+    /**
+     * Drawn inside the paper's Billed to editor (U15): no card and no
+     * heading of its own, the editor's title naming it.
+     */
+    bare?: boolean;
 }) {
     const ids = {
         contact: useId(),
@@ -70,9 +76,16 @@ export function CustomerBlock({
     return (
         <section
             aria-labelledby={`${ids.contact}-label`}
-            className="rounded-[12px] border border-border bg-card px-4 py-[13px]"
+            className={
+                bare
+                    ? "min-w-0"
+                    : "rounded-[12px] border border-border bg-card px-4 py-[13px]"
+            }
         >
-            <h2 id={`${ids.contact}-label`} className="label mb-2">
+            <h2
+                id={`${ids.contact}-label`}
+                className={bare ? "sr-only" : "label mb-2"}
+            >
                 Billed to
             </h2>
             <Controller

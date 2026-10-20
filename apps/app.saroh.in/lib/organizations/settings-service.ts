@@ -244,6 +244,11 @@ export interface OrganizationSettingsInput {
     siteShowsRegisteredAddress?: boolean;
     /** Its Google Maps link, as typed; "" clears it. */
     registeredAddressMapUrl?: string;
+    /**
+     * The look invoices go out in (DEC-173): Owner or Admin
+     * (`org:update`). "" or null puts one back to Classic, or ink.
+     */
+    invoicePaper?: { style?: PaperStyle | ""; colour?: string | null };
 }
 
 /** A refusal names the field it is about when the API says which. */

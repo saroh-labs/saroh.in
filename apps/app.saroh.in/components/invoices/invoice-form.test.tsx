@@ -7,7 +7,14 @@ import { InvoiceForm } from "./invoice-form";
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+    useSearchParams: () => new URLSearchParams(),
 }));
+// On the paper (U15), the business\'s settings save in place.
+vi.mock("@/lib/organizations/settings-actions", () => ({
+    saveOrganizationSettings: vi.fn(),
+    saveBusinessLogo: vi.fn(),
+}));
+vi.mock("@/components/shared/logo-upload", () => ({ LogoUpload: () => null }));
 vi.mock("@/lib/invoices/actions", () => ({
     createInvoice: vi.fn(),
     createPayLink: vi.fn(),

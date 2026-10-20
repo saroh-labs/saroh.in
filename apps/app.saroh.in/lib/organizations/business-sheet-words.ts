@@ -101,6 +101,12 @@ export function sheetWords(sheet: BusinessSheet, page: Page): SheetWords {
                 title: "Invoice numbers",
                 description: "How your invoices are numbered.",
             };
+        case "paper":
+            return {
+                title: "Invoice style",
+                description:
+                    "The look every new invoice starts in. An invoice can choose its own.",
+            };
         case "delivery":
             return {
                 title: "GST on delivery",

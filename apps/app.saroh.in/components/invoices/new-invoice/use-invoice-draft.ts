@@ -124,11 +124,12 @@ export function useInvoiceDraft({
                 if (idRef.current === null) {
                     idRef.current = invoice.id;
                     setId(invoice.id);
-                    // The draft's own address from now on.
+                    // The draft's own address from now on, keeping how
+                    // it is being written (`?mode=paper`, U15).
                     window.history.replaceState(
                         window.history.state,
                         "",
-                        `/billing/invoices/${invoice.id}/edit`,
+                        `/billing/invoices/${invoice.id}/edit${window.location.search}`,
                     );
                 }
             },

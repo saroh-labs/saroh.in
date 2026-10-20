@@ -5,6 +5,7 @@ import { businessModeOf } from "@/lib/gst/price-mode";
 import { printedAddress } from "@/lib/organizations/registered-address";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 
+import { howToPayLines } from "./how-to-pay";
 import type { InvoiceFormBusiness } from "./new-invoice";
 import { nextNumberOf } from "./new-invoice";
 
@@ -42,5 +43,12 @@ export function newInvoiceBusiness(
             colour: paperColourOf(settings.invoicePaper?.colour),
         },
         nextNumber: nextNumberOf(settings.tax, zone, now),
+        // As an issued, unpaid invoice prints it: what it will carry.
+        howToPay: howToPayLines(
+            { standing: "ISSUED" },
+            settings.payInstructions,
+        ),
+        logoFile: settings.logo ?? null,
+        pay: settings.payInstructions,
     };
 }
