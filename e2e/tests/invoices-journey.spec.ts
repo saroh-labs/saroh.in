@@ -119,8 +119,15 @@ const shareSheet = (page: Page, number: string) =>
 
 /** The share sheet, from the money card's button or from Share. */
 async function openShare(page: Page, number: string, button: string) {
+    // Waited for, not counted: right after a payment the card is still the
+    // one before it until the details are read again, and a count then
+    // finds no button and goes to a menu that hasn't got it.
     const lead = cardAction(page, button);
-    if ((await lead.count()) > 0) {
+    const inCard = await lead.waitFor({ timeout: 10_000 }).then(
+        () => true,
+        () => false,
+    );
+    if (inCard) {
         await pressUntil(lead, shareSheet(page, number));
     } else {
         const item = await menuItem(page, "Share", button);
@@ -247,6 +254,12 @@ test.describe("the invoice journey", { tag: "@serial" }, () => {
             const sent = await lastWhatsApp(page);
             expect(sent).toContain("Hi Meera");
             expect(sent).toContain(number);
+            // The message carries a link of its own: a link is shown only
+            // once, so sharing makes a new one and the one copied at issue
+            // stops working. The customer opens the one they were sent.
+            const shared = /https?:\/\/\S+\/pay\/[\w-]+/.exec(sent)?.[0] ?? "";
+            expect(shared).not.toBe("");
+            expect(shared).not.toBe(link);
             await expect
                 .poll(async () =>
                     ((await read(page, id)).shared ?? []).some(
@@ -283,7 +296,7 @@ test.describe("the invoice journey", { tag: "@serial" }, () => {
             // The customer's pay page says what is paid and what is left.
             const customer = await context.newPage();
             await customer.goto(
-                new URL(new URL(link).pathname, urls.RENDERER_URL).toString(),
+                new URL(new URL(shared).pathname, urls.RENDERER_URL).toString(),
             );
             await expect(
                 customer.getByRole("heading", { name: `Invoice ${number}` }),
