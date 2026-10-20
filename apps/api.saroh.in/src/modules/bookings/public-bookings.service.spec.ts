@@ -290,10 +290,23 @@ describe("PublicBookingsService.book — capacity-one reservation", () => {
         expect(jobCreate).not.toHaveBeenCalled();
     });
 
-    it("maps a Postgres serialization failure (P2034) to 409", async () => {
+    it("tries once more after losing a serialization race (P2034), and books a time still free", async () => {
         const service = new PublicBookingsService();
         wireBookHappyPath();
         transaction.mockRejectedValueOnce({ code: "P2034" });
+
+        await expect(
+            service.book("svc_1", baseInput(), "iphash"),
+        ).resolves.toMatchObject({ id: "bk_1" });
+        expect(transaction).toHaveBeenCalledTimes(2);
+    });
+
+    it("maps a serialization race lost twice to 409", async () => {
+        const service = new PublicBookingsService();
+        wireBookHappyPath();
+        transaction
+            .mockRejectedValueOnce({ code: "P2034" })
+            .mockRejectedValueOnce({ code: "P2034" });
 
         await expect(
             service.book("svc_1", baseInput(), "iphash"),
