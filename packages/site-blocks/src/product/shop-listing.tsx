@@ -1,5 +1,6 @@
 "use client";
 
+import type { LookId } from "@saroh/block-contract";
 import { useEffect, useState } from "react";
 
 import { focusRing, quietFill } from "../booking-flow/styles";
@@ -552,12 +553,15 @@ export function ShopUnavailable({
     business,
     retryHref = null,
     reach = null,
+    look,
 }: {
     business: string;
     /** The page's own address: "Try again" asks for it afresh. */
     retryHref?: string | null;
     /** A call and a message, when the site shows them. */
     reach?: BusinessReach | null;
+    /** Folio, Quiet or Live (DEC-172, U15); absent is Classic. */
+    look?: LookId;
 }) {
     return (
         <SitePageState
@@ -565,6 +569,7 @@ export function ShopUnavailable({
             failed
             retryHref={retryHref}
             reach={reach}
+            look={look}
         >
             Something went wrong on our side. Try again in a moment, or get in
             touch with {business} to order.

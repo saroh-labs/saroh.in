@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import {
+    lookOf,
     modulePageTopOf,
     ModulePageUnavailable,
     NotTakingOrders,
@@ -162,7 +163,12 @@ export default async function ShopPage({
 
     const route = moduleRoute(snapshot.pages, resolved.modules, "SHOP");
     if (route.draw === "unavailable") {
-        return <ModulePageUnavailable business={snapshot.site.name} />;
+        return (
+            <ModulePageUnavailable
+                business={snapshot.site.name}
+                look={lookOf(snapshot.site.look)}
+            />
+        );
     }
     // The page's main landmark (UX-082), as the product page has: the
     // header and footer sit outside it.
@@ -190,6 +196,7 @@ export default async function ShopPage({
             <ShopUnavailable
                 business={snapshot.site.name}
                 retryHref="/shop"
+                look={lookOf(snapshot.site.look)}
                 // The layout's own read, shared through `cache`.
                 reach={reachOf(await getSiteContact(siteId))}
             />

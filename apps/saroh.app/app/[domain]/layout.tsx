@@ -437,6 +437,11 @@ export default async function SiteLayout({
                     <SiteTrackers
                         trackers={head.trackers}
                         noticeHref={head.privacyUrl ?? "/cookie-notice"}
+                        // The banner in the look (DEC-172, U15); and it
+                        // says visits are counted without cookies, true
+                        // here: the beacon above runs on these same hosts.
+                        look={look}
+                        countsVisits
                     />
                 ) : null}
                 {/* The account area draws its own compact header and no

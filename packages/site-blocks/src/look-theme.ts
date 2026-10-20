@@ -191,7 +191,54 @@ ${block}
                     --site-page-margin: ${px(tokens.pageMargin.desk)};
                     --site-section-padding: ${px(tokens.sectionPadding.desk)};
                 }
-            }${cardCorners(at)}${fonts && lookNeedsRupee(look) ? rupeeFaceRules() : ""}`;
+            }${cardCorners(at)}${stateRules(at)}${fonts && lookNeedsRupee(look) ? rupeeFaceRules() : ""}`;
+}
+
+/**
+ * How long a loading shape waits before it shows (U15, the boards' 28):
+ * a read that answers sooner never flashes one. A wait, not a motion: the
+ * shape appears at once when it does, and is still.
+ */
+export const HELD_AFTER_MS = 300;
+
+/**
+ * The states every look shares (DEC-172, plan U15, #1108):
+ *
+ * - THE COOKIE BANNER LIFTS THE PAGE. While it floats at the foot it sets
+ *   `--site-consent-offset` (`consent-banner.tsx`), and the page is padded
+ *   by it, so the footer's last line still scrolls clear of it.
+ * - LOADING IS STILL SHAPES, AFTER 300MS. A held page (`aria-busy`), the
+ *   booking's times (`data-times-loading`) and a services list being read
+ *   (`data-services-loading`) stay hidden for {@link HELD_AFTER_MS}, then
+ *   appear in the shape of what is coming; no pulse and no shimmer (the
+ *   pulse is stopped first, so a held shape that pulses only holds). A
+ *   live fact is left alone: while it loads it shows today's hours or its
+ *   other true fallback, which is never hidden.
+ */
+function stateRules(at: string): string {
+    return `
+            ${at}[data-site-look],
+            ${at} [data-site-look] {
+                padding-bottom: var(--site-consent-offset, 0px);
+            }
+            @keyframes site-held {
+                from {
+                    visibility: hidden;
+                }
+            }
+            ${at} .animate-pulse {
+                animation: none;
+            }
+            ${at} :is(
+                    [aria-busy="true"]:not([data-live-fact]),
+                    [data-times-loading],
+                    [data-services-loading]
+                ) {
+                animation-name: site-held;
+                animation-duration: 1ms;
+                animation-fill-mode: both;
+                animation-delay: ${HELD_AFTER_MS}ms;
+            }`;
 }
 
 /**

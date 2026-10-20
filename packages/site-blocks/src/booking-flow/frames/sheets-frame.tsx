@@ -101,7 +101,7 @@ export function SheetsFrame(props: FrameProps) {
             {bar ? (
                 <div
                     data-booking-bar=""
-                    className="bg-site-bg border-site-border fixed inset-x-0 bottom-0 z-50 border-t px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 min-[700px]:hidden"
+                    className="bg-site-bg border-site-border fixed inset-x-0 bottom-[var(--site-consent-offset,0px)] z-50 border-t px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 min-[700px]:hidden"
                 >
                     <BarContent bar={bar} />
                 </div>

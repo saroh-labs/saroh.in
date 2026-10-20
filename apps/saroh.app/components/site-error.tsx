@@ -1,6 +1,6 @@
+import type { LookId } from "@saroh/block-contract";
+import { ctaClasses, frontButton, SitePageMessage } from "@saroh/site-blocks";
 import Link from "next/link";
-
-import { ctaClasses, SitePageMessage } from "@saroh/site-blocks";
 
 /**
  * A page on a merchant's site that didn't load: the 5xx twin of
@@ -22,6 +22,7 @@ export function SiteError({
     home = true,
     ground = false,
     digest,
+    look,
 }: {
     /** Next's `retry`. */
     onRetry: () => void;
@@ -30,8 +31,41 @@ export function SiteError({
     /** Fill the screen with the site's ground (the root, outside the layout). */
     ground?: boolean;
     digest?: string;
+    /**
+     * Folio, Quiet or Live (DEC-172, U15; VA27 "Couldn't load"): the same
+     * words and ways in the look's type, Try again the one filled button.
+     * Absent is Classic, unchanged.
+     */
+    look?: LookId;
 }) {
-    const page = (
+    const page = look ? (
+        <SitePageMessage
+            look={look}
+            eyebrow="Something went wrong"
+            title={<>This page didn&rsquo;t load</>}
+            fill={ground}
+            actions={
+                <>
+                    <button
+                        type="button"
+                        onClick={onRetry}
+                        data-site-primary=""
+                        className={frontButton(look, "fill")}
+                    >
+                        Try again
+                    </button>
+                    {home ? (
+                        <Link href="/" className={frontButton(look, "link")}>
+                            Back to home
+                        </Link>
+                    ) : null}
+                </>
+            }
+            note={digest ? <>Reference: {digest}</> : null}
+        >
+            It&rsquo;s on our side, not yours. Try again in a moment.
+        </SitePageMessage>
+    ) : (
         <SitePageMessage
             eyebrow="Something went wrong"
             title={<>This page isn&rsquo;t loading</>}

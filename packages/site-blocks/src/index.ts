@@ -22,6 +22,8 @@ export {
 export type { Section } from "./section-renderer";
 // The hero's way in and its proof line under a look (DEC-172, U6).
 export type { FrontDoor, PageProof } from "./blocks/look-front";
+// A look's button classes, for a state page's ways on (DEC-172, U15).
+export { frontButton } from "./blocks/look-front";
 // The look a page is drawn in, and whether it is the owner's preview
 // (DEC-172, U4): handed to every block as props.
 export { lookOf, lookScope } from "./look-context";
@@ -628,7 +630,14 @@ export {
 } from "./test-release/test-release-stop";
 export type { TestReleaseVerb } from "./test-release/test-release-stop";
 // Server-safe: the site's server actions refuse in these words.
-export { ConsentBanner, CookieChoicesButton, listOf } from "./consent-banner";
+export {
+    ConsentBanner,
+    CookieChoicesButton,
+    listOf,
+    lookConsentWords,
+} from "./consent-banner";
+// Where a look's banner docks, so it never covers the hero's buttons (U15).
+export { consentDock, heroTargets } from "./consent-dock";
 export { SITE_CONSENT_OFFSET, SITE_CONSENT_OPEN_EVENT } from "./consent-events";
 export { CookieNotice } from "./cookie-notice";
 export {

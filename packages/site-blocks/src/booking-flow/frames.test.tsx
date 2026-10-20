@@ -378,3 +378,93 @@ describe("Classic", () => {
         ).toBeVisible();
     });
 });
+
+describe("booking paused, in a look (DEC-172, U15)", () => {
+    it.each(["folio", "quiet", "live"] as const)(
+        "%s: says so and offers Message us and Call as buttons, naming no plan",
+        (look) => {
+            render(
+                <BookingFlow
+                    page={{ ...PAGE, paused: true }}
+                    apiUrl={API}
+                    account={account()}
+                    look={look}
+                    reach={{
+                        phone: "+918040992210",
+                        whatsapp: "https://wa.me/918040992210",
+                        email: null,
+                    }}
+                />,
+            );
+            expect(
+                screen.getByRole("heading", {
+                    name: "We’re not taking bookings online right now.",
+                }),
+            ).toBeInTheDocument();
+            const message = screen.getByRole("link", { name: "Message us" });
+            expect(message.getAttribute("href")).toBe(
+                "https://wa.me/918040992210",
+            );
+            const call = screen.getByRole("link", {
+                name: "Call +91 80409 92210",
+            });
+            expect(call.getAttribute("href")).toBe("tel:+918040992210");
+            // Both are buttons of equal standing: neither is the filled one.
+            expect(message.className).toBe(call.className);
+            expect(message.className).not.toMatch(/\bbg-site-accent\b/);
+            expect(document.body.textContent).not.toMatch(/plan|limit/i);
+        },
+    );
+
+    it("messages by email when the business has no WhatsApp", () => {
+        render(
+            <BookingFlow
+                page={{ ...PAGE, paused: true }}
+                apiUrl={API}
+                account={account()}
+                look="quiet"
+                reach={{
+                    phone: null,
+                    whatsapp: null,
+                    email: "hello@example.com",
+                }}
+            />,
+        );
+        expect(
+            screen
+                .getByRole("link", { name: "Message us" })
+                .getAttribute("href"),
+        ).toBe("mailto:hello@example.com");
+        expect(screen.queryByRole("link", { name: /^Call/ })).toBeNull();
+    });
+
+    it("with no way to reach the business, says to get in touch and offers nothing dead", () => {
+        render(
+            <BookingFlow
+                page={{ ...PAGE, paused: true }}
+                apiUrl={API}
+                account={account()}
+                look="live"
+                reach={{ phone: null, whatsapp: null, email: null }}
+            />,
+        );
+        expect(screen.getByText(/get in touch with/)).toBeInTheDocument();
+        expect(screen.queryByRole("link", { name: "Message us" })).toBeNull();
+    });
+
+    it("not open at all says that, in the look", () => {
+        render(
+            <BookingFlow
+                page={{ ...PAGE, open: false }}
+                apiUrl={API}
+                account={account()}
+                look="folio"
+            />,
+        );
+        expect(
+            screen.getByRole("heading", {
+                name: "Online booking isn’t open right now.",
+            }),
+        ).toBeInTheDocument();
+    });
+});

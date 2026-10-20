@@ -1,3 +1,8 @@
+import type { LookId } from "@saroh/block-contract";
+
+import { cn } from "./lib/utils";
+import { LOOK_PAGE } from "./site-page-message";
+
 /**
  * The cookie notice a merchant's site links its banner to when the merchant
  * has no privacy page of their own (DEC-108): which tools the site uses and
@@ -7,14 +12,31 @@
 export function CookieNotice({
     siteName,
     tools,
+    look,
 }: {
     siteName: string;
     tools: readonly { name: string; purpose: string; asks: boolean }[];
+    /**
+     * Folio, Quiet or Live (DEC-172, U15): the heading in the look's type
+     * and the page's margins. The words are the same. Absent is Classic.
+     */
+    look?: LookId;
 }) {
     const asking = tools.some((t) => t.asks);
     return (
-        <main className="bg-site-bg text-site-fg font-site-body mx-auto max-w-[720px] px-5 py-14">
-            <h1 className="font-site-heading text-[28px] font-semibold tracking-[-0.03em]">
+        <main
+            className={cn(
+                "bg-site-bg text-site-fg font-site-body mx-auto max-w-[720px] px-5 py-14",
+                look && "px-[var(--site-page-margin,20px)] min-[700px]:py-24",
+            )}
+        >
+            <h1
+                className={
+                    look
+                        ? LOOK_PAGE[look].title
+                        : "font-site-heading text-[28px] font-semibold tracking-[-0.03em]"
+                }
+            >
                 Cookies and visitor counting
             </h1>
             {tools.length === 0 ? (

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { PostIndex } from "@/components/post-view";
 import { PublishedPage } from "@/components/published-page";
-import { ModulePageUnavailable } from "@saroh/site-blocks";
+import { lookOf, ModulePageUnavailable } from "@saroh/site-blocks";
 
 import { moduleOff } from "@/lib/module-pages";
 import {
@@ -123,7 +123,12 @@ export default async function SitePostPage({
     // words with a way home, so a shared link still lands somewhere. (Book
     // and Shop pages never reach here: `/book` and `/shop` are routes.)
     if (moduleOff(page, resolved.modules)) {
-        return <ModulePageUnavailable business={snapshot.site.name} />;
+        return (
+            <ModulePageUnavailable
+                business={snapshot.site.name}
+                look={lookOf(snapshot.site.look)}
+            />
+        );
     }
 
     return <PublishedPage page={page} snapshot={snapshot} siteId={siteId} />;

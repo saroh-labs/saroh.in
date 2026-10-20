@@ -5,6 +5,7 @@ import type { SignInOptions } from "@saroh/site-blocks";
 import {
     AddToBag,
     AskAboutOrdering,
+    lookOf,
     NotTakingOrders,
     ProductPage,
     reachOf,
@@ -129,6 +130,7 @@ export default async function ShopProductPage({
             <ShopUnavailable
                 business={resolved.snapshot.site.name}
                 retryHref={`/shop/${encodeURIComponent(productSlug)}`}
+                look={lookOf(resolved.snapshot.site.look)}
                 // The layout's own read, shared through `cache`.
                 reach={reachOf(await getSiteContact(resolved.siteId))}
             />

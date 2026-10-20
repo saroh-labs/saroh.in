@@ -9,6 +9,7 @@ import {
     useSyncExternalStore,
 } from "react";
 
+import type { LookId } from "@saroh/block-contract";
 import { ConsentBanner, SITE_CONSENT_OPEN_EVENT } from "@saroh/site-blocks";
 
 import type { SiteHeadTracker } from "@/lib/site-head-shape";
@@ -168,9 +169,19 @@ function withdraw(): void {
 export function SiteTrackers({
     trackers,
     noticeHref,
+    look,
+    countsVisits = false,
 }: {
     trackers: SiteHeadTracker[];
     noticeHref: string;
+    /** Folio, Quiet or Live: the banner in that look (U15); absent is Classic. */
+    look?: LookId;
+    /**
+     * The site counts visits without cookies before any choice (the visit
+     * beacon, mounted under the same conditions), so a look's banner says
+     * what runs before the visitor chooses.
+     */
+    countsVisits?: boolean;
 }) {
     const pathname = usePathname();
     const allowed = trackersAllowedOn(pathname);
@@ -250,6 +261,8 @@ export function SiteTrackers({
             noticeHref={noticeHref}
             onAccept={accept}
             onReject={reject}
+            look={look}
+            countsVisits={countsVisits}
         />
     ) : null;
 }

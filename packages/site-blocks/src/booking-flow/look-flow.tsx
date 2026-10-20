@@ -12,7 +12,7 @@ import { TestReleaseStopSheet } from "../test-release/test-release-stop";
 import { useCloseBooking } from "./book-return";
 import type { BookingFlowProps } from "./booking-account";
 import { headerFacts, testReleaseBookingLine } from "./flow-helpers";
-import { BookingHeader, ClosedCard } from "./flow-parts";
+import { BookingHeader } from "./flow-parts";
 import type { FrameProps } from "./frames/frame-parts";
 import { PageFrame } from "./frames/page-frame";
 import { PanelFrame } from "./frames/panel-frame";
@@ -22,6 +22,7 @@ import { stepBar } from "./look-bar";
 import { LookStepBody } from "./look-body";
 import { LookBooked } from "./look-booked";
 import { ChosenSoFar, LiveAnswered } from "./look-chosen";
+import { LookClosedCard } from "./look-closed";
 import { LookPaying } from "./look-paying";
 import { FRAME_PILL, FRAME_RADII, STEP_HEADING } from "./look-styles";
 import type { LookStep } from "./look-words";
@@ -90,6 +91,7 @@ export function LookBookingFlow(props: BookingFlowProps & { look: LookId }) {
     const callReach: BusinessReach = {
         phone: reach?.phone ?? facts.phone,
         whatsapp: reach?.whatsapp ?? null,
+        email: reach?.email ?? null,
     };
     const paused = page.paused === true;
     const bookable = page.open && page.services.length > 0 && !paused;
@@ -330,10 +332,10 @@ export function LookBookingFlow(props: BookingFlowProps & { look: LookId }) {
         );
     } else if (!bookable) {
         drawn = plain(
-            <ClosedCard
+            <LookClosedCard
+                look={look}
                 paused={page.open && page.services.length > 0 && paused}
                 businessName={page.businessName}
-                phone={facts.phone}
                 reach={callReach}
             />,
         );

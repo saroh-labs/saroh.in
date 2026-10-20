@@ -208,7 +208,12 @@ export default async function BookPage({
         isBookingDeepLink({ service, date, start, step, staff, ref }),
     );
     if (route.draw === "unavailable") {
-        return <ModulePageUnavailable business={resolved.snapshot.site.name} />;
+        return (
+            <ModulePageUnavailable
+                business={resolved.snapshot.site.name}
+                look={lookOf(resolved.snapshot.site.look)}
+            />
+        );
     }
     if (route.draw === "page") {
         return (
@@ -268,6 +273,7 @@ export default async function BookPage({
                 // the same service, day and time.
                 retryHref={bookHref({ service, date, start, staff, step })}
                 reach={reachOf(contact)}
+                look={lookOf(resolved.snapshot.site.look)}
             />
         );
     }

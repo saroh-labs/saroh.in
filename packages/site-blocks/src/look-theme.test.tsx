@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { lookOf, lookScope } from "./look-context";
-import { RUPEE_FAMILY, withRupee } from "./look-theme";
+import { HELD_AFTER_MS, RUPEE_FAMILY, withRupee } from "./look-theme";
 import SectionRenderer, {
     opensOverPhoto,
     PageSections,
@@ -257,9 +257,15 @@ describe("a look's type", () => {
 });
 
 /** Every `NNNms` / `N.Ns` duration in a sheet, in ms. */
+/**
+ * Every time in a sheet that is a motion's length. A loading shape's
+ * hold (`animation-delay`, U15: still shapes after 300ms) is a wait before
+ * anything shows, not a motion, so it is left out; its own test holds it.
+ */
 function durations(sheet: string): number[] {
-    return [...sheet.matchAll(/(\d+(?:\.\d+)?)(ms|s)\b/g)].map(([, n, unit]) =>
-        unit === "s" ? Number(n) * 1000 : Number(n),
+    const motion = sheet.replace(/animation-delay:[^;]*;/g, "");
+    return [...motion.matchAll(/(\d+(?:\.\d+)?)(ms|s)\b/g)].map(
+        ([, n, unit]) => (unit === "s" ? Number(n) * 1000 : Number(n)),
     );
 }
 
@@ -438,5 +444,41 @@ describe("the look reaches every block", () => {
                 }
             }
         }
+    });
+});
+
+describe("the states every look shares (U15)", () => {
+    it.each(LOOK_IDS)(
+        "%s: loading shapes wait 300ms and then stay still; the banner lifts the page",
+        (look) => {
+            const sheet = css(look);
+            expect(HELD_AFTER_MS).toBe(300);
+            expect(sheet).toContain(`animation-delay: ${HELD_AFTER_MS}ms`);
+            expect(sheet).toMatch(
+                /@keyframes site-held\s*{\s*from\s*{\s*visibility: hidden;/,
+            );
+            // The hold is visibility only: nothing moves, nothing loops.
+            const held = sheet.slice(sheet.indexOf("@keyframes site-held"));
+            expect(held.slice(0, held.indexOf("}") + 1)).not.toMatch(
+                /transform|opacity/,
+            );
+            expect(sheet).toMatch(/\[data-times-loading\]/);
+            expect(sheet).toMatch(/\[data-services-loading\]/);
+            // A live fact's true fallback is never held back.
+            expect(sheet).toContain('[aria-busy="true"]:not([data-live-fact])');
+            // No shimmer: the pulse is stopped before the hold is set.
+            expect(sheet.indexOf(".animate-pulse")).toBeLessThan(
+                sheet.indexOf("animation-name: site-held"),
+            );
+            expect(sheet).toContain(
+                "padding-bottom: var(--site-consent-offset, 0px)",
+            );
+        },
+    );
+
+    it("Classic has none of them", () => {
+        const sheet = css(undefined);
+        expect(sheet).not.toContain("site-held");
+        expect(sheet).not.toContain("--site-consent-offset");
     });
 });
