@@ -56,29 +56,32 @@ function draw({
     lines?: InvoiceFormValues["lines"];
 } = {}) {
     const buyer = { billToGstin: "29ABCFB2207K1ZL", billToState };
-    return renderToStaticMarkup(
-        <PaperPreview
-            seller={SELLER}
-            registered={registered}
-            currency="INR"
-            zone="Asia/Kolkata"
-            buyer={{
-                name: "Vivek Nair",
-                address: "7 27th Main, HSR Layout",
-                gstin: buyer.billToGstin,
-            }}
-            place={placeOf(buyer, "29")}
-            sums={previewSums(
-                { lines, ...buyer },
-                { registered, businessState: "29" },
-            )}
-            dueAt={dueAt}
-            style={style}
-            colour={colour}
-        />,
-    )
-        .replace(/&amp;/g, "&")
-        .replace(/&#x27;/g, "'");
+    return (
+        renderToStaticMarkup(
+            <PaperPreview
+                seller={SELLER}
+                registered={registered}
+                currency="INR"
+                zone="Asia/Kolkata"
+                buyer={{
+                    name: "Vivek Nair",
+                    address: "7 27th Main, HSR Layout",
+                    gstin: buyer.billToGstin,
+                }}
+                place={placeOf(buyer, "29")}
+                sums={previewSums(
+                    { lines, ...buyer },
+                    { registered, businessState: "29" },
+                )}
+                dueAt={dueAt}
+                style={style}
+                colour={colour}
+            />,
+        )
+            // &amp; last, so "&amp;#x27;" stays "&#x27;" and isn't decoded twice.
+            .replace(/&#x27;/g, "'")
+            .replace(/&amp;/g, "&")
+    );
 }
 
 describe("the paper preview", () => {
