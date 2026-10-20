@@ -3,8 +3,10 @@ import {
     createViewLink,
     remindInvoice,
     sendInvoice,
+    shareInvoice,
 } from "./actions";
 import { forgetLink, rememberLink } from "./minted-links";
+import type { ShareAsk } from "./service";
 
 /**
  * Every way this app replaces an invoice's link token, with the tab's
@@ -47,5 +49,26 @@ export async function sendWithLink(id: string) {
 export async function remindWithLink(id: string) {
     const res = await remindInvoice(id);
     if (res.ok) forgetLink(id);
+    return res;
+}
+
+/**
+ * Share it by hand (DEC-173, U11): WhatsApp and Link make a fresh link and
+ * end the one before, as a send does. A payment link made here is
+ * remembered to show again; a view link, or PDF and print, which make
+ * none, leave the memory as it is or clear it. `updatedAt`: the invoice's,
+ * as known now.
+ */
+export async function shareWithLink(
+    id: string,
+    ask: ShareAsk,
+    updatedAt?: string | null,
+) {
+    const res = await shareInvoice(id, ask);
+    if (res.ok && res.data.url) {
+        if (res.data.payOnline) {
+            rememberLink(id, res.data.url, updatedAt);
+        } else forgetLink(id);
+    }
     return res;
 }

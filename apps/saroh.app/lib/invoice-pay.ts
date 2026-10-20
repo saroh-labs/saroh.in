@@ -5,6 +5,7 @@ import { serverApiUrl } from "./api-url";
 import { autopayDoneAnswer, autopayStartAnswer } from "./autopay-shape";
 import type { CheckoutIntent } from "./checkout-shape";
 import { isIntent } from "./checkout-shape";
+import { payAmountOf, payPaymentsOf } from "./invoice-paid-shape";
 import type { PayInvoice } from "./invoice-pay-shape";
 import {
     isPayInvoice,
@@ -26,7 +27,8 @@ export type { PayInvoice, PayInvoiceLine } from "./invoice-pay-shape";
  *   GET  ${API_URL}/public/invoices/:token
  *   POST ${API_URL}/public/invoices/:token/payment-intent
  *
- * No amount is ever sent: the API charges the stored invoice's total.
+ * No amount is ever sent: the API charges what is left to pay on the
+ * stored invoice (DEC-173).
  */
 const API_URL = serverApiUrl();
 
@@ -60,6 +62,11 @@ export async function getPayInvoice(token: string): Promise<PayLookup> {
                       autopayCharging: payChargingOf(body.autopayCharging),
                       // When autopay next charges (D13B): the same shape.
                       autopayNextCharge: payChargingOf(body.autopayNextCharge),
+                      // Paid so far, what is left and what was received
+                      // (DEC-173, U16), checked; strange is none said.
+                      paidSoFar: payAmountOf(body.paidSoFar),
+                      leftToPay: payAmountOf(body.leftToPay),
+                      payments: payPaymentsOf(body.payments),
                       // Where the link lives (DEC-069, L6).
                       payUrl: payUrlOf(body.payUrl),
                       // Whether Pay is offered at all (DEC-070).

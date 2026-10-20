@@ -83,6 +83,7 @@ import { checkDesk42, seedDesk42 } from "./desk42";
 import { seedDiaryShop } from "./diary-shop";
 import { checkDiaryShop } from "./diary-shop-check";
 import { checkFrameVow, seedFrameVow } from "./frame-vow";
+import { writeTrailRows } from "./invoice-states";
 import type { JournalPost } from "./journal";
 import { seedJournal } from "./journal";
 import { checkPagdandi, seedPagdandi } from "./pagdandi";
@@ -520,8 +521,15 @@ async function setProfile(
     key: string,
     orgId: string,
     address: ShowcaseBusiness["registeredAddress"],
+    paper?: ShowcaseBusiness["invoicePaper"],
 ) {
-    const profile = { timezone: TIMEZONE, ...address };
+    const profile = {
+        timezone: TIMEZONE,
+        ...address,
+        ...(paper
+            ? { invoiceStyle: paper.style, invoiceColour: paper.colour }
+            : {}),
+    };
     await ctx.prisma.businessProfile.upsert({
         where: { organizationId: orgId },
         update: profile,
@@ -665,6 +673,9 @@ async function clearVolume(ctx: Context, key: string) {
     const p = ctx.prisma;
     await p.invoiceLine.deleteMany({ where });
     await p.invoice.deleteMany({ where });
+    // The emails that sent and reminded about its invoices (#1129): an
+    // invoice's delete leaves them, so they go on their own seeded ids.
+    await p.message.deleteMany({ where });
     await p.packRedemption.deleteMany({ where });
     await p.submission.deleteMany({ where });
     await p.activity.deleteMany({ where });
@@ -1159,7 +1170,7 @@ async function seedBusiness(
         },
     });
     const orgId = org.id;
-    await setProfile(ctx, key, orgId, biz.registeredAddress);
+    await setProfile(ctx, key, orgId, biz.registeredAddress, biz.invoicePaper);
 
     // --- team
     const ownerId = biz.owner
@@ -1471,6 +1482,7 @@ async function seedBusiness(
                   contacts: billingCtx.contacts,
                   pool: billingCtx.pool,
                   team: teamIds,
+                  manual: manual?.invoices ?? [],
               })
             : null;
 
@@ -1722,6 +1734,8 @@ async function writeInvoices(
     await createInChunks(rows.lines, (data) =>
         p.invoiceLine.createMany({ data }),
     );
+    // What happened after they went out: payments, shares, emails (#1129).
+    await writeTrailRows(p, rows.trails);
     const lastNumber = Math.max(rows.lastNumber, ...handNumbers);
     // The seeded numbers are INV-000n: the legacy series (ADR-008).
     await p.invoiceSequence.upsert({

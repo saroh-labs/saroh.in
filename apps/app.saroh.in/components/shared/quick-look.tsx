@@ -42,6 +42,7 @@ export function QuickLook({
     side = "right",
     close = "square",
     closeLabel = "Close",
+    wide = false,
     children,
 }: {
     open: boolean;
@@ -68,6 +69,11 @@ export function QuickLook({
     close?: "square" | "plain";
     /** Close's name to a screen reader. */
     closeLabel?: string;
+    /**
+     * 512px rather than 460px: an invoice's details, which hold its paper
+     * and act on it there (DEC-173, U9).
+     */
+    wide?: boolean;
     children: ReactNode;
 }) {
     // What had focus as it opened — the row's button — to return focus to.
@@ -91,7 +97,9 @@ export function QuickLook({
                     "flex w-full flex-col gap-0 bg-background p-0 outline-none",
                     side === "bottom"
                         ? "max-h-[85dvh] overflow-hidden rounded-t-2xl"
-                        : "sm:max-w-[460px]",
+                        : wide
+                          ? "sm:max-w-[512px]"
+                          : "sm:max-w-[460px]",
                 )}
                 // Focus lands on the sheet, not its first link, so nothing
                 // opens already ringed; Tab moves in from there.
@@ -108,7 +116,7 @@ export function QuickLook({
                     }
                 }}
             >
-                <div className="flex items-center gap-2.5 border-b border-border bg-card px-[18px] py-3.5">
+                <div className="flex items-center gap-2.5 border-b border-border bg-card px-[18px] py-3.5 print:hidden">
                     {leading}
                     <div className="min-w-0 flex-1">
                         <SheetTitle
@@ -145,7 +153,7 @@ export function QuickLook({
                     {children}
                 </div>
                 {footer ? (
-                    <div className="flex flex-wrap gap-2 border-t border-border bg-card px-[18px] py-3 pb-[max(12px,env(safe-area-inset-bottom))]">
+                    <div className="flex flex-wrap gap-2 border-t border-border bg-card px-[18px] py-3 pb-[max(12px,env(safe-area-inset-bottom))] print:hidden">
                         {footer}
                     </div>
                 ) : null}

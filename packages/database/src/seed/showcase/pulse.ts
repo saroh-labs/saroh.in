@@ -12,6 +12,11 @@ import type {
 } from "./billing";
 import { rupees } from "./billing";
 import type { ShowcasePack, ShowcasePlan } from "./data";
+import {
+    describeInvoiceStates,
+    invoiceStateCounts,
+    PULSE_COLOUR,
+} from "./invoice-states";
 import { addMinutes, istAt, istWeekday, minuteOf } from "./people";
 import type { Rng } from "./random";
 
@@ -357,6 +362,8 @@ export interface PulseInput {
     contacts: readonly BillingContact[];
     pool: readonly number[];
     team: readonly string[];
+    /** Its invoices written by hand, in fixture order; changed in place. */
+    manual: InvoiceSpec[];
 }
 
 export interface PulsePlan {
@@ -744,6 +751,18 @@ export function planPulse(input: PulseInput): PulsePlan {
         }
     }
 
+    // --- invoices after they went out (DEC-173, #1129)
+    planInvoiceStates(input, {
+        skip: new Set(
+            subs.filter((x) => x === changing || failedRenewal(x)).map(idOf),
+        ),
+        failed: subs.filter(failedRenewal).map((x) => {
+            const list = invoicesOf(idOf(x));
+            return list[list.length - 1];
+        }),
+        invoicesOf,
+    });
+
     // --- the team's notes on a few people
     const noteOn = (contactId: string | null | undefined) =>
         contactId ? contactIndex.get(contactId) : undefined;
@@ -801,6 +820,217 @@ export function planPulse(input: PulseInput): PulsePlan {
     };
 }
 
+/**
+ * What Pulse's invoices show after they went out (DEC-173, #1129), on the
+ * planned specs and in place:
+ *
+ * - **part payments on two renewals:** two members' latest period, owed,
+ *   with part of it paid at the desk (UPI, then cash), the rest still to
+ *   pay; one shared its receipt on WhatsApp, the other was reminded;
+ * - **the failed renewal** reminded by email, then on WhatsApp;
+ * - **the corporate membership** emailed and shared on WhatsApp as it
+ *   went out; **the old training invoice** reminded both ways;
+ * - **the invoice written again** after its void: its receipt shared.
+ *
+ * No randomness: times are fixed hours on fixed days, after the invoice
+ * went out and before now.
+ */
+function planInvoiceStates(
+    input: PulseInput,
+    seen: {
+        /** Subscriptions already showing a state of their own. */
+        skip: ReadonlySet<string>;
+        failed: readonly InvoiceSpec[];
+        invoicesOf: (subId: string) => InvoiceSpec[];
+    },
+) {
+    const { now } = input;
+    const nowMs = now.getTime();
+    const desk = input.team[0] ?? null;
+    /** `daysAgo` at `hour` in India, after `after` and before now. */
+    const at = (daysAgo: number, hour: number, after: Date) => {
+        const t = Math.max(
+            istAt(now, -daysAgo, hour * 60).getTime(),
+            after.getTime() + 20 * 60_000,
+        );
+        return new Date(Math.min(t, nowMs - 5 * 60_000));
+    };
+    const trailOf = (inv: InvoiceSpec) => {
+        inv.trail ??= {};
+        return inv.trail;
+    };
+
+    // Two renewals paid in part.
+    const renewals = input.subscriptions.subscriptions
+        .filter(
+            (x) =>
+                x.status === "ACTIVE" &&
+                !x.cancelAtPeriodEnd &&
+                !x.pendingPlanId &&
+                !seen.skip.has(idOf(x)),
+        )
+        .flatMap((x) => {
+            // Its latest period, a renewal (not the first), issued 3 to 25
+            // days ago.
+            const list = seen.invoicesOf(idOf(x));
+            const inv = list.at(-1);
+            const issued = inv?.issuedAt?.getTime() ?? 0;
+            return inv &&
+                list.length > 1 &&
+                issued < nowMs - 3 * DAY &&
+                issued > nowMs - 25 * DAY
+                ? [inv]
+                : [];
+        })
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .slice(0, 2);
+    if (renewals.length < 2) {
+        throw new Error(
+            "Pulse Fitness has no two renewals to show part payments on",
+        );
+    }
+    renewals.forEach((inv, k) => {
+        if (!inv.issuedAt) return;
+        const price = inv.lines.reduce(
+            (sum, l) => sum + l.quantity * l.unitPaise,
+            0,
+        );
+        // About 40%, in whole hundreds of rupees.
+        const part = Math.max(
+            10_000,
+            Math.floor((price * 0.4) / 10_000) * 10_000,
+        );
+        if (part >= price) return;
+        inv.paid = null;
+        const receivedAt = at(
+            Math.max(1, Math.floor((nowMs - inv.issuedAt.getTime()) / DAY) - 1),
+            18,
+            inv.issuedAt,
+        );
+        const trail = trailOf(inv);
+        trail.ledger = [
+            {
+                amountPaise: part,
+                method: k === 0 ? "UPI" : "CASH",
+                receivedAt,
+                reference:
+                    k === 0
+                        ? `UPI ref 4${String(part).padStart(11, "7")}`
+                        : null,
+                recordedById: desk,
+            },
+        ];
+        trail.shares =
+            k === 0
+                ? [
+                      {
+                          channel: "WHATSAPP",
+                          kind: "RECEIPT",
+                          at: at(0, 0, receivedAt),
+                          byUserId: desk,
+                      },
+                  ]
+                : [];
+        trail.emails =
+            k === 1
+                ? [
+                      {
+                          template: "INVOICE_REMINDER",
+                          at: at(1, 10, receivedAt),
+                          byUserId: desk,
+                      },
+                  ]
+                : [];
+    });
+
+    // The failed renewal, reminded by email and then on WhatsApp.
+    for (const inv of seen.failed.slice(0, 1)) {
+        if (!inv.issuedAt) continue;
+        const trail = trailOf(inv);
+        trail.emails = [
+            {
+                template: "INVOICE_REMINDER",
+                at: at(3, 9, inv.issuedAt),
+                byUserId: null,
+            },
+        ];
+        trail.shares = [
+            {
+                channel: "WHATSAPP",
+                kind: "REMINDER",
+                at: at(1, 17, inv.issuedAt),
+                byUserId: desk,
+            },
+        ];
+    }
+
+    // By hand: the corporate membership (0), the old training invoice (3)
+    // and the one written again after its void (6).
+    const manual = (i: number) => {
+        const inv = input.manual[i] as InvoiceSpec | undefined;
+        return inv?.issuedAt ? { inv, issuedAt: inv.issuedAt } : null;
+    };
+    const corporate = manual(0);
+    if (corporate) {
+        const trail = trailOf(corporate.inv);
+        trail.emails = [
+            {
+                template: "INVOICE_SENT",
+                at: new Date(corporate.issuedAt.getTime() + 2 * 60_000),
+                byUserId: desk,
+            },
+        ];
+        trail.shares = [
+            {
+                channel: "WHATSAPP",
+                kind: "NEW",
+                at: new Date(corporate.issuedAt.getTime() + 4 * 60_000),
+                byUserId: desk,
+            },
+        ];
+    }
+    const training = manual(3);
+    if (training && !training.inv.paid) {
+        const trail = trailOf(training.inv);
+        trail.emails = [
+            {
+                template: "INVOICE_SENT",
+                at: new Date(training.issuedAt.getTime() + 3 * 60_000),
+                byUserId: desk,
+            },
+            {
+                template: "INVOICE_REMINDER",
+                at: at(6, 11, training.issuedAt),
+                byUserId: desk,
+            },
+        ];
+        trail.shares = [
+            {
+                channel: "WHATSAPP",
+                kind: "REMINDER",
+                at: at(1, 12, training.issuedAt),
+                byUserId: desk,
+            },
+        ];
+    }
+    const rewritten = manual(6);
+    if (rewritten?.inv.paid) {
+        trailOf(rewritten.inv).shares = [
+            {
+                channel: "WHATSAPP",
+                kind: "RECEIPT",
+                at: new Date(
+                    Math.min(
+                        rewritten.inv.paid.at.getTime() + 25 * 60_000,
+                        nowMs - 5 * 60_000,
+                    ),
+                ),
+                byUserId: desk,
+            },
+        ];
+    }
+}
+
 // --- Checks ----------------------------------------------------------------------
 
 export interface PulseCounts {
@@ -820,6 +1050,8 @@ export interface PulseCounts {
     packsExpiringSoon: number;
     packsExpiredUnused: number;
     notes: number;
+    /** The rebuilt invoice screens' states (DEC-173, #1129). */
+    invoiceStates: string;
 }
 
 type Row = Record<string, unknown>;
@@ -915,9 +1147,20 @@ export async function checkPulse(
               AND NOT EXISTS (SELECT 1 FROM "PackRedemption" r
                   WHERE r."purchaseId" = p.id AND r."reversedAt" IS NULL)`),
         notes,
+        invoiceStates: "",
     };
+    const states = await invoiceStateCounts(prisma, orgId, now);
+    counts.invoiceStates = describeInvoiceStates(states);
 
     const missing = Object.entries({
+        "part payments on two renewals": states.partlyPaidRenewals >= 2,
+        "an invoice void and written again": states.voidAndWrittenAgain >= 1,
+        "an invoice shared on WhatsApp": states.sharedOnWhatsApp >= 1,
+        "reminders by email and on WhatsApp":
+            states.remindedByEmail >= 1 && states.remindedOnWhatsApp >= 1,
+        "a receipt shared on WhatsApp": states.receiptsShared >= 1,
+        "Compact in Pulse's colour as its default":
+            states.defaultLook === `COMPACT ${PULSE_COLOUR}`,
         "four people on the diary": counts.staff >= 4,
         "one linked to a team member": counts.linked >= 1,
         "weekly hours": counts.hours > 0,

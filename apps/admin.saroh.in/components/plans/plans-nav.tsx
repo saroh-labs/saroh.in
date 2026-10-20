@@ -56,7 +56,7 @@ export function PlansNavProvider({
         setFocus(at ?? null);
         const url = new URL(window.location.href);
         url.searchParams.set("tab", next);
-        window.history.replaceState(window.history.state, "", url);
+        window.history.replaceState(null, "", url);
     }, []);
 
     const clearFocus = useCallback(() => setFocus(null), []);

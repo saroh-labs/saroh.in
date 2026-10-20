@@ -17,6 +17,7 @@ import {
 } from "@/components/organizations/business-hours-section";
 import { BusinessLogoSheet } from "@/components/organizations/business-logo-sheet";
 import { BusinessPrintPreview } from "@/components/organizations/business-print-preview";
+import { InvoicePaperSheet } from "@/components/organizations/invoice-paper-sheet";
 import {
     PAY_SECTION,
     PayInstructionsSection,
@@ -194,6 +195,20 @@ export function OrganizationSettingsForm({
                             said,
                             logoCardUndo(settings, next, setSettings),
                         );
+                        setSettings(next);
+                    }}
+                />
+            ) : editing?.which === "paper" ? (
+                <InvoicePaperSheet
+                    key={editing.opened}
+                    settings={settings}
+                    open={editing.open}
+                    returnTo={editing.returnTo}
+                    onClose={sheets.close}
+                    onSaved={(next, said) => {
+                        // No Undo: the sheet is the way back, and issued
+                        // paper keeps its look whatever the default.
+                        undo.offer(said, null);
                         setSettings(next);
                     }}
                 />

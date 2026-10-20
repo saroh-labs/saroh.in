@@ -3,15 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Invoice } from "@/lib/invoices/service";
 
-import { ShownLink, TaxRows } from "./invoice-quick-look";
-
-vi.mock("@/lib/invoices/actions", () => ({
-    createPayLink: vi.fn(),
-    readInvoice: vi.fn(),
-}));
+import { ShownLink, TaxRows } from "./lines";
 
 /**
- * The invoice quick look's tax rows (DEC-072): a registered business's
+ * The details' tax rows, kept from the quick look (DEC-072): a registered business's
  * paper with no line rated shows none — just the total below them.
  */
 

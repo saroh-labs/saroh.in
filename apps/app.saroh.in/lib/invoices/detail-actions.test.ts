@@ -71,7 +71,7 @@ describe("detailActions", () => {
             "Record payment",
             "Print",
             "Download PDF",
-            "Cancel invoice",
+            "Cancel or correct",
         ]);
         expect(primary({})).toBe("Send with payment link");
     });
@@ -91,7 +91,7 @@ describe("detailActions", () => {
             "Record payment",
             "Print",
             "Download PDF",
-            "Cancel invoice",
+            "Cancel or correct",
         ]);
         expect(primary({ payOnline: false, sendable: false })).toBe(
             "Record payment",
@@ -157,6 +157,26 @@ describe("detailActions", () => {
             "Print",
             "Download PDF",
         ]);
+    });
+
+    it("a void invoice nobody wrote again: Write again (DEC-173, U13)", () => {
+        expect(labels({ standing: "VOID", writeAgain: true })).toEqual([
+            "Print",
+            "Download PDF",
+            "Write again",
+        ]);
+        // Written again already, an order's, or a role that only reads: none.
+        expect(labels({ standing: "VOID" })).not.toContain("Write again");
+        expect(
+            labels({ standing: "VOID", writeAgain: true, fromOrder: true }),
+        ).not.toContain("Write again");
+        expect(
+            labels({ standing: "VOID", writeAgain: true, canWrite: false }),
+        ).not.toContain("Write again");
+        // Only a void one: a credited invoice is never written again here.
+        expect(
+            labels({ standing: "CREDITED", writeAgain: true }),
+        ).not.toContain("Write again");
     });
 
     it("a paid invoice keeps Copy view link, online payment or not (UX-080)", () => {
@@ -850,6 +870,7 @@ describe("actionsFor keeps every action today's page has (§15)", () => {
         cancel: "cancel",
         refund: "refund",
         refundOrder: "refundOrder",
+        writeAgain: "writeAgain",
     };
 
     const standings = [
@@ -870,6 +891,7 @@ describe("actionsFor keeps every action today's page has (§15)", () => {
             { fromOrder: true },
             { credit: true },
             { canWrite: false },
+            { writeAgain: true },
         ]) {
             for (const a of detailActions({ ...base, standing, ...flags })) {
                 today.add(a.id);

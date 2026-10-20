@@ -83,6 +83,45 @@ Editor's rules (problems, the save blocker, "When you publish" lines) are pure
 in `lib/subscriptions/plan-editor.ts`, and `plan-editor-adapter.ts` turns the
 typed form into the API's values and back.
 
+**Current** — **A form with no publish step saves as it is typed on the
+shell's autosave alone** (New invoice A, DEC-173 U14 #1126). An invoice
+draft has no revision and nothing to publish, so it doesn't take the whole
+`EditorShell`: `components/invoices/new-invoice/use-invoice-draft.ts`
+drives the shell's `Autosave` (`lib/editor-shell/autosave.ts`) from the
+react-hook-form's `watch`, sends nothing while the zod schema refuses the
+values (the form says what, on leaving a field, as before), makes the
+draft on the first save and changes it after, and puts the draft's own
+address in the bar (`/billing/invoices/<id>/edit`) with
+`history.replaceState`, so a reload never starts a second draft. The pill
+beside the title is the save state ("Draft · saved", "Saving…", "Not
+saved" with Try again). The leave guard takes `flush` (and `save`, which
+says what is wrong), so leaving asks only when the save can't go. Save
+draft and Issue flush first and then go on with the draft the server has.
+A live preview beside such a form is drawn from the typed values with the
+API's rule mirrored in a pure module (`lib/invoices/new-invoice-lines.ts`
+`previewSums`), never sent.
+
+**Current** — **A record edited "on the paper" is the same form, pressed
+where it prints** (New invoice on the paper, DEC-173 U15 #1127).
+`?mode=paper` (`useTabParam`, "Form" / "On the paper" in the header) swaps
+the form's columns for `components/invoices/paper-editor/`, under the same
+`useForm` and the same autosave, so switching keeps everything typed and
+the draft's address keeps the mode. The paper (`PaperPreview`) takes an
+`editing` seam: each part is wrapped in a control laid OVER it (the words
+stay the paper's for a screen reader; the press has its own name, "Change
+line 2: Butter croissant") that opens the part's editor in a popover on
+the desk and a sheet from the foot of a phone (`HeaderOverlay`). Each
+editor writes the form's own fields (`register`, `setValue`), so the paper,
+the totals and the save follow every keystroke; a line typed but not yet
+priced is drawn as "Set its quantity and price" so it can be finished.
+What the record can't change here says where it comes from instead (the
+seller, the number). A particular the law requires (CGST Rule 46) carries
+a label on the paper ("Next in series", "Set from the customer",
+"Required") and has no way off in any style. What the paper changes for
+the whole business (the logo, How to pay us, the default look) opens that
+setting's own sheet in place, for those who may (`org:update`), and is
+never a link away mid-task.
+
 **Current** — **An editor never opens in an error state over a rule newer
 than the record** (UX audit, 12 Oct). A plan or pack published before a GST
 rate was asked for opens with a plain note beside the field ("This plan has
@@ -161,12 +200,52 @@ has no way back in the API but need not be final is **held**: gone at once,
 written when its ten seconds are up (`useHold`, an invitation cancelled, a
 course session removed). See `frontend-error-feedback.md`.
 
+**Current** — **Money recorded by hand is one sheet, written at once
+with Undo** (DEC-173, U10 #1122). Record payment
+(`components/invoices/record-payment-sheet.tsx`) is the one way an
+invoice's payment is written down, opened from the page, the details
+sheet, the list and the customer's Invoices tab; it takes an invoice
+already read (`PaymentTarget`, `paymentTargetOf`) or an id, and reads the
+rest on opening. The amount starts at what is left; less is a part
+payment and says what stays to pay; more is refused on Record with what
+was typed kept and the way out beside it ("Record ₹8,400"). The button
+names the amount. The write happens at once and `showUndo` removes it;
+the receipt is held by the API past the Undo window (`RECEIPT_HOLD_MS`),
+so the sheet never holds it. It opens through the details' seam
+(`useRecordPaymentFlow` in `components/invoices/details/flows.tsx`). A
+cheque's next steps are `cheque-dialogs.tsx`: in the bank is a
+`FormDialog` (with no email provider its toast offers the receipt on
+WhatsApp), Bounced is the one confirm, since the API can't take it back,
+with "Tell Vivek on WhatsApp after"; Remove payment is the details'
+`remove-payment-dialog.tsx`, whose Undo records it again. WhatsApp is opened on the
+press (`whatsapp-share.ts`), so a tab is never blocked; Saroh sends
+nothing itself. The words and rules are pure, in
+`lib/invoices/record-payment.ts`.
+
 **Current** — **Nobody is sent away from an overlay.** A task finishes in
 the sheet or dialog that opened. Add a lead and Add contact stay on the
 list, and the toast has the way to the new record
 (`showSuccess(message, description, { label, onClick })`). A link out that
 has to stay (a product's full editor, a record to compare) is the quiet
 action at the far side of the foot, never the main one.
+
+**Current** — **A record's details open from its row in a side sheet, and
+its page draws the same view** (DEC-173, invoices U9 #1121). An invoice's
+row opens `components/invoices/details/invoice-details-sheet.tsx`
+(`QuickLook` widened to 512px, the whole screen on a phone, `?invoice=` in
+the address so a reload keeps it); `/billing/invoices/[id]` renders the
+same `InvoiceDetailsView` as a page, from the same server read
+(`lib/invoices/details.ts`), so a deep link and the sheet can't differ.
+Which buttons a state has is `actionsFor` (one main, what sits beside it,
+Share, More); what each does is one hook (`use-details-actions.tsx`), and
+every action opens its own frame over the details and comes back to them:
+after a write the sheet reads the record again in place and the list
+behind it refreshes. Flows other units own are opened through one seam
+each (`details/flows.tsx`: `useRecordPaymentFlow`, `useShareFlow`,
+`useCancelFlow`, each `open(…)` plus `overlays`), so a new sheet replaces
+the hook's body and nothing in the view changes. Previous and Next walk
+the list as filtered without closing. The money card says one thing and
+holds at most one note.
 
 **Current** — **A settings row is read first and edited in a side sheet**
 (owner, 10 Oct): a location's tabs (`components/stores/`) and every tab of
@@ -301,7 +380,7 @@ preview under its fields, from the draft.
   is the reversible one** (UX audit, 10 Oct). A step that can't be taken
   back (issuing an invoice numbers it and locks its lines) is a
   `type="button"` with its own press, never the form's submit: the invoice
-  form's one submit is Save as draft. Where the primary is reversible (a
+  form's one submit is Save draft. Where the primary is reversible (a
   course), it is the submit, so Enter runs it.
 - **Current** — **One leave guard, one question** (UX audit, 10 Oct). Every
   create and edit flow mounts `useLeaveGuard({ dirty, lost, save? })` from

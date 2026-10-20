@@ -34,6 +34,8 @@ jest.mock("@saroh/database", () => {
         organizationModule: { findFirst: jest.fn().mockResolvedValue(null) },
         // How to pay us (R32): none set unless a test sets some.
         businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
+        // DEC-173 (U16): nothing received unless a test records some.
+        invoicePayment: { findMany: jest.fn().mockResolvedValue([]) },
     };
     return {
         ...actual,
@@ -207,6 +209,8 @@ describe("PublicInvoicesService.read", () => {
                 // DEC-173: paid so far and what is left to pay.
                 "paidSoFar",
                 "leftToPay",
+                // U16: what has been received, as the page says it.
+                "payments",
             ].sort(),
         );
         expect(view).toEqual({
@@ -230,6 +234,7 @@ describe("PublicInvoicesService.read", () => {
             total: "1400.00",
             paidSoFar: "0.00",
             leftToPay: "1400.00",
+            payments: [],
             currency: "INR",
             status: "ISSUED",
             billedTo: "Asha Rao",
@@ -257,6 +262,67 @@ describe("PublicInvoicesService.read", () => {
             "id",
         ]) {
             expect(select).not.toHaveProperty(hidden);
+        }
+    });
+
+    it("says what was received, oldest first, with a cheque's number, bank and status, and nothing private (U16)", async () => {
+        invoiceFindFirst.mockResolvedValue(STORED);
+        const findMany = prisma.invoicePayment.findMany as jest.Mock;
+        // Newest first, as asked for; the page reads oldest first.
+        findMany.mockResolvedValueOnce([
+            {
+                amountCents: 440000,
+                method: "CHEQUE",
+                receivedAt: new Date("2026-10-19T00:00:00Z"),
+                chequeNumber: "004512",
+                chequeBank: "HDFC Bank",
+                bankStatus: "WAITING",
+            },
+            {
+                amountCents: 400000,
+                method: "CASH",
+                receivedAt: new Date("2026-10-12T00:00:00Z"),
+                chequeNumber: null,
+                chequeBank: null,
+                bankStatus: null,
+            },
+        ]);
+        const view = await makeService().service.read(TOKEN);
+        expect(view.payments).toEqual([
+            {
+                amount: "4000.00",
+                method: "CASH",
+                receivedAt: "2026-10-12T00:00:00.000Z",
+                cheque: null,
+            },
+            {
+                amount: "4400.00",
+                method: "CHEQUE",
+                receivedAt: "2026-10-19T00:00:00.000Z",
+                cheque: {
+                    number: "004512",
+                    bank: "HDFC Bank",
+                    status: "WAITING",
+                },
+            },
+        ]);
+        const args = findMany.mock.calls.at(-1)?.[0];
+        // This business's, this invoice's, never a removed one.
+        expect(args.where).toEqual({
+            organizationId: "org_1",
+            invoiceId: "inv_1",
+            removedAt: null,
+        });
+        for (const hidden of [
+            "id",
+            "reference",
+            "note",
+            "recordedById",
+            "bounceReason",
+            "removedReason",
+            "paymentIntentId",
+        ]) {
+            expect(args.select).not.toHaveProperty(hidden);
         }
     });
 

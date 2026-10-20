@@ -51,14 +51,16 @@ export function shortNumber(number: string | null): string {
  *   reader.
  *
  * A correction sits indented under the invoice it corrects. `after` is a
- * slot beside the row for its own action (U11's Remind), outside the
- * button so it is a control of its own.
+ * slot beside the row for its own action (the per-row Remind, U12), and
+ * `before` one for its tick when rows are picked (U12, desk only); both
+ * sit outside the button so each is a control of its own.
  */
 export function InvoiceRow({
     invoice: i,
     selected,
     onOpen,
     timeZone,
+    before,
     after,
 }: {
     /**
@@ -69,6 +71,7 @@ export function InvoiceRow({
     invoice: Invoice;
     selected: boolean;
     onOpen: () => void;
+    before?: ReactNode;
     after?: ReactNode;
 }) {
     const pill = invoicePill(i);
@@ -178,13 +181,20 @@ export function InvoiceRow({
             </span>
         </button>
     );
-    if (!after) return button;
+    if (!after && !before) return button;
     return (
         <div className="flex min-w-0 items-center">
+            {before ? (
+                <div className="flex w-[38px] shrink-0 items-center pl-[14px] max-md:hidden">
+                    {before}
+                </div>
+            ) : null}
             <div className="min-w-0 flex-1">{button}</div>
-            <div className="flex shrink-0 items-center gap-1.5 pr-3">
-                {after}
-            </div>
+            {after ? (
+                <div className="flex shrink-0 items-center gap-1.5 md:pr-3">
+                    {after}
+                </div>
+            ) : null}
         </div>
     );
 }

@@ -19,6 +19,12 @@ import {
 import type { InvoiceSource, InvoiceView } from "./invoice-state";
 import { INVOICE_SOURCES, INVOICE_VIEWS } from "./invoice-state";
 import { SEARCH_MAX } from "./list-filter";
+import {
+    COLOUR_INPUT,
+    COLOUR_MESSAGE,
+    STYLE_INPUTS,
+    STYLE_MESSAGE,
+} from "./paper-styles";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -129,6 +135,24 @@ export class InvoiceInputDto {
     @IsString()
     @MaxLength(500)
     billToAddress?: string;
+
+    /**
+     * The draft's own style (DEC-173, #1118): CLASSIC, BAND or COMPACT. ""
+     * or null goes back to the business's default. Frozen at issue.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsIn(STYLE_INPUTS, { message: STYLE_MESSAGE })
+    paperStyle?: string | null;
+
+    /**
+     * The draft's own colour, `#RRGGBB`. "" or null goes back to the
+     * business's default. Frozen at issue.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @Matches(COLOUR_INPUT, { message: COLOUR_MESSAGE })
+    paperColour?: string | null;
 }
 
 /** Cancel an issued invoice with a credit note for all of it (ADR-008). */

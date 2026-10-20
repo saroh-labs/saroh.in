@@ -1,7 +1,7 @@
 // @covers accounts:/login app:/open app:/billing/invoices app:/settings/organization api:invoices api:organizations
-import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { pressInvoiceAction } from "../fixtures/invoice-actions";
 import { makeContact, northwind, stamp } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
 import { NORTHWIND_ORG } from "../playwright.config";
@@ -34,13 +34,6 @@ const ADDRESS = {
     city: "Bengaluru",
     postalCode: "560058",
 };
-
-/** The page's own action, drawn once per layout: the one on screen. */
-const action = (page: Page, name: string) =>
-    page
-        .getByRole("button", { name, exact: true })
-        .filter({ visible: true })
-        .first();
 
 test.describe(
     "business details before the first invoice (DEC-068)",
@@ -93,7 +86,8 @@ test.describe(
                 });
 
                 await page.goto(`/billing/invoices/${draft.id}`);
-                await action(page, "Issue it").click();
+                // The main button, or in More beside "Issue and share".
+                await pressInvoiceAction(page, "Issue it");
                 const confirm = page.getByRole("alertdialog");
                 await confirm
                     .getByRole("button", { name: "Issue invoice" })

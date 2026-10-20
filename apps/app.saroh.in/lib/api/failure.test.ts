@@ -3,6 +3,28 @@ import { describe, expect, it } from "vitest";
 import { toFailure } from "./failure";
 
 describe("toFailure", () => {
+    it("carries when a refused reminder can go again (a 429's retryAt, DEC-173)", () => {
+        expect(
+            toFailure(
+                {
+                    error: {
+                        message:
+                            "One reminder a day. The next can go after 9:30 am.",
+                        details: { retryAt: "2026-10-21T04:00:00.000Z" },
+                    },
+                },
+                "Couldn't share that invoice.",
+            ),
+        ).toMatchObject({
+            ok: false,
+            error: "One reminder a day. The next can go after 9:30 am.",
+            retryAt: "2026-10-21T04:00:00.000Z",
+        });
+        expect(toFailure({ message: "No." }, "x")).not.toHaveProperty(
+            "retryAt",
+        );
+    });
+
     it("carries the field from the API envelope's details", () => {
         expect(
             toFailure(

@@ -218,6 +218,42 @@ export class InvoicesController {
         return this.invoices.credit(ctx, id, dto);
     }
 
+    /**
+     * The credit note "Cancel all of it" would issue (DEC-173, U13): its
+     * likely number and amount, refused as the credit itself would be.
+     */
+    @Get(":invoiceId/credit-preview")
+    creditPreview(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+    ) {
+        return this.invoices.creditPreview(ctx, id);
+    }
+
+    /**
+     * "Cancel and write a correct one" (DEC-173, U13): the credit note and
+     * a draft with the same lines, in one transaction. Answers with both.
+     */
+    @Post(":invoiceId/credit-and-rewrite")
+    @HttpCode(201)
+    creditAndRewrite(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+        @Body() dto: CreditInvoiceDto,
+    ) {
+        return this.invoices.creditAndRewrite(ctx, id, dto);
+    }
+
+    /** "Write again" on a void invoice nobody wrote again (U13); the draft. */
+    @Post(":invoiceId/write-again")
+    @HttpCode(201)
+    writeAgain(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+    ) {
+        return this.invoices.writeAgain(ctx, id);
+    }
+
     /** Void it and open a corrected draft; answers with the new draft. */
     @Post(":invoiceId/reissue")
     @HttpCode(201)

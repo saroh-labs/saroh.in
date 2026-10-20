@@ -58,10 +58,16 @@ const CONFIRMS: [what: string, file: string, verb: string, keep: string][] = [
         "`Keep ${offer.planName}`",
     ],
     [
-        "an invoice",
+        "an invoice (Cancel or correct, DEC-173 U13)",
+        "components/invoices/cancel-or-correct-sheet.tsx",
+        'tone="destructive"',
+        'cancelLabel="Keep invoice"',
+    ],
+    [
+        "a paid invoice, by Refund…",
         "components/invoices/invoice-actions.tsx",
-        "Cancel with a credit note",
-        "Keep invoice",
+        "Issue the credit note",
+        'cancelLabel="Keep invoice"',
     ],
 ];
 

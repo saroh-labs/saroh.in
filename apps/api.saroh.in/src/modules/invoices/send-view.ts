@@ -38,6 +38,11 @@ export interface InvoiceSendView {
     payOnline: boolean;
     /** A send or reminder went in the last day: the next reminder can go from here. */
     nextReminderAt: string | null;
+    /**
+     * The contact's phone (E.164), for Share's WhatsApp tab and its "To"
+     * line (DEC-173, U11). Left out when there is none.
+     */
+    phone?: string;
 }
 
 /** One send or reminder, for "What happened". */

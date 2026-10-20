@@ -208,7 +208,18 @@ const CASES = [
             "remindersPreview",
             "remindMany",
         ],
-        refused: ["create", "update", "remove", "issue", "reissue"],
+        refused: [
+            "create",
+            "update",
+            "remove",
+            "issue",
+            "reissue",
+            // Each opens a new draft (DEC-173, U13): a closing business
+            // still cancels with a credit note or voids, but writes nothing
+            // new.
+            "creditAndRewrite",
+            "writeAgain",
+        ],
     },
 ] as const;
 

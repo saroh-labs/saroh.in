@@ -64,6 +64,13 @@ export interface SellerParticulars {
     sellerName: string | null;
     sellerLegalName: string | null;
     sellerEmail: string | null;
+    /**
+     * How the paper looks (DEC-173, #1118): the business's default style
+     * and colour, frozen with the rest of the paper; a correction takes its
+     * original's. Absent or null: Classic in ink.
+     */
+    paperStyle?: string | null;
+    paperColour?: string | null;
 }
 
 export interface OrderForInvoice {
@@ -129,6 +136,9 @@ export interface BuiltDocument {
     sellerName: string | null;
     sellerLegalName: string | null;
     sellerEmail: string | null;
+    /** Its look, frozen likewise (DEC-173, #1118); absent: Classic in ink. */
+    paperStyle?: string | null;
+    paperColour?: string | null;
 }
 
 export interface BillTo {
@@ -368,6 +378,8 @@ function sellerOf(original: SellerParticulars): SellerParticulars {
         sellerName: original.sellerName,
         sellerLegalName: original.sellerLegalName,
         sellerEmail: original.sellerEmail,
+        paperStyle: original.paperStyle ?? null,
+        paperColour: original.paperColour ?? null,
     };
 }
 

@@ -1,148 +1,86 @@
 "use client";
 
-import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button } from "@saroh/ui/button";
-import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
-import { cn } from "@saroh/ui/lib/utils";
-import { MoneyInput } from "@saroh/ui/money-input";
-import { Textarea } from "@saroh/ui/textarea";
-import { showError, showSuccess } from "@saroh/ui/toast";
-import { X } from "lucide-react";
-import Link from "next/link";
+import { PageHeader } from "@saroh/ui/page-header";
+import { Segmented } from "@saroh/ui/segmented";
+import { showError } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import type { BaseSyntheticEvent, ReactNode } from "react";
 import { useId, useState } from "react";
 import type { FieldErrors } from "react-hook-form";
-import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
-import { z } from "zod";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
 
-import { reportFailure } from "@/components/billing/plan-refusal";
 import type { AddedContact } from "@/components/contacts/add-contact-dialog";
-import { AddContactDialog } from "@/components/contacts/add-contact-dialog";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
-import { ChipGroup } from "@/components/shared/choice-group";
-import { ContactPicker } from "@/components/shared/contact-picker";
 import {
     lostChanges,
     lostNew,
     useLeaveGuard,
 } from "@/components/shared/use-leave-guard";
-import { ViewerDate } from "@/components/shared/viewer-date";
-import { formatMoneyMajor } from "@/lib/format/money";
+import { formatMoney } from "@/lib/format/money";
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { PAGE_FORM, toFirstError, toFirstErrorIn } from "@/lib/hooks/page-form";
-import {
-    createInvoice,
-    issueInvoice,
-    updateInvoice,
-} from "@/lib/invoices/actions";
-import type { GstRateValue } from "@/lib/invoices/gst";
-import {
-    GST_RATE_OPTIONS,
-    GST_STATES,
-    GSTIN_SHAPE,
-    isHsnSac,
-    rateOption,
-} from "@/lib/invoices/gst";
+import { useTabParam } from "@/lib/hooks/use-tab-param";
+import { rateOption } from "@/lib/invoices/gst";
 import { LINE_RATE_NEEDED, linesMissingRate } from "@/lib/invoices/line-rates";
-import { newPayLink } from "@/lib/invoices/link-actions";
+import type {
+    InvoiceFormBusiness,
+    InvoiceFormValues,
+} from "@/lib/invoices/new-invoice";
+import {
+    EMPTY_LINE,
+    invoiceFormSchema,
+    isGoodLine,
+} from "@/lib/invoices/new-invoice";
+import { newInvoiceBusiness } from "@/lib/invoices/new-invoice-business";
+import { previewSums } from "@/lib/invoices/new-invoice-lines";
 import type { Invoice } from "@/lib/invoices/service";
+import { ISSUE_AND_SHARE, ISSUE_IT } from "@/lib/invoices/words";
 import type { DetailsOnFile } from "@/lib/organizations/business-details";
-import { copyText } from "@saroh/ui/copy-button";
-import { OptionSelect } from "@saroh/ui/option-select";
-import type { BaseSyntheticEvent } from "react";
+import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 
-const MONEY = /^\d{1,9}(\.\d{1,2})?$/;
+import { CustomerBlock, NoContactsYet } from "./new-invoice/customer-block";
+import { DueStrip } from "./new-invoice/due-strip";
+import { finishInvoice } from "./new-invoice/finish";
+import {
+    FormButtons,
+    PhoneFoot,
+    SavePill,
+    SeeItToggle,
+} from "./new-invoice/form-parts";
+import { LinesTable } from "./new-invoice/lines-table";
+import { paperPropsOf } from "./new-invoice/paper-props";
+import { PreviewAside } from "./new-invoice/preview-aside";
+import { useInvoiceDraft } from "./new-invoice/use-invoice-draft";
+import { PaperEditor } from "./paper-editor/paper-editor";
+import { SeeAsCustomer } from "./paper-editor/see-as-customer";
 
-/** When it falls due, as the design offers it: days after today. */
-const DUES = [
-    { days: 0, label: "On receipt" },
-    { days: 7, label: "In 7 days" },
-    { days: 14, label: "In 14 days" },
-    { days: 30, label: "In 30 days" },
-] as const;
-
-const STATES = [{ value: "", label: "Same as yours" }, ...GST_STATES] as const;
-
-const formSchema = z.object({
-    contactId: z.string().min(1, { message: "Choose who it's for" }),
-    /** Days from today, or "kept" for a draft's own due date. */
-    due: z.union([z.number(), z.literal("kept")]),
-    billToGstin: z
-        .string()
-        .trim()
-        .toUpperCase()
-        .refine((v) => v === "" || GSTIN_SHAPE.test(v), {
-            message: "A GSTIN is 15 characters, like 29AAGCR4375J1ZU",
-        }),
-    billToState: z.string(),
-    billToAddress: z.string().trim().max(500),
-    lines: z
-        .array(
-            z.object({
-                description: z
-                    .string()
-                    .trim()
-                    .min(1, { message: "Say what it's for" })
-                    .max(200),
-                quantity: z
-                    .number({ message: "A whole number" })
-                    .int({ message: "A whole number" })
-                    .min(1, { message: "At least 1" })
-                    .max(9999),
-                unitPrice: z.string().trim().regex(MONEY, {
-                    message: "A price, with at most two decimals",
-                }),
-                gstRate: z.string(),
-                hsnSac: z
-                    .string()
-                    .trim()
-                    .refine((v) => v === "" || isHsnSac(v), {
-                        message: "An HSN or SAC is 4 to 8 digits",
-                    }),
-            }),
-        )
-        .min(1, { message: "Add a line" }),
-});
-
-type FormValues = z.infer<typeof formSchema>;
-
-/** Minor units, for the running total only; the API prices the invoice. */
-const toCents = (s: string | undefined) => {
-    const t = (s ?? "").trim();
-    if (!MONEY.test(t)) return 0;
-    const [whole, frac = ""] = t.split(".");
-    return Number(whole) * 100 + Number((frac + "00").slice(0, 2));
-};
-
-/** The end of the day `days` from now, so "due 15 Sep" is overdue from the 16th. */
-function dueFrom(days: number): string {
-    const d = new Date();
-    return new Date(
-        d.getFullYear(),
-        d.getMonth(),
-        d.getDate() + days,
-        23,
-        59,
-        59,
-    ).toISOString();
-}
+/** How it is written: the form, or on the paper (U15), in `?mode=`. */
+const MODES = ["form", "paper"] as const;
+type Mode = (typeof MODES)[number];
 
 /**
- * A hand-written invoice — new, or a draft being changed — after "Saroh
- * Invoice Detail" (?new=1): who it is billed to, its lines, when it falls
- * due, and the total beside them. For trade and one-off work; orders and
- * subscriptions make their own.
+ * New invoice (A), INVNewA and INVNewAPhone (DEC-173 U14 #1126): a
+ * hand-written invoice, new or a draft being changed, for trade and one-off
+ * work. Orders and subscriptions make their own.
  *
- * A GST-registered business gives each line its rate and HSN/SAC and may
- * add the buyer's GSTIN and state — the state is the place of supply, so
- * another state than the business's is IGST. Prices include GST; the API
- * works the tax out and freezes it when the invoice is issued.
+ * The left column is who it's billed to (picked or added in place, and on a
+ * GST-registered business their GSTIN, state and address, with the place
+ * of supply worked out), what it's for (the lines, typed or picked from the
+ * products) and when it falls due. The right is "How it will look": the
+ * paper at a reduced size, in the style and colour it will go out in,
+ * changing as it is typed. On a phone it is one column, the paper behind
+ * "See how it will look", and the buttons at the foot.
  *
- * Nothing is sent: "Issue with payment link" numbers it, locks its lines and
- * copies its payment link for the merchant to send. The running total is the
- * only sum the browser does, and only to read.
+ * "On the paper" (U15 #1127, `?mode=paper`) is the same draft written by
+ * pressing the paper itself, with the style rail beside it
+ * (`paper-editor/`). Switching keeps everything typed: one form holds both.
+ *
+ * It saves as it is typed (`use-invoice-draft.ts`). "Save draft" is the
+ * form's one submit, so Enter keeps it a draft; issuing numbers it and
+ * locks its lines, so it is a press of its own ("Issue and share", which
+ * copies its payment link, or "Issue it"). The GST-rate step and the
+ * business-details step stand before issuing, as they did.
  */
 export function InvoiceForm({
     contacts: listed,
@@ -153,6 +91,10 @@ export function InvoiceForm({
     businessName,
     providerConnected,
     detailsOnFile = null,
+    business = null,
+    canPickProducts = false,
+    canSetDefault = false,
+    header,
 }: {
     contacts: { id: string; name: string; email: string }[];
     defaultCurrency: string;
@@ -170,6 +112,17 @@ export function InvoiceForm({
      * that are missing before it saves anything (#838).
      */
     detailsOnFile?: DetailsOnFile | null;
+    /** Null when this role can't read the business's settings. */
+    business?: InvoiceFormBusiness | null;
+    /** The business has products this person can read. */
+    canPickProducts?: boolean;
+    /**
+     * `org:update` (Owner, Admin): may make a look the business's default,
+     * and change its logo and How to pay us from the paper.
+     */
+    canSetDefault?: boolean;
+    /** The page's breadcrumb and title. */
+    header?: { breadcrumb: ReactNode[]; title: string };
 }) {
     const router = useRouter();
     const details = useBusinessDetailsStep({
@@ -177,16 +130,10 @@ export function InvoiceForm({
         continueLabel: "Save and issue",
         onFile: detailsOnFile,
     });
-    const ids = {
-        contact: useId(),
-        gstin: useId(),
-        state: useId(),
-        address: useId(),
-        lines: useId(),
-    };
+    const ids = { preview: useId(), why: useId() };
     // Which button is working, for its label. Never what a submit does:
     // Enter in a field is the form's own submit, and that saves the draft.
-    const [intent, setIntent] = useState<"issue" | "draft">("draft");
+    const [intent, setIntent] = useState<"issue" | "draft" | null>(null);
     // Someone added from Who (UX-047) joins the list here, chosen.
     const [added, setAdded] = useState<AddedContact[]>([]);
     const contacts = [...added, ...listed];
@@ -196,10 +143,20 @@ export function InvoiceForm({
         draft?.billToGst?.address,
     );
     const [buyerOpen, setBuyerOpen] = useState(hasBuyerGst);
+    // The phone's paper, behind "See how it will look".
+    const [seeIt, setSeeIt] = useState(false);
+    const [mode, setMode] = useTabParam<Mode>("mode", MODES, "form");
+    // The business as the page read it, and as a save on the paper
+    // answered (its default look, logo, How to pay us).
+    const [biz, setBiz] = useState(business);
+    const onSettings = (next: OrganizationSettings) =>
+        setBiz(newInvoiceBusiness(next));
     const currency = draft?.currency ?? defaultCurrency;
+    const zone = biz?.zone ?? "Asia/Kolkata";
+    const [now] = useState(() => new Date());
 
-    const form = useForm<FormValues>({
-        resolver: zodResolver(formSchema),
+    const form = useForm<InvoiceFormValues>({
+        resolver: zodResolver(invoiceFormSchema),
         ...PAGE_FORM,
         defaultValues: {
             contactId: draft?.contact?.id ?? initialContactId ?? "",
@@ -215,107 +172,71 @@ export function InvoiceForm({
                       gstRate: rateOption(l.gst?.rate),
                       hsnSac: l.gst?.hsnSac ?? "",
                   }))
-                : [
-                      {
-                          description: "",
-                          quantity: 1,
-                          unitPrice: "",
-                          gstRate: "",
-                          hsnSac: "",
-                      },
-                  ],
+                : [EMPTY_LINE],
+            // Its own look, or "" to follow the business's (U15).
+            paperStyle: draft?.paperChoice?.style ?? "",
+            paperColour: draft?.paperChoice?.colour ?? "",
         },
     });
-    const { fields, append, remove } = useFieldArray({
-        control: form.control,
-        name: "lines",
+    const lines = useFieldArray({ control: form.control, name: "lines" });
+    const saving = useInvoiceDraft({
+        form,
+        draft,
+        registered,
+        currency,
+        zone,
     });
-    // The last line empties rather than goes: an invoice has one.
-    const removeLine = (i: number) =>
-        fields.length > 1
-            ? remove(i)
-            : form.setValue(`lines.0`, {
-                  description: "",
-                  quantity: 1,
-                  unitPrice: "",
-                  gstRate: "",
-                  hsnSac: "",
-              });
-    const { isSubmitting, isDirty, errors } = form.formState;
-    const lines = useWatch({ control: form.control, name: "lines" });
-    const due = useWatch({ control: form.control, name: "due" });
+    const { isSubmitting } = form.formState;
+    const values = useWatch({ control: form.control }) as InvoiceFormValues;
+    const watchedLines = values.lines;
 
-    const good = lines.filter(
-        (l) =>
-            l.description.trim() &&
-            Number(l.quantity) > 0 &&
-            toCents(l.unitPrice) > 0,
-    );
-    const total = good.reduce(
-        (sum, l) => sum + Number(l.quantity) * toCents(l.unitPrice),
-        0,
-    );
-    const noLine = good.length === 0;
-    const typed = lines.some((l) => l.description || l.unitPrice);
-    const show = (cents: number) => formatMoneyMajor(cents / 100, currency);
+    const noLine = !watchedLines.some(isGoodLine);
+    const typed = watchedLines.some((l) => l.description || l.unitPrice);
     const withLink = providerConnected;
+    const sums = previewSums(
+        {
+            lines: watchedLines,
+            billToGstin: values.billToGstin,
+            billToState: values.billToState,
+        },
+        { registered, businessState: biz?.state ?? null },
+    );
+    const buyerName =
+        contacts.find((c) => c.id === values.contactId)?.name ??
+        draft?.contact?.name ??
+        null;
+    const paper = paperPropsOf({
+        values,
+        sums,
+        business: biz,
+        businessName,
+        buyerName,
+        registered,
+        currency,
+        zone,
+        draft,
+        now,
+    });
+    const busy = isSubmitting || intent !== null;
 
-    /** Keep it as a draft. Null when refused, which is said on the form. */
-    async function save(values: FormValues) {
-        const input = {
-            contactId: values.contactId,
-            ...(draft ? {} : { currency, tax: "0" }),
-            dueAt:
-                values.due === "kept"
-                    ? (draft?.dueAt ?? null)
-                    : dueFrom(values.due),
-            lines: values.lines.map((l) => ({
-                description: l.description.trim(),
-                quantity: l.quantity,
-                unitPrice: l.unitPrice.trim(),
-                ...(registered && l.gstRate ? { gstRate: l.gstRate } : {}),
-                ...(registered && l.hsnSac.trim()
-                    ? { hsnSac: l.hsnSac.replace(/\s+/g, "") }
-                    : {}),
-            })),
-            ...(registered
-                ? {
-                      billToGstin: values.billToGstin,
-                      billToState: values.billToState,
-                      billToAddress: values.billToAddress,
-                  }
-                : {}),
-        };
-        const saved = draft
-            ? await updateInvoice(draft.id, input)
-            : await createInvoice(input);
-        if (!saved.ok) {
-            const field = saved.field;
-            if (
-                field === "contactId" ||
-                field === "billToGstin" ||
-                field === "billToState"
-            ) {
-                if (field !== "contactId") setBuyerOpen(true);
-                form.setError(field, { message: saved.error });
-            } else {
-                showError(saved.error);
-            }
+    /** The draft as the server now has it, or null when that couldn't be. */
+    async function kept(): Promise<Invoice | null> {
+        const res = await saving.keep();
+        if (!res.ok) {
+            showError(res.error);
             return null;
         }
-        return saved.data;
+        return res.invoice;
     }
 
-    const savedAsDraft = (who: string | undefined) =>
-        `Saved as a draft for ${who ?? "them"}. No number yet.`;
-
-    async function onSubmit(values: FormValues, want: "issue" | "draft") {
-        setIntent(want);
+    async function onSubmit(want: "issue" | "draft") {
         // A tax invoice's lines each need their rate before it is issued
         // (12 Oct 2026): said on the line, before anything is saved. A
         // draft is kept without them.
         const unrated =
-            want === "issue" ? linesMissingRate(values.lines, registered) : [];
+            want === "issue"
+                ? linesMissingRate(form.getValues("lines"), registered)
+                : [];
         if (unrated.length > 0) {
             for (const place of unrated) {
                 form.setError(`lines.${place}.gstRate`, {
@@ -327,66 +248,31 @@ export function InvoiceForm({
             toFirstErrorIn(null);
             return;
         }
-        // Missing details are asked for at once, before the save (#838):
-        // asked after it, the sheet waited on a save, a refusal and a read.
-        // Closed without saving, the draft is still kept, as below.
-        const detailsReady = want === "issue" ? await details.ensure() : true;
-        const saved = await save(values);
-        if (!saved) return;
-        const id = saved.id;
-        const to = `/billing/invoices/${id}`;
-        if (want === "draft") {
-            showSuccess(savedAsDraft(saved.contact?.name));
-            router.push(to);
-            return;
+        setIntent(want);
+        try {
+            // Missing details are asked for at once, before the save (#838):
+            // asked after it, the sheet waited on a save, a refusal and a
+            // read. Closed without saving, the draft is still kept.
+            const detailsReady =
+                want === "issue" ? await details.ensure() : true;
+            const saved = await kept();
+            if (!saved) return;
+            guard.release();
+            await finishInvoice({
+                want,
+                saved,
+                detailsReady,
+                run: details.run,
+                withLink,
+                push: (to) => router.push(to),
+            });
+        } finally {
+            setIntent(null);
         }
-        // No registered address yet (DEC-068): asked here, then it issues.
-        const issued = detailsReady
-            ? await details.run(() => issueInvoice(id))
-            : null;
-        if (!issued) {
-            showSuccess("Saved as a draft. Issue it once your address is in.");
-            router.push(to);
-            return;
-        }
-        if (!issued.ok) {
-            // The draft is saved; only issuing failed. Say which.
-            showError("Saved as a draft, but not issued.", issued.error);
-            router.push(to);
-            return;
-        }
-        const number = issued.data.number ?? "Invoice";
-        if (!withLink) {
-            showSuccess(`${number} issued. Its lines are locked.`);
-            router.push(to);
-            return;
-        }
-        const link = await newPayLink(id, issued.data.updatedAt);
-        if (!link.ok) {
-            if (link.plan) {
-                // Issued; only the payment link is the plan's to refuse.
-                showSuccess(`${number} issued. Its lines are locked.`);
-                reportFailure(link);
-            } else {
-                showError(
-                    `${number} issued, but no payment link was made.`,
-                    link.error,
-                );
-            }
-        } else if (await copyText(link.data.url)) {
-            showSuccess(
-                `${number} issued and its payment link copied. Send it to ${issued.data.contact?.name ?? "them"}.`,
-            );
-        } else {
-            showError(
-                `${number} issued, but its payment link couldn't be copied. Copy a new one from the invoice.`,
-            );
-        }
-        router.push(to);
     }
 
     function onInvalid(
-        errs: FieldErrors<FormValues>,
+        errs: FieldErrors<InvoiceFormValues>,
         event?: BaseSyntheticEvent,
     ) {
         if (errs.billToGstin || errs.billToState) setBuyerOpen(true);
@@ -397,45 +283,75 @@ export function InvoiceForm({
         }
     }
 
-    // Leaving with lines typed asks first, and can keep them as a draft.
+    const press = (want: "issue" | "draft") =>
+        form.handleSubmit(() => onSubmit(want), onInvalid);
+
+    // Saved as it is typed: a way out saves first, and asks only when that
+    // save can't go (a field that's wrong, or Saroh out of reach).
     const guard = useLeaveGuard({
-        dirty: isDirty,
-        lost: draft ? lostChanges("this draft") : lostNew("invoice"),
+        dirty: !saving.settled,
+        lost: saving.id ? lostChanges("this draft") : lostNew("invoice"),
+        flush: saving.flush,
         save: async () => {
-            let kept = false;
-            await form.handleSubmit(async (values) => {
-                setIntent("draft");
-                const saved = await save(values);
-                if (!saved) return;
-                kept = true;
-                showSuccess(savedAsDraft(saved.contact?.name));
+            let ok = false;
+            await form.handleSubmit(async () => {
+                ok = (await kept()) !== null;
             }, onInvalid)();
-            return kept;
+            return ok;
         },
     });
 
     function onContactAdded(c: AddedContact) {
         setAdded((a) => [c, ...a]);
-        form.setValue("contactId", c.id, { shouldValidate: true });
+        form.setValue("contactId", c.id, {
+            shouldValidate: true,
+            shouldDirty: true,
+        });
     }
+
+    const heading = (
+        badge?: ReactNode,
+        actions?: ReactNode,
+        meta?: ReactNode,
+    ) =>
+        header ? (
+            <PageHeader
+                className="mb-4"
+                breadcrumb={header.breadcrumb}
+                title={header.title}
+                // "New invoice" or "Edit the draft": fixed words.
+                holdsData={false}
+                badge={badge}
+                meta={meta}
+                actions={actions}
+            />
+        ) : badge || actions || meta ? (
+            <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+                {badge}
+                {meta}
+                {actions}
+            </div>
+        ) : null;
 
     if (contacts.length === 0 && !draft) {
         return (
-            <div className="max-w-xl rounded-[12px] border border-border bg-card p-5 text-[13.5px]">
-                <p className="text-muted-foreground">
-                    An invoice is for someone in your contacts, and there is no
-                    one there yet. Add who it&apos;s for here, then write the
-                    invoice.
-                </p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                    <NewContact onAdded={onContactAdded} solid />
-                    <Button variant="ghost" asChild>
-                        <Link href="/contacts">Go to Contacts</Link>
-                    </Button>
-                </div>
-            </div>
+            <>
+                {heading()}
+                <NoContactsYet onAdded={onContactAdded} />
+            </>
         );
     }
+
+    const buttons = (foot: boolean) => (
+        <FormButtons
+            foot={foot}
+            off={busy || noLine}
+            intent={intent}
+            issueLabel={withLink ? ISSUE_AND_SHARE : ISSUE_IT}
+            describedBy={noLine && typed ? ids.why : undefined}
+            onIssue={() => void press("issue")()}
+        />
+    );
 
     return (
         <>
@@ -443,480 +359,128 @@ export function InvoiceForm({
             {guard.dialog}
             <form
                 onKeyDown={submitOnModEnter}
-                onSubmit={form.handleSubmit(
-                    (values) => onSubmit(values, "draft"),
-                    onInvalid,
-                )}
-                className="flex flex-wrap items-start gap-4"
+                onSubmit={press("draft")}
                 noValidate
             >
-                {/* One column that never grows past the form: an auto
-                    track took the picker's whole "name · email" as its
-                    least width, and a long email zoomed a phone out. */}
-                <div className="grid min-w-0 flex-[3_1_440px] grid-cols-[minmax(0,1fr)] gap-3">
-                    <Card label="Billed to">
-                        <Controller
-                            control={form.control}
-                            name="contactId"
-                            render={({ field }) => (
-                                <ContactPicker
-                                    id={ids.contact}
-                                    contacts={contacts}
-                                    value={field.value}
-                                    onValueChange={field.onChange}
-                                    disabled={isSubmitting}
-                                    aria-label="Who it's for"
-                                    aria-invalid={Boolean(errors.contactId)}
+                {heading(
+                    <SavePill
+                        state={saving.state}
+                        hasDraft={saving.id !== null}
+                        onRetry={() => void saving.flush()}
+                    />,
+                    <div className="flex gap-2 max-sm:hidden">
+                        {mode === "paper" ? (
+                            <SeeAsCustomer paper={paper} />
+                        ) : null}
+                        {buttons(false)}
+                    </div>,
+                    <Segmented<Mode>
+                        label="How to write it"
+                        value={mode}
+                        onValueChange={setMode}
+                        options={[
+                            { value: "form", label: "Form" },
+                            { value: "paper", label: "On the paper" },
+                        ]}
+                    />,
+                )}
+                {mode === "paper" ? (
+                    <PaperEditor
+                        form={form}
+                        lines={lines}
+                        paper={paper}
+                        business={biz}
+                        businessName={businessName}
+                        registered={registered}
+                        currency={currency}
+                        zone={zone}
+                        now={now}
+                        draftDueAt={draft?.dueAt ?? null}
+                        customer={{
+                            contacts,
+                            canAdd: !draft,
+                            onContactAdded,
+                            registered,
+                            businessState: biz?.state ?? null,
+                            buyerOpen,
+                            onOpenBuyer: () => setBuyerOpen(true),
+                        }}
+                        canPickProducts={canPickProducts}
+                        priceMode={biz?.priceMode ?? null}
+                        disabled={busy}
+                        canSetDefault={canSetDefault && biz !== null}
+                        onSettings={onSettings}
+                    />
+                ) : (
+                    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_440px]">
+                        {/* One column that never grows past the form: an auto
+                        track took the picker's whole "name · email" as its
+                        least width, and a long email zoomed a phone out. */}
+                        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
+                            <CustomerBlock
+                                form={form}
+                                contacts={contacts}
+                                canAdd={!draft}
+                                onContactAdded={onContactAdded}
+                                registered={registered}
+                                businessState={biz?.state ?? null}
+                                buyerOpen={buyerOpen}
+                                onOpenBuyer={() => setBuyerOpen(true)}
+                                disabled={busy}
+                            />
+                            <LinesTable
+                                form={form}
+                                lines={lines}
+                                currency={currency}
+                                registered={registered}
+                                canPickProducts={canPickProducts}
+                                priceMode={biz?.priceMode ?? null}
+                                disabled={busy}
+                            />
+                            <section className="rounded-[12px] border border-border bg-card px-4 py-[13px]">
+                                <h2 className="label mb-2">Due</h2>
+                                <DueStrip
+                                    value={values.due}
+                                    onChange={(due) =>
+                                        form.setValue("due", due, {
+                                            shouldDirty: true,
+                                        })
+                                    }
+                                    draftDueAt={draft?.dueAt ?? null}
+                                    zone={zone}
+                                    now={now}
                                 />
-                            )}
-                        />
-                        {errors.contactId ? (
-                            <p className="mt-1.5 text-[12px] text-destructive-subtle-foreground">
-                                {errors.contactId.message}
-                            </p>
-                        ) : null}
-                        {!draft ? (
-                            <div className="mt-1.5">
-                                <NewContact onAdded={onContactAdded} />
-                            </div>
-                        ) : null}
-                        {registered ? (
-                            buyerOpen ? (
-                                <div className="mt-3 grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
-                                    <div className="grid content-start gap-1.5">
-                                        <Label
-                                            htmlFor={ids.gstin}
-                                            className="text-[12.5px]"
-                                        >
-                                            Their GSTIN{" "}
-                                            <span className="font-normal text-muted-foreground">
-                                                (if registered)
-                                            </span>
-                                        </Label>
-                                        <Input
-                                            id={ids.gstin}
-                                            maxLength={15}
-                                            autoCapitalize="characters"
-                                            placeholder="29AAGFL5531Q1ZO"
-                                            className="font-mono uppercase"
-                                            aria-invalid={Boolean(
-                                                errors.billToGstin,
-                                            )}
-                                            disabled={isSubmitting}
-                                            {...form.register("billToGstin")}
-                                        />
-                                        {errors.billToGstin ? (
-                                            <p className="text-[12px] text-destructive-subtle-foreground">
-                                                {errors.billToGstin.message}
-                                            </p>
-                                        ) : null}
-                                    </div>
-                                    <div className="grid content-start gap-1.5">
-                                        <Label
-                                            htmlFor={ids.state}
-                                            className="text-[12.5px]"
-                                        >
-                                            Their state
-                                        </Label>
-                                        <Controller
-                                            control={form.control}
-                                            name="billToState"
-                                            render={({ field }) => (
-                                                <OptionSelect
-                                                    id={ids.state}
-                                                    value={field.value}
-                                                    onValueChange={
-                                                        field.onChange
-                                                    }
-                                                    options={STATES}
-                                                    disabled={isSubmitting}
-                                                    aria-invalid={Boolean(
-                                                        errors.billToState,
-                                                    )}
-                                                />
-                                            )}
-                                        />
-                                        <p className="text-[12px] text-muted-foreground">
-                                            {errors.billToState?.message ??
-                                                "The place of supply. Another state than yours is IGST."}
-                                        </p>
-                                    </div>
-                                    <div className="grid gap-1.5 sm:col-span-2">
-                                        <Label
-                                            htmlFor={ids.address}
-                                            className="text-[12.5px]"
-                                        >
-                                            Their address, as it prints
-                                        </Label>
-                                        <Textarea
-                                            id={ids.address}
-                                            rows={2}
-                                            maxLength={500}
-                                            disabled={isSubmitting}
-                                            {...form.register("billToAddress")}
-                                        />
-                                    </div>
-                                </div>
-                            ) : (
-                                <Button
-                                    variant="link"
-                                    size="inline"
-                                    type="button"
-                                    onClick={() => setBuyerOpen(true)}
-                                    className="mt-2 py-1 text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground"
-                                >
-                                    + Their GSTIN, state and address
-                                </Button>
-                            )
-                        ) : null}
-                    </Card>
-
-                    <Card label="Lines">
-                        {/* The desk's column heads (UX-080): a phone labels
-                            each field instead. The fields carry their own
-                            names for a screen reader. */}
-                        <div
-                            aria-hidden
-                            className="hidden gap-1.5 px-0.5 pb-1 text-[12px] text-muted-foreground sm:grid sm:grid-cols-[minmax(0,3fr)_70px_100px_30px]"
-                        >
-                            <span>What it&apos;s for</span>
-                            <span>Qty</span>
-                            <span>Price each</span>
+                            </section>
+                            <SeeItToggle
+                                open={seeIt}
+                                controls={ids.preview}
+                                onToggle={() => setSeeIt((v) => !v)}
+                            />
                         </div>
-                        <ul className="grid gap-1.5">
-                            {fields.map((line, i) => {
-                                const lineErr = errors.lines?.[i];
-                                return (
-                                    <li key={line.id} className="grid gap-1.5">
-                                        {/* A phone stacks the line (T7):
-                                            what it's for beside its remove
-                                            button, then Quantity and Price
-                                            each, labelled, side by side.
-                                            The desk keeps one row. The
-                                            remove button is drawn twice
-                                            (one per layout, the other
-                                            display:none) so the tab order
-                                            follows what is seen. */}
-                                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] gap-1.5 sm:grid-cols-[minmax(0,3fr)_70px_100px_30px]">
-                                            <Input
-                                                aria-label={`Line ${i + 1}: what it's for`}
-                                                placeholder="What it's for"
-                                                className="col-span-2 sm:col-span-1"
-                                                disabled={isSubmitting}
-                                                aria-invalid={Boolean(
-                                                    lineErr?.description,
-                                                )}
-                                                {...form.register(
-                                                    `lines.${i}.description`,
-                                                )}
-                                            />
-                                            <RemoveLine
-                                                index={i}
-                                                className="grid size-11 sm:hidden"
-                                                disabled={isSubmitting}
-                                                onRemove={() => removeLine(i)}
-                                            />
-                                            <div className="grid gap-1 sm:contents">
-                                                <Label
-                                                    htmlFor={`${ids.lines}-${i}-qty`}
-                                                    className="text-[12px] text-muted-foreground sm:hidden"
-                                                >
-                                                    Quantity
-                                                </Label>
-                                                <Input
-                                                    id={`${ids.lines}-${i}-qty`}
-                                                    aria-label={`Line ${i + 1}: quantity`}
-                                                    inputMode="numeric"
-                                                    className="tabular-nums"
-                                                    disabled={isSubmitting}
-                                                    aria-invalid={Boolean(
-                                                        lineErr?.quantity,
-                                                    )}
-                                                    {...form.register(
-                                                        `lines.${i}.quantity`,
-                                                        {
-                                                            valueAsNumber: true,
-                                                        },
-                                                    )}
-                                                />
-                                            </div>
-                                            <div className="grid gap-1 sm:contents">
-                                                <Label
-                                                    htmlFor={`${ids.lines}-${i}-price`}
-                                                    className="text-[12px] text-muted-foreground sm:hidden"
-                                                >
-                                                    Price each
-                                                </Label>
-                                                <Controller
-                                                    control={form.control}
-                                                    name={`lines.${i}.unitPrice`}
-                                                    render={({ field }) => (
-                                                        <MoneyInput
-                                                            {...field}
-                                                            id={`${ids.lines}-${i}-price`}
-                                                            aria-label={`Line ${i + 1}: price each, ${currency}`}
-                                                            currency={currency}
-                                                            onValueChange={
-                                                                field.onChange
-                                                            }
-                                                            disabled={
-                                                                isSubmitting
-                                                            }
-                                                            aria-invalid={Boolean(
-                                                                lineErr?.unitPrice,
-                                                            )}
-                                                        />
-                                                    )}
-                                                />
-                                            </div>
-                                            <RemoveLine
-                                                index={i}
-                                                className="hidden sm:grid"
-                                                disabled={isSubmitting}
-                                                onRemove={() => removeLine(i)}
-                                            />
-                                        </div>
-                                        {registered ? (
-                                            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_30px] gap-1.5 sm:grid-cols-[170px_140px_1fr]">
-                                                <Controller
-                                                    control={form.control}
-                                                    name={`lines.${i}.gstRate`}
-                                                    render={({ field }) => (
-                                                        <OptionSelect
-                                                            size="sm"
-                                                            aria-label={`Line ${i + 1}: GST rate`}
-                                                            value={
-                                                                field.value as GstRateValue
-                                                            }
-                                                            onValueChange={
-                                                                field.onChange
-                                                            }
-                                                            options={
-                                                                GST_RATE_OPTIONS
-                                                            }
-                                                            placeholder="GST rate"
-                                                            disabled={
-                                                                isSubmitting
-                                                            }
-                                                            aria-invalid={
-                                                                lineErr?.gstRate
-                                                                    ? true
-                                                                    : undefined
-                                                            }
-                                                        />
-                                                    )}
-                                                />
-                                                <Input
-                                                    dense
-                                                    aria-label={`Line ${i + 1}: HSN or SAC`}
-                                                    placeholder="HSN / SAC"
-                                                    inputMode="numeric"
-                                                    className="font-mono"
-                                                    disabled={isSubmitting}
-                                                    aria-invalid={Boolean(
-                                                        lineErr?.hsnSac,
-                                                    )}
-                                                    {...form.register(
-                                                        `lines.${i}.hsnSac`,
-                                                    )}
-                                                />
-                                            </div>
-                                        ) : null}
-                                        {lineErr ? (
-                                            <p className="text-[12px] text-destructive-subtle-foreground">
-                                                {lineErr.description?.message ??
-                                                    lineErr.quantity?.message ??
-                                                    lineErr.unitPrice
-                                                        ?.message ??
-                                                    lineErr.gstRate?.message ??
-                                                    lineErr.hsnSac?.message}
-                                            </p>
-                                        ) : null}
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                        <Button
-                            variant="link"
-                            size="inline"
-                            type="button"
-                            disabled={isSubmitting}
-                            onClick={() =>
-                                append({
-                                    description: "",
-                                    quantity: 1,
-                                    unitPrice: "",
-                                    gstRate: "",
-                                    hsnSac: "",
-                                })
-                            }
-                            className="mt-1 py-1.5 text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground"
-                        >
-                            + Add a line
-                        </Button>
-                        {registered ? (
-                            <p className="mt-1 text-[12px] text-muted-foreground">
-                                Prices include GST. Each line needs its rate
-                                before the invoice is issued: choose 0% for
-                                anything exempt or nil-rated.
-                            </p>
-                        ) : null}
-                    </Card>
 
-                    <Card label="Due">
-                        <ChipGroup
-                            label="Due"
-                            className="items-center"
-                            value={String(due)}
-                            onChange={(v) =>
-                                form.setValue(
-                                    "due",
-                                    v === "kept" ? "kept" : Number(v),
-                                )
-                            }
-                            choices={[
-                                ...(draft?.dueAt
-                                    ? [
-                                          {
-                                              value: "kept",
-                                              label: (
-                                                  <ViewerDate
-                                                      iso={draft.dueAt}
-                                                      variant="dayMonth"
-                                                  />
-                                              ),
-                                          },
-                                      ]
-                                    : []),
-                                ...DUES.map((d) => ({
-                                    value: String(d.days),
-                                    label: d.label,
-                                })),
-                            ]}
+                        <PreviewAside
+                            id={ids.preview}
+                            open={seeIt}
+                            paper={paper}
+                            business={biz}
+                            withLink={withLink}
                         />
-                    </Card>
-                </div>
-
-                <aside className="min-w-0 flex-[2_1_260px] rounded-[12px] border border-border bg-card px-4 py-3.5 lg:sticky lg:top-3">
-                    <h2 className="label">Total</h2>
-                    <p className="mb-0.5 mt-1 font-display text-[28px] font-semibold tabular-nums tracking-[-0.02em]">
-                        {show(total)}
-                    </p>
-                    <p className="text-[12px] text-muted-foreground">
-                        {registered
-                            ? "GST worked out per line when it's issued. Prices include it."
-                            : `No GST. ${businessName} isn't registered.`}
-                    </p>
-                    <p className="mt-3 text-[12.5px] leading-[1.5] text-foreground">
-                        A draft has no number and can still change. Issuing
-                        numbers it and locks the lines
-                        {withLink
-                            ? ", and copies its payment link for you to send. Saroh doesn't send it."
-                            : ". Saroh doesn't send it. Print it or share it yourself."}
-                    </p>
-                    <div className="mt-3 flex flex-col gap-2">
-                        {/* Issuing numbers the invoice and locks its lines, so
-                            it takes a press of this button. The form's one
-                            submit, which Enter runs, is the draft below. */}
-                        <Button
-                            type="button"
-                            disabled={isSubmitting || noLine}
-                            onClick={() =>
-                                void form.handleSubmit(
-                                    (values) => onSubmit(values, "issue"),
-                                    onInvalid,
-                                )()
-                            }
-                            busy={isSubmitting && intent === "issue"}
-                            busyLabel="Issuing…"
-                        >
-                            {withLink ? "Issue with payment link" : "Issue it"}
-                        </Button>
-                        <Button
-                            type="submit"
-                            variant="outline"
-                            disabled={isSubmitting || noLine}
-                            busy={isSubmitting && intent === "draft"}
-                            busyLabel="Saving…"
-                        >
-                            {draft ? "Save the draft" : "Save as draft"}
-                        </Button>
                     </div>
-                    {noLine && typed ? (
-                        <p className="mt-2 text-[12px] text-destructive-subtle-foreground">
-                            Add at least one line with a description, quantity
-                            and price.
-                        </p>
-                    ) : null}
-                </aside>
+                )}
+                {noLine && typed ? (
+                    <p
+                        id={ids.why}
+                        className="mt-3 text-[12px] text-destructive-subtle-foreground"
+                    >
+                        Add at least one line with a description, quantity and
+                        price.
+                    </p>
+                ) : null}
+
+                <PhoneFoot total={formatMoney(sums.totalCents, currency)}>
+                    {buttons(true)}
+                </PhoneFoot>
             </form>
         </>
-    );
-}
-
-function Card({ label, children }: { label: string; children: ReactNode }) {
-    return (
-        <section className="rounded-[12px] border border-border bg-card px-4 py-[13px]">
-            <h2 className="label mb-2">{label}</h2>
-            {children}
-        </section>
-    );
-}
-
-/** A line's remove button: 44px on a phone, the desk's 30px column. */
-function RemoveLine({
-    index,
-    className,
-    disabled,
-    onRemove,
-}: {
-    index: number;
-    className: string;
-    disabled: boolean;
-    onRemove: () => void;
-}) {
-    return (
-        <button
-            type="button"
-            aria-label={`Remove line ${index + 1}`}
-            disabled={disabled}
-            onClick={onRemove}
-            className={cn(
-                "place-items-center rounded-[8px] text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active",
-                className,
-            )}
-        >
-            <X aria-hidden className="size-4" />
-        </button>
-    );
-}
-
-/**
- * "New contact" in Who (UX-047): adds someone without leaving the invoice,
- * and picks them. The API still decides (Contacts off, or no
- * `contact:write`), and the dialog says why it couldn't.
- */
-function NewContact({
-    onAdded,
-    solid = false,
-}: {
-    onAdded: (c: AddedContact) => void;
-    solid?: boolean;
-}) {
-    return (
-        <AddContactDialog
-            onAdded={onAdded}
-            description="Who this invoice is for. They're added to your contacts and picked here."
-            trigger={
-                <Button
-                    type="button"
-                    variant={solid ? "default" : "link"}
-                    size="sm"
-                    className={solid ? undefined : "h-auto px-0"}
-                >
-                    New contact
-                </Button>
-            }
-        />
     );
 }

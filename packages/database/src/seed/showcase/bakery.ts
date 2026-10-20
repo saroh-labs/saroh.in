@@ -36,6 +36,20 @@ import {
     writeVariantsAndListings,
 } from "./bakery-stock";
 import { SHOWCASE_SEED, TIMEZONE } from "./data";
+import type {
+    InvoiceTrail,
+    LedgerMethod,
+    LedgerSpec,
+    PaperSpec,
+    ShareSpec,
+} from "./invoice-states";
+import {
+    addTrailRows,
+    emptyTrailRows,
+    ledgerColumns,
+    RYE_COLOUR,
+    writeTrailRows,
+} from "./invoice-states";
 import { seedJournal } from "./journal";
 import { addMinutes, earliest, hashKey, istAt, istWeekday } from "./people";
 
@@ -536,6 +550,9 @@ export async function seedBakery(
         gstState: GST.state,
         ...RYE_ADDRESS,
         invoicePrefix: GST.prefix,
+        // Its paper (DEC-173, #1129): Band, in the colour of a rye crust.
+        invoiceStyle: "BAND",
+        invoiceColour: RYE_COLOUR,
         // The business counts stock (#515); a take that turned it off is undone.
         stockTracking: true,
         deliveryGstRate: bpsToRate(GST.deliveryRateBps),
@@ -975,6 +992,9 @@ async function clearVolume(prisma: Db) {
         },
     });
     await prisma.contactNote.deleteMany({ where });
+    // The emails that sent and reminded about its invoices (#1129): kept
+    // by a deleted invoice, so cleared on their own seeded ids.
+    await prisma.message.deleteMany({ where });
     await prisma.customer.deleteMany({ where });
     await prisma.contact.deleteMany({ where });
 }
@@ -1703,7 +1723,7 @@ function canReview(o: OrderPlan, now: Date): boolean {
 export interface DocSpec {
     id: string;
     kind: "INVOICE" | "CREDIT_NOTE" | "SUPPLEMENTARY";
-    status: "DRAFT" | "ISSUED" | "PAID";
+    status: "DRAFT" | "ISSUED" | "PAID" | "CREDITED";
     source: "ORDER" | "SUBSCRIPTION" | "MANUAL";
     createdAt: Date;
     issuedAt: Date | null;
@@ -1718,6 +1738,15 @@ export interface DocSpec {
     period?: Period;
     relatedInvoiceId?: string;
     paymentRefundId?: string;
+    /** "Cancel and write a correct one": the invoice this one replaces. */
+    reissuedFromId?: string;
+    /**
+     * After it went out (DEC-173): its payments, shares and emails. With
+     * payments, its status and paid columns come from them.
+     */
+    trail?: InvoiceTrail;
+    /** The look it went out in; absent is Classic in ink. */
+    paper?: PaperSpec;
     billTo: {
         name: string;
         email: string;
@@ -2464,13 +2493,46 @@ export function planWorld(input: PlanInput): World {
             code: rateOf(p).code,
         };
     };
+    /** A payment on a trade invoice (DEC-173): rupees, days ago, how. */
+    interface TradePayment {
+        daysAgo: number;
+        rupees: number;
+        method: LedgerMethod;
+        cheque?: {
+            number: string;
+            bank: string;
+            status: "WAITING" | "CLEARED" | "BOUNCED";
+            /** When it cleared or bounced. */
+            daysAgo?: number;
+            reason?: string;
+        };
+    }
+    const band: PaperSpec = { style: "BAND", colour: RYE_COLOUR };
     const trade: {
         cafe: string;
         issuedDaysAgo: number | null;
         createdDaysAgo: number;
+        /** Paid in full before the ledger: the backfill writes its payment. */
         paidDaysAgo?: number;
         method?: string;
         lines: DocLineInput[];
+        /** Its ledger (#1129): part payments and cheques. */
+        payments?: TradePayment[];
+        shares?: {
+            daysAgo: number;
+            channel: ShareSpec["channel"];
+            kind: ShareSpec["kind"];
+        }[];
+        emails?: {
+            daysAgo: number;
+            template: "INVOICE_SENT" | "INVOICE_REMINDER";
+        }[];
+        /** The look it went out in; absent is Classic in ink (before styles). */
+        paper?: PaperSpec;
+        /** "Cancel and write a correct one": credited in full, then. */
+        credited?: { daysAgo: number; reason: string };
+        /** The trade invoice (by index) this one was written again from. */
+        rewriteOf?: number;
     }[] = [
         {
             cafe: "kiln",
@@ -2495,7 +2557,8 @@ export function planWorld(input: PlanInput): World {
             ],
         },
         {
-            // Overdue: due ten days after it went out, and not paid.
+            // Overdue a week: due ten days after it went out, and not paid.
+            // Emailed when it went out, reminded by email, then on WhatsApp.
             cafe: "fern",
             createdDaysAgo: 21,
             issuedDaysAgo: 21,
@@ -2503,6 +2566,11 @@ export function planWorld(input: PlanInput): World {
                 tradeLine("seeded-multigrain-loaf", 15, 350),
                 tradeLine("almond-croissant", 20, 300),
             ],
+            emails: [
+                { daysAgo: 21, template: "INVOICE_SENT" },
+                { daysAgo: 3, template: "INVOICE_REMINDER" },
+            ],
+            shares: [{ daysAgo: 1, channel: "WHATSAPP", kind: "REMINDER" }],
         },
         {
             cafe: "kiln",
@@ -2514,9 +2582,10 @@ export function planWorld(input: PlanInput): World {
                 tradeLine("sourdough-loaf", 20, 400),
                 tradeLine("pain-au-chocolat", 30, 180),
             ],
+            paper: band,
         },
         {
-            // To Goa: IGST.
+            // To Goa: IGST. A long trade order, on the Compact paper.
             cafe: "saltpan",
             createdDaysAgo: 8,
             issuedDaysAgo: 8,
@@ -2533,9 +2602,10 @@ export function planWorld(input: PlanInput): World {
                     code: GST.deliverySac,
                 },
             ],
+            paper: { style: "COMPACT", colour: RYE_COLOUR },
         },
         {
-            // Due: out this week.
+            // Due: out this week, shared on WhatsApp as it went.
             cafe: "brew",
             createdDaysAgo: 4,
             issuedDaysAgo: 4,
@@ -2543,9 +2613,11 @@ export function planWorld(input: PlanInput): World {
                 tradeLine("sourdough-loaf", 12, 400),
                 tradeLine("butter-croissant", 24, 150),
             ],
+            shares: [{ daysAgo: 4, channel: "WHATSAPP", kind: "NEW" }],
+            paper: band,
         },
         {
-            // A draft for next week's standing order.
+            // A draft for next week's standing order: the business's look.
             cafe: "brew",
             createdDaysAgo: 1,
             issuedDaysAgo: null,
@@ -2554,14 +2626,205 @@ export function planWorld(input: PlanInput): World {
                 tradeLine("cinnamon-bun", 30, 100),
             ],
         },
+        {
+            // Partly paid ₹1,000 of ₹2,500, not due yet; the receipt
+            // shared on WhatsApp.
+            cafe: "kiln",
+            createdDaysAgo: 9,
+            issuedDaysAgo: 9,
+            lines: [
+                tradeLine("sourdough-loaf", 5, 400),
+                tradeLine("cinnamon-bun", 5, 100),
+            ],
+            payments: [{ daysAgo: 3, rupees: 1_000, method: "UPI" }],
+            shares: [
+                { daysAgo: 9, channel: "WHATSAPP", kind: "NEW" },
+                { daysAgo: 3, channel: "WHATSAPP", kind: "RECEIPT" },
+            ],
+            paper: band,
+        },
+        {
+            // Partly paid in cash and overdue a fortnight; reminded on
+            // WhatsApp. Printed on the Classic paper in Rye's colour.
+            cafe: "fern",
+            createdDaysAgo: 30,
+            issuedDaysAgo: 30,
+            lines: [
+                tradeLine("seeded-multigrain-loaf", 9, 350),
+                tradeLine("butter-croissant", 21, 150),
+            ],
+            payments: [{ daysAgo: 20, rupees: 3_000, method: "CASH" }],
+            emails: [{ daysAgo: 30, template: "INVOICE_SENT" }],
+            shares: [{ daysAgo: 2, channel: "WHATSAPP", kind: "REMINDER" }],
+            paper: { style: "CLASSIC", colour: RYE_COLOUR },
+        },
+        {
+            // Paid by cheque, not in the bank yet: ₹8,400.
+            cafe: "brew",
+            createdDaysAgo: 12,
+            issuedDaysAgo: 12,
+            lines: [
+                tradeLine("sourdough-loaf", 12, 400),
+                tradeLine("butter-croissant", 24, 150),
+            ],
+            payments: [
+                {
+                    daysAgo: 2,
+                    rupees: 8_400,
+                    method: "CHEQUE",
+                    cheque: {
+                        number: "004512",
+                        bank: "HDFC Bank",
+                        status: "WAITING",
+                    },
+                },
+            ],
+            shares: [{ daysAgo: 12, channel: "WHATSAPP", kind: "NEW" }],
+            paper: band,
+        },
+        {
+            // The second cheque waiting for the bank: ₹5,600.
+            cafe: "kiln",
+            createdDaysAgo: 6,
+            issuedDaysAgo: 6,
+            lines: [
+                tradeLine("sourdough-loaf", 8, 400),
+                tradeLine("butter-croissant", 16, 150),
+            ],
+            payments: [
+                {
+                    daysAgo: 1,
+                    rupees: 5_600,
+                    method: "CHEQUE",
+                    cheque: {
+                        number: "118230",
+                        bank: "Canara Bank",
+                        status: "WAITING",
+                    },
+                },
+            ],
+            emails: [{ daysAgo: 6, template: "INVOICE_SENT" }],
+            paper: band,
+        },
+        {
+            // A cheque that bounced: owed again, a month late, reminded
+            // by email and on WhatsApp since.
+            cafe: "fern",
+            createdDaysAgo: 45,
+            issuedDaysAgo: 45,
+            lines: [
+                tradeLine("almond-croissant", 6, 300),
+                tradeLine("sourdough-loaf", 6, 400),
+            ],
+            payments: [
+                {
+                    daysAgo: 36,
+                    rupees: 4_200,
+                    method: "CHEQUE",
+                    cheque: {
+                        number: "220871",
+                        bank: "State Bank of India",
+                        status: "BOUNCED",
+                        daysAgo: 33,
+                        reason: "Insufficient funds",
+                    },
+                },
+            ],
+            emails: [
+                { daysAgo: 45, template: "INVOICE_SENT" },
+                { daysAgo: 5, template: "INVOICE_REMINDER" },
+            ],
+            shares: [{ daysAgo: 1, channel: "WHATSAPP", kind: "REMINDER" }],
+        },
+        {
+            // Long overdue: to Goa, nearly two months late, reminded twice.
+            cafe: "saltpan",
+            createdDaysAgo: 70,
+            issuedDaysAgo: 70,
+            lines: [
+                tradeLine("sourdough-loaf", 10, 400),
+                tradeLine("almond-croissant", 10, 300),
+            ],
+            emails: [
+                { daysAgo: 70, template: "INVOICE_SENT" },
+                { daysAgo: 40, template: "INVOICE_REMINDER" },
+                { daysAgo: 12, template: "INVOICE_REMINDER" },
+            ],
+        },
+        {
+            // A cheque that went into the bank; its receipt shared then.
+            cafe: "kiln",
+            createdDaysAgo: 26,
+            issuedDaysAgo: 26,
+            lines: [tradeLine("sourdough-loaf", 15, 400)],
+            payments: [
+                {
+                    daysAgo: 22,
+                    rupees: 6_000,
+                    method: "CHEQUE",
+                    cheque: {
+                        number: "118102",
+                        bank: "Canara Bank",
+                        status: "CLEARED",
+                        daysAgo: 19,
+                    },
+                },
+            ],
+            shares: [{ daysAgo: 19, channel: "WHATSAPP", kind: "RECEIPT" }],
+        },
+        {
+            // Billed 12 croissants for 18: cancelled with a credit note…
+            cafe: "brew",
+            createdDaysAgo: 16,
+            issuedDaysAgo: 16,
+            lines: [tradeLine("butter-croissant", 12, 150)],
+            credited: {
+                daysAgo: 15,
+                reason: "Billed 12 croissants; 18 went out.",
+            },
+            paper: band,
+        },
+        {
+            // …and written again, correct, and paid.
+            cafe: "brew",
+            createdDaysAgo: 15,
+            issuedDaysAgo: 15,
+            lines: [tradeLine("butter-croissant", 18, 150)],
+            payments: [{ daysAgo: 7, rupees: 2_700, method: "UPI" }],
+            rewriteOf: 14,
+            paper: band,
+        },
     ];
+    // Times after it went out come from their own stream, so the paper
+    // above keeps the times it always had.
+    const trailRng = rngFor("trade-trail");
+    const latest = (a: Date, b: Date) => (a > b ? a : b);
+    /** A time `daysAgo` days back, after `after` and before now. */
+    const trailAt = (daysAgo: number, after: Date) =>
+        earliest(
+            latest(
+                istAt(now, -daysAgo, trailRng.int(10 * 60, 18 * 60)),
+                addMinutes(after, trailRng.int(15, 50)),
+            ),
+            addMinutes(now, -5),
+        );
+    const credits = new Map<number, Date>();
     trade.forEach((t, k) => {
         const c = cafe(t.cafe);
-        const createdAt = istAt(
+        const id = sid("invoice", "trade", k);
+        let createdAt = istAt(
             now,
             -t.createdDaysAgo,
             tradeRng.int(10 * 60, 12 * 60),
         );
+        // Written again after the credit note that cancelled the first.
+        const creditedAt =
+            t.rewriteOf === undefined ? undefined : credits.get(t.rewriteOf);
+        if (t.rewriteOf !== undefined && !creditedAt) {
+            throw new Error(`Trade invoice ${k} rewrites one never credited`);
+        }
+        if (creditedAt)
+            createdAt = latest(createdAt, addMinutes(creditedAt, 10));
         const issuedAt =
             t.issuedDaysAgo === null
                 ? null
@@ -2570,35 +2833,125 @@ export function planWorld(input: PlanInput): World {
             issuedAt && t.paidDaysAgo !== undefined
                 ? istAt(now, -t.paidDaysAgo, tradeRng.int(11 * 60, 17 * 60))
                 : null;
+        const paymentReference =
+            paidAt && t.method === "BANK_TRANSFER"
+                ? `NEFT ${digits(tradeRng, 10)}`
+                : paidAt
+                  ? `UPI ref ${digits(tradeRng, 12)}`
+                  : null;
+        const billTo = {
+            name: `${c.first} ${c.last}`,
+            email: c.email,
+            gstin: gstin(c.state, c.pan),
+            state: c.state,
+            address: c.address,
+        };
+
+        let trail: InvoiceTrail | undefined;
+        if (issuedAt && (t.payments || t.shares || t.emails)) {
+            const ledger: LedgerSpec[] = [];
+            for (const p of t.payments ?? []) {
+                const receivedAt = trailAt(p.daysAgo, issuedAt);
+                ledger.push({
+                    amountPaise: p.rupees * 100,
+                    method: p.method,
+                    receivedAt,
+                    reference:
+                        p.method === "UPI"
+                            ? `UPI ref ${digits(trailRng, 12)}`
+                            : p.method === "BANK_TRANSFER"
+                              ? `NEFT ${digits(trailRng, 10)}`
+                              : null,
+                    cheque: p.cheque
+                        ? {
+                              number: p.cheque.number,
+                              bank: p.cheque.bank,
+                              status: p.cheque.status,
+                              settledAt:
+                                  p.cheque.daysAgo === undefined
+                                      ? undefined
+                                      : trailAt(p.cheque.daysAgo, receivedAt),
+                              reason: p.cheque.reason,
+                          }
+                        : undefined,
+                    recordedById: trailRng.chance(0.6)
+                        ? owner
+                        : input.counterUserId,
+                });
+            }
+            trail = {
+                ledger,
+                shares: (t.shares ?? []).map((s) => ({
+                    channel: s.channel,
+                    kind: s.kind,
+                    at: trailAt(s.daysAgo, issuedAt),
+                    byUserId: owner,
+                })),
+                emails: (t.emails ?? []).map((e) => ({
+                    template: e.template,
+                    at: trailAt(e.daysAgo, issuedAt),
+                    byUserId: owner,
+                })),
+            };
+        }
+
+        const credit =
+            issuedAt && t.credited
+                ? trailAt(t.credited.daysAgo, issuedAt)
+                : null;
+        if (credit) credits.set(k, credit);
         w.docs.push({
-            id: sid("invoice", "trade", k),
+            id,
             kind: "INVOICE",
-            status: !issuedAt ? "DRAFT" : paidAt ? "PAID" : "ISSUED",
+            status: !issuedAt
+                ? "DRAFT"
+                : credit
+                  ? "CREDITED"
+                  : paidAt
+                    ? "PAID"
+                    : "ISSUED",
             source: "MANUAL",
             createdAt,
             issuedAt,
             dueAt: issuedAt ? new Date(issuedAt.getTime() + 15 * DAY) : null,
             paidAt,
             paymentMethod: paidAt ? (t.method ?? "BANK_TRANSFER") : null,
-            paymentReference:
-                paidAt && t.method === "BANK_TRANSFER"
-                    ? `NEFT ${digits(tradeRng, 10)}`
-                    : paidAt
-                      ? `UPI ref ${digits(tradeRng, 12)}`
-                      : null,
+            paymentReference,
             paymentNote: null,
             contactId: contactId(c.key),
-            billTo: {
-                name: `${c.first} ${c.last}`,
-                email: c.email,
-                gstin: gstin(c.state, c.pan),
-                state: c.state,
-                address: c.address,
-            },
+            billTo,
             placeOfSupply: c.state,
             lines: t.lines,
             createdByUserId: owner,
+            ...(t.rewriteOf !== undefined
+                ? { reissuedFromId: sid("invoice", "trade", t.rewriteOf) }
+                : {}),
+            ...(trail ? { trail } : {}),
+            ...(issuedAt && t.paper ? { paper: t.paper } : {}),
         });
+        if (credit && t.credited) {
+            // The credit note for all of it (`issueCreditNote`): its own
+            // RCCN number, the same lines, the reason as its note.
+            w.docs.push({
+                id: sid("invoice", "trade", k, "credit"),
+                kind: "CREDIT_NOTE",
+                status: "ISSUED",
+                source: "MANUAL",
+                createdAt: credit,
+                issuedAt: credit,
+                dueAt: null,
+                paidAt: null,
+                paymentMethod: null,
+                paymentReference: null,
+                paymentNote: t.credited.reason,
+                contactId: contactId(c.key),
+                relatedInvoiceId: id,
+                billTo,
+                placeOfSupply: c.state,
+                lines: t.lines,
+                createdByUserId: owner,
+            });
+        }
         const seen = firstSeen.get(c.key);
         if (!seen || createdAt < seen) firstSeen.set(c.key, createdAt);
     });
@@ -2824,6 +3177,7 @@ async function writeDocuments(prisma: Db, orgId: string, docs: DocSpec[]) {
 
     const invoices: Prisma.InvoiceCreateManyInput[] = [];
     const lines: Prisma.InvoiceLineCreateManyInput[] = [];
+    const trails = emptyTrailRows();
     for (const d of docs) {
         const inter = d.placeOfSupply !== GST.state;
         const taxed = d.lines.map((l) => taxLine(l, inter));
@@ -2835,11 +3189,42 @@ async function writeDocuments(prisma: Db, orgId: string, docs: DocSpec[]) {
         const igst = sum((l) => l.igstPaise);
         const tax = cgst + sgst + igst;
         const isIssued = d.issuedAt !== null;
+        const number = numbers.get(d.id) ?? null;
+        // Paid from its ledger (DEC-173): status and the paid columns are
+        // the ledger's, as the API settles them.
+        const ledger =
+            d.trail?.ledger && d.trail.ledger.length > 0
+                ? ledgerColumns(d.id, total, d.trail.ledger)
+                : null;
+        const paid = ledger ?? {
+            status: d.status,
+            paidCents: 0,
+            paidAt: d.paidAt,
+            paymentMethod: d.paymentMethod,
+            paymentReference: d.paymentReference,
+            paymentNote: d.paymentNote,
+        };
+        if (d.trail && number) {
+            addTrailRows(trails, {
+                orgId,
+                invoiceId: d.id,
+                currency: CURRENCY,
+                trail: d.trail,
+                number,
+                business: NAME,
+                to: {
+                    name: d.billTo.name,
+                    email: d.billTo.email,
+                    contactId: d.contactId ?? null,
+                },
+                idFor: (...parts) => `${d.id}_${parts.join("_")}`,
+            });
+        }
         invoices.push({
             id: d.id,
             organizationId: orgId,
-            number: numbers.get(d.id) ?? null,
-            status: d.status,
+            number,
+            status: paid.status,
             kind: d.kind,
             relatedInvoiceId: d.relatedInvoiceId ?? null,
             orderId: d.orderId ?? null,
@@ -2870,17 +3255,21 @@ async function writeDocuments(prisma: Db, orgId: string, docs: DocSpec[]) {
             total: rupees(total),
             issuedAt: d.issuedAt,
             dueAt: d.dueAt,
-            paidAt: d.paidAt,
-            paymentMethod: d.paymentMethod,
-            paymentReference: d.paymentReference,
-            paymentNote: d.paymentNote,
+            paidAt: paid.paidAt,
+            paymentMethod: paid.paymentMethod,
+            paymentReference: paid.paymentReference,
+            paymentNote: paid.paymentNote,
+            paidCents: paid.paidCents,
+            paperStyle: d.paper?.style ?? null,
+            paperColour: d.paper?.colour ?? null,
+            reissuedFromId: d.reissuedFromId ?? null,
             source: d.source,
             subscriptionId: d.subscriptionId ?? null,
             periodStart: d.period?.start ?? null,
             periodEnd: d.period?.end ?? null,
             createdByUserId: d.createdByUserId,
             createdAt: d.createdAt,
-            updatedAt: d.paidAt ?? d.issuedAt ?? d.createdAt,
+            updatedAt: paid.paidAt ?? d.issuedAt ?? d.createdAt,
         });
         taxed.forEach((l, position) => {
             lines.push({
@@ -2911,6 +3300,8 @@ async function writeDocuments(prisma: Db, orgId: string, docs: DocSpec[]) {
         data: invoices.filter((i) => i.relatedInvoiceId),
     });
     await prisma.invoiceLine.createMany({ data: lines });
+    // What happened after they went out: payments, shares, emails (#1129).
+    await writeTrailRows(prisma, trails);
 
     // Each series' counter at its last number, so the API's next follows on.
     await prisma.invoiceSequence.deleteMany({

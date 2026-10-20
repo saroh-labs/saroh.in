@@ -27,7 +27,7 @@ export function useArrival(
         const url = new URL(window.location.href);
         url.searchParams.delete("panel");
         url.searchParams.delete("print");
-        window.history.replaceState(window.history.state, "", url);
+        window.history.replaceState(null, "", url);
         if (arrival === "print" && allows.print) {
             // After the page has painted, so the ticket prints whole.
             window.setTimeout(() => window.print(), 300);

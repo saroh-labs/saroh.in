@@ -12,6 +12,135 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Home — Turn down's Undo was drawn and pulled away in the same moment
+
+**Symptom**: 20 Oct 2026. `home-needs-groups.spec.ts` "Turn down is held
+with Undo" (desk) failed on both tries in two local gates in a row, and
+passed on CI and alone. The row said "Turning down in 10 seconds", then the
+Undo click timed out: "element is not stable", then "element was detached
+from the DOM". Looped alone it failed in 33 of 36 runs.
+**Cause**: a Needs you group whose every row is done here folds to "All
+done", and `need-groups.tsx` folded it in a `useEffect`. An effect runs
+after paint, so the screen first drew the open group with the held row and
+its Undo, then closed it and unmounted the row. The spec read that one
+frame ("Turning down…" was there, so the group needed no re-opening),
+pressed Undo, and the row was gone, closed for good. It only folds when
+the test's booking is the group's only row. On CI and in short runs, the
+spec's two sibling tests ran on other workers at the same moment, and
+their bookings kept the group from folding. In the full gate they rarely
+overlapped. Nothing refreshed Home.
+**Fix**: the fold is decided while rendering, in the same render that
+marks the last row done (React's "adjust state while rendering":
+`foldedKey` state, compared with `emptiedKey`, then `setOpen`). React
+re-renders before committing, so no frame shows the row it is folding
+away. `need-groups.test.tsx` watches the DOM with a MutationObserver and
+fails if the held row is ever inserted into the group that folds. It also
+checks that a re-opened group stays open with its Undo when Home is read
+again.
+**Rule**: state that follows from props or other state on the same screen
+(open, folded, selected) is set during render or derived, never in a
+`useEffect` after paint. An effect leaves a frame where a control is drawn
+and then taken away.
+
+## New order — the sheet scrolled sideways on a phone, only in the full gate
+
+**Symptom**: 20 Oct 2026. `phone-reflow.spec.ts` "the New order sheet keeps
+its create button on the screen" failed at 320px in 4 of 5 local gates and
+on every retry ("Northwind Supply Store [-5–169 of 320]": the Taken at chip
+moved ~30px left), but passed alone, on CI on development, and by hand.
+**Cause**: the customer picker shows the 8 most recently seen customers
+before anything is typed, as `Chip`s, which are `whitespace-nowrap
+shrink-0`. The release's invoice specs record payments for customers like
+"Vivek Pay phone0-mvgpdxmd70h1-bounce", whose paid invoice made them
+recent; that one chip, wider than the sheet, set the sheet body's grid
+column to its width (317px in a 279px body). The body is `overflow-y-auto`,
+so it scrolled sideways, and a tap's scroll-into-view moved the whole form
+27px left. Which customers are recent depended on what else had run, so
+the spec alone never saw it.
+**Fix**: the picker's chips for a person or what was typed wrap, and break
+an address with nowhere to break (`PERSON_CHIP` in
+`components/customers/customer-picker.tsx`). The spec now finds a long-named
+customer of its own in the sheet before measuring, so the chip is always
+there. `overflow-x-hidden` on the sheet body was not added: an
+`overflow: hidden` box still scrolls for focus and scroll-into-view, so it
+would only hide the next overflow from this spec.
+**Rule**: a chip whose words come from a merchant or a customer (a name, an
+email, a product) wraps; `Chip`'s nowrap is for Saroh's own short words.
+
+## Invoices gate — 30 browser failures, two of them the app
+
+**Symptom**: 20 Oct 2026, the invoices release gate again. Bulk remind and
+Share failed in ~90ms with 401 "Invalid or expired session"; once signed
+in, with 400 "The due date has passed". Cancel and write a correct one
+left the page on the cancelled invoice. A phone's Style sheet on the paper
+closed by itself. The journey's "Owed to you" dropped by ₹1,00,000 for a
+₹1,000 payment.
+**Cause and fix**, each:
+
+- **A helper used `page.request` before the page was signed in**
+  (`ownThree`, `ownInvoice`); a test passed the signed-out `request`
+  fixture although the last entry below already said so. Helpers that make
+  data call `useSession(page)` first. `pnpm run check:e2e-signed-in-request`
+  (prepush and CI) now fails a test that signs its page in and passes the
+  `request` fixture on, and `northwind()`'s 401 says to sign in.
+- **An invoice is never born overdue**: the API refuses to issue one past
+  its due date, and nothing moves a due date after issue, so a spec can't
+  make one "13 days late". `issueOverdue` (`fixtures/own-data.ts`) issues
+  with the due time a few seconds ahead and waits for Overdue.
+- **`pressUntil` answered by the wrong thing.** Its answer was any
+  `listbox`; the one for "Who it's for" was still closing, so the product
+  pick was never pressed. An answer names what this press opens.
+- **`innerText` runs inline spans together**: "Owed to you₹1,18,50019
+  invoices", so `₹([\d,]+)` read the count into the amount. Read the
+  amount's own element.
+- **The app (1): any revalidation re-reads the page the router is on.**
+  After the draft's address became `/<id>/edit`, the next save's
+  `revalidatePath` drew the edit page in place of `/new`, throwing the
+  editor away. The editor's later saves revalidate nothing
+  (`lib/invoices/actions.ts`).
+- **The app (2): an `onDone={() => onDone()}` dropped the sheet's
+  outcome**, so the corrected draft never opened from the details
+  (`details/flows.tsx`). Pass the outcome through.
+
+---
+
+## Next router — an address written in place went back to the old one
+
+**Symptom**: 20 Oct 2026, the invoices release gate. New invoice saved its
+draft as it was typed ("Draft · saved" on screen), but the address stayed
+`/billing/invoices/new?…` instead of becoming the draft's `/edit`, so a
+reload opened an empty form and a second draft (`invoices-journey.spec`).
+**Cause**: the draft hook wrote the address with
+`history.replaceState(window.history.state, "", url)`. Next 16 patches
+`replaceState` so its router follows a write, unless the state passed
+carries its own marker (`__NA`), which `window.history.state` always does.
+The router never heard of the new address; on its next commit (the Server
+Action's answer) it wrote its own `canonicalUrl`, `/new`, back. Five other
+places wrote the address the same way (the invoice list's `?invoice=`, a
+post's address, an order's `?panel=`, a post category, the console's plans
+nav).
+**Fix**: pass `null` (Next copies its own state across itself), and keep
+only `?mode=` on the draft's address. `pnpm run check:history-state`
+(`scripts/check-history-state.mjs`, in prepush and CI) fails on
+`history.replaceState(window.history.state` or `pushState` the same way.
+
+Two more misses from the same gate, both in specs:
+
+- **Playwright's `request` fixture is not signed in.** `useSession(page)`
+  adds the saved cookies to the page's context; the test's `request`
+  fixture is a context of its own with none, so the API answers 401
+  "Invalid or expired session". Call the API as the person through
+  `page.request` (`northwind(page.request)`).
+- **A modal editor takes the page out of `getByRole`.** A Radix popover
+  with `modal` or a sheet sets `aria-hidden` on everything else, so
+  `getByRole("article")` finds nothing behind it although it is on screen.
+  Check the name once with nothing open, then read it with
+  `includeHidden: true` (`invoices-paper-editor.spec.ts`). And a helper
+  that counts buttons waits for the screen first: right after `goto` the
+  route's loading state is showing (`pressInvoiceAction`).
+
+---
+
 ## Session replay — every recording played back as a blank black screen
 
 **Symptom**: 14 Oct 2026, four days after session replay went on in
@@ -5389,3 +5518,17 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** (1) The trace has one Enter, ~250ms after the page loaded, while the page's own routes still prefetched. React replayed the pre-hydration keydown on the trigger, which opened the menu, but Radix's document-level keydown listener (attached in an effect) had not seen it, so it treated the open as a pointer's and left focus on the menu, not its first row. The spec's `toPass` only waited for the menu to show. (2) Both files walk whole sheets in jsdom with real settle waits, ~2s a test locally. A test that times out leaves its `act()` running ("overlapping act() calls"), which fails every later test in the file.
 - **Fix:** the spec presses Escape and Enter again until the first row holds focus (`toBeFocused` inside `toPass`). Both New booking describes and the bag-through-a-reload describe get `{ timeout: 15_000 }`.
 - **Rule:** a keyboard spec's first press after a load waits for the focus it expects, not only for the menu or sheet to show: a replayed press can open it in pointer mode. A jsdom file whose tests take over a second locally sets a describe timeout, so one slow test can't fail the file.
+
+### Demo invoices would have kept their emails after a re-seed (20 Oct 2026)
+
+- **Symptom:** while giving Rye & Co. and Pulse invoices that were emailed and reminded (#1129), a second `db:seed:showcase` run would have left the first run's `INVOICE_SENT` and `INVOICE_REMINDER` messages behind, with no invoice, in Messages.
+- **Cause:** `Message.invoice` is `onDelete: SetNull`, so deleting a seeded invoice keeps its emails. The ledger rows and the share log cascade with the invoice; the emails don't.
+- **Fix:** both clears (`bakery.ts` `clearVolume`, `run.ts` `clearVolume`) delete `Message` rows on the business's seeded id prefix. Invoice states are planned in one place (`seed/showcase/invoice-states.ts`), and an invoice's status and paid columns come from its planned ledger through `settleLedger`, the API's settle rules, never typed beside it.
+- **Rule:** a seed that writes rows a parent's delete only unlinks (`SetNull`) clears them by its own ids. `check.ts` now fails on a status that doesn't follow the payments, a paid date that isn't the last payment's, cheque fields that don't fit, a payment, share or email out of the invoice's life, a rewrite from paper that wasn't cancelled, and a style the API wouldn't store (`backend-billing-and-classes.md` → Payments on an invoice are a ledger → Demo data).
+
+### A backfill run inside the API's container restarted it (20 Oct 2026)
+
+- **Symptom:** running the invoice-payments backfill with `docker exec` in the development API's container (saroh-api-dev) ended with exit 137, and the API restarted once.
+- **Cause:** the container has a 448 MB memory limit and the API already uses about half of it. `tsx` compiling the backfill beside it went over the limit, and Docker killed the container.
+- **Fix:** run a backfill in a one-off container from the same image: `docker run --rm --network coolify --env-file <the API container's env, written to a mode-600 temp file and removed on exit> --memory 2g -w /repo/packages/database <image> …`. `DATABASE_TARGET_CONFIRM` is read from the URL's database name inside that container, so no value is printed. Dry run first, the real run, then a dry run again that must write 0.
+- **Rule:** never run tooling inside a serving container; it shares the container's memory limit with the app.

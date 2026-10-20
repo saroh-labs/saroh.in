@@ -38,6 +38,9 @@
 import type { SeedSection, SeedSite } from "../data";
 import { ENQUIRY_FIELDS } from "../data";
 
+import type { PaperSpec } from "./invoice-states";
+import { PULSE_COLOUR } from "./invoice-states";
+
 /** The PRNG seed. Change it and every generated row changes with it. */
 export const SHOWCASE_SEED = 20_260_922;
 
@@ -988,6 +991,10 @@ export interface ShowcaseManualInvoice {
     voidReason?: string;
     /** Bill a contact with a company, when there is one. */
     company?: boolean;
+    /** "Void and write again" (DEC-173): the VOID fixture, by index, it replaces. */
+    rewriteOf?: number;
+    /** The look it went out in (DEC-173); absent is Classic in ink. */
+    paper?: PaperSpec;
 }
 
 export interface ShowcaseBilling {
@@ -1040,6 +1047,12 @@ export interface ShowcaseBusiness {
         postalCode: string;
         gstState: string;
     };
+    /**
+     * The look its invoices go out in by default (DEC-173,
+     * `BusinessProfile.invoiceStyle`, `.invoiceColour`); absent leaves it
+     * as it is.
+     */
+    invoicePaper?: PaperSpec;
     /** Plans, packs, courses and invoices; needs PAYMENTS for the invoices. */
     billing?: ShowcaseBilling;
     site: SeedSite;
@@ -1118,6 +1131,8 @@ export const PULSE: ShowcaseBusiness = {
         postalCode: "560034",
         gstState: "29",
     },
+    // Its paper (DEC-173, #1129): Compact, in its green.
+    invoicePaper: { style: "COMPACT", colour: PULSE_COLOUR },
     modules: [
         "APPOINTMENTS",
         "CRM",
@@ -1349,6 +1364,7 @@ export const PULSE: ShowcaseBusiness = {
                 daysAgo: 3,
                 state: "ISSUED",
                 company: true,
+                paper: { style: "COMPACT", colour: PULSE_COLOUR },
             },
             {
                 lines: [
@@ -1403,6 +1419,37 @@ export const PULSE: ShowcaseBusiness = {
                 taxPaise: 0,
                 daysAgo: 1,
                 state: "DRAFT",
+            },
+            {
+                // Void and written again (DEC-173): eight sessions billed
+                // for a pack of six…
+                lines: [
+                    {
+                        description: "Personal training session",
+                        quantity: 8,
+                        unitPaise: 120_000,
+                    },
+                ],
+                taxPaise: 0,
+                daysAgo: 12,
+                state: "VOID",
+                voidReason: "Eight sessions billed; the pack was six",
+                paper: { style: "COMPACT", colour: PULSE_COLOUR },
+            },
+            {
+                // …written again for six, and paid.
+                lines: [
+                    {
+                        description: "Personal training session",
+                        quantity: 6,
+                        unitPaise: 120_000,
+                    },
+                ],
+                taxPaise: 0,
+                daysAgo: 9,
+                state: "PAID",
+                rewriteOf: 5,
+                paper: { style: "COMPACT", colour: PULSE_COLOUR },
             },
         ],
     },

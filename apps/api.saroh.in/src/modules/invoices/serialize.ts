@@ -1,3 +1,5 @@
+import { isPaperStyle, paperColourOf } from "@saroh/block-contract";
+
 import { toMoneyString } from "../../common/money";
 import type { PayInstructionsView } from "../organizations/business-pay-instructions";
 import type { AddedLine } from "./added-line";
@@ -13,6 +15,8 @@ import {
 } from "./invoice-state";
 import type { InvoiceTitle } from "./invoice-title";
 import { invoiceTitle, isExemptSupply } from "./invoice-title";
+import type { InvoicePaper, PaperColumns, PaperStyle } from "./paper-styles";
+import { resolvePaper } from "./paper-styles";
 import type { InvoiceOnlineBlocker } from "./pay-online";
 import type { InvoiceSendView, InvoiceSentView } from "./send-view";
 import { fromCents } from "./totals";
@@ -77,6 +81,8 @@ export const INVOICE_SELECT = {
     sellerName: true,
     sellerLegalName: true,
     sellerEmail: true,
+    paperStyle: true,
+    paperColour: true,
     placeOfSupply: true,
     taxType: true,
     cgst: true,
@@ -226,6 +232,8 @@ export interface InvoiceRow {
     sellerName?: string | null;
     sellerLegalName?: string | null;
     sellerEmail?: string | null;
+    paperStyle?: string | null;
+    paperColour?: string | null;
     placeOfSupply?: string | null;
     taxType?: string | null;
     cgst?: Money;
@@ -398,6 +406,17 @@ export interface InvoiceViewModel {
     sellerName: string | null;
     sellerLegalName: string | null;
     sellerEmail: string | null;
+    /**
+     * How the paper looks (DEC-173, #1118): issued paper's frozen style and
+     * colour (null frozen is Classic in ink); a draft's own choice, else the
+     * business's default as it is today.
+     */
+    paper: InvoicePaper;
+    /**
+     * What this invoice itself chose, before any default: a draft's "use
+     * its own" (null follows the business's), issued paper's frozen look.
+     */
+    paperChoice: { style: PaperStyle | null; colour: string | null };
     currency: string;
     subtotal: string;
     tax: string;
@@ -549,8 +568,15 @@ export function serializeInvoice(
     {
         detail = false,
         exempt: exemptHint,
+        paperDefault,
     }: {
         detail?: boolean;
+        /**
+         * The business's default look (`BusinessProfile.invoiceStyle`,
+         * `invoiceColour`), which a draft that chose none follows. Never
+         * read for issued paper: it is frozen.
+         */
+        paperDefault?: PaperColumns | null;
         /**
          * Whether every line is exempt (D15), for a row read without its
          * lines — the list's `exemptInvoiceIds`.
@@ -616,6 +642,14 @@ export function serializeInvoice(
         sellerLegalName:
             row.status === "DRAFT" ? null : (row.sellerLegalName ?? null),
         sellerEmail: row.status === "DRAFT" ? null : (row.sellerEmail ?? null),
+        paper: resolvePaper(
+            { style: row.paperStyle, colour: row.paperColour },
+            row.status === "DRAFT" ? paperDefault : null,
+        ),
+        paperChoice: {
+            style: isPaperStyle(row.paperStyle) ? row.paperStyle : null,
+            colour: paperColourOf(row.paperColour),
+        },
         gst: row.sellerGstin
             ? {
                   sellerGstin: row.sellerGstin,

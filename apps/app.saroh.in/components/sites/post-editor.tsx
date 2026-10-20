@@ -70,7 +70,7 @@ const RichTextEditor = dynamic(
  * stay mounted.
  */
 export function adoptPostAddress(path: string): void {
-    window.history.replaceState(window.history.state, "", path);
+    window.history.replaceState(null, "", path);
 }
 
 /** Long enough to be worth saying, short enough not to nag. */

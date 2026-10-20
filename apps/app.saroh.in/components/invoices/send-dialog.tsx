@@ -36,12 +36,15 @@ export function useInvoiceSend({
     invoice,
     send,
     onSent,
+    onDone,
 }: {
     invoice: InvoiceRef;
     /** How it can be sent; null when it can't, and nothing is offered. */
     send: InvoiceSend | null;
     /** It went: the link shown before is dead, so the screen drops it. */
     onSent?: () => void;
+    /** Something changed (sent, or issued): the details sheet reads it again. */
+    onDone?: () => void;
 }): {
     /** Send it, or send a reminder: held ten seconds with Undo. */
     start: (reminder: boolean) => void;
@@ -78,6 +81,7 @@ export function useInvoiceSend({
         // The details sheet was closed without saving: nothing was sent.
         if (!res) return { ok: false, error: "", said: true };
         router.refresh();
+        onDone?.();
         if (!res.ok) return { ok: false, error: res.error };
         onSent?.();
         const out = sendOutcome(
@@ -115,6 +119,7 @@ export function useInvoiceSend({
         const number = issued.data.number ?? invoice.number;
         const res = await deliver(false);
         router.refresh();
+        onDone?.();
         if (res.ok) showSuccess(res.message);
         else if (!res.said) {
             // Issued, so the confirm is done: what didn't go is said.

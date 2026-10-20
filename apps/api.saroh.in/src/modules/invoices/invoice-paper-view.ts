@@ -1,8 +1,12 @@
+import type { PaperColours } from "@saroh/block-contract";
+
 import type { PayInstructionsView } from "../organizations/business-pay-instructions";
 import { paperPrices, pricesSentence } from "./added-line";
 import { rateToBps } from "./gst";
 import { stateName } from "./gst-states";
 import type { InvoiceTitle } from "./invoice-title";
+import type { InvoicePaper, PaperStyle } from "./paper-styles";
+import { paperColours } from "./paper-styles";
 import type { InvoiceLineView, InvoiceViewModel } from "./serialize";
 
 /**
@@ -75,7 +79,28 @@ export interface PaperLine {
     amount: string;
 }
 
+/**
+ * How the paper is drawn (DEC-173, #1118): its style and colour as frozen
+ * at issue, and the colours worked out from them — the colour as text on
+ * the paper, and on Band the band's fill and the tone of the text on it,
+ * each readable at 4.5:1 (`@saroh/block-contract` `invoice-paper.ts`).
+ */
+export interface PaperLook extends PaperColours {
+    style: PaperStyle;
+    colour: string | null;
+}
+
+/** The look a paper of `style` in `colour` is drawn in. */
+export function paperLook(paper: InvoicePaper): PaperLook {
+    return { ...paper, ...paperColours(paper.style, paper.colour) };
+}
+
 export interface PaperView {
+    /**
+     * Classic, Band or Compact, and its colours. Absent (Saroh's own
+     * invoices to businesses): Classic in ink.
+     */
+    look?: PaperLook;
     title: InvoiceTitle;
     number: string;
     /** "Issued 5 Sep 2026 · due 19 Sep 2026". */
@@ -424,6 +449,9 @@ export function paperView(
           : [];
 
     return {
+        // Issued paper's frozen look (Classic in ink for a row without);
+        // a draft's own, else the business's default.
+        look: paperLook(i.paper),
         title: i.title,
         number: i.number,
         dates,

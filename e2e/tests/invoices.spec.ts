@@ -2,6 +2,7 @@
 import type { APIResponse, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { closeMenu, menuItem } from "../fixtures/invoice-actions";
 import { makeOrder, stamp as ownStamp } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
@@ -9,7 +10,7 @@ import { urls } from "../playwright.config";
 /**
  * A hand-written invoice, end to end (U11): write it, issue it with its pay
  * link, open the link as the customer would, record the money, and find it
- * paid in the list's quick look.
+ * paid in the list's details sheet (DEC-173, U9).
  *
  * It runs on Northwind Supply, the base seed — not Rye & Co. or Pulse
  * Fitness, which are kept camera-ready — because an issued invoice is never
@@ -37,13 +38,14 @@ test.describe("invoices", () => {
         await signIn(page);
         await page.goto(`/open/${ORG}`);
 
-        // 1. Write it: who, one line, when it falls due.
+        // 1. Write it: who, one line, when it falls due (New invoice A,
+        //    U14 #1126: it saves as it is typed).
         await page.goto("/billing/invoices/new");
         await expect(
             page.getByRole("heading", { name: "New invoice" }),
         ).toBeVisible();
         const issue = page.getByRole("button", {
-            name: /^Issue (with payment link|it)$/,
+            name: /^Issue (and share|it)$/,
         });
         await expect(issue).toBeDisabled();
 
@@ -53,15 +55,17 @@ test.describe("invoices", () => {
         await page.getByLabel("Line 1: what it's for").fill(what);
         await page.getByLabel("Line 1: quantity").fill("3");
         await page.getByLabel(/^Line 1: price each/).fill("450");
-        await expect(page.getByText("₹1,350").first()).toBeVisible();
-        await page.getByRole("radio", { name: "In 7 days" }).click();
         await expect(
-            page.getByRole("radio", { name: "In 7 days" }),
+            page.getByText("₹1,350").filter({ visible: true }).first(),
+        ).toBeVisible();
+        await page.getByRole("radio", { name: /^7 days/ }).click();
+        await expect(
+            page.getByRole("radio", { name: /^7 days/ }),
         ).toHaveAttribute("aria-checked", "true");
 
         // 2. Issue it: numbered, lines locked, the payment link copied.
         await expect(issue).toBeEnabled();
-        await expect(issue).toHaveText("Issue with payment link");
+        await expect(issue).toHaveText("Issue and share");
         await issue.click();
         await page.waitForURL(/\/billing\/invoices\/(?!new)[^/?]+$/, {
             timeout: 30_000,
@@ -117,7 +121,7 @@ test.describe("invoices", () => {
             expect(sideways).toEqual([]);
         }
         // Issued: the draft's actions are gone, the unpaid ones are here.
-        await expect(page.getByRole("button", { name: "Edit" })).toHaveCount(0);
+        await expect(page.getByRole("link", { name: "Edit" })).toHaveCount(0);
         await expect(
             page.getByRole("button", { name: "Record payment" }),
         ).toBeVisible();
@@ -137,9 +141,11 @@ test.describe("invoices", () => {
         // 4. The money arrives, and is recorded.
         await page.getByRole("button", { name: "Record payment" }).click();
         const dialog = page.getByRole("dialog", { name: "Record payment" });
-        await dialog.getByRole("button", { name: "Record payment" }).click();
+        await dialog.getByRole("button", { name: "Record ₹1,350" }).click();
         await expect(
-            page.getByText(`Payment recorded on ${number}`).first(),
+            page
+                .getByText(`₹1,350 recorded on ${number}. Paid in full.`)
+                .first(),
         ).toBeVisible();
         await expect(
             page.getByText("Paid", { exact: true }).first(),
@@ -157,7 +163,7 @@ test.describe("invoices", () => {
             `${number.replace(/[^A-Za-z0-9._-]+/g, "-")}.pdf`,
         );
 
-        // 5. The list has it under Paid, and its quick look says so.
+        // 5. The list has it under Paid, and its details sheet says so.
         await page.goto("/billing/invoices?view=paid");
         // An invoice's standing is a dropdown in the toolbar, not tabs.
         await expect(
@@ -168,7 +174,7 @@ test.describe("invoices", () => {
         await expect(look.getByText(number).first()).toBeVisible();
         await expect(look.getByText(what)).toBeVisible();
         await expect(
-            look.getByRole("link", { name: "Open invoice" }),
+            look.getByRole("link", { name: "Open full page" }),
         ).toBeVisible();
         await page.keyboard.press("Escape");
         await expect(look).toHaveCount(0);
@@ -366,8 +372,8 @@ test.describe("sending an invoice with its payment link (D17)", () => {
         await expect(
             page.getByRole("heading", { level: 1, name: before.number ?? "" }),
         ).toBeVisible();
-        const send = action(page, "Send with payment link");
-        await expect(send).toBeVisible();
+        // Email is in Share (DEC-173, U9): WhatsApp leads beside the money.
+        const send = await menuItem(page, "Share", "Email it");
         await expect(send).toHaveCSS("cursor", "pointer");
         await send.click();
 
@@ -409,9 +415,10 @@ test.describe("sending an invoice with its payment link (D17)", () => {
         await page.reload();
         if (status === "SENT") {
             // It went: the next is a reminder, and only one a day.
-            const remind = action(page, "Send reminder");
-            await expect(remind).toBeVisible();
+            const remind = await menuItem(page, "Share", "Email a reminder");
             await expect(remind).toBeDisabled();
+            await expect(remind).toContainText("Reminded today");
+            await closeMenu(page);
             await expect(
                 page
                     .getByText(/One reminder a day\. The next can go after/)
@@ -431,7 +438,10 @@ test.describe("sending an invoice with its payment link (D17)", () => {
                     )
                     .first(),
             ).toBeVisible();
-            await expect(action(page, "Send with payment link")).toBeVisible();
+            await expect(
+                await menuItem(page, "Share", "Email it"),
+            ).toBeEnabled();
+            await closeMenu(page);
         }
 
         // The send minted a new link: the one shared before stops working.
@@ -468,7 +478,8 @@ test.describe("sending an invoice with its payment link (D17)", () => {
         );
 
         await page.goto(`/billing/invoices/${id}`);
-        await action(page, "Send with payment link").click();
+        // A draft that can be sent: the main button issues and sends.
+        await action(page, "Issue and share").click();
         const confirm = page.getByRole("alertdialog");
         await expect(confirm).toContainText(
             "It takes the next number and its lines lock.",
@@ -486,9 +497,9 @@ test.describe("sending an invoice with its payment link (D17)", () => {
         ).toBeVisible();
         expect(sent.sent[0]).toMatchObject({ to: email, reminder: false });
         // Issued: the draft's actions are gone.
-        await expect(page.getByRole("button", { name: "Edit" })).toHaveCount(0);
+        await expect(page.getByRole("link", { name: "Edit" })).toHaveCount(0);
         await expect(
-            page.getByRole("button", { name: "Delete draft" }),
+            page.getByRole("button", { name: "Issue and share" }),
         ).toHaveCount(0);
     });
 
@@ -530,15 +541,16 @@ test.describe("sending an invoice with its payment link (D17)", () => {
         await expect(
             page.getByText(/Autopay charge in progress/).first(),
         ).toBeVisible();
+        // Every way out is held, and says why.
+        for (const name of ["Email", "Copy link"]) {
+            const item = await menuItem(page, "Share", name);
+            await expect(item.first()).toBeDisabled();
+            await expect(item.first()).toContainText("Autopay");
+            await closeMenu(page);
+        }
         await expect(
-            page.getByRole("button", { name: "Send with payment link" }),
-        ).toHaveCount(0);
-        await expect(
-            page.getByRole("button", { name: "Send reminder" }),
-        ).toHaveCount(0);
-        await expect(
-            page.getByRole("button", { name: "Copy payment link" }),
-        ).toHaveCount(0);
+            page.getByRole("button", { name: "Share on WhatsApp" }),
+        ).toBeDisabled();
         const refused = await call.postRaw(`/invoices/${id}/send`);
         expect(refused.status()).toBe(409);
         expect(await refused.text()).toContain("Autopay charge in progress");

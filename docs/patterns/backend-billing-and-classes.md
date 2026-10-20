@@ -17,6 +17,22 @@
   never set by hand: a removed payment or a bounced cheque takes a PAID
   invoice back to ISSUED. "Partly paid" is derived like Overdue (ISSUED
   with `paidCents > 0`, `isPartlyPaid`), never a status.
+- **Cancel or correct** (DEC-173, U13 #1125): one sheet in the app
+  (`components/invoices/cancel-or-correct-sheet.tsx`) for every way an
+  unpaid issued invoice is taken back. A registered business credits all
+  of it (`POST :id/credit`) or credits it and writes a correct one
+  (`POST :id/credit-and-rewrite`: the credit note and a draft with the same
+  lines in **one transaction**, so a failure leaves neither; a PAID invoice
+  is refused, it is refunded instead). One not registered voids it, or
+  voids and writes again (`reissue`). The credit note is previewed before
+  it is made (`GET :id/credit-preview`, `peekInvoiceNumber`: the number it
+  would most likely take, nothing taken), refused as the credit itself
+  would be. A void invoice nobody wrote again gets **Write again**
+  (`POST :id/write-again`): the same draft, once, under the row lock, and
+  never beside a live invoice for the same subscription period. Every
+  draft made this way points back with `reissuedFromId`. A partly paid
+  invoice is refused everywhere until its payments are removed; Refund…
+  on a paid one is unchanged (`RefundInvoiceDialog`).
 - **Numbers** come from `InvoiceSequence` inside the caller's transaction
   (`nextInvoiceNumber`), so a rolled-back caller leaves no gap. Another module
   issues through `InvoicesService.issueInTx(tx, organizationId, input)`, never
@@ -120,7 +136,36 @@ requireProvider: false })`), the email says "view it and download a copy",
 - **Tests:** `invoice-ledger.spec.ts` (the settle rules) and
   `invoice-payments.db.spec.ts` (every refusal, repeats, two payments
   racing on the row lock, one business never reaching another's), plain
-  and under `TEST_RLS=on`.
+  and under `TEST_RLS=on`. The whole journey (written on the paper in
+  Band, issued and shared on WhatsApp, ₹1,000 in cash taking ₹1,000 off
+  Owed, the rest by cheque, the cheques line, in the bank, the receipt
+  shared) is one browser spec on Northwind's own data,
+  `e2e/tests/invoices-journey.spec.ts`, `@serial` because the strip and
+  the cheques line are business-wide (U17 #1129).
+- **Demo data shows every state** (U17 #1129). The showcase plans what
+  happened to an invoice after it went out in
+  `packages/database/src/seed/showcase/invoice-states.ts`: its ledger
+  rows, its share log and its `INVOICE_SENT` / `INVOICE_REMINDER` emails,
+  and the look it went out in. The invoice's status and paid columns are
+  worked out from the planned rows by `settleLedger`, the API's `settle`
+  rules, never typed by hand, and an overpayment stops the seed. Rye &
+  Co. (`bakery.ts`, GST) has a part payment, two cheques waiting (₹8,400
+  and ₹5,600), one in the bank, one bounced and owed again, overdue a
+  week, a month and longer, WhatsApp shares, reminders both ways, a
+  credit note with the invoice written again, and Classic, Band and
+  Compact paper with Band in its colour as the default. Pulse (`pulse.ts`,
+  not registered) has part payments on two renewals, a void invoice
+  written again, and Compact in its colour. A paid invoice planned without
+  rows gets its one payment from the ledger backfill, as a live database
+  did. The seed's own check (`check.ts`) fails on: `paidCents` not its
+  live sum, a PAID invoice with no payment, a status that doesn't follow
+  the payments, a paid date that isn't the last payment's, cheque fields
+  that don't fit the method and bank status, a payment on paper that
+  doesn't take one or out of time, a share or email before issue, a
+  rewrite from an invoice that wasn't cancelled, and a style or colour the
+  API wouldn't store; `checkRye` and `checkPulse` fail when a state is
+  missing. The emails are `Message` rows, which an invoice's delete leaves
+  (`SetNull`): a seed clears them on its own seeded ids.
 - **The list's search, views and money strip** (U4, #1116). `GET /`
   takes `q` (trimmed, at most 80 characters): a name (bill-to, or the
   contact's first and last name, so a draft is found too), part of a
@@ -185,6 +230,21 @@ requireProvider: false })`), the email says "view it and download a copy",
   `whatsappChatLink(phone, text)` (`@saroh/block-contract`); the API
   answers the same link so the bulk flow needs no second rule. Saroh can't
   know a WhatsApp message went: words say "shared on WhatsApp".
+- **The share sheet** (U11 #1123, `components/invoices/share-sheet.tsx`,
+  rules in `lib/invoices/share.ts`) is the one place an invoice is shared
+  by hand: the details open it through `useShareFlow`, and Record
+  payment's "Share receipt on WhatsApp" opens it on the receipt. Tabs
+  WhatsApp, Email, Link, PDF. The preview is drawn from the invoice before
+  anything is minted (`previewMessage`, the API's words with the link as
+  a chip); the API's text replaces it once shared. A link minted in the
+  sheet is reused by every tab while it is open (Copy message then Open
+  WhatsApp is one share, one link). The number comes from `send.phone`
+  (the contact's, on the detail read); with none, it is typed and used for
+  that message only. Each refusal mirrors the API's, said before the
+  press; a 429's `retryAt` reaches the screen as `ApiFailure.retryAt`.
+  A WhatsApp tab is opened inside the press (`about:blank`) and pointed at
+  `wa.me` once the share answers, so no popup blocker stops it. PDF and
+  print are logged quietly where a share could be, never for a reader.
 - **The share log** is `InvoiceShare` (channel, kind, who, when; its own
   RLS policy and CHECKs), served as `shared[]` on the invoice read. Emails
   aren't in it: their `Message` rows are the record.
@@ -209,6 +269,24 @@ invoices/reminders` (`InvoiceRemindersService`, `invoice:write`, at most
   (its own transaction and checks), and sends nothing else: the business
   opens each WhatsApp one through the share route. Never a failure for
   the lot.
+- **Remind many's three steps** (U12 #1124, INVBulkSend;
+  `components/invoices/bulk-remind-sheet.tsx`, its steps in
+  `bulk-remind-steps.tsx`, the words in `lib/invoices/remind-many.ts`):
+  "Remind all N" on the Overdue view, or the rows ticked at a desk (the
+  ink bar, `remind-bar.tsx`), opens one `FormSheet`: Pick who (all
+  ticked), How each one goes (the preview grouped Email / WhatsApp /
+  Can't reach now, headed by INVShareB's one look, the button saying
+  "Send 3 emails, then WhatsApp 2"), Send. The emails go through
+  `useHold().send` (ten seconds; the sheet draws its own Undo, since the
+  toast is behind a modal); Undo before any WhatsApp opened comes back to
+  step 2, after one it stands. WhatsApp is walked one at a time with Open
+  (`openWhatsAppShare`, the share route, so it is logged and counts as the
+  day's reminder) or Skip. More than 100 picked go in calls of at most 100
+  (`chunks`), for the preview and the send. A row reminded here shows
+  "Reminded today · by email / on WhatsApp" until the list is read again.
+  On Overdue each row also has its own Remind: the share sheet on the
+  reminder, through `useRowShare` (details read, then `useShareFlow`).
+  Only `invoice:write` sees any of it.
 - **The receipt is automatic** (owner, 20 Oct). `paymentRecordedInTx`
   queues `invoice.receipt` (`invoice-receipt.ts`) at
   `now + RECEIPT_HOLD_MS`, for every payment the ledger records, by hand,
@@ -227,6 +305,65 @@ invoices/reminders` (`InvoiceRemindersService`, `invoice:write`, at most
 - **Tests:** `invoice-share-words.spec.ts`, `invoice-share.db.spec.ts`,
   `invoice-reminders.db.spec.ts`, `invoice-receipt.db.spec.ts` and
   `rls/invoice-shares-rls.db.spec.ts`, plain and under `TEST_RLS=on`.
+
+## Invoice styles: Classic, Band, Compact, frozen at issue — **Current** (DEC-173, U6 #1118)
+
+- **Three styles in the business's colour.** `PAPER_STYLES` (CLASSIC, BAND,
+  COMPACT), the colour rule and `RULE_46_FIELDS` live in
+  `@saroh/block-contract` (`invoice-paper.ts`) so the app's paper and the
+  API's PDF draw from one rule; `invoices/paper-styles.ts` is the API's
+  side (what a write may store, which look a paper is drawn in). Null style
+  is Classic and null colour is ink: every invoice issued before styles
+  reads as it did, with no backfill.
+- **The business's default** is `BusinessProfile.invoiceStyle` and
+  `invoiceColour`, set through the settings PATCH as `invoicePaper: {
+style, colour }` (Owner or Admin, `org:update`) and read back as
+  `invoicePaper` on the settings read. It is its own field, not part of
+  `tax`, so a style save never re-runs the GSTIN and address checks.
+- **A draft may choose its own** (`paperStyle`, `paperColour` on the draft
+  DTO); null follows the default, read when the draft is (`paper` on the
+  read is what it will go out in, `paperChoice` what it chose itself).
+  Style and colour fall back on their own. `""` or null clears one.
+- **Issuing freezes the look** (DEC-082): `issue` writes the draft's own
+  choice, else the default as it is then, never null, so a later change of
+  default never redraws issued paper. Every other path that issues
+  (orders, bookings, plans, packs) freezes the default through
+  `loadTaxProfile` → `documentColumns`. A credit note takes its original's
+  look (`sellerOf`, `asOriginal`); a reissued draft carries it too. The
+  logo stays live.
+- **Validation:** a colour is `#RRGGBB` (stored in capitals), a style one
+  of the three; anything else is a 400 on its field (`paperWrite`, after
+  the DTO's own check). A colour is never refused for being pale or dark.
+- **Readable by rule, never typed:** the colour as text and heavy rules is
+  the business's when it reads at 4.5:1 on white, else moved toward ink
+  (`paperColours`, the safe-colour rule the site looks use). Band's text is
+  ink or white, whichever reads on the fill (`bandTextTone`); a mid grey
+  neither reads on is moved, not refused.
+- **The PDF** (`invoice-pdf.ts`): Classic is today's paper with the colour
+  on the title, the labels and the heavy rules; Band fills the top of the
+  first page edge to edge, measured first, with the seller and the number
+  on it; Compact has smaller rows and the seller, the buyer and the place
+  of supply side by side, still A4. Every style draws every Rule 46
+  particular; an unregistered business's paper draws no GST in any.
+  Saroh's own invoices to businesses carry no look: Classic in ink.
+- **Chosen in the app** (U15 #1127): a draft's own look is picked on the
+  paper's style rail (`paper-editor/style-panel.tsx`) and saved with the
+  draft as `paperStyle`/`paperColour` through its autosave ("" follows the
+  default; "Use my default" sends both ""). "Make this my default" and
+  Settings › Business › Tax and invoices › Invoice style
+  (`invoice-paper-sheet.tsx`) send `invoicePaper`, Owner and Admin only
+  (`org:update`; `mayUpdateBusiness` reads the resolved actions, never a
+  role name). The app's details paper (`invoice-paper.tsx`) draws the
+  invoice's `paper` in the same three styles from `paperColours`, so the
+  sheet, the PDF and the paper agree; its spec checks each style against
+  the Rule 46 particulars.
+- **Not here:** terms and a business's own signature are #1060.
+- **Tests:** `paper-styles.spec.ts`, `invoice-pdf.styles.spec.ts` (each
+  style against `RULE_46_FIELDS`, no GST unregistered, a long name, pale
+  and dark colours read from the uncompressed drawing, with and without a
+  logo), `invoice-paper-styles.db.spec.ts` (the default's permissions and
+  refusals, the freeze, credit notes and reissues), plain and under
+  `TEST_RLS=on`; `@saroh/block-contract` `invoice-paper.test.ts`.
 
 ## Saroh's own invoices — **Current** (pricing catalogue U17)
 
@@ -1193,7 +1330,8 @@ options, items, more }` and a sentence with the count, the first
   a new link replaces the old, and voiding the invoice or deleting its contact
   clears it. Never log `/public/invoices/<token>` — the request log redacts it.
 - **The public read is an allow-list** (business name, number, dates, lines,
-  tax, total, `paidSoFar` and `leftToPay` (DEC-173), currency, status,
+  tax, total, `paidSoFar` and `leftToPay` (DEC-173), `payments` (U16),
+  currency, status,
   billed-to name, `payOnline`, and on an owed
   view-only invoice `payInstructions`, R32) served
   server-to-server to `saroh.app/pay/<token>`; reads and payment starts are
@@ -1217,6 +1355,20 @@ options, items, more }` and a sentence with the count, the first
   paid by hand while the checkout was open: `MORE_THAN_LEFT`), is
   `CAPTURED_NEEDS_REFUND`, raised on Home until the provider's refund webhook
   clears it. A refund never changes an invoice's status.
+- **The page says what was paid, and only that** (DEC-173, U16 #1128). The
+  pay read's `payments` (`payments/pay-link-payments.ts`, the newest 20,
+  oldest first) is its own allow-list: amount, method, `receivedAt`, and a
+  cheque's number, bank and bank status. Never a reference, note, reason,
+  who recorded it or an id; a removed payment is left out; a bounced cheque
+  stays so the page can say why the amount is due again. The renderer
+  (`saroh.app` `lib/invoice-paid-shape.ts`, `components/invoice-paid-so-far.tsx`)
+  draws the newest payment as a receipt ("₹4,000.00 received · Cash · 19
+  October 2026"), Paid so far and Left to pay under the total, and Pay for
+  what is left. A cheque not in the bank yet has its own words ("This invoice
+  is settled once the cheque clears…"), is badged "Cheque received", never
+  "Paid", and offers no Pay when it covers what was left. Every owed figure on
+  the page (Pay, autopay's "just pay", How to pay us' amount and QR) reads
+  `leftToPay`. An older API without these fields reads as before.
 
 ## How to pay us: offline payment details — **Current** (R32)
 
@@ -1674,3 +1826,5 @@ options, items, more }` and a sentence with the count, the first
 - Demo data: `db:seed:showcase` builds Pulse (subscriptions and invoices),
   Prana (courses, packs, online classes) and CarePoint (a clinic without
   Payments), and checks its own sums in SQL (`docs/architecture/LOCAL_DEV.md`).
+  Rye & Co. and Pulse carry every state the rebuilt invoice screens draw
+  ("Payments on an invoice are a ledger" → Demo data, #1129).

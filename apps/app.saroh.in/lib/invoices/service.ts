@@ -1,3 +1,5 @@
+import type { PaperStyle } from "@saroh/block-contract";
+
 import { apiFetch, getJson, orgBase } from "@/lib/api/http";
 
 import type { ApiResult } from "@/lib/api/failure";
@@ -159,6 +161,11 @@ export interface InvoiceSend {
     payOnline?: boolean;
     /** Something went in the last day: the next reminder can go from here. */
     nextReminderAt: string | null;
+    /**
+     * The contact's phone (E.164), for Share's WhatsApp tab (U11); absent
+     * when there is none, or from an older API.
+     */
+    phone?: string;
 }
 
 /** One send or reminder, newest first. */
@@ -292,6 +299,14 @@ export interface Invoice {
     sellerName?: string | null;
     sellerLegalName?: string | null;
     sellerEmail?: string | null;
+    /**
+     * How the paper looks (DEC-173, U6 #1118): a draft's own choice, else
+     * the business's default as it is today; issued paper's frozen look.
+     * Absent from an API older than styles: Classic in ink.
+     */
+    paper?: { style: PaperStyle; colour: string | null };
+    /** What this invoice chose itself; null follows the business's. */
+    paperChoice?: { style: PaperStyle | null; colour: string | null };
     currency: string;
     subtotal: string;
     tax: string;
@@ -377,14 +392,55 @@ export interface InvoiceInput {
     /** The buyer's GST state code — the place of supply. "" clears it. */
     billToState?: string;
     billToAddress?: string;
+    /** The draft's own style (DEC-173); "" follows the business's. */
+    paperStyle?: PaperStyle | "";
+    /** The draft's own colour, `#RRGGBB`; "" follows the business's. */
+    paperColour?: string;
 }
 
 export interface PaymentInput {
-    method: PaymentMethod;
+    method: InvoicePaymentMethod;
+    /**
+     * How much came in, as a Decimal string (DEC-173). Left out, it is
+     * everything left to pay.
+     */
+    amount?: string;
     reference?: string;
     note?: string;
+    /** The name before the ledger; `receivedAt` from DEC-173. */
     paidAt?: string;
+    /** When the money came in (ISO). */
+    receivedAt?: string;
+    /** A cheque only. */
+    chequeNumber?: string;
+    chequeBank?: string;
 }
+
+/** What recording a payment answers (DEC-173): the invoice, and what Undo removes. */
+export type RecordedPayment = Invoice & { recorded?: { paymentId: string } };
+
+/** How an invoice is shared by hand (DEC-173, `POST :id/share`). */
+export interface ShareAsk {
+    channel: "WHATSAPP" | "LINK" | "PDF" | "PRINT" | "EMAIL";
+    kind?: "NEW" | "REMINDER" | "RECEIPT";
+}
+
+/** What a share answers: the link minted, the message, and WhatsApp's link. */
+export interface ShareResult {
+    channel: ShareAsk["channel"];
+    kind: "NEW" | "REMINDER" | "RECEIPT";
+    url: string | null;
+    text: string | null;
+    phone: string | null;
+    /** `wa.me` with the message filled in; null without a phone. */
+    whatsappUrl: string | null;
+    payOnline: boolean;
+    email: { status: string; to: string } | null;
+    sharedAt: string;
+}
+
+/** The same, by the name Record payment (U10) reads it. */
+export type InvoiceShareResult = ShareResult;
 
 /** The newest invoices, and every unpaid one however old (see `withLive`). */
 export async function listInvoices(): Promise<CappedList<Invoice>> {
@@ -501,7 +557,7 @@ export async function getInvoice(id: string): Promise<Invoice | null> {
 
 async function send<T>(
     path: string,
-    method: "POST" | "PATCH" | "DELETE",
+    method: "GET" | "POST" | "PATCH" | "DELETE",
     body: unknown,
     fallback: string,
 ): Promise<ApiResult<T>> {
@@ -558,6 +614,57 @@ export function creditInvoice(id: string, reason: string) {
     );
 }
 
+/** The credit note "Cancel all of it" would issue (DEC-173, U13); nothing is taken. */
+export interface CreditPreview {
+    /** Most likely its number: a credit note issued meanwhile moves it on. */
+    number: string;
+    amount: string;
+    currency: string;
+}
+
+/**
+ * What "Cancel all of it" would issue, read when the sheet opens: the
+ * credit note's likely number and amount. Refused as the credit would be
+ * (a partly paid invoice, one already credited), with the API's words.
+ */
+export function readCreditPreview(id: string) {
+    return send<CreditPreview>(
+        `${at(id)}/credit-preview`,
+        "GET",
+        undefined,
+        "Couldn't load the credit note.",
+    );
+}
+
+/** "Cancel and write a correct one" (U13): what was made, in one step. */
+export interface CreditAndRewrite {
+    creditNote: { id: string; number: string | null };
+    draft: Invoice;
+}
+
+/**
+ * The credit note for all of it and a draft with the same lines, in one
+ * transaction on the API: a failure leaves neither.
+ */
+export function creditAndRewriteInvoice(id: string, reason: string) {
+    return send<CreditAndRewrite>(
+        `${at(id)}/credit-and-rewrite`,
+        "POST",
+        { reason },
+        "Couldn't cancel that invoice.",
+    );
+}
+
+/** "Write again" on a void invoice nobody wrote again (U13): the draft. */
+export function writeInvoiceAgain(id: string) {
+    return send<Invoice>(
+        `${at(id)}/write-again`,
+        "POST",
+        {},
+        "Couldn't write that invoice again.",
+    );
+}
+
 export function voidInvoice(id: string, reason: string) {
     return send<Invoice>(
         `${at(id)}/void`,
@@ -578,11 +685,69 @@ export function reissueInvoice(id: string, reason: string) {
 }
 
 export function recordPayment(id: string, input: PaymentInput) {
-    return send<Invoice>(
+    return send<RecordedPayment>(
         `${at(id)}/payments`,
         "POST",
         input,
         "Couldn't record that payment.",
+    );
+}
+
+const payment = (id: string, paymentId: string) =>
+    `${at(id)}/payments/${encodeURIComponent(paymentId)}`;
+
+/**
+ * Remove a payment recorded by mistake (DEC-173): soft, kept in the
+ * history with the reason. Answers with the invoice, owed again by it.
+ */
+export function removePayment(id: string, paymentId: string, reason?: string) {
+    return send<Invoice>(
+        payment(id, paymentId),
+        "DELETE",
+        reason ? { reason } : {},
+        "Couldn't remove that payment.",
+    );
+}
+
+/** A waiting cheque is in the bank; its receipt goes then. */
+export function chequeCleared(
+    id: string,
+    paymentId: string,
+    clearedAt?: string,
+) {
+    return send<Invoice>(
+        `${payment(id, paymentId)}/cleared`,
+        "POST",
+        clearedAt ? { clearedAt } : {},
+        "Couldn't mark that cheque as in the bank.",
+    );
+}
+
+/** A waiting cheque bounced: what it paid is owed again, with no charge. */
+export function chequeBounced(
+    id: string,
+    paymentId: string,
+    input: { bouncedAt?: string; reason?: string } = {},
+) {
+    return send<Invoice>(
+        `${payment(id, paymentId)}/bounced`,
+        "POST",
+        input,
+        "Couldn't mark that cheque as bounced.",
+    );
+}
+
+/**
+ * Share it by hand (DEC-173): on WhatsApp (a fresh link and the message;
+ * Saroh sends nothing), as a link, a PDF or printed, each logged; or a
+ * receipt by the business's own email.
+ */
+export function shareInvoice(id: string, ask: ShareAsk) {
+    return send<ShareResult>(
+        `${at(id)}/share`,
+        "POST",
+        ask,
+        "Couldn't share that invoice.",
     );
 }
 
