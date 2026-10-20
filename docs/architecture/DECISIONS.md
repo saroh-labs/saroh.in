@@ -2136,6 +2136,8 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **A Platform owner may set, or back-pay, their own business's rate** (the account manager's commission, DEC-169). Nothing changes; recorded here.
     - **A waiting rule request is closed automatically** when that person's rules are changed directly by someone allowed to, and when the business switches "Members' rule changes need approval" off. It reads **"Replaced by a newer change"** (status `REPLACED`). The person is told as they are of an approval or a turn-down: in their own alerts in the app (`notification:read-own`) and by email.
 
+- **Change who (#1157), owner 20 Oct 2026:** giving someone else's booking to another person needs `service:write` as well as `booking:write`. Without it, a person can hand over a booking from their own diary, or take one that has nobody, for themselves; another business's booking or person is a 404. The customer gets one notice, both people an in-app alert, and the booking's history keeps who changed it, from whom and to whom.
+
 ## DEC-171 Home is "Today first"; Insights is an overview with tabs; comparisons are the last 7 days against the 7 before
 
 **Status: Accepted — 2026-10-19, designs first** · owner, choosing between the improved Home (A/B/C) and Insights (A/B/C) boards after the Home and Insights UX audits (canvas pages "Home: current and improved" and "Insights: current and improved"). Plan: `docs/plans/2026-10-19-002-feat-home-insights-plan.md`.
