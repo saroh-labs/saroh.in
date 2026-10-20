@@ -127,6 +127,22 @@ function inFirstView(page: Page, selector: string): Promise<boolean> {
     }, selector);
 }
 
+interface DraftSection {
+    type: string;
+    contractVersion: number;
+    content: Record<string, unknown>;
+    hidden?: boolean;
+    key?: string;
+}
+
+const asSent = (s: DraftSection): DraftSection => ({
+    type: s.type,
+    contractVersion: s.contractVersion,
+    content: s.content,
+    ...(s.hidden === undefined ? {} : { hidden: s.hidden }),
+    ...(s.key ? { key: s.key } : {}),
+});
+
 const slotSelector = "[data-site-look-hero] [data-site-next-free]";
 const factSelector = `${slotSelector} [data-live-fact]`;
 
@@ -339,13 +355,53 @@ test.describe("live facts on cached pages", { tag: "@serial" }, () => {
             test.setTimeout(180_000);
             await page.setViewportSize({ width: 390, height: 844 });
             const look = await setNorthwindLook(browser, id, testInfo);
+            // The bar shows only while no button of the page's own is on
+            // screen. Northwind's home is short enough that its closing
+            // band's button is in view as soon as the hero's leaves, so its
+            // text is drawn three times more under the hero, put back after.
+            const nw = look.owner;
+            const site = await nw.get<{
+                pages: { id: string; path: string }[];
+            }>(`/sites/${look.siteId}`);
+            const home = site.pages.find((p) => p.path === "/");
+            expect(home, "Northwind's site has a home page").toBeTruthy();
+            const draftPath = `/sites/${look.siteId}/pages/${home?.id ?? ""}/draft`;
+            const before = await nw.get<{
+                revision: number;
+                sections: DraftSection[];
+            }>(draftPath);
+            const text = before.sections.filter((x) => x.type === "richText");
+            expect(text.length, "Northwind's home has text").toBeGreaterThan(0);
+            const sent = before.sections.map(asSent);
             try {
+                await nw.put(`${draftPath}/sections`, {
+                    revision: before.revision,
+                    sections: [
+                        ...sent.slice(0, 1),
+                        ...[1, 2, 3].flatMap(() =>
+                            text.map(({ key: _key, ...t }) => asSent(t)),
+                        ),
+                        ...sent.slice(1),
+                    ],
+                });
                 await look.publish();
                 await page.route(TODAY, (route) => answer(route));
                 await page.goto(fresh());
                 await heroDrawn(page, id);
-                // Scroll the hero's own Book away: the bar comes.
-                await page.mouse.wheel(0, 2000);
+                // Scroll just past the hero, so its own button is off
+                // screen: the bar comes. (Not to the foot: the closing
+                // band's own button there sends the bar away again.)
+                await page.evaluate(() => {
+                    const hero = document.querySelector(
+                        "[data-site-look-hero]",
+                    );
+                    const bottom = hero?.getBoundingClientRect().bottom ?? 0;
+                    window.scrollTo(0, window.scrollY + bottom);
+                });
+                await expect(page.locator("html")).toHaveAttribute(
+                    "data-site-primary",
+                    "gone",
+                );
                 const bar = page.locator('[data-site-chrome-bar="book"]');
                 await expect(bar).toBeVisible({ timeout: 10_000 });
                 await expect(bar).toContainText("Next free: today, 6:00 pm");
@@ -355,6 +411,11 @@ test.describe("live facts on cached pages", { tag: "@serial" }, () => {
                 ).toHaveCount(1);
             } finally {
                 await page.unroute(TODAY);
+                const now = await nw.get<{ revision: number }>(draftPath);
+                await nw.put(`${draftPath}/sections`, {
+                    revision: now.revision,
+                    sections: before.sections.map(asSent),
+                });
                 await look.restore();
             }
         });

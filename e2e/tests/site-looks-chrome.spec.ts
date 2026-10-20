@@ -2,6 +2,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { phone as aPhone } from "../fixtures/own-data";
 import { setNorthwindLook } from "../fixtures/site-look";
 import { urls } from "../playwright.config";
 import { asNewVisitor, signInOnSheet } from "./site-codes";
@@ -20,7 +21,10 @@ import { asNewVisitor, signInOnSheet } from "./site-codes";
  *   its foot.
  * - On a phone the menu is a dialog: it takes focus, Escape closes it and
  *   focus goes back to the menu button. "Visit us" is in it (and in the
- *   header's row on a desk).
+ *   header's row on a desk). The seed gives Northwind no public phone,
+ *   place or link, and "Visit us" lands on the footer's facts, so it is
+ *   drawn only while there are some (`withVisitUs`): the test gives
+ *   Northwind a public phone for its run and puts it back.
  * - Every control in the header, the footer and the bar or dock is at
  *   least 44×44 on a phone.
  * - Nothing is hidden off to the side: the page is no wider than the screen.
@@ -162,7 +166,14 @@ test.describe("each look's chrome", { tag: "@serial" }, () => {
             test.setTimeout(180_000);
             const phone = testInfo.project.name.startsWith("phone");
             const look = await setNorthwindLook(browser, id, testInfo);
+            // "Visit us" opens the footer's facts, so the footer needs one:
+            // a public phone, read live (no publish), put back after.
+            const { profile } = await look.owner.get<{
+                profile: { phone?: string | null } | null;
+            }>("/settings");
+            const phoneBefore = profile?.phone ?? null;
             try {
+                await look.owner.patch("", { profile: { phone: aPhone() } });
                 await look.publish();
                 await page.goto(fresh());
                 await settled(page, id);
@@ -226,6 +237,9 @@ test.describe("each look's chrome", { tag: "@serial" }, () => {
                 expect(await smallTargets(page)).toEqual([]);
                 expect(await sideways(page)).toBeLessThanOrEqual(0);
             } finally {
+                await look.owner.patch("", {
+                    profile: { phone: phoneBefore ?? "" },
+                });
                 await look.restore();
             }
         });

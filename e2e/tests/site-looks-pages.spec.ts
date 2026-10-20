@@ -318,9 +318,11 @@ test.describe("each look's content blocks", { tag: "@serial" }, () => {
                 // The timetable: prices, the full class's waitlist.
                 const week = page.locator(`[data-site-look-timetable="${id}"]`);
                 await week.scrollIntoViewIfNeeded();
-                const shown = week.locator(
-                    phone ? "[role='tabpanel']" : ".grid-cols-7",
-                );
+                // The week as this width draws it: the desk's columns and
+                // the phone's day tabs are both in the page, CSS shows one.
+                const shown = week
+                    .locator(phone ? "[role='tabpanel']" : ".grid-cols-7")
+                    .filter({ visible: true });
                 if (phone) {
                     // Tomorrow's tab holds the priced classes.
                     await week.getByRole("tab").nth(1).click();

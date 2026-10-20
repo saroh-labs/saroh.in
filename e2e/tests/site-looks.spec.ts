@@ -67,7 +67,9 @@ test.describe("a look per site", { tag: "@serial" }, () => {
             const another = await look.saveLook("folio");
             expect(another.status()).toBe(400);
             expect(await another.json()).toMatchObject({
-                details: { field: "look", code: "look-not-available" },
+                error: {
+                    details: { field: "look", code: "look-not-available" },
+                },
             });
 
             const classic = await look.saveLook(null);

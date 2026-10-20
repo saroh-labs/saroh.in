@@ -27,7 +27,8 @@ import { asNewVisitor, expectNoZoomOnFocus, readSiteCode } from "./site-codes";
  * What it owns: `SITE_SHOP` and `SITE_LOOKS` turned on for Northwind alone
  * (per-business overrides, put back after), Northwind's site style (put
  * back and published again), the storefront's Pick-up and "Pay when you
- * collect" (put back), and two products called "E2E Look Shop …", brought
+ * collect" with a place to collect from (put back), the site's storefront
+ * when the seed left it unanswered (cleared again), and two products called "E2E Look Shop …", brought
  * back the same each run. It leaves one unpaid pay-at-pick-up order per
  * look and project on Northwind.
  *
@@ -41,22 +42,45 @@ const PRODUCTS = ["E2E Look Shop Loaf", "E2E Look Shop Jam"] as const;
 
 interface Storefront {
     id: string;
+    kind: "SHOP" | "ONLINE";
+    address: string | null;
     fulfilmentTypes: string[];
     offerPayOnHandover: boolean;
 }
 
-/** The storefront Northwind's site sells from (G11). */
-async function sellsFrom(nw: ReturnType<typeof northwind>): Promise<string> {
+/**
+ * The storefront Northwind's site sells from (G11). The seed leaves the
+ * question unanswered, so the site is given its first choice, as the owner
+ * does in Website settings, and `restore` clears it again.
+ */
+async function sellsFrom(
+    nw: ReturnType<typeof northwind>,
+): Promise<{ storeId: string; restore: () => Promise<void> }> {
     const sites =
         await nw.get<{ id: string; subdomain: string | null }[]>("/sites");
     const site = sites.find((s) => s.subdomain === "northwind");
     expect(site, "Northwind has its site at northwind").toBeTruthy();
+    const siteId = site?.id ?? "";
     const read = await nw.get<{
-        sellsFrom: { storefront: { id: string } | null } | null;
-    }>(`/sites/${site?.id ?? ""}`);
-    const id = read.sellsFrom?.storefront?.id;
-    expect(id, "Northwind's site sells from a storefront").toBeTruthy();
-    return id ?? "";
+        sellsFrom: {
+            storefront: { id: string } | null;
+            choices: { id: string }[];
+        } | null;
+    }>(`/sites/${siteId}`);
+    expect(read.sellsFrom, "SITE_SHOP is on for Northwind").toBeTruthy();
+    const chosen = read.sellsFrom?.storefront?.id;
+    if (chosen) return { storeId: chosen, restore: () => Promise.resolve() };
+    const first = read.sellsFrom?.choices.at(0)?.id;
+    expect(first, "Northwind has a storefront to sell from").toBeTruthy();
+    await nw.patch(`/sites/${siteId}/settings`, { storefrontId: first });
+    return {
+        storeId: first ?? "",
+        restore: async () => {
+            await nw.patch(`/sites/${siteId}/settings`, {
+                storefrontId: null,
+            });
+        },
+    };
 }
 
 /** The visible one of a control drawn twice (a desk aside, a phone bar). */
@@ -109,9 +133,14 @@ test.describe("the shop in each look", { tag: "@serial" }, () => {
             const teamPage = await team.newPage();
             await useSession(teamPage);
             const nw = northwind(teamPage.request);
-            const storeId = await sellsFrom(nw);
+            const sells = await sellsFrom(nw);
+            const { storeId } = sells;
             const was = await nw.get<Storefront>(`/storefronts/${storeId}`);
+            // Pick-up is offered only from a place customers visit, with
+            // its address (UX-025); the seed's storefronts are online.
             await nw.patch(`/storefronts/${storeId}`, {
+                kind: "SHOP",
+                address: was.address ?? "Plot 12, Peenya Industrial Area",
                 offerPayOnHandover: true,
                 fulfilmentTypes: was.fulfilmentTypes.includes("PICKUP")
                     ? was.fulfilmentTypes
@@ -182,7 +211,8 @@ test.describe("the shop in each look", { tag: "@serial" }, () => {
                 await emailField.fill(email);
                 await emailField.press("Tab");
                 const code = await readSiteCode(email);
-                const codeField = page.getByLabel("Code");
+                // Exactly: a phone's "Country code" is a label too.
+                const codeField = page.getByLabel("Code", { exact: true });
                 await expect(codeField).toHaveAttribute(
                     "autocomplete",
                     "one-time-code",
@@ -199,7 +229,10 @@ test.describe("the shop in each look", { tag: "@serial" }, () => {
                 const collect = pays.getByRole("radio", {
                     name: /Pay at pick-up/,
                 });
-                if ((await collect.count()) > 0) await collect.click();
+                // The storefront offers it (set above), so it is asked:
+                // waited for, never skipped when it hasn't drawn yet.
+                await collect.click();
+                await expect(collect).toHaveAttribute("aria-checked", "true");
                 const place = visible(page, "[data-place-order]");
                 await expect(place).toHaveText(
                     /^Place order · pay .+ at pick-up$/,
@@ -223,9 +256,12 @@ test.describe("the shop in each look", { tag: "@serial" }, () => {
             } finally {
                 await look.restore();
                 await nw.patch(`/storefronts/${storeId}`, {
+                    kind: was.kind,
+                    address: was.address,
                     offerPayOnHandover: was.offerPayOnHandover,
                     fulfilmentTypes: was.fulfilmentTypes,
                 });
+                await sells.restore();
                 await team.close();
                 await shop.restore();
             }

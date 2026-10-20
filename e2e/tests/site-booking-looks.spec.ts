@@ -148,9 +148,11 @@ function sideways(page: Page): Promise<number> {
  * draws its button quiet, so it has none filled (`ready` false).
  */
 async function holdsTheRules(page: Page, phone: boolean, ready = true) {
-    const filled = await filledInView(page);
-    if (ready) expect(filled).toHaveLength(1);
-    else expect(filled.length).toBeLessThanOrEqual(1);
+    // Polled: the step's button eases into the accent (150ms) once a
+    // choice lets it go, so one read right after the click can land
+    // between the two colours.
+    if (ready) await expect.poll(() => filledInView(page)).toHaveLength(1);
+    else expect((await filledInView(page)).length).toBeLessThanOrEqual(1);
     expect(await sideways(page)).toBeLessThanOrEqual(0);
     if (!phone) return;
     expect((await fixedBars(page)).length).toBeLessThanOrEqual(1);
@@ -259,7 +261,8 @@ test.describe("booking in each look", { tag: "@serial" }, () => {
                         `We sent a 6-digit code to ${email} to confirm it's you.`,
                     ),
                 ).toBeVisible();
-                const codeField = page.getByLabel("Code");
+                // Exactly: the phone's "Country code" is a label too.
+                const codeField = page.getByLabel("Code", { exact: true });
                 await expect(codeField).toHaveAttribute(
                     "autocomplete",
                     "one-time-code",
@@ -318,11 +321,22 @@ test.describe("booking in each look", { tag: "@serial" }, () => {
             try {
                 await look.publish();
                 await page.goto(`${SITE}/?v=${Date.now()}`);
+                // The hero's way in (its next free time, else See times):
+                // a link of the page's own, not the header's Book. A site
+                // page has no <main> of its own to look in.
                 const opener = page
-                    .locator('main a[href^="/book"]')
+                    .locator('[data-site-look-hero] a[href^="/book"]')
                     .filter({ visible: true })
                     .first();
                 await expect(opener).toBeVisible({ timeout: 15_000 });
+                // The way in is a live fact: "See times" until the next
+                // free time is read, then "Book this time". Settled first,
+                // so the link read is the one pressed.
+                await expect(
+                    page.locator("[data-site-look-hero] [data-live-fact]"),
+                ).not.toHaveAttribute("data-live-state", "loading", {
+                    timeout: 15_000,
+                });
                 const href = await opener.getAttribute("href");
                 await opener.click();
                 await expect(page).toHaveURL(/\/book/);
@@ -338,8 +352,14 @@ test.describe("booking in each look", { tag: "@serial" }, () => {
                     await page.keyboard.press("Tab");
                     await expect(dialog.locator(":focus")).toHaveCount(1);
                 }
-                await page.keyboard.press("Escape");
-                await expect(page).not.toHaveURL(/\/book/);
+                // Escape is heard once the frame's handler is attached,
+                // after the step has drawn; pressed until it is.
+                await expect(async () => {
+                    await page.keyboard.press("Escape");
+                    await expect(page).not.toHaveURL(/\/book/, {
+                        timeout: 2_000,
+                    });
+                }).toPass({ timeout: 15_000 });
                 await expect
                     .poll(() =>
                         page.evaluate(() =>

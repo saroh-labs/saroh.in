@@ -126,16 +126,25 @@ test.describe("each look's state pages", { tag: "@serial" }, () => {
                 // Reject and Accept: the same size, side by side.
                 const reject = banner.getByRole("button", { name: "Reject" });
                 const accept = banner.getByRole("button", { name: "Accept" });
-                const r = await reject.boundingBox();
-                const a = await accept.boundingBox();
-                expect(r && a).toBeTruthy();
-                if (r && a) {
-                    expect(Math.abs(r.width - a.width)).toBeLessThanOrEqual(1);
-                    expect(Math.abs(r.height - a.height)).toBeLessThanOrEqual(
-                        1,
+                // Both read in the same frame: the banner rises in (200ms),
+                // and two separate reads can land at two heights of it.
+                const apart = await banner.evaluate((el) => {
+                    const [r, a] = ["Reject", "Accept"].map((name) =>
+                        Array.from(el.querySelectorAll("button"))
+                            .find((b) => b.textContent.trim() === name)
+                            ?.getBoundingClientRect(),
                     );
-                    expect(Math.abs(r.y - a.y)).toBeLessThanOrEqual(1);
-                }
+                    if (!r || !a) return null;
+                    return {
+                        width: Math.abs(r.width - a.width),
+                        height: Math.abs(r.height - a.height),
+                        y: Math.abs(r.y - a.y),
+                    };
+                });
+                expect(apart, "Reject and Accept are both drawn").toBeTruthy();
+                expect(apart?.width).toBeLessThanOrEqual(1);
+                expect(apart?.height).toBeLessThanOrEqual(1);
+                expect(apart?.y).toBeLessThanOrEqual(1);
                 expect(
                     await reject.evaluate(
                         (el) => getComputedStyle(el).fontWeight,
@@ -147,12 +156,13 @@ test.describe("each look's state pages", { tag: "@serial" }, () => {
                 );
 
                 // The hero's main button stays free, and can be pressed.
-                const heroAction = site
-                    .locator(
-                        "[data-site-look-hero] a[href], [data-site-look-hero] button",
-                    )
-                    .first();
-                if ((await heroAction.count()) > 0) {
+                // Its own filled button (`data-site-primary`), not the
+                // live slot's link, which is swapped when the time lands.
+                const heroAction = site.locator(
+                    "[data-site-look-hero] [data-site-primary]",
+                );
+                await expect(heroAction).toHaveCount(1);
+                {
                     await heroAction.scrollIntoViewIfNeeded();
                     // Let the banner look again after the scroll.
                     await site.waitForTimeout(250);

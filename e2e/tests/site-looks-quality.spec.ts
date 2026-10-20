@@ -305,9 +305,11 @@ async function requestedFamilies(page: Page): Promise<string[]> {
  */
 async function viewByView(page: Page, phone: boolean, where: string) {
     await page.evaluate(() => window.scrollTo(0, 0));
-    expect(await filledInView(page), `${where}: the first view`).toHaveLength(
-        1,
-    );
+    // Polled: a button that a choice just let go eases into the accent
+    // (150ms), and one read can land between the two colours.
+    await expect
+        .poll(() => filledInView(page), { message: `${where}: the first view` })
+        .toHaveLength(1);
     if (phone)
         expect(
             (await fixedBars(page)).length,
