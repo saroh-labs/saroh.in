@@ -12,6 +12,55 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Sites — the looks' first browser run: 45 serial failures, five app bugs
+
+**Symptom**: 20 Oct 2026, the Saroh looks release (batch-2026-10-20-3). The
+look specs had been written by agents that could not run Playwright, so the
+local gate was their first run: 45 serial failures and a parallel one on
+every try (`site-booking-steps` "a pay-now hold survives a step back": Back
+from paying landed on When, not Your details).
+**Cause**, the app (five):
+
+- `StickyActions` counted every `[data-site-primary]` on the page as the
+  page's own button, and the root itself carries `data-site-primary` to say
+  whether one is shown. Once a rescan watched `<html>`, it was always in
+  view and the phone's Book bar never came.
+- The hero's next free slot reserved 64px; the fresh line's mixed faces
+  made its line box 21px, not its 20px line-height, so the slot grew to 67.
+- Closing the booking put focus back on the link that opened it by `href`,
+  but the hero's way in is a live fact: "See times" while the read is out,
+  then "Book this time" with another `href`. Focus landed nowhere.
+- Quiet's step button sits under the column on a desk, so a fortnight of
+  times pushed the step's one filled button out of the first view.
+- The step-in-the-address hook writes with `history.pushState`, which
+  Next's router follows. Signing in with the code is a Server Action that
+  sets a cookie, so Next refreshes at the address its router last knew,
+  and its history sync pushed an earlier step's address over the one on
+  screen. Next also copies its `__NA` mark into every write that passes its
+  patch, so the mark alone can't tell its writes from the page's.
+  **Cause**, the specs: one read of a colour right after a click, while the
+  button eased into the accent (150ms); two `boundingBox` reads of a banner
+  mid-rise; `getByLabel("Code")` also matching "Country code"; a selector
+  that matched both the desk's and the phone's copy (CSS shows one); `if
+(count > 0)` skipping a choice that hadn't drawn yet; `main a[...]` on a site
+  page, which has no `<main>`; and assumptions about the seed (Northwind has
+  no public phone or place, so no "Visit us"; its site's storefront is
+  unanswered; its storefronts are online, so no Pick-up; its home is too short
+  for the Book bar to show).
+  **Fix**: `[data-site-primary]:not(html)`; the slot's line held to `h-5` and
+  66px reserved; return focus follows the live slot's link for 8 s unless the
+  visitor moves it (`book-return.ts`); Quiet's desk bar is sticky at the foot;
+  `useStepHistory` wraps the History API while the page is up and keeps a
+  router write of an address it has left on the current one, in place,
+  passing its own writes through (`writingOwn`). Each has a unit test. The
+  specs poll, read both boxes in one frame, match labels exactly, filter to
+  the visible copy, wait for the choice, and give Northwind what each test
+  needs and put it back (a phone, the site's storefront, a pick-up place,
+  three more text sections).
+  **Rule**: the saroh-browser-tests skill's Traps. A spec is not done until
+  it has run once against the stack; an agent that cannot run Playwright says
+  so in its hand-off and the spec is marked unrun.
+
 ## Home — Turn down's Undo was drawn and pulled away in the same moment
 
 **Symptom**: 20 Oct 2026. `home-needs-groups.spec.ts` "Turn down is held
