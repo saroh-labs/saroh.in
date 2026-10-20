@@ -53,6 +53,7 @@ import {
     TAKE_ONLY_YOURSELF,
 } from "./booking-reassign";
 import { BookingsService } from "./bookings.service";
+import * as reservation from "./reservation";
 
 const tag = `${process.pid}-${Date.now()}`;
 const bookings = new BookingsService();
@@ -527,15 +528,82 @@ describe("someone who can't take it", () => {
         ).rejects.toThrow("Ravi Kumar isn't working then.");
     });
 
-    it("refuses outside their hours", async () => {
+    it("refuses outside their hours, saying so, and changes nothing", async () => {
         const booking = await bookWith(staff.asha, 10);
         const evening = new Date(booking.startAt.getTime() + 8 * 3_600_000);
-        await expect(
-            bookings.reassignBooking(owner, booking.id, {
+        const error = await bookings
+            .reassignBooking(owner, booking.id, {
                 staffId: staff.meera,
                 startAt: evening.toISOString(),
-            }),
-        ).rejects.toBeInstanceOf(BadRequestException);
+            })
+            .catch((e: unknown) => e);
+        // Any 400 would have passed before (review #35): this one says why.
+        expect(error).toBeInstanceOf(BadRequestException);
+        expect((error as BadRequestException).message).toBe(
+            "Meera Iyer isn't working then.",
+        );
+        const after = await prisma.booking.findUniqueOrThrow({
+            where: { id: booking.id },
+        });
+        expect(after.staffId).toBe(staff.asha);
+        expect(after.startAt).toEqual(booking.startAt);
+        expect(await reassignedLines(booking.id)).toHaveLength(0);
+    });
+
+    it("refuses a person who doesn't take the service (review #27)", async () => {
+        const booking = await bookWith(staff.asha, 10);
+        // On the diary, but for classes only.
+        const nisha = await person(orgId, `Nisha Pal ${tag}`, [yoga]);
+        const error = await bookings
+            .reassignBooking(owner, booking.id, { staffId: nisha })
+            .catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(BadRequestException);
+        expect((error as BadRequestException).message).toBe(
+            "That person doesn't take this service.",
+        );
+        const after = await prisma.booking.findUniqueOrThrow({
+            where: { id: booking.id },
+        });
+        expect(after.staffId).toBe(staff.asha);
+        expect(await reassignedLines(booking.id)).toHaveLength(0);
+    });
+
+    it("refuses when nobody takes the service yet (review #27)", async () => {
+        const massage = await prisma.service.create({
+            data: {
+                organizationId: orgId,
+                name: `Massage ${tag}`,
+                durationMinutes: 60,
+                capacity: 1,
+                priceCents: 120_000,
+                currency: "INR",
+                timezone: "UTC",
+            },
+        });
+        const startAt = monday(10, 0, 60);
+        const booking = await prisma.booking.create({
+            data: {
+                organizationId: orgId,
+                serviceId: massage.id,
+                startAt,
+                endAt: new Date(startAt.getTime() + 3_600_000),
+                timezone: "UTC",
+                status: "CONFIRMED",
+                bookerName: "Kabir Singh",
+                snapshot: {},
+            },
+        });
+        const error = await bookings
+            .reassignBooking(owner, booking.id, { staffId: staff.asha })
+            .catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(BadRequestException);
+        expect((error as BadRequestException).message).toBe(
+            "Nobody takes this service yet. Add who takes it on the service first.",
+        );
+        const after = await prisma.booking.findUniqueOrThrow({
+            where: { id: booking.id },
+        });
+        expect(after.staffId).toBeNull();
     });
 
     it("refuses a class: its instructor is changed on the class", async () => {
@@ -569,6 +637,61 @@ describe("someone who can't take it", () => {
                 staffId: staff.meera,
             }),
         ).rejects.toBeInstanceOf(ConflictException);
+    });
+});
+
+describe("losing a race with another booking (review #33)", () => {
+    // Postgres's 40001, as Prisma reports it, from inside the move's
+    // serializable write (where a concurrent booking makes it).
+    const raced = () =>
+        Object.assign(new Error("could not serialize access"), {
+            code: "P2034",
+        });
+
+    it("tries again, and hands it over once the race is gone", async () => {
+        const booking = await bookWith(staff.asha, 11);
+        const real = reservation.assertPersonFreeInTx;
+        let calls = 0;
+        const spy = jest
+            .spyOn(reservation, "assertPersonFreeInTx")
+            .mockImplementation((...args) => {
+                calls += 1;
+                return calls <= 2 ? Promise.reject(raced()) : real(...args);
+            });
+        try {
+            const moved = await bookings.reassignBooking(owner, booking.id, {
+                staffId: staff.meera,
+            });
+            expect(moved.staffId).toBe(staff.meera);
+            expect(calls).toBe(3);
+        } finally {
+            spy.mockRestore();
+        }
+        expect(await reassignedLines(booking.id)).toHaveLength(1);
+    });
+
+    it("says others are booking, never fully booked, when every try loses", async () => {
+        const booking = await bookWith(staff.asha, 12);
+        const spy = jest
+            .spyOn(reservation, "assertPersonFreeInTx")
+            .mockImplementation(() => Promise.reject(raced()));
+        let error: unknown;
+        try {
+            error = await bookings
+                .reassignBooking(owner, booking.id, { staffId: staff.meera })
+                .catch((e: unknown) => e);
+            expect(spy).toHaveBeenCalledTimes(3);
+        } finally {
+            spy.mockRestore();
+        }
+        expect(error).toBeInstanceOf(ConflictException);
+        expect((error as ConflictException).message).toBe(
+            "Lots of people are booking right now. Try again.",
+        );
+        const after = await prisma.booking.findUniqueOrThrow({
+            where: { id: booking.id },
+        });
+        expect(after.staffId).toBe(staff.asha);
     });
 });
 

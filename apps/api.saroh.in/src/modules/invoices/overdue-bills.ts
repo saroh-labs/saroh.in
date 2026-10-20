@@ -127,8 +127,12 @@ export async function overdueBillIds(
     db: Db,
     organizationId: string,
     now: Date,
+    // The where a caller already worked out for the same `now` (Home's
+    // build, review #16); else it is worked out here.
+    overdueWhere?: Promise<Prisma.InvoiceWhereInput>,
 ): Promise<string[]> {
-    const where = await overdueBillsWhere(db, organizationId, now);
+    const where = await (overdueWhere ??
+        overdueBillsWhere(db, organizationId, now));
     const rows = await db.invoice.findMany({
         where,
         orderBy: [{ dueAt: "asc" }, { id: "asc" }],

@@ -2,6 +2,7 @@ import type { Prisma, prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
 import { toMinor } from "../../common/money";
+import type { UnpaidBillsRead } from "../analytics/unpaid-bills";
 import {
     isPastDue,
     leftToPayCents,
@@ -269,6 +270,9 @@ export async function readOwed(
     db: Db,
     organizationId: string,
     now: Date,
+    // A full Home build reads the unpaid bills once and hands this and
+    // How it's going the same read (review #16).
+    shared?: UnpaidBillsRead,
 ): Promise<HomeWeekOwed | null> {
     const unpaid = {
         organizationId,
@@ -277,24 +281,26 @@ export async function readOwed(
     // What is left to pay on each bill (DEC-173), folded through
     // `leftToPayCents`, the one place it is worked out, as Insights'
     // owed-by-age does.
-    const [bills, ever] = await Promise.all([
-        db.invoice.findMany({
-            where: unpaid,
-            select: {
-                currency: true,
-                status: true,
-                total: true,
-                paidCents: true,
-                dueAt: true,
-            },
-        }),
-        // A business that has never billed anyone outside an order has
-        // nothing to be owed: no "₹0" row for a shop.
-        db.invoice.findFirst({
-            where: { organizationId, ...OWED_WHERE },
-            select: { id: true },
-        }),
-    ]);
+    const [bills, ever] = shared
+        ? await shared().then((u) => [u.bills, u.ever] as const)
+        : await Promise.all([
+              db.invoice.findMany({
+                  where: unpaid,
+                  select: {
+                      currency: true,
+                      status: true,
+                      total: true,
+                      paidCents: true,
+                      dueAt: true,
+                  },
+              }),
+              // A business that has never billed anyone outside an order has
+              // nothing to be owed: no "₹0" row for a shop.
+              db.invoice.findFirst({
+                  where: { organizationId, ...OWED_WHERE },
+                  select: { id: true },
+              }),
+          ]);
     if (!ever) return null;
     const byCurrency = new Map<string, number>();
     let overdue = 0;
@@ -329,6 +335,7 @@ export async function readWeek(
     scope: WeekScope,
     clock: { now: Date; zone: string },
     storeIds: readonly string[] | null = null,
+    unpaid?: UnpaidBillsRead,
 ): Promise<HomeWeek> {
     const w = weekWindows(clock.now, clock.zone);
     const monday = w.start.toISOString();
@@ -363,7 +370,7 @@ export async function readWeek(
                       },
                   })
                 : null,
-            scope.owed ? readOwed(db, organizationId, clock.now) : null,
+            scope.owed ? readOwed(db, organizationId, clock.now, unpaid) : null,
         ]);
 
     const week: HomeWeek = { zone: clock.zone, startDate: w.startDate };

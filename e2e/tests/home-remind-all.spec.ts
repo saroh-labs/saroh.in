@@ -3,6 +3,13 @@ import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { needsYou } from "../fixtures/home";
+import {
+    issueOverdue,
+    makeContact,
+    northwind,
+    phone,
+    stamp,
+} from "../fixtures/own-data";
 import { pressUntil } from "../fixtures/press";
 import { onPhone, openNorthwindAs } from "../fixtures/roles";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
@@ -13,12 +20,11 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  * reminder for an overdue bill, who is skipped and why, and the words they
  * get; Send holds them ten seconds with Undo, and Undo sends nothing.
  *
- * @serial: Remind all is business-wide, every overdue bill Northwind has,
- * and an overdue bill can't be made here (the API refuses a due date
- * before the day it is issued), so it runs on Northwind's own overdue
- * bills, alone. It never lets a reminder go: every journey ends in Cancel
- * or Undo, and the API's list of who would get one is the same after.
- * Skipped where Northwind has no overdue bill on this stack.
+ * @serial: Remind all is business-wide, every overdue bill Northwind has.
+ * Each journey first makes an overdue bill of its own (`issueOverdue`,
+ * review #36), so the bills group is there on any stack, seeded or not.
+ * It never lets a reminder go: every journey ends in Cancel or Undo, and
+ * the API's list of who would get one is the same after.
  *
  * At a desk the button sits on the bills group before See bills; on a
  * phone it sits in the bills sheet's foot beside See bills (U17,
@@ -64,6 +70,29 @@ async function whoWouldGetOne(page: Page): Promise<string[]> {
         .sort();
 }
 
+/**
+ * An overdue Northwind bill of the test's own (review #36): a contact with
+ * an email and a phone, a draft for them, issued and overdue a moment
+ * later. So Home has a bills group whatever the stack was seeded with.
+ */
+async function ownOverdueBill(page: Page): Promise<string> {
+    const nw = northwind(page.request);
+    const tag = `Remind all ${stamp(test.info())}`;
+    const contact = await makeContact(page.request, {
+        firstName: "Rohan",
+        lastName: tag,
+        email: `home-remind-${tag.replace(/\W+/g, "-").toLowerCase()}@example.com`,
+        phone: phone(),
+    });
+    const made = await nw.post<{ id: string }>("/invoices", {
+        contactId: contact.id,
+        currency: "INR",
+        lines: [{ description: "Shelving", quantity: 1, unitPrice: "1800" }],
+    });
+    await issueOverdue(page.request, made.id);
+    return made.id;
+}
+
 /** Where this layout draws the bills' Remind all, or null when it doesn't. */
 async function billsHost(page: Page): Promise<Locator | null> {
     if (onPhone(page)) {
@@ -86,9 +115,10 @@ test.describe("Remind all on the unpaid bills (U8)", () => {
         async ({ page }) => {
             test.setTimeout(90_000);
             await openNorthwindAs(page, "owner");
+            await ownOverdueBill(page);
             await page.goto("/");
             const host = await billsHost(page);
-            test.skip(!host, "Northwind has no overdue bill on this stack");
+            expect(host, "Home draws the bills group").not.toBeNull();
             if (!host) return;
             const before = await whoWouldGetOne(page);
 
@@ -147,15 +177,20 @@ test.describe("Remind all on the unpaid bills (U8)", () => {
         { tag: "@serial" },
         async ({ page }) => {
             test.setTimeout(90_000);
+            // The page's own clock, so the hold is run out, not slept (#24).
+            await page.clock.install();
             await openNorthwindAs(page, "owner");
+            await ownOverdueBill(page);
             await page.goto("/");
             const host = await billsHost(page);
-            test.skip(!host, "Northwind has no overdue bill on this stack");
+            expect(host, "Home draws the bills group").not.toBeNull();
             if (!host) return;
             const before = await whoWouldGetOne(page);
+            // Its own bill goes by email only where Northwind has its own
+            // email connected on this stack (DEC-011): else nobody can be.
             test.skip(
                 before.length === 0,
-                "nobody on Northwind can be reminded on this stack",
+                "Northwind has no email of its own on this stack",
             );
 
             const sheet = page.getByRole("dialog", { name: "Remind all" });
@@ -196,7 +231,7 @@ test.describe("Remind all on the unpaid bills (U8)", () => {
             ).toBeVisible();
 
             // Past where the hold would have ended, nobody was reminded.
-            await page.waitForTimeout(11_000);
+            await page.clock.runFor(11_000);
             expect(await whoWouldGetOne(page)).toEqual(before);
         },
     );

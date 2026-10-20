@@ -12,6 +12,7 @@ import {
     OWED_VIEW_WHERE,
     OWED_WHERE,
 } from "../invoices/invoice-state";
+import type { OwedBill, UnpaidBills, UnpaidBillsRead } from "./unpaid-bills";
 
 /**
  * Who owes the business, by how late (DEC-171): what is left to pay on
@@ -38,13 +39,7 @@ export const LATE_LONG_DAYS = 30;
 export type OwedByAge = HomeGoingOwed;
 export type OwedAge = "notDue" | "late1to30" | "lateOver30";
 
-/** One unpaid bill, as `readOwedByAge` reads it. */
-export interface OwedBill {
-    currency: string;
-    dueAt: Date | null;
-    total: { toString(): string };
-    paidCents: number;
-}
+export type { OwedBill, UnpaidBills, UnpaidBillsRead } from "./unpaid-bills";
 
 /**
  * How late a bill is at `now`: not due (no due date, or due from now on),
@@ -116,20 +111,22 @@ export function foldOwedByAge(
 }
 
 /**
- * What is owed now, by how late. Null for a business that has never billed
- * outside an order: no "₹0 owed" for a shop.
+ * A business's unpaid bills (`OWED_VIEW_WHERE`), and whether it has ever
+ * billed outside an order at all. Home's This week and How it's going both
+ * fold them, so a full Home build reads them once and hands both the same
+ * read (review #16, `unpaidBillsOnce`).
  */
-export async function readOwedByAge(
+export async function readUnpaidBills(
     db: Db,
     organizationId: string,
-    clock: { now: Date; zone: string },
-    money: boolean,
-): Promise<OwedByAge | null> {
+): Promise<UnpaidBills> {
     const [bills, ever] = await Promise.all([
         db.invoice.findMany({
             where: { organizationId, ...OWED_VIEW_WHERE },
             select: {
                 currency: true,
+                // Past due is `isPastDue`'s, which reads the status too.
+                status: true,
                 dueAt: true,
                 total: true,
                 paidCents: true,
@@ -140,6 +137,36 @@ export async function readOwedByAge(
             select: { id: true },
         }),
     ]);
+    return { bills, ever: ever !== null };
+}
+
+/**
+ * The unpaid bills, read on the first ask and shared after: one Home build
+ * hands it to every figure that folds them.
+ */
+export function unpaidBillsOnce(
+    db: Db,
+    organizationId: string,
+): UnpaidBillsRead {
+    let read: Promise<UnpaidBills> | null = null;
+    return () => (read ??= readUnpaidBills(db, organizationId));
+}
+
+/**
+ * What is owed now, by how late. Null for a business that has never billed
+ * outside an order: no "₹0 owed" for a shop. `unpaid` is a read already
+ * shared with another figure; without it the bills are read here.
+ */
+export async function readOwedByAge(
+    db: Db,
+    organizationId: string,
+    clock: { now: Date; zone: string },
+    money: boolean,
+    unpaid?: UnpaidBillsRead,
+): Promise<OwedByAge | null> {
+    const { bills, ever } = await (unpaid
+        ? unpaid()
+        : readUnpaidBills(db, organizationId));
     if (!ever) return null;
     return foldOwedByAge(bills, clock, money);
 }

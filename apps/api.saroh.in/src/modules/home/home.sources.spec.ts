@@ -695,8 +695,16 @@ describe("HomeService with the F1 sources", () => {
         const { service, db } = home([PAYMENTS], {
             overdue: [handOverdue()],
         });
-        // The renewal read is the first findMany on invoices.
-        db.invoice.findMany.mockRejectedValueOnce(new Error("timeout"));
+        // The renewal read: the one invoice read that selects the
+        // subscription's plan (picked by shape, not by call order, since
+        // a build now starts the overdue where first, review #16).
+        const answer = db.invoice.findMany.getMockImplementation();
+        db.invoice.findMany.mockImplementation(
+            (args: { select?: { subscription?: unknown } }) =>
+                args?.select?.subscription
+                    ? Promise.reject(new Error("timeout"))
+                    : answer?.(args),
+        );
         const model = await service.build(OWNER);
 
         expect(model.unavailable).toEqual([

@@ -3,6 +3,7 @@ import { DateTime } from "luxon";
 
 import { whenWords } from "../../common/words-format";
 import { planTakesOnlinePayment } from "../billing/online-payments-plan";
+import { PAID_ALREADY } from "../bookings/booking-pay-link";
 import { leftToPayCents } from "../invoices/invoice-state";
 import { OPENS_CHECKOUT } from "../payments/public-key";
 import { firstNameOf, payLinkWords, turnDownWords } from "./home-inline-words";
@@ -50,9 +51,6 @@ export const AWAITING_PAYMENT_CODE = "APPOINTMENTS_AWAITING_PAYMENT";
 
 /** How many it reads at most for the group's count and total. */
 export const AWAITING_READ_LIMIT = 200;
-
-/** How a booking is already paid, so it never waits on a link. */
-const PAID_ALREADY = ["PAID", "PACK", "MEMBERSHIP"];
 
 /** The where for bookings awaiting payment, from `from` on. */
 export function awaitingPaymentWhere(

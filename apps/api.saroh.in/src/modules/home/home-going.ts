@@ -2,6 +2,7 @@ import type { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
 import { readOwedByAge } from "../analytics/owed-by-age";
+import type { UnpaidBillsRead } from "../analytics/unpaid-bills";
 import { realOrderWhere } from "../orders/open-orders";
 import { MONEY_ON_THE_CALENDAR, sinceHref } from "./home-last-day";
 import type { HomeGoing, HomeGoingSales } from "./home-model";
@@ -111,7 +112,12 @@ export async function readGoing(
     organizationId: string,
     scope: WeekScope,
     clock: { now: Date; zone: string },
-    view: { money: boolean; storeIds?: readonly string[] | null },
+    view: {
+        money: boolean;
+        storeIds?: readonly string[] | null;
+        /** The build's one read of the unpaid bills (review #16). */
+        unpaid?: UnpaidBillsRead;
+    },
 ): Promise<HomeGoing> {
     const w = goingWindows(clock.now, clock.zone);
     const storeIds = view.storeIds ?? null;
@@ -145,7 +151,13 @@ export async function readGoing(
             scope.orders ? placed(w.from, w.to) : null,
             scope.orders ? placed(w.beforeFrom, w.beforeSoFar) : null,
             scope.owed
-                ? readOwedByAge(db, organizationId, clock, view.money)
+                ? readOwedByAge(
+                      db,
+                      organizationId,
+                      clock,
+                      view.money,
+                      view.unpaid,
+                  )
                 : null,
         ]);
 

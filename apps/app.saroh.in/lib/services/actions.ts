@@ -29,6 +29,7 @@ import {
     replaceRules as replaceRulesApi,
     rescheduleBooking as rescheduleBookingApi,
     takeDeskPayment as takeDeskPaymentApi,
+    turnDownBooking as turnDownBookingApi,
     updateService as updateServiceApi,
 } from "./service";
 
@@ -93,6 +94,15 @@ export async function cancelBooking(
     options: { returnCredit?: boolean; closesClass?: boolean } = {},
 ) {
     return cancelBookingApi(bookingId, options);
+}
+
+/**
+ * Turn down a booking awaiting payment from Home (review #11): cancelled
+ * only while it still awaits its money; `paid` when the customer paid in
+ * the meantime.
+ */
+export async function turnDownBooking(bookingId: string) {
+    return turnDownBookingApi(bookingId);
 }
 
 /**

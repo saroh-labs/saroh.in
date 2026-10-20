@@ -667,18 +667,24 @@ describe("BookingsService.rescheduleBooking", () => {
         expect(bookingUpdate).not.toHaveBeenCalled();
     });
 
-    it("maps a lost race for the last seat to the same conflict", async () => {
+    it("tries a lost race again (review #33), and says others are booking when every try loses", async () => {
         wireReschedule();
-        transaction.mockRejectedValueOnce(
+        const raced = () =>
             Object.assign(new Error("serialization failure"), {
                 code: "P2034",
-            }),
+            });
+        transaction
+            .mockRejectedValueOnce(raced())
+            .mockRejectedValueOnce(raced())
+            .mockRejectedValueOnce(raced());
+        const refused = new BookingsService().rescheduleBooking(ctx(), "bk_1", {
+            startAt: AT_10,
+        });
+        await expect(refused).rejects.toBeInstanceOf(ConflictException);
+        await expect(refused).rejects.toThrow(
+            "Lots of people are booking right now. Try again.",
         );
-        await expect(
-            new BookingsService().rescheduleBooking(ctx(), "bk_1", {
-                startAt: AT_10,
-            }),
-        ).rejects.toBeInstanceOf(ConflictException);
+        expect(transaction).toHaveBeenCalledTimes(3);
     });
 
     it("will not move a cancelled booking", async () => {

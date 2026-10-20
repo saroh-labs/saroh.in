@@ -99,6 +99,7 @@ test("a QR code's short link counts the scan and opens the booking page", async 
         const headers = visitor(testInfo);
 
         // A scan: 302, an absolute Location on the address asked, the tag.
+        // The request fixture: signed out on purpose, a visitor's scan.
         const first = await request.get(short, { maxRedirects: 0, headers });
         expect(first.status()).toBe(302);
         const location = first.headers().location;
@@ -111,6 +112,7 @@ test("a QR code's short link counts the scan and opens the booking page", async 
         await expect
             .poll(async () => (await mine(made.id))?.scans.total)
             .toBe(1);
+        // The request fixture: signed out on purpose, a visitor's scan.
         const second = await request.get(short, { maxRedirects: 0, headers });
         expect(second.status()).toBe(302);
         await expect
@@ -118,6 +120,7 @@ test("a QR code's short link counts the scan and opens the booking page", async 
             .toEqual({ total: 2, last7Days: 2 });
 
         // Asking only for the headers forwards the same way, uncounted.
+        // The request fixture: signed out on purpose, a visitor's scan.
         const head = await request.head(short, { maxRedirects: 0, headers });
         expect(head.status()).toBe(302);
         expect(head.headers().location).toBe(location);
@@ -125,6 +128,7 @@ test("a QR code's short link counts the scan and opens the booking page", async 
 
         // A code the site doesn't have still reaches the business: its
         // home page, untagged, never a bare "Not found".
+        // The request fixture: signed out on purpose, a visitor's scan.
         const unknown = await request.get(`${LIVE}/q/zzzzzz`, {
             maxRedirects: 0,
             headers,
@@ -144,6 +148,7 @@ test("a QR code's short link counts the scan and opens the booking page", async 
         const total = (await mine(made.id))?.scans.total ?? 0;
         const retired = await nw.post<QrCode>(`${codes}/${made.id}/retire`);
         expect(retired.retired).toBe(true);
+        // The request fixture: signed out on purpose, a visitor's scan.
         const after = await request.get(short, { maxRedirects: 0, headers });
         expect(after.status()).toBe(302);
         expect(after.headers().location).toBe(`${LIVE}/`);
