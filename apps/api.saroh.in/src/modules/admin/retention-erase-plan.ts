@@ -186,15 +186,9 @@ export const KEPT_FIELD_DECISIONS: Readonly<Record<string, KeptDecision>> = {
         at180Days: "erased",
         why: "Free text about a lead; no business is left to keep its CRM.",
     },
-    // DEC-172: the record of a customer's "Ask to remove my data".
-    "CustomerDataRequest.requesterEmail": {
-        at180Days: "erased",
-        why: "The request goes with the business's customers: no business is left to answer it or keep its record.",
-    },
-    "CustomerDataRequest.requesterName": {
-        at180Days: "erased",
-        why: "The request goes with the business's customers: no business is left to answer it or keep its record.",
-    },
+    // DEC-172's "Ask to remove my data": a removal no longer keeps its
+    // requester's name or email (review #19), so neither is decided here;
+    // the eraser still deletes every request of a business that is gone.
 };
 
 /**

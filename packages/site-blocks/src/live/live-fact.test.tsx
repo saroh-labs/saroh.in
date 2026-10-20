@@ -229,7 +229,7 @@ function okResponse(body: unknown) {
     );
 }
 
-describe("useLiveRead: reads in view, every 30 s, one read per address", () => {
+describe("useLiveRead: reads in view, once a minute, one read per address", () => {
     const realFetch = globalThis.fetch;
     let fetchMock: Mock<typeof fetch>;
     let n = 0;
@@ -252,7 +252,7 @@ describe("useLiveRead: reads in view, every 30 s, one read per address", () => {
         globalThis.fetch = realFetch;
     });
 
-    it("reads once on mount, no-store, then every 30 s while visible", async () => {
+    it("reads once on mount, no-store, then every minute while visible", async () => {
         render(<Probe />);
         await act(() => vi.advanceTimersByTimeAsync(0));
         expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -263,6 +263,11 @@ describe("useLiveRead: reads in view, every 30 s, one read per address", () => {
         await act(() => vi.advanceTimersByTimeAsync(POLL_EVERY_MS));
         expect(fetchMock).toHaveBeenCalledTimes(2);
         expect(screen.getByText("value 2")).toBeInTheDocument();
+    });
+
+    it("polls once a minute, and keeps a count up until the next answer is late (review #4)", () => {
+        expect(POLL_EVERY_MS).toBe(60_000);
+        expect(FRESH_FOR_MS).toBeGreaterThan(POLL_EVERY_MS + READ_TIMEOUT_MS);
     });
 
     it("stops while the page is hidden, and reads once when it is shown", async () => {
@@ -290,7 +295,7 @@ describe("useLiveRead: reads in view, every 30 s, one read per address", () => {
         expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
-    it("hides a value that is older than 60 s while it checks again", async () => {
+    it("hides a value that is older than 75 s while it checks again", async () => {
         render(<Probe />);
         await act(() => vi.advanceTimersByTimeAsync(0));
         expect(screen.getByText("value 1")).toBeInTheDocument();

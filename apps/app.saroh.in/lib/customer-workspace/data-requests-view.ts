@@ -61,8 +61,12 @@ export const STATUS_WORDS: Record<
     CLOSED_WITHOUT_REMOVAL: { label: "Closed", tone: "neutral" },
 };
 
-/** Who asked, as a row names them: their name, else their email. */
+/**
+ * Who asked, as a row names them: their name, else their email. A done
+ * request names nobody: their details were removed (review #19).
+ */
 export function requesterLabel(row: DataRequestRow): string {
+    if (row.status === "DONE") return "A removed customer";
     const name = row.name?.trim();
     if (name) return name;
     return row.email ?? "A customer";

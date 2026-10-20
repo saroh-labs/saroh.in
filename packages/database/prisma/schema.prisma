@@ -7470,9 +7470,11 @@ model CustomerDataRequest {
   contactId         String?
   contact           Contact?         @relation(fields: [contactId], references: [id], onDelete: SetNull)
 
-  // Who asked, as they were when they asked.
+  // Who asked, as they were when they asked. Once their details are removed
+  // (DONE) the name is cleared, and the email too once the "done" email has
+  // gone (review #19); a CHECK keeps the email until then.
   requesterName  String?
-  requesterEmail String
+  requesterEmail String?
 
   kind   CustomerDataRequestKind   @default(REMOVAL)
   status CustomerDataRequestStatus @default(OPEN)

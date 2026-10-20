@@ -35,7 +35,7 @@ import { useLiveRead } from "./use-live-read";
  *
  * Until the read answers, and whenever it fails or finds nothing free, the
  * slot keeps the plain "See times" the cached page was sent with, at the
- * same height. A count shows only while the answer is under a minute old
+ * same height. A count shows only while the answer is fresh (`FRESH_FOR_MS`)
  * and the count is 5 or fewer; an older answer keeps the time and hides
  * the count while it checks again (VB00Live's four states).
  */

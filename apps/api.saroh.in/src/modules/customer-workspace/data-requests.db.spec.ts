@@ -35,7 +35,10 @@ import {
     FakeMerchantProvider,
     FakeProviderFactory,
 } from "../payments/providers/fake.provider";
-import { DATA_REQUEST_EMAIL_TYPE } from "../site-accounts/data-request-email.handler";
+import {
+    DATA_REQUEST_EMAIL_TYPE,
+    DataRequestEmailHandler,
+} from "../site-accounts/data-request-email.handler";
 import { CloseDataRequestDto } from "./data-requests.dto";
 import { DataRequestsService } from "./data-requests.service";
 import { PrivacyRemovalService } from "./privacy-removal.service";
@@ -307,7 +310,9 @@ describe("the privacy removal marks it done", () => {
             handledAt: now,
             customerAccountId: null,
             contactId: asha.contactId,
-            // Where the done email goes, kept on the request.
+            // Their name goes with their details (review #19); the email
+            // stays only until the done email has gone to it.
+            requesterName: null,
             requesterEmail: asha.email,
         });
 
@@ -337,10 +342,30 @@ describe("the privacy removal marks it done", () => {
                 id: request.id,
                 status: "DONE",
                 contactId: null,
+                name: null,
                 email: null,
                 handledAt: now.toISOString(),
             }),
         ]);
+
+        // The done email goes to the address they asked from; then that
+        // address leaves the request too, and a retry sends nothing.
+        const sent: string[] = [];
+        const handler = new DataRequestEmailHandler(async (to) => {
+            sent.push(to);
+            return "sent";
+        });
+        await handler.handle(jobs[0]!);
+        await handler.handle(jobs[0]!);
+        expect(sent).toEqual([asha.email]);
+        const after = await prisma.customerDataRequest.findUniqueOrThrow({
+            where: { id: request.id },
+        });
+        expect(after).toMatchObject({
+            status: "DONE",
+            requesterName: null,
+            requesterEmail: null,
+        });
         // Done is the removal's: closing it now is refused.
         await expect(
             requests.close(ctx, request.id, "Too late"),

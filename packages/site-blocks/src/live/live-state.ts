@@ -23,14 +23,22 @@
  * call (`LiveFact`'s `pick`), not the read's.
  */
 
-/** How often a fact is read again while the page is in view. */
-export const POLL_EVERY_MS = 30_000;
-
-/** How long an answer may be shown: older than this, a count hides. */
-export const FRESH_FOR_MS = 60_000;
+/**
+ * How often a fact is read again while the page is in view: once a minute
+ * (review #4). Every open tab of a site polls, so this is most of the
+ * read's load; the API keeps each site's answer 30 s and shares it.
+ */
+export const POLL_EVERY_MS = 60_000;
 
 /** A read slower than this has failed, and the fact falls back. */
 export const READ_TIMEOUT_MS = 8_000;
+
+/**
+ * How long an answer may be shown: older than this, a count hides. Longer
+ * than a poll and its slowest read together, so a count never blinks out
+ * while the next answer is on its way.
+ */
+export const FRESH_FOR_MS = 75_000;
 
 export type LiveReadStatus =
     "loading" | "fresh" | "refreshing" | "stale" | "failed";

@@ -301,7 +301,7 @@ describe("PublicBookingsService.book — capacity-one reservation", () => {
         expect(transaction).toHaveBeenCalledTimes(2);
     });
 
-    it("maps a serialization race lost twice to 409", async () => {
+    it("tries up to three times against lost races, and books on the third (review #33)", async () => {
         const service = new PublicBookingsService();
         wireBookHappyPath();
         transaction
@@ -310,7 +310,24 @@ describe("PublicBookingsService.book — capacity-one reservation", () => {
 
         await expect(
             service.book("svc_1", baseInput(), "iphash"),
-        ).rejects.toBeInstanceOf(ConflictException);
+        ).resolves.toMatchObject({ id: "bk_1" });
+        expect(transaction).toHaveBeenCalledTimes(3);
+    });
+
+    it("says it is busy, never fully booked, when all three tries lose a race (review #33)", async () => {
+        const service = new PublicBookingsService();
+        wireBookHappyPath();
+        transaction
+            .mockRejectedValueOnce({ code: "P2034" })
+            .mockRejectedValueOnce({ code: "P2034" })
+            .mockRejectedValueOnce({ code: "P2034" });
+
+        const refused = service.book("svc_1", baseInput(), "iphash");
+        await expect(refused).rejects.toBeInstanceOf(ConflictException);
+        await expect(refused).rejects.toThrow(
+            "Lots of people are booking right now. Try again.",
+        );
+        expect(transaction).toHaveBeenCalledTimes(3);
     });
 
     it("replays an existing booking for a repeated (serviceId, idempotencyKey) — no tx", async () => {

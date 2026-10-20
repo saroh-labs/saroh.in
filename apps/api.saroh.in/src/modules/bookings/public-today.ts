@@ -7,6 +7,7 @@ import {
 import { prisma, runInOrgContext } from "@saroh/database";
 import { DateTime } from "luxon";
 
+import { LiveReadCache } from "../../common/live-read-cache";
 import type { PublicOpeningDay } from "../sites/public-visit.service";
 import { publicWeek } from "../sites/public-visit.service";
 import { appointmentsOpen } from "./appointments-open";
@@ -14,6 +15,7 @@ import { closedDates, closuresAhead } from "./closed-dates";
 import type { PublicDays } from "./public-booking-page";
 import { offeredOnSite, publicDays } from "./public-booking-page";
 import { FixedWindowRateLimiter } from "./rate-limiter";
+import { onceReads } from "./reservation";
 import { businessTimezone } from "./staff-availability";
 
 /**
@@ -23,7 +25,7 @@ import { businessTimezone } from "./staff-availability";
  *
  * THE TIMES ARE THE BOOKING PAGE'S OWN. Each service's today is read through
  * {@link publicDays} — the very read the booking page draws its days from —
- * for one day, and listed as it comes back. Nothing here snaps or rounds, so
+ * over the Next free window, once, and today's are listed as they come back. Nothing here snaps or rounds, so
  * when the booking page's starts change (E6's half hours, default 41) On
  * today follows without a change here, and a time shown in On today is
  * always one the booking page offers.
@@ -41,6 +43,13 @@ export const TODAY_ITEMS = 4;
  * window, so a time named on the home is always one it offers.
  */
 export const NEXT_FREE_DAYS = 14;
+
+/**
+ * How long one site's answer is kept and shared by every visitor (review
+ * #4): a page polls every minute, so a site with fifty open tabs works it
+ * out about twice a minute, not fifty times.
+ */
+export const TODAY_KEPT_MS = 30_000;
 
 /** Page views per visitor per minute, as the Visit us read allows. */
 const READS_PER_WINDOW = 120;
@@ -217,8 +226,21 @@ export class PublicTodayService {
             READS_PER_WINDOW,
             READ_WINDOW_MS,
         ),
+        // Not a DI provider either: one per process, replaceable in tests.
+        @Optional()
+        private readonly kept: LiveReadCache<PublicToday> = new LiveReadCache(
+            TODAY_KEPT_MS,
+        ),
     ) {}
 
+    /**
+     * What a visitor sees: one answer per site, at most
+     * {@link TODAY_KEPT_MS} old. A time booked in that window may still
+     * show as free until the next read, and booking it is refused
+     * honestly (the booking reads the diary, never this). An answer is
+     * worked out again sooner when a start it names has begun or the
+     * business's day has turned, so it never offers a time gone by.
+     */
     async read(
         siteId: string,
         callerHash: string | undefined,
@@ -230,6 +252,34 @@ export class PublicTodayService {
                 429,
             );
         }
+        return this.kept.get(
+            siteId,
+            () => this.workOut(siteId, now),
+            now.getTime(),
+            stillTrue,
+        );
+    }
+
+    /**
+     * How much longer a shared cache may keep this site's answer: what is
+     * left of the window, and never past a start it names or midnight.
+     */
+    secondsLeft(
+        siteId: string,
+        answer: PublicToday,
+        now: Date = new Date(),
+    ): number {
+        const at = now.getTime();
+        const starts = [answer.nextFree, ...answer.items].flatMap((item) =>
+            item ? [new Date(item.startAt).getTime()] : [],
+        );
+        return Math.min(
+            this.kept.secondsLeft(siteId, at),
+            secondsUntil(at, starts, answer.timezone),
+        );
+    }
+
+    private async workOut(siteId: string, now: Date): Promise<PublicToday> {
         const site = await prisma.site.findFirst({
             where: { id: siteId, deletedAt: null },
             select: { organizationId: true },
@@ -269,36 +319,28 @@ export class PublicTodayService {
                   })
                 : [];
 
-            // One service the booking page would refuse (no one takes it,
-            // say) leaves On today without it, not without the panel.
-            const rows = (
-                await Promise.all(
-                    services.map((service) =>
-                        publicDays(service.id, now, 1).then(
-                            (days) => todayRows(service, days, date),
-                            () => [] as TodayItem[],
-                        ),
+            // ONE PASS (review #4): each service's whole Next free window
+            // is read once, through the booking page's own read, and the
+            // business's own reads (zone, rules, closures, hours, whether
+            // it is online) are made once for all of them. Today's rows
+            // are its first day; Next free is the soonest free start of
+            // the lot. One service the booking page would refuse (no one
+            // takes it, say) leaves On today without it, not without the
+            // panel.
+            const once = onceReads();
+            const perService = await Promise.all(
+                services.map((service) =>
+                    publicDays(service.id, now, NEXT_FREE_DAYS, { once }).then(
+                        (days) => ({
+                            today: todayRows(service, days, date),
+                            all: allRows(service, days),
+                        }),
+                        () => ({ today: [] as TodayItem[], all: [] }),
                     ),
-                )
-            ).flat();
-
-            // Next free: today's own rows first, read already. Only when
-            // nothing today is free are the later days read, from tomorrow,
-            // through the same booking-page read (U8, #1042).
-            let nextFree = firstFree(rows);
-            if (!nextFree && services.length > 0) {
-                const later = await Promise.all(
-                    services.map((service) =>
-                        publicDays(service.id, now, NEXT_FREE_DAYS - 1, {
-                            skip: 1,
-                        }).then(
-                            (days) => allRows(service, days),
-                            () => [] as TodayItem[],
-                        ),
-                    ),
-                );
-                nextFree = firstFree(later.flat());
-            }
+                ),
+            );
+            const rows = perService.flatMap((s) => s.today);
+            const nextFree = firstFree(perService.flatMap((s) => s.all));
 
             return {
                 timezone: zone,
@@ -312,4 +354,33 @@ export class PublicTodayService {
             };
         });
     }
+}
+
+/**
+ * Whole seconds from `now` to the first of `starts` or the business's
+ * midnight, whichever is sooner: past either, a kept answer is wrong.
+ */
+export function secondsUntil(
+    now: number,
+    starts: readonly number[],
+    zone: string,
+): number {
+    const midnight = DateTime.fromMillis(now, { zone })
+        .plus({ days: 1 })
+        .startOf("day")
+        .toMillis();
+    const soonest = Math.min(midnight, ...starts);
+    return Math.max(0, Math.floor((soonest - now) / 1000));
+}
+
+/**
+ * Whether a kept answer is still true at `now`: the business's day is the
+ * same, and no start it names has begun.
+ */
+export function stillTrue(answer: PublicToday, now: number): boolean {
+    const day = DateTime.fromMillis(now, { zone: answer.timezone }).toISODate();
+    if (day !== answer.date) return false;
+    const begun = (item: TodayItem | null) =>
+        item !== null && new Date(item.startAt).getTime() <= now;
+    return !begun(answer.nextFree) && !answer.items.some(begun);
 }

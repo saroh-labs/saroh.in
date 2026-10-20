@@ -50,6 +50,12 @@ describe("a row's words", () => {
         );
     });
 
+    it("names nobody once their details are removed (review #19)", () => {
+        expect(
+            requesterLabel({ ...ROW, status: "DONE", name: "Asha Rao" }),
+        ).toBe("A removed customer");
+    });
+
     it("an open one says how to find them; an unlinked one says so", () => {
         expect(requestSub(ROW)).toBe("asha@example.com");
         expect(requestSub({ ...ROW, contactId: null })).toBe(

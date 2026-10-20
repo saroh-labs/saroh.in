@@ -8,9 +8,12 @@
 import { HttpException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { LiveReadCache } from "../../common/live-read-cache";
+import * as bookingPage from "./public-booking-page";
 import { publicDays } from "./public-booking-page";
-import { PublicTodayService } from "./public-today";
+import { PublicTodayService, TODAY_KEPT_MS } from "./public-today";
 import { FixedWindowRateLimiter } from "./rate-limiter";
+import * as staffAvailability from "./staff-availability";
 
 // Generous: these tests read many times from one "visitor".
 const today = new PublicTodayService(new FixedWindowRateLimiter(1_000));
@@ -27,12 +30,12 @@ let seq = 0;
 const uniq = (label: string) => `${label}-${process.pid}-${++seq}`;
 
 /** The next Monday at `hour`:`minute` UTC (the businesses here keep UTC). */
-function nextMonday(hour: number, minute = 0): Date {
+function nextMonday(hour: number, minute = 0, second = 0): Date {
     const d = new Date();
     d.setUTCHours(0, 0, 0, 0);
     const ahead = (MONDAY - d.getUTCDay() + 7) % 7 || 7;
     d.setUTCDate(d.getUTCDate() + ahead);
-    d.setUTCHours(hour, minute);
+    d.setUTCHours(hour, minute, second);
     return d;
 }
 
@@ -312,7 +315,16 @@ describe("On today (real database)", () => {
                 },
             });
         }
-        const after = await today.read(gym.siteId, "visitor", now);
+        // Inside the window the kept answer still names it: a visitor may
+        // see it free until the next read, and booking it is refused.
+        const kept = await today.read(gym.siteId, "visitor", now);
+        expect(kept.nextFree?.startAt).toBe(first!.startAt);
+        // The next read after the window has moved on.
+        const after = await today.read(
+            gym.siteId,
+            "visitor",
+            new Date(now.getTime() + TODAY_KEPT_MS),
+        );
         expect(after.nextFree?.startAt).not.toBe(first!.startAt);
     });
 
@@ -379,5 +391,98 @@ describe("On today (real database)", () => {
         await expect(
             strict.read(studio.siteId, "one-visitor", nextMonday(8)),
         ).rejects.toBeInstanceOf(HttpException);
+    });
+});
+
+describe("On today's cost per read (review #4)", () => {
+    let busy: { organizationId: string; siteId: string };
+
+    beforeAll(async () => {
+        busy = await business("Busy Evening Studio");
+        // Three classes on Mondays at 11:00: nothing is free in the evening,
+        // so Next free looks into the days ahead.
+        for (const name of ["Yoga", "Pilates", "Barre"]) {
+            await prisma.service.create({
+                data: {
+                    organizationId: busy.organizationId,
+                    name,
+                    durationMinutes: 60,
+                    capacity: 4,
+                    timezone: "UTC",
+                    availabilityRules: {
+                        create: {
+                            organizationId: busy.organizationId,
+                            dayOfWeek: MONDAY,
+                            startMinute: 11 * 60,
+                            endMinute: 12 * 60,
+                        },
+                    },
+                },
+            });
+        }
+    });
+
+    afterEach(() => jest.restoreAllMocks());
+
+    it("reads each service once, and the business's own reads once, even when nothing is free today", async () => {
+        const days = jest.spyOn(bookingPage, "publicDays");
+        const zone = jest.spyOn(staffAvailability, "businessTimezone");
+        const fresh = new PublicTodayService(new FixedWindowRateLimiter(1_000));
+        const read = await fresh.read(busy.siteId, "visitor", nextMonday(20));
+        expect(read.items).toEqual([]);
+        // Next Monday's 11:00, a week on.
+        expect(read.nextFree?.time).toBe("11:00");
+        expect(days).toHaveBeenCalledTimes(3);
+        // The panel's own, and the business's zone and opening hours read
+        // once for every service's days: not once per service (it was 7).
+        expect(zone).toHaveBeenCalledTimes(3);
+    });
+
+    it("works a site's answer out once for every visitor inside the window, and once for many at a time", async () => {
+        const days = jest.spyOn(bookingPage, "publicDays");
+        const fresh = new PublicTodayService(
+            new FixedWindowRateLimiter(1_000),
+            new LiveReadCache(TODAY_KEPT_MS),
+        );
+        const now = nextMonday(20);
+        const many = await Promise.all(
+            Array.from({ length: 20 }, (_, i) =>
+                fresh.read(busy.siteId, `visitor-${i}`, now),
+            ),
+        );
+        expect(new Set(many.map((r) => JSON.stringify(r))).size).toBe(1);
+        expect(days).toHaveBeenCalledTimes(3);
+        await fresh.read(
+            busy.siteId,
+            "visitor-late",
+            new Date(now.getTime() + TODAY_KEPT_MS - 1),
+        );
+        expect(days).toHaveBeenCalledTimes(3);
+        await fresh.read(
+            busy.siteId,
+            "visitor-later",
+            new Date(now.getTime() + TODAY_KEPT_MS),
+        );
+        expect(days).toHaveBeenCalledTimes(6);
+    });
+
+    it("never keeps an answer past a start it names", async () => {
+        const fresh = new PublicTodayService(new FixedWindowRateLimiter(1_000));
+        const before = await fresh.read(
+            busy.siteId,
+            "visitor",
+            nextMonday(10, 59, 50),
+        );
+        expect(before.nextFree?.startAt).toBe(nextMonday(11).toISOString());
+        // An edge copy is kept no longer than until it starts.
+        expect(
+            fresh.secondsLeft(busy.siteId, before, nextMonday(10, 59, 50)),
+        ).toBe(10);
+        const after = await fresh.read(
+            busy.siteId,
+            "visitor",
+            nextMonday(11, 0, 5),
+        );
+        expect(after.nextFree?.startAt).not.toBe(nextMonday(11).toISOString());
     });
 });

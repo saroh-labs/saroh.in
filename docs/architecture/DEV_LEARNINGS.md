@@ -5603,3 +5603,25 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** the container has a 448 MB memory limit and the API already uses about half of it. `tsx` compiling the backfill beside it went over the limit, and Docker killed the container.
 - **Fix:** run a backfill in a one-off container from the same image: `docker run --rm --network coolify --env-file <the API container's env, written to a mode-600 temp file and removed on exit> --memory 2g -w /repo/packages/database <image> …`. `DATABASE_TARGET_CONFIRM` is read from the URL's database name inside that container, so no value is printed. Dry run first, the real run, then a dry run again that must write 0.
 - **Rule:** never run tooling inside a serving container; it shares the container's memory limit with the app.
+
+### The live "today" read fanned out per service, per tab, uncached (review #4, #21; 20 Oct 2026)
+
+- **Symptom:** On today and the Timetable, polled `no-store` every 30 s by every open tab, worked each site's answer out from scratch: `publicDays` once per service for today, and again over 13 days for every service whenever nothing was free today (every evening, closed days, full days). About 12 queries a call, so 15 services and 50 tabs came to some 20,000 queries a minute for one site. The Live shop polled the whole catalogue (photos, prices, terms) for its "N left".
+- **Cause:** each read was written as the booking page's read, per service, and nothing was shared: not between services in one read (the zone, rules, closures and hours were read again for each), nor between visitors, whose answers are identical.
+- **Fix:** `LiveReadCache` (`common/live-read-cache.ts`): one answer per site kept 30 s, single-flight, bounded, never a failure, retired early when a start it names begins or the business's day turns. `publicDays` takes a per-read `once` (`onceReads()`) for the business's own reads. On today reads each service's window once (no second fan-out). A success says `public, max-age=0, s-maxage=<what is left of the 30 s>` and its CORS answer is `*` (`EDGE_KEPT_READ`), so a shared cache may keep it without serving one site's origin to another; a 404 or 429 stays `no-store`. Pages poll once a minute (`POLL_EVERY_MS`), a count shows for 75 s (`FRESH_FOR_MS`, longer than a poll plus its slowest read). The Live shop polls `GET /public/sites/:id/shop/stock`.
+- **What a visitor sees:** an answer at most 30 s old at the API, then up to a minute and a bit in the page. A time booked or a place taken in that window may still show as free until the next read, and booking it is refused honestly by the booking, which never reads the cache.
+- **Rule:** a public read every visitor polls is worked out once per site and shared (`LiveReadCache`), and its several services share the business's reads. `public-today.db.spec.ts` and `public-timetable.db.spec.ts` bound `publicDays` calls per read and per window; a new live read gets the same test.
+
+### A removed customer's name stayed on their done data request (review #19; 20 Oct 2026)
+
+- **Symptom:** after a privacy removal marked a customer's "Ask to remove my data" request DONE, Customers › Requests still named them, and the request kept their email for good.
+- **Cause:** the list fell back to `requesterName` when the contact was anonymised, and `markRequestsDoneInTx` left both requester fields as they were; `personal-data.ts` called them kept.
+- **Fix:** `markRequestsDoneInTx` clears `requesterName`; the "done" email handler clears `requesterEmail` once that email has gone (migration `20261221120000_data_request_email_cleared` makes it nullable, with a CHECK that only a DONE request may have none). The API names nobody on a DONE row and the list says "A removed customer". `personal-data.ts` marks both cleared.
+- **Rule:** a record kept after a removal keeps only what its purpose still needs, for as long as it needs it: say when each field goes in `personal-data.ts`.
+
+### A busy booking page told visitors a free time was fully booked (review #33; 20 Oct 2026)
+
+- **Symptom:** when several people booked at once, a visitor could be told "That time is fully booked." for a time that had room.
+- **Cause:** the site's reservation tried once more after a lost serializable race, with no wait; two losses in a row threw the race's message, "fully booked", though no try had seen the time full.
+- **Fix:** `reserve` takes `tries` (the site's is 3), 20 to 80 ms apart (`RACE_RETRY_WAIT_MS`), and `busy`, said when every try lost: "Lots of people are booking right now. Try again." A full time is still refused by the capacity check, with its own words.
+- **Rule:** a lost race is not an answer: retry with jitter, and when the tries run out say it is busy, never what no read saw.

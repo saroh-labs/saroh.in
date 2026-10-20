@@ -4,7 +4,6 @@ import type { LookId } from "@saroh/block-contract";
 import { useState } from "react";
 
 import { browsePriceWords } from "../lib/gst-price";
-import { productCardsOf } from "../lib/product-grid-read";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import { showsCount } from "../live/live-state";
@@ -88,12 +87,25 @@ export function shopWhenLine(
     return `${parts.join(". ")}.`;
 }
 
-/** The slug → left map from the shop's public read; undefined if bad. */
-function parseLeft(body: unknown): Record<string, number | null> | undefined {
-    const cards = productCardsOf(body);
-    if (!cards) return undefined;
+/**
+ * The slug → left map from the shop's live counts
+ * (`GET /public/sites/:siteId/shop/stock`, review #21); undefined if bad.
+ */
+export function parseLeft(
+    body: unknown,
+): Record<string, number | null> | undefined {
+    const items =
+        body && typeof body === "object"
+            ? (body as { items?: unknown }).items
+            : undefined;
+    if (!Array.isArray(items)) return undefined;
     const map: Record<string, number | null> = {};
-    for (const c of cards) map[c.slug] = c.bagLeft ?? null;
+    for (const item of items as unknown[]) {
+        if (!item || typeof item !== "object") return undefined;
+        const { slug, left } = item as { slug?: unknown; left?: unknown };
+        if (typeof slug !== "string") return undefined;
+        map[slug] = typeof left === "number" ? left : null;
+    }
     return map;
 }
 
@@ -170,7 +182,7 @@ export function LookShopListing({
 
     const liveUrl =
         look === "live" && bagSite && apiUrl
-            ? `${apiUrl}/public/sites/${encodeURIComponent(bagSite)}/shop/products`
+            ? `${apiUrl}/public/sites/${encodeURIComponent(bagSite)}/shop/stock`
             : null;
     const live = useLiveRead(liveUrl, parseLeft);
 

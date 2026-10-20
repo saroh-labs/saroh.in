@@ -40,7 +40,10 @@ export interface DataRequestRow {
     reason: string | null;
     /** The customer to open; null once removed, or when none is linked. */
     contactId: string | null;
-    /** Their name now, else as they gave it when they asked. */
+    /**
+     * Their name now, else as they gave it when they asked. Null once done:
+     * the list says "A removed customer" (review #19).
+     */
     name: string | null;
     /**
      * The email they asked from, to find them by. Null once done: the
@@ -82,7 +85,10 @@ type Selected = Prisma.CustomerDataRequestGetPayload<{
 
 export function dataRequestRow(row: Selected): DataRequestRow {
     const live = row.contact && !row.contact.removedAt ? row.contact : null;
-    const name = (live ? fullName(live) : null) ?? row.requesterName ?? null;
+    const done = row.status === "DONE";
+    const name = done
+        ? null
+        : ((live ? fullName(live) : null) ?? row.requesterName ?? null);
     return {
         id: row.id,
         kind: row.kind,
@@ -92,7 +98,7 @@ export function dataRequestRow(row: Selected): DataRequestRow {
         reason: row.status === "CLOSED_WITHOUT_REMOVAL" ? row.reason : null,
         contactId: live ? row.contactId : null,
         name,
-        email: row.status === "DONE" ? null : row.requesterEmail,
+        email: done ? null : row.requesterEmail,
     };
 }
 

@@ -9,8 +9,13 @@
 import { HttpException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import * as bookingPage from "./public-booking-page";
 import { publicDays } from "./public-booking-page";
-import { PublicTimetableService, TIMETABLE_DAYS } from "./public-timetable";
+import {
+    PublicTimetableService,
+    TIMETABLE_DAYS,
+    TIMETABLE_KEPT_MS,
+} from "./public-timetable";
 import { FixedWindowRateLimiter } from "./rate-limiter";
 
 // Generous: these tests read many times from one "visitor".
@@ -202,5 +207,44 @@ describe("Timetable (real database)", () => {
         await expect(
             strict.read(gym.siteId, [], "one-visitor", nextMonday(5)),
         ).rejects.toBeInstanceOf(HttpException);
+    });
+});
+
+describe("Timetable's cost per read (review #4)", () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    it("reads each class once, then shares the week inside the window, whatever order the classes are named in", async () => {
+        const days = jest.spyOn(bookingPage, "publicDays");
+        const fresh = new PublicTimetableService(
+            new FixedWindowRateLimiter(1_000),
+        );
+        const now = nextMonday(5);
+        const reads = await Promise.all(
+            Array.from({ length: 10 }, (_, i) =>
+                fresh.read(
+                    gym.siteId,
+                    i % 2 ? [yoga, strength] : [strength, yoga],
+                    `visitor-${i}`,
+                    now,
+                ),
+            ),
+        );
+        expect(reads[0]?.sessions.length).toBeGreaterThan(0);
+        expect(days).toHaveBeenCalledTimes(2);
+        // Still kept a moment before the window ends; read again after.
+        await fresh.read(
+            gym.siteId,
+            [yoga, strength],
+            "late",
+            new Date(now.getTime() + TIMETABLE_KEPT_MS - 1),
+        );
+        expect(days).toHaveBeenCalledTimes(2);
+        await fresh.read(
+            gym.siteId,
+            [yoga, strength],
+            "later",
+            new Date(now.getTime() + TIMETABLE_KEPT_MS),
+        );
+        expect(days).toHaveBeenCalledTimes(4);
     });
 });

@@ -6,16 +6,20 @@ import {
     Ip,
     Param,
     Query,
+    Res,
     UseGuards,
 } from "@nestjs/common";
+import type { Response } from "express";
 
 import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
+import { edgeMayKeep } from "../../common/live-read-headers";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import type { RawGridQuery } from "./product-grid";
 import { parseGridQuery } from "./product-grid";
 import type {
     PublicCatalogue,
     PublicProduct,
+    PublicShopStock,
 } from "./public-catalogue.serialize";
 import { PublicCatalogueService } from "./public-catalogue.service";
 
@@ -61,6 +65,25 @@ export class PublicCatalogueController {
             visitorKey(ip, relay),
             parseGridQuery(query),
         );
+    }
+
+    /**
+     * The Live look's "N left" (review #21): `/shop`'s cards with only
+     * their counts, polled by the page instead of the whole catalogue.
+     * One answer per site, kept 30 seconds in the API and at the edge; a
+     * refusal is never kept.
+     */
+    @Get(":siteId/shop/stock")
+    @Header("Cache-Control", "no-store")
+    async stock(
+        @Param("siteId") siteId: string,
+        @Ip() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
+        @Res({ passthrough: true }) res: Response,
+    ): Promise<PublicShopStock> {
+        const stock = await this.catalogue.stock(siteId, visitorKey(ip, relay));
+        edgeMayKeep(res, this.catalogue.stockSecondsLeft(siteId));
+        return stock;
     }
 
     @Get(":siteId/shop/products/:slug")

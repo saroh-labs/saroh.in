@@ -294,8 +294,9 @@ export async function removeDetailsInTx(
  * accounts, or naming the contact. Each keeps its row as the record; its
  * account link is cleared here, before the account is deleted (the key's
  * SET NULL is the backstop), and the contact link stays on the anonymised
- * contact. Each queues the customer's "done" email, which reads the email
- * kept on the request, and writes `customer.data_request.done`, ids only.
+ * contact. Their name on it is cleared; the email is kept only until the
+ * "done" email, which reads it, has gone (review #19). Each writes
+ * `customer.data_request.done`, ids only.
  */
 export async function markRequestsDoneInTx(
     tx: Tx,
@@ -326,6 +327,9 @@ export async function markRequestsDoneInTx(
             handledByUserId: userId,
             handledAt: now,
             customerAccountId: null,
+            // Their name goes with the rest of their details (review #19).
+            // The email stays only until the "done" email has gone to it.
+            requesterName: null,
         },
     });
     for (const requestId of ids) {

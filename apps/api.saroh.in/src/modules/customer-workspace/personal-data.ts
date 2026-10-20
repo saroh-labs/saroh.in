@@ -183,12 +183,12 @@ export const PERSONAL_FIELDS: Readonly<Record<string, PersonalField>> = {
     // Their "Ask to remove my data" request (DEC-172): the record that they
     // asked and that it was done, and where the done email goes.
     "CustomerDataRequest.requesterEmail": {
-        rule: "kept",
-        why: "The record of their request: where Saroh tells them it's done (DEC-172). The business's list stops showing it once done.",
+        rule: "cleared",
+        why: "Where Saroh tells them it's done (DEC-172): cleared once that email has gone (review #19). The business's list stops showing it once done.",
     },
     "CustomerDataRequest.requesterName": {
-        rule: "kept",
-        why: "The record of their request, as they were when they asked (DEC-172).",
+        rule: "cleared",
+        why: "Their name as they asked: cleared when the removal marks the request done (review #19).",
     },
 };
 

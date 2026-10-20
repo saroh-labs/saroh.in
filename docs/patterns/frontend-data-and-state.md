@@ -112,12 +112,14 @@ add or change there may be served to the next visitor without rendering.
   (DEC-172, U8, #1042): "Next free", places left, "Open now", stock.
   Never on the server, never with `dontCachePage`: read it with
   `useLiveRead` and draw it with `LiveFact` (`site-blocks/src/live/`). One read
-  per address on a page, every 30 s while the page is in view, none while
+  per address on a page, once a minute while the page is in view, none while
   it is hidden. The box keeps its height in every state (loading, fresh,
   stale, unknown, failed); the cached HTML is always "loading", holding the
-  plain way in ("See times"). A count shows only under a minute old and 5
-  or fewer (`placesLeftWords`); an older answer keeps the time and hides
-  the count. `e2e/tests/site-live-facts.spec.ts` fetches the page with no
+  plain way in ("See times"). A count shows only while fresh (75 s,
+  `FRESH_FOR_MS`) and 5 or fewer (`placesLeftWords`); an older answer keeps
+  the time and hides the count. The API works each site's answer out once
+  and shares it 30 s (`LiveReadCache`, review #4), so a new live read is
+  one answer per site, never per visitor, and names nobody. `e2e/tests/site-live-facts.spec.ts` fetches the page with no
   scripts and finds no time and no count.
 - **A look is part of the publication** (DEC-172). The renderer draws the
   look the publication names and reads no flag; a value this build doesn't

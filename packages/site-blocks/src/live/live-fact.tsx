@@ -16,7 +16,7 @@ import type { LiveRead } from "./use-live-read";
  * - **loading**: `loading`, else nothing: the reserved box, no number, no
  *   shimmer. The cached HTML is always this.
  * - **fresh** and **refreshing**: `fresh(value, fetchedAt)`.
- * - **stale** (older than a minute): `stale(value)`, which leaves out its
+ * - **stale** (older than `FRESH_FOR_MS`, 75 s): `stale(value)`, which leaves out its
  *   counts; none given, nothing.
  * - **unknown** (`pick` found nothing to say) and **failed**: `fallback`,
  *   the plain way in the cached page already had ("See times"), else

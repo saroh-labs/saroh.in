@@ -110,15 +110,17 @@ export class DataRequestEmailHandler {
                         contactId: true,
                     },
                 });
-                if (!request) return null;
+                // No email left: the "done" email already went (review #19).
+                if (!request?.requesterEmail) return null;
                 const stands = STANDS[payload.step];
                 if (stands && request.status !== stands) return null;
                 const org = await tx.organization.findUnique({
                     where: { id: organizationId },
                     select: { name: true },
                 });
+                const to: string = request.requesterEmail;
                 return {
-                    to: request.requesterEmail,
+                    to,
                     contactId: request.contactId,
                     business: cleanBusinessName(
                         org?.name ?? "",
@@ -141,17 +143,31 @@ export class DataRequestEmailHandler {
         }
         if (outcome === "sent") {
             // The record that it went; a duplicate is skipped, never thrown.
+            // Once the "done" email has gone, the email it went to leaves
+            // the request too (review #19): nothing more is sent to them.
             await runInOrgContext(organizationId, () =>
-                prisma.customerNotice.createMany({
-                    data: [
-                        {
-                            organizationId,
-                            eventKey,
-                            kind: KIND[payload.step],
-                            contactId: due.contactId,
-                        },
-                    ],
-                    skipDuplicates: true,
+                prisma.$transaction(async (tx) => {
+                    await tx.customerNotice.createMany({
+                        data: [
+                            {
+                                organizationId,
+                                eventKey,
+                                kind: KIND[payload.step],
+                                contactId: due.contactId,
+                            },
+                        ],
+                        skipDuplicates: true,
+                    });
+                    if (payload.step === "done") {
+                        await tx.customerDataRequest.updateMany({
+                            where: {
+                                id: payload.requestId,
+                                organizationId,
+                                status: "DONE",
+                            },
+                            data: { requesterEmail: null },
+                        });
+                    }
                 }),
             );
             return;

@@ -21,7 +21,8 @@ import { urls } from "../playwright.config";
  * - Couldn't load: the page still renders, "See times" is in the first
  *   screen, there is no "0 places", and nothing shifted (CLS ≤ 0.1).
  * - Slow: the slot keeps its height while it waits; CLS ≤ 0.1.
- * - Older than 60 s: the count hides, the time stays (the page's clock).
+ * - Older than 75 s (`FRESH_FOR_MS`): the count hides, the time stays
+ *   (the page's clock).
  * - A hidden page reads nothing.
  * - On a phone, Folio's and Quiet's Book bar says the next free time.
  *
@@ -318,9 +319,10 @@ test.describe("live facts on cached pages", { tag: "@serial" }, () => {
                     timeout: 15_000,
                 });
 
-                // 60.5 s on: the read at 60 s is still out, the answer is
-                // older than a minute, so the count hides and the time stays.
-                await page.clock.runFor(60_500);
+                // 75.5 s on: the read at 60 s is still out, the answer is
+                // older than FRESH_FOR_MS (75 s, review #4), so the count
+                // hides and the time stays.
+                await page.clock.runFor(75_500);
                 await expect(slot.locator("[data-live-fact]")).toHaveAttribute(
                     "data-live-state",
                     "stale",

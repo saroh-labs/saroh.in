@@ -8,12 +8,15 @@ import {
 import { prisma, runInOrgContext } from "@saroh/database";
 import { DateTime } from "luxon";
 
+import { LiveReadCache } from "../../common/live-read-cache";
 import type { GstOnPrice } from "../invoices/gst-price";
 import { loadPriceTerms } from "../invoices/price-terms";
 import { appointmentsOpen } from "./appointments-open";
 import type { PublicDays } from "./public-booking-page";
 import { offeredOnSite, publicDays } from "./public-booking-page";
+import { secondsUntil } from "./public-today";
 import { FixedWindowRateLimiter } from "./rate-limiter";
+import { onceReads } from "./reservation";
 import { serviceCharge } from "./service-price";
 import { businessTimezone } from "./staff-availability";
 
@@ -39,6 +42,9 @@ export const TIMETABLE_DAYS = 7;
 
 /** The section contract's cap on the classes a timetable names. */
 export const TIMETABLE_MAX_IDS = 24;
+
+/** How long one site's week is kept and shared, as On today's (review #4). */
+export const TIMETABLE_KEPT_MS = 30_000;
 
 /** Page views per visitor per minute, as On today and Visit us allow. */
 const READS_PER_WINDOW = 120;
@@ -178,8 +184,20 @@ export class PublicTimetableService {
             READS_PER_WINDOW,
             READ_WINDOW_MS,
         ),
+        // Not a DI provider either: one per process, replaceable in tests.
+        @Optional()
+        private readonly kept: LiveReadCache<PublicTimetable> = new LiveReadCache(
+            TIMETABLE_KEPT_MS,
+        ),
     ) {}
 
+    /**
+     * What a visitor sees: one week per site and choice of classes, at
+     * most {@link TIMETABLE_KEPT_MS} old. A place taken in that window may
+     * still count as free until the next read, and booking the last one
+     * twice is refused honestly by the booking. A week is worked out again
+     * sooner when its first day is over or its first session has begun.
+     */
     async read(
         siteId: string,
         serviceIds: readonly string[],
@@ -192,6 +210,40 @@ export class PublicTimetableService {
                 429,
             );
         }
+        return this.kept.get(
+            timetableKey(siteId, serviceIds),
+            () => this.workOut(siteId, serviceIds, now),
+            now.getTime(),
+            weekStillTrue,
+        );
+    }
+
+    /**
+     * How much longer a shared cache may keep this week: what is left of
+     * the window, and never past its first session or midnight.
+     */
+    secondsLeft(
+        siteId: string,
+        serviceIds: readonly string[],
+        week: PublicTimetable,
+        now: Date = new Date(),
+    ): number {
+        const at = now.getTime();
+        return Math.min(
+            this.kept.secondsLeft(timetableKey(siteId, serviceIds), at),
+            secondsUntil(
+                at,
+                week.sessions.map((s) => new Date(s.startAt).getTime()),
+                week.timezone,
+            ),
+        );
+    }
+
+    private async workOut(
+        siteId: string,
+        serviceIds: readonly string[],
+        now: Date,
+    ): Promise<PublicTimetable> {
         const site = await prisma.site.findFirst({
             where: { id: siteId, deletedAt: null },
             select: { organizationId: true },
@@ -244,11 +296,15 @@ export class PublicTimetableService {
             }));
 
             // A class the booking page would refuse (no one takes it, say)
-            // leaves the timetable without it, not without the week.
+            // leaves the timetable without it, not without the week. The
+            // business's own reads are made once for every class.
+            const once = onceReads();
             const rows = (
                 await Promise.all(
                     classes.map((service) =>
-                        publicDays(service.id, now, TIMETABLE_DAYS).then(
+                        publicDays(service.id, now, TIMETABLE_DAYS, {
+                            once,
+                        }).then(
                             (week) => timetableRows(service, week),
                             () => [] as TimetableSession[],
                         ),
@@ -259,4 +315,19 @@ export class PublicTimetableService {
             return { timezone: zone, days, sessions: sortSessions(rows) };
         });
     }
+}
+
+/** The same classes in any order are one question. */
+function timetableKey(siteId: string, serviceIds: readonly string[]): string {
+    return `${siteId}|${[...serviceIds].sort().join(",")}`;
+}
+
+/**
+ * Whether a kept week is still true at `now`: it still starts today, and
+ * none of its sessions has begun.
+ */
+export function weekStillTrue(week: PublicTimetable, now: number): boolean {
+    const today = DateTime.fromMillis(now, { zone: week.timezone }).toISODate();
+    if (week.days[0] !== today) return false;
+    return !week.sessions.some((s) => new Date(s.startAt).getTime() <= now);
 }

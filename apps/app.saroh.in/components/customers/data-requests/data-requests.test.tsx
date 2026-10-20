@@ -196,10 +196,16 @@ describe("the Requests tab", () => {
                 status: "DONE",
                 handledAt: "2026-10-20T06:00:00.000Z",
                 contactId: null,
+                // The API names nobody once done (review #19).
+                name: null,
                 email: null,
             },
         ]);
-        act(() => row(/^Asha Rao, asked to remove their data, Done$/)?.click());
+        act(() =>
+            row(
+                /^A removed customer, asked to remove their data, Done$/,
+            )?.click(),
+        );
         const sheet = s.sheet();
         expect(sheet?.textContent).toContain("Removed");
         expect(s.button("Remove their details…", sheet)).toBeUndefined();

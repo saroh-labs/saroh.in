@@ -268,6 +268,35 @@ describe("asking to remove my data", () => {
         expect(JSON.stringify(audits[0].metadata)).not.toContain("@");
     });
 
+    it("makes one request of two asks at once: one 201, one 200 with the same ref (review #38)", async () => {
+        const shop = await business("Northwind");
+        const me = await signIn(shop);
+        const both = await Promise.all([
+            call("POST", PATH, { ...shop, token: me.token }),
+            call("POST", PATH, { ...shop, token: me.token }),
+        ]);
+        expect(both.map((r) => r.status).sort()).toEqual([200, 201]);
+        const refs = both.map((r) => (r.body.request as Request).ref);
+        expect(refs[0]).toBe(refs[1]);
+
+        expect(
+            await prisma.customerDataRequest.count({
+                where: { organizationId: shop.organizationId },
+            }),
+        ).toBe(1);
+        const alerts = await jobsFor(shop.organizationId, TEAM_ALERT_TYPE);
+        expect(alerts.map((j) => j.payload)).toEqual([
+            { event: "request", requestId: refs[0] },
+        ]);
+        const emails = await jobsFor(
+            shop.organizationId,
+            DATA_REQUEST_EMAIL_TYPE,
+        );
+        expect(emails.map((j) => j.payload)).toEqual([
+            { requestId: refs[0], step: "received" },
+        ]);
+    });
+
     it("refuses without a session, or without the site's relay", async () => {
         const shop = await business("Northwind");
         const me = await signIn(shop);
