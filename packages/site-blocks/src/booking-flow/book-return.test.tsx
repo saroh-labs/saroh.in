@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -23,6 +23,25 @@ function Home({ path }: { path: string }) {
         <main>
             <a href="/about">About</a>
             <a href="/book?service=svc_private">Book a private session</a>
+        </main>
+    );
+}
+
+/** A home whose hero draws its way in as a live fact (U8). */
+function LiveHome({ fact }: { fact: "loading" | "fresh" }) {
+    useBookReturnFocus("/");
+    return (
+        <main>
+            <a href="/book">Book</a>
+            <div data-site-next-free="">
+                {fact === "loading" ? (
+                    <a href="/book">See times</a>
+                ) : (
+                    <a href="/book?service=svc_walk&start=09%3A00">
+                        Book this time
+                    </a>
+                )}
+            </div>
         </main>
     );
 }
@@ -67,5 +86,51 @@ describe("leaving the booking", () => {
         expect(document.activeElement).toBe(
             screen.getByRole("link", { name: "Book a private session" }),
         );
+    });
+
+    it("follows the hero's live link as it is drawn and swapped", async () => {
+        const first = render(<LiveHome fact="fresh" />);
+        const link = screen.getByRole("link", { name: "Book this time" });
+        link.addEventListener("click", (e) => e.preventDefault());
+        fireEvent.click(link);
+        first.unmount();
+
+        const closing = render(<Closer />);
+        fireEvent.click(screen.getByRole("button", { name: "Close" }));
+        closing.unmount();
+
+        // Landing: the read is out, so the slot says See times.
+        const back = render(<LiveHome fact="loading" />);
+        expect(document.activeElement).toBe(
+            screen.getByRole("link", { name: "See times" }),
+        );
+        // The time lands: focus goes with the slot, not to the header's Book.
+        back.rerender(<LiveHome fact="fresh" />);
+        await waitFor(() =>
+            expect(document.activeElement).toBe(
+                screen.getByRole("link", { name: "Book this time" }),
+            ),
+        );
+        back.unmount();
+    });
+
+    it("leaves focus where the visitor moved it", async () => {
+        const first = render(<LiveHome fact="fresh" />);
+        const link = screen.getByRole("link", { name: "Book this time" });
+        link.addEventListener("click", (e) => e.preventDefault());
+        fireEvent.click(link);
+        first.unmount();
+
+        const closing = render(<Closer />);
+        fireEvent.click(screen.getByRole("button", { name: "Close" }));
+        closing.unmount();
+
+        const back = render(<LiveHome fact="loading" />);
+        const header = screen.getByRole("link", { name: "Book" });
+        header.focus();
+        back.rerender(<LiveHome fact="fresh" />);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(document.activeElement).toBe(header);
+        back.unmount();
     });
 });

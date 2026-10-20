@@ -17,6 +17,13 @@ import { closeHref } from "./step-url";
  * the look's chrome), and found again on the page closing lands on
  * (`useBookReturnFocus`). Both live in `sessionStorage`, hold only a path
  * and an `href`, and are let go once used.
+ *
+ * The hero's way in is a live fact (U8): "See times" while the page reads
+ * the next free time, then "Book this time" with its own `href`. So the
+ * link that opened the booking may not be on the page yet when closing
+ * lands, or may be swapped while it holds focus. For a few seconds after
+ * landing, focus follows that slot's link as it is drawn, unless the
+ * visitor has moved focus somewhere else themselves.
  */
 
 const OPENER = "saroh.book-opener";
@@ -25,7 +32,21 @@ const RETURN = "saroh.book-return";
 interface Opener {
     from: string;
     href: string;
+    /** It was the hero's live link (`[data-site-next-free]`). */
+    live?: boolean;
 }
+
+interface Return {
+    to: string;
+    href: string;
+    live?: boolean;
+}
+
+/** The live slot that draws the hero's way in. */
+const LIVE_SLOT = "[data-site-next-free]";
+
+/** How long focus follows the opener's slot after landing. */
+const FOLLOW_MS = 8_000;
 
 function read<T>(key: string): T | null {
     try {
@@ -67,7 +88,16 @@ export function useCloseBooking(): () => void {
         const to = opener
             ? closeHref(new URL(opener.from, origin).href, origin)
             : closeHref(document.referrer, origin);
-        write(RETURN, opener ? { to, href: opener.href } : null);
+        write(
+            RETURN,
+            opener
+                ? ({
+                      to,
+                      href: opener.href,
+                      live: opener.live,
+                  } satisfies Return)
+                : null,
+        );
         router.replace(to);
     }, [router]);
 }
@@ -88,6 +118,7 @@ export function useBookReturnFocus(path: string | null): void {
             write(OPENER, {
                 from: `${window.location.pathname}${window.location.search}`,
                 href,
+                live: link?.closest(LIVE_SLOT) ? true : undefined,
             } satisfies Opener);
         };
         document.addEventListener("click", onClick, true);
@@ -95,22 +126,67 @@ export function useBookReturnFocus(path: string | null): void {
     }, []);
 
     useEffect(() => {
-        const back = read<{ to: string; href: string }>(RETURN);
-        if (!back) return;
+        const found = read<Return>(RETURN);
+        if (!found) return;
+        const back: Return = found;
         const to = new URL(back.to, window.location.origin).pathname;
         if (to !== window.location.pathname) return;
         write(RETURN, null);
-        const links = Array.from(
-            document.querySelectorAll<HTMLAnchorElement>("a[href]"),
-        ).filter(
-            (a) =>
-                a.getAttribute("href") === back.href &&
-                a.closest('[role="dialog"]') === null,
-        );
-        // The one on the page itself before the chrome's copy of it.
-        const link =
-            links.find((a) => a.closest("[data-site-header]") === null) ??
-            links.at(0);
-        link?.focus();
+        const live = back.live === true;
+        let placed: HTMLElement | null = null;
+        // Held in an object: `stop` sets it from inside `place`.
+        const watching = { on: true };
+        // The live slot draws its link after landing, and swaps it.
+        const watch = live ? new MutationObserver(() => place()) : null;
+        const timer = live
+            ? window.setTimeout(() => stop(), FOLLOW_MS)
+            : undefined;
+        function stop(): void {
+            watching.on = false;
+            watch?.disconnect();
+            window.clearTimeout(timer);
+        }
+        function place(): void {
+            const active = document.activeElement;
+            const free =
+                active === null ||
+                active === document.body ||
+                (placed !== null && active === placed);
+            // The visitor moved focus themselves: leave it with them.
+            if (!free) return stop();
+            const link = returnLink(back);
+            if (!link || link === active) return;
+            link.focus();
+            placed = link;
+        }
+        place();
+        if (watching.on)
+            watch?.observe(document.body, { childList: true, subtree: true });
+        return stop;
     }, [path]);
+}
+
+/**
+ * The link to put focus back on. For the hero's live link, whatever that
+ * slot draws now ("See times" or "Book this time"). Otherwise the one with
+ * the opener's `href`, on the page itself before the chrome's copy of it.
+ */
+function returnLink(back: Return): HTMLAnchorElement | null {
+    const links = Array.from(
+        document.querySelectorAll<HTMLAnchorElement>("a[href]"),
+    ).filter((a) => a.closest('[role="dialog"]') === null);
+    if (back.live) {
+        const slot = links.find(
+            (a) =>
+                a.closest(LIVE_SLOT) !== null &&
+                opensBooking(a.href, window.location.origin),
+        );
+        if (slot) return slot;
+    }
+    const same = links.filter((a) => a.getAttribute("href") === back.href);
+    return (
+        same.find((a) => a.closest("[data-site-header]") === null) ??
+        same.at(0) ??
+        null
+    );
 }
