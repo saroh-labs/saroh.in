@@ -2,19 +2,27 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { RenderedServicesList } from "@saroh/block-contract";
+import type { LookId, RenderedServicesList } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 
 import { destructiveAlertClasses } from "../alert";
 import { DEFAULT_API_URL } from "../api-url";
 import { quietFill } from "../booking-flow/styles";
-import type { GstOnPrice } from "../lib/gst-price";
-import { browsePriceWords, gstOnPriceOf } from "../lib/gst-price";
-import { siteMoney } from "../lib/money";
 import { cn } from "../lib/utils";
 import type { LookProps } from "../look-context";
 import { useQrSource, withQrSource } from "../qr-source";
 import { CtaButton, ctaClasses } from "./cta";
+import { frontButton } from "./look-front";
+import type { PublicService } from "./service-words";
+import { formatDuration, servicePriceWords } from "./service-words";
+import LookServices from "./services-look";
+
+export {
+    formatDuration,
+    formatPrice,
+    servicePriceWords,
+} from "./service-words";
+export type { PublicService } from "./service-words";
 
 /**
  * `servicesList` v1 — the merchant's real Services, read live (#255).
@@ -38,22 +46,6 @@ import { CtaButton, ctaClasses } from "./cta";
  * Drawn from `--site-*` only; gate G2 fails the build otherwise.
  */
 
-/** A service as the public endpoint returns it. */
-export interface PublicService {
-    id: string;
-    name: string;
-    description: string | null;
-    durationMinutes: number;
-    priceCents: number | null;
-    currency: string | null;
-    /**
-     * The GST in or on the price; null for none. Absent from an older API.
-     * The list only browses, so it reads the mode alone: "+ GST" after a
-     * price GST is added to.
-     */
-    gst?: GstOnPrice | null;
-}
-
 type LoadState =
     | { kind: "loading" }
     | { kind: "ready"; services: PublicService[] }
@@ -72,56 +64,12 @@ function isPublicService(value: unknown): value is PublicService {
     );
 }
 
-/**
- * A service's price as the list shows it: the price the business typed,
- * with "+ GST" after it when GST comes on top. Null for none to show.
- */
-export function servicePriceWords(
-    service: Pick<PublicService, "priceCents" | "currency" | "gst">,
-    locale?: string,
-): string | null {
-    const price = formatPrice(service.priceCents, service.currency, locale);
-    return price === null
-        ? null
-        : browsePriceWords(price, gstOnPriceOf(service.gst)?.mode === "ADDED");
-}
-
-/** "30 min", "1 hr", "1 hr 30 min". */
-export function formatDuration(minutes: number): string {
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    if (h === 0) return `${m} min`;
-    return m === 0 ? `${h} hr` : `${h} hr ${m} min`;
-}
-
-/**
- * A service price, or null when there is none to show; an absent price is
- * never "0".
- *
- * `priceCents` is the amount x 100 for EVERY currency: that is how the service
- * form writes it (`Math.round(price * 100)`) and how the workspace reads it
- * (`formatMoney`, amount / 100). Dividing by the currency's own minor unit
- * instead showed a ¥1,500 service as ¥150,000 (review of #255). Intl still
- * chooses the decimals to DISPLAY, so yen shows none.
- *
- * `locale` defaults to the visitor's; tests pin one.
- */
-export function formatPrice(
-    priceCents: number | null,
-    currency: string | null,
-    locale?: string,
-): string | null {
-    if (priceCents === null || !currency) return null;
-    // Whole amounts without decimals (DEC-073 #11); an unknown currency
-    // code is no price rather than a wrong one.
-    return siteMoney(priceCents / 100, currency, locale);
-}
-
 export default function ServicesListSection({
     content,
     apiUrl = DEFAULT_API_URL,
     services: given,
     bookHref,
+    look,
 }: LookProps & {
     content: RenderedServicesList;
     /** Base URL of the public API. See {@link DEFAULT_API_URL}. */
@@ -190,6 +138,21 @@ export default function ServicesListSection({
         return (
             <PriceCardSection
                 content={content}
+                state={state}
+                retry={retry}
+                bookHref={bookHref}
+                look={look}
+            />
+        );
+    }
+
+    // Under a look (U6), a list is the look's rows; cards and the price
+    // card keep their own layouts, restyled by the look's tokens.
+    if (look && content.layout !== "cards") {
+        return (
+            <LookServices
+                content={content}
+                look={look}
                 state={state}
                 retry={retry}
                 bookHref={bookHref}
@@ -276,6 +239,7 @@ export default function ServicesListSection({
                         showDescriptions={showDescriptions}
                         label={label}
                         bookHref={bookHref}
+                        look={look}
                     />
                     {content.cta ? (
                         <div className="mt-8">
@@ -402,6 +366,7 @@ function ServiceCards({
     showDescriptions,
     label,
     bookHref,
+    look,
 }: {
     services: PublicService[];
     showPrices: boolean;
@@ -409,6 +374,8 @@ function ServiceCards({
     /** The merchant's button words; null keeps "Book". */
     label: string | null;
     bookHref?: string;
+    /** Under a look, a card takes the look's card corner, not its button's. */
+    look?: LookId;
 }) {
     const source = useQrSource();
     const words = label ?? "Book";
@@ -419,7 +386,11 @@ function ServiceCards({
                 return (
                     <li
                         key={service.id}
-                        className="border-site-border bg-site-surface text-site-fg grid min-w-0 content-start gap-1.5 overflow-hidden rounded-[calc(var(--site-radius)*1.4)] border p-4"
+                        className={
+                            look
+                                ? "border-site-border bg-site-surface text-site-fg rounded-site-s grid min-w-0 content-start gap-1.5 overflow-hidden border p-4"
+                                : "border-site-border bg-site-surface text-site-fg grid min-w-0 content-start gap-1.5 overflow-hidden rounded-[calc(var(--site-radius)*1.4)] border p-4"
+                        }
                     >
                         <span className="text-site-muted text-[11.5px] font-bold uppercase tracking-[0.08em]">
                             {formatDuration(service.durationMinutes)}
@@ -444,16 +415,30 @@ function ServiceCards({
                                         source,
                                     )}
                                     aria-label={`${words}: ${service.name}`}
-                                    className={cn(
-                                        cardButton,
-                                        "cursor-pointer transition-[opacity,transform] hover:opacity-90 active:scale-[0.98]",
-                                        focusRing,
-                                    )}
+                                    className={
+                                        // Under a look, one filled button a
+                                        // view: a card's Book is quiet.
+                                        look
+                                            ? frontButton(look, "quiet")
+                                            : cn(
+                                                  cardButton,
+                                                  "cursor-pointer transition-[opacity,transform] hover:opacity-90 active:scale-[0.98]",
+                                                  focusRing,
+                                              )
+                                    }
                                 >
                                     {words}
                                 </a>
                             ) : (
-                                <span className={cardButton}>{words}</span>
+                                <span
+                                    className={
+                                        look
+                                            ? frontButton(look, "quiet")
+                                            : cardButton
+                                    }
+                                >
+                                    {words}
+                                </span>
                             )}
                         </span>
                     </li>
@@ -479,11 +464,13 @@ function PriceCardSection({
     state,
     retry,
     bookHref,
+    look,
 }: {
     content: RenderedServicesList;
     state: LoadState;
     retry: () => void;
     bookHref?: string;
+    look?: LookId;
 }) {
     const heading = said(content.heading);
     const intro = said(content.intro);
@@ -516,6 +503,7 @@ function PriceCardSection({
                 content={content}
                 service={service}
                 bookHref={bookHref}
+                look={look}
             />
         ) : null;
 
@@ -574,10 +562,12 @@ function PriceCard({
     content,
     service,
     bookHref,
+    look,
 }: {
     content: RenderedServicesList;
     service: PublicService;
     bookHref?: string;
+    look?: LookId;
 }) {
     const source = useQrSource();
     const price =
@@ -592,7 +582,11 @@ function PriceCard({
     return (
         <div
             data-price-card=""
-            className="border-site-border bg-site-surface rounded-[calc(var(--site-radius)*1.4)] border p-6"
+            className={
+                look
+                    ? "border-site-border bg-site-surface rounded-site-s border p-6"
+                    : "border-site-border bg-site-surface rounded-[calc(var(--site-radius)*1.4)] border p-6"
+            }
         >
             <h3 className="text-site-muted text-[12px] font-semibold uppercase tracking-[0.1em]">
                 {service.name}

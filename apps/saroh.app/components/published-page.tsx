@@ -22,6 +22,7 @@ import {
 import { accountAreaOn } from "@/lib/account-area";
 import { publicApiUrl } from "@/lib/api-url";
 import { getSignedInCustomer } from "@/lib/customer-session";
+import { frontDoorFor } from "@/lib/front-door";
 import type { PublicationPage, PublicationSnapshot } from "@/lib/publication";
 import { getJournalFeed } from "@/lib/publication";
 import { getSignInOptions } from "@/lib/sign-in";
@@ -58,7 +59,7 @@ export async function PublishedPage({
             page.kind === "SHOP" || page.path === "/shop",
         ),
     ]);
-    const [prices, thread, contact] = await Promise.all([
+    const [prices, thread, contact, frontDoor] = await Promise.all([
         pricesActions(snapshot.site.name, plans, packs),
         threadActions(snapshot.site.name, page.sections),
         // How to reach the business, for a booking block with no time to
@@ -67,6 +68,15 @@ export async function PublishedPage({
         siteId && page.sections.some((s) => s.type === "booking")
             ? getSiteContact(siteId)
             : null,
+        // Under a look, the hero's way in beside its button (U6): the
+        // booking page, else the shop. The header's own reads, shared.
+        frontDoorFor({
+            siteId,
+            look: snapshot.site.look,
+            sections: page.sections,
+            pages: snapshot.pages,
+            home: page.isHome === true,
+        }),
     ]);
 
     return (
@@ -87,6 +97,7 @@ export async function PublishedPage({
             // For a closing band whose content gives no heading.
             siteName={snapshot.site.name}
             look={snapshot.site.look}
+            frontDoor={frontDoor}
             // A customer's page: never the owner's preview, so nothing that
             // speaks to the owner ("No photo yet") is ever drawn here.
             isOwnerPreview={false}

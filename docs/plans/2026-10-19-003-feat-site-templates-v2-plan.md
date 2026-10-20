@@ -615,6 +615,19 @@ Every unit follows `docs/patterns/00-universal.md` §15 (keep every capability: 
 
 **Verification:** Side by side with VA01, VD01 and VB01 (Desk and Phone): spacing, sizes and colour roles match (match design fidelity), except where the motion or data rules override the board.
 
+**Notes (built 20 Oct, #1094):**
+
+- **Which hero is the look's.** A centred or split hero whose section named no layout, or named the look's own default (Quiet's centred, Folio's split; Live sets none, so either), is drawn by `blocks/hero-look.tsx` (`wearsLookHero`). A section's other choice wins (KD2): a split hero under Quiet, a full-bleed or `none` hero and one with On today keep their layouts, restyled by tokens. No new hero variant ids were added to `BLOCK_META`; the look carries the layout.
+- **Order per look.** One list of parts, ordered with `max-[699px]:order-*` on a phone and a desk grid whose areas are built from the parts present (`gridAreas`, inline, so a missing part leaves no empty row). Folio: headline, proof, the card (slot and button), photo 3:2, then the line; on a desk the words beside a 4:5 photo and the card across. Quiet: photo 3:2 full width first, headline, button, slot, proof, line last; on a desk centred, line second, photo 16:9 below. Live: slot on top, headline, line, photo in a card, button full width, proof; on a desk the words beside a 560px photo.
+- **The next booking's slot** (`data-site-next-free`, `data-book-href`) keeps its height from the first paint and holds only "See times" until U8 fills it; the cached HTML has no time. The way in is worked out by the live site from the header's own reads (`apps/saroh.app/lib/front-door.ts`, `headerAction`): the booking page, else the shop ("See the shop"), else none. Home page only: About opens on its own title, as the boards draw it.
+- **Proof line** (`pageProof`): the first quote and name of the page's first testimonials, passed by `PageSections` to the page's first hero only. A page without testimonials shows none.
+- **No photo.** No `<img>` and no frame; the empty slot is `empty:hidden`. `OwnerPhotoNote` ("Only you see this · No photo yet: {brief}") draws only with `isOwnerPreview`. People get `InitialsPlate` (`aria-hidden`; a title such as "Dr" is skipped; any script).
+- **Services** (`blocks/services-look.tsx`): a list under a look is the look's rows; the name link is stretched over the row (`after:inset-0`) and Book is a 44px sibling link above it (`z-10`), both to `/book?service=`. Cards and the price card keep their layouts; under a look their corners are `rounded-site-s` and a card's Book is quiet, so the hero keeps the one filled button.
+- **People** (`blocks/person-look.tsx`): the `team` look is each look's teachers (Folio square plates two then three across, Quiet a list, Live a sideways row of cards); the default and `portrait` looks keep their layout with initials in the photo's place, `rounded-site-photo` and the look's button. "Book with {name}" is not drawn: choosing a person in the booking link is Phase 2 (U19).
+- **Testimonials** (`blocks/testimonials-look.tsx`): Folio a pull quote with the rest beside it on a desk and behind "Read all {n}" (`<details>`) on a phone (VA-16); Quiet italic quotes between hairlines; Live cards in a sideways row.
+- **One filled button.** `FrontCta` marks a block's primary-style button `data-site-primary`; `CtaButton` takes `primary`, set only for the closing band under a look. Features and the band are restyled by tokens only.
+- **Not done here:** one shared sample source for the catalog's fixtures (VA-13): the block fixtures still use their own sample businesses, and moving them changes the catalog's pinned snapshots, so it waits for U16's picker work.
+
 ---
 
 #### U7. Content blocks, part 2: gallery, journal, timetable, plans, packs, visit us and the rest

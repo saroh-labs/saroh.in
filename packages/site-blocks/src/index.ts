@@ -16,9 +16,12 @@ export {
     PageSections,
     default as SectionRenderer,
     opensOverPhoto,
+    pageProof,
     withLookVariant,
 } from "./section-renderer";
 export type { Section } from "./section-renderer";
+// The hero's way in and its proof line under a look (DEC-172, U6).
+export type { FrontDoor, PageProof } from "./blocks/look-front";
 // The look a page is drawn in, and whether it is the owner's preview
 // (DEC-172, U4): handed to every block as props.
 export { lookOf, lookScope } from "./look-context";

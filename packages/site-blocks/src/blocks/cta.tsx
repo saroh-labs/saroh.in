@@ -186,11 +186,19 @@ function isExternal(href: string): boolean {
 export function CtaButton({
     content,
     surface = "page",
+    primary = false,
 }: {
     content: RenderedCta;
     surface?: CtaSurface;
+    /**
+     * The block's main action under a look (U6): marked
+     * `data-site-primary`, which the look's chrome reads to keep one
+     * filled button a view. Never set on Classic.
+     */
+    primary?: boolean;
 }) {
     const className = ctaClasses(content.style, surface);
+    const mark = primary ? { "data-site-primary": "" } : {};
     if (content.href.trim() === "") {
         // A v2 button whose page was hidden or removed after it was set. The
         // flag engine told the merchant before publish; here the label draws
@@ -209,13 +217,14 @@ export function CtaButton({
                 href={content.href}
                 className={className}
                 rel="noopener noreferrer"
+                {...mark}
             >
                 {content.label}
             </a>
         );
     }
     return (
-        <Link href={content.href} className={className}>
+        <Link href={content.href} className={className} {...mark}>
             {content.label}
         </Link>
     );
@@ -235,6 +244,9 @@ export function CtaButton({
  * left edge with the button beside them at the desk, and above it on a
  * phone: a row, not one more centred stack.
  *
+ * Under a look (DEC-172, U6) the band is restyled by the look's tokens
+ * only, and its filled button is marked as the band's main action.
+ *
  * The band's colour runs edge to edge; its words keep the page's column and
  * margins, as every section's do. `data-site-ground` tells `SiteTheme` the
  * block paints its own ground, so the page's rhythm never tucks it up
@@ -243,6 +255,7 @@ export function CtaButton({
 export default function CtaSection({
     content,
     siteName,
+    look,
 }: LookProps & {
     content: RenderedCtaSection;
     /** Whose site this is, for a band whose content gives no heading. */
@@ -266,7 +279,17 @@ export default function CtaSection({
                     ) : null}
                 </div>
                 <div className="shrink-0">
-                    <CtaButton content={content} surface="band" />
+                    <CtaButton
+                        content={content}
+                        surface="band"
+                        // Under a look, the band's filled button is its
+                        // main action (U6); a quieter style is not.
+                        primary={
+                            look !== undefined &&
+                            content.style !== "secondary" &&
+                            content.style !== "link"
+                        }
+                    />
                 </div>
             </div>
         </section>

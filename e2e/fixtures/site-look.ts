@@ -44,6 +44,8 @@ interface FlagExplanation {
 export interface NorthwindLook {
     /** The site the look was set on: Northwind's first. */
     siteId: string;
+    /** The demo owner's Northwind API, for a spec that edits the draft too. */
+    owner: ReturnType<typeof northwind>;
     /** Publish the draft, so the live site wears the look. */
     publish: () => Promise<void>;
     /**
@@ -125,6 +127,7 @@ export async function setNorthwindLook(
     let published = false;
     return {
         siteId: site.id,
+        owner: nw,
         saveLook,
         flag,
         publish: async () => {

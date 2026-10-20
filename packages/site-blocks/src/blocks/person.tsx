@@ -1,9 +1,12 @@
-import type { RenderedPerson } from "@saroh/block-contract";
+import type { LookId, RenderedPerson } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 
 import { siteImage } from "../lib/site-image";
 import type { LookProps } from "../look-context";
 import { CtaButton } from "./cta";
+import { FrontCta } from "./look-front";
+import { InitialsPlate } from "./no-photo";
+import LookTeam from "./person-look";
 
 /**
  * `person` v1 — one practitioner (industry templates U2): a photo, their
@@ -25,6 +28,11 @@ import { CtaButton } from "./cta";
  * `people` side by side, 3:4 photos, four across on a desk and two on a
  * phone). A qualification may be a row, its title and where it came from,
  * under a visible label. Drawn from `--site-*` only (gate G2).
+ *
+ * UNDER A LOOK (DEC-172, U6): a team is drawn as the look's teachers
+ * (`person-look.tsx`); one person keeps the layout their section chose,
+ * with the look's corners and button, and a person with no photo shows
+ * their initials where it would be, never an empty frame.
  */
 function said(value: string | undefined): string | null {
     const trimmed = value?.trim();
@@ -56,14 +64,23 @@ export const PERSON_CREDENTIALS_LABEL = "Qualifications";
 
 export default function PersonSection({
     content,
+    look: siteLook,
 }: LookProps & {
     content: RenderedPerson;
 }) {
     const name = said(content.name);
     if (!name) return null;
     const look = resolveVariant("person", content);
-    if (look === "team") return <TeamGrid content={content} />;
-    if (look === "portrait") return <PortraitColumn content={content} />;
+    if (look === "team") {
+        return siteLook ? (
+            <LookTeam content={content} look={siteLook} />
+        ) : (
+            <TeamGrid content={content} />
+        );
+    }
+    if (look === "portrait") {
+        return <PortraitColumn content={content} siteLook={siteLook} />;
+    }
     const src = said(content.image?.src);
     const role = said(content.role);
     const bio = said(content.bio);
@@ -77,9 +94,18 @@ export default function PersonSection({
                 className={
                     src
                         ? "grid items-start gap-6 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] sm:gap-10"
-                        : "max-w-2xl"
+                        : siteLook
+                          ? "grid max-w-3xl items-start gap-6 sm:grid-cols-[auto_minmax(0,1fr)] sm:gap-10"
+                          : "max-w-2xl"
                 }
             >
+                {!src && siteLook ? (
+                    <InitialsPlate
+                        name={name}
+                        look={siteLook}
+                        className="size-24 text-[38px] sm:size-[160px] sm:text-[64px]"
+                    />
+                ) : null}
                 {src ? (
                     // A merchant's own photo, a plain <img> as every block's.
                     <img
@@ -92,7 +118,11 @@ export default function PersonSection({
                             width: content.image?.width,
                             sizes: "(min-width: 640px) 384px, 100vw",
                         })}
-                        className="aspect-[4/5] w-full max-w-sm rounded-[calc(var(--site-radius)*1.4)] object-cover"
+                        className={
+                            siteLook
+                                ? "rounded-site-photo aspect-[4/5] w-full max-w-sm object-cover"
+                                : "aspect-[4/5] w-full max-w-sm rounded-[calc(var(--site-radius)*1.4)] object-cover"
+                        }
                     />
                 ) : null}
                 <div className="min-w-0">
@@ -148,12 +178,28 @@ export default function PersonSection({
                     ) : null}
                     {content.cta ? (
                         <div className="mt-6">
-                            <CtaButton content={content.cta} />
+                            <PersonCta content={content} siteLook={siteLook} />
                         </div>
                     ) : null}
                 </div>
             </div>
         </section>
+    );
+}
+
+/** The person's button: the look's under a look, Classic's otherwise. */
+function PersonCta({
+    content,
+    siteLook,
+}: {
+    content: RenderedPerson;
+    siteLook?: LookId;
+}) {
+    if (!content.cta) return null;
+    return siteLook ? (
+        <FrontCta content={content.cta} look={siteLook} />
+    ) : (
+        <CtaButton content={content.cta} />
     );
 }
 
@@ -163,7 +209,13 @@ export default function PersonSection({
  * rows (title / where) under their label; beside it the name set large,
  * the role and the words. On a phone the portrait comes first.
  */
-function PortraitColumn({ content }: { content: RenderedPerson }) {
+function PortraitColumn({
+    content,
+    siteLook,
+}: {
+    content: RenderedPerson;
+    siteLook?: LookId;
+}) {
     const name = said(content.name) ?? "";
     const src = said(content.image?.src);
     const role = said(content.role);
@@ -171,10 +223,11 @@ function PortraitColumn({ content }: { content: RenderedPerson }) {
     const credentials = credentialsOf(content.credentials);
     const label = said(content.credentialsLabel) ?? PERSON_CREDENTIALS_LABEL;
     const Name = content.asTitle ? "h1" : "h2";
-    const aside = src !== null || credentials.length > 0;
+    const aside =
+        src !== null || credentials.length > 0 || siteLook !== undefined;
     const rows =
         credentials.length > 0 ? (
-            <div className={src ? "mt-6" : undefined}>
+            <div className={src || siteLook ? "mt-6" : undefined}>
                 <p className="text-site-muted text-[12px] font-semibold uppercase tracking-[0.1em]">
                     {label}
                 </p>
@@ -220,7 +273,17 @@ function PortraitColumn({ content }: { content: RenderedPerson }) {
                                     width: content.image?.width,
                                     sizes: "300px",
                                 })}
-                                className="bg-site-surface aspect-[4/5] w-full rounded-[var(--site-radius)] object-cover"
+                                className={
+                                    siteLook
+                                        ? "bg-site-surface rounded-site-photo aspect-[4/5] w-full object-cover"
+                                        : "bg-site-surface aspect-[4/5] w-full rounded-[var(--site-radius)] object-cover"
+                                }
+                            />
+                        ) : siteLook ? (
+                            <InitialsPlate
+                                name={name}
+                                look={siteLook}
+                                className="size-[120px] text-[50px]"
                             />
                         ) : null}
                         {rows}
@@ -242,7 +305,7 @@ function PortraitColumn({ content }: { content: RenderedPerson }) {
                     ) : null}
                     {content.cta ? (
                         <div className="mt-6">
-                            <CtaButton content={content.cta} />
+                            <PersonCta content={content} siteLook={siteLook} />
                         </div>
                     ) : null}
                 </div>

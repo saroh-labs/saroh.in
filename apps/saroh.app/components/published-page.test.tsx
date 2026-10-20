@@ -30,6 +30,11 @@ vi.mock("@/app/[domain]/account/plan/actions", () => ({
 }));
 vi.mock("@/lib/account-area", () => ({ accountAreaOn: () => false }));
 vi.mock("@/lib/api-url", () => ({ publicApiUrl: () => "https://api.test" }));
+vi.mock("@/lib/front-door", () => ({
+    frontDoorFor: vi.fn(({ look }: { look?: string }) =>
+        Promise.resolve(look ? { kind: "book", href: "/book" } : null),
+    ),
+}));
 vi.mock("@/lib/customer-session", () => ({
     getSignedInCustomer: vi.fn(() => Promise.resolve(null)),
 }));
@@ -49,7 +54,7 @@ vi.mock("@/lib/site-product-grids", () => ({
 }));
 
 interface Drawn {
-    props: { isOwnerPreview?: boolean; look?: unknown };
+    props: { isOwnerPreview?: boolean; look?: unknown; frontDoor?: unknown };
 }
 
 async function draw(look?: string): Promise<Drawn> {
@@ -70,11 +75,14 @@ describe("a published page", () => {
         const drawn = await draw("live");
         expect(drawn.props.isOwnerPreview).toBe(false);
         expect(drawn.props.look).toBe("live");
+        // The hero's way in beside its button (U6).
+        expect(drawn.props.frontDoor).toEqual({ kind: "book", href: "/book" });
     });
 
     it("is Classic when the publication has no look", async () => {
         const drawn = await draw();
         expect(drawn.props.isOwnerPreview).toBe(false);
         expect(drawn.props.look).toBeUndefined();
+        expect(drawn.props.frontDoor).toBeNull();
     });
 });

@@ -41,6 +41,7 @@ import { heroLevels } from "./blocks/hero-level";
 import HoursSection from "./blocks/hours";
 import type { JournalFeed } from "./blocks/journal";
 import JournalSection from "./blocks/journal";
+import type { FrontDoor, PageProof } from "./blocks/look-front";
 import type { PacksFeed } from "./blocks/packs";
 import PacksSection from "./blocks/packs";
 import PersonSection from "./blocks/person";
@@ -109,8 +110,17 @@ export default function SectionRenderer({
     siteName,
     look,
     isOwnerPreview = false,
+    frontDoor = null,
+    proof = null,
 }: LookProps & {
     section: Section;
+    /**
+     * Under a look, for the page's first hero: its way in beside its
+     * button (the booking page or the shop) and the page's proof line
+     * (U6). `PageSections` works both out; elsewhere they are absent.
+     */
+    frontDoor?: FrontDoor | null;
+    proof?: PageProof | null;
     /**
      * Which heading a hero's headline is: `1` for the page's first hero,
      * `2` for a later one (`hero-level.ts`). A section drawn on its own is
@@ -215,6 +225,8 @@ export default function SectionRenderer({
                     now={now}
                     priority={first}
                     level={heroLevel}
+                    frontDoor={frontDoor}
+                    proof={proof}
                 />
             );
         case "richText":
@@ -477,8 +489,15 @@ export function PageSections({
     siteName,
     look,
     isOwnerPreview = false,
+    frontDoor = null,
 }: LookProps & {
     sections: Section[];
+    /**
+     * Under a look: the way in the page's first hero offers beside its
+     * button (U6), worked out by the live site from what it serves now
+     * (the booking page, else the shop). Absent: no slot.
+     */
+    frontDoor?: FrontDoor | null;
     /** Whose site this is, for the closing band's composed heading. */
     siteName?: string | null;
     /** How to reach the business, for the blocks that offer it. */
@@ -536,6 +555,15 @@ export function PageSections({
         titled: top !== null,
         skip: nothing,
     });
+    // Under a look, the page's first hero carries its way in and one proof
+    // line from the page's own testimonials (U6). Classic gets neither.
+    const lookId = lookOf(look);
+    const proof = lookId ? pageProof(sections) : null;
+    const opener = lookId
+        ? sections.findIndex(
+              (s, i) => s.type === "hero" && levels[i] === 1 && !nothing(i),
+          )
+        : -1;
     return (
         <>
             {top ? <ModulePageTop title={top.title} lead={top.lead} /> : null}
@@ -569,6 +597,7 @@ export function PageSections({
                         siteName={siteName}
                         look={look}
                         isOwnerPreview={isOwnerPreview}
+                        {...(i === opener ? { frontDoor, proof } : {})}
                     />
                 );
                 return (
@@ -591,4 +620,30 @@ export function PageSections({
             })}
         </>
     );
+}
+
+/**
+ * The page's one proof line under a look (U6): the first quote of its
+ * first testimonials section, as the owner wrote it. Null when the page
+ * has none: a proof line is never composed.
+ */
+export function pageProof(sections: readonly Section[]): PageProof | null {
+    for (const section of sections) {
+        if (section.type !== "testimonials") continue;
+        const items = (section.content as { items?: unknown } | null)?.items;
+        if (!Array.isArray(items)) continue;
+        for (const item of items) {
+            const quote = (item as { quote?: unknown } | null)?.quote;
+            const name = (item as { name?: unknown } | null)?.name;
+            if (
+                typeof quote === "string" &&
+                quote.trim() !== "" &&
+                typeof name === "string" &&
+                name.trim() !== ""
+            ) {
+                return { quote: quote.trim(), name: name.trim() };
+            }
+        }
+    }
+    return null;
 }
