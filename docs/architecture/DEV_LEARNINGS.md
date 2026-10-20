@@ -12,6 +12,28 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Bookings — a free time called fully booked when bookings landed together
+
+**Symptom**: 20 Oct 2026, the looks release gate. `public-booking.spec.ts`
+failed now and then, desk or phone: after signing in, "That time is fully
+booked." for a time the page still showed free, and no payment intent. The
+API answered 409 in 352ms beside four other Northwind bookings.
+**Cause**: the reservation is a serializable transaction, and Postgres
+aborts the loser of any overlap it sees, a booking of another time too
+(P2034). A site booking without a credit or a treatment did not retry, so
+the lost race was told to the visitor as "fully booked". The parallel
+specs book Northwind at once, which a busy business does too.
+**Fix**: a site booking always tries once more after a lost race
+(`retryOnce: true` in `public-bookings.service.ts`); the second attempt's
+capacity check gives the true answer. Its unit spec books on one P2034 and
+answers 409 on two.
+**Also**: `page.waitForURL` throws `net::ERR_ABORTED` when a navigation on
+the way is replaced by the next (accounts' sign-in redirects), though the
+page lands where it should: `auth.spec.ts` polls the URL instead.
+**Rule**: `backend-billing-and-classes.md` → Race safety already said a
+lost race is retried once; a plain site booking now follows it. In a spec,
+assert where the page ends up, not each navigation on the way.
+
 ## Sites — the looks' first browser run: 45 serial failures, five app bugs
 
 **Symptom**: 20 Oct 2026, the Saroh looks release (batch-2026-10-20-3). The
