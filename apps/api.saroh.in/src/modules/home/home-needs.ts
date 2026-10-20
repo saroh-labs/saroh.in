@@ -101,9 +101,6 @@ const SEVERITY_TONE: Record<HomeSeverity, HomeTone> = {
     SUGGESTION: "info",
 };
 
-/** The zone a business without one keeps its days in (as invoicing does). */
-export const HOME_DEFAULT_ZONE = "Asia/Kolkata";
-
 /** "14 Sep", in the business's zone. */
 function day(at: string, zone: string): string {
     return DateTime.fromISO(at, { zone }).toFormat("d LLL");

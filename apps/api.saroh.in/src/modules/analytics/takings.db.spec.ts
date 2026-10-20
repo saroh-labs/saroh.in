@@ -11,6 +11,7 @@
 import { ForbiddenException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { onTheLedger } from "../../../test/ledger-paid";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { MoneyRead } from "./money";
 import { INVOICES_PLACE, locationPlace, ONLINE_PLACE } from "./takings";
@@ -77,18 +78,20 @@ async function order(
 
 async function invoice(organizationId: string, data: Record<string, unknown>) {
     n += 1;
-    return prisma.invoice.create({
-        data: {
-            organizationId,
-            number: `TK-INV-${n}-${tag}`,
-            status: "PAID",
-            currency: "INR",
-            subtotal: "0",
-            total: "0",
-            issuedAt: new Date("2026-08-01T06:00:00.000Z"),
-            ...data,
-        },
-    });
+    return onTheLedger(
+        await prisma.invoice.create({
+            data: {
+                organizationId,
+                number: `TK-INV-${n}-${tag}`,
+                status: "PAID",
+                currency: "INR",
+                subtotal: "0",
+                total: "0",
+                issuedAt: new Date("2026-08-01T06:00:00.000Z"),
+                ...data,
+            },
+        }),
+    );
 }
 
 async function refund(

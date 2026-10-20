@@ -2,6 +2,10 @@ import { Injectable, Logger, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { planConnectsOwnAccounts } from "../billing/online-payments-plan";
+import {
+    businessTimezone,
+    FALLBACK_TIMEZONE,
+} from "../bookings/staff-availability";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
 import {
@@ -39,7 +43,7 @@ import {
     refundReasonWords,
     refundsOwedTitle,
 } from "./home-money-sources";
-import { flattenNeeds, HOME_DEFAULT_ZONE } from "./home-needs";
+import { flattenNeeds } from "./home-needs";
 import type { OpenOrders } from "./home-open-orders";
 import { readOpenOrders } from "./home-open-orders";
 import { pausesWaitingOnPayments } from "./home-pause-sources";
@@ -856,27 +860,22 @@ export class HomeService {
     }
 
     /**
-     * The zone the business keeps its days in, or India's when it has set
-     * none (as invoicing reads it). Not a source of its own: when it can't be
-     * read, the default only moves "Due today" by the zones' difference, and
-     * saying Home is missing a part would be untrue.
+     * The zone the business keeps its days in: `businessTimezone`, the one
+     * reader every surface uses (its own setting, else its first service's,
+     * else India's). Not a source of its own: when it can't be read, the
+     * fallback only moves "Due today" by the zones' difference, and saying
+     * Home is missing a part would be untrue.
      */
     private async businessZone(organizationId: string): Promise<string> {
         try {
-            const profile = await this.db.businessProfile.findUnique({
-                where: { organizationId },
-                select: { timezone: true },
-            });
-            // "" included, as older rows stored it.
-            const zone = profile?.timezone?.trim() ?? "";
-            return zone.length > 0 ? zone : HOME_DEFAULT_ZONE;
+            return await businessTimezone(this.db, organizationId);
         } catch (error) {
             this.logger.warn(
                 `Home could not read the business's time zone: ${
                     error instanceof Error ? error.message : String(error)
                 }`,
             );
-            return HOME_DEFAULT_ZONE;
+            return FALLBACK_TIMEZONE;
         }
     }
 

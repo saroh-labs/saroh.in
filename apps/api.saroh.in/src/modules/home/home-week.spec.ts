@@ -3,7 +3,6 @@ import type { OrgAction } from "../organizations/organization-actions";
 import type { HomeInput } from "./home-model";
 import {
     compareTakings,
-    paidBetweenWhere,
     readWeek,
     refundedBetweenWhere,
     takingsFigures,
@@ -49,6 +48,21 @@ const grouped = (rows: Sum[]) =>
     rows.map((r) => ({
         currency: r.currency,
         _sum: { total: r.total },
+        _count: { _all: r.count },
+    }));
+/** Money in (`money-in.ts`) as `readMoneyIn` folds it, from sums. */
+const moneyIn = (rows: Sum[]) => ({
+    totals: new Map(
+        rows.map((r) => [r.currency, Math.round(Number(r.total) * 100)]),
+    ),
+    payments: new Map(rows.map((r) => [r.currency, r.count])),
+});
+/** The ledger's grouped rows for `readMoneyIn`: one invoice per sum. */
+const ledgerRows = (rows: Sum[]) =>
+    rows.map((r, i) => ({
+        invoiceId: `inv_${i}`,
+        currency: r.currency,
+        _sum: { amountCents: Math.round(Number(r.total) * 100) },
         _count: { _all: r.count },
     }));
 
@@ -118,7 +132,7 @@ describe("compareTakings", () => {
 describe("the money this week", () => {
     it("takes a refund off the week it was made in, per currency", () => {
         const money = windowMoney(
-            grouped([
+            moneyIn([
                 { currency: "INR", total: "12000.50", count: 4 },
                 { currency: "USD", total: "20", count: 1 },
             ]),
@@ -138,22 +152,6 @@ describe("the money this week", () => {
         );
     });
 
-    it("counts paid invoices once — an order's own included, credit notes never, a booking's unpaid hold never", () => {
-        const where = paidBetweenWhere("org_1", new Date(MONDAY), NOW);
-        expect(where).toEqual({
-            organizationId: "org_1",
-            paidAt: { gte: new Date(MONDAY), lt: NOW },
-            kind: { not: "CREDIT_NOTE" },
-            NOT: {
-                source: { in: ["BOOKING", "PACK", "SUBSCRIPTION"] },
-                number: null,
-            },
-        });
-        // No `orderId: null`: an order's money is its invoice (ADR-008),
-        // and nothing else counts it.
-        expect(where).not.toHaveProperty("orderId");
-    });
-
     it("counts as refunded only a credit note that gave money back", () => {
         expect(refundedBetweenWhere("org_1", new Date(MONDAY), NOW)).toEqual({
             organizationId: "org_1",
@@ -169,14 +167,14 @@ describe("the money this week", () => {
 
     it("compares each currency with its own last week", () => {
         const thisWeek = windowMoney(
-            grouped([
+            moneyIn([
                 { currency: "USD", total: "20", count: 1 },
                 { currency: "INR", total: "11000", count: 5 },
             ]),
             [],
         );
         const lastWeek = windowMoney(
-            grouped([{ currency: "INR", total: "10000", count: 4 }]),
+            moneyIn([{ currency: "INR", total: "10000", count: 4 }]),
             [],
         );
         expect(takingsFigures(thisWeek, lastWeek, "/x")).toEqual([
@@ -295,13 +293,22 @@ function db(
     const bookings = [...(over.bookings ?? [0, 0])];
     return {
         invoice: {
-            groupBy: jest.fn((args: { where: { kind?: unknown } }) => {
-                if (args.where.kind === "CREDIT_NOTE") {
-                    return Promise.resolve(grouped(refunded.shift() ?? []));
-                }
-                return Promise.resolve(grouped(paid.shift() ?? []));
-            }),
-            findMany: jest.fn().mockResolvedValue(over.owed ?? []),
+            // Money handed back: credit notes, grouped per currency.
+            groupBy: jest.fn(() =>
+                Promise.resolve(grouped(refunded.shift() ?? [])),
+            ),
+            // An order's paper paid in a window (`money-in.ts`) has none
+            // here; the unpaid bills otherwise.
+            findMany: jest.fn((args: { where: { paidAt?: unknown } }) =>
+                Promise.resolve(
+                    args.where.paidAt
+                        ? []
+                        : (over.owed ?? []).map((b) => ({
+                              status: "ISSUED",
+                              ...b,
+                          })),
+                ),
+            ),
             findFirst: jest
                 .fn()
                 .mockResolvedValue(over.billed ? { id: "inv_1" } : null),
@@ -317,12 +324,27 @@ function db(
         },
         order: { count: jest.fn().mockResolvedValue(over.orders ?? 0) },
         invoicePayment: {
-            groupBy: jest.fn().mockResolvedValue(over.cheques ?? []),
+            // Money in by the ledger (`money-in.ts`), else the cheques.
+            groupBy: jest.fn((args: { where: { receivedAt?: unknown } }) =>
+                Promise.resolve(
+                    args.where.receivedAt
+                        ? ledgerRows(paid.shift() ?? [])
+                        : (over.cheques ?? []),
+                ),
+            ),
         },
     };
 }
 
 const EVERY = { takings: true, bookings: true, orders: true, owed: true };
+
+/** The cheques line's reads among the ledger's (money in reads it too). */
+function chequeReads(client: ReturnType<typeof db>) {
+    return client.invoicePayment.groupBy.mock.calls.filter(
+        ([args]) =>
+            (args.where as { bankStatus?: unknown }).bankStatus === "WAITING",
+    );
+}
 const clock = { now: NOW, zone: ZONE };
 
 describe("readWeek", () => {
@@ -397,7 +419,7 @@ describe("readWeek", () => {
         );
         // Read on its own by HomeService, so its failure is its own.
         expect(week).not.toHaveProperty("chequesWaiting");
-        expect(client.invoicePayment.groupBy).not.toHaveBeenCalled();
+        expect(chequeReads(client)).toEqual([]);
     });
 
     it("lowers takings by a refund made this week", async () => {
@@ -425,10 +447,11 @@ describe("readWeek", () => {
     it("measures this week to now and last week to the same moment", async () => {
         const client = db();
         await readWeek(client as never, "org_1", EVERY, clock);
-        const paidWheres = client.invoice.groupBy.mock.calls
-            .map(([args]) => args.where as { paidAt?: unknown })
-            .filter((w) => w.paidAt);
-        expect(paidWheres.map((w) => w.paidAt)).toEqual([
+        // Money in by the ledger's `receivedAt` (`money-in.ts`).
+        const paidWheres = client.invoicePayment.groupBy.mock.calls
+            .map(([args]) => args.where as { receivedAt?: unknown })
+            .filter((w) => w.receivedAt);
+        expect(paidWheres.map((w) => w.receivedAt)).toEqual([
             { gte: new Date(MONDAY), lt: NOW },
             {
                 gte: new Date("2026-09-06T18:30:00.000Z"),
@@ -653,7 +676,7 @@ describe("HomeService: This week", () => {
             const client = db({ ...waiting, bookings: [3, 2] });
             const model = await home(client).build(holding(actions));
             expect(model.week?.chequesWaiting ?? null).toBeNull();
-            expect(client.invoicePayment.groupBy).not.toHaveBeenCalled();
+            expect(chequeReads(client)).toEqual([]);
         }
     });
 
@@ -662,9 +685,13 @@ describe("HomeService: This week", () => {
             paid: [[{ currency: "INR", total: "500", count: 1 }], []],
             bookings: [3, 2],
         });
-        client.invoicePayment.groupBy = jest
-            .fn()
-            .mockRejectedValue(new Error("relation is being migrated"));
+        const reads = client.invoicePayment.groupBy;
+        client.invoicePayment.groupBy = jest.fn(
+            (args: { where: { receivedAt?: unknown } }) =>
+                args.where.receivedAt
+                    ? reads(args)
+                    : Promise.reject(new Error("relation is being migrated")),
+        ) as typeof reads;
         const model = await home(client).build(owner);
         expect(model.unavailable).toContainEqual({
             moduleKey: "PAYMENTS",

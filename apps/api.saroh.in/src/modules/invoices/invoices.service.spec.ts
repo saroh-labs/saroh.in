@@ -723,8 +723,32 @@ describe("lists and what is owed", () => {
                 source: { in: ["BOOKING", "PACK", "SUBSCRIPTION"] },
                 number: null,
             },
-            paidAt: { gte: new Date(since) },
-            kind: { not: "CREDIT_NOTE" },
+            // Money in by the one rule (`money-in.ts`, DEC-173): a payment
+            // that counts received since, or an order's paper paid since.
+            AND: [
+                {
+                    kind: { not: "CREDIT_NOTE" },
+                    OR: [
+                        {
+                            orderId: null,
+                            payments: {
+                                some: {
+                                    removedAt: null,
+                                    OR: [
+                                        { bankStatus: null },
+                                        { bankStatus: { not: "BOUNCED" } },
+                                    ],
+                                    receivedAt: { gte: new Date(since) },
+                                },
+                            },
+                        },
+                        {
+                            orderId: { not: null },
+                            paidAt: { gte: new Date(since) },
+                        },
+                    ],
+                },
+            ],
         });
     });
 

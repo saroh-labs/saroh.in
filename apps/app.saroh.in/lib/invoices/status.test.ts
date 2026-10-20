@@ -415,6 +415,19 @@ describe("paidSinceRows", () => {
         ).toEqual(["inv_old", "inv_new"]);
     });
 
+    it("keeps an invoice the API found a part payment on since, though it isn't paid (DEC-173)", () => {
+        // ₹400 of ₹1,000 came in this morning: still issued, no paid date,
+        // and Home's money figure counts it.
+        const partly = inv("inv_partly", { paidAt: null });
+        expect(
+            paidSinceRows(
+                [],
+                [partly, inv("cn", { kind: "CREDIT_NOTE" })],
+                since,
+            ).map((i) => i.id),
+        ).toEqual(["inv_partly"]);
+    });
+
     it("filters what is on hand when the API couldn't answer, never a credit note", () => {
         const onHand = [
             inv("paid"),

@@ -257,7 +257,7 @@ export interface HomeWeekTakings {
     /** The same days last week, in the same currency. */
     lastWeekMinor: number;
     change: HomeWeekChange;
-    /** The invoices paid since Monday. */
+    /** The invoices money came in on since Monday. */
     href: string;
 }
 

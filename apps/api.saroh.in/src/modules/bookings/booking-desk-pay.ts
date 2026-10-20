@@ -31,8 +31,6 @@ import {
     chargingOnly,
     DESK_REFUSED,
     deskTake,
-    paidAtDesk,
-    paidOnlineOf,
 } from "./desk-take";
 import { bookedPriceMode } from "./service-price";
 
@@ -184,13 +182,10 @@ export async function takeDeskPaymentInTx(
         orderBy: { createdAt: "asc" },
         select: PAPER_SELECT,
     });
-    const paidOnlineCents = paidOnlineOf(paper);
-    const desk = paidAtDesk(paper);
     const { priceCents, currency: bookedIn } = bookingPrice(booking.snapshot);
+    // What was paid is the paper's ledger (DEC-173), however it came in.
     const take = deskTake(booking, {
         priceCents,
-        paidOnlineCents,
-        paidAtDeskCents: desk.cents,
         paper: chargingOnly(paper),
     });
 

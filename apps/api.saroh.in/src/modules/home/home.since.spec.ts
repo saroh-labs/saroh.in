@@ -64,14 +64,29 @@ function db(
         },
         invoice: {
             findFirst: first,
-            groupBy: jest.fn((args: { where: { kind?: unknown } }) =>
+            // What went back: credit notes, per currency.
+            groupBy: jest.fn(() =>
                 Promise.resolve(
-                    (args.where.kind === "CREDIT_NOTE"
-                        ? (over.refunded ?? [])
-                        : (over.money ?? [])
-                    ).map((m) => ({
+                    (over.refunded ?? []).map((m) => ({
                         currency: m.currency,
                         _sum: { total: m.total },
+                        _count: { _all: m.count },
+                    })),
+                ),
+            ),
+            // An order's paper paid in the window (`money-in.ts`): none.
+            findMany: jest.fn().mockResolvedValue([]),
+        },
+        // Money in by the ledger (`money-in.ts`), one invoice per sum.
+        invoicePayment: {
+            groupBy: jest.fn(() =>
+                Promise.resolve(
+                    (over.money ?? []).map((m, i) => ({
+                        invoiceId: `inv_${i}`,
+                        currency: m.currency,
+                        _sum: {
+                            amountCents: Math.round(Number(m.total ?? 0) * 100),
+                        },
                         _count: { _all: m.count },
                     })),
                 ),
@@ -228,11 +243,15 @@ describe("readSince", () => {
                 status: "CONFIRMED",
             },
         });
-        const money = client.invoice.groupBy.mock.calls[0][0];
+        // Money in by the one rule (`money-in.ts`): the ledger's payments
+        // by when they came in.
+        const money = client.invoicePayment.groupBy.mock.calls[0][0] as {
+            where: unknown;
+        };
         expect(money.where).toMatchObject({
             organizationId: "org_1",
-            paidAt: { gte: since },
-            kind: { not: "CREDIT_NOTE" },
+            receivedAt: { gte: since },
+            removedAt: null,
         });
     });
 
@@ -295,6 +314,7 @@ describe("readSince", () => {
         expect(client.booking.count).not.toHaveBeenCalled();
         expect(client.productReview.count).not.toHaveBeenCalled();
         expect(client.invoice.groupBy).not.toHaveBeenCalled();
+        expect(client.invoicePayment.groupBy).not.toHaveBeenCalled();
     });
 });
 
@@ -334,6 +354,7 @@ describe("readLastDay", () => {
         const day = await readLastDay(client as never, member, ALL, clock);
         expect(day.items.map((i) => i.kind)).not.toContain("PAYMENTS");
         expect(client.invoice.groupBy).not.toHaveBeenCalled();
+        expect(client.invoicePayment.groupBy).not.toHaveBeenCalled();
     });
 
     it("isFresh is false once one paid invoice exists", async () => {

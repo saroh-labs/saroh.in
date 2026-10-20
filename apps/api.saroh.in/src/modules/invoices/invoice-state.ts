@@ -144,20 +144,6 @@ export const NOT_A_BOOKING_HOLD = {
 } satisfies Prisma.InvoiceWhereInput;
 
 /**
- * Invoices paid from `since` on, credit notes never — the money Home's
- * "Last 24 hours" adds up, and what the list's `?paidSince=` shows. An
- * order's own invoice is stamped paid with the order (ADR-008), and every
- * order has one, so the invoices alone count each rupee once.
- */
-export function paidSinceFilter(since: Date) {
-    return {
-        paidAt: { gte: since },
-        kind: { not: "CREDIT_NOTE" },
-        ...NOT_A_BOOKING_HOLD,
-    } satisfies Prisma.InvoiceWhereInput;
-}
-
-/**
  * The where for money handed back in `[from, to)`: a credit note issued
  * then, on an order (a refund, or an edit down that gave money back — the
  * calendar's takings read them the same) or made by a refund of an

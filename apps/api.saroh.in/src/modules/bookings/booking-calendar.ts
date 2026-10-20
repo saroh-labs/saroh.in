@@ -1,6 +1,6 @@
 import { bookingPrice } from "./booking-money";
 import type { DeskTake } from "./desk-take";
-import { chargingOnly, deskTake, paidAtDesk, paidOnlineOf } from "./desk-take";
+import { chargingOnly, deskTake, paidAtDesk } from "./desk-take";
 import type { PaidWith } from "./dto";
 import { PAID_WITH } from "./dto";
 import type { TreatmentRow, TreatmentView } from "./treatment-view";
@@ -219,8 +219,6 @@ function deskOf(row: DiaryRow): {
     const desk = paidAtDesk(paper);
     const take = deskTake(row, {
         priceCents: bookingPrice(row.snapshot).priceCents,
-        paidOnlineCents: paidOnlineOf(paper),
-        paidAtDeskCents: desk.cents,
         paper: chargingOnly(paper),
     });
     return {

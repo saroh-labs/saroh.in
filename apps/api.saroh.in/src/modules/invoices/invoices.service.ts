@@ -13,6 +13,7 @@ import {
     isRenewalInvoice,
     planTakesOnlinePayment,
 } from "../billing/online-payments-plan";
+import { businessTimezone } from "../bookings/staff-availability";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { businessPayInstructionsOf } from "../organizations/business-pay-instructions";
 import { authorize } from "../organizations/organization-policy";
@@ -45,11 +46,10 @@ import {
     leftToPayCents,
     NOT_A_BOOKING_HOLD,
     OWED_WHERE,
-    paidSinceFilter,
     viewWhere,
     WAITING_CHEQUE_WHERE,
 } from "./invoice-state";
-import { invoiceZoneOf, startOfDayIn } from "./invoice-summary.service";
+import { startOfDayIn } from "./invoice-summary.service";
 import { listFilterWhere, paidFromWhere, searchWhere } from "./list-filter";
 import { moneyQueryCents } from "./money-query";
 import type { BuiltDocument, TaxProfile } from "./order-invoice";
@@ -267,7 +267,7 @@ export class InvoicesService {
         const [search, paidFrom] = await Promise.all([
             q ? this.searchFor(organizationId, q) : null,
             paidFromDay
-                ? invoiceZoneOf(prisma, organizationId).then((zone) =>
+                ? businessTimezone(prisma, organizationId).then((zone) =>
                       startOfDayIn(paidFromDay, zone),
                   )
                 : null,
@@ -281,6 +281,11 @@ export class InvoicesService {
             ...((narrowed.AND as Prisma.InvoiceWhereInput[] | undefined) ?? []),
             ...(search ? [search] : []),
             ...(paidFrom ? [paidFromWhere(paidFrom)] : []),
+            // Home's money figures' link: the same money-in rule from an
+            // instant (`money-in.ts`).
+            ...(query.paidSince
+                ? [paidFromWhere(new Date(query.paidSince))]
+                : []),
         ];
         const rows = await prisma.invoice.findMany({
             where: {
@@ -290,9 +295,6 @@ export class InvoicesService {
                 ...(query.contactId ? { contactId: query.contactId } : {}),
                 ...(query.subscriptionId
                     ? { subscriptionId: query.subscriptionId }
-                    : {}),
-                ...(query.paidSince
-                    ? paidSinceFilter(new Date(query.paidSince))
                     : {}),
                 ...(and.length > 0 ? { AND: and } : {}),
             },

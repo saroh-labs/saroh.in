@@ -1,4 +1,4 @@
-import { formatMoneyMajor } from "@/lib/format/money";
+import { formatMoneyMajor, minorOf } from "@/lib/format/money";
 import { METHOD_WORD } from "@/lib/payments/method-words";
 
 import type { Invoice, InvoicePaymentMethod } from "./service";
@@ -51,7 +51,8 @@ export const FIRST_METHOD: InvoicePaymentMethod = "UPI";
 export function toPaise(amount: string): number | null {
     const trimmed = amount.trim();
     if (!/^\d+(\.\d{0,2})?$/.test(trimmed)) return null;
-    return Math.round(Number(trimmed) * 100);
+    // "4000." is 4000 as typed; the rest is read as every amount is.
+    return minorOf(trimmed.replace(/\.$/, ""));
 }
 
 /** Paise back to the API's string: 400050 → "4000.50". */

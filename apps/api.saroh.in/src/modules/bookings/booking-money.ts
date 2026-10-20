@@ -11,6 +11,7 @@ import {
     BOOKING_PAPER_SELECT,
     deskTake,
     paidAtDesk,
+    paidOnPaperCents,
 } from "./desk-take";
 
 /*
@@ -99,16 +100,17 @@ export function bookingPrice(snapshot: unknown): {
 }
 
 /**
- * What is still due at the visit (default 50): the price less what was paid
- * online and at the desk (P2), while the booking stands and is paid for with
- * money — at the desk, or online in part. Null for a pack's or a
- * membership's class, and once cancelled. The calendar's Due (E19) reads the
- * same rule.
+ * What is still due at the visit (default 50): the price less what the
+ * booking's paper has been paid, from its ledger (`paidOnPaperCents`,
+ * DEC-173: online, at the desk or recorded by hand), while the booking
+ * stands and is paid for with money — at the desk, or online in part.
+ * Null for a pack's or a membership's class, and once cancelled. The
+ * calendar's Due (E19) reads the same rule.
  */
 export function bookingDueCents(
     booking: { status: string; paidWith: string | null; snapshot: unknown },
     paidOnlineCents: number,
-    paidAtDeskCents = 0,
+    paidOnPaper = 0,
 ): number | null {
     const { priceCents } = bookingPrice(booking.snapshot);
     const byMoney =
@@ -118,7 +120,7 @@ export function bookingDueCents(
     if (booking.status === "CANCELLED" || !byMoney || priceCents === null) {
         return null;
     }
-    return Math.max(0, priceCents - paidOnlineCents - paidAtDeskCents);
+    return Math.max(0, priceCents - paidOnPaper);
 }
 
 type Db = Pick<
@@ -185,18 +187,17 @@ export async function bookingMoney(
     ]);
     const paidOnlineCents = paid._sum.amountCents ?? 0;
     const desk = paidAtDesk(paper);
-    const take = deskTake(booking, {
-        priceCents,
-        paidOnlineCents,
-        paidAtDeskCents: desk.cents,
-        paper,
-    });
+    const take = deskTake(booking, { priceCents, paper });
     return {
         priceCents,
         currency,
         paidOnlineCents,
         deposit: paidOnlineCents > 0 && paidADeposit(booking.snapshot),
-        dueCents: bookingDueCents(booking, paidOnlineCents, desk.cents),
+        dueCents: bookingDueCents(
+            booking,
+            paidOnlineCents,
+            paidOnPaperCents(paper),
+        ),
         refund: refund
             ? {
                   amountCents: refund.amountCents,

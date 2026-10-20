@@ -1,4 +1,4 @@
-import { formatMoneyMajor } from "@/lib/format/money";
+import { formatMoneyMajor, minorOf } from "@/lib/format/money";
 
 import { sentLine } from "./send";
 import type { Invoice, InvoicePayment } from "./service";
@@ -64,7 +64,7 @@ export function historyLines(
     }
 
     const payments = i.payments ?? [];
-    const totalCents = Math.round(Number(i.total) * 100);
+    const totalCents = minorOf(i.total) ?? 0;
     for (const p of payments) {
         paymentEvents(p, totalCents).forEach((e, n) => {
             const first = n === 0;

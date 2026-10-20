@@ -140,6 +140,7 @@ describe("paidFromWhere (DEC-173, U4)", () => {
             kind: { not: "CREDIT_NOTE" },
             OR: [
                 {
+                    orderId: null,
                     payments: {
                         some: {
                             removedAt: null,

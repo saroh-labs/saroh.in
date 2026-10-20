@@ -52,6 +52,8 @@ function moneyDb(opts: {
         unpaid.map((u) => ({ id: u.id, subscriptionId: u.subscriptionId }));
     const findMany = jest.fn((args: { where: Record<string, unknown> }) => {
         const where = args.where;
+        // Money in's order paper paid in a window (`money-in.ts`): none.
+        if ("paidAt" in where) return Promise.resolve([]);
         if ("dueAt" in where) return Promise.resolve(opts.overdue ?? []);
         if (where.status === "ISSUED") return Promise.resolve(unpaid);
         return Promise.resolve(latest);

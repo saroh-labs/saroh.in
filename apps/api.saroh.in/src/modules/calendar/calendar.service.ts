@@ -12,7 +12,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { holdsPlace } from "../bookings/booking-hold";
 import { bookingDueCents, bookingPrice } from "../bookings/booking-money";
 import type { BookingPaperRow } from "../bookings/desk-take";
-import { paidAtDesk } from "../bookings/desk-take";
+import { paidAtDesk, paidOnPaperCents } from "../bookings/desk-take";
 import { ownBookingsWhere, ownDiaryOf } from "../bookings/own-diary";
 import type { ZoneSource } from "../bookings/staff-availability";
 import { businessZone } from "../bookings/staff-availability";
@@ -1295,6 +1295,8 @@ export class CalendarService {
                         status: true,
                         paymentMethod: true,
                         total: true,
+                        // What its ledger holds as paid (DEC-173).
+                        paidCents: true,
                         paidAt: true,
                         paymentIntents: {
                             where: { status: "SUCCEEDED" },
@@ -1388,11 +1390,12 @@ export class CalendarService {
             .filter((i) => i.status === "PAID" || i.status === "CREDITED")
             .flatMap((i) => i.paymentIntents)
             .reduce((n, p) => n + p.amountCents, 0);
-        // Taken at the desk (P2) is paid, as online is.
+        // Paid is what the paper's ledger holds (DEC-173): online, at the
+        // desk (P2) or recorded by hand on Invoices.
         const due = bookingDueCents(
             b,
             paidOnline,
-            paidAtDesk(b.invoices).cents,
+            paidOnPaperCents(b.invoices),
         );
         const { currency } = bookingPrice(b.snapshot);
         return due && currency

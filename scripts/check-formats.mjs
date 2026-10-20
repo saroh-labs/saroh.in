@@ -7,7 +7,10 @@
 // - `Intl.NumberFormat`, `Intl.DateTimeFormat`, `toLocaleString`,
 //   `toLocaleDateString` or `toLocaleTimeString` outside `lib/format`;
 // - a plural built by hand: `n === 1 ? "" : "s"`;
-// - "successfully" or an exclamation mark in what a toast says.
+// - "successfully" or an exclamation mark in what a toast says;
+// - an amount from the API turned into paise with a float sum,
+//   `Math.round(Number(x) * 100)`, in the money screens' lib folders:
+//   `minorOf` from `lib/format/money` reads it exactly.
 //
 // Tests are left alone: a test may spell out the string it expects.
 import { readdirSync, readFileSync } from "node:fs";
@@ -29,7 +32,11 @@ const ALLOWED = new Map([
 ]);
 
 const NATIVE = [
-    [/\bIntl\.NumberFormat\b/, "Intl.NumberFormat", "formatMoney, formatNumber"],
+    [
+        /\bIntl\.NumberFormat\b/,
+        "Intl.NumberFormat",
+        "formatMoney, formatNumber",
+    ],
     [
         /\bIntl\.DateTimeFormat\b/,
         "Intl.DateTimeFormat",
@@ -40,9 +47,21 @@ const NATIVE = [
     [/\.toLocaleString\(/, "toLocaleString", "formatNumber, formatDateTime"],
 ];
 
-const HAND_PLURAL = /===\s*1\s*\?\s*""\s*:\s*"e?s"|!==\s*1\s*\?\s*"e?s"\s*:\s*""/;
+/** An amount read as paise with a float sum, not `minorOf`. */
+const FLOAT_PAISE = /Math\.round\(\s*Number\([^)]*\)\s*\*\s*100\s*\)/;
+/** Where every amount comes from the API, so `minorOf` reads it. */
+const MONEY_LIBS = ["lib/invoices/", "lib/home/", "lib/insights/"];
 
-const TOASTS = ["showSuccess", "showError", "showWarning", "showInfo", "showUndo"];
+const HAND_PLURAL =
+    /===\s*1\s*\?\s*""\s*:\s*"e?s"|!==\s*1\s*\?\s*"e?s"\s*:\s*""/;
+
+const TOASTS = [
+    "showSuccess",
+    "showError",
+    "showWarning",
+    "showInfo",
+    "showUndo",
+];
 const TOAST_CALL = new RegExp(`(?<![\\w.])(${TOASTS.join("|")})\\(`, "g");
 
 const isTest = (f) =>
@@ -152,6 +171,14 @@ for (const file of SOURCES.flatMap(walk)) {
                 }
             }
         }
+        if (
+            MONEY_LIBS.some((dir) => file.startsWith(dir)) &&
+            FLOAT_PAISE.test(line)
+        ) {
+            problems.push(
+                `${APP}/${file}:${i + 1}  paise from a float sum: use minorOf() from @/lib/format/money`,
+            );
+        }
         if (!inFormat && HAND_PLURAL.test(line)) {
             problems.push(
                 `${APP}/${file}:${i + 1}  a plural built by hand: use count() or plural() from @/lib/format/plural`,
@@ -182,7 +209,9 @@ for (const file of ALLOWED.keys()) {
     try {
         readFileSync(join(root, APP, file));
     } catch {
-        problems.push(`${APP}/${file}  is on the allow-list but no longer exists`);
+        problems.push(
+            `${APP}/${file}  is on the allow-list but no longer exists`,
+        );
     }
 }
 

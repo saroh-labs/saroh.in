@@ -1,5 +1,5 @@
 import { formatDate } from "@/lib/format/datetime";
-import { formatMoneyMajor } from "@/lib/format/money";
+import { formatMoneyMajor, minorOf } from "@/lib/format/money";
 
 import type { ShareMessageKind } from "./detail-actions";
 import { hasPdf } from "./pdf";
@@ -209,7 +209,7 @@ export function previewMessage({
         first ? `Hi ${first}, this is ${signed}` : `Hello, this is ${signed}`,
     ];
     const money = (cents: number) => formatMoneyMajor(cents / 100, i.currency);
-    const totalCents = Math.round(Number(i.total) * 100);
+    const totalCents = minorOf(i.total) ?? 0;
     const paid = paidCents(i);
     const leftC = Math.max(0, totalCents - paid);
     const n = i.number ?? "";

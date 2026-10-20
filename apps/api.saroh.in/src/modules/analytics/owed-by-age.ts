@@ -7,7 +7,11 @@ import type {
     HomeOwedBucket,
 } from "../home/home-model";
 import { WEEK_PATHS } from "../home/home-week";
-import { leftToPayCents, OWED_WHERE } from "../invoices/invoice-state";
+import {
+    leftToPayCents,
+    OWED_VIEW_WHERE,
+    OWED_WHERE,
+} from "../invoices/invoice-state";
 
 /**
  * Who owes the business, by how late (DEC-171): what is left to pay on
@@ -27,13 +31,6 @@ import { leftToPayCents, OWED_WHERE } from "../invoices/invoice-state";
  */
 
 type Db = typeof prisma;
-
-/**
- * Every bill someone still owes on: issued, and not an order's own paper or
- * a credit note (`OWED_WHERE`). Owed by age and the late-bill suggestion
- * (`suggestions.service.ts`) read the same bills.
- */
-export const UNPAID_BILLS_WHERE = { ...OWED_WHERE, status: "ISSUED" } as const;
 
 /** Past due by more than this many days is "more than 30 days late". */
 export const LATE_LONG_DAYS = 30;
@@ -130,7 +127,7 @@ export async function readOwedByAge(
 ): Promise<OwedByAge | null> {
     const [bills, ever] = await Promise.all([
         db.invoice.findMany({
-            where: { organizationId, ...UNPAID_BILLS_WHERE },
+            where: { organizationId, ...OWED_VIEW_WHERE },
             select: {
                 currency: true,
                 dueAt: true,

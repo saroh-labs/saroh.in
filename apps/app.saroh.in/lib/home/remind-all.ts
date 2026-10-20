@@ -1,4 +1,4 @@
-import { formatMoney } from "@/lib/format/money";
+import { formatMoney, minorOf } from "@/lib/format/money";
 import { count, plural } from "@/lib/format/plural";
 import type {
     ReminderPreview,
@@ -77,21 +77,6 @@ export interface RemindAllResult {
         why?: ReminderWhyCode;
         words: string;
     }[];
-}
-
-/** "1125.50" (a Decimal string) as 112550; null when absent. */
-export function minorOf(amount: string | undefined): number | null {
-    if (amount === undefined) return null;
-    const m = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(amount.trim());
-    if (!m) return null;
-    const [, sign, whole, cents = ""] = m as unknown as [
-        string,
-        string,
-        string,
-        string | undefined,
-    ];
-    const minor = Number(whole) * 100 + Number(cents.padEnd(2, "0"));
-    return sign ? -minor : minor;
 }
 
 function billOf(row: ReminderRow): RemindAllBill {

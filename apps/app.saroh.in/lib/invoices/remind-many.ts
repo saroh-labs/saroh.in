@@ -1,6 +1,6 @@
-import { formatNumber } from "@/lib/format/money";
+import { formatNumber, minorOf } from "@/lib/format/money";
 import { count, plural } from "@/lib/format/plural";
-import { minorOf, totalWords } from "@/lib/home/remind-all";
+import { totalWords } from "@/lib/home/remind-all";
 
 import type {
     ReminderPreview,

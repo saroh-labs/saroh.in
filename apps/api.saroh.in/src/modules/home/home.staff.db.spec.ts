@@ -10,6 +10,7 @@
  */
 import { prisma } from "@saroh/database";
 
+import { onTheLedger } from "../../../test/ledger-paid";
 import type { OrgAction } from "../organizations/organization-actions";
 import { readSince } from "./home-last-day";
 import type { HomeInput } from "./home-model";
@@ -205,17 +206,19 @@ beforeAll(async () => {
 
     // Money in this week, for the takings figure.
     for (const hoursAgo of [2, 5]) {
-        await prisma.invoice.create({
-            data: {
-                organizationId: orgId,
-                status: "PAID",
-                currency: "INR",
-                subtotal: "1000",
-                total: "1000",
-                issuedAt: new Date(NOW.getTime() - hoursAgo * HOUR),
-                paidAt: new Date(NOW.getTime() - hoursAgo * HOUR),
-            },
-        });
+        await onTheLedger(
+            await prisma.invoice.create({
+                data: {
+                    organizationId: orgId,
+                    status: "PAID",
+                    currency: "INR",
+                    subtotal: "1000",
+                    total: "1000",
+                    issuedAt: new Date(NOW.getTime() - hoursAgo * HOUR),
+                    paidAt: new Date(NOW.getTime() - hoursAgo * HOUR),
+                },
+            }),
+        );
     }
 });
 

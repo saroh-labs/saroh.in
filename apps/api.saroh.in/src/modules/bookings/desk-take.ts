@@ -1,6 +1,10 @@
 import type { Prisma } from "@saroh/database";
 
-import { PAYMENT_METHODS } from "../invoices/invoice-state";
+import {
+    leftToPayCents,
+    paidSoFarCents,
+    PAYMENT_METHODS,
+} from "../invoices/invoice-state";
 import { toCents } from "../invoices/totals";
 
 /*
@@ -13,6 +17,9 @@ import { toCents } from "../invoices/totals";
  * money taken at the desk is the same paper recorded by hand — its own
  * invoice, or, after a deposit, a balance invoice against the deposit's
  * (DEC-023: money in has an invoice; an issued invoice never changes).
+ * What has been paid is read from that paper's ledger (DEC-173): however
+ * it came in — online, at the desk, or recorded by hand on Invoices, in
+ * one payment or several — never from how the last of it was paid.
  */
 
 /** How the desk takes it: cash, UPI at the counter, or the card machine. */
@@ -84,26 +91,31 @@ export function paidAtDesk(rows: readonly BookingPaperRow[]): {
 }
 
 /**
- * What was paid online for a booking, from its paper read with its intents:
- * the SUCCEEDED payments on its own invoice once paid (or credited since),
- * as `bookingMoney` sums them.
+ * What the booking's paper has been paid, in paise, from its ledger
+ * (DEC-173): each invoice's paid so far (`paidSoFarCents`), on paper that
+ * took money — issued (part paid), paid, or credited since. A draft or a
+ * voided invoice took nothing.
  */
-export function paidOnlineOf(
-    paper: readonly {
-        kind: string;
-        status: string;
-        paymentIntents: readonly { status: string; amountCents: number }[];
-    }[],
+export function paidOnPaperCents(
+    paper: readonly Pick<BookingPaperRow, "status" | "total" | "paidCents">[],
 ): number {
     return paper
         .filter(
             (p) =>
-                p.kind === "INVOICE" &&
-                (p.status === "PAID" || p.status === "CREDITED"),
+                p.status === "ISSUED" ||
+                p.status === "PAID" ||
+                p.status === "CREDITED",
         )
-        .flatMap((p) => p.paymentIntents)
-        .filter((i) => i.status === "SUCCEEDED")
-        .reduce((n, i) => n + i.amountCents, 0);
+        .reduce(
+            (n, p) =>
+                n +
+                paidSoFarCents({
+                    status: p.status,
+                    total: p.total,
+                    paidCents: p.paidCents ?? 0,
+                }),
+            0,
+        );
 }
 
 /** The same paper with only its payments going through online right now. */
@@ -156,10 +168,11 @@ const PAID_OTHERWISE = ["PACK", "MEMBERSHIP"];
  * stands (not cancelled, not a hold still waiting on its own payment), and
  * its money is its own (not a treatment's visit, not a course's session,
  * not a pack's or membership's class). Then its paper: nothing going
- * through online, an invoice with a pay link out takes its total, a voided
- * or credited invoice is left to Invoices. Otherwise the price less what was
- * paid online and at the desk — a booking recorded as "Paid now" by hand,
- * with nothing on paper, is paid already.
+ * through online, an invoice with a pay link out takes what is left on it,
+ * a voided or credited invoice is left to Invoices. Otherwise the price
+ * less what the paper's ledger says was paid (`paidOnPaperCents`), however
+ * it was paid; paid in full is refused. A booking recorded as "Paid now"
+ * by hand, with nothing on paper, is paid already.
  */
 export function deskTake(
     booking: {
@@ -170,8 +183,6 @@ export function deskTake(
     },
     money: {
         priceCents: number | null;
-        paidOnlineCents: number;
-        paidAtDeskCents: number;
         paper: readonly BookingPaperRow[];
     },
 ): DeskTake | { refusal: string } {
@@ -192,11 +203,13 @@ export function deskTake(
     // total less anything recorded on it by hand (DEC-173).
     const issued = own.find((p) => p.status === "ISSUED");
     if (issued) {
-        const left = Math.max(
-            0,
-            toCents(issued.total.toString()) - (issued.paidCents ?? 0),
-        );
-        return { cents: left, byLink: true };
+        const left = leftToPayCents({
+            total: issued.total,
+            paidCents: issued.paidCents ?? 0,
+        });
+        return left > 0
+            ? { cents: left, byLink: true }
+            : { refusal: DESK_REFUSED.paid };
     }
     const paidOwn = own.some((p) => p.status === "PAID");
     if (!paidOwn && own.some((p) => p.status !== "DRAFT")) {
@@ -205,15 +218,13 @@ export function deskTake(
     if (money.priceCents === null || money.priceCents <= 0) {
         return { refusal: DESK_REFUSED.unpriced };
     }
-    const nothingCounted =
-        money.paidOnlineCents === 0 && money.paidAtDeskCents === 0;
+    const paid = paidOnPaperCents(money.paper);
     // Paid, with no amount to count: "Paid now" by hand (E4) records no
-    // paper, and an invoice paid some other way says it is paid.
-    if ((booking.paidWith === "PAID" || paidOwn) && nothingCounted) {
+    // paper.
+    if (booking.paidWith === "PAID" && paid === 0) {
         return { refusal: DESK_REFUSED.paid };
     }
-    const cents =
-        money.priceCents - money.paidOnlineCents - money.paidAtDeskCents;
+    const cents = money.priceCents - paid;
     if (cents <= 0) return { refusal: DESK_REFUSED.paid };
-    return { cents, byLink: nothingCounted };
+    return { cents, byLink: paid === 0 };
 }

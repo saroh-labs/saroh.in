@@ -15,7 +15,6 @@ import {
     heldToast,
     introWords,
     lateWords,
-    minorOf,
     noneWords,
     remindLine,
     resultWords,
@@ -350,13 +349,5 @@ describe("Remind all's words", () => {
                 },
             ],
         });
-    });
-
-    it("reads a Decimal string as minor units", () => {
-        expect(minorOf("11250.00")).toBe(1125000);
-        expect(minorOf("480.5")).toBe(48050);
-        expect(minorOf("7")).toBe(700);
-        expect(minorOf(undefined)).toBeNull();
-        expect(minorOf("abc")).toBeNull();
     });
 });

@@ -12,6 +12,7 @@ import {
     moneyPlaces,
     moneyToday,
     usualOrder,
+    withDaySoFar,
 } from "./money";
 import { moneyBuckets, periodWindows } from "./period";
 import type { TakingsDayRow, TakingsWeek } from "./takings";
@@ -64,6 +65,22 @@ const ROWS: TakingsDayRow[] = [
 ];
 
 describe("Insights money folds", () => {
+    it("compares part of today with the period before's last day up to the same time, never the whole day", () => {
+        // 12 Oct is the day today stands for: all of it took ₹200, but by
+        // this time of day only ₹50 had come in.
+        const soFar = [row("2026-10-12", INVOICES_PLACE, "50")];
+        const fold = foldPeriod(
+            withDaySoFar(ROWS, W.beforeToDate, soFar),
+            "INR",
+            W,
+        );
+        expect(fold.before.minor).toBe(175_000);
+        expect(foldPeriod(ROWS, "INR", W).before.minor).toBe(190_000);
+        expect(fold.places.get(INVOICES_PLACE)?.before.minor).toBe(5_000);
+        // The period itself is unchanged.
+        expect(fold.period.minor).toBe(450_000);
+    });
+
     it("sums the period and the one before, in the business's currency only", () => {
         const fold = foldPeriod(ROWS, "INR", W);
         expect(moneyIn(fold, false)).toEqual({

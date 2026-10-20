@@ -298,7 +298,14 @@
   (`invoices/invoice-state.ts`), the one place it is worked out. A payment
   is never deleted: one recorded by mistake is removed softly
   (`removedAt`). An order's invoice has no rows; the order is its ledger
-  (ADR-008). The migration's CHECKs hold the shape (an amount above 0, a
+  (ADR-008). **Money in is one rule** (`invoices/money-in.ts`, DEC-173):
+  the ledger's payments that count, on the day each was received, and an
+  order's paper on the day it was paid. Every figure of money that came in
+  (the Invoices strip, Home, Insights) reads it; never an invoice's total
+  on its `paidAt`, which moves part payments, bounced cheques and
+  back-dated payments to the wrong day (`backend-billing-and-classes.md`
+  → Money in is one rule). What a booking's paper has been paid is its
+  ledger too (`paidOnPaperCents`), never its last payment's method. The migration's CHECKs hold the shape (an amount above 0, a
   known method, a bank status only and always on a cheque); they exist
   only where migrations ran, so prove them under `TEST_RLS=on`
   (`rls/invoice-payments-rls.db.spec.ts`).

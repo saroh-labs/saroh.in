@@ -8,6 +8,7 @@
  */
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { onTheLedger } from "../../../test/ledger-paid";
 import { readMoneyToday } from "./home-money-today";
 
 const tag = `${process.pid}-${Date.now()}`;
@@ -23,18 +24,20 @@ describe("Home A money in today (DB)", () => {
 
     async function paid(organizationId: string, paidAt: Date, total: string) {
         n += 1;
-        await prisma.invoice.create({
-            data: {
-                organizationId,
-                status: "PAID",
-                number: `MT-${n}-${tag}`,
-                currency: "INR",
-                subtotal: total,
-                total,
-                issuedAt: paidAt,
-                paidAt,
-            },
-        });
+        await onTheLedger(
+            await prisma.invoice.create({
+                data: {
+                    organizationId,
+                    status: "PAID",
+                    number: `MT-${n}-${tag}`,
+                    currency: "INR",
+                    subtotal: total,
+                    total,
+                    issuedAt: paidAt,
+                    paidAt,
+                },
+            }),
+        );
     }
 
     beforeAll(async () => {

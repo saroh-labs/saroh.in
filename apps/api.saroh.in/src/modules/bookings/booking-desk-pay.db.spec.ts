@@ -18,6 +18,7 @@ import { backfillInvoicePayments, prisma } from "@saroh/database";
 
 import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { recordOnlinePaymentInTx } from "../invoices/invoice-ledger";
 import { InvoicesService } from "../invoices/invoices.service";
 import { hashPayToken } from "../invoices/pay-token";
 import { BookingsService } from "./bookings.service";
@@ -481,6 +482,67 @@ describe("taking payment at the desk (P2, real database)", () => {
                 select: { status: true, paidCents: true },
             }),
         ).resolves.toEqual({ status: "PAID", paidCents: 50_000 });
+    });
+
+    it("a part paid by hand, then the rest paid online on the link: the desk refuses it as paid, never takes the hand part again (DEC-173)", async () => {
+        // ₹500 booking, a pay link out. ₹200 is recorded by hand on
+        // Invoices; the customer then pays the ₹300 left online. The
+        // invoice is PAID and its last payment reads ONLINE, but its
+        // ledger holds all ₹500: nothing is left for the desk to take.
+        const booking = await book({ paidWith: null });
+        await bookings.payLink(owner, booking.id, NOW);
+        const [issued] = await prisma.invoice.findMany({
+            where: { bookingId: booking.id },
+        });
+        await new InvoicesService().recordPayment(owner, issued!.id, {
+            method: "CASH",
+            amount: "200.00",
+        });
+        const intent = await prisma.paymentIntent.create({
+            data: {
+                organizationId: owner.organizationId,
+                invoiceId: issued!.id,
+                provider: "RAZORPAY",
+                providerIntentId: `order_rest_${booking.id}`,
+                amountCents: 30_000,
+                currency: "INR",
+                status: "SUCCEEDED",
+            },
+        });
+        const outcome = await prisma.$transaction((tx) =>
+            recordOnlinePaymentInTx(tx, owner.organizationId, issued!.id, {
+                paymentIntentId: intent.id,
+                amountCents: 30_000,
+                reference: "pay_rest",
+                note: "Paid online through Razorpay",
+                // After the hand part, recorded at the real clock.
+                receivedAt: new Date(),
+            }),
+        );
+        expect(outcome).toMatchObject({ applied: true, paid: true });
+        await expect(
+            prisma.invoice.findUniqueOrThrow({
+                where: { id: issued!.id },
+                select: { status: true, paidCents: true, paymentMethod: true },
+            }),
+        ).resolves.toEqual({
+            status: "PAID",
+            paidCents: 50_000,
+            paymentMethod: "ONLINE",
+        });
+
+        const read = await bookings.getBooking(owner, booking.id);
+        expect(read.money).toMatchObject({ take: null, dueCents: 0 });
+        await expect(
+            take(owner, booking.id, { method: "CASH", amountCents: 20_000 }),
+        ).rejects.toThrow(DESK_REFUSED.paid);
+        // Nothing more written: no balance invoice, no second payment.
+        await expect(
+            prisma.invoice.count({ where: { bookingId: booking.id } }),
+        ).resolves.toBe(1);
+        await expect(
+            prisma.invoicePayment.count({ where: { invoiceId: issued!.id } }),
+        ).resolves.toBe(2);
     });
 
     it("a double click takes it once, and answers the second the same", async () => {

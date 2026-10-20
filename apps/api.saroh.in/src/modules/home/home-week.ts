@@ -3,11 +3,14 @@ import { DateTime } from "luxon";
 
 import { toMinor } from "../../common/money";
 import {
+    isPastDue,
     leftToPayCents,
-    NOT_A_BOOKING_HOLD,
+    OWED_VIEW_WHERE,
     OWED_WHERE,
     refundedBetweenWhere,
 } from "../invoices/invoice-state";
+import type { MoneyIn } from "../invoices/money-in";
+import { readMoneyIn } from "../invoices/money-in";
 import { realOrderWhere } from "../orders/open-orders";
 import { MONEY_ON_THE_CALENDAR, sinceHref } from "./home-last-day";
 import type {
@@ -26,10 +29,12 @@ import { onOneStore, seesBusinessBookings, storeWhere } from "./home-staff";
  *
  * - **Takings so far** (`payment:read`, as the Last 24 hours' money; its
  *   link opens the invoices counted for someone who also holds
- *   `invoice:read`, else the Calendar's money — F11): what came in since Monday, net of refunds, against the
- *   same days last week. Each rupee once: an order's money is its invoice
- *   (ADR-008, every order has one), so paid invoices alone count it; a
- *   refund is its credit note, taken off on the day it was issued.
+ *   `invoice:read`, else the Calendar's money — F11): what came in since
+ *   Monday, net of refunds, against the same days last week. Money in is
+ *   the one rule the Invoices strip and Insights read (`money-in.ts`,
+ *   DEC-173): each payment on its ledger on the day it came in, an order's
+ *   paper on the day it was paid; a refund is its credit note, taken off on
+ *   the day it was issued.
  * - **Bookings this week** (`booking:read`): confirmed bookings starting
  *   Monday to Sunday, against the whole of last week.
  * - **Orders this week** (`order:read` or `order:stage`): real orders
@@ -171,22 +176,8 @@ export function compareTakings(
 export interface WindowMoney {
     /** Paid in, less refunds, per currency. */
     net: Map<string, number>;
-    /** How many invoices were paid, per currency. */
+    /** How many payments brought it, per currency. */
     payments: Map<string, number>;
-}
-
-/** The where for invoices paid in `[from, to)`; credit notes never. */
-export function paidBetweenWhere(
-    organizationId: string,
-    from: Date,
-    to: Date,
-): Prisma.InvoiceWhereInput {
-    return {
-        organizationId,
-        paidAt: { gte: from, lt: to },
-        kind: { not: "CREDIT_NOTE" },
-        ...NOT_A_BOOKING_HOLD,
-    };
 }
 
 // The where for money handed back lives with the invoice rules, which
@@ -196,30 +187,21 @@ export { refundedBetweenWhere };
 interface SumRow {
     currency: string;
     _sum: { total: { toString(): string } | null };
-    _count: { _all: number };
 }
 
-/** Paid in less handed back, per currency, from two grouped reads. */
-export function windowMoney(paid: SumRow[], refunded: SumRow[]): WindowMoney {
-    const net = new Map<string, number>();
-    const payments = new Map<string, number>();
-    for (const row of paid) {
-        net.set(
-            row.currency,
-            (net.get(row.currency) ?? 0) + toMinor(row._sum.total ?? 0),
-        );
-        payments.set(
-            row.currency,
-            (payments.get(row.currency) ?? 0) + row._count._all,
-        );
-    }
+/** Money in (`money-in.ts`) less what was handed back, per currency. */
+export function windowMoney(
+    paid: Pick<MoneyIn, "totals" | "payments">,
+    refunded: readonly SumRow[],
+): WindowMoney {
+    const net = new Map(paid.totals);
     for (const row of refunded) {
         net.set(
             row.currency,
             (net.get(row.currency) ?? 0) - toMinor(row._sum.total ?? 0),
         );
     }
-    return { net, payments };
+    return { net, payments: new Map(paid.payments) };
 }
 
 /**
@@ -261,24 +243,24 @@ export const WEEK_PATHS = {
     OVERDUE: "/billing/invoices?view=overdue",
 } as const;
 
-/** Paid in less handed back in `[from, to)`, per currency. */
+/**
+ * Money in (`money-in.ts`, the rule the strip and Insights read) less what
+ * was handed back, in `[from, to)`, per currency.
+ */
 export async function readMoney(
     db: Db,
     organizationId: string,
     from: Date,
     to: Date,
 ): Promise<WindowMoney> {
-    const sums = (where: Prisma.InvoiceWhereInput) =>
+    const [paid, refunded] = await Promise.all([
+        readMoneyIn(db, organizationId, from, to),
         db.invoice.groupBy({
             by: ["currency"],
-            where,
+            where: refundedBetweenWhere(organizationId, from, to),
             _sum: { total: true },
-            _count: { _all: true },
             orderBy: { currency: "asc" },
-        });
-    const [paid, refunded] = await Promise.all([
-        sums(paidBetweenWhere(organizationId, from, to)),
-        sums(refundedBetweenWhere(organizationId, from, to)),
+        }),
     ]);
     return windowMoney(paid, refunded);
 }
@@ -290,8 +272,7 @@ export async function readOwed(
 ): Promise<HomeWeekOwed | null> {
     const unpaid = {
         organizationId,
-        ...OWED_WHERE,
-        status: "ISSUED",
+        ...OWED_VIEW_WHERE,
     } satisfies Prisma.InvoiceWhereInput;
     // What is left to pay on each bill (DEC-173), folded through
     // `leftToPayCents`, the one place it is worked out, as Insights'
@@ -301,6 +282,7 @@ export async function readOwed(
             where: unpaid,
             select: {
                 currency: true,
+                status: true,
                 total: true,
                 paidCents: true,
                 dueAt: true,
@@ -321,7 +303,7 @@ export async function readOwed(
             bill.currency,
             (byCurrency.get(bill.currency) ?? 0) + leftToPayCents(bill),
         );
-        if (bill.dueAt !== null && bill.dueAt < now) overdue += 1;
+        if (isPastDue(bill, now)) overdue += 1;
     }
     return {
         totals: [...byCurrency.entries()]

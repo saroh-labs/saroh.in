@@ -50,6 +50,13 @@ export interface PeriodWindows {
     /** The period before's first and last days. */
     beforeFromDate: string;
     beforeToDate: string;
+    /** 00:00 on the period before's last day: the day today stands for. */
+    beforeLastStart: Date;
+    /**
+     * The same time of day on the period before's last day as now: money
+     * is compared so far, never part of today against a whole day.
+     */
+    beforeSoFar: Date;
 }
 
 function firstDay(today: DateTime, period: InsightsPeriod): DateTime {
@@ -69,7 +76,8 @@ export function periodWindows(
     now: Date,
     zone: string,
 ): PeriodWindows {
-    const today = DateTime.fromJSDate(now, { zone }).startOf("day");
+    const at = DateTime.fromJSDate(now, { zone });
+    const today = at.startOf("day");
     const from = firstDay(today, period);
     // Counted on the calendar, so a clock change inside the period does not
     // make it a day short.
@@ -91,6 +99,10 @@ export function periodWindows(
         toDate: today.toISODate() ?? "",
         beforeFromDate: beforeFrom.toISODate() ?? "",
         beforeToDate: from.minus({ days: 1 }).toISODate() ?? "",
+        beforeLastStart: from.minus({ days: 1 }).toJSDate(),
+        // By the zone's calendar, so a clock change between the two still
+        // compares 10:00 with 10:00.
+        beforeSoFar: at.minus({ days }).toJSDate(),
     };
 }
 
