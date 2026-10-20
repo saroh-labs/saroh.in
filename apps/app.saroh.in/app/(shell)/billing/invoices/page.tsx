@@ -104,7 +104,6 @@ export default async function InvoicesPage({
                 invoices={invoices}
                 truncated={truncated}
                 canWrite={canWrite}
-                businessName={organization?.name ?? "This business"}
                 tax={
                     business
                         ? {
@@ -123,6 +122,8 @@ export default async function InvoicesPage({
                 timeZone={invoiceZone(business)}
                 missingRates={missingRates}
                 summary={summary}
+                // Signs a reminder's preview in Remind many (U12).
+                businessName={organization?.name ?? "This business"}
             />
         </PageContainer>
     );

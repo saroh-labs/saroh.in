@@ -213,6 +213,14 @@ jobs:
       - name: Date inputs
         run: pnpm run check:date-inputs
 
+      # An address written in place is one Next's router follows (null state).
+      - name: History state
+        run: pnpm run check:history-state
+
+      # A browser spec that signs its page in calls the API with page.request.
+      - name: E2E signed-in request
+        run: pnpm run check:e2e-signed-in-request
+
       # A server component never calls a "use client" module's function.
       - name: Client calls from the server
         run: pnpm run check:client-calls

@@ -1,0 +1,239 @@
+import type { SectionType } from "./section-contract";
+import type { SiteTypeScale } from "./type-scale";
+
+/**
+ * A site's look (DEC-172, KD1): Folio, Quiet or Live, chosen per site in
+ * Website › Style and stored as `Site.style.look`. ABSENT means Classic,
+ * the sites as they were before looks, and is never written out: a style
+ * with no look is byte for byte the style it always was, so no live site
+ * reports a change nobody made.
+ *
+ * A look is data (KD3): the tokens the renderer writes under the business's
+ * own colours, a font pair, a type scale, the layout each block takes when
+ * a section has not chosen one (KD2), how booking is framed (KD8) and how
+ * long anything may move (KD5). Colours are never a look's: they come from
+ * the business, made safe by `safe-colours.ts`.
+ *
+ * Pure: no React, no Nest. The API validates a saved look with
+ * {@link parseLook}, site creation and the editor's "Suggested for" read
+ * {@link defaultLookForTemplate}, and the renderer reads the rest.
+ */
+
+export const LOOK_IDS = ["folio", "quiet", "live"] as const;
+export type LookId = (typeof LOOK_IDS)[number];
+
+/**
+ * The font pair each look sets (`FONT_PAIRS` keys U3 adds; its sync test
+ * checks every look's pair exists).
+ */
+export type LookFontPair = "folio" | "quiet" | "live";
+
+/** How the booking steps are framed (KD8): one engine, three frames. */
+export type BookingPresentation = "panel" | "page" | "sheets";
+
+/** A length that differs on a phone and a desk, in px. */
+export interface LookLength {
+    phone: number;
+    desk: number;
+}
+
+/** The look's tokens (KD3), each a new or existing `--site-*` role. */
+export interface LookTokens {
+    /** Buttons and inputs (`--site-radius`); 999 is a pill. */
+    radius: number;
+    /** Small things: chips, tags, a time slot (`--site-radius-s`). */
+    radiusSmall: number;
+    /** Photos (`--site-radius-photo`). */
+    radiusPhoto: number;
+    pageMargin: LookLength;
+    sectionPadding: LookLength;
+    /** The longest reading line, in characters. */
+    measure: number;
+}
+
+/**
+ * Motion (KD5, R5): the existing scale only, fade or rise of 8px or less,
+ * ease-out, no bounce, no loops. `ceiling` is what nothing may exceed.
+ */
+export interface LookMotion {
+    fast: number;
+    base: number;
+    slow: number;
+    ceiling: number;
+    /** The furthest anything rises, in px. */
+    rise: number;
+}
+
+/** What a look adds to the colours it is given (`safe-colours.ts`). */
+export interface LookColour {
+    /**
+     * How far a card's surface sits from the page, toward the text (0: the
+     * page itself). Used only when the palette has no surface of its own.
+     */
+    surfaceTint: number;
+}
+
+export interface SiteLook {
+    id: LookId;
+    name: string;
+    /** One line on what it suits, for the picker (U16). */
+    suits: string;
+    tokens: LookTokens;
+    fontPair: LookFontPair;
+    type: SiteTypeScale;
+    /**
+     * The layout each block takes where its section names none (KD2). Only
+     * ids `BLOCK_META` has today (the tests hold that); U6 and U7 add their
+     * new variants and switch these.
+     */
+    defaultVariants: Partial<Record<SectionType, string>>;
+    booking: BookingPresentation;
+    motion: LookMotion;
+    colour: LookColour;
+}
+
+/** KD5's scale, the same for every look. */
+const MOTION: LookMotion = {
+    fast: 100,
+    base: 140,
+    slow: 200,
+    ceiling: 200,
+    rise: 8,
+};
+
+export const LOOKS: Readonly<Record<LookId, SiteLook>> = {
+    folio: {
+        id: "folio",
+        name: "Folio",
+        suits: "A printed monograph: a tinted page, square corners and a serif. For classes and yoga.",
+        tokens: {
+            radius: 0,
+            radiusSmall: 0,
+            radiusPhoto: 0,
+            pageMargin: { phone: 20, desk: 64 },
+            sectionPadding: { phone: 56, desk: 112 },
+            measure: 64,
+        },
+        fontPair: "folio",
+        type: {
+            displaySize: 64,
+            bodySize: 17,
+            measure: 64,
+            labelStyle: "eyebrow",
+        },
+        defaultVariants: {
+            hero: "split",
+            journal: "archive",
+            timetable: "list",
+            productGrid: "lead",
+        },
+        booking: "panel",
+        motion: MOTION,
+        colour: { surfaceTint: 0 },
+    },
+    quiet: {
+        id: "quiet",
+        name: "Quiet",
+        suits: "Warm white and airy, with pill buttons and one question at a time. For salons, clinics, studios, bakeries, shops and makers.",
+        tokens: {
+            radius: 999,
+            radiusSmall: 12,
+            radiusPhoto: 16,
+            pageMargin: { phone: 20, desk: 48 },
+            sectionPadding: { phone: 64, desk: 120 },
+            measure: 60,
+        },
+        fontPair: "quiet",
+        type: { displaySize: 56, bodySize: 17, measure: 60 },
+        defaultVariants: {
+            hero: "centered",
+            journal: "lead",
+            timetable: "list",
+            productGrid: "default",
+        },
+        booking: "page",
+        motion: MOTION,
+        colour: { surfaceTint: 0 },
+    },
+    live: {
+        id: "live",
+        name: "Live",
+        suits: "App-like, with cards and what's on now. For gyms.",
+        tokens: {
+            radius: 16,
+            radiusSmall: 10,
+            radiusPhoto: 20,
+            pageMargin: { phone: 16, desk: 40 },
+            sectionPadding: { phone: 40, desk: 80 },
+            measure: 68,
+        },
+        fontPair: "live",
+        type: { displaySize: 48, bodySize: 16, measure: 68 },
+        defaultVariants: {
+            timetable: "grid",
+            productGrid: "default",
+        },
+        booking: "sheets",
+        motion: MOTION,
+        colour: { surfaceTint: 0.05 },
+    },
+};
+
+/** Whether `value` is a look this build has. */
+export function isLookId(value: unknown): value is LookId {
+    return (
+        typeof value === "string" &&
+        (LOOK_IDS as readonly string[]).includes(value)
+    );
+}
+
+export type LookResult =
+    { ok: true; look: LookId | undefined } | { ok: false; message: string };
+
+/**
+ * Validate a saved look. Absent and null are Classic (`look: undefined`);
+ * a listed id is itself; anything else, "classic" included, is refused
+ * rather than coerced, like a colour key: only a listed look reaches a
+ * page.
+ */
+export function parseLook(input: unknown): LookResult {
+    if (input === undefined || input === null) {
+        return { ok: true, look: undefined };
+    }
+    if (isLookId(input)) return { ok: true, look: input };
+    return { ok: false, message: "Choose one of the looks offered" };
+}
+
+/**
+ * The look a new site starts in, by the template it is made from (R10,
+ * DEC-172): the template id is the industry signal, because the business's
+ * kind (BUSINESS, SOLO, WORK) says nothing about its trade. Quiet for
+ * salons, clinics, studios, bakeries, shops and makers; Folio for classes
+ * and yoga (no such template yet, so it is keyed for one); Live for gyms.
+ * Any other template, the starter included, starts Quiet.
+ *
+ * One mapping, read by site creation (API) and the picker's "Suggested
+ * for" (editor, U16).
+ */
+export const TEMPLATE_LOOKS: Readonly<Record<string, LookId>> = {
+    gym: "live",
+    yoga: "folio",
+    classes: "folio",
+    salon: "quiet",
+    clinic: "quiet",
+    dietician: "quiet",
+    studio: "quiet",
+    bakery: "quiet",
+    ceramics: "quiet",
+    starter: "quiet",
+};
+
+/** The look a site made from `templateId` starts in. */
+export function defaultLookForTemplate(
+    templateId: string | null | undefined,
+): LookId {
+    return templateId &&
+        Object.prototype.hasOwnProperty.call(TEMPLATE_LOOKS, templateId)
+        ? TEMPLATE_LOOKS[templateId]
+        : "quiet";
+}

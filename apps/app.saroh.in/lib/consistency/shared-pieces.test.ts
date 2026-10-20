@@ -98,7 +98,7 @@ describe("one of each small piece", () => {
 
     it("no uppercase outside the .label utility", () => {
         const allow = {
-            "components/invoices/invoice-form.tsx":
+            "components/invoices/new-invoice/customer-block.tsx":
                 "the HSN/SAC code field: a code is typed and kept in capitals",
             "components/organizations/business-tax-fields.tsx":
                 "the GSTIN field: a registration number is capitals",

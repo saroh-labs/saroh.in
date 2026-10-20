@@ -531,6 +531,27 @@ export async function nextInvoiceNumber(
     });
 }
 
+/**
+ * The number the series would give next, without taking it: a preview,
+ * such as the credit note shown before "Issue credit note" is pressed
+ * (DEC-173, U13). Nothing is written, so another document issued in the
+ * meantime takes it first and the real one is the next along — the preview
+ * says what it will most likely be, never a promise.
+ */
+export async function peekInvoiceNumber(
+    tx: Pick<Prisma.TransactionClient, "invoiceSequence">,
+    organizationId: string,
+    series: InvoiceSeries,
+): Promise<string> {
+    const row = await tx.invoiceSequence.findUnique({
+        where: {
+            organizationId_series: { organizationId, series: series.key },
+        },
+        select: { lastNumber: true },
+    });
+    return series.format((row?.lastNumber ?? 0) + 1);
+}
+
 async function taken(
     tx: Sequencer,
     organizationId: string,

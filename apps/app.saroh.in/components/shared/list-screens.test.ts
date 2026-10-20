@@ -233,6 +233,8 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
             "Levels, Log and Checks: three views of stock with different columns",
         "components/customers/detail/header.tsx":
             "a person's sections: Overview, Orders, Bookings and the rest",
+        "components/invoices/share-sheet.tsx":
+            "Share's ways: WhatsApp, Email, Link and PDF, each its own panel (INVShareA)",
         "components/insights/insights-tabs.tsx":
             "Insights' answers: Overview, Money, What sells, Where customers come from",
         "components/leads/leads-tabs.tsx":
@@ -323,6 +325,8 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
             {
                 "components/customers/list/unlinked-sheet.tsx":
                     'a sheet\'s foot, not a list page: small steps beside "Page 2 of 3" while linking customers',
+                "components/invoices/details/invoice-details-sheet.tsx":
+                    "a record's sheet: Previous and Next walk to the invoice either side, not pages of a list",
             },
         );
     });

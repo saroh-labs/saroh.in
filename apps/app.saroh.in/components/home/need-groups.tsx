@@ -5,7 +5,7 @@ import { EmptyState } from "@saroh/ui/data-state";
 import { TextLink } from "@saroh/ui/text-link";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 import { count } from "@/lib/format/plural";
 import { deskChequesAt, totalWithCheques } from "@/lib/home/cheques";
@@ -114,24 +114,29 @@ export function NeedGroups({
 
     // A group emptied here folds, once; it can be opened again to see
     // what was done, and Undo there brings it back.
+    //
+    // Folded while rendering, in the same render that marks its last row
+    // done, never in an effect after paint: an effect lets the screen draw
+    // the open group with the held row and its Undo for a frame, then pulls
+    // it away, so a press on that Undo lands on nothing (DEV_LEARNINGS,
+    // 20 Oct). React re-renders before committing when state is set here.
     const emptied = groups
         .filter((g) => groupEmptied(g, doneIds))
         .map((g) => g.kind);
     const emptiedKey = emptied.join(",");
-    const folded = useRef<ReadonlySet<HomeNeedKind>>(new Set());
-    useEffect(() => {
-        const now = new Set(emptied);
-        const newly = emptied.filter((k) => !folded.current.has(k));
-        folded.current = now;
-        if (newly.length === 0) return;
-        setOpen((was) => {
-            const next = new Set(was);
-            for (const k of newly) next.delete(k);
-            return next;
-        });
-        // `emptiedKey` stands for `emptied`.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [emptiedKey]);
+    const [foldedKey, setFoldedKey] = useState("");
+    if (foldedKey !== emptiedKey) {
+        const was = new Set(foldedKey === "" ? [] : foldedKey.split(","));
+        const newly = emptied.filter((k) => !was.has(k));
+        setFoldedKey(emptiedKey);
+        if (newly.length > 0) {
+            setOpen((open) => {
+                const next = new Set(open);
+                for (const k of newly) next.delete(k);
+                return next;
+            });
+        }
+    }
 
     const toggle = (kind: HomeNeedKind) =>
         setOpen((was) => {

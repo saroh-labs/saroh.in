@@ -9,6 +9,8 @@ import type {
     ShowcasePlan,
 } from "./data";
 import { TIMEZONE } from "./data";
+import type { InvoiceTrail, PaperSpec, TrailRows } from "./invoice-states";
+import { addTrailRows, emptyTrailRows, ledgerColumns } from "./invoice-states";
 import { addMinutes, earliest, istAt, istWeekday, minuteOf } from "./people";
 import type { Period } from "./periods";
 import { boundary, periodLabel } from "./periods";
@@ -118,6 +120,16 @@ export interface InvoiceSpec {
     createdByUserId: string | null;
     paid: Payment | null;
     voided: { at: Date; reason: string } | null;
+    /**
+     * After it went out (DEC-173, #1129): payments on its ledger, shares
+     * and emails. With payments, its status and paid columns come from
+     * them, and `paid` is ignored.
+     */
+    trail?: InvoiceTrail;
+    /** The look it went out in; absent is Classic in ink. */
+    paper?: PaperSpec;
+    /** "Void and write again": the spec id of the invoice it replaces. */
+    reissuedFromId?: string;
 }
 
 // --- small helpers -----------------------------------------------------------
@@ -911,14 +923,26 @@ export function planManualInvoices(
     const seen: Seen[] = [];
     const withCompany = ctx.pool.filter((c) => ctx.contacts[c].company);
     fixtures.forEach((inv, i) => {
-        const contact =
+        const picked =
             inv.company && withCompany.length > 0
                 ? rng.pick(withCompany)
                 : rng.pick(ctx.pool);
-        const createdAt = earliest(
+        // "Void and write again" (DEC-173): the same person, after the void.
+        const replaces =
+            inv.rewriteOf === undefined ? undefined : invoices[inv.rewriteOf];
+        if (inv.rewriteOf !== undefined && !replaces?.voided) {
+            throw new Error(
+                `Manual invoice ${i} is written again from one that isn't void`,
+            );
+        }
+        const contact = replaces ? replaces.contact : picked;
+        const planned = earliest(
             istAt(now, -inv.daysAgo, rng.int(10 * 60, 18 * 60)),
             addMinutes(now, -90),
         );
+        const createdAt = replaces?.voided
+            ? later(planned, addMinutes(replaces.voided.at, 20))
+            : planned;
         const issuedAt =
             inv.state === "DRAFT"
                 ? null
@@ -954,6 +978,8 @@ export function planManualInvoices(
             createdByUserId: rng.pick(ctx.staff),
             paid,
             voided,
+            ...(inv.paper ? { paper: inv.paper } : {}),
+            ...(replaces ? { reissuedFromId: replaces.id } : {}),
         });
         seen.push({ contact, at: createdAt });
     });
@@ -967,6 +993,8 @@ export interface InvoiceRows {
     lines: Prisma.InvoiceLineCreateManyInput[];
     /** The business's last invoice number, for its InvoiceSequence. */
     lastNumber: number;
+    /** Payments, shares and emails after they went out (#1129). */
+    trails: TrailRows;
 }
 
 /**
@@ -989,6 +1017,7 @@ export function invoiceRows(
 
     const invoices: Prisma.InvoiceCreateManyInput[] = [];
     const lines: Prisma.InvoiceLineCreateManyInput[] = [];
+    const trails = emptyTrailRows();
     for (const spec of specs) {
         const contact = ctx.contacts[spec.contact];
         const subtotal = spec.lines.reduce(
@@ -997,13 +1026,41 @@ export function invoiceRows(
         );
         const number = numbers.get(spec.id);
         const issuedAt = spec.issuedAt;
+        // Paid from its ledger (DEC-173), as the API settles it.
+        const ledger =
+            issuedAt && !spec.voided && spec.trail?.ledger?.length
+                ? ledgerColumns(
+                      spec.id,
+                      subtotal + spec.taxPaise,
+                      spec.trail.ledger,
+                  )
+                : null;
         const status = !issuedAt
             ? "DRAFT"
             : spec.voided
               ? "VOID"
-              : spec.paid
-                ? "PAID"
-                : "ISSUED";
+              : ledger
+                ? ledger.status
+                : spec.paid
+                  ? "PAID"
+                  : "ISSUED";
+        const paidAt = ledger ? ledger.paidAt : (spec.paid?.at ?? null);
+        if (spec.trail && issuedAt && number) {
+            addTrailRows(trails, {
+                orgId: ctx.orgId,
+                invoiceId: spec.id,
+                currency: CURRENCY,
+                trail: spec.trail,
+                number: invoiceNumber(number),
+                business: ctx.seller.sellerName,
+                to: {
+                    name: contact.name,
+                    email: contact.email,
+                    contactId: contact.id,
+                },
+                idFor: (...parts) => `${spec.id}_${parts.join("_")}`,
+            });
+        }
         invoices.push({
             id: spec.id,
             organizationId: ctx.orgId,
@@ -1023,9 +1080,17 @@ export function invoiceRows(
             dueAt: issuedAt
                 ? new Date(issuedAt.getTime() + DUE_DAYS * DAY)
                 : null,
-            paidAt: spec.paid?.at ?? null,
-            paymentMethod: spec.paid?.method ?? null,
-            paymentReference: spec.paid?.reference ?? null,
+            paidAt,
+            paymentMethod: ledger
+                ? ledger.paymentMethod
+                : (spec.paid?.method ?? null),
+            paymentReference: ledger
+                ? ledger.paymentReference
+                : (spec.paid?.reference ?? null),
+            paidCents: ledger?.paidCents ?? 0,
+            paperStyle: issuedAt ? (spec.paper?.style ?? null) : null,
+            paperColour: issuedAt ? (spec.paper?.colour ?? null) : null,
+            reissuedFromId: spec.reissuedFromId ?? null,
             voidedAt: spec.voided?.at ?? null,
             voidReason: spec.voided?.reason ?? null,
             source: spec.source,
@@ -1036,8 +1101,7 @@ export function invoiceRows(
             packPurchaseId: spec.packPurchaseId ?? null,
             createdByUserId: spec.createdByUserId,
             createdAt: spec.createdAt,
-            updatedAt:
-                spec.voided?.at ?? spec.paid?.at ?? issuedAt ?? spec.createdAt,
+            updatedAt: spec.voided?.at ?? paidAt ?? issuedAt ?? spec.createdAt,
         });
         spec.lines.forEach((l, position) => {
             lines.push({
@@ -1052,5 +1116,5 @@ export function invoiceRows(
             });
         });
     }
-    return { invoices, lines, lastNumber: issued.length };
+    return { invoices, lines, lastNumber: issued.length, trails };
 }

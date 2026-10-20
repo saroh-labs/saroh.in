@@ -1,4 +1,8 @@
-import type { SocialLinks, SocialNetwork } from "@saroh/block-contract";
+import type {
+    PaperStyle,
+    SocialLinks,
+    SocialNetwork,
+} from "@saroh/block-contract";
 
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getJson, orgBase } from "@/lib/api/http";
@@ -159,6 +163,11 @@ export interface OrganizationSettings {
      * an older API: none.
      */
     registeredAddressMapUrl?: string | null;
+    /**
+     * The look its invoices go out in when a draft chooses none (DEC-173,
+     * U6 #1118). Absent from an older API: Classic in ink.
+     */
+    invoicePaper?: { style: PaperStyle; colour: string | null };
 }
 
 /**
@@ -235,6 +244,11 @@ export interface OrganizationSettingsInput {
     siteShowsRegisteredAddress?: boolean;
     /** Its Google Maps link, as typed; "" clears it. */
     registeredAddressMapUrl?: string;
+    /**
+     * The look invoices go out in (DEC-173): Owner or Admin
+     * (`org:update`). "" or null puts one back to Classic, or ink.
+     */
+    invoicePaper?: { style?: PaperStyle | ""; colour?: string | null };
 }
 
 /** A refusal names the field it is about when the API says which. */

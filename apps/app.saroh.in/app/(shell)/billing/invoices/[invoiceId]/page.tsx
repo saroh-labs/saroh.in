@@ -1,38 +1,12 @@
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
-import {
-    ConnectedPanel,
-    HistoryPanel,
-} from "@/components/invoices/connected-panel";
 import { InvoiceDetail } from "@/components/invoices/invoice-detail";
-import { InvoicePaper } from "@/components/invoices/invoice-paper";
-import { PaymentsToRefund } from "@/components/invoices/pay-link";
 import { PaymentsLocked } from "@/components/invoices/payments-locked";
 import { PageContainer } from "@/components/shared/page-container";
-import { ViewerDate } from "@/components/shared/viewer-date";
-import {
-    emailRefusalNote,
-    INVOICE_EMAIL_WORDS,
-} from "@/lib/communications/email-setup";
-import { readEmailSetup } from "@/lib/communications/email-setup-service";
-import { formatMoneyMajor } from "@/lib/format/money";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
-import { paymentsModuleOn } from "@/lib/invoices/payments-on";
-import { canSend, paysOnline } from "@/lib/invoices/send";
-import type { Invoice } from "@/lib/invoices/service";
-import { getInvoice, listInvoicesFor } from "@/lib/invoices/service";
-import {
-    billedTo,
-    invoicePill,
-    paidHow,
-    sourceLine,
-    whenLine,
-} from "@/lib/invoices/status";
-import { getInvoiceBusiness } from "@/lib/invoices/tax";
-import { NOT_PAID_YET } from "@/lib/invoices/words";
-import { invoiceZone } from "@/lib/invoices/zone";
-import { permitsFor } from "@/lib/organizations/permits";
+import { readInvoiceDetails } from "@/lib/invoices/details";
+import { getInvoice } from "@/lib/invoices/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { recordTitle } from "@/lib/page-title";
 import { requireSession } from "@/lib/session";
@@ -61,10 +35,12 @@ export async function generateMetadata({
 }
 
 /**
- * Payments → Invoices → one invoice, after "Saroh Invoice Detail": the tax
- * invoice (a GST-registered business) or receipt as the customer gets it,
- * with the actions its status allows, what it is connected to, how it is
- * being paid and what has happened to it. Print leaves only the paper.
+ * Payments → Invoices → one invoice (DEC-173, U9 #1121, INVPageA): the
+ * details the list's side sheet shows, as a page — for a deep link, Home,
+ * and a customer's invoices. The tax invoice (a GST-registered business) or
+ * receipt as the customer gets it, the money card with the state's one main
+ * button, Share and More, what happened, and what it is connected to.
+ * Print leaves only the paper.
  */
 export default async function InvoicePage({
     params,
@@ -83,176 +59,12 @@ export default async function InvoicePage({
             <PaymentsLocked {...paymentsLockedCopy(organization, "invoices")} />
         );
     }
-    const [invoice, business, paymentsOn] = await Promise.all([
-        readInvoice(invoiceId),
-        getInvoiceBusiness(),
-        paymentsModuleOn(),
-    ]);
-    if (!invoice) notFound();
-
-    // The customer's other invoices, for "N more for …". A failure here
-    // is said in the panel; it never takes the invoice down with it.
-    const others = invoice.contact
-        ? await listInvoicesFor(invoice.contact.id).catch(() => null)
-        : [];
-
-    const may = permitsFor(organization);
-    const canWrite = may("invoice:write");
-    // It can't be emailed for want of the business's own email (DEC-011):
-    // why, and Connect or See plans (DEC-091) for whoever may.
-    const emailMay = {
-        connect: may("comms:manage"),
-        plans: may("billing:read"),
-    };
-    const emailNote =
-        canWrite && invoice.send?.reason === "NO_EMAIL_PROVIDER"
-            ? emailRefusalNote(
-                  (await readEmailSetup(emailMay)) ?? {
-                      connected: false,
-                      canConnect: null,
-                  },
-                  emailMay,
-                  INVOICE_EMAIL_WORDS,
-              )
-            : null;
-    const businessName = organization?.name ?? "This business";
-    const who = billedTo(invoice);
-    const money = (a: string) => formatMoneyMajor(a, invoice.currency);
-    const late = whenLine(invoice);
-    // Its dates in the business's zone, as its paper prints them (#836).
-    const zone = invoiceZone(business);
-    // Whether its link takes payment: the API's word (DEC-070).
-    const payOnline = paysOnline(invoice.send, invoice.online);
-    const again = payOnline ? "Send the payment link again" : "Send it again";
+    const details = await readInvoiceDetails(invoiceId, readInvoice);
+    if (!details) notFound();
 
     return (
         <PageContainer width="full">
-            <InvoiceDetail
-                invoice={{
-                    id: invoice.id,
-                    number: invoice.number,
-                    standing: invoice.standing,
-                    kind: invoice.kind ?? "INVOICE",
-                    who: who.name,
-                    total: money(invoice.total),
-                    updatedAt: invoice.updatedAt,
-                }}
-                pill={invoicePill(invoice)}
-                subline={
-                    <>
-                        {who.name} · {sourceLine(invoice)} ·{" "}
-                        {invoice.issuedAt ? (
-                            <>
-                                issued{" "}
-                                <ViewerDate
-                                    iso={invoice.issuedAt}
-                                    variant="dayMonth"
-                                    timeZone={zone}
-                                />
-                            </>
-                        ) : (
-                            "not issued yet"
-                        )}
-                    </>
-                }
-                canWrite={canWrite}
-                registered={
-                    invoice.gst != null || (business?.registered ?? false)
-                }
-                orderHref={
-                    invoice.order
-                        ? `/commerce/orders/${encodeURIComponent(invoice.order.id)}`
-                        : null
-                }
-                editHref={`/billing/invoices/${encodeURIComponent(invoice.id)}/edit`}
-                online={invoice.online ?? null}
-                send={invoice.send ?? null}
-                sent={invoice.sent ?? []}
-                payLine={payLine(invoice, who.name, canWrite)}
-                late={
-                    invoice.standing === "OVERDUE" && invoice.dueAt ? (
-                        <>
-                            {late.before}, due{" "}
-                            <ViewerDate
-                                iso={invoice.dueAt}
-                                variant="dayMonth"
-                                timeZone={zone}
-                            />
-                            .{" "}
-                            {invoice.source === "SUBSCRIPTION"
-                                ? `The renewal hasn't been paid. ${again}, or call.`
-                                : `${again}, or call.`}
-                        </>
-                    ) : null
-                }
-                paper={
-                    <InvoicePaper
-                        invoice={invoice}
-                        business={business}
-                        businessName={businessName}
-                    />
-                }
-                connected={<ConnectedPanel invoice={invoice} others={others} />}
-                after={
-                    <>
-                        {invoice.online ? (
-                            <PaymentsToRefund
-                                payments={invoice.online.payments}
-                                invoiceStatus={invoice.status}
-                            />
-                        ) : null}
-                        <HistoryPanel invoice={invoice} />
-                    </>
-                }
-                paymentsOn={paymentsOn}
-                emailNote={emailNote}
-            />
+            <InvoiceDetail details={details} />
         </PageContainer>
     );
-}
-
-/** How it stands, in the Payment panel's words. */
-function payLine(i: Invoice, who: string, canWrite: boolean) {
-    const first = who.split(" ")[0] ?? who;
-    if (i.kind === "CREDIT_NOTE") {
-        return `A credit note. Nothing is owed on it. It cancels ${i.related?.number ?? "an invoice"}.`;
-    }
-    if (i.order) {
-        return i.standing === "CREDITED"
-            ? "Refunded on the order. A credit note cancels it."
-            : "Paid with the order. Its payments and refunds are made on the order, never here.";
-    }
-    switch (i.standing) {
-        case "PAID":
-            return (
-                <>
-                    Paid{" "}
-                    {i.paidAt ? (
-                        <ViewerDate iso={i.paidAt} variant="dayMonth" />
-                    ) : (
-                        "today"
-                    )}
-                    {i.payment ? ` ${paidHow(i.payment.method)}` : ""}.
-                </>
-            );
-        case "CREDITED":
-            return "Cancelled by a credit note. Nothing is owed.";
-        case "VOID":
-            return "Voided. Nothing is owed.";
-        case "DRAFT":
-            return "Not issued yet. A draft has no number and can still change.";
-        default:
-            if (!paysOnline(i.send, i.online)) {
-                // No online payment (DEC-070): the link only shows it.
-                return canWrite && canSend(i.send)
-                    ? `Not paid yet. Send it to ${first}. When the money comes in, record it.`
-                    : NOT_PAID_YET;
-            }
-            if (canWrite && canSend(i.send)) {
-                return `Not paid yet. ${first} can pay by UPI or card from the payment link. Send it to them. When the money comes in, record it.`;
-            }
-            return i.online?.providerConnected
-                ? `Not paid yet. ${first} can pay online from the payment link. Copy it and send it. When the money comes in, record it.`
-                : NOT_PAID_YET;
-    }
 }

@@ -121,7 +121,7 @@ test.describe("each start opens its flow, already open (U5)", () => {
         {
             label: "Book someone",
             role: "owner",
-            lands: /\/bookings\?new=1/,
+            lands: /\/bookings\?(?:[^#]*&)?new=1(?:&|$)/,
             open: (page) => page.getByRole("dialog", { name: "New booking" }),
         },
         {
@@ -129,7 +129,7 @@ test.describe("each start opens its flow, already open (U5)", () => {
             // has no booking:write, the API does, and the flow opens.
             label: "Book someone",
             role: "northwindMember",
-            lands: /\/bookings\?new=1/,
+            lands: /\/bookings\?(?:[^#]*&)?new=1(?:&|$)/,
             open: (page) => page.getByRole("dialog", { name: "New booking" }),
         },
         {
@@ -199,7 +199,7 @@ test.describe("the desk's New menu by keyboard (U5)", () => {
         await expect(items.nth(1)).toBeFocused();
         await expect(items.nth(1)).toHaveText(/Book someone/);
         await page.keyboard.press("Enter");
-        await expect(page).toHaveURL(/\/bookings\?new=1/);
+        await expect(page).toHaveURL(/\/bookings\?(?:[^#]*&)?new=1(?:&|$)/);
         await expect(
             page.getByRole("dialog", { name: "New booking" }),
         ).toBeVisible();

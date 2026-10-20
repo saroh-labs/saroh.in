@@ -181,9 +181,8 @@ test.describe("the person page", () => {
         await page.getByRole("button", { name: "Record payment" }).click();
         const dialog = page.getByRole("dialog", { name: "Record payment" });
         await expect(dialog).toContainText(who.name);
-        await dialog.getByRole("combobox", { name: "How it was paid" }).click();
-        await page.getByRole("option", { name: "Cash" }).click();
-        await dialog.getByRole("button", { name: "Record payment" }).click();
+        await dialog.getByRole("radio", { name: "Cash" }).click();
+        await dialog.getByRole("button", { name: /^Record ₹/ }).click();
         await expect(dialog).toBeHidden();
         await expect
             .poll(

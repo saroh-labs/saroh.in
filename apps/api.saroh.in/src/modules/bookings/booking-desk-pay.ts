@@ -96,6 +96,8 @@ const PAPER_SELECT = {
     sellerName: true,
     sellerLegalName: true,
     sellerEmail: true,
+    paperStyle: true,
+    paperColour: true,
     placeOfSupply: true,
     taxType: true,
     contactId: true,

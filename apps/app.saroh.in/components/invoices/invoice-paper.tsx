@@ -1,5 +1,7 @@
+import { paperColours, paperStyleOf } from "@saroh/block-contract";
 import { AbsentValue } from "@saroh/ui/absent-value";
 import { cn } from "@saroh/ui/lib/utils";
+import type { CSSProperties } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
@@ -46,6 +48,14 @@ const DESK_ONLY = "hidden sm:block print:block";
  * or IGST — or a receipt for a business that is not registered. A
  * registered business's paper whose every line is exempt is a bill of
  * supply (D15): its GSTIN and SAC, and no place of supply or tax columns.
+ *
+ * It is drawn in the invoice's look (DEC-173, U15 #1127): `paper`, the
+ * draft's own or the business's default, frozen at issue. Classic carries
+ * the colour on the title, the labels and the heavy rules; Band fills the
+ * top with it, the seller and the number on it; Compact sets the seller
+ * and the buyer side by side and its rows closer. The colours are the
+ * shared rule's (`paperColours`), the PDF's, and no style leaves a Rule 46
+ * particular off.
  *
  * Every figure is the API's, frozen when it was issued; nothing is summed
  * here. Unpaid paper prints "How to pay us" (#833) when the business set
@@ -109,6 +119,17 @@ export function InvoicePaper({
         Boolean(gst) && (i.lines ?? []).some((l) => l.gst?.hsnSac?.trim());
     // "How to pay us" on unpaid paper (#833), as the PDF prints it.
     const howToPay = howToPayLines(i, i.payInstructions);
+    // Its look (DEC-173): an API older than styles is Classic in ink.
+    const style = paperStyleOf(i.paper?.style);
+    const colours = paperColours(style, i.paper?.colour);
+    const band = colours.band;
+    const compact = style === "COMPACT";
+    const accent: CSSProperties | undefined = colours.coloured
+        ? { color: colours.accent }
+        : undefined;
+    const rule: CSSProperties | undefined = colours.coloured
+        ? { borderColor: colours.accent }
+        : undefined;
 
     // No line with a rate set: no GST rows, just the total (DEC-072).
     const gstRows = taxed && showsGstTotals(i) ? taxed : null;
@@ -133,93 +154,161 @@ export function InvoicePaper({
             ]
           : [];
 
-    return (
-        <article
-            aria-label={`The ${title.toLowerCase()} as it prints`}
-            className="invoice-paper invoice-print rounded-[6px] border border-border px-5 py-[22px] shadow-[0_6px_18px_hsl(60_4%_11%/0.08)] [overflow-wrap:anywhere] sm:px-7 sm:py-[26px] print:rounded-none print:border-0 print:p-0 print:shadow-none"
-        >
-            <header className="flex flex-wrap items-start gap-4 border-b-2 border-foreground pb-4">
-                <div className="min-w-0 flex-[1_1_200px]">
-                    {business?.logo ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- a tenant's own image, outside next/image's allowlist
-                        <img
-                            src={business.logo}
-                            alt=""
-                            className="mb-2 size-10 rounded-lg object-cover"
+    // The seller, the number and who it's billed to: Band puts the first
+    // two on its colour, Compact all three side by side.
+    const sellerBlock = (
+        <div className="min-w-0 flex-[1_1_200px]">
+            {business?.logo ? (
+                // eslint-disable-next-line @next/next/no-img-element -- a tenant's own image, outside next/image's allowlist
+                <img
+                    src={business.logo}
+                    alt=""
+                    className="mb-2 size-10 rounded-lg object-cover"
+                />
+            ) : null}
+            <p
+                className={cn(
+                    "font-display font-semibold tracking-[-0.02em]",
+                    compact ? "text-[17px]" : "text-[20px]",
+                )}
+            >
+                {businessName}
+            </p>
+            <p
+                className={cn(
+                    "mt-[3px] text-[12px] leading-[1.5]",
+                    band ? "opacity-85" : "text-muted-foreground",
+                )}
+            >
+                {sellerLines.map((line) => (
+                    <span key={line} className="block">
+                        {line}
+                    </span>
+                ))}
+                {gst || gstin
+                    ? `GSTIN ${gstin ?? ""}${sellerState ? ` · ${sellerState}` : ""}`
+                    : "Not registered for GST"}
+            </p>
+        </div>
+    );
+    const numberBlock = (
+        <div className="text-right">
+            <p
+                className={cn("label", band && "!text-current")}
+                style={band ? undefined : accent}
+            >
+                {title}
+            </p>
+            <p className="mt-[3px] font-mono text-[15px]">
+                {i.number ?? "Draft"}
+            </p>
+            <p
+                className={cn(
+                    "mt-[3px] text-[12px]",
+                    band ? "opacity-85" : "text-muted-foreground",
+                )}
+            >
+                {i.issuedAt ? (
+                    <>
+                        Issued{" "}
+                        <ViewerDate
+                            iso={i.issuedAt}
+                            variant="dayMonth"
+                            timeZone={zone}
                         />
-                    ) : null}
-                    <p className="font-display text-[20px] font-semibold tracking-[-0.02em]">
-                        {businessName}
-                    </p>
-                    <p className="mt-[3px] text-[12px] leading-[1.5] text-muted-foreground">
-                        {sellerLines.map((line) => (
-                            <span key={line} className="block">
-                                {line}
-                            </span>
-                        ))}
-                        {gst || gstin
-                            ? `GSTIN ${gstin ?? ""}${sellerState ? ` · ${sellerState}` : ""}`
-                            : "Not registered for GST"}
-                    </p>
-                </div>
-                <div className="text-right">
-                    <p className="label">{title}</p>
-                    <p className="mt-[3px] font-mono text-[15px]">
-                        {i.number ?? "Draft"}
-                    </p>
-                    <p className="mt-[3px] text-[12px] text-muted-foreground">
-                        {i.issuedAt ? (
+                        {i.dueAt && !credit && !i.order ? (
                             <>
-                                Issued{" "}
+                                {" · due "}
                                 <ViewerDate
-                                    iso={i.issuedAt}
+                                    iso={i.dueAt}
                                     variant="dayMonth"
                                     timeZone={zone}
                                 />
-                                {i.dueAt && !credit && !i.order ? (
-                                    <>
-                                        {" · due "}
-                                        <ViewerDate
-                                            iso={i.dueAt}
-                                            variant="dayMonth"
-                                            timeZone={zone}
-                                        />
-                                    </>
-                                ) : null}
                             </>
-                        ) : (
-                            "Draft, not numbered"
-                        )}
-                    </p>
-                    {i.related ? (
-                        <p className="text-[12px] text-muted-foreground">
-                            {credit ? "Against" : "Supplementary to"}{" "}
-                            <span className="font-mono">
-                                {i.related.number}
-                            </span>
-                        </p>
-                    ) : null}
-                </div>
-            </header>
+                        ) : null}
+                    </>
+                ) : (
+                    "Draft, not numbered"
+                )}
+            </p>
+            {i.related ? (
+                <p
+                    className={cn(
+                        "text-[12px]",
+                        band ? "opacity-85" : "text-muted-foreground",
+                    )}
+                >
+                    {credit ? "Against" : "Supplementary to"}{" "}
+                    <span className="font-mono">{i.related.number}</span>
+                </p>
+            ) : null}
+        </div>
+    );
+    const buyerBlock = (
+        <div className="min-w-0 flex-[1_1_200px]">
+            <p className="label" style={accent}>
+                Billed to
+            </p>
+            <p className="mt-1 text-[14px] font-semibold">{who.name}</p>
+            {address || who.email ? (
+                <p className="text-[12px] leading-[1.5] text-muted-foreground">
+                    {address ?? who.email}
+                </p>
+            ) : null}
+            {buyerGstin ? (
+                <p className="mt-[3px] font-mono text-[12px]">
+                    GSTIN {buyerGstin}
+                </p>
+            ) : null}
+        </div>
+    );
 
-            <div className="flex flex-wrap gap-5 py-3.5">
-                <div className="min-w-0 flex-[1_1_200px]">
-                    <p className="label">Billed to</p>
-                    <p className="mt-1 text-[14px] font-semibold">{who.name}</p>
-                    {address || who.email ? (
-                        <p className="text-[12px] leading-[1.5] text-muted-foreground">
-                            {address ?? who.email}
-                        </p>
-                    ) : null}
-                    {buyerGstin ? (
-                        <p className="mt-[3px] font-mono text-[12px]">
-                            GSTIN {buyerGstin}
-                        </p>
-                    ) : null}
-                </div>
+    return (
+        <article
+            aria-label={`The ${title.toLowerCase()} as it prints`}
+            data-style={style}
+            className="invoice-paper invoice-print overflow-hidden rounded-[6px] border border-border px-5 py-[22px] shadow-[0_6px_18px_hsl(60_4%_11%/0.08)] [overflow-wrap:anywhere] sm:px-7 sm:py-[26px] print:rounded-none print:border-0 print:p-0 print:shadow-none"
+        >
+            {band ? (
+                <header
+                    data-band={band.tone.toLowerCase()}
+                    className="-mx-5 -mt-[22px] mb-1 flex flex-wrap items-start gap-4 px-5 py-4 sm:-mx-7 sm:-mt-[26px] sm:px-7 print:mx-0 print:mt-0"
+                    style={{ backgroundColor: band.fill, color: band.text }}
+                >
+                    {sellerBlock}
+                    {numberBlock}
+                </header>
+            ) : compact ? (
+                <header
+                    className="grid gap-4 border-b-2 border-foreground pb-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+                    style={rule}
+                >
+                    {sellerBlock}
+                    {buyerBlock}
+                    {numberBlock}
+                </header>
+            ) : (
+                <header
+                    className="flex flex-wrap items-start gap-4 border-b-2 border-foreground pb-4"
+                    style={rule}
+                >
+                    {sellerBlock}
+                    {numberBlock}
+                </header>
+            )}
+
+            <div
+                className={cn(
+                    "flex flex-wrap gap-5",
+                    compact ? "py-2.5" : "py-3.5",
+                )}
+            >
+                {compact && !band ? null : buyerBlock}
                 {taxed ? (
                     <div className="min-w-0 flex-[0_1_200px]">
-                        <p className="label">Place of supply</p>
+                        <p className="label" style={accent}>
+                            Place of supply
+                        </p>
                         <p className="mt-1 text-[13px]">
                             {taxed.placeOfSupply ? (
                                 `${taxed.placeOfSupply.name ?? "State"} (${taxed.placeOfSupply.code})`
@@ -293,7 +382,10 @@ export function InvoicePaper({
                             className={cn(
                                 COLS,
                                 hsnColumn ? DESK_WITH_HSN : DESK,
-                                "items-baseline border-b border-border/60 py-[9px] text-[13px]",
+                                "items-baseline border-b border-border/60",
+                                compact
+                                    ? "py-[5px] text-[12.5px]"
+                                    : "py-[9px] text-[13px]",
                             )}
                         >
                             <span className="min-w-0">
@@ -356,6 +448,7 @@ export function InvoicePaper({
                             "flex border-t-2 border-foreground pt-2 text-[16px] font-bold",
                             sums.length > 0 && "mt-[5px]",
                         )}
+                        style={rule}
                     >
                         <span className="flex-1">
                             {credit ? "Credited" : "Total"}
@@ -375,7 +468,9 @@ export function InvoicePaper({
                     aria-label="How to pay us"
                     className="mt-[18px] break-inside-avoid"
                 >
-                    <p className="label">How to pay us</p>
+                    <p className="label" style={accent}>
+                        How to pay us
+                    </p>
                     {howToPay.map((line) => (
                         <p
                             key={line}

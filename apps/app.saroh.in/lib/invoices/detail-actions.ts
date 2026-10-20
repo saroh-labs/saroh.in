@@ -55,7 +55,8 @@ export type DetailActionId =
     | "pdf"
     | "cancel"
     | "refund"
-    | "refundOrder";
+    | "refundOrder"
+    | "writeAgain";
 
 export interface DetailAction {
     id: DetailActionId;
@@ -95,6 +96,12 @@ export interface DetailActionState {
     linkUnseen?: boolean;
     /** The PDF is being made. */
     pdfBusy: boolean;
+    /**
+     * A void invoice of its own that nobody wrote again (`reissuedAsId`
+     * null, not an order's): "Write again" opens a draft with its lines
+     * (DEC-173, U13).
+     */
+    writeAgain?: boolean;
 }
 
 /** Whether money is owed on it here, rather than on an order. */
@@ -175,7 +182,7 @@ export function detailActions(s: DetailActionState): DetailAction[] {
             },
             { id: "print", label: "Print" },
             ...pdf,
-            { id: "cancel", label: "Cancel invoice", danger: true },
+            { id: "cancel", label: CANCEL_OR_CORRECT, danger: true },
         ];
     }
     // Owed, and this role can't record it (DEC-098): Record payment is
@@ -209,6 +216,9 @@ export function detailActions(s: DetailActionState): DetailAction[] {
         ...paidView,
         ...pdf,
     ];
+    if (s.canWrite && s.standing === "VOID" && s.writeAgain && !s.fromOrder) {
+        actions.push({ id: "writeAgain", label: WRITE_AGAIN });
+    }
     if (s.canWrite && s.standing === "PAID" && !s.credit) {
         actions.push(
             s.fromOrder

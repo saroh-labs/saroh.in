@@ -16,10 +16,12 @@ import { Row } from "@/components/sites/settings-rows";
 import { PRICE_MODE_ROW, PRICE_MODE_SAYS } from "@/lib/gst/price-mode";
 import { rateOption } from "@/lib/invoices/gst";
 import { formatOf, RESTART_LABEL } from "@/lib/invoices/invoice-number";
+import { lookWords } from "@/lib/invoices/paper-look";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 
 import { TextLink } from "@saroh/ui/text-link";
+import { savedPaper } from "./invoice-paper-sheet";
 import type { BusinessSheets } from "./use-business-sheets";
 
 export const TAX_TAB = {
@@ -126,6 +128,17 @@ export function BusinessTaxRows({
                 <Saved text={nextNumberOf(saved, settings)} mono />
                 <Follows>
                     Restarts: {RESTART_LABEL[formatOf(saved).restart]}
+                </Follows>
+            </Row>
+            <Row
+                id={BUSINESS_ROW_ID.paper}
+                label="Invoice style"
+                action={edit("paper", "Edit", "Edit invoice style")}
+            >
+                <Saved text={lookWords(savedPaper(settings))} />
+                <Follows>
+                    New invoices start in it. An invoice can choose its own on
+                    the paper.
                 </Follows>
             </Row>
             {registered ? (

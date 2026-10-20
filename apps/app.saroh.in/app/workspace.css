@@ -262,6 +262,31 @@
     }
 }
 
+/* An invoice printed from the list's details sheet (DEC-173, U9): the list
+   behind it goes, and the sheet lets its paper run on to as many pages as it
+   needs rather than printing the window it scrolls in. The sheet's header,
+   money card, history and foot are `print:hidden`, as on the page. */
+@media print {
+    body:has([data-invoice-sheet]) main {
+        display: none !important;
+    }
+    [role="dialog"]:has([data-invoice-sheet]) {
+        position: static !important;
+        inset: auto !important;
+        transform: none !important;
+        width: auto !important;
+        max-width: none !important;
+        height: auto !important;
+        max-height: none !important;
+        border: 0 !important;
+        box-shadow: none !important;
+    }
+    [role="dialog"]:has([data-invoice-sheet]) * {
+        overflow: visible !important;
+        max-height: none !important;
+    }
+}
+
 /* =============================================================================
    PRINTING TICKETS (plan B, B6)
    =============================================================================
