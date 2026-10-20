@@ -164,6 +164,29 @@ async function pause(ms = 900) {
 const text = () => host.textContent.replace(/\s+/g, " ");
 
 describe("saved as it is typed", () => {
+    it("the draft's address keeps ?mode= only, through a replace Next's router follows", async () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+        // Next marks its own history entries `__NA`; a replace carrying the
+        // marker is one its router ignores, and later writes back over.
+        window.history.replaceState(
+            { __NA: true },
+            "",
+            "/billing/invoices/new?mode=form&contactId=c_1",
+        );
+        const replaceState = vi.spyOn(window.history, "replaceState");
+        render({ initialContactId: "c_1" });
+        type("Line 1: what it's for", "Catering platter");
+        type("Line 1: price each, INR", "450");
+        await pause();
+        expect(actions.createInvoice).toHaveBeenCalledTimes(1);
+        expect(`${window.location.pathname}${window.location.search}`).toBe(
+            "/billing/invoices/inv_9/edit?mode=form",
+        );
+        const [data] = replaceState.mock.calls.at(-1) ?? [];
+        expect(data).toBeNull();
+        replaceState.mockRestore();
+    });
+
     it("becomes a draft once who and a line are in, at the draft's own address", async () => {
         vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
         render({ initialContactId: "c_1" });

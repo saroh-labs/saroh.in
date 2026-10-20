@@ -266,7 +266,7 @@ export function InvoicesScreen({
         const next = new URL(window.location.href);
         if (id) next.searchParams.set("invoice", id);
         else next.searchParams.delete("invoice");
-        window.history.replaceState(window.history.state, "", next);
+        window.history.replaceState(null, "", next);
     }
     const openInvoice = (invoice: Invoice) => showInvoice(invoice.id);
 

@@ -12,6 +12,43 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Next router — an address written in place went back to the old one
+
+**Symptom**: 20 Oct 2026, the invoices release gate. New invoice saved its
+draft as it was typed ("Draft · saved" on screen), but the address stayed
+`/billing/invoices/new?…` instead of becoming the draft's `/edit`, so a
+reload opened an empty form and a second draft (`invoices-journey.spec`).
+**Cause**: the draft hook wrote the address with
+`history.replaceState(window.history.state, "", url)`. Next 16 patches
+`replaceState` so its router follows a write, unless the state passed
+carries its own marker (`__NA`), which `window.history.state` always does.
+The router never heard of the new address; on its next commit (the Server
+Action's answer) it wrote its own `canonicalUrl`, `/new`, back. Five other
+places wrote the address the same way (the invoice list's `?invoice=`, a
+post's address, an order's `?panel=`, a post category, the console's plans
+nav).
+**Fix**: pass `null` (Next copies its own state across itself), and keep
+only `?mode=` on the draft's address. `pnpm run check:history-state`
+(`scripts/check-history-state.mjs`, in prepush and CI) fails on
+`history.replaceState(window.history.state` or `pushState` the same way.
+
+Two more misses from the same gate, both in specs:
+
+- **Playwright's `request` fixture is not signed in.** `useSession(page)`
+  adds the saved cookies to the page's context; the test's `request`
+  fixture is a context of its own with none, so the API answers 401
+  "Invalid or expired session". Call the API as the person through
+  `page.request` (`northwind(page.request)`).
+- **A modal editor takes the page out of `getByRole`.** A Radix popover
+  with `modal` or a sheet sets `aria-hidden` on everything else, so
+  `getByRole("article")` finds nothing behind it although it is on screen.
+  Check the name once with nothing open, then read it with
+  `includeHidden: true` (`invoices-paper-editor.spec.ts`). And a helper
+  that counts buttons waits for the screen first: right after `goto` the
+  route's loading state is showing (`pressInvoiceAction`).
+
+---
+
 ## Session replay — every recording played back as a blank black screen
 
 **Symptom**: 14 Oct 2026, four days after session replay went on in
@@ -5389,6 +5426,7 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** (1) The trace has one Enter, ~250ms after the page loaded, while the page's own routes still prefetched. React replayed the pre-hydration keydown on the trigger, which opened the menu, but Radix's document-level keydown listener (attached in an effect) had not seen it, so it treated the open as a pointer's and left focus on the menu, not its first row. The spec's `toPass` only waited for the menu to show. (2) Both files walk whole sheets in jsdom with real settle waits, ~2s a test locally. A test that times out leaves its `act()` running ("overlapping act() calls"), which fails every later test in the file.
 - **Fix:** the spec presses Escape and Enter again until the first row holds focus (`toBeFocused` inside `toPass`). Both New booking describes and the bag-through-a-reload describe get `{ timeout: 15_000 }`.
 - **Rule:** a keyboard spec's first press after a load waits for the focus it expects, not only for the menu or sheet to show: a replayed press can open it in pointer mode. A jsdom file whose tests take over a second locally sets a describe timeout, so one slow test can't fail the file.
+
 ### Demo invoices would have kept their emails after a re-seed (20 Oct 2026)
 
 - **Symptom:** while giving Rye & Co. and Pulse invoices that were emailed and reminded (#1129), a second `db:seed:showcase` run would have left the first run's `INVOICE_SENT` and `INVOICE_REMINDER` messages behind, with no invoice, in Messages.

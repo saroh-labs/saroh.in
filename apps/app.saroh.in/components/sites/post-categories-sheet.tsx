@@ -54,7 +54,7 @@ export function PostCategoriesSheet({
         if (arriving) {
             const url = new URL(window.location.href);
             url.searchParams.delete(CATEGORIES_PARAM);
-            window.history.replaceState(window.history.state, "", url);
+            window.history.replaceState(null, "", url);
         }
     }
 

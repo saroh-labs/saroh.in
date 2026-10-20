@@ -125,11 +125,19 @@ export function useInvoiceDraft({
                     idRef.current = invoice.id;
                     setId(invoice.id);
                     // The draft's own address from now on, keeping how
-                    // it is being written (`?mode=paper`, U15).
+                    // it is being written (`?mode=paper`, U15) and nothing
+                    // else: `?contactId=` started a new one, and the draft
+                    // now has its contact. `null`, never
+                    // `window.history.state`: Next's router only follows a
+                    // replace without its own marker, and a router that
+                    // didn't follow writes `/new` back on its next commit.
+                    const mode = new URLSearchParams(
+                        window.location.search,
+                    ).get("mode");
                     window.history.replaceState(
-                        window.history.state,
+                        null,
                         "",
-                        `/billing/invoices/${invoice.id}/edit${window.location.search}`,
+                        `/billing/invoices/${invoice.id}/edit${mode ? `?mode=${encodeURIComponent(mode)}` : ""}`,
                     );
                 }
             },
