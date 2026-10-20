@@ -47,11 +47,22 @@ async function openPaper(page: Page, org: string, query = "") {
     await expect(
         page.getByRole("heading", { level: 1, name: "New invoice" }),
     ).toBeVisible();
-    const paper = page.getByRole("article", {
-        name: "The invoice: press a part to change it",
-    });
-    await expect(paper).toBeVisible();
-    return paper;
+    // Named for a screen reader while nothing is open over it…
+    await expect(page.getByRole("article", { name: PAPER_NAME })).toBeVisible();
+    return paperBehind(page);
+}
+
+const PAPER_NAME = "The invoice: press a part to change it";
+
+/**
+ * The paper as the eye sees it, also while a part's editor is open. The
+ * editor is modal (a popover on the desk, a sheet on a phone), so the rest
+ * of the page leaves the accessibility tree, where `getByRole` looks; the
+ * paper stays on screen beside it, following every keystroke, and that is
+ * what these tests read.
+ */
+function paperBehind(page: Page) {
+    return page.getByRole("article", { name: PAPER_NAME, includeHidden: true });
 }
 
 /** A part's control on the paper, by the start of its name. */
@@ -232,9 +243,7 @@ test.describe("New invoice on the paper", () => {
         await page.getByLabel(/^Line 1: price each/).fill("900");
         await page.getByRole("radio", { name: "On the paper" }).click();
         await expect(page).toHaveURL(/mode=paper/);
-        const paper = page.getByRole("article", {
-            name: "The invoice: press a part to change it",
-        });
+        const paper = page.getByRole("article", { name: PAPER_NAME });
         await expect(paper).toContainText("Tasting box");
         await page.getByRole("radio", { name: "Form" }).click();
         await expect(page.getByLabel("Line 1: what it's for")).toHaveValue(
@@ -244,9 +253,11 @@ test.describe("New invoice on the paper", () => {
 
     test("the look chosen on the paper is saved with the draft", async ({
         page,
-        request,
     }, testInfo) => {
         await useSession(page);
+        // The page's own request context: it carries the session's cookies,
+        // which Playwright's `request` fixture never has.
+        const request = page.request;
         const tag = stamp(testInfo);
         const contact = await makeContact(request, {
             firstName: "Paper",
@@ -336,11 +347,11 @@ test.describe("New invoice on the paper", () => {
 test.describe("the business's invoice style", { tag: "@serial" }, () => {
     test("Make this my default sets it for the business, and Settings reads it", async ({
         page,
-        request,
     }) => {
         await useSession(page);
         await page.goto(`/open/${NORTHWIND_ORG}`);
-        const nw = northwind(request);
+        // As the signed-in owner: the page's request context, with its cookies.
+        const nw = northwind(page.request);
         const before = await nw.get<{
             invoicePaper?: { style: string; colour: string | null };
         }>("/settings");

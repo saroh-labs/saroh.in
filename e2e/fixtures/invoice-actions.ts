@@ -52,12 +52,17 @@ export async function closeMenu(page: Page): Promise<void> {
 
 /**
  * Presses an action wherever it is: a button on screen first, then Share,
- * then More.
+ * then More. It waits for the invoice's details to be drawn first: a page
+ * just opened shows its loading state, and counting buttons there finds
+ * none (business-details.spec failed in 400ms on it, 20 Oct).
  */
 export async function pressInvoiceAction(
     page: Page,
     name: string,
 ): Promise<void> {
+    await expect(
+        page.locator("[data-money-card]").filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 30_000 });
     const button = page
         .getByRole("button", { name, exact: true })
         .filter({ visible: true });

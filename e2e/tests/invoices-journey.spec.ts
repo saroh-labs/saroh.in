@@ -167,10 +167,17 @@ test.describe("the invoice journey", { tag: "@serial" }, () => {
             await page.goto(
                 `/billing/invoices/new?mode=paper&contactId=${who.id}`,
             );
+            const named = "The invoice: press a part to change it";
+            await expect(
+                page.getByRole("article", { name: named }),
+            ).toBeVisible();
+            // Read as the eye sees it from here: an editor or the phone's
+            // Style sheet is modal and takes the rest of the page out of the
+            // accessibility tree, while the paper stays on screen.
             const paper = page.getByRole("article", {
-                name: "The invoice: press a part to change it",
+                name: named,
+                includeHidden: true,
             });
-            await expect(paper).toBeVisible();
             await pressUntil(
                 page.getByRole("button", { name: /^Add a line/ }),
                 page.getByRole("dialog", { name: "Add a line" }),
