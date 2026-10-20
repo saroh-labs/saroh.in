@@ -119,6 +119,13 @@ add or change there may be served to the next visitor without rendering.
   or fewer (`placesLeftWords`); an older answer keeps the time and hides
   the count. `e2e/tests/site-live-facts.spec.ts` fetches the page with no
   scripts and finds no time and no count.
+- **A look is part of the publication** (DEC-172). The renderer draws the
+  look the publication names and reads no flag; a value this build doesn't
+  know draws Classic (`lookOf`). Choosing a look changes the draft, and
+  customers see it only after a publish, which revalidates the page as any
+  publish does. A resized photo is not page state either: the Worker's
+  `/_img/…` route keeps each size in the Cache API by host, key, width and
+  format, apart from the page cache (`frontend-design-system.md` → "A photo is sized for the screen").
 - **A live read outside the publication shortens the page's life.** The
   head (trackers, codes; DEC-108) keeps it 60 seconds at most
   (`keepPageAtMost`). Everything else lives `SITE_PAGE_CACHE_TTL` (five

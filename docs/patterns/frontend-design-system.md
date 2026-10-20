@@ -40,6 +40,28 @@
   `--site-body-size` and `--site-measure` with today's value as the fallback,
   and marks a section title `data-site-title` (the eyebrow rule `SiteTheme`
   writes from `--site-label-style`). Section headings use `font-site-heading`.
+- **Current** (20 Oct 2026, DEC-172) — **A look is data, chosen per site**
+  (`looks.ts` in `@saroh/block-contract`): Folio, Quiet or Live, stored as
+  `Site.style.look`. Absent is Classic and is never written out, so a style
+  with no look is byte for byte what it was. A look carries tokens (corners,
+  margins, measure), its font pair, a type scale, the layout each block takes
+  where its section chose none (`resolveVariant(type, content, look)`), how
+  booking is framed (Folio a panel, Quiet a page, Live sheets) and its motion
+  ceiling. Colours are never a look's: they are the business's, **made safe,
+  never refused** (`safe-colours.ts`): the accent is moved toward the text
+  until it reads, and an accent that is the ink itself is drawn as an
+  outline. Blocks are told `LookProps` (`look`, `isOwnerPreview`;
+  `site-blocks/src/look-context.ts`) as props, and the page's root wears
+  `data-site-look` for CSS. **Look code is inert for Classic**: every look
+  branch leaves Classic's markup and motion as they were, held by the
+  `classic-pin` tests; a change to Classic is its own decision. "No photo
+  yet" and other notes on what is missing show only where `isOwnerPreview`
+  is true. A state page under a look (404, the page that didn't load, a
+  module off) is `SitePageMessage` given the `look`
+  (`site-page-message.tsx`); paused booking is `booking-flow/look-closed.tsx`.
+  Loading shapes wait 300 ms
+  (`HELD_AFTER_MS`, `look-theme.ts`), then stand still. The flag and its
+  rollout: `docs/architecture/runbooks/SITE_LOOKS_ROLLOUT.md`.
 - **Current** — **A section's frame and the page's column** (industry
   templates, polish pass). Every section may carry `anchor`, `navLabel` and
   `band` beside its own fields (`section-frame.ts` in `@saroh/block-contract`;
