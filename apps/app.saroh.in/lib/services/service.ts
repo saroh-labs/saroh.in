@@ -170,11 +170,18 @@ export interface BookingEvent {
         | "CANCELLED"
         | "ATTENDED"
         | "NO_SHOW"
-        | "PAID_AT_DESK";
+        | "PAID_AT_DESK"
+        | "REASSIGNED";
     /** Null when the booker did it themselves through the public form. */
     actor: { name: string | null } | null;
     fromStartAt: string | null;
     toStartAt: string | null;
+    /**
+     * On REASSIGNED (#1157): who it was with (null: nobody) and who it is
+     * with now; a person since removed reads null too.
+     */
+    fromStaff?: { name: string } | null;
+    toStaff?: { name: string } | null;
     createdAt: string;
 }
 
@@ -698,6 +705,57 @@ export function rescheduleBooking(
         { startAt },
         "Couldn't move the booking.",
     );
+}
+
+/**
+ * Change who a booking is with, or give one that has nobody a person
+ * (#1157), at a new time when `startAt` is given. 409 when they're booked
+ * then (saying when), 400 when they don't take it or aren't working.
+ */
+export function reassignBooking(
+    bookingId: string,
+    input: { staffId: string; startAt?: string },
+): Promise<CrmResult<Booking>> {
+    return send<Booking>(
+        `/bookings/${encodeURIComponent(bookingId)}/reassign`,
+        "POST",
+        input,
+        "Couldn't change who the booking is with.",
+    );
+}
+
+/** One person a booking could be given to, and whether they can then. */
+export interface ReassignCandidate {
+    id: string;
+    name: string;
+    /** It is with them now, they're free, booked then, or not working. */
+    state: "current" | "free" | "busy" | "off";
+    busyFrom?: string;
+    busyTo?: string;
+}
+
+/**
+ * Who could take a booking at `startAt` (its own start when left out):
+ * the Change who picker's list. Null when it couldn't be read; a failed
+ * read is never an empty list.
+ */
+export async function readReassignCandidates(
+    bookingId: string,
+    startAt?: string,
+): Promise<{ startAt: string; people: ReassignCandidate[] } | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    const query = startAt
+        ? `?${new URLSearchParams({ startAt }).toString()}`
+        : "";
+    const res = await apiFetch(
+        `${base}/services/bookings/${encodeURIComponent(bookingId)}/people${query}`,
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as {
+        startAt: string;
+        people: ReassignCandidate[];
+    };
 }
 
 export function cancelBooking(

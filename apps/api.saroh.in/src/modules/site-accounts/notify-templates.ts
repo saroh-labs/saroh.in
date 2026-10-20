@@ -33,6 +33,11 @@ export interface BookingNoticeVars {
     /** The customer did it themselves, from their account or the site. */
     byCustomer: boolean;
     /**
+     * Given to someone else (#1157): "now with Meera", and the time only
+     * when it moved too (`fromStartAt` differs from `startAt`).
+     */
+    reassigned?: boolean;
+    /**
      * Their bookings on the business's own site, where they can move or
      * cancel it (`notice-link.ts`); null or absent: the email has no link.
      */
@@ -138,6 +143,7 @@ function bookingSentence(
         case "BOOKING_CONFIRMED":
             return `Your ${b.service}${withWhom} on ${when} is booked.`;
         case "BOOKING_MOVED": {
+            if (b.reassigned && b.staff) return reassignedSentence(b, when);
             if (b.byCustomer) return `You moved your ${b.service} to ${when}.`;
             const was = b.fromStartAt
                 ? ` It was ${noticeWhen(b.fromStartAt, b.timeZone)}.`
@@ -149,6 +155,22 @@ function bookingSentence(
                 ? `You cancelled your ${b.service} on ${when}.`
                 : `Your ${b.service} on ${when} has been cancelled.`;
     }
+}
+
+/**
+ * "Your booking is now with Meera" (#1157): "Your Physio assessment on Tue
+ * 20 Oct at 10:00 am is now with Meera Iyer.", or, moved too, "… is now
+ * with Meera Iyer on Wed 21 Oct at 11:00 am. It was Tue 20 Oct at 10:00 am."
+ */
+function reassignedSentence(b: BookingNoticeVars, when: string): string {
+    const moved =
+        b.fromStartAt !== null &&
+        b.fromStartAt.getTime() !== b.startAt.getTime();
+    if (!moved) return `Your ${b.service} on ${when} is now with ${b.staff}.`;
+    const was = b.fromStartAt
+        ? ` It was ${noticeWhen(b.fromStartAt, b.timeZone)}.`
+        : "";
+    return `Your ${b.service} is now with ${b.staff} on ${when}.${was}`;
 }
 
 function placedSentence(p: PlacedOrderVars): string {
@@ -197,7 +219,9 @@ function noticeSubject(vars: NoticeVars): string {
         case "BOOKING_CONFIRMED":
             return `You're booked with ${vars.booking.business}`;
         case "BOOKING_MOVED":
-            return `Your booking with ${vars.booking.business} has moved`;
+            return vars.booking.reassigned && vars.booking.staff
+                ? `Your booking with ${vars.booking.business} is now with ${vars.booking.staff}`
+                : `Your booking with ${vars.booking.business} has moved`;
         case "BOOKING_CANCELLED":
             return `Your booking with ${vars.booking.business} is cancelled`;
         case "ORDER_PLACED":

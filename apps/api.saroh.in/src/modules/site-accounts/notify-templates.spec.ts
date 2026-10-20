@@ -85,6 +85,43 @@ describe("notice words (A14)", () => {
         ).toBe("You cancelled your Check-up on Tue 6 Oct at 11:00 am.");
     });
 
+    it("says who it is with now when it was given to someone else (#1157)", () => {
+        expect(
+            noticeSentence({
+                kind: "BOOKING_MOVED",
+                booking: booking({
+                    reassigned: true,
+                    staff: "Meera Iyer",
+                    fromStartAt: AT,
+                }),
+            }),
+        ).toBe(
+            "Your Check-up on Tue 6 Oct at 11:00 am is now with Meera Iyer.",
+        );
+        expect(
+            noticeSentence({
+                kind: "BOOKING_MOVED",
+                booking: booking({
+                    reassigned: true,
+                    staff: "Meera Iyer",
+                    fromStartAt: WAS,
+                }),
+            }),
+        ).toBe(
+            "Your Check-up is now with Meera Iyer on Tue 6 Oct at 11:00 am. It was Mon 5 Oct at 10:00 am.",
+        );
+        expect(
+            renderNotice({
+                kind: "BOOKING_MOVED",
+                booking: booking({
+                    reassigned: true,
+                    staff: "Meera Iyer",
+                    fromStartAt: AT,
+                }),
+            }).subject,
+        ).toBe("Your booking with Kavi Dental is now with Meera Iyer");
+    });
+
     it("leaves out the person when the booking has none", () => {
         expect(
             noticeSentence({

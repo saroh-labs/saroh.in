@@ -67,7 +67,7 @@ export default async function BookingPage({
 }: {
     params: Promise<{ bookingId: string }>;
 }) {
-    await requireSession();
+    const session = await requireSession();
     const { bookingId } = await params;
 
     // Null covers missing, another org's, and not permitted alike — the api
@@ -96,7 +96,7 @@ export default async function BookingPage({
     const canWrite = permits(organization, "booking:write");
     // Times in the business's zone, labelled (Q10): the service's.
     const timezone = booking.service.timezone || booking.timezone;
-    const [packs, waitlist, person] = await Promise.all([
+    const [packs, waitlist, person, staffList] = await Promise.all([
         packsFor(booking),
         waitlistFor(booking),
         // Their phone, Needs attention and how a change reaches them
@@ -105,7 +105,16 @@ export default async function BookingPage({
         booking.contact && may("contact:read")
             ? readPeekPerson(booking.contact.id)
             : Promise.resolve(null),
+        // Who is on the diary: New booking's people, and the viewer's own
+        // place on it for Change who (#1157).
+        canWrite ? listStaff().catch(() => null) : Promise.resolve(null),
     ]);
+    const me =
+        staffList?.staff.find(
+            (p) =>
+                p.status === "ACTIVE" &&
+                p.membership?.userId === session.user.id,
+        )?.id ?? null;
 
     const view = (
         <BookingDetailView
@@ -120,16 +129,14 @@ export default async function BookingPage({
             desk={desk}
             waitlist={waitlist}
             person={person}
+            reassign={{ any: may("service:write"), me }}
         />
     );
     if (!canWrite) return view;
 
     // Book their next visit and Book a new time open New booking here
     // (U8), with who, what and with whom already filled.
-    const [services, staffList] = await Promise.all([
-        listServices().catch(() => []),
-        listStaff().catch(() => null),
-    ]);
+    const services = await listServices().catch(() => []);
     return (
         <NewBookingHost
             setup={{

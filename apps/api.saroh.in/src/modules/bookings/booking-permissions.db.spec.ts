@@ -13,6 +13,7 @@
  * | approve or turn down a request to change them (#1038)      | `service:write`               |
  * | the diary, a booking, a class's waitlist                   | `booking:read`                |
  * | book, move, outcome, cancel, a treatment's visit           | `booking:write`               |
+ * | change who a booking is with, and who could take it (#1157) | `booking:write`              |
  * | a booking's pay link                                       | `booking:write`, `invoice:write` |
  * | packs, selling terms, Pack Detail's tabs, purchases        | `pack:read`                   |
  * | sell a pack                                                | `pack:sell`                   |
@@ -311,6 +312,19 @@ const ENDPOINTS: [
             bookings.rescheduleBooking(c, MISSING, {
                 startAt: FROM,
             } as never),
+    ],
+    [
+        "POST services/bookings/:id/reassign",
+        ["booking:write"],
+        (c) =>
+            bookings.reassignBooking(c, MISSING, {
+                staffId: MISSING,
+            }),
+    ],
+    [
+        "GET services/bookings/:id/people",
+        ["booking:write"],
+        (c) => bookings.reassignCandidates(c, MISSING),
     ],
     [
         "POST services/bookings/:id/outcome",

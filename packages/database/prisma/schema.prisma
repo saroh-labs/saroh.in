@@ -5197,13 +5197,16 @@ model StaffMember {
   status     String    @default("ACTIVE") // ACTIVE | ARCHIVED — archived take no new bookings
   archivedAt DateTime?
 
-  services    StaffService[]
-  hours       StaffHours[]
-  timeOff     StaffTimeOff[]
-  extraHours  StaffExtraHours[]
-  bookings    Booking[]
+  services          StaffService[]
+  hours             StaffHours[]
+  timeOff           StaffTimeOff[]
+  extraHours        StaffExtraHours[]
+  bookings          Booking[]
+  // The history lines that handed a booking from or to them (#1157).
+  bookingEventsFrom BookingEvent[]           @relation("BookingEventFromStaff")
+  bookingEventsTo   BookingEvent[]           @relation("BookingEventToStaff")
   // Invites that would give them a login (#868).
-  invitations OrganizationInvitation[]
+  invitations       OrganizationInvitation[]
 
   // Their own timing rules for their diary (DEC-170, #1038), each one
   // falling back to the business's (`BookingRules`) when null — "same as
@@ -5428,10 +5431,21 @@ model BookingEvent {
   fromStartAt DateTime?
   toStartAt   DateTime?
 
+  // Who it was with, and who it is with now, on REASSIGNED (#1157): the
+  // booking given to someone else, or to someone when it had nobody
+  // (`fromStaffId` null). SetNull keeps the line if a person goes; the
+  // history then reads "someone".
+  fromStaffId String?
+  fromStaff   StaffMember? @relation("BookingEventFromStaff", fields: [fromStaffId], references: [id], onDelete: SetNull)
+  toStaffId   String?
+  toStaff     StaffMember? @relation("BookingEventToStaff", fields: [toStaffId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
 
   @@index([bookingId, createdAt])
   @@index([organizationId])
+  @@index([fromStaffId])
+  @@index([toStaffId])
 }
 
 // ============================================================================

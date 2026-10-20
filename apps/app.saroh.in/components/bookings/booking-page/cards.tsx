@@ -295,6 +295,7 @@ export function eventTitle(event: BookingEvent, timeZone: string): string {
     if (event.type === "ATTENDED") return "Marked as came";
     if (event.type === "NO_SHOW") return "Marked as didn't come";
     if (event.type === "PAID_AT_DESK") return "Paid at the desk";
+    if (event.type === "REASSIGNED") return reassignedTitle(event, timeZone);
     const from = event.fromStartAt
         ? formatDateTime(event.fromStartAt, timeZone, { weekday: "short" })
         : null;
@@ -302,6 +303,27 @@ export function eventTitle(event: BookingEvent, timeZone: string): string {
         ? formatDateTime(event.toStartAt, timeZone, { weekday: "short" })
         : null;
     return from && to ? `Moved from ${from} to ${to}` : "Moved";
+}
+
+/**
+ * A change of who it is with (#1157): "Given to Meera Iyer" when it had
+ * nobody, "Changed from Asha Rao to Meera Iyer" otherwise, with the time
+ * when it moved in the same step.
+ */
+function reassignedTitle(event: BookingEvent, timeZone: string): string {
+    const to = event.toStaff?.name ?? "someone";
+    const who = event.fromStaff
+        ? `Changed from ${event.fromStaff.name} to ${to}`
+        : event.fromStaff === null && event.toStaff
+          ? `Given to ${to}`
+          : `Now with ${to}`;
+    const moved =
+        event.fromStartAt &&
+        event.toStartAt &&
+        event.fromStartAt !== event.toStartAt;
+    return moved && event.toStartAt
+        ? `${who}, moved to ${formatDateTime(event.toStartAt, timeZone, { weekday: "short" })}`
+        : who;
 }
 
 /** What happened: the booking's history, oldest first. */

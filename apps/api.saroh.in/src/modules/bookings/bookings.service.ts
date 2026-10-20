@@ -47,6 +47,12 @@ import { bookingMoney, bookingPrice } from "./booking-money";
 import { moveFoundBooking } from "./booking-move";
 import { lockVisitOrderInTx, writeOutcomeInTx } from "./booking-outcome";
 import { bookingPayLinkInTx } from "./booking-pay-link";
+import type { ReassignCandidate } from "./booking-reassign";
+import {
+    assertMayReassign,
+    reassignCandidates as reassignCandidatesFor,
+    requireTeamPerson,
+} from "./booking-reassign";
 import { loadBookingRules } from "./booking-rules";
 import type { AvailableSlot } from "./booking-slots";
 import {
@@ -68,6 +74,7 @@ import {
 } from "./desk-take";
 import type {
     AvailabilityRuleDto,
+    BookingLocationType,
     BookingOutcome,
     CreateServiceDto,
     LocationType,
@@ -119,7 +126,12 @@ const bookingDetailInclude = {
     },
     events: {
         orderBy: { createdAt: "asc" },
-        include: { actor: { select: { name: true } } },
+        include: {
+            actor: { select: { name: true } },
+            // Who it was handed from and to, on REASSIGNED (#1157).
+            fromStaff: { select: { name: true } },
+            toStaff: { select: { name: true } },
+        },
     },
     // How it is paid, when a class pack pays for it (ADR-007). A pack taken
     // back off leaves its row with `reversedAt` set: that booking is no
@@ -1033,6 +1045,129 @@ export class BookingsService {
             { organizationId: ctx.organizationId, userId: ctx.userId },
             { audience: "team" },
         );
+    }
+
+    /**
+     * Change who a booking is with, or give one that has nobody a person
+     * (#1157), and optionally its time in the same step. The move's own
+     * write (`moveFoundBooking` with `reassign`), so the money, pack
+     * credit, waitlist place and series stay; see `booking-reassign.ts`
+     * for who may and who is told. Another business's booking or person
+     * is a 404; the same person at the same time changes nothing.
+     */
+    async reassignBooking(
+        ctx: OrganizationContext,
+        bookingId: string,
+        input: { staffId: string; startAt?: string },
+    ): Promise<Booking> {
+        requireBookingPower(ctx, "booking:write");
+        const booking = await this.requireOwnedBooking(ctx, bookingId);
+        const person = await requireTeamPerson(
+            ctx.organizationId,
+            input.staffId,
+        );
+        await assertMayReassign(ctx, booking, person.id);
+        const service = await this.requireMovableBooking(ctx, booking);
+        const startAt = input.startAt
+            ? new Date(input.startAt)
+            : booking.startAt;
+        if (Number.isNaN(startAt.getTime())) {
+            throw new BadRequestException("startAt is not a valid instant");
+        }
+        if (
+            booking.staffId === person.id &&
+            startAt.getTime() === booking.startAt.getTime()
+        ) {
+            // Already with them then: no event, no notice.
+            return booking;
+        }
+        if (booking.staffId === person.id) {
+            // Only the time changes: that is a move.
+            return moveFoundBooking(
+                booking,
+                service,
+                startAt,
+                { organizationId: ctx.organizationId, userId: ctx.userId },
+                { audience: "team" },
+            );
+        }
+        return moveFoundBooking(
+            booking,
+            service,
+            startAt,
+            { organizationId: ctx.organizationId, userId: ctx.userId },
+            {
+                audience: "team",
+                reassign: { staffId: person.id, name: person.name },
+            },
+        );
+    }
+
+    /**
+     * Who this booking could be given to at `startAt` (its own start when
+     * left out): everyone who takes the service, each free, busy (saying
+     * when) or not working then (#1157's picker). Asks what the change
+     * does: `booking:write`.
+     */
+    async reassignCandidates(
+        ctx: OrganizationContext,
+        bookingId: string,
+        at?: string,
+    ): Promise<{ startAt: string; people: ReassignCandidate[] }> {
+        requireBookingPower(ctx, "booking:write");
+        const booking = await this.requireOwnedBooking(ctx, bookingId);
+        const service = await this.requireOwnedService(ctx, booking.serviceId);
+        const startAt = at ? new Date(at) : booking.startAt;
+        if (Number.isNaN(startAt.getTime())) {
+            throw new BadRequestException("startAt is not a valid instant");
+        }
+        const [rules, staffing, opening] = await Promise.all([
+            prisma.availabilityRule.findMany({
+                where: { serviceId: service.id },
+            }),
+            loadStaffing(service),
+            openingFor(
+                service,
+                booking.locationType as BookingLocationType | null,
+            ),
+        ]);
+        const people = await reassignCandidatesFor(
+            booking,
+            service,
+            rules,
+            staffing,
+            startAt,
+            opening,
+        );
+        return { startAt: startAt.toISOString(), people };
+    }
+
+    /**
+     * The service of a booking that can still be changed: not cancelled,
+     * not a course's session, on a service that is still offered. Said as
+     * a move says it.
+     */
+    private async requireMovableBooking(
+        ctx: OrganizationContext,
+        booking: Booking,
+    ): Promise<Service> {
+        if (booking.status === "CANCELLED") {
+            throw new ConflictException(
+                "This booking was cancelled. Book a new time instead of changing it.",
+            );
+        }
+        if (booking.courseEnrollmentId) {
+            throw new ConflictException(
+                "This is a course session. Change the course's sessions instead of one booking.",
+            );
+        }
+        const service = await this.requireOwnedService(ctx, booking.serviceId);
+        if (service.status !== "ACTIVE") {
+            throw new ConflictException(
+                "This service is archived, so its bookings cannot be changed. Make it active again first, or cancel the booking.",
+            );
+        }
+        return service;
     }
 
     /**

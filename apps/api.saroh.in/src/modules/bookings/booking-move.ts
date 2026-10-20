@@ -7,6 +7,11 @@ import { guarded, guardMinutes, isValidSlotStart } from "./availability";
 import { BookingEventType } from "./booking-event-type";
 import { holdsPlace } from "./booking-hold";
 import {
+    refuseIfBusy,
+    refuseUnreassignable,
+    tellStaffInTx,
+} from "./booking-reassign";
+import {
     loadStaffing,
     refuseIfClosed,
     resolvePerson,
@@ -41,6 +46,12 @@ import { acceptWaitlistInTx, offerFreedPlaceInTx } from "./waitlist-queue";
  * - A visit of a treatment (E9) takes its order's lock first (order →
  *   booking, the documented order); the customer's move is refused once
  *   the treatment's order is cancelled or refunded (`refuseClosedTreatment`).
+ * - Given to someone else (#1157, `reassign`): the new person must take
+ *   the service, work then and be free (a clash says when they are busy),
+ *   checked as a move within their diary is. Only `staffId` and the time
+ *   change, so money, pack credit, waitlist and series stay; one
+ *   REASSIGNED line names both people, one notice tells the customer and
+ *   the two people get their own alerts (`booking-reassign.ts`).
  */
 
 /** Who is moving it, as the booking's history needs. */
@@ -63,6 +74,11 @@ export interface MoveOptions {
     slotTaken?: string;
     /** Refuse a visit of a treatment whose order is closed (E9). */
     refuseClosedTreatment?: boolean;
+    /**
+     * Give it to this person too (#1157): someone in the business, found
+     * by the caller, who has checked the caller may.
+     */
+    reassign?: { staffId: string; name: string };
 }
 
 /** Move `booking` of `service` to `startAt`. See the file comment. */
@@ -102,11 +118,35 @@ export async function moveFoundBooking(
     // A booking with a person moves within that person's diary (U3):
     // one-to-one, to one of their free starts; a class, on the class's
     // own grid with its instructor checked for a clash.
-    const staffing = booking.staffId
-        ? await loadStaffing(service)
-        : { people: [], perPerson: false, zone: null };
+    const reassign = options.reassign ?? null;
+    const staffing =
+        booking.staffId || reassign
+            ? await loadStaffing(service)
+            : { people: [], perPerson: false, zone: null };
     let person: ReserveWith = { staffId: null, perPerson: false };
-    if (booking.staffId && staffing.perPerson) {
+    if (reassign) {
+        // A class's instructor is the class's to change; a service nobody
+        // takes has nobody to give it to.
+        refuseUnreassignable(staffing, service);
+        // Busy is said with when, before whether they work then.
+        await refuseIfBusy(
+            service,
+            staffing,
+            booking,
+            { id: reassign.staffId, name: reassign.name },
+            startAt,
+        );
+        person = await resolvePerson(
+            service,
+            rules,
+            staffing,
+            startAt,
+            reassign.staffId,
+            "team",
+            booking.id,
+            opening,
+        );
+    } else if (booking.staffId && staffing.perPerson) {
         try {
             person = await resolvePerson(
                 service,
@@ -229,7 +269,9 @@ export async function moveFoundBooking(
 
                 const moved = await tx.booking.update({
                     where: { id: booking.id },
-                    data: { startAt, endAt },
+                    data: reassign
+                        ? { startAt, endAt, staffId: reassign.staffId }
+                        : { startAt, endAt },
                 });
                 // The place it left is free for the old session's line,
                 // and a place they were in line for here is taken (A12).
@@ -254,13 +296,43 @@ export async function moveFoundBooking(
                     data: {
                         bookingId: booking.id,
                         organizationId: actor.organizationId,
-                        type: BookingEventType.Rescheduled,
+                        type: reassign
+                            ? BookingEventType.Reassigned
+                            : BookingEventType.Rescheduled,
                         actorUserId: actor.userId,
                         fromStartAt: booking.startAt,
                         toStartAt: startAt,
+                        ...(reassign
+                            ? {
+                                  fromStaffId: booking.staffId,
+                                  toStaffId: reassign.staffId,
+                              }
+                            : {}),
                     },
                     select: { id: true },
                 });
+                if (reassign) {
+                    const from = booking.staffId
+                        ? await tx.staffMember.findFirst({
+                              where: {
+                                  id: booking.staffId,
+                                  organizationId: actor.organizationId,
+                              },
+                              select: { id: true, name: true },
+                          })
+                        : null;
+                    await tellStaffInTx(tx, {
+                        organizationId: actor.organizationId,
+                        bookingId: booking.id,
+                        actorUserId: actor.userId,
+                        who: await bookerNameInTx(tx, booking),
+                        service: service.name,
+                        startAt,
+                        timeZone: staffing.zone ?? booking.timezone,
+                        from,
+                        to: { id: reassign.staffId, name: reassign.name },
+                    });
+                }
                 // Same transactional outbox as booking: a committed move
                 // always has its notice queued, so a failed send cannot
                 // drop it. A14's `booking-notify.handler.ts` tells the
@@ -273,7 +345,7 @@ export async function moveFoundBooking(
                             bookingId: booking.id,
                             serviceId: service.id,
                             contactId: booking.contactId,
-                            reason: "rescheduled",
+                            reason: reassign ? "reassigned" : "rescheduled",
                             eventId: event.id,
                         },
                     },
@@ -290,4 +362,24 @@ export async function moveFoundBooking(
         }
         throw err;
     }
+}
+
+/** "Asha Rao", the booker's name, or "A customer". */
+async function bookerNameInTx(
+    tx: Prisma.TransactionClient,
+    booking: Booking,
+): Promise<string> {
+    const contact = booking.contactId
+        ? await tx.contact.findFirst({
+              where: { id: booking.contactId },
+              select: { firstName: true, lastName: true },
+          })
+        : null;
+    const name = [contact?.firstName, contact?.lastName]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+    // `||`, not `??`: an empty name falls through too.
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+    return name || booking.bookerName?.trim() || "A customer";
 }

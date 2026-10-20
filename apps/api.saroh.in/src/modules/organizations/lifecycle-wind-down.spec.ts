@@ -108,6 +108,8 @@ const CASES = [
             "deleteRule",
             "bookByHand",
             "rescheduleBooking",
+            // A booking given to someone else is a new commitment (#1157).
+            "reassignBooking",
             "bookVisit",
         ],
     },

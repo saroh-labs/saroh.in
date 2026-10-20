@@ -22,7 +22,9 @@ import {
     createService as createServiceApi,
     getBooking,
     listAvailability as listAvailabilityApi,
+    readReassignCandidates as readReassignCandidatesApi,
     readServices,
+    reassignBooking as reassignBookingApi,
     recordBookingOutcome as recordBookingOutcomeApi,
     replaceRules as replaceRulesApi,
     rescheduleBooking as rescheduleBookingApi,
@@ -116,6 +118,22 @@ export async function readBookingForCancel(bookingId: string): Promise<{
 /** Move a booking to another slot (#121). */
 export async function rescheduleBooking(bookingId: string, startAt: string) {
     return rescheduleBookingApi(bookingId, startAt);
+}
+
+/** Change who a booking is with, optionally at a new time (#1157). */
+export async function reassignBooking(
+    bookingId: string,
+    input: { staffId: string; startAt?: string },
+) {
+    return reassignBookingApi(bookingId, input);
+}
+
+/** Who could take a booking at a time (#1157): Change who's list. */
+export async function readReassignCandidates(
+    bookingId: string,
+    startAt?: string,
+) {
+    return readReassignCandidatesApi(bookingId, startAt);
 }
 
 /**

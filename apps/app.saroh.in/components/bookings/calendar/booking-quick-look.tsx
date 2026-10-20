@@ -18,6 +18,7 @@ import {
 
 import type { SendHeld } from "@/components/bookings/sheets/cancel-sheet";
 import { CancelSheet } from "@/components/bookings/sheets/cancel-sheet";
+import { mayChangeWho } from "@/components/bookings/sheets/change-who";
 import { TakePayment } from "@/components/bookings/take-payment";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { useHold } from "@/components/shared/use-hold";
@@ -47,6 +48,7 @@ import type {
     QuickLookActions,
     QuickLookContext,
 } from "./quick-look-types";
+import { WhoStep } from "./quick-look-who";
 
 /**
  * The quick look over the calendar (U7, #1023; BKMQuickLook,
@@ -125,7 +127,7 @@ export function BookingQuickLook({
 
     const one = shown?.kind === "one" ? shown.booking : null;
     const person = usePerson(one?.contact?.id ?? null);
-    const tall = step === "move" || step === "next";
+    const tall = step === "move" || step === "who" || step === "next";
 
     return (
         <>
@@ -178,6 +180,7 @@ export function BookingQuickLook({
                                     : false
                             }
                             person={person}
+                            send={send}
                             onStep={(next, choice) => {
                                 setNextChoice(choice ?? null);
                                 setStep(next);
@@ -249,6 +252,7 @@ function Steps({
     held,
     cancelHeld,
     person,
+    send,
     onStep,
     onTake,
     onClose,
@@ -261,6 +265,8 @@ function Steps({
     held: HeldFor;
     cancelHeld: boolean;
     person: PersonRead;
+    /** The quick look's hold, for a change that tells the customer. */
+    send: SendHeld;
     onStep: (step: QuickLookStep, choice?: NextDayChoice) => void;
     onTake: () => void;
     onClose: () => void;
@@ -324,6 +330,13 @@ function Steps({
                     paid={b.treatment ? null : paidWords(b, ctx, state)}
                     reach={reach}
                     onMove={() => onStep("move")}
+                    onWho={
+                        ctx.canBook &&
+                        b.service.capacity <= 1 &&
+                        mayChangeWho(ctx.reassign, b.staff?.id ?? null)
+                            ? () => onStep("who")
+                            : undefined
+                    }
                     onCancel={() => onStep("cancel")}
                     onBack={back}
                     onClose={onClose}
@@ -337,6 +350,18 @@ function Steps({
                     reach={reach}
                     onBack={() => onStep("choose")}
                     onMoved={onClose}
+                    onClose={onClose}
+                />
+            );
+        case "who":
+            return (
+                <WhoStep
+                    booking={b}
+                    ctx={ctx}
+                    reach={reach}
+                    send={send}
+                    onBack={() => onStep("look")}
+                    onDone={onClose}
                     onClose={onClose}
                 />
             );

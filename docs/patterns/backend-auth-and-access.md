@@ -185,6 +185,15 @@ what the API allows.
   (and Mark paid, Paid in cash) **disabled with why**, never hidden.
   Guarded by `organizations/money-by-permission.spec.ts` (API) and
   `lib/organizations/money-by-permission.test.ts` (app).
+- **Current** (#1157, 2026-10-20) — **Changing who a booking is with is
+  narrower than moving it.** `POST services/bookings/:id/reassign` asks
+  `booking:write`; giving someone else's booking away also asks
+  `service:write` (who takes what is set-up, as approving another person's
+  booking rules is, #1038). Without it — a Member at the front desk,
+  Calendar only — a person hands over a booking from their own diary, or
+  takes one that has nobody, and only for themselves; anything else is a
+  403 in words. Another business's booking or person is a 404.
+  `bookings/booking-reassign.ts`, `booking-reassign.db.spec.ts`.
 - **Current** (DEC-106, 2026-10-07) — **Storefront roles follow permissions
   for money too.** A storefront Admin, Manager or Editor still takes and
   changes its storefront's orders (DEC-048), but recording or taking a

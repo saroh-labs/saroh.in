@@ -29,7 +29,12 @@ const createBookingPayLink = vi.fn();
 const rescheduleBooking = vi.fn();
 const cancelBooking = vi.fn();
 const listAvailability = vi.fn();
+const readReassignCandidates = vi.fn();
+const reassignBooking = vi.fn();
 vi.mock("@/lib/services/actions", () => ({
+    readReassignCandidates: (...a: unknown[]) =>
+        readReassignCandidates(...a) as unknown,
+    reassignBooking: (...a: unknown[]) => reassignBooking(...a) as unknown,
     recordBookingOutcome: (...a: unknown[]) =>
         recordBookingOutcome(...a) as unknown,
     takeDeskPayment: (...a: unknown[]) => takeDeskPayment(...a) as unknown,
@@ -210,6 +215,8 @@ beforeEach(() => {
         rescheduleBooking,
         cancelBooking,
         listAvailability,
+        readReassignCandidates,
+        reassignBooking,
         refresh,
         showSuccess,
         showError,
@@ -221,6 +228,14 @@ beforeEach(() => {
     showUndo.mockImplementation(() => "toast_1");
     listAvailability.mockResolvedValue([]);
     recordBookingOutcome.mockResolvedValue({ ok: true, data: {} });
+    readReassignCandidates.mockResolvedValue({
+        startAt: at("2026-10-19T11:30"),
+        people: [
+            { id: "st_meera", name: "Meera Iyer", state: "current" },
+            { id: "st_asha", name: "Asha Rao", state: "free" },
+        ],
+    });
+    reassignBooking.mockResolvedValue({ ok: true, data: {} });
 });
 
 afterEach(() => {
@@ -364,6 +379,7 @@ describe.each([
             "Book their next visit",
             "Open Kabir's page",
             "Move to another time",
+            "Change who it's with",
             "Cancel booking",
         ]);
         // Cancel is last, and red.
@@ -716,5 +732,124 @@ describe("a booking that couldn't be read", () => {
         expect(text()).toContain("Couldn't load this booking");
         await press("Try again");
         expect(retry).toHaveBeenCalled();
+    });
+});
+
+describe.each([
+    ["phone", true],
+    ["desk", false],
+])("Change who on a booking's page on a %s (#1157)", (_name, phone) => {
+    beforeEach(() => size(phone));
+
+    /** Asha's row in the sheet's list. */
+    const asha = () =>
+        Array.from(
+            dialog().querySelectorAll<HTMLButtonElement>(
+                'button[role="radio"]',
+            ),
+        ).find((b) =>
+            document
+                .querySelector(`label[for="${b.id}"]`)
+                ?.textContent.startsWith("Asha Rao"),
+        );
+
+    it("opens from More, and holds the change ten seconds with Undo", async () => {
+        await draw(kabir());
+        const { frame } = await moreRows(phone);
+        await press("Change who it's with", frame ?? undefined);
+        expect(dialog().textContent).toContain(
+            "Change who Kabir's booking is with",
+        );
+        expect(dialog().textContent).toContain("now with Meera Iyer");
+        const row = asha();
+        if (!row) throw new Error("No Asha");
+        await act(async () => {
+            row.click();
+            await Promise.resolve();
+        });
+        await settle();
+        await press("Give it to Asha", dialog());
+        // Held: the toast offers Undo, and nothing is written yet.
+        expect(showUndo).toHaveBeenCalledWith(
+            "Giving it to Asha in 10 seconds",
+            expect.any(Function),
+            { description: "Kabir is emailed once it's done." },
+        );
+        expect(reassignBooking).not.toHaveBeenCalled();
+        // The sheet closed: the change finished where it was opened.
+        expect(
+            Array.from(document.querySelectorAll('[role="dialog"]')).some((d) =>
+                d.textContent.includes("Change who"),
+            ),
+        ).toBe(false);
+        // Undo drops it, with nothing written.
+        const undo = (showUndo.mock.calls.at(-1) as unknown[] | undefined)?.[1];
+        await act(async () => {
+            await (undo as () => Promise<unknown>)();
+        });
+        expect(reassignBooking).not.toHaveBeenCalled();
+    });
+
+    it("says a booking with nobody on it, with Assign someone", async () => {
+        readReassignCandidates.mockResolvedValue({
+            startAt: at("2026-10-19T11:30"),
+            people: [{ id: "st_asha", name: "Asha Rao", state: "free" }],
+        });
+        await draw(kabir({ staff: null }));
+        expect(text()).toContain("Nobody is on this booking yet.");
+        await press("Assign someone");
+        expect(dialog().textContent).toContain(
+            "Assign someone to Kabir's booking",
+        );
+        expect(find("Pick someone", dialog())?.disabled).toBe(true);
+    });
+
+    it("isn't offered on a class, or to a role that can't change bookings", async () => {
+        await draw(kabir(), { canWrite: false });
+        expect((await moreRows(phone)).rows).not.toContain(
+            "Change who it's with",
+        );
+        act(() => root.unmount());
+        root = createRoot(host);
+        const base = kabir();
+        await draw(
+            kabir({
+                service: { ...base.service, capacity: 6 },
+            }),
+        );
+        expect((await moreRows(phone)).rows).not.toContain(
+            "Change who it's with",
+        );
+    });
+
+    it("writes the change in What happened", async () => {
+        await draw(
+            kabir({
+                events: [
+                    {
+                        id: "e9",
+                        type: "REASSIGNED",
+                        actor: { name: "Priya Nair" },
+                        fromStartAt: at("2026-10-19T11:30"),
+                        toStartAt: at("2026-10-19T11:30"),
+                        fromStaff: { name: "Asha Rao" },
+                        toStaff: { name: "Meera Iyer" },
+                        createdAt: "2026-10-18T05:30:00.000Z",
+                    },
+                    {
+                        id: "e10",
+                        type: "REASSIGNED",
+                        actor: { name: "Priya Nair" },
+                        fromStartAt: at("2026-10-19T10:00"),
+                        toStartAt: at("2026-10-19T11:30"),
+                        fromStaff: null,
+                        toStaff: { name: "Meera Iyer" },
+                        createdAt: "2026-10-18T06:30:00.000Z",
+                    },
+                ],
+            }),
+        );
+        expect(text()).toContain("Changed from Asha Rao to Meera Iyer");
+        expect(text()).toMatch(/Given to Meera Iyer, moved to Mon 19 Oct/);
     });
 });

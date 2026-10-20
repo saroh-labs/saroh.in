@@ -1,3 +1,4 @@
+import type { ReassignScope } from "@/components/bookings/sheets/change-who";
 import type { NoticeChannels } from "@/lib/messages/notice-reach";
 import type { DiaryBooking } from "@/lib/services/booking-calendar";
 import type { BookingRules } from "@/lib/staff/types";
@@ -32,6 +33,11 @@ export interface QuickLookContext {
     canRefund?: boolean;
     /** `service:write`: "Edit this class" in a class's More. */
     canEditService?: boolean;
+    /**
+     * Who the viewer may give bookings to (#1157); left out, anyone's to
+     * anyone (the API still decides).
+     */
+    reassign?: ReassignScope;
     /** `order:read`: a treatment's order is a link, else words (E10). */
     canReadOrder?: boolean;
     /**

@@ -433,6 +433,12 @@ export function CalendarScreen({
                     canBook: can.book,
                     canRefund: can.refund ?? false,
                     canEditService: can.addPeople ?? false,
+                    // Someone else's booking is given away with
+                    // `service:write` (#1157); else only their own.
+                    reassign: {
+                        any: can.addPeople ?? false,
+                        me: me?.id ?? null,
+                    },
                     canReadOrder: can.order ?? false,
                     desk: can.desk,
                     notices,

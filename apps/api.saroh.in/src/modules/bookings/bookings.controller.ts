@@ -27,6 +27,7 @@ import { payLinkUrlFor } from "../invoices/pay-link-url";
 import type { DeskPayment } from "./booking-desk-pay";
 import type { WithoutIntakeNote } from "./booking-intake";
 import { withoutIntakeNote } from "./booking-intake";
+import type { ReassignCandidate } from "./booking-reassign";
 import type {
     BookingDetailView,
     BookingsCalendar,
@@ -40,6 +41,8 @@ import {
     BookingsRangeQueryDto,
     BookVisitDto,
     CreateServiceDto,
+    ReassignBookingDto,
+    ReassignCandidatesQueryDto,
     RecordOutcomeDto,
     ReplaceRulesDto,
     RescheduleBookingDto,
@@ -254,6 +257,41 @@ export class BookingsController {
         return this.bookings
             .rescheduleBooking(ctx, bookingId, dto)
             .then(withoutIntakeNote);
+    }
+
+    /**
+     * Change who a booking is with, or give one that has nobody a person
+     * (#1157), optionally at a new time. A route of its own, not the move's
+     * PATCH: who may give a booking away is narrower than who may move it.
+     * 409 when the person is booked then (saying when) or for a class, 400
+     * when they don't take it or aren't working, 404 for another business's
+     * booking or person.
+     */
+    @Post("bookings/:bookingId/reassign")
+    @RequireModule("APPOINTMENTS")
+    @HttpCode(200)
+    reassignBooking(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("bookingId") bookingId: string,
+        @Body() dto: ReassignBookingDto,
+    ): Promise<WithoutIntakeNote<Booking>> {
+        return this.bookings
+            .reassignBooking(ctx, bookingId, dto)
+            .then(withoutIntakeNote);
+    }
+
+    /**
+     * Who this booking could be given to at a time (#1157's picker): each
+     * person who takes the service, free, booked then or not working.
+     */
+    @Get("bookings/:bookingId/people")
+    @RequireModule("APPOINTMENTS")
+    reassignCandidates(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("bookingId") bookingId: string,
+        @Query() query: ReassignCandidatesQueryDto,
+    ): Promise<{ startAt: string; people: ReassignCandidate[] }> {
+        return this.bookings.reassignCandidates(ctx, bookingId, query.startAt);
     }
 
     /**
