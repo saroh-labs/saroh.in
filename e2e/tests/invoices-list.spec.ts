@@ -248,8 +248,12 @@ test.describe("invoices list: Rye & Co., read only", () => {
         ).toBeLessThan(12);
 
         await expect(rows(page).first()).toBeVisible();
+        // To the nearest pixel: a row laid out at 64px can measure
+        // 63.9999 after the browser's sub-pixel rounding (20 Oct).
         const heights = await rows(page).evaluateAll((els) =>
-            els.slice(0, 10).map((el) => el.getBoundingClientRect().height),
+            els
+                .slice(0, 10)
+                .map((el) => Math.round(el.getBoundingClientRect().height)),
         );
         expect(heights.length).toBeGreaterThan(0);
         for (const h of heights) {
