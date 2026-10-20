@@ -121,7 +121,8 @@ test.describe("Home on a phone (U17)", () => {
             const links = figures(page).getByRole("link");
             await expect(links).toHaveCount(3);
             await expect(figures(page)).toContainText("in today");
-            await expect(figures(page)).toContainText("bookings");
+            // "1 booking" or "3 bookings", by what today holds.
+            await expect(figures(page)).toContainText("booking");
             await expect(figures(page)).toContainText("to pack");
 
             // The desk's parts are not drawn here.
@@ -254,7 +255,7 @@ test.describe("Home on a phone (U17)", () => {
         const list = figures(page);
         await expect(list).toBeVisible();
         await expect(list).not.toContainText("in today");
-        await expect(list).toContainText("bookings");
+        await expect(list).toContainText("booking");
         await expect(list).toContainText("came");
         await expect(phoneHome(page)).not.toContainText("₹");
         // Insights isn't open to a Member: the sentence, no way in.

@@ -205,7 +205,9 @@ test.describe("Remind all on the unpaid bills (U8)", () => {
         "a role that can't send reminders isn't offered it, and the API refuses",
         { tag: "@serial" },
         async ({ page }) => {
-            await openNorthwindAs(page, "member");
+            // Maya, Northwind's Member ("member" is Rye's Nisha, who is
+            // not on Northwind at all).
+            await openNorthwindAs(page, "northwindMember");
             await page.goto("/");
             // Home itself, drawn: while it streams in, the page also holds
             // its loading frame's <main> for a moment (one when settled).
