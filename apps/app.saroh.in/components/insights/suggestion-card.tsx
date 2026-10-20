@@ -194,7 +194,7 @@ function Suggestions({
                 <div className="flex items-center gap-2">
                     <span
                         aria-hidden
-                        className="flex size-[30px] shrink-0 items-center justify-center rounded-lg bg-brand-surface-foreground/10 text-highlight"
+                        className="flex size-[30px] shrink-0 items-center justify-center rounded-lg bg-brand-surface-foreground/10 text-brand-surface-foreground"
                     >
                         <Lightbulb className="size-[18px]" />
                     </span>
@@ -203,7 +203,7 @@ function Suggestions({
                         ref={heading as RefObject<HTMLHeadingElement>}
                         tabIndex={-1}
                         data-ph-unmask=""
-                        className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-brand-surface-foreground/85 outline-none"
+                        className="label text-brand-surface-foreground/85 outline-none"
                     >
                         {SUGGESTION_HEADING}
                     </h2>

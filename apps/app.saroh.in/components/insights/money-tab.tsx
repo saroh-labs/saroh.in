@@ -90,6 +90,7 @@ export function MoneyTab({
         return (
             <div className="flex flex-col gap-5" data-testid="money-tab">
                 <FailedState
+                    data-ph-unmask=""
                     size="panel"
                     title={couldntLoad("money")}
                     retryHref={retryHref}
