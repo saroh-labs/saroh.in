@@ -8,7 +8,7 @@ import {
     AccountEntry,
     AccountHeader,
     AccountLookFrame,
-    ACCOUNTS_OFF_TEXT,
+    AccountsOffNote,
     AccountTabBar,
     greetingWords,
     lookOf,
@@ -93,9 +93,7 @@ export default async function AccountLayout({
                 greeting=""
                 title="Your account"
             >
-                <p className="max-w-[480px] text-[17px] leading-relaxed text-site-body">
-                    {ACCOUNTS_OFF_TEXT}
-                </p>
+                <AccountsOffNote />
             </AccountLookFrame>
         );
     }

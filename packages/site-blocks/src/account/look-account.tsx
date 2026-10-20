@@ -10,7 +10,11 @@ import { cn } from "../lib/utils";
 import { LOOK_EASE, LOOK_RING } from "../look-header-parts";
 import { ACCOUNT_TAB_HREF, currentTab } from "./hrefs";
 import { accountLookRules } from "./look-account-rules";
-import { lookAccountTitle, lookTabLabel } from "./look-account-words";
+import {
+    ACCOUNTS_OFF_TEXT,
+    lookAccountTitle,
+    lookTabLabel,
+} from "./look-account-words";
 import type { AccountTab } from "./model";
 import { ICON } from "./tab-bar";
 
@@ -500,5 +504,18 @@ export function AccountLookFrame({
                 />
             ) : null}
         </div>
+    );
+}
+
+/**
+ * What a look's account page says while the site doesn't use sign-in
+ * (DEC-172, plan U12): in the site's body colour, so it is drawn here,
+ * in the one renderer, and never in the app (G6).
+ */
+export function AccountsOffNote() {
+    return (
+        <p className="text-site-body max-w-[480px] text-[17px] leading-relaxed">
+            {ACCOUNTS_OFF_TEXT}
+        </p>
     );
 }
