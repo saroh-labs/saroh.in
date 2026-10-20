@@ -281,6 +281,76 @@ describe("InvoicePaper's seller (DEC-082)", () => {
     });
 });
 
+describe("InvoicePaper's GSTIN as it was at issue (#1161)", () => {
+    /** The business today: registered since, with a GSTIN. */
+    const TODAY: InvoiceBusiness = {
+        name: "Rye & Co.",
+        legalName: null,
+        email: null,
+        registered: true,
+        gstin: "29AAGCR9999M1Z1",
+        state: { code: "29", name: "Karnataka" },
+        address: "22 Hill Road, Bengaluru 560038, Karnataka",
+        logo: null,
+        timeZone: "Asia/Kolkata",
+    };
+    const paper = (i: Invoice) =>
+        renderToStaticMarkup(
+            <InvoicePaper
+                invoice={i}
+                business={TODAY}
+                businessName={TODAY.name}
+            />,
+        );
+    /** Issued while unregistered: no GST frozen, no tax charged. */
+    const unregistered = (over: Partial<Invoice> = {}) =>
+        invoice({
+            gst: null,
+            title: "Invoice",
+            tax: "0.00",
+            subtotal: "1200.00",
+            total: "1200.00",
+            sellerName: "Rye & Co.",
+            sellerAddress: "22 Hill Road, Bengaluru 560038, Karnataka",
+            ...over,
+        });
+
+    it("issued unregistered, then a GSTIN added: no GSTIN, and the not-registered lines stand", () => {
+        const out = paper(unregistered());
+        expect(out).not.toContain("GSTIN");
+        expect(out).not.toContain(TODAY.gstin);
+        expect(out).toContain("Not registered for GST");
+        expect(out).toContain(
+            "Rye &amp; Co. is not registered for GST, so no tax is charged.",
+        );
+    });
+
+    it("a paid one issued unregistered keeps its receipt line and no GSTIN", () => {
+        const out = paper(unregistered({ status: "PAID", standing: "PAID" }));
+        expect(out).not.toContain(TODAY.gstin);
+        expect(out).toContain("is not registered for GST");
+    });
+
+    it("a tax invoice prints the GSTIN frozen on it, not today's", () => {
+        const out = paper(invoice({ sellerName: "Rye & Co." }));
+        expect(out).toContain(`GSTIN ${GST.sellerGstin}`);
+        expect(out).not.toContain(TODAY.gstin);
+    });
+
+    it("a draft prints today's GSTIN", () => {
+        const out = paper(
+            invoice({
+                status: "DRAFT",
+                standing: "DRAFT",
+                number: null,
+                gst: null,
+                sellerName: null,
+            }),
+        );
+        expect(out).toContain(`GSTIN ${TODAY.gstin}`);
+    });
+});
+
 describe("InvoicePaper's lines on a phone (T6)", () => {
     const croissant = line({
         description: "Almond croissant (trade)",

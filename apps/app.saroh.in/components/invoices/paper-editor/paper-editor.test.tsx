@@ -466,6 +466,21 @@ describe("the style rail", () => {
         expect(hasButton("Use my default")).toBe(false);
     });
 
+    it("sits beside the paper on a wide screen, not at the page's far edge (#1161)", () => {
+        render();
+        const rail = host.querySelector<HTMLElement>(
+            'aside[aria-label="Style"]',
+        );
+        const grid = rail?.parentElement;
+        // The paper's track is capped at its own width, so no free space
+        // opens between it and the rail; one column below the desk.
+        expect(grid?.className).toContain(
+            "min-[1100px]:grid-cols-[minmax(0,820px)_260px]",
+        );
+        expect(grid?.className).not.toContain("1fr");
+        expect(grid?.firstElementChild?.className).toContain("max-w-[820px]");
+    });
+
     it("Band and a colour are the draft's own, drawn and saved", async () => {
         vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
         render();
