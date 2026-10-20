@@ -3,7 +3,13 @@ import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
-import { makeContact, northwind, phone, stamp } from "../fixtures/own-data";
+import {
+    issueOverdue,
+    makeContact,
+    northwind,
+    phone,
+    stamp,
+} from "../fixtures/own-data";
 import { pressUntil } from "../fixtures/press";
 import { onPhone } from "../fixtures/roles";
 import { useSession } from "../fixtures/sessions";
@@ -30,8 +36,6 @@ import { NORTHWIND_ORG } from "../playwright.config";
  * in the page, so no WhatsApp tab really opens.
  */
 
-const DAY = 86_400_000;
-
 interface Own {
     ids: string[];
     tag: string;
@@ -39,6 +43,8 @@ interface Own {
 
 /** Three overdue Northwind invoices of the test's own; the last reminded today. */
 async function ownThree(page: Page): Promise<Own> {
+    // Signed in first: page.request carries the page's cookies, and has none until now.
+    await useSession(page);
     const nw = northwind(page.request);
     const tag = `Remind ${stamp(test.info())}`;
     const ids: string[] = [];
@@ -59,11 +65,11 @@ async function ownThree(page: Page): Promise<Own> {
                     unitPrice: String(1800 + i * 100),
                 },
             ],
-            dueAt: new Date(Date.now() - (13 - i) * DAY).toISOString(),
         });
-        await nw.post(`/invoices/${made.id}/issue`);
         ids.push(made.id);
     }
+    // Overdue a moment after issue: the API never issues one already late.
+    for (const id of ids) await issueOverdue(page.request, id);
     // Tara was reminded today, on WhatsApp: she waits until tomorrow.
     await nw.post(`/invoices/${ids[2]}/share`, {
         channel: "WHATSAPP",
@@ -201,6 +207,8 @@ test.describe("Remind many by channel: Northwind, own invoices", () => {
             w.email.length === 0,
             "Northwind has no email of its own on this stack",
         );
+        // The page's clock, so the ten seconds are run past, not waited.
+        await page.clock.install();
         const sheet = await openOverdue(page, own);
         await toStep2(sheet);
         await sheet.getByRole("button", { name: sendLabel(w) }).click();
@@ -208,7 +216,7 @@ test.describe("Remind many by channel: Northwind, own invoices", () => {
         await sheet.getByRole("button", { name: "Undo", exact: true }).click();
         await expect(sheet).toContainText("Step 2 of 3 · How each one goes");
         // Past the ten seconds: still nobody was emailed.
-        await page.waitForTimeout(11_000);
+        await page.clock.runFor(11_000);
         expect((await ways(page, own.ids)).email).toEqual(w.email);
     });
 

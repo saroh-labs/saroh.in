@@ -4,7 +4,13 @@ import { expect, test } from "@playwright/test";
 
 import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
 import { cardAction, menuItem } from "../fixtures/invoice-actions";
-import { makeContact, northwind, phone, stamp } from "../fixtures/own-data";
+import {
+    issueOverdue,
+    makeContact,
+    northwind,
+    phone,
+    stamp,
+} from "../fixtures/own-data";
 import { pressUntil } from "../fixtures/press";
 import { onPhone } from "../fixtures/roles";
 import { useSession } from "../fixtures/sessions";
@@ -28,15 +34,21 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 const DAY = 86_400_000;
 
-/** A Northwind invoice for a contact of the test's own, issued, `late` days overdue. */
+/**
+ * A Northwind invoice for a contact of the test's own, issued: overdue (a
+ * moment after issue, `issueOverdue`), or with `overdue: false` due in a
+ * week.
+ */
 async function ownInvoice(
     page: Page,
     tag: string,
     {
         withPhone = true,
-        late = 13,
-    }: { withPhone?: boolean; late?: number } = {},
+        overdue = true,
+    }: { withPhone?: boolean; overdue?: boolean } = {},
 ): Promise<{ id: string; number: string; first: string }> {
+    // Signed in first: page.request carries the page's cookies, and has none until now.
+    await useSession(page);
     const nw = northwind(page.request);
     const s = `${stamp(test.info())}-${tag}`;
     const contact = await makeContact(page.request, {
@@ -55,11 +67,13 @@ async function ownInvoice(
                 unitPrice: "8400",
             },
         ],
-        dueAt: new Date(Date.now() - late * DAY).toISOString(),
+        ...(overdue
+            ? {}
+            : { dueAt: new Date(Date.now() + 7 * DAY).toISOString() }),
     });
-    const issued = await nw.post<{ number: string }>(
-        `/invoices/${made.id}/issue`,
-    );
+    const issued = overdue
+        ? await issueOverdue(page.request, made.id)
+        : await nw.post<{ number: string }>(`/invoices/${made.id}/issue`);
     return { id: made.id, number: issued.number, first: "Vivek" };
 }
 
@@ -100,6 +114,11 @@ const shareSheet = (page: Page, number: string) =>
 
 /** Opens the sheet from the details: WhatsApp beside Record payment, else Share. */
 async function openShare(page: Page, number: string) {
+    // The details first: counting the card's buttons on a page still
+    // loading finds none, and goes to a menu that hasn't got it.
+    await expect(
+        page.locator("[data-money-card]").filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 30_000 });
     const lead = cardAction(page, "Share on WhatsApp");
     if ((await lead.count()) > 0) {
         await pressUntil(lead, shareSheet(page, number));
@@ -141,13 +160,12 @@ test.describe("share one invoice: Northwind, own invoices", () => {
         expect(text).toContain(`Hi ${inv.first}`);
         expect(text).toContain("₹8,400 was due on");
 
-        // One reminder a day, by WhatsApp or email.
-        const again = await openShare(page, inv.number);
-        await expect(
-            again.getByRole("button", { name: "Open WhatsApp" }),
-        ).toBeDisabled();
-        await expect(again).toContainText(
-            "One reminder a day. The next can go after",
+        // One reminder a day, by WhatsApp or email: Share on WhatsApp is
+        // off, and says when the next can go.
+        const again = cardAction(page, "Share on WhatsApp");
+        await expect(again).toBeDisabled();
+        await expect(again).toHaveAccessibleDescription(
+            /^One reminder a day\. The next can go after /,
         );
     });
 
@@ -178,7 +196,7 @@ test.describe("share one invoice: Northwind, own invoices", () => {
         await context.grantPermissions(["clipboard-read", "clipboard-write"], {
             origin: new URL(urls.APP_URL).origin,
         });
-        const inv = await ownInvoice(page, "link", { late: -7 });
+        const inv = await ownInvoice(page, "link", { overdue: false });
         const before = await northwind(page.request).post<{ url: string }>(
             `/invoices/${inv.id}/view-link`,
         );

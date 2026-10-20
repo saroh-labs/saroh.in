@@ -100,8 +100,11 @@ async function owed(page: Page): Promise<number> {
     const figure = page.locator('[data-figure="owed"]');
     await expect(figure).toContainText("Owed to you");
     await expect(figure).toContainText("₹");
-    const text = await figure.innerText();
-    const match = /₹\s?([\d,]+(?:\.\d{1,2})?)/.exec(text);
+    // The amount's own line: the figure's text runs its label, amount and
+    // count together ("Owed to you₹1,18,50019 invoices"), so read from the
+    // whole of it the count's digits joined the amount's.
+    const text = await figure.locator(":scope > span").nth(1).innerText();
+    const match = /^₹\s?([\d,]+(?:\.\d{1,2})?)$/.exec(text.trim());
     expect(match, text).toBeTruthy();
     return Number((match?.[1] ?? "0").replace(/,/g, ""));
 }

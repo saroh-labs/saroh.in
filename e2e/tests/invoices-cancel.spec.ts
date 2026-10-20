@@ -209,8 +209,13 @@ test.describe("Cancel or correct", () => {
         ).toBeVisible();
         await expect(page.getByText("Cancelled").first()).toBeVisible();
         // The credit note sits in the list, under the invoice it cancels.
+        // Its row is found by the whole number: a desk shows it in its own
+        // column, a phone shows the tail ("0001") and says the whole one to
+        // a screen reader, so a bare first text match is the hidden layout's.
         await page.goto("/billing/invoices");
-        await expect(page.getByText(noteNumber).first()).toBeVisible();
+        await expect(
+            page.locator("[data-invoice-row]").filter({ hasText: noteNumber }),
+        ).toBeVisible();
 
         // 2. Cancel and write a correct one: the draft opens, same lines.
         const second = await issuedInvoice(

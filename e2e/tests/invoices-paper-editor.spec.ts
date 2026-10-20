@@ -152,7 +152,7 @@ test.describe("New invoice on the paper", () => {
         const line = editor(page);
         await expect(line).toContainText(/Line \d/);
         await line.getByLabel("Price each").fill("640");
-        await line.getByRole("radio", { name: "5%" }).click();
+        await line.getByRole("radio", { name: "5%", exact: true }).click();
         await expect(paper).toContainText("GST 5%");
         await expect(paper).toContainText("₹640");
     });

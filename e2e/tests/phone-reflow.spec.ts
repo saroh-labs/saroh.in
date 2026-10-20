@@ -539,8 +539,10 @@ test.describe("phone reflow: invoices", () => {
                 page.getByRole("article", { name: /as it prints$/ }),
             ).toContainText(who.email);
             await noSidewaysScroll(page, "a draft invoice with a long email");
+            // A draft's main button (DEC-173, U9): it asks once, then
+            // issues and sends.
             await page
-                .getByRole("button", { name: "Send with payment link" })
+                .getByRole("button", { name: "Issue and share" })
                 .filter({ visible: true })
                 .first()
                 .click();

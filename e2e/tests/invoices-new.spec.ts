@@ -64,13 +64,15 @@ function dayIn(days: number): string {
 
 /** The paper, opened on a phone first. */
 async function paper(page: Page) {
-    if (onPhone(page)) {
-        const toggle = page.getByRole("button", {
-            name: "See how it will look",
-        });
-        if (await toggle.isVisible()) await toggle.click();
-    }
     const it = page.getByRole("article", { name: "How it will look" });
+    if (onPhone(page)) {
+        // Pressed until the paper shows: a single look at the toggle can
+        // land before it is drawn, and then nothing opens the paper.
+        await pressUntil(
+            page.getByRole("button", { name: "See how it will look" }),
+            it,
+        );
+    }
     await expect(it).toBeVisible();
     return it;
 }
@@ -84,9 +86,11 @@ test.describe("New invoice (A)", () => {
         await page.getByRole("combobox", { name: "Who it's for" }).click();
         await page.getByRole("option").first().click();
 
+        // The product search is the answer, not any listbox: the one for
+        // who it's for can still be closing, and would answer for it.
         await pressUntil(
             page.getByRole("button", { name: "+ Pick from your products" }),
-            page.getByRole("listbox"),
+            page.getByPlaceholder("Search names and SKUs"),
         );
         const option = page
             .getByRole("option")
@@ -191,9 +195,11 @@ test.describe("New invoice (A)", () => {
 
     test("saved as it is typed: the draft is made once, at its own address", async ({
         page,
-        request,
     }, testInfo) => {
         await useSession(page);
+        // The page's own request context: it carries the session just added.
+        // Playwright's `request` fixture is a context of its own, signed out.
+        const request = page.request;
         const tag = stamp(testInfo);
         const contact = await makeContact(request, {
             firstName: "Invoice",

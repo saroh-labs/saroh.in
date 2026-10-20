@@ -55,7 +55,13 @@ export function northwind(request: APIRequestContext) {
             ? `${urls.API_URL}${path}`
             : `${urls.API_URL}/organizations/${NORTHWIND_ORG}${path}`;
     const ok = async <T>(res: APIResponse): Promise<T> => {
-        expect(res.ok(), `${res.url()}: ${await res.text()}`).toBe(true);
+        // A 401 here is almost always a context with no session: sign the
+        // page in (`useSession(page)`) before using its `page.request`.
+        const hint =
+            res.status() === 401
+                ? " (no session: call useSession(page) before page.request)"
+                : "";
+        expect(res.ok(), `${res.url()}: ${await res.text()}${hint}`).toBe(true);
         const text = await res.text();
         return (text ? JSON.parse(text) : null) as T;
     };
@@ -219,4 +225,44 @@ export async function makeOrder(
         `/orders/${id}`,
     );
     return { id, orderId: String(read.orderId ?? read.number ?? "") };
+}
+
+/**
+ * Issues a Northwind draft of the test's own that is overdue a moment
+ * later, and returns its number once it is.
+ *
+ * The API never issues an invoice already past its due date ("an invoice
+ * is never born overdue"), and nothing moves a due date after issue, so a
+ * spec can't make one "13 days late". It sets the due time a few seconds
+ * ahead, issues, and waits for the API to call it Overdue. On a slow
+ * runner the few seconds can pass before the issue lands: the API refuses
+ * it, and it tries again with a later time.
+ */
+export async function issueOverdue(
+    request: APIRequestContext,
+    draftId: string,
+): Promise<{ number: string }> {
+    const nw = northwind(request);
+    let issued: { number: string } | null = null;
+    for (let ahead = 4_000; !issued && ahead <= 16_000; ahead *= 2) {
+        await nw.patch(`/invoices/${draftId}`, {
+            dueAt: new Date(Date.now() + ahead).toISOString(),
+        });
+        const res = await request.post(
+            `${urls.API_URL}/organizations/${NORTHWIND_ORG}/invoices/${draftId}/issue`,
+            { headers: nw.headers, data: {} },
+        );
+        if (res.ok()) issued = (await res.json()) as { number: string };
+        else expect(await res.text()).toContain("due date has passed");
+    }
+    expect(issued, "issued before its due time").not.toBeNull();
+    await expect
+        .poll(
+            async () =>
+                (await nw.get<{ standing: string }>(`/invoices/${draftId}`))
+                    .standing,
+            { timeout: 20_000 },
+        )
+        .toBe("OVERDUE");
+    return { number: issued?.number ?? "" };
 }
