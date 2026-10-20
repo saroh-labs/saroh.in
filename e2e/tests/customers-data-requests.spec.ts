@@ -83,6 +83,10 @@ const requestRow = (page: Page, name: string, status: string) =>
         name: `${name}, asked to remove their data, ${status}`,
     });
 
+/** Every done request: its row names no one once the removal ran. */
+const removedRows = (page: Page) =>
+    requestRow(page, "A removed customer", "Done");
+
 test.describe("Customers › Requests (U14)", () => {
     test.skip(
         process.env.SITE_ACCOUNT_AREA !== "on",
@@ -97,8 +101,15 @@ test.describe("Customers › Requests (U14)", () => {
         const customer = await customerAsks(browser, testInfo);
         const { name } = customer;
 
+        // A done request names no one (#19): it reads "A removed customer"
+        // and keeps neither their name nor their email. So theirs is told
+        // apart by the count: one more Done than before, and their name on
+        // no row at all.
+        await openRequests(page, "all");
+        await expect(requestRow(page, name, "Open")).toBeVisible();
+        const before = await removedRows(page).count();
+
         // The list's banner leads to the tab.
-        await useSession(page, "owner");
         await page.goto(`/open/${NORTHWIND}`);
         await page.goto("/commerce/customers");
         await expect(
@@ -129,11 +140,17 @@ test.describe("Customers › Requests (U14)", () => {
             .fill(name);
         await removal.getByRole("button", { name: "Remove details" }).click();
 
-        // Back on the Requests tab, all of them: theirs reads Done.
+        // Back on the Requests tab, all of them: theirs reads Done, as
+        // "A removed customer", and their name has gone from the list.
         await expect(page).toHaveURL(/tab=requests&status=all/, {
             timeout: 15_000,
         });
-        await expect(requestRow(page, name, "Done")).toBeVisible();
+        await expect
+            .poll(() => removedRows(page).count(), { timeout: 15_000 })
+            .toBeGreaterThan(before);
+        await expect(
+            page.getByRole("button", { name: new RegExp(`^${name}, `) }),
+        ).toHaveCount(0);
         await customer.close();
     });
 
