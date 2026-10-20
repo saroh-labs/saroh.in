@@ -1,8 +1,9 @@
-import { Avatar, AvatarFallback, avatarInitials } from "@saroh/ui/avatar";
+import { Avatar, AvatarFallback } from "@saroh/ui/avatar";
 import { TextLink } from "@saroh/ui/text-link";
 
 import type { SellsRead } from "@/lib/insights/reads";
 import { customersView } from "@/lib/insights/sells-words";
+import { initials } from "@/lib/names";
 
 import { AnswerCard, AnswerLink, AnswerText } from "./answer-card";
 
@@ -37,7 +38,7 @@ export function BestCustomers({ read }: { read: SellsRead }) {
                             {row.name ? (
                                 <Avatar size="row" aria-hidden>
                                     <AvatarFallback>
-                                        {avatarInitials(row.name)}
+                                        {initials(row.name)}
                                     </AvatarFallback>
                                 </Avatar>
                             ) : (

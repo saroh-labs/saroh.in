@@ -213,6 +213,10 @@ jobs:
       - name: Date inputs
         run: pnpm run check:date-inputs
 
+      # A server component never calls a "use client" module's function.
+      - name: Client calls from the server
+        run: pnpm run check:client-calls
+
       # An IconButton is its own tooltip: no <Tip> drawing a second one.
       - name: Icon button tooltips
         run: pnpm run check:icon-button-tips
