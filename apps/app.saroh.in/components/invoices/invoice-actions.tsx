@@ -54,6 +54,7 @@ export function IssueDialog({
     invoice,
     canSend = false,
     payOnline = true,
+    onDone,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -62,6 +63,8 @@ export function IssueDialog({
     canSend?: boolean;
     /** Its link takes payment (`payOnline`), so there is a payment link to copy. */
     payOnline?: boolean;
+    /** It was issued: the details sheet reads it again (U9). */
+    onDone?: () => void;
 }) {
     const router = useRouter();
     // No registered address yet (DEC-068): asked here, then it issues.
@@ -87,6 +90,7 @@ export function IssueDialog({
         if (!res.ok) return { ok: false, error: res.error };
         showSuccess(`${res.data.number ?? "Invoice"} issued.`);
         router.refresh();
+        onDone?.();
     }
 
     return (
@@ -120,10 +124,16 @@ export function DeleteDraftDialog({
     open,
     onOpenChange,
     invoice,
+    onDeleted,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     invoice: InvoiceRef;
+    /**
+     * It went. From the list's details sheet the list stays (U9): the
+     * sheet closes and the row goes. Left out, back to the list.
+     */
+    onDeleted?: () => void;
 }) {
     const router = useRouter();
 
@@ -131,7 +141,10 @@ export function DeleteDraftDialog({
         const res = await deleteInvoice(invoice.id);
         if (!res.ok) return { ok: false, error: res.error };
         showSuccess("Draft deleted.");
-        router.push("/billing/invoices");
+        if (onDeleted) {
+            onDeleted();
+            router.refresh();
+        } else router.push("/billing/invoices");
     }
 
     return (
@@ -156,10 +169,13 @@ export function RecordPaymentDialog({
     open,
     onOpenChange,
     invoice,
+    onDone,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     invoice: InvoiceRef;
+    /** It was recorded: the details sheet reads it again (U9). */
+    onDone?: () => void;
 }) {
     const router = useRouter();
     const ids = { method: useId(), ref: useId(), on: useId(), note: useId() };
@@ -200,6 +216,7 @@ export function RecordPaymentDialog({
         showSuccess(`Payment recorded on ${invoice.number ?? "the invoice"}.`);
         onOpenChange(false);
         router.refresh();
+        onDone?.();
     }
 
     return (
@@ -288,10 +305,13 @@ export function RefundInvoiceDialog({
     open,
     onOpenChange,
     invoice,
+    onDone,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     invoice: InvoiceRef;
+    /** It was refunded: the details sheet reads it again (U9). */
+    onDone?: () => void;
 }) {
     const router = useRouter();
     const reasonId = useId();
@@ -316,6 +336,7 @@ export function RefundInvoiceDialog({
             `${`${invoice.number ?? "Invoice"} cancelled with credit note ${res.data.number ?? ""}`.trim()}.`,
         );
         router.refresh();
+        onDone?.();
     }
 
     return (

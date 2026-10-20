@@ -104,7 +104,6 @@ export default async function InvoicesPage({
                 invoices={invoices}
                 truncated={truncated}
                 canWrite={canWrite}
-                businessName={organization?.name ?? "This business"}
                 tax={
                     business
                         ? {

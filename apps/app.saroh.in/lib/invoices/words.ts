@@ -36,6 +36,8 @@ export const MARK_IN_BANK = "Mark as in the bank";
 export const BOUNCED = "Bounced";
 export const CANCEL_OR_CORRECT = "Cancel or correct";
 export const REMOVE_PAYMENT = "Remove payment";
+/** On a payment's own line in the history. */
+export const REMOVE_THIS_PAYMENT = "Remove this payment";
 export const WRITE_AGAIN = "Write again";
 
 /* The states ----------------------------------------------------------- */

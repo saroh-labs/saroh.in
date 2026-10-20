@@ -168,6 +168,24 @@ list, and the toast has the way to the new record
 has to stay (a product's full editor, a record to compare) is the quiet
 action at the far side of the foot, never the main one.
 
+**Current** — **A record's details open from its row in a side sheet, and
+its page draws the same view** (DEC-173, invoices U9 #1121). An invoice's
+row opens `components/invoices/details/invoice-details-sheet.tsx`
+(`QuickLook` widened to 512px, the whole screen on a phone, `?invoice=` in
+the address so a reload keeps it); `/billing/invoices/[id]` renders the
+same `InvoiceDetailsView` as a page, from the same server read
+(`lib/invoices/details.ts`), so a deep link and the sheet can't differ.
+Which buttons a state has is `actionsFor` (one main, what sits beside it,
+Share, More); what each does is one hook (`use-details-actions.tsx`), and
+every action opens its own frame over the details and comes back to them:
+after a write the sheet reads the record again in place and the list
+behind it refreshes. Flows other units own are opened through one seam
+each (`details/flows.tsx`: `useRecordPaymentFlow`, `useShareFlow`,
+`useCancelFlow`, each `open(…)` plus `overlays`), so a new sheet replaces
+the hook's body and nothing in the view changes. Previous and Next walk
+the list as filtered without closing. The money card says one thing and
+holds at most one note.
+
 **Current** — **A settings row is read first and edited in a side sheet**
 (owner, 10 Oct): a location's tabs (`components/stores/`) and every tab of
 Settings › Business (`components/organizations/`) draw `Row`s from

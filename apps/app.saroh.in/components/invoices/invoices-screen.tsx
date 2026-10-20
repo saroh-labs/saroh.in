@@ -7,11 +7,11 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { ChequesLine } from "@/components/invoices/cheques-line";
+import { InvoiceDetailsSheet } from "@/components/invoices/details/invoice-details-sheet";
 import type { InvoiceBusinessTax } from "@/components/invoices/gst-status-line";
 import { GstStatusLine } from "@/components/invoices/gst-status-line";
 import type { ListEmpty } from "@/components/invoices/invoice-list-body";
 import { InvoiceListBody } from "@/components/invoices/invoice-list-body";
-import { InvoiceQuickLook } from "@/components/invoices/invoice-quick-look";
 import { InvoiceSearch } from "@/components/invoices/invoice-search";
 import { MoneyStrip } from "@/components/invoices/money-strip";
 import { ScopeNotice, SourceFilter } from "@/components/invoices/source-filter";
@@ -63,8 +63,9 @@ export type { InvoiceBusinessTax } from "@/components/invoices/gst-status-line";
  * Kept from before (§15): the status filter with its counts (`?tab=`),
  * "What it was for" (`?source=`) and one pack's or course's invoices
  * (`?pack=`, `?course=`), Home's "Last 24 hours" (`?since=`), corrections
- * under their invoice, paging, "Showing the newest N", both empty states,
- * and the quick look on every row.
+ * under their invoice, paging, "Showing the newest N", and both empty
+ * states. A row opens the invoice's details in a side sheet (U9 #1121),
+ * where every action finishes; `?invoice=` keeps it open on a reload.
  *
  * Overdue is worked out from the due date by the API, never stored. A
  * credit note sits under the invoice it corrects and never counts as
@@ -74,7 +75,6 @@ export function InvoicesScreen({
     invoices,
     truncated = false,
     canWrite,
-    businessName,
     tax,
     query,
     initialChip = "all",
@@ -96,7 +96,6 @@ export function InvoicesScreen({
      * (#836), as on the paper the customer gets. Absent, the viewer's.
      */
     timeZone?: string;
-    businessName: string;
     invoices: Invoice[];
     /** The newest read hit its cap: older paid and void ones are not here. */
     truncated?: boolean;
@@ -135,7 +134,10 @@ export function InvoicesScreen({
     // once.
     const [picked, setPicked] = useState<ListQuery | null>(null);
     const [chip, setChip] = useState<SourceChip>(initialChip);
-    const [peek, setPeek] = useState<Invoice | null>(null);
+    // The invoice whose details are open in the side sheet (`?invoice=`).
+    const [openId, setOpenId] = useState<string | null>(() =>
+        params.get("invoice"),
+    );
     // A new address from the server is the truth again: what was picked
     // has arrived (or a link moved the list), so it gives way.
     const [arrived, setArrived] = useState({ query, initialChip });
@@ -148,7 +150,12 @@ export function InvoicesScreen({
 
     const go = (next: URLSearchParams) =>
         start(() => router.replace(hrefOf(pathname, next), { scroll: false }));
-    const here = () => new URLSearchParams(params.toString());
+    // Every move of the list closes the sheet: its `?invoice=` goes too.
+    const here = () => {
+        const q = new URLSearchParams(params.toString());
+        q.delete("invoice");
+        return q;
+    };
 
     /** The status dropdown: a figure of its own goes. */
     function pickTab(tab: InvoiceTab) {
@@ -176,13 +183,13 @@ export function InvoicesScreen({
             cheques: filter?.view === "cheques",
             paidFrom: filter?.paidFrom ?? null,
         });
-        setPeek(null);
+        showInvoice(null);
         go(withFigure(here(), filter));
     }
 
     function pickChip(next: SourceChip) {
         setChip(next);
-        setPeek(null);
+        showInvoice(null);
         const q = here();
         if (next === "all") q.delete("source");
         else q.set("source", next);
@@ -191,7 +198,7 @@ export function InvoicesScreen({
 
     function search(term: string) {
         if (term === shownQuery.q) return;
-        setPeek(null);
+        showInvoice(null);
         go(withSearch(here(), term));
     }
 
@@ -204,17 +211,25 @@ export function InvoicesScreen({
             q: "",
         });
         setChip("all");
-        setPeek(null);
+        showInvoice(null);
         const q = withFigure(withSearch(here(), ""), null);
         q.delete("source");
         go(q);
     }
 
     /**
-     * The one seam a row opens through: today the quick look, and the
-     * details side sheet once U9 lands (`?invoice=` keeps it open).
+     * The one seam a row opens through: the details side sheet (U9). It is
+     * kept in the address (`?invoice=`), so a reload or a shared link opens
+     * it again, without asking the server for the list again.
      */
-    const openInvoice = (invoice: Invoice) => setPeek(invoice);
+    function showInvoice(id: string | null) {
+        setOpenId(id);
+        const next = new URL(window.location.href);
+        if (id) next.searchParams.set("invoice", id);
+        else next.searchParams.delete("invoice");
+        window.history.replaceState(window.history.state, "", next);
+    }
+    const openInvoice = (invoice: Invoice) => showInvoice(invoice.id);
 
     // Everything below — the counts, the rows — reads the chosen source's.
     const chips = scope ? [] : chipsFor(invoices, chip);
@@ -368,7 +383,7 @@ export function InvoicesScreen({
                 rows={rows}
                 empty={empty}
                 resetOn={`${shownQuery.tab}|${chip}|${shownQuery.owed}|${shownQuery.cheques}|${shownQuery.paidFrom}|${shownQuery.q}`}
-                selectedId={peek?.id ?? null}
+                selectedId={openId}
                 onOpen={openInvoice}
                 timeZone={timeZone}
                 truncated={truncated && !onServer}
@@ -389,14 +404,13 @@ export function InvoicesScreen({
                 }
             />
 
-            <InvoiceQuickLook
-                invoice={peek}
-                canWrite={canWrite}
-                businessName={businessName}
-                timeZone={timeZone}
-                onOpenChange={(open) => {
-                    if (!open) setPeek(null);
-                }}
+            <InvoiceDetailsSheet
+                invoiceId={openId}
+                row={rows.find((r) => r.id === openId) ?? null}
+                rows={rows}
+                tab={shownQuery.tab}
+                onMove={openInvoice}
+                onClose={() => showInvoice(null)}
             />
         </div>
     );

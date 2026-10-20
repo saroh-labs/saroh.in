@@ -57,6 +57,11 @@ const NOT_FORMS: Record<string, string> = {
     "components/commerce/product-page/variant-drawer.tsx":
         "a read-only quick look",
     "components/calendar/day-sheet.tsx": "a read-only list of a day",
+    // An invoice's details from its row (DEC-173, U9): the quick look's
+    // frame, wider, holding the paper; every action opens its own sheet,
+    // dialog or confirm over it, so it has no Save of its own.
+    "components/invoices/details/invoice-details-sheet.tsx":
+        "an invoice's details: each action opens its own frame over it",
     "components/insights/week-sheet.tsx":
         "a read-only quick look of a week's orders, opening the list",
     // Hours and time off's sheets (U17, DEC-170): what they hold saves as

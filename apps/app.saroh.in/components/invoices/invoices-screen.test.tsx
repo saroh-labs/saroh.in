@@ -24,13 +24,22 @@ vi.mock("next/navigation", () => ({
     usePathname: () => "/billing/invoices",
     useSearchParams: () => new URLSearchParams(search),
 }));
-// The quick look has its own tests: here it is only which invoice it opens
-// on, which is the seam U9's details sheet takes over.
-vi.mock("@/components/invoices/invoice-quick-look", () => ({
-    InvoiceQuickLook: ({ invoice }: { invoice: { number: string } | null }) =>
-        invoice ? (
-            <div role="dialog" data-quick-look="">
-                {invoice.number}
+// The details sheet has its own tests: here it is only which invoice it
+// opens on, and what Previous and Next walk.
+vi.mock("@/components/invoices/details/invoice-details-sheet", () => ({
+    InvoiceDetailsSheet: ({
+        invoiceId,
+        row,
+        rows,
+    }: {
+        invoiceId: string | null;
+        row: { number: string } | null;
+        rows: readonly { id: string }[];
+    }) =>
+        invoiceId ? (
+            <div role="dialog" data-details-sheet={invoiceId}>
+                {row?.number}
+                <span data-walks={rows.map((r) => r.id).join(",")} />
             </div>
         ) : null,
 }));
@@ -153,7 +162,6 @@ function show(over: Partial<Parameters<typeof InvoicesScreen>[0]> = {}): void {
         <InvoicesScreen
             invoices={[DUE, LATE, PAID, DRAFT]}
             canWrite
-            businessName="Rye & Co."
             tax={{ registered: true, gstin: "29AAGCR4375J1ZU" }}
             query={ALL}
             timeZone="Asia/Kolkata"
@@ -357,7 +365,8 @@ describe("InvoicesScreen: rows", () => {
         expect(row?.textContent).toContain("Written by hand");
     });
 
-    it("a row opens the invoice's quick look (U9's sheet next)", () => {
+    it("a row opens the invoice's details sheet, kept in the address (U9)", () => {
+        const replaceState = vi.spyOn(window.history, "replaceState");
         show({ invoices: [LATE] });
         const row = document.querySelector<HTMLButtonElement>(
             '[data-invoice-row="0106"]',
@@ -365,8 +374,24 @@ describe("InvoicesScreen: rows", () => {
         expect(row?.getAttribute("aria-haspopup")).toBe("dialog");
         act(() => row?.click());
         expect(row?.className).toContain("bg-muted");
-        expect(document.querySelector("[data-quick-look]")?.textContent).toBe(
-            "RC/26-27/0106",
-        );
+        const sheet = document.querySelector("[data-details-sheet]");
+        expect(sheet?.textContent).toBe("RC/26-27/0106");
+        expect(sheet?.getAttribute("data-details-sheet")).toBe(LATE.id);
+        // `?invoice=` keeps it open on a reload, without a new list read.
+        const url = String(replaceState.mock.calls.at(-1)?.[2]);
+        expect(new URL(url).searchParams.get("invoice")).toBe(LATE.id);
+        expect(replace).not.toHaveBeenCalled();
+        replaceState.mockRestore();
+    });
+
+    it("opens on the invoice in the address after a reload", () => {
+        search = `invoice=${LATE.id}`;
+        show({ invoices: [LATE] });
+        expect(
+            document
+                .querySelector("[data-details-sheet]")
+                ?.getAttribute("data-details-sheet"),
+        ).toBe(LATE.id);
+        search = "";
     });
 });

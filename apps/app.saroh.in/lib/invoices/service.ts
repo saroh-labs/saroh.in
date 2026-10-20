@@ -380,10 +380,44 @@ export interface InvoiceInput {
 }
 
 export interface PaymentInput {
-    method: PaymentMethod;
+    method: InvoicePaymentMethod;
+    /**
+     * How much came in, as a Decimal string (DEC-173). Left out, it is
+     * everything left to pay.
+     */
+    amount?: string;
     reference?: string;
     note?: string;
+    /** The name before the ledger; `receivedAt` from DEC-173. */
     paidAt?: string;
+    /** When the money came in (ISO). */
+    receivedAt?: string;
+    /** A cheque only. */
+    chequeNumber?: string;
+    chequeBank?: string;
+}
+
+/** What recording a payment answers (DEC-173): the invoice, and what Undo removes. */
+export type RecordedPayment = Invoice & { recorded?: { paymentId: string } };
+
+/** How an invoice is shared by hand (DEC-173, `POST :id/share`). */
+export interface ShareAsk {
+    channel: "WHATSAPP" | "LINK" | "PDF" | "PRINT" | "EMAIL";
+    kind?: "NEW" | "REMINDER" | "RECEIPT";
+}
+
+/** What a share answers: the link minted, the message, and WhatsApp's link. */
+export interface ShareResult {
+    channel: ShareAsk["channel"];
+    kind: "NEW" | "REMINDER" | "RECEIPT";
+    url: string | null;
+    text: string | null;
+    phone: string | null;
+    /** `wa.me` with the message filled in; null without a phone. */
+    whatsappUrl: string | null;
+    payOnline: boolean;
+    email: { status: string; to: string } | null;
+    sharedAt: string;
 }
 
 /** The newest invoices, and every unpaid one however old (see `withLive`). */
@@ -629,11 +663,69 @@ export function reissueInvoice(id: string, reason: string) {
 }
 
 export function recordPayment(id: string, input: PaymentInput) {
-    return send<Invoice>(
+    return send<RecordedPayment>(
         `${at(id)}/payments`,
         "POST",
         input,
         "Couldn't record that payment.",
+    );
+}
+
+const payment = (id: string, paymentId: string) =>
+    `${at(id)}/payments/${encodeURIComponent(paymentId)}`;
+
+/**
+ * Remove a payment recorded by mistake (DEC-173): soft, kept in the
+ * history with the reason. Answers with the invoice, owed again by it.
+ */
+export function removePayment(id: string, paymentId: string, reason?: string) {
+    return send<Invoice>(
+        payment(id, paymentId),
+        "DELETE",
+        reason ? { reason } : {},
+        "Couldn't remove that payment.",
+    );
+}
+
+/** A waiting cheque is in the bank; its receipt goes then. */
+export function chequeCleared(
+    id: string,
+    paymentId: string,
+    clearedAt?: string,
+) {
+    return send<Invoice>(
+        `${payment(id, paymentId)}/cleared`,
+        "POST",
+        clearedAt ? { clearedAt } : {},
+        "Couldn't mark that cheque as in the bank.",
+    );
+}
+
+/** A waiting cheque bounced: what it paid is owed again, with no charge. */
+export function chequeBounced(
+    id: string,
+    paymentId: string,
+    input: { bouncedAt?: string; reason?: string } = {},
+) {
+    return send<Invoice>(
+        `${payment(id, paymentId)}/bounced`,
+        "POST",
+        input,
+        "Couldn't mark that cheque as bounced.",
+    );
+}
+
+/**
+ * Share it by hand (DEC-173): on WhatsApp (a fresh link and the message;
+ * Saroh sends nothing), as a link, a PDF or printed, each logged; or a
+ * receipt by the business's own email.
+ */
+export function shareInvoice(id: string, ask: ShareAsk) {
+    return send<ShareResult>(
+        `${at(id)}/share`,
+        "POST",
+        ask,
+        "Couldn't share that invoice.",
     );
 }
 

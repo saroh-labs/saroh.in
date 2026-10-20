@@ -3,8 +3,10 @@ import {
     createViewLink,
     remindInvoice,
     sendInvoice,
+    shareInvoice,
 } from "./actions";
 import { forgetLink, rememberLink } from "./minted-links";
+import type { ShareAsk } from "./service";
 
 /**
  * Every way this app replaces an invoice's link token, with the tab's
@@ -47,5 +49,15 @@ export async function sendWithLink(id: string) {
 export async function remindWithLink(id: string) {
     const res = await remindInvoice(id);
     if (res.ok) forgetLink(id);
+    return res;
+}
+
+/**
+ * Share it by hand (DEC-173): on WhatsApp the API mints a fresh link the
+ * way a send does, ending the one kept here, so it is forgotten.
+ */
+export async function shareWithLink(id: string, ask: ShareAsk) {
+    const res = await shareInvoice(id, ask);
+    if (res.ok && res.data.url) forgetLink(id);
     return res;
 }

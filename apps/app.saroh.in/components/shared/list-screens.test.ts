@@ -323,6 +323,8 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
             {
                 "components/customers/list/unlinked-sheet.tsx":
                     'a sheet\'s foot, not a list page: small steps beside "Page 2 of 3" while linking customers',
+                "components/invoices/details/invoice-details-sheet.tsx":
+                    "a record's sheet: Previous and Next walk to the invoice either side, not pages of a list",
             },
         );
     });

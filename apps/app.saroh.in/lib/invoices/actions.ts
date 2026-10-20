@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { linesWithRates } from "./line-rates";
 import type { ReminderAsk } from "./remind-all";
-import type { InvoiceInput, PaymentInput } from "./service";
+import type { InvoiceInput, PaymentInput, ShareAsk } from "./service";
 import * as api from "./service";
 
 /** Thin: the API decides who may and what an invoice may become. */
@@ -81,27 +81,6 @@ export async function creditInvoice(id: string, reason: string) {
     return res;
 }
 
-/**
- * One invoice with its lines, for a quick look opened from a list. A read,
- * so nothing is revalidated; a failure comes back as a message to show.
- */
-export async function readInvoice(id: string) {
-    try {
-        const invoice = await api.getInvoice(id);
-        return invoice
-            ? ({ ok: true, data: invoice } as const)
-            : ({
-                  ok: false,
-                  error: "That invoice is not here any more.",
-              } as const);
-    } catch {
-        return {
-            ok: false,
-            error: "That invoice could not be loaded.",
-        } as const;
-    }
-}
-
 export async function reissueInvoice(id: string, reason: string) {
     const res = await api.reissueInvoice(id, reason);
     if (res.ok) refresh(id);
@@ -129,6 +108,46 @@ export async function writeInvoiceAgain(id: string) {
 
 export async function recordPayment(id: string, input: PaymentInput) {
     const res = await api.recordPayment(id, input);
+    if (res.ok) refresh(id);
+    return res;
+}
+
+/** Remove a payment recorded by mistake (DEC-173); kept in the history. */
+export async function removePayment(
+    id: string,
+    paymentId: string,
+    reason?: string,
+) {
+    const res = await api.removePayment(id, paymentId, reason);
+    if (res.ok) refresh(id);
+    return res;
+}
+
+/** A waiting cheque is in the bank. */
+export async function chequeCleared(
+    id: string,
+    paymentId: string,
+    clearedAt?: string,
+) {
+    const res = await api.chequeCleared(id, paymentId, clearedAt);
+    if (res.ok) refresh(id);
+    return res;
+}
+
+/** A waiting cheque bounced: what it paid is owed again. */
+export async function chequeBounced(
+    id: string,
+    paymentId: string,
+    input: { bouncedAt?: string; reason?: string } = {},
+) {
+    const res = await api.chequeBounced(id, paymentId, input);
+    if (res.ok) refresh(id);
+    return res;
+}
+
+/** Share it by hand: WhatsApp, a link, the PDF, print, or a receipt by email. */
+export async function shareInvoice(id: string, ask: ShareAsk) {
+    const res = await api.shareInvoice(id, ask);
     if (res.ok) refresh(id);
     return res;
 }
