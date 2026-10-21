@@ -156,6 +156,20 @@ describe("changeWhat", () => {
         expect(what({ kind: "SOMETHING_NEW" })).toBe("Changed");
     });
 
+    it("says why an eMandate renewal wasn't charged: its pre-debit email didn't go (DEC-180)", () => {
+        const noNotice = (reason?: string) =>
+            what({ kind: "NOT_CHARGED_NO_NOTICE", data: { reason } });
+        expect(noNotice("NO_EMAIL_PROVIDER")).toBe(
+            "Autopay didn't charge. A bank account debit needs an email to the customer a day before, and no email provider is connected",
+        );
+        expect(noNotice("NO_EMAIL_ADDRESS")).toContain(
+            "and they have no email address",
+        );
+        expect(noNotice("EMAIL_OFF")).toContain("and they turned email off");
+        expect(noNotice("NOT_SENT")).toContain("and it didn't go");
+        expect(noNotice()).toContain("and it didn't go");
+    });
+
     it("says why autopay was cancelled (D20)", () => {
         const cancelled = (reason?: string) =>
             what({ kind: "MANDATE_CANCELLED", data: { reason } });

@@ -643,9 +643,27 @@ Test mode, 2026-09-29, on a business's own connection (Northwind). Docs:
 - **Card and eMandate pre-debit notice (D6, U21).** Card: the issuing bank
   sends the notice (SMS or email) when the debit is asked for, and Razorpay
   debits ~36 hours later (an AFA link instead above ₹15,000); the order
-  needs no `notification`. eMandate: no notice is sent by anyone; the RBI
-  framework covers cards, PPIs and UPI only. Evidence and open questions:
+  needs no `notification`. eMandate: Razorpay and the bank send none (the
+  RBI framework covers cards, PPIs and UPI only), so **Saroh sends it**
+  (DEC-180, below); its order carries no `notification` either
+  (`PRE_DEBIT_METHODS` stays UPI only). Evidence:
   `docs/architecture/research/2026-10-pre-debit-notice.md`, DEC-174.
+- **eMandate: Saroh's notice, or no debit (DEC-180, #1175).** For an
+  eMandate (`sarohSendsNotice` in `subscriptions/autopay-timing.ts`) the
+  debit is planned at least `PRE_DEBIT_LEAD_HOURS` (26 h) after the
+  charge is prepared, as for UPI (`needsNotice`, `prepareCharge` holds
+  `debitAfter` to `debitAt` though the provider answers `NOT_NEEDED`).
+  Once prepared, the charge job queues `customer.notify`
+  `AUTOPAY_PRE_DEBIT` (`site-accounts/notices/pre-debit.ts`, keyed
+  `pre-debit:<intentId>`) for 26 h before the debit (`sarohNoticeAt`):
+  "₹X will be taken from your bank account on ‹day› for ‹plan›", through
+  the business's own email provider, no switch. Before the debit it reads
+  `preDebitNoticeState`: the email SENT, the debit goes no sooner than
+  `SAROH_NOTICE_MIN_HOURS` (24 h) after it (a late email moves the debit);
+  otherwise (no provider, no address, email turned off, not sent) the
+  charge is CANCELLED, the subscription's history gets
+  NOT_CHARGED_NO_NOTICE with `data.reason`, and the renewal invoice takes
+  U10's auto-send. Card and UPI are untouched.
 - **Unanswered charges.** A UPI debit can take 24–36 hours to be answered,
   more when the notice fails; some banks leave the payment `created`.
   Razorpay doesn't retry a failed debit on an order with `notification`;

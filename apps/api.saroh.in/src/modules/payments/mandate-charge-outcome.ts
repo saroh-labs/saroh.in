@@ -60,7 +60,10 @@ export async function recordChargeEventInTx(
     invoiceId: string,
     kind: Extract<
         SubscriptionEventKind,
-        "CHARGED" | "RENEWAL_FAILED" | "MANDATE_LIMIT_LOW"
+        | "CHARGED"
+        | "RENEWAL_FAILED"
+        | "MANDATE_LIMIT_LOW"
+        | "NOT_CHARGED_NO_NOTICE"
     >,
     data?: Record<string, string | number>,
 ): Promise<boolean> {

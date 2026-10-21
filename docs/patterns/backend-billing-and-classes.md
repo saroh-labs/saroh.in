@@ -428,6 +428,16 @@ invoices/reminders` (`InvoiceRemindersService`, `invoice:write`, at most
   `data.reason` (NO_EMAIL_PROVIDER, NO_EMAIL_ADDRESS,
   BUSINESS_DETAILS_MISSING, REFUSED), never thrown. Hand-made invoices are
   never auto-sent. The autopay-cancelled note's words follow the switch.
+- **An eMandate renewal is announced, or not taken** (DEC-180, #1175): a
+  day before each eMandate debit the customer is emailed what will be
+  taken, when and for what (`AUTOPAY_PRE_DEBIT`); if that email didn't go
+  the period isn't debited, NOT_CHARGED_NO_NOTICE says why on the
+  subscription's history ("Autopay didn't charge. A bank account debit
+  needs an email to the customer a day before, and no email provider is
+  connected"), and the renewal invoice goes as without autopay
+  (`sendRenewalUnlessCharged`). Not a failure: no RENEWAL_FAILED, no
+  "Payment failed", no failed-charge email. Rules in
+  `backend-integrations.md` → "eMandate: Saroh's notice, or no debit".
 - **A failed autopay charge tells the customer** (U10): every place that
   writes RENEWAL_FAILED for a decline (`failMandateChargeInTx`, the charge
   job's give-up, the webhook's `applyInvoiceFailure`) calls

@@ -53,6 +53,8 @@ export interface CustomerNotifyPayload {
     threadMessageId?: string;
     /** The invoice a failed autopay charge was for (U10). */
     invoiceId?: string;
+    /** The eMandate charge an AUTOPAY_PRE_DEBIT announces (DEC-180). */
+    paymentIntentId?: string;
     /** The online refund the customer is told is on its way (U12). */
     refundId?: string;
     /** The course enrolment a COURSE_* notice is about (U17). */

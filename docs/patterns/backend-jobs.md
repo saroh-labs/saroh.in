@@ -684,6 +684,14 @@ the Privacy Policy states both.
   asked, so a run delivered twice debits once. A redelivery that finds the
   debit already claimed (`ALREADY`, PROCESSING) writes the `LOOK` step: the
   run before it may have died between the claim and its next step.
+- **An eMandate's debit waits on Saroh's own notice** (DEC-180). `PREPARE`
+  queues `AUTOPAY_PRE_DEBIT` with the `DEBIT` step, on one transaction
+  (`enqueuePreDebitNoticeInTx` skips a notice already queued or handled),
+  26 h before the debit; `DEBIT` reads `preDebitNoticeState` first and,
+  with no email gone, lets the charge go (`notTold`: CANCELLED, the
+  waiting notice deleted, NOT_CHARGED_NO_NOTICE, the renewal invoice's
+  auto-send) instead of asking for it. Rules in `backend-integrations.md`
+  → "eMandate: Saroh's notice, or no debit".
 - **A charge that stands aside comes back on its own** (review 3). When a
   step refuses for a pay-link checkout the customer has open
   (CHECKOUT_OPEN), `stoodAside` writes, on the same transaction as its

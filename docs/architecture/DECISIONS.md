@@ -2325,3 +2325,5 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - Card and UPI are unchanged: their notices come from the bank and from Razorpay.
 - Consequences:
     - A notice job keyed to the charge, run ahead of `debitAfter` for EMANDATE only; the charge job checks the notice went before it debits.
+- Built (#1175): the eMandate debit is planned at least 26 h after its charge is prepared, the email is queued 26 h before it, and the debit goes no sooner than 24 h after the email went (a late email moves the debit, never shortens the notice). A period not taken is NOT_CHARGED_NO_NOTICE on the subscription's history with why.
+- Rules: `docs/patterns/backend-integrations.md` → "eMandate: Saroh's notice, or no debit".

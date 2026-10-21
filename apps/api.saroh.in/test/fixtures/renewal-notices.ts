@@ -20,6 +20,7 @@ import {
     FakeMerchantProvider,
     FakeProviderFactory,
 } from "../../src/modules/payments/providers/fake.provider";
+import type { MandateMethod } from "../../src/modules/payments/providers/provider.port";
 import {
     CustomerNotifyHandler,
     CustomerNotifyService,
@@ -171,13 +172,17 @@ export function renewalHarness() {
         return { contactId, subscriptionId, renewal: sub.currentPeriodEnd };
     }
 
-    /** {@link member} with ACTIVE UPI autopay up to `limitCents`. */
-    async function autopayMember(biz: Biz, limitCents = 180_000) {
+    /** {@link member} with ACTIVE autopay by `method` (UPI) up to `limitCents`. */
+    async function autopayMember(
+        biz: Biz,
+        limitCents = 180_000,
+        method: MandateMethod = "UPI",
+    ) {
         const who = await member(biz);
         const view = await setups.createSetup({
             organizationId: biz.owner.organizationId,
             subscriptionId: who.subscriptionId,
-            method: "UPI",
+            method,
             maxAmountCents: limitCents,
         });
         const setup = fake.authorise(`fake_setup_${view.mandateId}`);
@@ -188,10 +193,10 @@ export function renewalHarness() {
                 status: "ACTIVE",
                 setupReference: setup.setupReference,
                 providerMandateId: setup.providerMandateId,
-                method: "UPI",
+                method,
             },
         });
-        return who;
+        return { ...who, mandateId: view.mandateId };
     }
 
     function setTiming(biz: Biz, timing: AutopayChargeTiming) {
@@ -310,6 +315,7 @@ export function renewalHarness() {
         comms,
         invoices,
         sending,
+        chargeHandler,
         subscriptions,
         autoSend,
         notices,
