@@ -65,6 +65,13 @@ export const TEAM_ALERT_TYPE = "team.alert";
  * - `request`: a customer asked the business to remove their data from
  *   their site account (DEC-172, `data-request-alerts.ts`). Keyed to the
  *   request; told to whoever can run a customer removal, on its own row.
+ * - `booking-mine`: a booking with someone on the diary who has a login was
+ *   made, moved or cancelled (DEC-174, #1138), told to that one person
+ *   (`userId`) in their own alerts and by email, on "Bookings with you".
+ *   Queued by `booking.notify` for the person the event is about, never
+ *   the one who did it. `change` "moved-away" and a "new" from a
+ *   reassignment (#1157) are email only: the reassigning write put the
+ *   bell's notice in their alerts already. Keyed to the event and person.
  */
 export type TeamAlertPayload =
     | { event: "order"; orderId: string; actorUserId?: string | null }
@@ -73,6 +80,13 @@ export type TeamAlertPayload =
     | { event: "booking"; notificationId: string }
     | { event: "uncollected"; orderId: string }
     | { event: "request"; requestId: string }
+    | {
+          event: "booking-mine";
+          bookingId: string;
+          eventId: string;
+          userId: string;
+          change: "new" | "moved" | "moved-away" | "cancelled";
+      }
     | {
           event: "provider";
           channel: "PAYMENTS" | "EMAIL";
@@ -192,4 +206,10 @@ export interface WordedAlert extends NoticeColumns {
     emailUserIds?: readonly string[];
     /** Why they got it, when it isn't a row's choice (`emailUserIds`). */
     footer?: string;
+    /**
+     * A personal alert (#1138, "Bookings with you"): the bell's notice is
+     * this person's alone (`Notification.userId`), and only they are
+     * emailed, on the row's choices.
+     */
+    forUserId?: string;
 }

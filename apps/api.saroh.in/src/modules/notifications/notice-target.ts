@@ -27,6 +27,11 @@ export const NOTICE_KINDS = {
     "booking.cancelled": "booking",
     // Given to someone else (#1157): in the two people's own alerts.
     "booking.reassigned": "booking",
+    // A booking with you made, moved or cancelled (#1138): in that
+    // person's own alerts.
+    "booking.mine.new": "booking",
+    "booking.mine.moved": "booking",
+    "booking.mine.cancelled": "booking",
     "payment.failed": "invoice",
     "site.live": "site",
     "site.not_live": "site",

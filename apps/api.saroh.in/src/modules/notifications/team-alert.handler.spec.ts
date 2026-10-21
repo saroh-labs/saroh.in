@@ -104,6 +104,9 @@ function makeTx() {
             findFirst: jest.fn(),
         },
         customerDataRequest: { findFirst: jest.fn() },
+        booking: { findFirst: jest.fn() },
+        bookingEvent: { findFirst: jest.fn() },
+        staffMember: { findFirst: jest.fn() },
         merchantPaymentProvider: { findFirst: jest.fn() },
         communicationProvider: { findFirst: jest.fn() },
         $executeRaw: jest.fn().mockResolvedValue(0),
@@ -1321,5 +1324,248 @@ describe("a customer asks to remove their data", () => {
             expect(out).toEqual({ told: false, emails: [] });
             expect(tx.notification.create).not.toHaveBeenCalled();
         }
+    });
+});
+
+describe("a booking with you (#1138)", () => {
+    const AT = new Date("2026-10-27T05:30:00.000Z");
+    const WAS = new Date("2026-10-26T05:30:00.000Z");
+    const booking = {
+        id: "bk_1",
+        status: "CONFIRMED",
+        startAt: AT,
+        timezone: "Asia/Kolkata",
+        staffId: "st_ravi",
+        bookerName: "Asha R",
+        service: { name: "Physio" },
+        contact: { firstName: "Asha", lastName: "Rao" },
+    };
+    const event = {
+        id: "ev_1",
+        type: "BOOKED",
+        fromStartAt: null,
+        toStartAt: AT,
+        fromStaffId: null,
+        toStaffId: null,
+        toStaff: null,
+    };
+
+    /** Ravi is u_kitchen, a Member on the diary. */
+    function ravi(tx: FakeTx, over: Partial<typeof event> = {}) {
+        tx.booking.findFirst.mockResolvedValue(booking);
+        tx.bookingEvent.findFirst.mockResolvedValue({ ...event, ...over });
+        tx.staffMember.findFirst.mockResolvedValue({
+            membership: { userId: "u_kitchen" },
+        });
+    }
+
+    it("rings Ravi's own bell, and emails Ravi alone, with no customer's name", async () => {
+        const tx = makeTx();
+        ravi(tx);
+        const out = await tellTeam(asTx(tx), ORG, {
+            event: "booking-mine",
+            bookingId: "bk_1",
+            eventId: "ev_1",
+            userId: "u_kitchen",
+            change: "new",
+        });
+        expect(
+            tx.customerNotice.createMany.mock.calls[0][0].data[0].eventKey,
+        ).toBe("team:booking-mine:ev_1:u_kitchen");
+        expect(tx.notification.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                organizationId: ORG,
+                userId: "u_kitchen",
+                type: "booking.mine.new",
+                bookingId: "bk_1",
+                title: "Asha Rao booked Physio with you",
+            }),
+            select: { id: true },
+        });
+        // Only Ravi, though the owner and admin read bookings too.
+        expect(recipients(out)).toEqual(["u_kitchen"]);
+        const mail = out.emails[0].mail;
+        expect(mail.heading).toBe("A booking with you: Physio");
+        expect(mail.body).toBe(
+            "Physio, Tue 27 Oct at 11:00 am. Open it in Saroh to see who.",
+        );
+        expect(JSON.stringify(mail)).not.toContain("Asha");
+        expect(mail.url).toBe("https://app.saroh.localhost/bookings/bk_1");
+        expect(mail.footer).toContain("“Bookings with you”");
+    });
+
+    it("Ravi turned email off: the bell only", async () => {
+        const tx = makeTx();
+        ravi(tx);
+        tx.notificationPreference.findMany.mockResolvedValue([
+            {
+                userId: "u_kitchen",
+                event: "mine",
+                channel: "email",
+                enabled: false,
+            },
+        ]);
+        const out = await tellTeam(asTx(tx), ORG, {
+            event: "booking-mine",
+            bookingId: "bk_1",
+            eventId: "ev_1",
+            userId: "u_kitchen",
+            change: "new",
+        });
+        expect(out.told).toBe(true);
+        expect(tx.notification.create).toHaveBeenCalledTimes(1);
+        expect(out.emails).toEqual([]);
+    });
+
+    it("moved: says the new time and the old", async () => {
+        const tx = makeTx();
+        ravi(tx, { type: "RESCHEDULED", fromStartAt: WAS });
+        const out = await tellTeam(asTx(tx), ORG, {
+            event: "booking-mine",
+            bookingId: "bk_1",
+            eventId: "ev_1",
+            userId: "u_kitchen",
+            change: "moved",
+        });
+        expect(tx.notification.create.mock.calls[0][0].data).toMatchObject({
+            type: "booking.mine.moved",
+            title: "Asha Rao's Physio with you was moved",
+            body: "Now Tue 27 Oct at 11:00 am. It was Mon 26 Oct at 11:00 am.",
+        });
+        expect(out.emails[0].mail.heading).toBe("A booking with you was moved");
+    });
+
+    it("cancelled: told even though the booking is cancelled now", async () => {
+        const tx = makeTx();
+        ravi(tx, { type: "CANCELLED", fromStartAt: AT, toStartAt: null });
+        tx.booking.findFirst.mockResolvedValue({
+            ...booking,
+            status: "CANCELLED",
+        });
+        const out = await tellTeam(asTx(tx), ORG, {
+            event: "booking-mine",
+            bookingId: "bk_1",
+            eventId: "ev_1",
+            userId: "u_kitchen",
+            change: "cancelled",
+        });
+        expect(tx.notification.create.mock.calls[0][0].data.type).toBe(
+            "booking.mine.cancelled",
+        );
+        expect(out.emails[0].mail.body).toBe(
+            "Physio, Tue 27 Oct at 11:00 am. It's off your diary.",
+        );
+    });
+
+    it("given to Meera: Ravi's is email only, the bell was written with the move (#1157)", async () => {
+        const tx = makeTx();
+        ravi(tx, {
+            type: "REASSIGNED",
+            fromStartAt: AT,
+            fromStaffId: "st_ravi",
+            toStaffId: "st_meera",
+            toStaff: { name: "Meera" } as never,
+        });
+        const out = await tellTeam(asTx(tx), ORG, {
+            event: "booking-mine",
+            bookingId: "bk_1",
+            eventId: "ev_1",
+            userId: "u_kitchen",
+            change: "moved-away",
+        });
+        expect(tx.staffMember.findFirst.mock.calls[0][0].where.id).toBe(
+            "st_ravi",
+        );
+        expect(tx.notification.create).not.toHaveBeenCalled();
+        expect(out.emails[0].mail).toMatchObject({
+            heading: "A booking was given to someone else",
+            body: "Physio, Tue 27 Oct at 11:00 am, is now with Meera. It's off your diary.",
+        });
+    });
+
+    it("says nothing when it no longer stands", async () => {
+        const cases: [string, (tx: FakeTx) => void][] = [
+            [
+                "someone else has it now",
+                (tx) => {
+                    tx.staffMember.findFirst.mockResolvedValue({
+                        membership: { userId: "u_admin" },
+                    });
+                },
+            ],
+            [
+                "Ravi left the team",
+                (tx) => {
+                    tx.staffMember.findFirst.mockResolvedValue({
+                        membership: null,
+                    });
+                },
+            ],
+            [
+                "the new booking was cancelled since",
+                (tx) => {
+                    tx.booking.findFirst.mockResolvedValue({
+                        ...booking,
+                        status: "CANCELLED",
+                    });
+                },
+            ],
+            [
+                "the booking is gone",
+                (tx) => {
+                    tx.booking.findFirst.mockResolvedValue(null);
+                },
+            ],
+        ];
+        for (const [, change] of cases) {
+            const tx = makeTx();
+            ravi(tx);
+            change(tx);
+            const out = await tellTeam(asTx(tx), ORG, {
+                event: "booking-mine",
+                bookingId: "bk_1",
+                eventId: "ev_1",
+                userId: "u_kitchen",
+                change: "new",
+            });
+            expect(out).toEqual({ told: false, emails: [] });
+            expect(tx.customerNotice.createMany).not.toHaveBeenCalled();
+        }
+    });
+
+    it("a job run twice tells once", async () => {
+        const tx = makeTx();
+        ravi(tx);
+        tx.customerNotice.createMany.mockResolvedValue({ count: 0 });
+        const out = await tellTeam(asTx(tx), ORG, {
+            event: "booking-mine",
+            bookingId: "bk_1",
+            eventId: "ev_1",
+            userId: "u_kitchen",
+            change: "new",
+        });
+        expect(out).toEqual({ told: false, emails: [] });
+        expect(tx.notification.create).not.toHaveBeenCalled();
+    });
+
+    it("the job skips a payload with no person or an unknown change", async () => {
+        const handler = new TeamAlertHandler();
+        for (const payload of [
+            { event: "booking-mine", bookingId: "bk_1", eventId: "ev_1" },
+            {
+                event: "booking-mine",
+                bookingId: "bk_1",
+                eventId: "ev_1",
+                userId: "u_kitchen",
+                change: "lost",
+            },
+        ]) {
+            await handler.handle({
+                id: "job_m",
+                organizationId: ORG,
+                payload,
+            } as unknown as Job);
+        }
+        expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 });

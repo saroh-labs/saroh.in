@@ -9,6 +9,7 @@ import { CustomerNotifyService } from "../site-accounts/customer-notify.handler"
 import type { NoticeKind } from "../site-accounts/notify-templates";
 import { teamNotice } from "../site-accounts/notify-templates";
 import { BookingEventType } from "./booking-event-type";
+import { queueStaffAlertsInTx } from "./booking-mine";
 
 /** The `type` this handler is registered under. */
 export const BOOKING_NOTIFY_TYPE = "booking.notify";
@@ -60,6 +61,9 @@ type Tx = Prisma.TransactionClient;
  * - **The customer** is told through `customer.notify`'s service
  *   ({@link CustomerNotifyService}): their thread when it is live, and
  *   email to a verified account through the business's own provider.
+ * - **The person it is with** (#1138, "Bookings with you"): their own
+ *   alert and email, queued as `team.alert` (`booking-mine.ts`), when they
+ *   have a login and didn't do it themselves.
  *
  * Idempotent per event: both sides claim a `CustomerNotice` row first.
  */
@@ -141,6 +145,7 @@ export async function tellAboutBooking(
             status: true,
             startAt: true,
             timezone: true,
+            staffId: true,
             bookerName: true,
             service: { select: { name: true } },
             contact: { select: { firstName: true, lastName: true } },
@@ -159,6 +164,8 @@ export async function tellAboutBooking(
             actorUserId: true,
             fromStartAt: true,
             toStartAt: true,
+            fromStaffId: true,
+            toStaffId: true,
         },
     });
     const kind = noticeKind(event?.type ?? null, payload.reason);
@@ -185,6 +192,14 @@ export async function tellAboutBooking(
             input.now,
         );
     }
+
+    // The person it is with, in their own alerts (#1138).
+    await queueStaffAlertsInTx(tx, organizationId, {
+        bookingId: booking.id,
+        bookingStaffId: booking.staffId,
+        event: event ?? null,
+        kind,
+    });
 
     // The customer did it themselves: no team member behind the event. A
     // booking they made is the team's "New booking" (F14), as a move or a

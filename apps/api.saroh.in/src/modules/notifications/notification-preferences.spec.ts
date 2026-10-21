@@ -9,6 +9,7 @@ jest.mock("@saroh/database", () => ({
         },
         communicationProvider: { findMany: jest.fn() },
         domain: { count: jest.fn() },
+        staffMember: { count: jest.fn() },
     },
 }));
 
@@ -32,6 +33,7 @@ const db = prisma as unknown as {
     notificationPreference: Record<string, jest.Mock>;
     communicationProvider: Record<string, jest.Mock>;
     domain: Record<string, jest.Mock>;
+    staffMember: Record<string, jest.Mock>;
 };
 
 const record = jest.fn();
@@ -78,6 +80,8 @@ beforeEach(() => {
     modules();
     providers();
     db.notificationPreference.findMany.mockResolvedValue([]);
+    // Not on the diary unless a test says so (#1138).
+    db.staffMember.count.mockResolvedValue(0);
     db.domain.count.mockResolvedValue(0);
 });
 

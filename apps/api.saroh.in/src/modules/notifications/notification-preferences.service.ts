@@ -65,7 +65,8 @@ export interface AlertChange {
  *   (a scheduled go-live, a business without test releases is not told
  *   of) or a verified custom domain of the business's own (#917: one that
  *   stops working is told on it), so nobody hears on a row they can't
- *   turn off.
+ *   turn off. "Bookings with you" (#1138) is offered only to someone on
+ *   the diary.
  * - **Channels** are only what can deliver: the bell to someone who sees
  *   the inbox, email through the business's own connected provider
  *   (DEC-011), and WhatsApp never — Saroh keeps no WhatsApp number for a
@@ -203,8 +204,10 @@ export class NotificationPreferencesService {
         );
         const website =
             readable.includes("site") && (await this.websiteRowOn(ctx));
+        const diary = readable.includes("mine") && (await this.onDiary(ctx));
         return readable.filter((e) => {
             if (e === "site" && !website) return false;
+            if (e === "mine" && !diary) return false;
             const module = ALERT_MODULE[e];
             return module === null || on.get(module) === true;
         });
@@ -228,6 +231,20 @@ export class NotificationPreferencesService {
             where: { organizationId: ctx.organizationId, status: "VERIFIED" },
         });
         return domains > 0;
+    }
+
+    /**
+     * Whether this person is on the diary (#1138): "Bookings with you" has
+     * nothing to tell someone no booking can be with.
+     */
+    private async onDiary(ctx: OrganizationContext): Promise<boolean> {
+        const people = await prisma.staffMember.count({
+            where: {
+                organizationId: ctx.organizationId,
+                membership: { userId: ctx.userId },
+            },
+        });
+        return people > 0;
     }
 
     /**

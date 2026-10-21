@@ -416,4 +416,55 @@ describe("the booking.notify job", () => {
         await handler.handle(job({ bookingId: "bk_1" }, null));
         expect(prisma.$transaction).not.toHaveBeenCalled();
     });
+
+    it("the person it is with hears of it in their own alerts (#1138), not whoever did it", async () => {
+        const tx = {
+            ...makeTx(),
+            staffMember: {
+                findMany: jest
+                    .fn()
+                    .mockResolvedValue([
+                        { id: "st_ravi", membership: { userId: "u_ravi" } },
+                    ]),
+            },
+        };
+        tx.booking.findFirst.mockResolvedValue({
+            ...(await tx.booking.findFirst()),
+            staffId: "st_ravi",
+        });
+        tx.bookingEvent.findFirst.mockResolvedValue({
+            id: "ev_book",
+            type: "BOOKED",
+            actorUserId: "u_owner",
+            fromStartAt: null,
+            toStartAt: NOW,
+        });
+        await run(tx, {
+            bookingId: "bk_1",
+            reason: "booked",
+            eventId: "ev_book",
+        });
+        expect(enqueueTeamAlert).toHaveBeenCalledWith(tx, ORG, {
+            event: "booking-mine",
+            bookingId: "bk_1",
+            eventId: "ev_book",
+            userId: "u_ravi",
+            change: "new",
+        });
+
+        jest.clearAllMocks();
+        tx.bookingEvent.findFirst.mockResolvedValue({
+            id: "ev_cancel",
+            type: "CANCELLED",
+            actorUserId: "u_ravi",
+            fromStartAt: NOW,
+            toStartAt: null,
+        });
+        await run(tx, {
+            bookingId: "bk_1",
+            reason: "cancelled",
+            eventId: "ev_cancel",
+        });
+        expect(enqueueTeamAlert).not.toHaveBeenCalled();
+    });
 });

@@ -26,6 +26,9 @@ export const ALERT_EVENTS = [
     "site",
     // A customer asked to remove their data (DEC-172, #1106).
     "request",
+    // A booking with you was made, moved or cancelled (DEC-174 D7, #1138):
+    // personal, to the person on the diary with a login.
+    "mine",
 ] as const;
 export type AlertEvent = (typeof ALERT_EVENTS)[number];
 
@@ -58,7 +61,13 @@ export function isAlertChannel(value: unknown): value is AlertChannel {
 export function defaultOn(event: AlertEvent, channel: AlertChannel): boolean {
     if (channel === "bell") return true;
     if (channel === "email") {
-        return event === "failed" || event === "site" || event === "request";
+        return (
+            event === "failed" ||
+            event === "site" ||
+            event === "request" ||
+            // Bookings with you (DEC-174, #1138): bell and email by default.
+            event === "mine"
+        );
     }
     return false;
 }
@@ -77,6 +86,9 @@ export const ALERT_READS: Record<AlertEvent, readonly OrgAction[]> = {
     site: ["site:publish"],
     // Anyone who can run a customer removal acts on a request (DEC-172).
     request: ["customer:remove"],
+    // Anyone who reads bookings, Calendar only included: it is their own
+    // diary (DEC-074 scopes). Offered only to someone on the diary.
+    mine: ["booking:read"],
 };
 
 /**
@@ -92,6 +104,7 @@ export const ALERT_MODULE: Record<AlertEvent, string | null> = {
     site: "WEBSITE",
     // A customer can ask from any site's account, whichever modules are on.
     request: null,
+    mine: "APPOINTMENTS",
 };
 
 /** The inbox notice types each row covers. */
@@ -115,7 +128,24 @@ export const ALERT_NOTIFICATION_TYPES: Record<AlertEvent, readonly string[]> = {
         "domain.back",
     ],
     request: ["customer.data-request"],
+    // Personal notices (`userId`), and #1157's "now with you" / "now with
+    // Meera", which are the same thing said on the reassigning write.
+    mine: [
+        "booking.mine.new",
+        "booking.mine.moved",
+        "booking.mine.cancelled",
+        "booking.reassigned",
+    ],
 };
+
+/**
+ * Notice types with no row of their own, shown only to whoever may act on
+ * them (#1138): a booking rules request reaches only who may approve it.
+ */
+export const NOTICE_TYPE_READS: Readonly<Record<string, readonly OrgAction[]>> =
+    {
+        "hours.rule-request": ["service:write"],
+    };
 
 /** Which row an inbox notice type belongs to, or null (enquiries, reviews). */
 export function alertEventOfType(type: string): AlertEvent | null {
@@ -207,9 +237,30 @@ export function hiddenNotificationTypes(
     has: (action: OrgAction) => boolean,
     roleKey?: string | null,
 ): string[] {
-    return ALERT_EVENTS.filter(
-        (event) =>
-            !mayHearAbout(event, has, roleKey) ||
-            !alertOn(stored, event, "bell"),
+    return [
+        ...ALERT_EVENTS.filter(
+            (event) =>
+                !mayHearAbout(event, has, roleKey) ||
+                !alertOn(stored, event, "bell"),
+        ).flatMap((event) => [...ALERT_NOTIFICATION_TYPES[event]]),
+        ...Object.entries(NOTICE_TYPE_READS)
+            .filter(([, reads]) => !reads.some(has))
+            .map(([type]) => type),
+    ];
+}
+
+/** The rows whose notices are personal (`userId`), not the business's. */
+export const PERSONAL_ALERTS: readonly AlertEvent[] = ["mine"];
+
+/**
+ * The types of a person's OWN notices (`userId`) they don't see: those of
+ * a personal row they turned the bell off for (#1138: "Bookings with
+ * you"). A notice addressed to them is theirs whatever their role reads.
+ */
+export function hiddenOwnNotificationTypes(
+    stored: readonly StoredPreference[],
+): string[] {
+    return PERSONAL_ALERTS.filter(
+        (event) => !alertOn(stored, event, "bell"),
     ).flatMap((event) => [...ALERT_NOTIFICATION_TYPES[event]]);
 }

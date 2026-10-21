@@ -9,7 +9,11 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { clearStaleLimitNotices } from "../billing/limit-notice-clear";
 import { allows } from "../organizations/organization-policy";
-import { hiddenNotificationTypes } from "./alert-preferences";
+import type { StoredPreference } from "./alert-preferences";
+import {
+    hiddenNotificationTypes,
+    hiddenOwnNotificationTypes,
+} from "./alert-preferences";
 import { noticeTargetOf } from "./notice-target";
 
 /** Options for {@link NotificationsService.list}. */
@@ -185,21 +189,25 @@ export class NotificationsService {
         seen: Audience,
     ): Promise<Prisma.NotificationWhereInput> {
         const either: Prisma.NotificationWhereInput[] = [];
+        const stored = await this.bellChoices(ctx);
         if (seen.business) {
-            either.push({ userId: null, ...(await this.hiddenFor(ctx)) });
+            either.push({ userId: null, ...this.hiddenFor(ctx, stored) });
         }
-        if (seen.own) either.push({ userId: ctx.userId });
+        if (seen.own) {
+            // Their own, less a row whose bell they turned off ("Bookings
+            // with you", #1138).
+            const hidden = hiddenOwnNotificationTypes(stored);
+            either.push({
+                userId: ctx.userId,
+                ...(hidden.length > 0 ? { type: { notIn: hidden } } : {}),
+            });
+        }
         return { organizationId: ctx.organizationId, OR: either };
     }
 
-    /**
-     * The notice types this person doesn't see (F14), as a filter to spread
-     * into a query; nothing when they see everything.
-     */
-    private async hiddenFor(
-        ctx: OrganizationContext,
-    ): Promise<{ type?: { notIn: string[] } }> {
-        const stored = await prisma.notificationPreference.findMany({
+    /** This person's own bell choices in this business (F14). */
+    private bellChoices(ctx: OrganizationContext) {
+        return prisma.notificationPreference.findMany({
             where: {
                 organizationId: ctx.organizationId,
                 userId: ctx.userId,
@@ -207,6 +215,16 @@ export class NotificationsService {
             },
             select: { event: true, channel: true, enabled: true },
         });
+    }
+
+    /**
+     * The notice types this person doesn't see (F14), as a filter to spread
+     * into a query; nothing when they see everything.
+     */
+    private hiddenFor(
+        ctx: OrganizationContext,
+        stored: readonly StoredPreference[],
+    ): { type?: { notIn: string[] } } {
         const hidden = hiddenNotificationTypes(
             stored,
             (action) => allows(ctx, action),

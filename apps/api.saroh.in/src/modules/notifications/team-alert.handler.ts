@@ -13,6 +13,7 @@ import { cleanBusinessName } from "../site-accounts/sender-name";
 import type { AlertEvent } from "./alert-preferences";
 import { alertOn, mayHearAbout } from "./alert-preferences";
 import { wordAsk } from "./ask-alerts";
+import { wordBookingMine } from "./booking-mine-alerts";
 import { wordDataRequest } from "./data-request-alerts";
 import { wordDomain } from "./domain-alerts";
 import { noticeHeadOf, noticeOf } from "./notice-target";
@@ -53,6 +54,7 @@ const ROW_LABEL: Record<AlertEvent, string> = {
     team: "Someone joins the team",
     site: "Your website",
     request: "Data removal requests",
+    mine: "Bookings with you",
 };
 
 const BUILT_IN_LABEL: Partial<Record<string, string>> = {
@@ -181,6 +183,8 @@ export async function tellTeam(
         const notification = await tx.notification.create({
             data: {
                 organizationId,
+                // One person's own alert (#1138), or the business's.
+                ...(alert.forUserId ? { userId: alert.forUserId } : {}),
                 // The type with what it opens; throws for a notice that
                 // would open nothing.
                 ...noticeHeadOf(alert),
@@ -251,6 +255,8 @@ async function whoToEmail(
     const recipients = members.filter((m) => {
         if (!m.user.email.trim()) return false;
         if (m.userId === alert.skipUserId) return false;
+        // A personal alert (#1138) is emailed to its one person alone.
+        if (alert.forUserId && m.userId !== alert.forUserId) return false;
         if (m.userId === alert.alwaysUserId) return true;
         const actions = resolveCapabilities(
             m.role,
@@ -428,6 +434,8 @@ export async function wordAlert(
             return wordAsk(tx, organizationId, payload);
         case "request":
             return wordDataRequest(tx, organizationId, payload);
+        case "booking-mine":
+            return wordBookingMine(tx, organizationId, payload);
     }
 }
 
@@ -707,6 +715,16 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
             return str("orderId") ? (p as TeamAlertPayload) : null;
         case "request":
             return str("requestId") ? (p as TeamAlertPayload) : null;
+        case "booking-mine":
+            return str("bookingId") &&
+                str("eventId") &&
+                str("userId") &&
+                (p.change === "new" ||
+                    p.change === "moved" ||
+                    p.change === "moved-away" ||
+                    p.change === "cancelled")
+                ? (p as TeamAlertPayload)
+                : null;
         case "provider":
             return str("providerId") &&
                 str("since") &&

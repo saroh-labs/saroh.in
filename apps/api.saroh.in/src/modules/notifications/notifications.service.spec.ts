@@ -411,6 +411,13 @@ describe("what each person sees of the inbox (F14)", () => {
                 "domain.back",
                 // Only who can run a customer removal sees a request (DEC-172).
                 "customer.data-request",
+                // Bookings with you (#1138) are personal: never the business's.
+                "booking.mine.new",
+                "booking.mine.moved",
+                "booking.mine.cancelled",
+                "booking.reassigned",
+                // A rules request, only to who may approve it (#1138).
+                "hours.rule-request",
             ],
         });
     });

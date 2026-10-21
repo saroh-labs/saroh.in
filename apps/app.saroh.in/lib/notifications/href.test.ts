@@ -35,6 +35,19 @@ const WRITTEN: {
         href: "/commerce/orders/o1",
     },
     { type: "booking.new", kind: "booking", id: "b1", href: "/bookings/b1" },
+    // Bookings with you (#1138), in that person's own alerts.
+    {
+        type: "booking.mine.new",
+        kind: "booking",
+        id: "b1",
+        href: "/bookings/b1",
+    },
+    {
+        type: "booking.mine.cancelled",
+        kind: "booking",
+        id: "b1",
+        href: "/bookings/b1",
+    },
     {
         type: "booking.moved",
         kind: "booking",

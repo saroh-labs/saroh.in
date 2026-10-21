@@ -104,6 +104,30 @@ describe("alertGrid", () => {
         );
     });
 
+    it("names Bookings with you when the API offers it (#1138)", () => {
+        const grid = alertGrid({
+            status: "ok",
+            prefs: prefs({
+                alerts: [
+                    {
+                        key: "mine",
+                        channels: { bell: true, email: true, whatsapp: false },
+                    },
+                ],
+            }),
+        });
+        expect(grid.rows.map((r) => [r.label, r.note])).toEqual([
+            [
+                "Bookings with you",
+                "When a booking with you is made, moved or cancelled",
+            ],
+        ]);
+        expect(grid.rows[0]?.cells.map((c) => c.label)).toEqual([
+            "Bookings with you by Bell, on",
+            "Bookings with you by Email, on",
+        ]);
+    });
+
     it("never offers the Monday summary: nothing sends it (default 127)", () => {
         const grid = alertGrid({ status: "ok", prefs: prefs() });
         expect(grid.rows.map((r) => r.label)).not.toContain("Monday summary");

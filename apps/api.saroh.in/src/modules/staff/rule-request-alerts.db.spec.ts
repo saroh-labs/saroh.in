@@ -416,13 +416,79 @@ describe("the answer", () => {
     });
 });
 
+describe("the request on the bell (#1138)", () => {
+    /** The business's waiting-request notices someone sees. */
+    async function requestsSeenBy(ctx: OrganizationContext) {
+        return (await inbox.list(ctx)).filter(
+            (n) => n.type === "hours.rule-request",
+        );
+    }
+
+    it("shows only to who may approve it, never to a role that reads the inbox but can't", async () => {
+        await ask();
+        expect(await requestsSeenBy(owner)).toHaveLength(1);
+        expect(await requestsSeenBy(admin)).toHaveLength(1);
+        // An invented role with the inbox and the diary, but no say in the
+        // business's booking rules.
+        const frontDesk: OrganizationContext = {
+            organizationId: orgId,
+            userId: owner.userId,
+            role: "MEMBER",
+            roleKey: "front-desk",
+            actions: new Set(["notification:read", "booking:read"]),
+        };
+        expect(await requestsSeenBy(frontDesk)).toEqual([]);
+        expect((await inbox.unreadCount(frontDesk)).count).toBe(0);
+        // A Member never reads the business's inbox at all.
+        expect(await requestsSeenBy(arjunCtx)).toEqual([]);
+    });
+
+    it.each([
+        ["approved", (id: string) => rules.approve(admin, id)],
+        ["turned down", (id: string) => rules.turnDown(owner, id, "Busy")],
+        ["withdrawn", (id: string) => rules.withdraw(arjunCtx, id)],
+        [
+            "replaced by a direct change",
+            () => rules.update(owner, arjun, { latestBookingMinutes: 60 }),
+        ],
+        [
+            "replaced by approval switched off",
+            () =>
+                staff.updateBookingRules(owner, {
+                    memberRuleChangesNeedApproval: false,
+                }),
+        ],
+    ] as const)("leaves the bell once %s", async (_, close) => {
+        const requestId = await ask();
+        expect((await inbox.unreadCount(owner)).count).toBe(1);
+        await close(requestId);
+        expect(await requestsSeenBy(owner)).toEqual([]);
+        expect(await requestsSeenBy(admin)).toEqual([]);
+        expect(
+            await prisma.notification.count({
+                where: { organizationId: orgId, type: "hours.rule-request" },
+            }),
+        ).toBe(0);
+        expect((await inbox.unreadCount(owner)).count).toBe(0);
+    });
+
+    it("asked again: only the request waiting is on the bell", async () => {
+        await ask({ gapMinutes: 15 });
+        await ask({ gapMinutes: 20 });
+        const seen = await requestsSeenBy(owner);
+        expect(seen).toHaveLength(1);
+        expect(seen[0]!.body).toMatch(/20 min/);
+    });
+});
+
 describe("whose alerts who reads", () => {
     async function answered(): Promise<{ request: string; answer: string }> {
         const requestId = await ask();
-        await rules.approve(owner, requestId);
+        // Read before the approval, which takes it off the bell (#1138).
         const request = await prisma.notification.findFirstOrThrow({
             where: { organizationId: orgId, type: "hours.rule-request" },
         });
+        await rules.approve(owner, requestId);
         const answer = await prisma.notification.findFirstOrThrow({
             where: { organizationId: orgId, type: "hours.rule-answer" },
         });
@@ -449,12 +515,10 @@ describe("whose alerts who reads", () => {
 
     it("never shows an owner or admin a Member's own", async () => {
         const ids = await answered();
-        expect((await inbox.list(owner)).map((n) => n.id)).toEqual([
-            ids.request,
-        ]);
-        expect((await inbox.list(admin)).map((n) => n.id)).toEqual([
-            ids.request,
-        ]);
+        // The request left their bell once answered (#1138); the answer is
+        // never theirs.
+        expect(await inbox.list(owner)).toEqual([]);
+        expect(await inbox.list(admin)).toEqual([]);
         await expect(inbox.markRead(owner, ids.answer)).rejects.toBeInstanceOf(
             NotFoundException,
         );
@@ -477,11 +541,6 @@ describe("whose alerts who reads", () => {
         });
         const press = await inbox.markAllRead(arjunCtx);
         expect(press.updated).toBe(1);
-        // The business's request is still unread for its owners.
-        const request = await prisma.notification.findUniqueOrThrow({
-            where: { id: ids.request },
-        });
-        expect(request.readAt).toBeNull();
         expect(await inbox.undoMarkAllRead(arjunCtx, press.readAt)).toEqual({
             updated: 1,
         });
