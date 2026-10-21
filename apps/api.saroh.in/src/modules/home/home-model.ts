@@ -116,6 +116,11 @@ export interface HomeAction {
     evidence?: HomeEvidence[];
     /** The action's own tag, when it is one row rather than a list of them. */
     tag?: string;
+    /**
+     * Its one row's line, when the source words it for this business (the
+     * email prompt, U5); else the row's fixed line in `home-needs.ts`.
+     */
+    sub?: string;
     tone?: HomeTone;
     /**
      * The worst of what `count` holds past `evidence` — "bad" when any of the

@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
 import { formatMoney } from "@/lib/format/money";
+import { readyDoneText, readyUndoneText } from "@/lib/messages/notice-reach";
 import {
     editBeforePreparing,
     moveStage,
@@ -121,6 +122,29 @@ export function useKitchen({
         [order.id, refresh],
     );
 
+    const undoReady = useCallback(
+        (eventId: string, back: KitchenStage) => {
+            startTransition(async () => {
+                const res = await runAction(() => undoStage(order.id, eventId));
+                if (!res) return;
+                if (!res.ok) {
+                    showError(res.error);
+                    return;
+                }
+                showInfo(
+                    readyUndoneText(
+                        order.customerNotice,
+                        first,
+                        res.data.told,
+                        STAGE_LABEL[back],
+                    ),
+                );
+                refresh();
+            });
+        },
+        [order.id, order.customerNotice, first, refresh],
+    );
+
     const move = (
         to: KitchenStage,
         extra: CourierFields & { note?: string } = {},
@@ -150,9 +174,18 @@ export function useKitchen({
                         ? "Preparing. Items are locked now."
                         : `${STAGE_LABEL[to]}.`);
                 if (to === "READY") {
-                    showSuccess(
+                    // The notice waits ten seconds after the step, so Undo
+                    // here takes it back unsent (U5).
+                    showUndo(
                         "Marked ready.",
-                        `It shows on the order. Nothing was sent to ${first}.`,
+                        () => undoReady(res.data.eventId, from),
+                        {
+                            description: readyDoneText(
+                                order.customerNotice,
+                                first,
+                            ),
+                            duration: HOLD_MS,
+                        },
                     );
                 } else {
                     showUndo(message, () => undo(res.data.eventId, from), {

@@ -4,7 +4,9 @@ import {
     bookingChangeText,
     classCancelText,
     isNoticeReach,
+    readyDoneText,
     readyNoticeText,
+    readyUndoneText,
 } from "./notice-reach";
 
 describe("what the workspace says a customer is told (A14)", () => {
@@ -71,5 +73,40 @@ describe("what the workspace says a customer is told (A14)", () => {
         expect(isNoticeReach("EMAIL")).toBe(true);
         expect(isNoticeReach("SMS")).toBe(false);
         expect(isNoticeReach(null)).toBe(false);
+    });
+
+    it("the Ready toast: who is told and when, never a send that doesn't happen (U5)", () => {
+        expect(readyDoneText("EMAIL_AND_ACCOUNT", "Asha")).toBe(
+            "Asha will be told in 10 seconds.",
+        );
+        expect(readyDoneText("EMAIL", "Asha")).toBe(
+            "Asha will be told in 10 seconds.",
+        );
+        expect(readyDoneText("ACCOUNT", "Asha")).toBe(
+            "Asha sees it in their account in 10 seconds.",
+        );
+        expect(readyDoneText("ON_SIGN_IN", "Asha")).toBe(
+            "Asha sees it when they sign in on your site.",
+        );
+        expect(readyDoneText("NONE", "Asha")).toBe(
+            "Asha isn't told. It shows on the order.",
+        );
+        expect(readyDoneText(null, "Asha")).toBe("It shows on the order.");
+        expect(readyDoneText("NONE", "Asha")).not.toMatch(/sent|emailed/);
+    });
+
+    it("the Ready toast's Undo: Not sent only where something would have gone", () => {
+        expect(readyUndoneText("EMAIL", "Asha", false, "Preparing")).toBe(
+            "Back to preparing. Not sent.",
+        );
+        expect(readyUndoneText("EMAIL", "Asha", true, "Preparing")).toBe(
+            "Back to preparing. Asha has already been told.",
+        );
+        expect(readyUndoneText("NONE", "Asha", false, "Preparing")).toBe(
+            "Back to preparing.",
+        );
+        expect(readyUndoneText(undefined, "Asha", undefined, "Preparing")).toBe(
+            "Back to preparing.",
+        );
     });
 });

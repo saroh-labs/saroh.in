@@ -1,6 +1,6 @@
 import type { EmailSetup } from "@/lib/communications/email-setup";
 import {
-    EMAIL_PROMPT_MISSED,
+    emailPromptMissed,
     SEE_PLANS_HREF,
 } from "@/lib/communications/email-setup";
 import { rolledOut } from "@/lib/modules/rollout";
@@ -207,7 +207,7 @@ export function emailAside(input: {
     return {
         key: "email",
         label: "Email your customers",
-        why: EMAIL_PROMPT_MISSED,
+        why: emailPromptMissed(input.emailSetup?.accountUpdates),
         comesWith: "Comes with a paid plan",
         cta: planLabel(),
         href: SEE_PLANS_HREF,

@@ -60,6 +60,50 @@ export function readyNoticeText(
 }
 
 /**
+ * The toast once Ready is recorded (U5, #1136): what the customer hears and
+ * when. The notice is held ten seconds after the step (the API's
+ * `ORDER_NOTICE_DELAY_MS`) so the toast's Undo can take it back unsent.
+ * `NONE` says only that they aren't told: the reason can be no email
+ * connected, no account, or email they turned off, and the read doesn't say
+ * which. Unknown claims nothing either way.
+ */
+export function readyDoneText(
+    reach: NoticeReach | null | undefined,
+    first: string,
+): string {
+    switch (reach) {
+        case "EMAIL_AND_ACCOUNT":
+        case "EMAIL":
+            return `${first} will be told in 10 seconds.`;
+        case "ACCOUNT":
+            return `${first} sees it in their account in 10 seconds.`;
+        case "ON_SIGN_IN":
+            return `${first} sees it when they sign in on your site.`;
+        case "NONE":
+            return `${first} isn't told. It shows on the order.`;
+        default:
+            return "It shows on the order.";
+    }
+}
+
+/**
+ * Undo on the Ready toast: the step it went back to, and whether the notice
+ * went. `told` is the API's answer (the notice had already been written);
+ * where nothing was ever sent, nothing is claimed about sending.
+ */
+export function readyUndoneText(
+    reach: NoticeReach | null | undefined,
+    first: string,
+    told: boolean | undefined,
+    backTo: string,
+): string {
+    const back = `Back to ${backTo.toLowerCase()}.`;
+    if (told) return `${back} ${first} has already been told.`;
+    if (reach && reach !== "NONE") return `${back} Not sent.`;
+    return back;
+}
+
+/**
  * The booking peek's line on moving or cancelling (the design's "‹First› is
  * told"). Unknown keeps the old advice, which asks the merchant to tell them.
  */

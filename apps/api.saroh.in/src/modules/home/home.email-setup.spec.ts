@@ -23,10 +23,14 @@ function db(status: string | null) {
     } as unknown as Pick<Prisma.TransactionClient, "communicationProvider">;
 }
 const room = (has: boolean) => () => Promise.resolve(has);
+// Whether Saroh posts the business's updates to its customers' accounts.
+const thread = (on: boolean) => () => Promise.resolve(on);
 const both = { connect: true, plans: true };
 
 const MISSED =
-    "No email provider is connected, so invoices, booking and order updates and review invitations aren't emailed. Your customers see their updates only in their account.";
+    "No email provider is connected, so invoices, booking and order updates and review invitations aren't emailed, and your customers don't hear about them.";
+const MISSED_ACCOUNT =
+    "No email provider is connected, so invoices, booking and order updates and review invitations aren't emailed. Customers with an account on your site see booking and order updates there.";
 
 describe("no email provider on Home", () => {
     it("asks whoever can connect one to connect it, in plain words", async () => {
@@ -35,6 +39,7 @@ describe("no email provider on Home", () => {
             "org_1",
             both,
             room(true),
+            thread(false),
         );
         expect(action).toMatchObject({
             code: NO_EMAIL_CODE,
@@ -61,6 +66,7 @@ describe("no email provider on Home", () => {
             "org_1",
             both,
             room(false),
+            thread(false),
         );
         expect(action).toMatchObject({
             code: NO_EMAIL_PLAN_CODE,
@@ -73,6 +79,28 @@ describe("no email provider on Home", () => {
         );
     });
 
+    it("says customers see updates in their account only where they do (U5)", async () => {
+        const action = await noEmailProvider(
+            db(null),
+            "org_1",
+            both,
+            room(true),
+            thread(true),
+        );
+        const { needs } = flattenNeeds([action as HomeAction], "Asia/Kolkata");
+        expect(needs[0]?.sub).toBe(MISSED_ACCOUNT);
+        const off = await noEmailProvider(
+            db(null),
+            "org_1",
+            both,
+            room(true),
+            thread(false),
+        );
+        expect(
+            flattenNeeds([off as HomeAction], "Asia/Kolkata").needs[0]?.sub,
+        ).not.toMatch(/account/);
+    });
+
     it("is said only to who can act on it", async () => {
         expect(
             await noEmailProvider(
@@ -80,6 +108,7 @@ describe("no email provider on Home", () => {
                 "org_1",
                 { connect: false, plans: true },
                 room(true),
+                thread(false),
             ),
         ).toBeNull();
         expect(
@@ -88,13 +117,20 @@ describe("no email provider on Home", () => {
                 "org_1",
                 { connect: true, plans: false },
                 room(false),
+                thread(false),
             ),
         ).toBeNull();
     });
 
     it("goes once a provider is connected", async () => {
         expect(
-            await noEmailProvider(db("CONNECTED"), "org_1", both, room(true)),
+            await noEmailProvider(
+                db("CONNECTED"),
+                "org_1",
+                both,
+                room(true),
+                thread(true),
+            ),
         ).toBeNull();
     });
 
@@ -104,12 +140,14 @@ describe("no email provider on Home", () => {
             "org_1",
             both,
             room(true),
+            thread(false),
         )) as HomeAction;
         const plans = (await noEmailProvider(
             db(null),
             "org_1",
             both,
             room(false),
+            thread(false),
         )) as HomeAction;
         const notLive: HomeAction = {
             code: "WEBSITE_NOT_LIVE",

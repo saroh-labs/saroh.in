@@ -5,6 +5,7 @@ import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { OptionSelect } from "@saroh/ui/option-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
+import Link from "next/link";
 import { useId, useMemo, useRef, useState } from "react";
 
 import type { CatalogueRow } from "@/lib/products/catalogue";
@@ -33,6 +34,20 @@ import { Notice } from "@saroh/ui/notice";
 import { TONE_TEXT } from "./tones";
 
 /**
+ * The open orders that have this product in them, at the storefront in
+ * view: where a short product's customers can be told it will be late.
+ */
+export function waitingOrdersHref(
+    productId: string,
+    storeId: string | null,
+): string {
+    const q = new URLSearchParams({ tab: "open" });
+    if (storeId) q.set("storefront", storeId);
+    q.set("product", productId);
+    return `/commerce/orders?${q.toString()}`;
+}
+
+/**
  * Stock: the headline, the short alert, and each variant with "Qty · Add"
  * for someone who can count stock. Shelves that need someone come first
  * (short, out, low), so the one shade that's out isn't the 26th row; past
@@ -44,12 +59,18 @@ export function StockBlock({
     row,
     storeId,
     canStock,
+    canOrders = false,
     need,
     onChanged,
 }: {
     row: CatalogueRow;
     storeId: string | null;
     canStock: boolean;
+    /**
+     * `order:read`: a short product links its open orders, where each
+     * customer can be told it will be late. Without it, no such advice.
+     */
+    canOrders?: boolean;
     /** What Needs you says about it, if anything. */
     need: NeedDetail | null;
     onChanged: () => void;
@@ -113,8 +134,23 @@ export function StockBlock({
                 <Notice tone="error">
                     <strong>{shortTitle(stock.total.short)}</strong>{" "}
                     {canStock
-                        ? "Add stock below, or tell the customers their order will be late."
-                        : "Someone who counts stock can add it, or tell the customers their order will be late."}
+                        ? "Add stock below."
+                        : "Someone who counts stock can add it."}
+                    {/* Saroh doesn't tell them itself (U5): say how, and
+                        only to someone who can open the orders. */}
+                    {canOrders ? (
+                        <>
+                            {" "}
+                            If an order will be late, open it to tell the
+                            customer.{" "}
+                            <Link
+                                href={waitingOrdersHref(row.id, storeId)}
+                                className="font-semibold underline underline-offset-2"
+                            >
+                                Open orders with it
+                            </Link>
+                        </>
+                    ) : null}
                 </Notice>
             ) : null}
             {showShelves(stock, canStock) ? (
