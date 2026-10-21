@@ -24,6 +24,8 @@ export const ALERT_EVENTS = [
     "failed",
     "team",
     "site",
+    // A customer asked to remove their data (DEC-172, #1106).
+    "request",
 ] as const;
 export type AlertEvent = (typeof ALERT_EVENTS)[number];
 
@@ -48,12 +50,16 @@ export function isAlertChannel(value: unknown): value is AlertChannel {
  * The defaults (default 126): the bell on for everything, email on for a
  * failed payment and for a scheduled go-live (DEC-071, T10: whoever can
  * publish should hear that the site changed, or didn't, while nobody was
- * watching), WhatsApp off. Code, not rows: a row is written only
+ * watching), and for a customer's data removal request (DEC-172: it asks
+ * the business to act, and Saroh has told the customer it will hear back),
+ * WhatsApp off. Code, not rows: a row is written only
  * when someone's choice differs from these.
  */
 export function defaultOn(event: AlertEvent, channel: AlertChannel): boolean {
     if (channel === "bell") return true;
-    if (channel === "email") return event === "failed" || event === "site";
+    if (channel === "email") {
+        return event === "failed" || event === "site" || event === "request";
+    }
     return false;
 }
 
@@ -69,6 +75,8 @@ export const ALERT_READS: Record<AlertEvent, readonly OrgAction[]> = {
     team: ["member:read"],
     // Who can put the site live hears when it went live without them.
     site: ["site:publish"],
+    // Anyone who can run a customer removal acts on a request (DEC-172).
+    request: ["customer:remove"],
 };
 
 /**
@@ -82,6 +90,8 @@ export const ALERT_MODULE: Record<AlertEvent, string | null> = {
     failed: "PAYMENTS",
     team: null,
     site: "WEBSITE",
+    // A customer can ask from any site's account, whichever modules are on.
+    request: null,
 };
 
 /** The inbox notice types each row covers. */
@@ -104,6 +114,7 @@ export const ALERT_NOTIFICATION_TYPES: Record<AlertEvent, readonly string[]> = {
         "domain.down",
         "domain.back",
     ],
+    request: ["customer.data-request"],
 };
 
 /** Which row an inbox notice type belongs to, or null (enquiries, reviews). */

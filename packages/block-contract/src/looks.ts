@@ -1,3 +1,4 @@
+import type { FontPairKey } from "./fonts";
 import type { SectionType } from "./section-contract";
 import type { SiteTypeScale } from "./type-scale";
 
@@ -23,10 +24,10 @@ export const LOOK_IDS = ["folio", "quiet", "live"] as const;
 export type LookId = (typeof LOOK_IDS)[number];
 
 /**
- * The font pair each look sets (`FONT_PAIRS` keys U3 adds; its sync test
- * checks every look's pair exists).
+ * The font pair each look sets: its own `FONT_PAIRS` entry, with only the
+ * weights its type uses (U3; `fonts.test.ts` checks every look's pair).
  */
-export type LookFontPair = "folio" | "quiet" | "live";
+export type LookFontPair = Extract<FontPairKey, "folio" | "quiet" | "live">;
 
 /** How the booking steps are framed (KD8): one engine, three frames. */
 export type BookingPresentation = "panel" | "page" | "sheets";
@@ -105,7 +106,7 @@ export const LOOKS: Readonly<Record<LookId, SiteLook>> = {
     folio: {
         id: "folio",
         name: "Folio",
-        suits: "A printed monograph: a tinted page, square corners and a serif. For classes and yoga.",
+        suits: "Like a printed magazine: a tinted page, square corners and a serif. Suits classes and yoga.",
         tokens: {
             radius: 0,
             radiusSmall: 0,
@@ -134,7 +135,7 @@ export const LOOKS: Readonly<Record<LookId, SiteLook>> = {
     quiet: {
         id: "quiet",
         name: "Quiet",
-        suits: "Warm white and airy, with pill buttons and one question at a time. For salons, clinics, studios, bakeries, shops and makers.",
+        suits: "Warm white and airy, with rounded buttons and one question at a time. Suits salons, clinics, studios, bakeries, shops and makers.",
         tokens: {
             radius: 999,
             radiusSmall: 12,
@@ -158,7 +159,7 @@ export const LOOKS: Readonly<Record<LookId, SiteLook>> = {
     live: {
         id: "live",
         name: "Live",
-        suits: "App-like, with cards and what's on now. For gyms.",
+        suits: "Like an app, with cards and what's on now. Suits gyms and classes that fill up.",
         tokens: {
             radius: 16,
             radiusSmall: 10,
@@ -236,4 +237,39 @@ export function defaultLookForTemplate(
         Object.prototype.hasOwnProperty.call(TEMPLATE_LOOKS, templateId)
         ? TEMPLATE_LOOKS[templateId]
         : "quiet";
+}
+
+/**
+ * Who a template is for, in the words "Suggested for {industry}" ends
+ * with in the editor's Look row (U16). Only templates with a trade: the
+ * starter and the personal, writing and portfolio templates name none,
+ * and their suggestion says only "Suggested".
+ */
+export const TEMPLATE_INDUSTRIES: Readonly<Record<string, string>> = {
+    gym: "gyms",
+    yoga: "yoga",
+    classes: "classes",
+    salon: "salons",
+    clinic: "clinics",
+    dietician: "dieticians",
+    studio: "studios",
+    bakery: "bakeries",
+    ceramics: "makers",
+};
+
+/**
+ * The look the editor suggests for a site made from `templateId`, and who
+ * it is suggested for ("salons"), or null when the template names no
+ * trade. The same look a new site starts in ({@link defaultLookForTemplate}).
+ */
+export function lookSuggestion(templateId: string | null | undefined): {
+    look: LookId;
+    industry: string | null;
+} {
+    const industry =
+        templateId &&
+        Object.prototype.hasOwnProperty.call(TEMPLATE_INDUSTRIES, templateId)
+            ? TEMPLATE_INDUSTRIES[templateId]
+            : null;
+    return { look: defaultLookForTemplate(templateId), industry };
 }

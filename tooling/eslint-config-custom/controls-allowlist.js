@@ -131,6 +131,8 @@ export const RAW_ALLOWED = {
     "components/commerce/product-settings/sku-tab.tsx": ["button"],
     // button: a chip
     "components/customers/customer-picker.tsx": ["button"],
+    // button: a Requests row that is one button, opening its side sheet (DEC-172)
+    "components/customers/data-requests/requests-view.tsx": ["button"],
     // button: a row or card that is one button
     "components/customers/detail/merge-search.tsx": ["button"],
     // button: a control styled by its screen's own helper

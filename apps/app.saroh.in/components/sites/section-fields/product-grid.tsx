@@ -207,6 +207,20 @@ export function ProductGridFieldsView({
                     placeholder="Baked this morning. What is gone usually goes before ten."
                 />
             </Field>
+            <Field
+                optional
+                label="Your order cut-off"
+                hint="Your own words, shown on the shop only when you write them. Saroh doesn't check orders against it."
+            >
+                <Input
+                    value={c.cutOff ?? ""}
+                    onChange={(e) =>
+                        patch({ cutOff: e.target.value || undefined })
+                    }
+                    maxLength={80}
+                    placeholder="Order by 9 pm"
+                />
+            </Field>
         </div>
     );
 }

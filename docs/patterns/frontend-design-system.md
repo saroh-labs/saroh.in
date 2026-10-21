@@ -40,6 +40,46 @@
   `--site-body-size` and `--site-measure` with today's value as the fallback,
   and marks a section title `data-site-title` (the eyebrow rule `SiteTheme`
   writes from `--site-label-style`). Section headings use `font-site-heading`.
+- **Current** (20 Oct 2026, DEC-172) — **A look is data, chosen per site**
+  (`looks.ts` in `@saroh/block-contract`): Folio, Quiet or Live, stored as
+  `Site.style.look`. Absent is Classic and is never written out, so a style
+  with no look is byte for byte what it was. A look carries tokens (corners,
+  margins, measure), its font pair, a type scale, the layout each block takes
+  where its section chose none (`resolveVariant(type, content, look)`), how
+  booking is framed (Folio a panel, Quiet a page, Live sheets) and its motion
+  ceiling. Colours are never a look's: they are the business's, **made safe,
+  never refused** (`safe-colours.ts`): the accent is moved toward the text
+  until it reads, and an accent that is the ink itself is drawn as an
+  outline. Blocks are told `LookProps` (`look`, `isOwnerPreview`;
+  `site-blocks/src/look-context.ts`) as props, and the page's root wears
+  `data-site-look` for CSS. **Look code is inert for Classic**: every look
+  branch leaves Classic's markup and motion as they were, held by the
+  `classic-pin` tests; a change to Classic is its own decision. "No photo
+  yet" and other notes on what is missing show only where `isOwnerPreview`
+  is true. A state page under a look (404, the page that didn't load, a
+  module off) is `SitePageMessage` given the `look`
+  (`site-page-message.tsx`); paused booking is `booking-flow/look-closed.tsx`.
+  Loading shapes wait 300 ms
+  (`HELD_AFTER_MS`, `look-theme.ts`), then stand still. The flag and its
+  rollout: `docs/architecture/runbooks/SITE_LOOKS_ROLLOUT.md`.
+- **Current** (20 Oct 2026, DEC-177) — **A paid style is refused in the
+  Style panel, and every look can be previewed.** Website › Style takes
+  `rules` (`styleChoiceRules` in `lib/sites/style-access.ts`, from the site
+  read's `styleAccess` and the style the server holds): a paid look,
+  typeface or colourway carries a small "Paid plans" tag; on a plan without
+  "Themes, fonts and templates" choosing one calls nothing, the previous
+  choice stays chosen and drawn, and one line where it was pressed says why
+  with See plans (`PaidRefusal`, `role="alert"`, never a toast). Colours
+  and spacing are never marked. Each look in the Look row has its own
+  "Preview {look}" button beside the radio, never inside it (`ChoiceGroup`'s
+  `layout`), a 44px target on a coarse pointer. It opens `LookPreview`: the
+  shared Dialog, large, on a desk; the shared Sheet from the bottom, full
+  height, on a phone (`useNarrow`). Inside, the home page in that look
+  (the editor's own sections when home is open, else its draft read by
+  `getPageSections`), inert, with a Desk and Phone switch, the look's name
+  and `suits`, Close, and "Use this look", which follows the same rule.
+  Nothing saves and the draft and canvas don't change until then; closing
+  hands the keyboard back to the Preview button.
 - **Current** — **A section's frame and the page's column** (industry
   templates, polish pass). Every section may carry `anchor`, `navLabel` and
   `band` beside its own fields (`section-frame.ts` in `@saroh/block-contract`;
@@ -684,8 +724,24 @@ results), mark it `data-ph-mask`; a picture inside it is left out too, and
   one rule**, `siteImage()` (`site-blocks/src/lib/site-image.ts`), spread
   onto a plain `<img>`: lazy below the fold, decoded off the main thread,
   the first section's hero fetched first. Give the `<img>` its width and
-  height, or a box with an aspect ratio. No `srcset`: storage keeps one
-  file per photo and nothing resizes on request.
+  height, or a box with an aspect ratio.
+- **Current** (19 Oct 2026, #1043) — **A photo is sized for the screen
+  through `siteImage(place, { src, width, sizes })`.** Pass the address the
+  `<img>` draws, the file's own width when the snapshot has it, and how wide
+  the block draws it (`sizes`, `100vw` unsaid). A photo in the business's
+  public media (`org/<id>/site-image|product-image|business-logo/…`, JPEG,
+  PNG, WebP or AVIF) then gets `srcset` over a fixed ladder (320, 480, 780,
+  1200, 1600, 1920; nothing wider than the file) through the Worker's
+  `/_img/<width>/<key>` route (`apps/saroh.app/lib/images/resize.ts`), which
+  resizes it with the `IMAGES` binding as AVIF or WebP and keeps the result.
+  The first hero is preloaded from the head with the same sources. The
+  route serves only the site's own organization's image keys, fetched only
+  from the public media address; anything else is a 404, and a failed
+  resize serves the original. It is on only in builds with
+  `NEXT_PUBLIC_SITE_MEDIA_URL` (the Worker's `wrangler.jsonc`); elsewhere,
+  and for any other address, the `<img>` keeps its own `src`. The ladder
+  and the key rules are one module, `@saroh/site-blocks/image-sizes`, which
+  the page and the route both import.
 - **Current** (12 Oct 2026) — **A product with no photo never leaves an
   empty frame on a merchant's site**, and "No photo yet" never reaches a
   customer (it is a note for the owner, said in the workspace). Where
@@ -798,6 +854,26 @@ results), mark it `data-ph-mask`; a picture inside it is left out too, and
   plus a loader in both files; tests hold the three in step. A pair may name a
   third, `mono` face (`archivo-narrow`: IBM Plex Mono; `geist`: JetBrains
   Mono), emitted as `--site-font-mono` only when it has one.
+- **Current** — **A look's pair (DEC-172, `folio`, `quiet`, `live`) names
+  its weights, styles and subsets**, and is marked `look: true`: it comes with
+  its look, so the Typeface picker (`PICKABLE_FONT_PAIRS`) does not offer it.
+  Each face has its own loader with exactly those options, filed in
+  `SITE_FACES` under the face's `load` key (`quiet:heading`), never its family,
+  because a family may be loaded twice (Folio's trimmed Newsreader beside the
+  `newsreader` pair's full one). Two families per look, no mono. Add
+  `latin-ext` only for a face that draws ₹ there (checked against the files).
+  Every face stays `preload: false`: `next/font` preloads per layout file, not
+  per request, so a preloaded look face would reach every Classic site.
+- **Current** (19 Oct 2026, DEC-172 U4) — **A look's ₹ is a sans, from the
+  device.** Prices sit in a look's body face, as the boards draw them. Where
+  that face has no ₹ (Quiet's Jost, Folio's Hanken Grotesk), `SiteTheme`
+  puts a rupee-only face, `"Site Rupee"`, right after it in
+  `--site-font-body`: an `@font-face` with `unicode-range: U+20B9` built
+  from `local()` sans faces that draw one (Arial, Roboto, Segoe UI, Noto
+  Sans, Liberation Sans, DejaVu Sans), regular and bold. No download, no
+  third family; never the look's serif display face. A face whose pair
+  loads `latin-ext` (Live's Figtree) draws its own and gets none, and
+  Classic never has it (`look-theme.ts`).
 - **Current** — **The mark is one SVG master** in `packages/ui/brand`, with
   `<Wordmark>` / `<SarohSymbol>` from `@saroh/ui/wordmark`. Never re-draw it.
   The stroke is never Saffron, and the dot drops below 20px. Every brand app
@@ -827,6 +903,34 @@ results), mark it `data-ph-mask`; a picture inside it is left out too, and
   `ease-linear` and a literal `duration-200` fail the scan. Exit faster than entry, and never animate position and size
   together. Motion only explains a change, so there is no decorative, looping,
   parallax or bounce motion on product surfaces.
+- **Current** (19 Oct 2026, DEC-172 U4) — **A merchant site's motion under a
+  look** is written by `craftRules(at, variables, look)`: fade or rise of 8px
+  or less, 200ms or less, `--site-ease` (no value over 1), no loops. Nothing
+  moves on scroll and nothing is hidden at rest. A block asks for an entrance
+  with `data-site-rise` (fade and rise, 200ms) or `data-site-fade` (140ms);
+  the phone menu takes 200ms and link colours 140ms. Under
+  `prefers-reduced-motion: reduce` every one of them is a 120ms fade. Classic
+  (no look) keeps its own motion unchanged. Corners are `rounded-site`
+  (buttons and inputs), `rounded-site-s` (chips, times) and
+  `rounded-site-photo`; the new colour roles are `site-accent-text`,
+  `site-accent-soft`, `site-rule` and `site-footer-muted`, each falling back
+  to the role it refines on a Classic site.
+- **Current** (20 Oct 2026, DEC-172 U5) — **A look's chrome keeps one filled
+  button per view and one fixed bar on a phone, in one place**
+  (`sticky-actions.tsx`). A block marks the page's own main action
+  `data-site-primary` (the accent's fill and the closing band's count too);
+  while one is on screen the page's root says `data-site-primary="shown"`,
+  and the header's Book and the dock's Book stay outlines until it says
+  `"gone"`. On a phone the header scrolls away; the Book bar (Folio, Quiet)
+  or the dock (Live) is the one bar, and it waits while the consent banner
+  (`data-site-consent`), a sheet or the menu (`role="dialog"` with
+  `aria-modal`) is open, and never draws on `/book`, a product or checkout.
+  A new fixed bar on a merchant page goes through it, never beside it.
+  Phone and desk differ by `max-[699px]:` and `min-[700px]:` only. Every
+  control in a look's header, menu, footer, bar and dock is 44×44 on every
+  pointer. Account links in a look's footer and menu are drawn only in the
+  browser (`footer-session-links.tsx`), so a cached page names no one.
+  Classic's chrome is pinned in `classic-pin.test.tsx`.
 - **Adopted** — **Motion comes from the primitives and the shared Tailwind
   config, not per-app `@keyframes`** (15 §3). Gap, and a contradiction to
   resolve rather than copy: `accounts.saroh.in/app/auth.css` defines 8 keyframes

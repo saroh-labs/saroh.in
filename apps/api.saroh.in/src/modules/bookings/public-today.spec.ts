@@ -2,7 +2,13 @@ import type { PublicOpeningDay } from "../sites/public-visit.service";
 import { closedDates } from "./closed-dates";
 import type { PublicDays } from "./public-booking-page";
 import type { TodayItem } from "./public-today";
-import { pickToday, TODAY_ITEMS, todayRows } from "./public-today";
+import {
+    allRows,
+    firstFree,
+    pickToday,
+    TODAY_ITEMS,
+    todayRows,
+} from "./public-today";
 
 /**
  * On today (G18): the rows are the booking page's own starts for today,
@@ -167,6 +173,73 @@ describe("pickToday", () => {
 
     it("is empty after closing: nothing left today", () => {
         expect(pickToday([])).toEqual([]);
+    });
+});
+
+describe("firstFree (Next free, U8)", () => {
+    it("is the soonest start that can still be booked", () => {
+        const next = firstFree([
+            row({ startAt: "2026-09-18T09:00:00.000Z" }),
+            row({ startAt: "2026-09-18T06:00:00.000Z" }),
+        ]);
+        expect(next?.startAt).toBe("2026-09-18T06:00:00.000Z");
+    });
+
+    it("never names a full class, however soon", () => {
+        const next = firstFree([
+            row({
+                kind: "class",
+                serviceId: HATHA.id,
+                startAt: "2026-09-18T05:00:00.000Z",
+                placesLeft: 0,
+            }),
+            row({
+                kind: "class",
+                serviceId: HATHA.id,
+                startAt: "2026-09-18T07:00:00.000Z",
+                placesLeft: 2,
+            }),
+        ]);
+        expect(next).toMatchObject({
+            startAt: "2026-09-18T07:00:00.000Z",
+            placesLeft: 2,
+        });
+    });
+
+    it("is null when nothing is free", () => {
+        expect(firstFree([])).toBeNull();
+        expect(
+            firstFree([
+                row({ kind: "class", placesLeft: 0, serviceId: HATHA.id }),
+            ]),
+        ).toBeNull();
+    });
+});
+
+describe("allRows", () => {
+    it("lists every day's starts, each with its own date", () => {
+        const two: PublicDays = {
+            ...days("one", [{ startAt: "2026-09-18T05:30:00.000Z" }]),
+        };
+        two.days.push({
+            date: "2026-09-19",
+            open: true,
+            closed: false,
+            starts: [
+                {
+                    startAt: "2026-09-19T04:30:00.000Z",
+                    endAt: "2026-09-19T05:15:00.000Z",
+                    staffId: "st_1",
+                    staffName: "Karan",
+                    placesLeft: null,
+                },
+            ],
+        });
+        const rows = allRows(PT, two);
+        expect(rows.map((r) => [r.date, r.time])).toEqual([
+            ["2026-09-18", "11:00"],
+            ["2026-09-19", "10:00"],
+        ]);
     });
 });
 

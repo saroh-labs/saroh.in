@@ -13,12 +13,12 @@ import {
     prisma,
     repeatedAnchor,
 } from "@saroh/database";
+import type { LookId } from "@saroh/templates";
 import { isDeepStrictEqual } from "node:util";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
 import { EntitlementService } from "../billing/entitlement.service";
-import { planMeter } from "../billing/metering.service";
 import { keptPostsOnSite } from "../content/post-paused";
 import { parsePostsPrefix } from "../content/posts-prefix";
 import {
@@ -125,6 +125,7 @@ import {
     publicSiteIcon,
     siteIconView,
 } from "./site-icon";
+import { assertLookAllowed, looksRolloutOn, snapshotLook } from "./site-looks";
 import type { SiteNavigation } from "./site-navigation";
 import {
     parseSiteNavigation,
@@ -137,6 +138,8 @@ import {
     siteStyleOptions,
     siteStyleVariables,
 } from "./site-style";
+import type { SiteStyleAccess } from "./site-style-free";
+import { assertStyleChoicesAllowed, siteStyleAccess } from "./site-style-free";
 import {
     assertSiteLookOffered,
     recordedTemplate,
@@ -325,6 +328,14 @@ export interface PublicSiteView {
      * route repeating the subdomain-or-custom-hostname resolution.
      */
     siteId?: string;
+    /**
+     * The business the site belongs to. The site's image route
+     * (`apps/saroh.app/lib/images/resize.ts`, #1043) resizes only photos
+     * stored under it (`org/<organizationId>/…`), so a site's host can't
+     * be used to serve another business's files. Not a secret: it is in
+     * the address of every photo the site shows.
+     */
+    organizationId?: string;
     /**
      * Whether each module page in the snapshot shows now (G15): its module
      * on or off, read live beside the immutable snapshot. Present only when
@@ -536,6 +547,26 @@ export interface SiteDetailView {
      */
     sellsFrom: SellsFromView | null;
     /**
+     * Whether this business may choose a look (`SITE_LOOKS`, DEC-172).
+     * Off, Website › Style offers no look to a Classic site; a site that
+     * has one keeps the row with it and Classic (plan U16).
+     */
+    looksAvailable: boolean;
+    /**
+     * Which looks, typefaces and colourways this site may choose for
+     * nothing, and whether the plan opens the rest (DEC-177): the Style
+     * panel marks a paid one and refuses it in place on a plan without
+     * `themes`, as the save would.
+     */
+    styleAccess: SiteStyleAccess;
+    /**
+     * The look the live site is in (DEC-172, U16): null for Classic or a
+     * site never published. The editor says "Not published yet" while the
+     * draft's look differs, and offers it back while `looksAvailable` is
+     * off.
+     */
+    liveLook: LookId | null;
+    /**
      * The shop could serve (`SITE_SHOP`, Commerce rolled out and on) and a
      * storefront with products could be chosen, but Sells from is
      * unanswered, so `/shop` isn't live (P4). The Shop settings say so.
@@ -685,6 +716,8 @@ interface PendingChanges {
     sections: number;
     /** Which site-level settings differ from what is live. */
     site: SiteChangeKind[];
+    /** The look the live site is in; null for Classic (U16). */
+    liveLook: LookId | null;
 }
 
 /** A section as stored on a page's current draft. */
@@ -908,6 +941,7 @@ export class SitesService {
             byId.set(site.id, {
                 sections: countPendingSectionChanges(pages, live),
                 site: pendingSiteChanges(draft.site, pages, live),
+                liveLook: snapshotLook(live) ?? null,
             });
         }
         return byId;
@@ -1064,6 +1098,13 @@ export class SitesService {
             footerPreview: sanitizedFooter(parseSiteFooter(footer)),
             navigation: parseSiteNavigation(navigation),
             sellsFrom,
+            looksAvailable: await looksRolloutOn(ctx.organizationId),
+            styleAccess: await siteStyleAccess(ctx.organizationId, {
+                templateId,
+                templateVersion,
+                templateStyleId,
+            }),
+            liveLook: pending.get(site.id)?.liveLook ?? null,
             // Asked only when it could be true: Commerce's gate is a read.
             shopAwaitsSellsFrom:
                 sellsFrom !== null &&
@@ -1219,9 +1260,12 @@ export class SitesService {
         // A palette or type scale only as one of the template's colourways
         // (DEC-090): never colours a merchant typed.
         await assertSiteLookOffered(ctx.organizationId, siteId, style);
-        // Changing the theme and fonts is a plan row (U13); a site keeps the
-        // look it has where the plan leaves it off.
-        await planMeter.assertIncluded(ctx.organizationId, "themes");
+        // Setting or changing a look needs `SITE_LOOKS` (DEC-172); keeping
+        // the one the draft has, or going back to Classic, never does.
+        await assertLookAllowed(ctx.organizationId, siteId, style);
+        // A paid look, typeface or colourway needs the plan's `themes` row
+        // (DEC-177); free ones, and what the site already has, never do.
+        await assertStyleChoicesAllowed(ctx.organizationId, siteId, style);
 
         await prisma.site.update({
             where: { id: siteId },
@@ -1992,6 +2036,13 @@ export class SitesService {
                  * silently restyle everything anyone has already published.
                  */
                 styleVariables: siteStyleVariables(publishedStyle),
+                /*
+                 * The look (DEC-172, KD1), beside the variables it already
+                 * shaped (its safe colours), for the renderer's tokens and
+                 * block defaults. Only when the site has one: a Classic
+                 * site's snapshot is byte for byte what it was.
+                 */
+                ...(publishedStyle.look ? { look: publishedStyle.look } : {}),
                 footer: publishedFooter,
                 /*
                  * The menu, RESOLVED (#206): page ids become paths and default
@@ -2317,6 +2368,7 @@ export class SitesService {
             snapshot,
             publishedAt,
             siteId: site.id,
+            organizationId: site.organizationId,
             ...(modules ? { modules } : {}),
             icon: await publicSiteIcon(snapshot, site.organizationId),
             primaryHost: await primaryHostOf(site),

@@ -271,7 +271,7 @@ describe("timetable", () => {
         // Seven sessions, one full.
         expect(links).toHaveLength(6);
         expect(links[0].getAttribute("href")).toBe(
-            "/book?service=sample-strength&date=2026-10-05&start=07%3A00",
+            "/book?service=sample-strength&date=2026-10-05&start=07%3A00&step=details",
         );
         // Every day of the week is named, a day with none says so.
         expect(screen.getAllByText("No classes.").length).toBeGreaterThan(0);

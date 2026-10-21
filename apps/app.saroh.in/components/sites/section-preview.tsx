@@ -6,6 +6,8 @@ import type {
     SiteFooterContent,
 } from "@saroh/site-blocks";
 import {
+    lookOf,
+    lookScope,
     ModulePageTop,
     modulePageTopOf,
     PageSections,
@@ -183,6 +185,13 @@ export function DraftPreview({
      * screen, and `:root` here would repaint the editor around it.
      */
     const top = current ? modulePageTopOf(current) : null;
+    /*
+     * The draft's look (DEC-172, U16), drawn as publishing will: its
+     * tokens, header, footer and block layouts. The owner's own view, so
+     * a block may say what is missing ("No photo yet"); a visitor never
+     * sees that. Absent is Classic, exactly as before.
+     */
+    const look = lookOf(style?.look);
     const vars =
         style && styleOptions
             ? resolveStyleVariables(style, styleOptions)
@@ -234,6 +243,8 @@ export function DraftPreview({
                         modulePage={top !== null}
                         // For a closing band whose content gives no heading.
                         siteName={chrome?.name}
+                        look={look}
+                        isOwnerPreview
                     />
                 );
                 if (!editing) return <div key={index}>{rendered}</div>;
@@ -264,7 +275,11 @@ export function DraftPreview({
      * they are on every page, so no one page moves or removes them.
      */
     const header = chrome ? (
-        <SiteHeader name={chrome.name} navigation={chrome.navigation} />
+        <SiteHeader
+            name={chrome.name}
+            navigation={chrome.navigation}
+            look={look}
+        />
     ) : null;
     // Always drawn, as on the live site: with nothing written its line is
     // the site's name (G17). A Free site's "Made with Saroh" is drawn by the
@@ -275,6 +290,7 @@ export function DraftPreview({
             name={chrome.name}
             // The menu again at the foot, as the live site lists it.
             navigation={chrome.navigation}
+            look={look}
         />
     ) : null;
 
@@ -283,6 +299,9 @@ export function DraftPreview({
             // The merchant's body face, as the live site's body sets it: the
             // page on the canvas never reads in the workspace's own font.
             className={`${PREVIEW_SCOPE} bg-[hsl(var(--site-bg))] font-site-body text-[hsl(var(--site-fg))]`}
+            // `data-site-look`, as the live page's root carries it, for
+            // the rules and classes that tell the looks apart.
+            {...lookScope(look)}
             /*
              * A link on this page is the merchant's link to THEIR site:
              * "/about" means their /about, not Saroh's. So it never navigates
@@ -343,6 +362,7 @@ export function DraftPreview({
                 variables={vars}
                 selector={`.${PREVIEW_SCOPE}`}
                 faces={faces}
+                look={look}
             />
             {header && editing && onSelectChrome ? (
                 <CanvasBlock

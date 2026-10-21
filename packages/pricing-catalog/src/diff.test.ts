@@ -159,4 +159,35 @@ describe("diff", () => {
             "Rows reordered on the pricing page",
         ]);
     });
+
+    it("words looks, typefaces and colourways made free or paid (DEC-177)", () => {
+        const a = edit(fixture(), (c) => {
+            c.freeStyles = {
+                looks: ["quiet"],
+                fontPairs: ["archivo"],
+                colourways: [],
+            };
+        });
+        const b = edit(fixture(), (c) => {
+            c.freeStyles = {
+                looks: ["quiet", "folio"],
+                fontPairs: [],
+                colourways: ["salon:kesar"],
+            };
+        });
+        expect(diff(a, b)).toEqual([
+            "Look folio made free",
+            "Typeface archivo now on paid plans only",
+            "Colourway salon:kesar made free",
+        ]);
+        // A version without the lists is the same as empty ones.
+        expect(
+            diff(
+                fixture(),
+                edit(fixture(), (c) => {
+                    c.freeStyles = { looks: [], fontPairs: [], colourways: [] };
+                }),
+            ),
+        ).toEqual([]);
+    });
 });

@@ -67,14 +67,6 @@ each with why it stops there:
   one serializable write with its helpers; cutting them splits a method.
   A10's credit rules went to `bookings/booking-credit.ts` rather than grow
   them further; `bookOnline` is the seam when they are next cut.
-- `site-blocks/src/booking-flow/booking-flow.tsx` (1,068; 643 before E7,
-  E11, G18, A9's sign-in at the last step and A10's credit) — its state,
-  effects and handlers (the hold poll, confirm, letting a hold go, signing
-  in and "Not you?") share one component's state; the drawing is already in
-  `steps/`, the pure rules in `flow-helpers.ts` and `initial-start.ts`, and
-  A10's credit read in the `use-credit.ts` hook. Less means a reducer or
-  more hook seams, which is new logic; the sign-in handlers are the next
-  one to take out.
 - Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
   (1,289 after C14, whose Spent read — net of refunds, the list's rule — is
   `customer-spent.ts` over `spent.sql.ts`; 1,293 after C7, which moved the

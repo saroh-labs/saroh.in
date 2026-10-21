@@ -374,6 +374,20 @@ export function siteStyleVariables(style: SiteStyle): Record<string, string> {
         ...typeScaleVariables(style.type),
     };
     // A look draws in safe colours (KD4); Classic keeps exactly these.
+    return withLookColours(style, vars);
+}
+
+/**
+ * Resolved `--site-*` variables in a look's safe colours (KD4), or the
+ * same variables for Classic. The step `siteStyleVariables` ends with,
+ * exported for the editor's preview (U16), which resolves its rows from
+ * the palette the API serves and then draws a look in the colours
+ * publishing will.
+ */
+export function withLookColours(
+    style: Pick<SiteStyle, "look" | "palette">,
+    vars: Record<string, string>,
+): Record<string, string> {
     const safe = style.look ? safeColoursOf(style, vars) : null;
     if (!safe) return vars;
     return {
@@ -398,7 +412,7 @@ export function siteStyleSafeColours(style: SiteStyle): SafeColours | null {
 }
 
 function safeColoursOf(
-    style: SiteStyle,
+    style: Pick<SiteStyle, "look" | "palette">,
     vars: Record<string, string>,
 ): SafeColours | null {
     if (!style.look) return null;

@@ -5,6 +5,7 @@ import type {
     AccountBookingRow,
     AccountBookings,
     AccountCourse,
+    AccountDataRequest,
     AccountHomeData,
     AccountInvoiceDue,
     AccountNote,
@@ -23,6 +24,7 @@ import type {
 import { bookingsResult, isBookingRow } from "./account-bookings-shape";
 import {
     coursesResult,
+    dataRequestResult,
     invoicesDueResult,
     noticesResult,
     waitlistResult,
@@ -225,6 +227,18 @@ export async function getNotices(): Promise<AccountBlock<AccountNotices>> {
     const read = await readJson("me/notifications");
     const value = read.ok ? noticesResult(read.body) : null;
     return value ? { ok: true, value } : { ok: false };
+}
+
+/**
+ * Their latest "Ask to remove my data" request (DEC-172, #1107): null when
+ * they never asked; a failed read stays failed, never "never asked".
+ */
+export async function getDataRequest(): Promise<
+    AccountBlock<AccountDataRequest | null>
+> {
+    const read = await readJson("me/data-request");
+    const value = read.ok ? dataRequestResult(read.body) : undefined;
+    return value === undefined ? { ok: false } : { ok: true, value };
 }
 
 export type ReceiptLookup =

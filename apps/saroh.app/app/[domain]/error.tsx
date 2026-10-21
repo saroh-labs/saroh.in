@@ -1,7 +1,8 @@
 "use client";
 
+import { lookOf } from "@saroh/site-blocks";
 import { reportError } from "@saroh/ui/lib/report-error";
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 import { SiteError } from "@/components/site-error";
 
@@ -11,6 +12,27 @@ import { SiteError } from "@/components/site-error";
  * scope, as for the sibling 404. Styled from the `--site-*` layer, never
  * Saroh's brand: this is still the merchant's website.
  */
+const noSubscribe = () => () => undefined;
+
+/**
+ * The site's look, read from the mark the layout put on the page
+ * (`data-site-look`, DEC-172): a boundary is handed no props of the
+ * layout's. Nothing on the server, so the first frame is Classic's words,
+ * and the look's follows at once.
+ */
+function usePageLook() {
+    return useSyncExternalStore(
+        noSubscribe,
+        () =>
+            lookOf(
+                document
+                    .querySelector("[data-site-look]")
+                    ?.getAttribute("data-site-look"),
+            ),
+        () => undefined,
+    );
+}
+
 export default function Error({
     error,
     retry,
@@ -22,5 +44,7 @@ export default function Error({
         reportError(error, { boundary: "sites/domain", digest: error.digest });
     }, [error]);
 
-    return <SiteError onRetry={retry} digest={error.digest} />;
+    const look = usePageLook();
+
+    return <SiteError onRetry={retry} digest={error.digest} look={look} />;
 }

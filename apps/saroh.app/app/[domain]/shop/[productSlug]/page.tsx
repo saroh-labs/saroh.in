@@ -5,6 +5,8 @@ import type { SignInOptions } from "@saroh/site-blocks";
 import {
     AddToBag,
     AskAboutOrdering,
+    LookAddToBag,
+    lookOf,
     NotTakingOrders,
     ProductPage,
     reachOf,
@@ -24,6 +26,7 @@ import {
 } from "@/lib/publication";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 import { enquiryPagePath } from "@/lib/shop-checkout-shape";
+import { shopCutOff } from "@/lib/shop-cut-off";
 import { getSignInOptions } from "@/lib/sign-in";
 import { getSiteContact } from "@/lib/site-contact";
 import { canonical, productDescription } from "@/lib/site-meta";
@@ -129,6 +132,7 @@ export default async function ShopProductPage({
             <ShopUnavailable
                 business={resolved.snapshot.site.name}
                 retryHref={`/shop/${encodeURIComponent(productSlug)}`}
+                look={lookOf(resolved.snapshot.site.look)}
                 // The layout's own read, shared through `cache`.
                 reach={reachOf(await getSiteContact(resolved.siteId))}
             />
@@ -138,9 +142,24 @@ export default async function ShopProductPage({
     // Its price and stock are on this page (#863).
     showsProduct(resolved.siteId, product.productId);
     const business = resolved.snapshot.site.name;
+    // Folio, Quiet or Live (DEC-172, U11): the look's Add to bag and its
+    // − 1 + stepper; absent, Classic's.
+    const look = lookOf(resolved.snapshot.site.look);
     const action =
         checkout?.canOrder && product.listingId ? (
-            <AddToBag site={resolved.siteId} listingId={product.listingId} />
+            look ? (
+                <LookAddToBag
+                    look={look}
+                    site={resolved.siteId}
+                    listingId={product.listingId}
+                    askHref={enquiryPagePath(resolved.snapshot)}
+                />
+            ) : (
+                <AddToBag
+                    site={resolved.siteId}
+                    listingId={product.listingId}
+                />
+            )
         ) : checkout?.notTakingOrders ? (
             // Stopped taking orders for now (#800): nothing to ask about.
             <NotTakingOrders />
@@ -188,9 +207,18 @@ export default async function ShopProductPage({
                 // location's checkout offers now.
                 facts={
                     checkout?.canOrder && product.listingId
-                        ? shopFactsLine(checkout)
+                        ? look
+                            ? // The owner's cut-off line leads, said once.
+                              [
+                                  shopCutOff(resolved.snapshot),
+                                  shopFactsLine(checkout),
+                              ]
+                                  .filter(Boolean)
+                                  .join(". ") || null
+                            : shopFactsLine(checkout)
                         : null
                 }
+                look={look}
             />
         </main>
     );

@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import type { RenderedTimetable } from "@saroh/block-contract";
+import type { LookId, RenderedTimetable } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
+import type { CreditFor } from "../booking-flow/api";
 import { clockWords } from "../lib/clock";
 import type {
     PlacesWord,
@@ -23,6 +24,11 @@ import {
     weekCounts,
 } from "../lib/timetable-read";
 import { cn } from "../lib/utils";
+import { showsCount } from "../live/live-state";
+import { checkedWords } from "../live/live-words";
+import { refreshLiveRead, useLiveRead } from "../live/use-live-read";
+import type { LookProps } from "../look-context";
+import { LookTimetable, LookTimetableNote } from "./timetable-look";
 
 /**
  * `timetable` v1 — the week's class sessions, read live (industry templates
@@ -53,6 +59,11 @@ import { cn } from "../lib/utils";
  *   will show, instead of inventing classes;
  * - `timetable` given: drawn without a fetch (catalog, tests).
  *
+ * UNDER A LOOK (DEC-172, U7) the week is the look's (`timetable-look.tsx`):
+ * every row with its price and an outline Book of 44px, places left only
+ * when 5 or fewer, and Join the waitlist on a full class. Classic draws
+ * exactly as before.
+ *
  * Drawn from `--site-*` only; gates G2 and G7 fail the build otherwise.
  */
 
@@ -69,13 +80,13 @@ function said(value: string | null | undefined): string | null {
     return trimmed === undefined || trimmed === "" ? null : trimmed;
 }
 
-export default function TimetableSection({
-    content,
-    siteId,
-    apiUrl = DEFAULT_API_URL,
-    bookHref,
-    timetable: given,
-}: {
+type TimetableProps = LookProps & {
+    /**
+     * Under a look, the signed-in customer's class credit, read in the
+     * browser with their session (the booking page's own read), so a row
+     * their pack covers says "1 pack class" (U7). Absent: prices only.
+     */
+    credit?: CreditFor;
     content: RenderedTimetable;
     siteId?: string | null;
     apiUrl?: string;
@@ -83,7 +94,132 @@ export default function TimetableSection({
     bookHref?: string;
     /** A sample week to draw instead of fetching (catalog, tests). */
     timetable?: PublicTimetable;
-}) {
+};
+
+/**
+ * The block. Under a look on a live site the week is a live fact (U8's
+ * `useLiveRead`: one read per page, read again while in view, counts
+ * only while fresh); otherwise it is read as it always was.
+ */
+export default function TimetableSection(props: TimetableProps) {
+    if (props.look && typeof props.siteId === "string" && !props.timetable) {
+        return (
+            <LiveLookTimetable
+                {...props}
+                look={props.look}
+                siteId={props.siteId}
+            />
+        );
+    }
+    return <TimetableBlock {...props} />;
+}
+
+/** The week a section shows: Monday to Friday when it says so. */
+function shownWeek(
+    content: RenderedTimetable,
+    timetable: PublicTimetable,
+): { week: PublicTimetable; days: string[] } {
+    const week: PublicTimetable =
+        content.weekdaysOnly === true
+            ? {
+                  ...timetable,
+                  days: timetable.days.filter(isWeekday),
+                  sessions: timetable.sessions.filter((s) => isWeekday(s.date)),
+              }
+            : timetable;
+    const days = week.days.length > 0 ? week.days : uniqueDays(week.sessions);
+    return { week, days };
+}
+
+/** The line under a look's title: the week's count and the merchant's. */
+function lookLede(
+    content: RenderedTimetable,
+    week: PublicTimetable,
+): string | null {
+    const counts = content.showCounts ? weekCounts(week.sessions) : null;
+    const lede = [counts ? `${counts.line}.` : null, said(content.intro)]
+        .filter(Boolean)
+        .join(" ");
+    return lede || null;
+}
+
+/**
+ * A look's week on a live site, read in the browser as a live fact. The
+ * server and the first paint draw "loading" (the cached page holds no
+ * session, no count and no pack words); places left show only while the
+ * answer is under a minute old, with when they were checked.
+ */
+function LiveLookTimetable({
+    content,
+    siteId,
+    apiUrl = DEFAULT_API_URL,
+    bookHref,
+    look,
+    credit,
+}: TimetableProps & { look: LookId; siteId: string }) {
+    const url = `${apiUrl}/public/sites/${encodeURIComponent(siteId)}/timetable${timetableQuery(content.serviceIds)}`;
+    const read = useLiveRead(url, parseTimetable);
+    const title = said(content.title) ?? TIMETABLE_TITLE;
+    if (read.data === undefined) {
+        return read.status === "failed" ? (
+            <LookTimetableNote
+                look={look}
+                title={title}
+                lede={said(content.intro)}
+                failed
+                onRetry={() => refreshLiveRead(url)}
+            >
+                We couldn&apos;t load this week&apos;s classes right now.
+            </LookTimetableNote>
+        ) : (
+            <LookTimetableNote
+                look={look}
+                title={title}
+                lede={said(content.intro)}
+            >
+                Loading this week&apos;s classes…
+            </LookTimetableNote>
+        );
+    }
+    const { week, days } = shownWeek(content, read.data);
+    if (week.sessions.length === 0) return null;
+    const counts = showsCount(read.status);
+    return (
+        <LookTimetable
+            look={look}
+            title={title}
+            lede={lookLede(content, week)}
+            week={week}
+            days={days}
+            show={{
+                trainer: content.showTrainer !== false,
+                // A count only while the answer is fresh (U8).
+                places: content.showPlacesLeft !== false && counts,
+                bookHref,
+            }}
+            checked={
+                counts && read.fetchedAt !== undefined
+                    ? `Places ${checkedWords(read.fetchedAt, week.timezone).toLowerCase()}`
+                    : null
+            }
+            credit={credit}
+        />
+    );
+}
+
+function parseTimetable(body: unknown): PublicTimetable | undefined {
+    return isPublicTimetable(body) ? body : undefined;
+}
+
+function TimetableBlock({
+    content,
+    siteId,
+    apiUrl = DEFAULT_API_URL,
+    bookHref,
+    timetable: given,
+    look: siteLook,
+    credit,
+}: TimetableProps) {
     const query = timetableQuery(content.serviceIds);
     const [state, setState] = useState<LoadState>(
         given ? { kind: "ready", timetable: given } : { kind: "loading" },
@@ -163,16 +299,7 @@ export default function TimetableSection({
 
     const look = resolveVariant("timetable", content);
     // Monday to Friday only (template polish): the weekend left off.
-    const weekdays = content.weekdaysOnly === true;
-    const week: PublicTimetable = weekdays
-        ? {
-              ...state.timetable,
-              days: state.timetable.days.filter(isWeekday),
-              sessions: state.timetable.sessions.filter((s) =>
-                  isWeekday(s.date),
-              ),
-          }
-        : state.timetable;
+    const { week, days } = shownWeek(content, state.timetable);
     if (week.sessions.length === 0) return null;
     const accent = look === "accent";
     const show: Show = {
@@ -182,8 +309,25 @@ export default function TimetableSection({
         accent,
     };
     const grid = look === "grid" || accent;
-    const days = week.days.length > 0 ? week.days : uniqueDays(week.sessions);
     const counts = content.showCounts ? weekCounts(week.sessions) : null;
+
+    if (siteLook) {
+        return (
+            <LookTimetable
+                look={siteLook}
+                title={title}
+                lede={lookLede(content, week)}
+                week={week}
+                days={days}
+                show={{
+                    trainer: show.trainer,
+                    places: show.places,
+                    bookHref,
+                }}
+                credit={credit}
+            />
+        );
+    }
 
     return (
         <Frame

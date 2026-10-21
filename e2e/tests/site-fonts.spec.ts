@@ -23,8 +23,14 @@ const PULSE = (() => {
     return `${renderer.protocol}//pulse-fitness.${renderer.host}`;
 })();
 
-/** Saroh's own faces, by file name, as `packages/ui/fonts` ships them. */
-const SAROH_FACE = /Geist|Bricolage|SpaceGrotesk|Space_Grotesk|JetBrainsMono/i;
+/**
+ * Saroh's own faces, by file name, as `packages/ui/fonts` ships them:
+ * Geist, Space Grotesk and JetBrains Mono. Bricolage Grotesque was Saroh's
+ * once and is not now; the Live look sets its headings in it on purpose
+ * (DEC-172), so it is a merchant's face like any other in `FONT_PAIRS`.
+ */
+const SAROH_FACE =
+    /Geist|SpaceGrotesk|Space_Grotesk|Space Grotesk|JetBrainsMono|JetBrains_Mono|JetBrains Mono/i;
 /** Where Saroh's font files live, and where Next serves a `localFont` from. */
 const SAROH_FONT_PATH = /packages\/ui\/fonts|\/_next\/static\/media\//;
 
@@ -82,6 +88,27 @@ test.describe("merchant sites load no Saroh font", () => {
         const body = await fontFamily(page.locator("body"));
         expect(body).not.toMatch(SAROH_FACE);
         expect(body).toContain("system-ui");
+    });
+
+    test("a Classic site on the system font fetches and preloads no font file", async ({
+        page,
+    }) => {
+        // The looks' faces (U3) are declared beside every other merchant
+        // face, preload off: a site that is set in none of them must fetch
+        // none, and no page may preload one.
+        const fonts = await fontRequests(page, async () => {
+            await page.goto(PULSE);
+        });
+        expect(fonts).toEqual([]);
+        await expect(
+            page.locator('link[rel="preload"][as="font"]'),
+        ).toHaveCount(0);
+        const loaded = await page.evaluate(() =>
+            [...document.fonts]
+                .filter((f) => f.status === "loaded")
+                .map((f) => f.family),
+        );
+        expect(loaded).toEqual([]);
     });
 
     test("the booking page fetches no Saroh face, and its step heading is the system stack", async ({

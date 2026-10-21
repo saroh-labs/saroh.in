@@ -1,5 +1,6 @@
 "use client";
 
+import type { LookId } from "@saroh/block-contract";
 import type { KeyboardEvent, ReactNode } from "react";
 import { useEffect, useId, useRef } from "react";
 
@@ -48,6 +49,7 @@ export function SheetFrame({
     mark,
     onClose,
     footer,
+    look,
     children,
 }: {
     title: string;
@@ -57,6 +59,13 @@ export function SheetFrame({
     onClose: () => void;
     /** Pinned to the foot of the sheet; the rest scrolls above it. */
     footer?: ReactNode;
+    /**
+     * A look's sheet (DEC-172, U11): a drawer from the right from 700px and
+     * a sheet from the foot on a phone, in the look's small corner (never a
+     * pill), fading and rising over the look's slow step. Absent: Classic's
+     * sheet, exactly as before.
+     */
+    look?: LookId;
     children: ReactNode;
 }) {
     const ids = useId();
@@ -111,7 +120,13 @@ export function SheetFrame({
                 tabIndex={-1}
                 onKeyDown={onKeyDown}
                 {...NO_CAPTURE_ATTRS}
-                className={`bg-site-surface text-site-fg font-site-body fixed inset-x-0 bottom-0 z-[61] mx-auto flex max-w-[560px] flex-col overflow-hidden rounded-t-[calc(var(--site-radius)+18px)] shadow-[0_-12px_40px_hsl(var(--site-fg)/0.2)] outline-none ${SHEET_HEIGHT} ${NO_CAPTURE_CLASS}`}
+                data-site-rise={look ? "" : undefined}
+                data-sheet-look={look}
+                className={
+                    look
+                        ? `bg-site-surface text-site-fg font-site-body rounded-t-site-s fixed inset-x-0 bottom-0 z-[61] flex flex-col overflow-hidden shadow-[0_-12px_40px_hsl(var(--site-fg)/0.2)] outline-none min-[700px]:inset-y-0 min-[700px]:left-auto min-[700px]:right-0 min-[700px]:max-h-none min-[700px]:w-[min(480px,100vw)] min-[700px]:rounded-none min-[700px]:supports-[height:100dvh]:max-h-none ${SHEET_HEIGHT} ${NO_CAPTURE_CLASS}`
+                        : `bg-site-surface text-site-fg font-site-body fixed inset-x-0 bottom-0 z-[61] mx-auto flex max-w-[560px] flex-col overflow-hidden rounded-t-[calc(var(--site-radius)+18px)] shadow-[0_-12px_40px_hsl(var(--site-fg)/0.2)] outline-none ${SHEET_HEIGHT} ${NO_CAPTURE_CLASS}`
+                }
             >
                 <div
                     data-sheet-scroll=""
@@ -169,7 +184,7 @@ export function SheetFrame({
                             aria-label="Close"
                             className={cn(
                                 "text-site-fg shrink-0 cursor-pointer rounded-full text-base hover:opacity-80 active:scale-95",
-                                SHEET_CLOSE_SIZE,
+                                look ? "size-11" : SHEET_CLOSE_SIZE,
                                 quietFill,
                                 focusRing,
                             )}

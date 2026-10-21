@@ -247,6 +247,7 @@ describe("on a plan without memberships, after a downgrade (DB)", () => {
             payOnline: false,
             autopayMethods: [],
             offered: false,
+            pauseWeeks: [],
         });
         await locked(
             service.subscribe(b.owner, { contactId: contact.id, planId }),

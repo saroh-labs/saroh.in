@@ -648,6 +648,16 @@ export class CatalogueAccessService {
     }
 
     /**
+     * The live catalogue, whatever version a business is on: for what
+     * applies to every business at once, as which looks, typefaces and
+     * colourways are free (DEC-177). Null with none live, or one that
+     * doesn't validate (logged).
+     */
+    async liveCatalog(now: Date = new Date()): Promise<Catalog | null> {
+        return (await this.version(null, now))?.catalog ?? null;
+    }
+
+    /**
      * A version's snapshot: the given one, or the live one for null. Null
      * when there is none, or it doesn't validate (logged; a corrupt row
      * must not take every limit check down with it).

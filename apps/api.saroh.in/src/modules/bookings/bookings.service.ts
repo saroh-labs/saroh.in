@@ -20,6 +20,7 @@ import {
     serviceFacts,
 } from "../audit/price-history";
 import { assertPlanTakesOnlinePayment } from "../billing/online-payments-plan";
+import { ModuleSetupService } from "../capabilities/setup/module-setup.service";
 import { redeemPackInTx } from "../class-packs/redeem-pack";
 import { assertBusinessDetails } from "../invoices/business-details";
 import { isGstRate, notGstRateMessage } from "../invoices/gst";
@@ -291,7 +292,34 @@ export class BookingsService {
         // Sends a cancel's refund after it commits (E8). Optional so the
         // specs that never refund need not build one.
         @Optional() private readonly payments?: PaymentsService,
+        // Makes the booking page when the first service customers can
+        // book online is added (DEC-175). Optional so the specs that never
+        // add one need not build it.
+        @Optional() private readonly setup?: ModuleSetupService,
     ) {}
+
+    /**
+     * A service customers can book online was added or opened to them:
+     * with no website, the booking page is made (DEC-175). After the
+     * commit, and it never refuses: the service is saved either way.
+     */
+    private async bookingPageFor(
+        ctx: OrganizationContext,
+        service: Pick<
+            Service,
+            "status" | "showOnBookingPage" | "siteId" | "deletedAt"
+        >,
+    ): Promise<void> {
+        if (
+            service.status !== "ACTIVE" ||
+            !service.showOnBookingPage ||
+            service.siteId !== null ||
+            service.deletedAt !== null
+        ) {
+            return;
+        }
+        await this.setup?.makeBookingSite(ctx, "service");
+    }
 
     // ── Service CRUD ───────────────────────────────────────────────────────
 
@@ -371,6 +399,7 @@ export class BookingsService {
             ctx.organizationId,
             created.id,
         );
+        await this.bookingPageFor(ctx, created);
         return toServiceView(
             created,
             await loadPriceTerms(prisma, ctx.organizationId),
@@ -538,6 +567,11 @@ export class BookingsService {
             );
             return next;
         });
+        // Opened to customers by this save (ticked for the booking page,
+        // or taking bookings again): the booking page, if it is missing.
+        const wasOnline =
+            service.status === "ACTIVE" && service.showOnBookingPage;
+        if (!wasOnline) await this.bookingPageFor(ctx, saved);
         return toServiceView(
             saved,
             await loadPriceTerms(prisma, ctx.organizationId),

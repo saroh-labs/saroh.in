@@ -12,6 +12,7 @@ import { rolledOut } from "@/lib/modules/rollout";
 import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { alsoSellFeatures } from "@/lib/services/also-sell";
+import { readBookingLink } from "@/lib/services/booking-link-read";
 import {
     businessCurrencyOf,
     readCanEditServices,
@@ -58,6 +59,7 @@ export default async function ServicesPage() {
         payment,
         missingRates,
         organization,
+        bookingLink,
     ] = await Promise.all([
         readServices(),
         readStaffOrNull(),
@@ -68,6 +70,8 @@ export default async function ServicesPage() {
         // What is on sale with no GST rate; null draws no notice.
         readMissingRates(),
         resolveActiveOrganization(),
+        // "Your booking page" (DEC-175); null leaves the row out.
+        readBookingLink(),
     ]);
     // New course joins New service only while Courses is on here and this
     // role may add one: the same answers the Courses screen gives.
@@ -136,6 +140,7 @@ export default async function ServicesPage() {
                     modules={modules ?? []}
                     missingRates={missingRates}
                     canNewCourse={canNewCourse}
+                    bookingLink={bookingLink}
                 />
             </div>
         </PageContainer>

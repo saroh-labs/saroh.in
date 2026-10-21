@@ -18,6 +18,10 @@ export const BAR_HEIGHT_VAR = "--test-release-bar-h";
 /**
  * The one rule that keeps the site's sticky header below the bar rather
  * than under it. The fallback is the bar's one-line height, for the moment
- * before the bar has measured itself.
+ * before the bar has measured itself. A look's header (DEC-172, U5) is
+ * sticky only from 700px up (on a phone it scrolls away with the page), so
+ * it is moved down only there.
  */
-export const HEADER_BELOW_BAR = `[data-test-release] header.sticky{top:var(${BAR_HEIGHT_VAR},2.25rem)}`;
+export const HEADER_BELOW_BAR =
+    `[data-test-release] header.sticky{top:var(${BAR_HEIGHT_VAR},2.25rem)}` +
+    `@media (min-width:700px){[data-test-release] header[data-site-look-header]{top:var(${BAR_HEIGHT_VAR},2.25rem)}}`;

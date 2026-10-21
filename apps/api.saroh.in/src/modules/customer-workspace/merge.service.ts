@@ -685,6 +685,14 @@ async function moveRelations(tx: Tx, pair: Pair): Promise<void> {
     await tx.customerSubscription.updateMany(move);
     await tx.courseEnrollment.updateMany(move);
     await tx.contactNote.updateMany(move);
+    // "Ask to remove my data" follows the person (DEC-172).
+    await tx.customerDataRequest.updateMany({
+        where: {
+            organizationId: pair.survivor.organizationId,
+            contactId: from,
+        },
+        data: { contactId: to },
+    });
 
     // Store records: a customer both are linked to keeps the survivor's link.
     await tx.customerIdentityLink.deleteMany({

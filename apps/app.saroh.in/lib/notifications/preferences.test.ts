@@ -81,6 +81,29 @@ describe("alertGrid", () => {
         expect(grid.rows[0]?.cells[0]?.label).toBe("Your website by Bell, on");
     });
 
+    it("names the data removal row when the API offers it (DEC-172)", () => {
+        const grid = alertGrid({
+            status: "ok",
+            prefs: prefs({
+                alerts: [
+                    {
+                        key: "request",
+                        channels: { bell: true, email: true, whatsapp: false },
+                    },
+                ],
+            }),
+        });
+        expect(grid.rows.map((r) => [r.label, r.note])).toEqual([
+            [
+                "Data removal requests",
+                "When a customer asks you to remove their details",
+            ],
+        ]);
+        expect(grid.rows[0]?.cells[1]?.label).toBe(
+            "Data removal requests by Email, on",
+        );
+    });
+
     it("never offers the Monday summary: nothing sends it (default 127)", () => {
         const grid = alertGrid({ status: "ok", prefs: prefs() });
         expect(grid.rows.map((r) => r.label)).not.toContain("Monday summary");

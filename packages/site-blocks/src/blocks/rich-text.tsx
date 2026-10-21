@@ -1,6 +1,7 @@
 import type { RenderedRichText } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 import { siteImage } from "../lib/site-image";
+import type { LookProps } from "../look-context";
 
 /**
  * `richText` v1 — authored rich content.
@@ -25,7 +26,7 @@ import { siteImage } from "../lib/site-image";
 export default function RichTextSection({
     content,
     align = "column",
-}: {
+}: LookProps & {
     content: RenderedRichText;
     /**
      * `column`: the centred reading column every page has always had.
@@ -144,7 +145,11 @@ export default function RichTextSection({
                 alt={image.alt ?? ""}
                 width={image.width}
                 height={image.height}
-                {...siteImage()}
+                {...siteImage("below", {
+                    src: image.src,
+                    width: image.width,
+                    sizes: "(min-width: 1280px) 1280px, 100vw",
+                })}
                 className="bg-site-surface mb-8 aspect-video h-auto w-full rounded-[var(--site-radius)] object-cover"
             />
         );
@@ -188,7 +193,11 @@ export default function RichTextSection({
                     alt={image.alt ?? ""}
                     width={image.width}
                     height={image.height}
-                    {...siteImage()}
+                    {...siteImage("below", {
+                        src: image.src,
+                        width: image.width,
+                        sizes: "(min-width: 768px) 50vw, 100vw",
+                    })}
                     className={
                         photoLeft
                             ? "h-auto w-full rounded-[var(--site-radius)] object-cover"

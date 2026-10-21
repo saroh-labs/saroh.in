@@ -12,6 +12,8 @@ import { CustomerDetailService } from "./customer-detail.service";
 import { CustomerWorkspaceController } from "./customer-workspace.controller";
 import { CustomerWorkspaceService } from "./customer-workspace.service";
 import { CustomersListService } from "./customers-list.service";
+import { DataRequestsController } from "./data-requests.controller";
+import { DataRequestsService } from "./data-requests.service";
 import { MergeService } from "./merge.service";
 import { PrivacyRemovalService } from "./privacy-removal.service";
 import { CustomerThreadsController } from "./threads.controller";
@@ -23,6 +25,8 @@ import { CustomerThreadsController } from "./threads.controller";
  * "This isn't them" on a customer's site account (A4) and the customer's
  * message thread (A13). PaymentsModule gives a privacy removal (C11) D20's
  * `MandatesService.cancelFor` and the refund a cancelled booking sends.
+ * Customers' "Ask to remove my data" requests (DEC-172) are listed and
+ * closed here (`DataRequestsController`); a removal marks them done.
  */
 @Module({
     imports: [
@@ -31,7 +35,11 @@ import { CustomerThreadsController } from "./threads.controller";
         SiteAccountsModule,
         PaymentsModule,
     ],
-    controllers: [CustomerWorkspaceController, CustomerThreadsController],
+    controllers: [
+        CustomerWorkspaceController,
+        CustomerThreadsController,
+        DataRequestsController,
+    ],
     providers: [
         CustomerWorkspaceService,
         CustomerDetailService,
@@ -41,6 +49,7 @@ import { CustomerThreadsController } from "./threads.controller";
         CustomerAddService,
         MergeService,
         PrivacyRemovalService,
+        DataRequestsService,
         OrganizationGuard,
     ],
 })

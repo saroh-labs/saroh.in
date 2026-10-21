@@ -75,7 +75,16 @@ async function website(ctx: OrganizationContext, name: string) {
         siteName: name,
         address: `k10-${seq}-${tag}`,
     });
-    const siteId = out.created.siteId;
+    // Bookings turned on first has made it already: the booking page is
+    // this same starter on the business's address (DEC-175).
+    const siteId =
+        out.created.siteId ??
+        (
+            await prisma.site.findFirst({
+                where: { organizationId: ctx.organizationId },
+                select: { id: true },
+            })
+        )?.id;
     if (!siteId) throw new Error("no site was made");
     return siteId;
 }

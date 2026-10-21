@@ -128,3 +128,37 @@ export async function nameThenBook(page: Page, name: string): Promise<void> {
         .first()
         .click();
 }
+
+/**
+ * After the page's Book press: wait until `done` shows, and when the time
+ * went to another test meanwhile ("That time is fully booked", or the
+ * busy-moment refusal), take the next free time and press again, as
+ * `bookOwn` tries the free times in order until one is its own (the
+ * browser-tests skill: times are claimed, not assumed; review #41). Signed
+ * in at the last step, the page picks the next free time itself (A9);
+ * otherwise the last free time on the day is chosen.
+ */
+export async function bookUntilOurs(
+    page: Page,
+    done: Locator,
+    tries = 4,
+): Promise<void> {
+    const gone = page
+        .getByRole("alert")
+        .filter({ hasText: /fully booked|has gone|booking right now/i });
+    const times = page.locator('[role="radiogroup"] button[role="radio"]', {
+        hasText: /^\d{1,2}:\d{2} [ap]m$/,
+    });
+    for (let left = tries; ; left--) {
+        await expect(done.or(gone).first()).toBeVisible({ timeout: 30_000 });
+        if (await done.first().isVisible()) return;
+        expect(left, "a free time that stayed free").toBeGreaterThan(0);
+        const chosen = times.and(page.locator('[aria-checked="true"]'));
+        if ((await chosen.count()) === 0) await times.last().click();
+        await page
+            .getByRole("button", { name: /^(Book|Pay )/ })
+            .filter({ visible: true })
+            .first()
+            .click();
+    }
+}

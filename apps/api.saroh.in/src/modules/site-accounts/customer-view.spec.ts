@@ -1,5 +1,6 @@
 import { accountTabs } from "./account-tabs";
 import {
+    accountDataRequestView,
     accountPackView,
     accountView,
     bookingChangeView,
@@ -1242,5 +1243,44 @@ describe("the rest of their details (DEC-142)", () => {
         ]);
         // The list handed in is left as it was.
         expect(many[0]).toMatchObject({ number: "3" });
+    });
+});
+
+describe("an Ask to remove my data request (DEC-172)", () => {
+    it("says its status and dates, never the business's reason or who handled it", () => {
+        const row = {
+            id: "dr_1",
+            status: "CLOSED_WITHOUT_REMOVAL",
+            createdAt: new Date("2026-10-20T05:00:00Z"),
+            handledAt: new Date("2026-10-21T06:30:00Z"),
+            reason: "We need these for an open warranty claim",
+            handledByUserId: "user_owner",
+            requesterEmail: "asha@example.com",
+            contactId: "con_1",
+        };
+        const view = accountDataRequestView(row);
+        expect(view).toEqual({
+            ref: "dr_1",
+            status: "closed",
+            askedAt: "2026-10-20T05:00:00.000Z",
+            handledAt: "2026-10-21T06:30:00.000Z",
+        });
+        expect(JSON.stringify(view)).not.toMatch(/warranty|user_owner|con_1/);
+    });
+
+    it("reads an open one as open, with no handled date", () => {
+        expect(
+            accountDataRequestView({
+                id: "dr_2",
+                status: "OPEN",
+                createdAt: new Date("2026-10-20T05:00:00Z"),
+                handledAt: null,
+            }),
+        ).toEqual({
+            ref: "dr_2",
+            status: "open",
+            askedAt: "2026-10-20T05:00:00.000Z",
+            handledAt: null,
+        });
     });
 });

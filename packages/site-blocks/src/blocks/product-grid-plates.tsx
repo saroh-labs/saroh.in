@@ -105,7 +105,10 @@ function Plate({
                 <img
                     src={p.image.url}
                     alt={p.image.alt}
-                    {...siteImage(lead ? "above" : "below")}
+                    {...siteImage(lead ? "above" : "below", {
+                        src: p.image.url,
+                        sizes: "(min-width: 768px) 50vw, 100vw",
+                    })}
                     className="absolute inset-0 h-full w-full object-cover"
                 />
             ) : null}

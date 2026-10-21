@@ -32,6 +32,14 @@
  *
  * Both lists are rewritten from every file on disk
  * (`template-shots-manifest.ts`), so a partial run keeps the rest.
+ *
+ *   pnpm --filter @saroh/e2e shots:templates --looks          # Look row
+ *   pnpm --filter @saroh/e2e shots:templates --looks salon    # one template
+ *
+ * `--looks` captures instead the editor's Look row pictures (DEC-172, U16):
+ * each template's home page on a phone in Classic, Quiet, Folio and Live
+ * (`?look=`), into `apps/app.saroh.in/public/looks/<id>-<look>.webp`,
+ * listed in `apps/app.saroh.in/lib/sites/look-thumbnails.ts`.
  */
 import fs from "node:fs";
 import { createRequire } from "node:module";
@@ -41,11 +49,13 @@ import type { Page } from "@playwright/test";
 import { chromium, request } from "@playwright/test";
 
 import type {
+    CapturedLookThumbnail,
     CapturedShot,
     CapturedThumbnail,
     Device,
 } from "./template-shots-manifest";
 import {
+    lookThumbnailsSource,
     templateShotsSource,
     templateThumbnailsSource,
 } from "./template-shots-manifest";
@@ -77,6 +87,16 @@ const DEVICES: Record<
 };
 /** The picker's card picture, in CSS pixels: a 16:10 card at its widest. */
 const THUMBNAIL_WIDTH = 360;
+
+const LOOKS_DIR = path.join(ROOT, "apps/app.saroh.in/public/looks");
+const LOOKS_MANIFEST = path.join(
+    ROOT,
+    "apps/app.saroh.in/lib/sites/look-thumbnails.ts",
+);
+/** The Look row's looks, Classic first (`?look=` absent). */
+const LOOKS = ["classic", "quiet", "folio", "live"] as const;
+/** The Look row's phone picture, in CSS pixels: twice the row's 50px. */
+const LOOK_THUMBNAIL_WIDTH = 100;
 
 /** What `/template-renders` lists (`render.ts`, `templateRenderIndex`). */
 interface RenderEntry {
@@ -194,8 +214,91 @@ async function thumbnailsOnDisk(
     return out;
 }
 
+/** Every Look row picture on disk for a template the renderer lists. */
+async function lookThumbnailsOnDisk(
+    sharp: Sharp,
+    templates: RenderEntry[],
+): Promise<CapturedLookThumbnail[]> {
+    const out: CapturedLookThumbnail[] = [];
+    for (const t of templates) {
+        for (const look of LOOKS) {
+            const name = `${t.id}-${look}.webp`;
+            const file = path.join(LOOKS_DIR, name);
+            if (!fs.existsSync(file)) continue;
+            out.push({
+                id: t.id,
+                look,
+                src: `/looks/${name}`,
+                ...(await sizeOf(sharp, file)),
+            });
+        }
+    }
+    return out;
+}
+
+/** The Look row's pictures (U16): each template's home, on a phone, per look. */
+async function captureLooks(all: RenderEntry[], chosen: RenderEntry[]) {
+    const sharp = loadSharp();
+    const browser = await chromium.launch();
+    const failed: string[] = [];
+    try {
+        for (const t of chosen) {
+            for (const look of LOOKS) {
+                const key = `${t.slug} ${look}`;
+                const context = await browser.newContext({
+                    ignoreHTTPSErrors: true,
+                    viewport: DEVICES.phone.viewport,
+                    deviceScaleFactor: DPR,
+                    isMobile: true,
+                    hasTouch: true,
+                    colorScheme: "light",
+                    reducedMotion: "reduce",
+                    locale: "en-IN",
+                    timezoneId: "Asia/Kolkata",
+                });
+                const page = await context.newPage();
+                try {
+                    const url =
+                        renderUrl(t, "/") +
+                        (look === "classic" ? "" : `?look=${look}`);
+                    const png = await shoot(page, url);
+                    const webp = await sharp(png)
+                        .resize(LOOK_THUMBNAIL_WIDTH * DPR)
+                        .webp(WEBP)
+                        .toBuffer();
+                    fs.mkdirSync(LOOKS_DIR, { recursive: true });
+                    fs.writeFileSync(
+                        path.join(LOOKS_DIR, `${t.id}-${look}.webp`),
+                        webp,
+                    );
+                    console.log(
+                        `${key.padEnd(24)} ${(webp.length / 1024).toFixed(0).padStart(5)} KB  ${url}`,
+                    );
+                } catch (error) {
+                    failed.push(key);
+                    console.error(`${key}: ${(error as Error).message}`);
+                } finally {
+                    await context.close();
+                }
+            }
+        }
+    } finally {
+        await browser.close();
+    }
+    fs.writeFileSync(
+        LOOKS_MANIFEST,
+        lookThumbnailsSource(await lookThumbnailsOnDisk(sharp, all)),
+    );
+    if (failed.length) {
+        console.error(`Failed: ${failed.join(", ")}`);
+        process.exitCode = 1;
+    }
+}
+
 async function main() {
-    const only = new Set(process.argv.slice(2));
+    const args = process.argv.slice(2);
+    const looks = args.includes("--looks");
+    const only = new Set(args.filter((a) => a !== "--looks"));
     const all = await index();
     const chosen = only.size
         ? all.filter((t) => only.has(t.id) || only.has(t.slug))
@@ -207,6 +310,11 @@ async function main() {
         throw new Error(
             `Not gallery templates: ${unknown.join(", ")} (have ${all.map((t) => t.id).join(", ")})`,
         );
+    }
+
+    if (looks) {
+        await captureLooks(all, chosen);
+        return;
     }
 
     const sharp = loadSharp();

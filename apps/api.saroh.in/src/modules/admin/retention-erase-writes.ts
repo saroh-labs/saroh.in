@@ -281,6 +281,9 @@ export async function eraseRecords(
         await tx.contactAttention.deleteMany({ where: { organizationId } });
         await tx.consent.deleteMany({ where: { organizationId } });
         await tx.customerThread.deleteMany({ where: { organizationId } });
+        // Customers' "Ask to remove my data" requests (DEC-172): no
+        // business is left to answer them or keep their record.
+        await tx.customerDataRequest.deleteMany({ where: { organizationId } });
         await tx.customerSignInCode.deleteMany({ where: { organizationId } });
         await tx.customerSession.deleteMany({ where: { organizationId } });
         // Retired accounts first: they point at the live one.

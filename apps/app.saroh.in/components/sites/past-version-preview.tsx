@@ -2,7 +2,7 @@
 
 import { useSiteFaces } from "@/components/sites/site-faces";
 import type { Section as RenderedSection } from "@saroh/site-blocks";
-import { PageSections, SiteTheme } from "@saroh/site-blocks";
+import { lookOf, lookScope, PageSections, SiteTheme } from "@saroh/site-blocks";
 
 /**
  * The class this preview's tokens are scoped to. A literal, for the same
@@ -25,12 +25,19 @@ const SCOPE = "past-version-scope";
 export function PastVersionPreview({
     sections,
     variables,
+    look: lookInput,
 }: {
     sections: RenderedSection[];
     variables?: Record<string, string> | null;
+    /**
+     * The look that version was published in (`snapshot.site.look`,
+     * DEC-172), drawn as it was served. Absent is Classic.
+     */
+    look?: unknown;
 }) {
     // The merchant faces the editor loaded, for the site's typeface.
     const faces = useSiteFaces();
+    const look = lookOf(lookInput);
     return (
         <div
             inert
@@ -39,18 +46,25 @@ export function PastVersionPreview({
             // straight into Saroh's own chrome, and the two must not read as
             // one page.
             className={`${SCOPE} space-y-4 overflow-hidden rounded-[var(--site-radius)] border bg-[hsl(var(--site-bg))] p-[var(--site-page-margin)] text-[hsl(var(--site-fg))]`}
+            {...lookScope(look)}
         >
             <SiteTheme
                 variables={variables ?? null}
                 selector={`.${SCOPE}`}
                 faces={faces}
+                look={look}
             />
             {sections.length === 0 ? (
                 <p className="p-8 text-center text-sm text-[hsl(var(--site-muted))]">
                     This page had no sections when it was published.
                 </p>
             ) : (
-                <PageSections sections={sections} />
+                <PageSections
+                    sections={sections}
+                    look={look}
+                    // The business's own history screen, never a visitor's.
+                    isOwnerPreview
+                />
             )}
         </div>
     );

@@ -44,6 +44,14 @@ export function phone(): string {
     return `+91 9${digits.slice(0, 4)} ${digits.slice(4)}`;
 }
 
+/**
+ * A cheque number no other test is likely to hold: six random digits, never
+ * the clock's last four, which desk and phone read in the same second.
+ */
+export function chequeNumber(): string {
+    return String(randomInt(1e6)).padStart(6, "0");
+}
+
 /** Northwind's API as the signed-in owner; writes carry an Origin (#50). */
 export function northwind(request: APIRequestContext) {
     const headers = {

@@ -24,6 +24,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FACT_DOT } from "@/lib/format/join";
+import type { BookingLinkView } from "@/lib/services/booking-link";
 import type { Service } from "@/lib/services/service";
 import type { ServiceUsage } from "@/lib/services/usage";
 import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
@@ -53,6 +54,11 @@ vi.mock("@/components/gst-rates/missing-rates-notice", () => ({
 }));
 vi.mock("@/components/services/also-sell", () => ({
     AlsoSell: () => <div role="group" aria-label="Also sell" />,
+}));
+vi.mock("@/components/services/booking-link-row", () => ({
+    BookingLinkRow: ({ view }: { view: { state: string } }) => (
+        <div data-booking-link={view.state} />
+    ),
 }));
 
 const api = { updateService: vi.fn() };
@@ -163,6 +169,7 @@ interface Shown {
     hasPage?: boolean | null;
     payment?: BookingPaymentView | null;
     canNewCourse?: boolean;
+    bookingLink?: BookingLinkView | null;
 }
 
 function show({
@@ -178,6 +185,7 @@ function show({
     hasPage = true,
     payment = null,
     canNewCourse = false,
+    bookingLink = null,
 }: Shown = {}) {
     act(() =>
         root.render(
@@ -191,6 +199,7 @@ function show({
                 payment={payment}
                 alsoSell={[]}
                 canNewCourse={canNewCourse}
+                bookingLink={bookingLink}
             />,
         ),
     );
@@ -237,6 +246,29 @@ async function flip(name: string, size: Size = "desk") {
 
 const checked = (name: string, size: Size) =>
     switchOf(name, size).getAttribute("aria-checked");
+
+describe("Your booking page (DEC-175)", () => {
+    it("sits above the list when it was read, and is left out when it wasn't", () => {
+        show({
+            bookingLink: {
+                state: "draft",
+                site: { id: "site_1", name: "Bend", address: "bend" },
+                host: "bend.saroh.app",
+                url: "https://bend.saroh.app/book",
+                published: false,
+                mayPublish: true,
+                make: null,
+            },
+        });
+        expect(
+            host
+                .querySelector("[data-booking-link]")
+                ?.getAttribute("data-booking-link"),
+        ).toBe("draft");
+        show();
+        expect(host.querySelector("[data-booking-link]")).toBeNull();
+    });
+});
 
 describe("one list, drawn for the desk and for a phone", () => {
     it("is a table at the desk, with the board's five columns", () => {

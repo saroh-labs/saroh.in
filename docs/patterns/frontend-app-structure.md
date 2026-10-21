@@ -239,6 +239,20 @@ accounts and the operator console. `pnpm run check:titles` and
   filter the menu at publish. A draft preview gets the same `modules` from
   its read and passes them to `SiteHeader` and its `[slug]`. The main
   button follows the same modules through `lib/header-action.ts`.
+- **Current** (20 Oct 2026, DEC-172 U9) — **Booking is one route with the
+  step in the address**: `/book?service=…&step=what|who|when|details|pay|done`
+  (`site-blocks/src/booking-flow/step-url.ts`), in every look and in
+  Classic. A later step is a new history entry, so Back is the step before;
+  anything else replaces the entry (`use-step-history.ts`), with no server
+  render. A link with no step opens the furthest its choices reach, and a
+  step the page can't stand on falls back (`resolveStep`): `pay` from a
+  link or a reload goes back to `when`, because the hold is only in the
+  page's memory. Only what is safe to share rides the address (the service,
+  the person, the day and time in the business's zone, the booking being
+  moved, the booked reference); a note, a name, an email, a phone, a code
+  or a hold's or payment's token never does (`NEVER`), and other
+  parameters (a QR code's `src`) are left alone. A look frames the same
+  steps differently; it never adds a route.
 
 ## Not adopted
 

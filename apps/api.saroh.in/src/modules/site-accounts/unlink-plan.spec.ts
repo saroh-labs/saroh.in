@@ -155,6 +155,7 @@ describe("counting and moving", () => {
             ["orders", "Order"],
             ["messages", "CustomerThreadMessage"],
             ["waitlist", "ClassWaitlistEntry"],
+            ["data-requests", "CustomerDataRequest"],
         ]);
     });
 
@@ -253,6 +254,7 @@ describe("counting and moving", () => {
             customerIdentityLink: { findMany: jest.fn().mockResolvedValue([]) },
             customerThreadMessage: noMessages(),
             classWaitlistEntry: noEntries(),
+            customerDataRequest: noEntries(),
         } as unknown as Prisma.TransactionClient;
         const where = {
             organizationId: "org_1",
@@ -286,6 +288,7 @@ describe("counting and moving", () => {
             customerIdentityLink: { findMany: jest.fn().mockResolvedValue([]) },
             customerThreadMessage: noMessages(),
             classWaitlistEntry: noEntries(),
+            customerDataRequest: noEntries(),
         } as unknown as Prisma.TransactionClient;
         const theirBooking = (on: string[]) => ({
             organizationId: "org_1",

@@ -10,7 +10,9 @@ import type {
     SitePage,
 } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
+import type { SiteStyleAccess } from "@/lib/sites/style-access";
 import type { TestReleasesRead } from "@/lib/sites/test-releases";
+import type { LookId } from "@saroh/block-contract";
 
 /** What the editor's page (`app/(editor)/sites/[siteId]/page.tsx`) hands it. */
 export interface SiteEditorProps {
@@ -58,6 +60,21 @@ export interface SiteEditorProps {
     canUpdateSite: boolean;
     initialStyle: SiteStyle;
     styleOptions: SiteStyleOptions;
+    /**
+     * Whether this business may choose a look (`SITE_LOOKS`, DEC-172):
+     * off, Website › Style offers no look to a Classic site, and a site
+     * that has one keeps it and Classic only (U16).
+     */
+    looksAvailable?: boolean;
+    /** The look the live site is in; null for Classic or never published. */
+    liveLook?: LookId | null;
+    /**
+     * Free and paid looks, typefaces and colourways for this site
+     * (DEC-177); null from an older API, which reads as all free.
+     */
+    styleAccess?: SiteStyleAccess | null;
+    /** The template the site was made from, for "Suggested for …". */
+    templateId?: string | null;
     /** Where this site lives, shown in the bar. Null before a subdomain exists. */
     address?: string | null;
     /**

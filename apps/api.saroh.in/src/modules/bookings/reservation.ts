@@ -220,6 +220,28 @@ export async function ownHoldOn(
 }
 
 /**
+ * Runs `load` at most once per key for the life of one read; the plain
+ * {@link readNow} runs it every time. Keys name their business.
+ */
+export type OnceRead = <T>(key: string, load: () => Promise<T>) => Promise<T>;
+
+/** No sharing: every check reads the database. */
+export const readNow: OnceRead = (_key, load) => load();
+
+/** A {@link OnceRead} for one read across several services (review #4). */
+export function onceReads(): OnceRead {
+    const memo = new Map<string, Promise<unknown>>();
+    return <T>(key: string, load: () => Promise<T>): Promise<T> => {
+        let kept = memo.get(key) as Promise<T> | undefined;
+        if (!kept) {
+            kept = load();
+            memo.set(key, kept);
+        }
+        return kept;
+    };
+}
+
+/**
  * Load an ACTIVE, non-deleted bookable service + its rules, or throw
  * (404/410). A service whose organization switched Appointments off is 410
  * like an archived one: the booking would otherwise land behind a module
@@ -229,7 +251,17 @@ export async function ownHoldOn(
  */
 export async function loadBookableService(
     serviceId: string,
-    { bookingPage = false }: { bookingPage?: boolean } = {},
+    {
+        bookingPage = false,
+        once = readNow,
+    }: {
+        bookingPage?: boolean;
+        /**
+         * Shares the business-wide checks across several services read
+         * together (On today, the Timetable: review #4). Keyed by business.
+         */
+        once?: OnceRead;
+    } = {},
 ): Promise<{ service: Service; rules: AvailabilityRuleWindow[] }> {
     const service = await prisma.service.findUnique({
         where: { id: serviceId },
@@ -245,10 +277,14 @@ export async function loadBookableService(
         throw new GoneException("This service isn't booked online");
     }
     // A deleted business's booking page is offline with its site (#921).
-    if (bookingPage && !(await publicSiteOnlineFor(service.organizationId))) {
+    const org = service.organizationId;
+    if (
+        bookingPage &&
+        !(await once(`${org}:site-online`, () => publicSiteOnlineFor(org)))
+    ) {
         throw new NotFoundException("Service not found");
     }
-    if (!(await appointmentsOpen(service.organizationId))) {
+    if (!(await once(`${org}:appointments`, () => appointmentsOpen(org)))) {
         throw new GoneException(
             "This business isn't taking online bookings right now",
         );
@@ -316,33 +352,55 @@ export async function reserve(
          * something changed (A10).
          */
         retryOnce?: boolean;
+        /**
+         * How many tries in all against lost races, a short random wait
+         * apart ({@link RACE_RETRY_WAIT_MS}); more than `retryOnce`'s two.
+         * The booking page's (review #33): many visitors booking at once
+         * each lose to another's serializable write, of any time, until
+         * one try sees the true count.
+         */
+        tries?: number;
+        /**
+         * What to say when every try lost a race: nobody has been told the
+         * time is full, since none of the tries saw it full.
+         */
+        busy?: string;
     },
     person?: ReserveWith,
 ): Promise<Booking> {
-    try {
-        return await reserveOnce(
-            activation,
-            service,
-            startAt,
-            endAt,
-            input,
-            by,
-            also,
-            person,
-        );
-    } catch (err) {
-        if (!also?.retryOnce || !(err instanceof RaceLost)) throw err;
-        return reserveOnce(
-            activation,
-            service,
-            startAt,
-            endAt,
-            input,
-            by,
-            also,
-            person,
-        );
+    const tries = Math.max(1, also?.tries ?? (also?.retryOnce ? 2 : 1));
+    for (let attempt = 1; ; attempt += 1) {
+        try {
+            return await reserveOnce(
+                activation,
+                service,
+                startAt,
+                endAt,
+                input,
+                by,
+                also,
+                person,
+            );
+        } catch (err) {
+            if (!(err instanceof RaceLost) || tries === 1) throw err;
+            if (attempt >= tries) {
+                throw also?.busy ? new RaceLost(also.busy) : err;
+            }
+            await sleep(raceRetryWait());
+        }
     }
+}
+
+/** Between tries after a lost race: 20 to 80 ms, so racers spread out. */
+export const RACE_RETRY_WAIT_MS = { min: 20, max: 80 } as const;
+
+function raceRetryWait(): number {
+    const { min, max } = RACE_RETRY_WAIT_MS;
+    return min + Math.floor(Math.random() * (max - min + 1));
+}
+
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function reserveOnce(

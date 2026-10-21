@@ -1,3 +1,4 @@
+import type { LookId } from "@saroh/block-contract";
 import { inPageNavigation, siteStyleVariables } from "@saroh/block-contract";
 import type {
     JournalFeed,
@@ -121,6 +122,11 @@ export interface TemplateRender {
     /** The sample business's name: the header's and the footer's. */
     name: string;
     styleVariables: Record<string, string>;
+    /**
+     * The look it is drawn in (DEC-172, U16), for the editor's Look row
+     * pictures; null for Classic.
+     */
+    look: LookId | null;
     navigation: SiteNavItem[];
     action: SiteHeaderAction | null;
     shopServes: boolean;
@@ -229,12 +235,15 @@ function renderSample(templateId: string): RenderSample | null {
  * Build one page. `null` when the id names neither a gallery template nor a
  * starter sample, the template has no such colourway, or it lays down no
  * page at `path` for its sample business. `styleId` absent: the first
- * colourway (or none, for a template without).
+ * colourway (or none, for a template without). `look` absent: Classic;
+ * otherwise the colourway in that look, its colours made safe as
+ * publishing makes them (DEC-172, U16).
  */
 export function templateRender(
     templateId: string,
     styleId: string | undefined,
     path: string,
+    look?: LookId,
 ): TemplateRender | null {
     const sample = renderSample(templateId);
     if (!sample) return null;
@@ -247,8 +256,9 @@ export function templateRender(
     if (!page) return null;
     const home = built.pages.find((p) => p.isHome) ?? page;
 
+    const preStyle = presetSiteStyle(preset?.style ?? {});
     const styleVariables = siteStyleVariables(
-        presetSiteStyle(preset?.style ?? {}),
+        look ? { ...preStyle, look } : preStyle,
     );
     const colours: BriefColours = {
         ground: hslOf(styleVariables["--site-border"], "#e7e5e4"),
@@ -296,6 +306,7 @@ export function templateRender(
         styleId: preset?.id ?? null,
         name: sample.name,
         styleVariables,
+        look: look ?? null,
         // A gallery template's site has no menu of its own yet: what it
         // publishes with is its home page's labelled sections
         // (`withInPageNavigation`). The starter starts with a real menu of

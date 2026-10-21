@@ -1,4 +1,7 @@
+import { dateText } from "../booking-flow/model";
 import { formatAmount } from "./money";
+import type { OpeningHoursDay } from "./opening-hours";
+import { clockText, nextOpening, openState } from "./opening-hours";
 
 /**
  * What an order costs to receive, said under the product's price before
@@ -88,4 +91,36 @@ export function shopLeadLine(
             ? ` Free delivery from ${formatAmount(over, input.currency, locale)}.`
             : "";
     return `Order online for ${list}.${free}`;
+}
+
+/** "7 am", "8:30 pm": a time as the word list writes it (WV2Voice). */
+export function shopClock(clock: string): string {
+    return clockText(clock).replace(/(am|pm)$/, " $1");
+}
+
+/**
+ * When a pick-up order can be collected, from the business hours alone
+ * (DEC-172, U11): there are no pick-up slots and no real cut-off yet, so
+ * Saroh says only what the hours say, and never "today" or "tomorrow".
+ *
+ * - Closed now: "Ready from 7 am Tue 20 Oct." — the next opening.
+ * - Open now: "Come for it any time we're open, till 8 pm." — the business
+ *   says when it is ready by email; nothing here claims it is ready now.
+ * - No hours saved: null, and the checkout says the place and its hours
+ *   line instead.
+ */
+export function pickupReadyWords(
+    week: readonly OpeningHoursDay[] | null | undefined,
+    now: Date,
+    timeZone: string,
+    closedDates: readonly string[] = [],
+): string | null {
+    const state = openState(week, now, timeZone, closedDates);
+    if (!state) return null;
+    if (state.open) {
+        return `Come for it any time we're open, till ${shopClock(state.closesAt)}.`;
+    }
+    const next = nextOpening(week, now, timeZone, closedDates);
+    if (!next) return null;
+    return `Ready from ${shopClock(next.opensAt)} ${dateText(next.date, true)}.`;
 }

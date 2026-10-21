@@ -1,5 +1,6 @@
 "use client";
 
+import type { LookId } from "@saroh/block-contract";
 import { useEffect, useState } from "react";
 
 import { focusRing, quietFill } from "../booking-flow/styles";
@@ -358,8 +359,12 @@ export default function ShopListing({
                                                     index < 4
                                                         ? "above"
                                                         : "below",
+                                                    {
+                                                        src: p.image.url,
+                                                        sizes: "(min-width: 1024px) 25vw, 50vw",
+                                                    },
                                                 )}
-                                                className="h-full w-full object-cover transition-transform duration-300 [transition-timing-function:cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.03] motion-reduce:transform-none motion-reduce:transition-none"
+                                                className="h-full w-full object-cover transition-transform duration-200 [transition-timing-function:cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.03] motion-reduce:transform-none motion-reduce:transition-none"
                                             />
                                         </span>
                                     ) : anyPhoto ? (
@@ -548,12 +553,15 @@ export function ShopUnavailable({
     business,
     retryHref = null,
     reach = null,
+    look,
 }: {
     business: string;
     /** The page's own address: "Try again" asks for it afresh. */
     retryHref?: string | null;
     /** A call and a message, when the site shows them. */
     reach?: BusinessReach | null;
+    /** Folio, Quiet or Live (DEC-172, U15); absent is Classic. */
+    look?: LookId;
 }) {
     return (
         <SitePageState
@@ -561,6 +569,7 @@ export function ShopUnavailable({
             failed
             retryHref={retryHref}
             reach={reach}
+            look={look}
         >
             Something went wrong on our side. Try again in a moment, or get in
             touch with {business} to order.

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import type { SectionType } from "@saroh/block-contract";
+import type { LookId, SectionType } from "@saroh/block-contract";
 import { BLOCK_META } from "@saroh/block-contract";
 import { BlockFixturePreview } from "@saroh/site-blocks";
 import { Button } from "@saroh/ui/button";
@@ -36,6 +36,7 @@ export function AddSectionDialog({
     open,
     onOpenChange,
     variables,
+    look,
     onAdd,
     startType = null,
     shopOpen = false,
@@ -45,6 +46,8 @@ export function AddSectionDialog({
     onOpenChange: (open: boolean) => void;
     /** This merchant's `--site-*` variables, so previews wear their palette. */
     variables?: Record<string, string>;
+    /** The draft's look (DEC-172, U16), so previews wear it; absent Classic. */
+    look?: LookId;
     /** Insert a section of `type`; `variant` is set when a look was chosen. */
     onAdd: (type: SectionType, variant?: string) => void;
     /**
@@ -94,10 +97,14 @@ export function AddSectionDialog({
                                         description={v.description}
                                         onPick={() => add(type, v.id)}
                                     >
-                                        <BlockThumbnail variables={variables}>
+                                        <BlockThumbnail
+                                            variables={variables}
+                                            look={look}
+                                        >
                                             <BlockFixturePreview
                                                 type={type}
                                                 variant={v.id}
+                                                look={look}
                                             />
                                         </BlockThumbnail>
                                     </PickerCard>
@@ -145,10 +152,12 @@ export function AddSectionDialog({
                                         >
                                             <BlockThumbnail
                                                 variables={variables}
+                                                look={look}
                                             >
                                                 <BlockFixturePreview
                                                     type={t}
                                                     variant={m.variants[0].id}
+                                                    look={look}
                                                 />
                                             </BlockThumbnail>
                                         </PickerCard>

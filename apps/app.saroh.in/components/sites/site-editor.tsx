@@ -35,9 +35,13 @@ import {
     TestReleaseSheets,
 } from "@/components/sites/test-releases/test-release-sheets";
 import { TestReleasesPanel } from "@/components/sites/test-releases/test-releases-panel";
+import { getPageSections } from "@/lib/sites/actions";
 import { flagsByScreenPosition } from "@/lib/sites/editor-positions";
 import { resolveStyleVariables } from "@/lib/sites/style";
+import { styleChoiceRules } from "@/lib/sites/style-access";
 import { publishOverScheduleWarning } from "@/lib/sites/test-releases";
+import type { LookId } from "@saroh/block-contract";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * SiteEditor (S2-004): the page's blocks beside a live `DraftPreview` of local
@@ -68,6 +72,10 @@ export function SiteEditor({
     address,
     initialStyle,
     styleOptions,
+    looksAvailable = false,
+    liveLook: initialLiveLook = null,
+    styleAccess = null,
+    templateId = null,
     shopOpen = false,
     packsOpen = false,
     addablePageKinds,
@@ -84,6 +92,13 @@ export function SiteEditor({
         initialReview,
     });
     // The site's test releases (DEC-071, T11); hidden while they're off.
+    /*
+     * The look the live site is in (U16). Publishing puts the draft's
+     * saved look live, so it moves with a publish; the ref holds the
+     * saved look for that moment, as the style hook comes after.
+     */
+    const [liveLook, setLiveLook] = useState<LookId | null>(initialLiveLook);
+    const savedLookRef = useRef<LookId | null>(initialStyle.look ?? null);
     const releaseState = useTestReleases({
         siteId,
         initialRead: initialTestReleases,
@@ -102,6 +117,7 @@ export function SiteEditor({
         // Publishing moves the live site under the releases: a scheduled
         // go-live won't run over it, and Go live replaces something newer.
         onLiveChanged: () => {
+            setLiveLook(savedLookRef.current);
             if (!releaseState.available) return;
             void releaseState.refresh();
             void releaseState.readLive();
@@ -155,6 +171,9 @@ export function SiteEditor({
         onSaved: publish.markStylePending,
     });
     const { style } = siteStyle;
+    useEffect(() => {
+        savedLookRef.current = siteStyle.savedLook;
+    }, [siteStyle.savedLook]);
     // Remove, move, hide and reset act at once and offer Undo (G3).
     const edits = useUndo({ ...draft, ...siteStyle, setSelectedIndex });
     /*
@@ -211,6 +230,16 @@ export function SiteEditor({
             : undefined,
     });
 
+    // Free and paid looks, typefaces and colourways (DEC-177): what the
+    // server holds stays open to the site whatever its plan.
+    const styleRules = styleChoiceRules(
+        styleAccess,
+        siteStyle.savedStyle,
+        styleOptions,
+        liveLook,
+    );
+    const homePage = pages.find((p) => p.isHome) ?? pages.at(0);
+
     return (
         // The workspace's theme (#335); the page on the canvas is bright.
         <div className="flex h-dvh flex-col bg-background text-foreground">
@@ -265,6 +294,35 @@ export function SiteEditor({
                         notedKeys={review.notedKeys}
                         shopOpen={shopOpen}
                         packsOpen={packsOpen}
+                        looks={{
+                            available: looksAvailable,
+                            liveLook,
+                            published: !publish.neverPublished,
+                            templateId,
+                            error: siteStyle.lookError,
+                            onChoose: siteStyle.chooseLook,
+                            // Each look's Preview draws the home page: the
+                            // editor's own sections when it is open.
+                            preview: {
+                                siteId,
+                                address: address ?? null,
+                                pages,
+                                chrome: canvasChromeFor({
+                                    siteName: chrome.displayName,
+                                    navigation,
+                                    pages,
+                                    footer: chrome.footer,
+                                    homeSections:
+                                        homePage?.id === pageId
+                                            ? sections
+                                            : undefined,
+                                }),
+                                homeSections:
+                                    homePage?.id === pageId ? sections : null,
+                                readPage: (id) => getPageSections(siteId, id),
+                            },
+                        }}
+                        styleRules={styleRules}
                     />
                 }
                 canvas={
@@ -348,6 +406,7 @@ export function SiteEditor({
                     }
                 }}
                 variables={resolveStyleVariables(style, styleOptions)}
+                look={style.look}
                 onAdd={(type, variant) => addSection(type, variant)}
                 shopOpen={shopOpen}
                 packsOpen={packsOpen}

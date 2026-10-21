@@ -25,6 +25,8 @@ export interface PlansRead {
     autopayMethods?: AutopayMethod[];
     /** The business isn't taking orders on this site (#800). */
     notTakingOrders?: boolean;
+    /** How long members may pause, in weeks (DEC-172 U7); none when absent. */
+    pauseWeeks?: number[];
 }
 
 export async function plansFeed(
@@ -42,6 +44,7 @@ export async function plansFeed(
         payOnline,
         autopayMethods = [],
         notTakingOrders,
+        pauseWeeks = [],
     } = await read();
     return {
         plans,
@@ -49,6 +52,9 @@ export async function plansFeed(
         payOnline,
         autopayMethods,
         ...(notTakingOrders ? { notTakingOrders: true } : {}),
+        // Said beside the plans under a look, only when the business lets
+        // members pause (U7).
+        ...(pauseWeeks.length > 0 ? { pauseWeeks } : {}),
     };
 }
 

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { CookieNotice } from "@saroh/site-blocks";
+import { CookieNotice, lookOf } from "@saroh/site-blocks";
 
 import { getSiteForHost } from "@/lib/publication";
 import { getSiteHead } from "@/lib/site-head";
@@ -29,6 +29,7 @@ export default async function CookieNoticePage({
     return (
         <CookieNotice
             siteName={resolved.snapshot.site.name}
+            look={lookOf(resolved.snapshot.site.look)}
             tools={head.trackers.map((t) => ({
                 name: TRACKER_NAMES[t.kind],
                 purpose: TRACKER_PURPOSES[t.kind],

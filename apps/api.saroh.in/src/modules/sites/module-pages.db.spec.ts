@@ -724,12 +724,16 @@ describe("module pages on the public site read (G15, real database)", () => {
         // `icon` is always there (DEC-124): null here, with no icon or logo.
         expect(Object.keys(view).sort()).toEqual([
             "icon",
+            // Whose photos the site's image route may resize (#1043).
+            "organizationId",
             // Where the site answers (its own domain, else its Saroh address).
             "primaryHost",
             "publishedAt",
             "siteId",
             "snapshot",
         ]);
+        // The site's own business, never the caller's (#1043).
+        expect(view.organizationId).toBe(b.ctx.organizationId);
     });
 });
 

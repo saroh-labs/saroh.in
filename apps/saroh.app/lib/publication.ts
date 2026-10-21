@@ -1,3 +1,4 @@
+import type { LookId } from "@saroh/block-contract";
 import type { JournalFeed, ModulePageStates } from "@saroh/site-blocks";
 
 import { env } from "@/env";
@@ -116,6 +117,13 @@ export interface PublicationSite {
      * already published.
      */
     styleVariables?: Record<string, string> | null;
+    /**
+     * The site's look (DEC-172): Folio, Quiet or Live. Absent is Classic,
+     * which every snapshot published before looks is, and draws exactly as
+     * it always did. The publisher has already made the colours in
+     * `styleVariables` safe for it.
+     */
+    look?: LookId;
     /**
      * What the merchant wrote at the foot of their site (#202).
      *

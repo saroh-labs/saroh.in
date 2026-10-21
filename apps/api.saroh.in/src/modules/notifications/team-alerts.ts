@@ -62,6 +62,9 @@ export const TEAM_ALERT_TYPE = "team.alert";
  *   notice is written on the request's own transaction and named here
  *   (`notificationId`), so only the email is left to do. Keyed to the
  *   request and the step.
+ * - `request`: a customer asked the business to remove their data from
+ *   their site account (DEC-172, `data-request-alerts.ts`). Keyed to the
+ *   request; told to whoever can run a customer removal, on its own row.
  */
 export type TeamAlertPayload =
     | { event: "order"; orderId: string; actorUserId?: string | null }
@@ -69,6 +72,7 @@ export type TeamAlertPayload =
     | { event: "team"; userId: string; invitationId: string }
     | { event: "booking"; notificationId: string }
     | { event: "uncollected"; orderId: string }
+    | { event: "request"; requestId: string }
     | {
           event: "provider";
           channel: "PAYMENTS" | "EMAIL";

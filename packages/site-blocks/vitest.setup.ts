@@ -28,3 +28,10 @@ beforeEach(() => viewport("desk"));
 afterEach(() => {
     if (typeof window !== "undefined") window.sessionStorage.clear();
 });
+
+// Each test starts at the site's root address: the booking page writes its
+// step into the address (U9), and one test's must not open the next's.
+afterEach(() => {
+    if (typeof window !== "undefined")
+        window.history.replaceState(null, "", "/");
+});

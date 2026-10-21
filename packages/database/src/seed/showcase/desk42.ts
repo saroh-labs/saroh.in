@@ -65,6 +65,24 @@ const LEADS = 22;
 const FORM_LEADS = 14;
 const OTHERS = 124;
 
+/** Contacts in the CRM: the membership enquiries, then members and visitors. */
+export const DK_PEOPLE = LEADS + OTHERS;
+
+/**
+ * The diary's shape. `showAhead` is what the demo shows booked ahead (a day
+ * pass, the room, the booth), so it is there on every day the seed runs
+ * rather than when the draws allow it.
+ */
+export const DK_DIARY = {
+    target: 340,
+    fromDay: -90,
+    toDay: 14,
+    prospects: Array.from({ length: LEADS }, (_, i) => i),
+    prospectServices: [DK_SERVICE.tour],
+    weekdayWeights: [0, 1.1, 1.15, 1.1, 1.05, 0.95, 0.45],
+    showAhead: [DK_SERVICE.dayPass, DK_SERVICE.room, DK_SERVICE.booth],
+};
+
 /** The booth opening (about ten weeks back) and the November events. */
 const extraTraffic = () => {
     const booth = bump(-68, 0.4, 8);
@@ -219,15 +237,10 @@ export async function seedDesk42(
 
     // --- the diary: day passes, the room, the booth, tours
     const planned = planBookings(rngFor(sid(""), "bookings"), {
+        ...DK_DIARY,
         now,
         services: DK_SERVICES,
-        target: 340,
-        fromDay: -90,
-        toDay: 14,
         contacts: people.length,
-        prospects: Array.from({ length: LEADS }, (_, i) => i),
-        prospectServices: [DK_SERVICE.tour],
-        weekdayWeights: [0, 1.1, 1.15, 1.1, 1.05, 0.95, 0.45],
     });
     const diary = bookingRows(planned, {
         now,

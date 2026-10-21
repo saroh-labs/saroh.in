@@ -106,7 +106,10 @@ function LeadCard({
                     <img
                         src={p.image.url}
                         alt={p.image.alt}
-                        {...siteImage(lead ? "above" : "below")}
+                        {...siteImage(lead ? "above" : "below", {
+                            src: p.image.url,
+                            sizes: "(min-width: 1024px) 33vw, 50vw",
+                        })}
                         className="bg-site-surface aspect-[4/5] w-full rounded-[var(--site-radius)] object-cover"
                     />
                 ) : (

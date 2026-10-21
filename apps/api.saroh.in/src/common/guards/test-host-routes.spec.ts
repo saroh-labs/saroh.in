@@ -9,7 +9,8 @@
  * allowed without anyone asking. So the lists below are pinned: a new public
  * write route fails this spec until it is added to REFUSED (a write: it
  * stores, sends or charges something) or to ALLOWED (it writes nothing,
- * with the reason).
+ * or, decided on the record, only the caller's own request; with the
+ * reason).
  */
 jest.mock("@saroh/database", () => ({
     prisma: {},
@@ -26,6 +27,11 @@ import { TestHostWriteGuard } from "./test-host.guard";
 const ALLOWED: Record<string, string> = {
     "POST public/sites/:siteId/checkout/quote":
         "prices the bag from listings and stores nothing",
+    // DEC-172 (#1106, U13): the one ALLOWED write. It deletes nothing and
+    // touches only the signed-in customer's own record, and the account's
+    // browser test (U14) asks from a test release.
+    "POST public/site-accounts/me/data-request":
+        "asks the business to remove the signed-in customer's own data; it deletes nothing",
 };
 
 /** Provider callbacks: no browser origin from a test host ever reaches them. */

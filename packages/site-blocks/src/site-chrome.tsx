@@ -1,7 +1,12 @@
+import type { LookId } from "@saroh/block-contract";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { siteImage } from "./lib/site-image";
+import type { SiteSession } from "./look-chrome";
+import { lookOf } from "./look-context";
+import { LookHeader } from "./look-header";
+import type { SiteContact } from "./site-footer-contact";
 import type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
 import { SiteActionLink, SiteMenu, SiteNavRow } from "./site-header-menu";
 import type { ModulePageStates } from "./site-menu";
@@ -16,6 +21,7 @@ import { withoutPrimaryAction } from "./site-primary-action";
  * here, the footer in `site-footer.tsx`, the menu both draw in
  * `site-menu.ts` (#252).
  */
+export type { SiteSession } from "./look-chrome";
 export {
     FOOTER_LAYOUTS,
     footerLine,
@@ -106,7 +112,28 @@ export function SiteHeader({
     account,
     modules,
     shopServes = false,
+    look,
+    contact = null,
+    session = null,
 }: {
+    /**
+     * The site's look (DEC-172, U5): Folio, Quiet or Live draw their own
+     * header, phone menu and main button (`look-header.tsx`). Absent, or
+     * anything this build doesn't know, is Classic: this header, unchanged.
+     */
+    look?: LookId | null;
+    /**
+     * The business's public place and ways to reach it, as the footer
+     * takes them: a look's phone menu says where to visit and today's
+     * hours, and offers Call and the business's WhatsApp chat. Classic
+     * doesn't read it.
+     */
+    contact?: SiteContact | null;
+    /**
+     * Whether a customer is signed in, for the look's phone menu (Your
+     * account or Sign in); null when the site has no accounts.
+     */
+    session?: SiteSession | null;
     name: string;
     navigation: SiteNavItem[];
     /**
@@ -149,6 +176,25 @@ export function SiteHeader({
     const hasMenu = items.length > 0 || main !== null;
     const mark = logo?.url.trim() ? logo.url.trim() : null;
 
+    const drawn = lookOf(look);
+    if (drawn) {
+        return (
+            <LookHeader
+                look={drawn}
+                name={name}
+                items={items}
+                homeHref={to("/")}
+                action={main ? { ...main, kind: action?.kind } : null}
+                logo={mark}
+                bag={bag}
+                account={account}
+                contact={contact}
+                session={session}
+                basePath={basePath}
+            />
+        );
+    }
+
     return (
         <header
             data-site-header=""
@@ -175,7 +221,10 @@ export function SiteHeader({
                             width={32}
                             height={32}
                             // On the first screen of every page.
-                            {...siteImage("above")}
+                            {...siteImage("above", {
+                                src: mark,
+                                sizes: "120px",
+                            })}
                             data-site-logo=""
                             className="h-8 w-auto max-w-[7.5rem] shrink-0 rounded-[min(var(--site-radius),8px)] object-contain"
                         />

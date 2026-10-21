@@ -3,6 +3,7 @@ import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
+import { pressUntil } from "../fixtures/press";
 import { useSession } from "../fixtures/sessions";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
 
@@ -245,12 +246,10 @@ test.describe("the phone tab bar", () => {
         await expect(more).toHaveAttribute("aria-expanded", "false");
 
         // Pressed until it opens: a press before hydration does nothing.
-        await expect(async () => {
-            await more.click();
-            await expect(
-                page.getByRole("dialog", { name: "Everything else" }),
-            ).toBeVisible({ timeout: 2_000 });
-        }).toPass({ timeout: 20_000 });
+        await pressUntil(
+            more,
+            page.getByRole("dialog", { name: "Everything else" }),
+        );
 
         const sheet = page.getByRole("dialog", { name: "Everything else" });
         await expect(

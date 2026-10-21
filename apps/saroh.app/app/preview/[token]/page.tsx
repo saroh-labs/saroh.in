@@ -66,6 +66,10 @@ export default async function PreviewHomePage({
             packs={packs}
             productGrids={productGrids}
             siteName={preview.snapshot.site.name}
+            // The draft is the business's own view (DEC-172, R8): blocks may
+            // say what is missing here, never on the live site.
+            look={preview.snapshot.site.look}
+            isOwnerPreview
         />
     );
 }

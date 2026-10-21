@@ -13,6 +13,7 @@ import type {
     CreateSiteInput,
     PreviewLinkDays,
     ReviewerVerdict,
+    Section,
     SectionInput,
     SiteFooter,
     SiteNavigation,
@@ -27,6 +28,7 @@ import {
     createPreviewLink as createPreviewLinkApi,
     createSite as createSiteApi,
     deletePage as deletePageApi,
+    getPageDraft as getPageDraftApi,
     getReviewState as getReviewStateApi,
     getSiteFlags as getSiteFlagsApi,
     listComments as listCommentsApi,
@@ -131,6 +133,28 @@ export async function restorePublication(
     override = false,
 ) {
     return restorePublicationApi(siteId, publicationId, override);
+}
+
+/**
+ * One page's draft sections, for a picture of it drawn outside the editor's
+ * open page: a look's preview draws the home page (DEC-177). Null when it
+ * can't be read; nothing is written.
+ */
+export async function getPageSections(
+    siteId: string,
+    pageId: string,
+): Promise<Section[] | null> {
+    try {
+        const draft = await getPageDraftApi(siteId, pageId);
+        if (!draft) return null;
+        // As the editor's page reads them: `order` is the array's.
+        return draft.sections.map(
+            ({ type, contractVersion, content, hidden, key }) =>
+                ({ type, contractVersion, content, hidden, key }) as Section,
+        );
+    } catch {
+        return null;
+    }
 }
 
 export async function updateSiteStyle(siteId: string, style: SiteStyle) {

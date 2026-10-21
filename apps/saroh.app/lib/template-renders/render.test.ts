@@ -140,6 +140,29 @@ describe("templateRender", () => {
         ).not.toEqual(templateRender(many.id, first.id, "/")?.styleVariables);
     });
 
+    it.each(["quiet", "folio", "live"] as const)(
+        "draws every gallery home page in %s, in safe colours, for the Look row (U16)",
+        (look) => {
+            for (const t of index) {
+                const classic = templateRender(t.id, undefined, "/");
+                const render = templateRender(t.id, undefined, "/", look);
+                expect(render?.look, t.id).toBe(look);
+                expect(classic?.look).toBeNull();
+                // The look's own roles; Classic has none of them.
+                expect(render?.styleVariables["--site-rule"]).toBeTruthy();
+                expect(classic?.styleVariables).not.toHaveProperty(
+                    "--site-rule",
+                );
+                // The same page and blocks; only the look (and the photo
+                // briefs, drawn in its colours) differs.
+                expect(render?.sections.map((x) => x.type)).toEqual(
+                    classic?.sections.map((x) => x.type),
+                );
+                expect(render?.navigation).toEqual(classic?.navigation);
+            }
+        },
+    );
+
     it("is null for what it cannot draw", () => {
         expect(templateRender("no-such-template", undefined, "/")).toBeNull();
         expect(templateRender("bakery", "no-such-colourway", "/")).toBeNull();

@@ -53,6 +53,7 @@ export function useMoreActions({
     suggestions,
     duplicates,
     deleteWords = deleteQuestion(null, {}),
+    removedHref,
 }: {
     d: CustomerDetail;
     name: string;
@@ -65,12 +66,22 @@ export function useMoreActions({
     duplicates: DuplicateSuggestion[];
     /** The delete confirm's paragraph; by default the plain one. */
     deleteWords?: string;
+    /**
+     * Where a privacy removal lands, when not back on the list: the
+     * Requests tab, while they have an open removal request (DEC-172).
+     */
+    removedHref?: string;
 }): {
     menu: MoreItem[];
     edit: () => void;
     link: () => void;
     /** Merge with a suggested duplicate; absent without `customer:merge`. */
     mergeDuplicate?: (dup: DuplicateSuggestion) => void;
+    /**
+     * "Remove their details (privacy request)…" (C11), from a banner;
+     * absent without `customer:remove`.
+     */
+    removeDetails?: () => void;
     dialogs: React.ReactNode;
 } {
     const router = useRouter();
@@ -117,7 +128,7 @@ export function useMoreActions({
     function removedDetails() {
         setRemovingDetails(false);
         showSuccess(REMOVED_TOAST);
-        router.push(back);
+        router.push(removedHref ?? back);
     }
 
     const menu = moreMenu(
@@ -210,6 +221,7 @@ export function useMoreActions({
         edit: () => setEditing((n) => n + 1),
         link: () => setLinking(true),
         mergeDuplicate,
+        removeDetails: canRemove ? () => setRemovingDetails(true) : undefined,
         dialogs,
     };
 }

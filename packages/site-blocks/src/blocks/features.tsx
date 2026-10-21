@@ -2,6 +2,7 @@ import type { RenderedFeatures } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 
 import { cn } from "../lib/utils";
+import type { LookProps } from "../look-context";
 
 /**
  * `features` v1 — a heading over a set of short, titled points (#255).
@@ -28,7 +29,7 @@ import { cn } from "../lib/utils";
  */
 export default function FeaturesSection({
     content,
-}: {
+}: LookProps & {
     content: RenderedFeatures;
 }) {
     const variant = resolveVariant("features", content);

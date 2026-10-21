@@ -1,4 +1,5 @@
 import type { RenderedFaq } from "@saroh/block-contract";
+import type { LookProps } from "../look-context";
 
 /**
  * `faq` v1 — questions and their answers (#255).
@@ -9,7 +10,11 @@ import type { RenderedFaq } from "@saroh/block-contract";
  *
  * Drawn from `--site-*` only; gate G2 fails the build otherwise.
  */
-export default function FaqSection({ content }: { content: RenderedFaq }) {
+export default function FaqSection({
+    content,
+}: LookProps & {
+    content: RenderedFaq;
+}) {
     return (
         <section className="mx-auto w-full max-w-3xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             {content.heading ? (

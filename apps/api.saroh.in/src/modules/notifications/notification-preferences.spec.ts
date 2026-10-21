@@ -90,7 +90,14 @@ describe("reading your alerts", () => {
             "booking",
             "failed",
             "team",
+            // The owner can remove a customer's details (DEC-172).
+            "request",
         ]);
+        expect(view.alerts.find((a) => a.key === "request")?.channels).toEqual({
+            bell: true,
+            email: true,
+            whatsapp: false,
+        });
         // Email defaults on for a failed payment: Saroh sends it, so no
         // provider is needed (DEC-011, amended 2026-10-07).
         expect(view.alerts.find((a) => a.key === "failed")?.channels).toEqual({
@@ -162,7 +169,11 @@ describe("reading your alerts", () => {
     it("never names a module that is off, or rolled out off (DEC-057)", async () => {
         modules(["APPOINTMENTS"], ["COMMERCE"]);
         const view = await service().read(ctx());
-        expect(view.alerts.map((a) => a.key)).toEqual(["failed", "team"]);
+        expect(view.alerts.map((a) => a.key)).toEqual([
+            "failed",
+            "team",
+            "request",
+        ]);
     });
 
     it("offers the Website row only with test releases on, to who can publish (DEC-071, T10)", async () => {
@@ -175,6 +186,7 @@ describe("reading your alerts", () => {
             "failed",
             "team",
             "site",
+            "request",
         ]);
         // Email on by default: the site changed, or didn't, unwatched.
         expect(view.alerts.find((a) => a.key === "site")?.channels).toEqual({

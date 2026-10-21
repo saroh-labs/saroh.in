@@ -2,17 +2,33 @@ import type { RenderedGallery } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
+import type { LookProps } from "../look-context";
+import LookGallery from "./gallery-look";
 
 /**
  * `gallery` v1 — an ordered set of images. `carousel` degrades to a horizontal
  * scroll strip; `grid` and `masonry` lay images out responsively. All variants
  * are keyboard/scroll accessible and never overflow the page horizontally.
+ *
+ * Under a look (DEC-172, U7) it is the look's own (`gallery-look.tsx`):
+ * each photo opens in a lightbox dialog. Classic draws exactly as before.
  */
 export default function GallerySection({
     content,
-}: {
+    look,
+    isOwnerPreview,
+}: LookProps & {
     content: RenderedGallery;
 }) {
+    if (look) {
+        return (
+            <LookGallery
+                content={content}
+                look={look}
+                isOwnerPreview={isOwnerPreview}
+            />
+        );
+    }
     /*
      * The look comes from `variant` now (#254). `resolveVariant` is what makes
      * that safe for content of any age: a `gallery@1` section carries `layout`
@@ -51,7 +67,11 @@ export default function GallerySection({
                                     alt={img.alt ?? ""}
                                     width={img.width}
                                     height={img.height}
-                                    {...siteImage()}
+                                    {...siteImage("below", {
+                                        src: img.src,
+                                        width: img.width,
+                                        sizes: "(min-width: 640px) 480px, 85vw",
+                                    })}
                                     className="h-64 w-auto rounded-[var(--site-radius)] object-cover"
                                 />
                                 <Caption text={img.caption} over={over} />
@@ -63,7 +83,11 @@ export default function GallerySection({
                                 alt={img.alt ?? ""}
                                 width={img.width}
                                 height={img.height}
-                                {...siteImage()}
+                                {...siteImage("below", {
+                                    src: img.src,
+                                    width: img.width,
+                                    sizes: "(min-width: 640px) 480px, 85vw",
+                                })}
                                 className="h-64 w-auto flex-none snap-start rounded-[var(--site-radius)] object-cover"
                             />
                         ),
@@ -93,7 +117,11 @@ export default function GallerySection({
                             // holds its room before it arrives.
                             width={img.width}
                             height={img.height}
-                            {...siteImage()}
+                            {...siteImage("below", {
+                                src: img.src,
+                                width: img.width,
+                                sizes: "(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw",
+                            })}
                             className={cn(
                                 "w-full rounded-[var(--site-radius)] object-cover",
                                 layout === "masonry"

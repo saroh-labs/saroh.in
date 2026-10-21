@@ -16,8 +16,18 @@ export {
     PageSections,
     default as SectionRenderer,
     opensOverPhoto,
+    pageProof,
+    withLookVariant,
 } from "./section-renderer";
 export type { Section } from "./section-renderer";
+// The hero's way in and its proof line under a look (DEC-172, U6).
+export type { FrontDoor, PageProof } from "./blocks/look-front";
+// A look's button classes, for a state page's ways on (DEC-172, U15).
+export { frontButton } from "./blocks/look-front";
+// The look a page is drawn in, and whether it is the owner's preview
+// (DEC-172, U4): handed to every block as props.
+export { lookOf, lookScope } from "./look-context";
+export type { LookProps } from "./look-context";
 // A business's live data given to a whole page (template renders, U14).
 export type { SiteFixtures } from "./site-fixtures";
 // Server-safe: which sections are known to draw nothing, for the menu.
@@ -109,6 +119,7 @@ export {
     plansAutopayMethods,
     plansNotTakingOrders,
     plansOf,
+    plansPauseWeeks,
     plansPayOnline,
 } from "./lib/plans-read";
 // Called by saroh.app's server: from a module with no "use client".
@@ -211,6 +222,9 @@ export type { ShopListingCard } from "./product/shop-listing";
 // ordering" in the product page's action slot, and the header's bag with
 // its sheets. The site's server actions arrive as a `ShopCheckoutApi`.
 export { AddToBag } from "./shop/add-to-bag";
+// The shop under a look (DEC-172, U11, #1102). Classic keeps the above.
+export { pickupReadyWords } from "./lib/shop-facts";
+export { LookShopListing } from "./product/shop-listing-look";
 export { SHOP_OFFLINE } from "./shop/api";
 export type {
     CheckoutQuote,
@@ -231,6 +245,9 @@ export type {
 } from "./shop/api";
 export { AskAboutOrdering, askAboutHref } from "./shop/ask-about-ordering";
 export { ShopBag } from "./shop/bag";
+export { LookAddToBag } from "./shop/look-add-to-bag";
+export { LookCheckout } from "./shop/look-checkout";
+export { LookOrderPlaced } from "./shop/look-placed";
 export {
     NOT_TAKING_ORDERS_TEXT,
     NotTakingOrders,
@@ -259,6 +276,7 @@ export type {
     BookingFlowProps,
 } from "./booking-flow/booking-flow";
 export { initialDateOf, initialTimeOf } from "./booking-flow/initial-start";
+// The booking step in the address (site templates v2 U9).
 export {
     isBookResult,
     isBookingPage,
@@ -270,6 +288,14 @@ export type {
     BookingService,
     CreditAnswer,
 } from "./booking-flow/model";
+export {
+    BOOKING_STEPS,
+    closeHref,
+    parseStepUrl,
+    resolveStep,
+    serializeStepUrl,
+} from "./booking-flow/step-url";
+export type { BookingStep, StepUrl } from "./booking-flow/step-url";
 // Booking signed in (A9): the site's server action books, and answers the
 // page in the page's own terms.
 export { OFFLINE_RESULT, resultOf } from "./booking-flow/api";
@@ -403,6 +429,16 @@ export type {
 } from "./account/packs-api";
 // G20: joining a plan and buying a pack from the site's Prices page.
 export { AccountTabBar } from "./account/tab-bar";
+// The account in a look (DEC-172, plan U12).
+export { AccountLookFrame, AccountsOffNote } from "./account/look-account";
+export {
+    ACCOUNTS_OFF_TEXT,
+    greetingWords,
+    lookTabLabel,
+} from "./account/look-account-words";
+export { LookSignIn } from "./account/look-sign-in";
+export { SignInOpener } from "./account/sign-in-return";
+export { orderStatusWords } from "./account/status-words";
 // The account's compact header, and the site's chrome stepping aside for it
 // (DEC-073 #10).
 export {
@@ -418,6 +454,12 @@ export { AccountLoading } from "./account/account-loading";
 export type { AccountLoadingShape } from "./account/account-loading";
 export { AccountBookingPage } from "./account/booking-page";
 export type { BookingLookup } from "./account/booking-page";
+export { DataRequestCard } from "./account/data-request";
+export type {
+    AccountDataRequest,
+    AskDataRequest,
+    DataRequestResult,
+} from "./account/data-request";
 export { DETAILS_OFFLINE } from "./account/details-api";
 export type {
     LeaveLine,
@@ -525,12 +567,20 @@ export type {
     SiteCredit,
     SiteFooterContent,
     SiteHeaderLogo,
+    SiteSession,
 } from "./site-chrome";
+// A look's chrome (DEC-172, U5): the one fixed bar on a phone and Live's
+// dock, mounted by the site's layout under a look.
+export { dockTabs, withVisitUs } from "./look-chrome";
+export type { DockTab } from "./look-chrome";
+export { StickyActions } from "./sticky-actions";
 // The one thing a site asks of a visitor: the header's main button, and
 // what a template's hero and closing band agree with. Pure.
 export {
     SITE_PRIMARY_ACTIONS,
     SITE_PRIMARY_ORDER,
+    chromeActionShows,
+    chromePageKind,
     contactPageHref,
     opensPrimaryAction,
     sitePrimaryAction,
@@ -562,11 +612,18 @@ export type { LoadedSiteFaces } from "./site-theme";
 // The typeface pairs (KTD-2), for the renderer's loader and the Style panel.
 export {
     FONT_PAIRS,
+    PICKABLE_FONT_PAIRS,
     findFontPair,
+    fontFaceKey,
+    fontPairFaceKeys,
     fontPairFamilies,
     isFontPairKey,
 } from "@saroh/block-contract";
-export type { FontPairKey, SiteFontPair } from "@saroh/block-contract";
+export type {
+    FontPairKey,
+    SiteFontFace,
+    SiteFontPair,
+} from "@saroh/block-contract";
 
 // A test release (DEC-071, T6): the layout's provider, the hook the flows
 // read, the stop they show instead of taking a real order, booking,
@@ -579,7 +636,14 @@ export {
 } from "./test-release/test-release-stop";
 export type { TestReleaseVerb } from "./test-release/test-release-stop";
 // Server-safe: the site's server actions refuse in these words.
-export { ConsentBanner, CookieChoicesButton, listOf } from "./consent-banner";
+export {
+    ConsentBanner,
+    CookieChoicesButton,
+    listOf,
+    lookConsentWords,
+} from "./consent-banner";
+// Where a look's banner docks, so it never covers the hero's buttons (U15).
+export { consentDock, heroTargets } from "./consent-dock";
 export { SITE_CONSENT_OFFSET, SITE_CONSENT_OPEN_EVENT } from "./consent-events";
 export { CookieNotice } from "./cookie-notice";
 export {

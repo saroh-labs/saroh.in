@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { PostIndex } from "@/components/post-view";
 import { PreviewGone } from "@/components/preview-gone";
 import {
+    lookOf,
     modulePageTopOf,
     ModulePageUnavailable,
     PageSections,
@@ -56,7 +57,12 @@ export default async function PreviewPage({
     // A module page whose module is off says so, as its live address will
     // (G15, G19), rather than showing what publishing wouldn't.
     if (moduleOff(page, preview.modules)) {
-        return <ModulePageUnavailable business={preview.snapshot.site.name} />;
+        return (
+            <ModulePageUnavailable
+                business={preview.snapshot.site.name}
+                look={lookOf(preview.snapshot.site.look)}
+            />
+        );
     }
 
     // The draft's posts (G10), as the preview's own index shows them, and
@@ -91,6 +97,9 @@ export default async function PreviewPage({
             packs={packs}
             productGrids={productGrids}
             siteName={preview.snapshot.site.name}
+            // The business's own view of its draft (DEC-172, R8).
+            look={preview.snapshot.site.look}
+            isOwnerPreview
         />
     );
 }

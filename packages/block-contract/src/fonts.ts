@@ -41,7 +41,25 @@ export interface SiteFontFace {
     weights: readonly number[];
     /** The stack after the family: shown while it loads, or if it can't. */
     fallback: string;
+    /** Styles the renderer loads; absent for upright only. */
+    styles?: readonly FontStyleName[];
+    /** Character sets the renderer loads; absent for `latin` only. */
+    subsets?: readonly FontSubset[];
+    /**
+     * The name the app's loaded faces file this face under, when it is not
+     * the family's: a look loads its own copy of a family with only the
+     * weights it sets (Newsreader for Folio beside the full `newsreader`
+     * pair), so the two need different keys. Absent: the family name.
+     */
+    load?: string;
 }
+
+export type FontStyleName = "normal" | "italic";
+/**
+ * `latin-ext` carries the rupee sign (U+20B9) in the faces that draw one; a
+ * browser fetches that file only for a page that has such a character.
+ */
+export type FontSubset = "latin" | "latin-ext";
 
 /**
  * A heading face and a body face, chosen together, and sometimes a third.
@@ -58,6 +76,13 @@ export interface SiteFontPair {
     heading: SiteFontFace;
     body: SiteFontFace;
     mono?: SiteFontFace;
+    /**
+     * A look's pair (DEC-172): set by the site's look, never chosen on its
+     * own. Its faces load only the weights the look's type sets, so the
+     * Typeface picker does not offer it to a Classic site, whose headings
+     * would ask for weights it never loaded.
+     */
+    look?: true;
 }
 
 const face = (
@@ -65,6 +90,27 @@ const face = (
     fallback: string,
     weights: readonly number[] = [],
 ): SiteFontFace => ({ family, weights, fallback });
+
+/**
+ * A look's face (DEC-172, U3): its own loader, filed under `load`, with the
+ * weights, styles and subsets named, so a variable font never loads its full
+ * range. Two families per look, no mono role.
+ */
+const lookFace = (
+    load: string,
+    family: string,
+    fallback: string,
+    weights: readonly number[],
+    more: {
+        styles?: readonly FontStyleName[];
+        subsets?: readonly FontSubset[];
+    } = {},
+): SiteFontFace => ({ family, weights, fallback, load, ...more });
+
+/** Upright and italic, for a face whose look sets italic words. */
+const WITH_ITALIC: readonly FontStyleName[] = ["normal", "italic"];
+/** Latin plus the set with the rupee sign, for a face that draws one. */
+const WITH_RUPEE: readonly FontSubset[] = ["latin", "latin-ext"];
 
 /**
  * The pairs, the default first. The eight template designs' pairs; more join
@@ -141,6 +187,79 @@ export const FONT_PAIRS = [
         heading: face("Inter Tight", SYSTEM_FONT_STACK),
         body: face("Inter", SYSTEM_FONT_STACK),
     },
+    /*
+     * The looks' pairs (DEC-172, U3), one per look and keyed by its id
+     * (`LOOKS[id].fontPair`). Each face loads only the weights its look's
+     * type sets, upright unless it names italic:
+     *
+     * - Folio: Newsreader 300 and 400 with italics, over Hanken Grotesk
+     *   400 to 600.
+     * - Quiet: Cormorant Garamond 400 and 500, Light (300) only at 48px and
+     *   up, italic for its 400, over Jost 400 and 500.
+     * - Live: Bricolage Grotesque 700 and 800 at its normal width, over
+     *   Figtree 400 to 700.
+     *
+     * The display faces and Figtree draw the rupee sign in `latin-ext`, so
+     * they load it; Hanken Grotesk and Jost have no rupee in any set, and a
+     * price in their text takes the system face's.
+     */
+    {
+        key: "folio",
+        name: "Newsreader and Hanken Grotesk",
+        look: true,
+        heading: lookFace(
+            "folio:heading",
+            "Newsreader",
+            SERIF_FALLBACK,
+            [300, 400],
+            {
+                styles: WITH_ITALIC,
+                subsets: WITH_RUPEE,
+            },
+        ),
+        body: lookFace(
+            "folio:body",
+            "Hanken Grotesk",
+            SYSTEM_FONT_STACK,
+            [400, 500, 600],
+        ),
+    },
+    {
+        key: "quiet",
+        name: "Cormorant Garamond and Jost",
+        look: true,
+        heading: lookFace(
+            "quiet:heading",
+            "Cormorant Garamond",
+            SERIF_FALLBACK,
+            [300, 400, 500],
+            { styles: WITH_ITALIC, subsets: WITH_RUPEE },
+        ),
+        body: lookFace("quiet:body", "Jost", SYSTEM_FONT_STACK, [400, 500]),
+    },
+    {
+        key: "live",
+        name: "Bricolage Grotesque and Figtree",
+        look: true,
+        heading: lookFace(
+            "live:heading",
+            "Bricolage Grotesque",
+            SYSTEM_FONT_STACK,
+            [700, 800],
+            {
+                subsets: WITH_RUPEE,
+            },
+        ),
+        body: lookFace(
+            "live:body",
+            "Figtree",
+            SYSTEM_FONT_STACK,
+            [400, 500, 600, 700],
+            {
+                subsets: WITH_RUPEE,
+            },
+        ),
+    },
 ] as const satisfies readonly SiteFontPair[];
 
 export type FontPairKey = (typeof FONT_PAIRS)[number]["key"];
@@ -162,6 +281,26 @@ export function isFontPairKey(value: unknown): value is FontPairKey {
 /** The pair for a key, or undefined for one that is not in the list. */
 export function findFontPair(key: unknown): SiteFontPair | undefined {
     return FONT_PAIRS.find((p) => p.key === key);
+}
+
+/**
+ * The pairs a merchant picks from in Website › Style's Typeface list: every
+ * pair but a look's, which comes with its look.
+ */
+export const PICKABLE_FONT_PAIRS: readonly SiteFontPair[] = FONT_PAIRS.filter(
+    (p: SiteFontPair) => !p.look,
+);
+
+/** The name an app files a face's loaded family under (`LoadedSiteFaces`). */
+export function fontFaceKey(face: SiteFontFace): string | null {
+    return face.load ?? face.family;
+}
+
+/** Every loaded-face key a pair reads, by role, mono included. */
+export function fontPairFaceKeys(pair: SiteFontPair): string[] {
+    return [pair.heading, pair.body, pair.mono]
+        .map((f) => (f ? fontFaceKey(f) : null))
+        .filter((k): k is string => typeof k === "string");
 }
 
 /**

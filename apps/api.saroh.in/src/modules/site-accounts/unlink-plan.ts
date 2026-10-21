@@ -22,7 +22,8 @@ import { ensureThread } from "./thread-store";
  *   treatments);
  * - thread messages the customer wrote (A13);
  * - waitlist entries (A12);
- * - mandates (D11).
+ * - mandates (D11);
+ * - "Ask to remove my data" requests (DEC-172).
  *
  * `unlink-plan.spec.ts` reads the Prisma schema and fails when a model
  * gains a `customerAccountId` without a mover here or a reason in
@@ -283,12 +284,33 @@ export const WAITLIST_MOVER: UnlinkMover = {
  * The records that move with the account. A9 adds the first, bookings made
  * signed in; each unit above adds its own, with a db test.
  */
+/**
+ * "Ask to remove my data" requests the account made (DEC-172): about the
+ * person signing in, so they follow the account, whatever their status. A
+ * removal of the contact staff said isn't them must never mark them done.
+ */
+export const DATA_REQUESTS_MOVER: UnlinkMover = {
+    key: "data-requests",
+    model: "CustomerDataRequest",
+    noun: ["removal request", "removal requests"],
+    count: (tx, scope) =>
+        tx.customerDataRequest.count({ where: madeByAccount(scope) }),
+    move: async (tx, scope) =>
+        (
+            await tx.customerDataRequest.updateMany({
+                where: madeByAccount(scope),
+                data: { contactId: scope.toContactId },
+            })
+        ).count,
+};
+
 export const UNLINK_MOVERS: readonly UnlinkMover[] = [
     BOOKINGS_MOVER,
     BOOKING_INVOICES_MOVER,
     ORDERS_MOVER,
     THREAD_MESSAGES_MOVER,
     WAITLIST_MOVER,
+    DATA_REQUESTS_MOVER,
 ];
 
 /**
