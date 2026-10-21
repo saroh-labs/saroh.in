@@ -122,11 +122,12 @@ function book(who: SignedInCustomer, serviceId: string, startAt: Date) {
 }
 
 /** The class as the workspace cancels it: every place, closing the line. */
-async function cancelClass(ids: string[]): Promise<void> {
+async function cancelClass(ids: string[], classReason?: string): Promise<void> {
     for (const id of ids) {
         await bookings.cancelBooking(owner, id, undefined, {
             returnCredit: true,
             closesClass: true,
+            ...(classReason !== undefined ? { classReason } : {}),
         });
     }
 }
@@ -440,5 +441,75 @@ describe("a class the business cancels (U17)", () => {
                 where: { organizationId: owner.organizationId },
             });
         }
+    });
+
+    it("with a reason (#1172): the booked, the held and the waiting all hear it, escaped, and the history keeps it", async () => {
+        const at = nextMonday(7, 8);
+        // Two places, both taken: so Bina can join the line.
+        const serviceId = await classOf(2);
+        const { booking } = await book(await customer(), serviceId, at);
+        const heldBy = await customer();
+        const hold = await prisma.booking.create({
+            data: {
+                organizationId: owner.organizationId,
+                serviceId,
+                contactId: heldBy.contactId,
+                startAt: at,
+                endAt: new Date(at.getTime() + 3_600_000),
+                timezone: "UTC",
+                status: "PENDING",
+                holdExpiresAt: new Date(Date.now() + 15 * 60_000),
+                snapshot: {},
+                bookerEmail: `hold-r-${process.pid}@example.com`,
+                bookerName: "Hema Rao",
+            },
+        });
+        const bina = await customer("Bina");
+        await waitlist.join(bina, serviceId, at.toISOString());
+        const reason = "Teacher's unwell <b>sorry</b> & see you soon";
+
+        await cancelClass([booking.id, hold.id], reason);
+
+        // The history: both CANCELLED events keep the reason.
+        for (const id of [booking.id, hold.id]) {
+            const events = await prisma.bookingEvent.findMany({
+                where: { bookingId: id, type: "CANCELLED" },
+            });
+            expect(events).toHaveLength(1);
+            expect(events[0]!.data).toEqual({ classCancelled: true, reason });
+        }
+        const read = await bookings.getBooking(owner, booking.id);
+        expect(read.events.find((e) => e.type === "CANCELLED")?.data).toEqual({
+            classCancelled: true,
+            reason,
+        });
+
+        const placed = await told(booking.id);
+        expect(placed.sentence).toMatch(
+            /^Pulse Fitness cancelled this class: Teacher's unwell <b>sorry<\/b> & see you soon\. Your place in HIIT \d+ on Mon \d+ \w+ at 7:00 am is cancelled\./,
+        );
+        expect(placed.email?.body).toContain(
+            "cancelled this class: Teacher&#39;s unwell &lt;b&gt;sorry&lt;/b&gt; &amp; see you soon.",
+        );
+        expect(placed.email?.body).not.toContain("<b>sorry");
+        expect(placed.email?.subject).toBe(
+            "Pulse Fitness cancelled your class",
+        );
+
+        const held = await told(hold.id);
+        expect(held.sentence).toMatch(
+            /^Pulse Fitness cancelled this class: Teacher's unwell <b>sorry<\/b> & see you soon\. Your place in HIIT \d+ .+ is cancelled\. No payment was taken\.$/,
+        );
+
+        const [line] = await waitlistJobs(serviceId);
+        expect(line!.payload).toMatchObject({ classCancelReason: reason });
+        const subject = await load(
+            line!.payload as unknown as CustomerNotifyPayload,
+        );
+        expect(subject?.contactId).toBe(bina.contactId);
+        expect(noticeSentence(subject!.vars)).toMatch(
+            /, the class you were waiting for\. Their reason: Teacher's unwell <b>sorry<\/b> & see you soon\. You're no longer on its waitlist\.$/,
+        );
+        expect(renderNotice(subject!.vars).body).not.toContain("<b>sorry");
     });
 });

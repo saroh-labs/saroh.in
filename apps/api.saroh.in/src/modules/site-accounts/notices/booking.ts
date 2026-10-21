@@ -1,6 +1,9 @@
 import type { Prisma } from "@saroh/database";
 
-import { BookingEventType } from "../../bookings/booking-event-type";
+import {
+    BookingEventType,
+    classCancelReasonOf,
+} from "../../bookings/booking-event-type";
 import type { CustomerNotifyPayload } from "../customer-notify-queue";
 import type { CancelMoney } from "./cancel-money";
 import { bookingCancelMoney, cancelMoneyWords } from "./cancel-money";
@@ -11,6 +14,7 @@ import {
     firstWord,
     noticeWhen,
     safeLink,
+    withStop,
 } from "./notice";
 
 /**
@@ -48,6 +52,12 @@ export interface BookingNoticeVars {
      * "‹Business› cancelled this class", with what happened to the money.
      */
     classCancelled?: boolean;
+    /**
+     * Why the business cancelled the class, in its own words (DEC-178,
+     * #1172): "‹Business› cancelled this class: ‹reason›." Null or absent
+     * for a cancel made before #1172, whose words stay as they were.
+     */
+    classReason?: string | null;
     /**
      * What the cancel did with their money (U13, #1144), read when the
      * notice runs: refunded, kept, the credit back, or nothing taken.
@@ -131,6 +141,10 @@ function bookingSentence(kind: BookingNoticeKind, b: BookingNoticeVars) {
             });
             const money = words ? ` ${words}` : "";
             if (b.classCancelled) {
+                // The business's reason first, in its own words (DEC-178).
+                if (b.classReason) {
+                    return `${b.business} cancelled this class: ${withStop(b.classReason)} Your place in ${b.service} on ${when} is cancelled.${money}`;
+                }
                 return `${b.business} cancelled this class: ${b.service} on ${when}. Your place in it is cancelled.${money}`;
             }
             return b.byCustomer
@@ -225,6 +239,7 @@ async function loadBooking(
                   toStartAt: true,
                   fromStaffId: true,
                   toStaff: { select: { name: true } },
+                  data: true,
               },
           })
         : null;
@@ -264,7 +279,12 @@ async function loadBooking(
                 ...(reassigned ? { reassigned: true } : {}),
                 timeZone: booking.timezone,
                 byCustomer: event ? event.actorUserId === null : false,
-                ...(classCancelled ? { classCancelled: true } : {}),
+                ...(classCancelled
+                    ? {
+                          classCancelled: true,
+                          classReason: classCancelReasonOf(event?.data),
+                      }
+                    : {}),
                 // Every cancel says what happened to the money (U13).
                 ...(kind === "BOOKING_CANCELLED"
                     ? {

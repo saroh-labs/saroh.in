@@ -13,7 +13,11 @@ export interface QuickLookActions {
     checkIn: (b: DiaryBooking) => void;
     noShow: (b: DiaryBooking) => void;
     cancel: (b: DiaryBooking) => void;
-    cancelClass: (seats: DiaryBooking[], title: string) => void;
+    /**
+     * Cancel the whole class, with the reason its customers are told
+     * (DEC-178, #1172).
+     */
+    cancelClass: (seats: DiaryBooking[], title: string, reason: string) => void;
 }
 
 /** Undo for a booking whose change is still held, or null. */

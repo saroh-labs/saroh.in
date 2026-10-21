@@ -5514,7 +5514,9 @@ model BookingEvent {
 
   // What a money line says (#1137): on REFUNDED and REFUND_FAILED,
   // `{ amountCents, currency, refundId, outcome }` — the refund it is about
-  // and where it stood when written. Null on every other kind.
+  // and where it stood when written. On the CANCELLED of a place in a class
+  // the business cancelled as a whole, `{ classCancelled: true, reason? }`:
+  // the reason it gave, in its own words (DEC-178, #1172). Null otherwise.
   data Json?
 
   createdAt DateTime @default(now())

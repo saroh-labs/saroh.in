@@ -24,3 +24,30 @@ export const BookingEventType = {
 
 export type BookingEventType =
     (typeof BookingEventType)[keyof typeof BookingEventType];
+
+/**
+ * `data` on the CANCELLED of a place in a class the business cancelled as
+ * a whole (U17, DEC-178 #1172): that it was the class, and the reason the
+ * business gave, in its own words. A cancel made before #1172 has no
+ * reason (and no `data`); its words stay as they were.
+ */
+export interface ClassCancelledData {
+    classCancelled: true;
+    reason?: string;
+}
+
+/** The CANCELLED event's `data` for a class cancelled as a whole. */
+export function classCancelledData(
+    reason: string | null | undefined,
+): ClassCancelledData {
+    return reason ? { classCancelled: true, reason } : { classCancelled: true };
+}
+
+/** The reason a class was cancelled with, from its event's `data`. */
+export function classCancelReasonOf(data: unknown): string | null {
+    if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+    const reason = (data as { reason?: unknown }).reason;
+    return typeof reason === "string" && reason.trim() !== ""
+        ? reason.trim()
+        : null;
+}

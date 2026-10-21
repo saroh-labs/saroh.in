@@ -3,7 +3,7 @@ import type { Prisma } from "@saroh/database";
 import { siteCodeSecret } from "../site-secrets";
 import { waitlistClaimUrl } from "../waitlist-claim";
 import type { NoticeSubject } from "./notice";
-import { defineNotice, firstWord, noticeWhen } from "./notice";
+import { defineNotice, firstWord, noticeWhen, withStop } from "./notice";
 
 /**
  * A waitlist offer (round-2 A12, R13): the place in line a freed place is
@@ -40,7 +40,13 @@ export interface WaitlistNoticeVars {
 export type WaitlistClassCancelledVars = Omit<
     WaitlistNoticeVars,
     "heldUntil" | "link"
->;
+> & {
+    /**
+     * Why, in the business's own words (DEC-178, #1172); null or absent
+     * for a cancel made before it, whose words stay as they were.
+     */
+    reason?: string | null;
+};
 
 export type WaitlistNotice =
     | { kind: "WAITLIST_OFFER"; waitlist: WaitlistNoticeVars }
@@ -60,6 +66,7 @@ export const waitlistNotice = defineNotice<WaitlistNotice>({
                 tx,
                 organizationId,
                 payload.waitlistEntryId,
+                payload.classCancelReason,
             );
         }
         if (payload.kind !== "WAITLIST_OFFER" || !payload.waitlistEntryId) {
@@ -107,7 +114,7 @@ export const waitlistNotice = defineNotice<WaitlistNotice>({
     },
     sentence: (vars) =>
         vars.kind === "WAITLIST_CLASS_CANCELLED"
-            ? `${vars.waitlist.business} cancelled ${vars.waitlist.service} on ${noticeWhen(vars.waitlist.startAt, vars.waitlist.timeZone)}, the class you were waiting for. You're no longer on its waitlist.`
+            ? classCancelledSentence(vars.waitlist)
             : `A place opened in ${vars.waitlist.service} on ${noticeWhen(vars.waitlist.startAt, vars.waitlist.timeZone)}. It's held for you until ${noticeWhen(vars.waitlist.heldUntil, vars.waitlist.timeZone)}.`,
     subject: ({ kind, waitlist }) =>
         kind === "WAITLIST_CLASS_CANCELLED"
@@ -125,6 +132,17 @@ export const waitlistNotice = defineNotice<WaitlistNotice>({
 });
 
 /**
+ * "‹Business› cancelled ‹class› on ‹when›, the class you were waiting
+ * for." With the business's reason (DEC-178, #1172), it is said next, in
+ * its own words: "Their reason: ‹reason›."
+ */
+function classCancelledSentence(w: WaitlistClassCancelledVars): string {
+    const lead = `${w.business} cancelled ${w.service} on ${noticeWhen(w.startAt, w.timeZone)}, the class you were waiting for.`;
+    const why = w.reason ? ` Their reason: ${withStop(w.reason)}` : "";
+    return `${lead}${why} You're no longer on its waitlist.`;
+}
+
+/**
  * A place in line for a class the business cancelled (U17): told only
  * while the entry is still the one the cancel closed.
  */
@@ -132,6 +150,7 @@ async function loadClassCancelled(
     tx: Prisma.TransactionClient,
     organizationId: string,
     entryId: string,
+    reason: string | undefined,
 ): Promise<NoticeSubject<WaitlistNotice> | null> {
     const entry = await tx.classWaitlistEntry.findFirst({
         where: { id: entryId, organizationId },
@@ -155,6 +174,9 @@ async function loadClassCancelled(
                 service: entry.service.name,
                 startAt: entry.startAt,
                 timeZone: entry.service.timezone,
+                ...(typeof reason === "string" && reason.trim() !== ""
+                    ? { reason: reason.trim() }
+                    : {}),
             },
         },
     };

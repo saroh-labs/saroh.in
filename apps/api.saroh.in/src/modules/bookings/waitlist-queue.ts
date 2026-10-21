@@ -118,6 +118,11 @@ export async function closeSessionWaitlistInTx(
         startAt: Date;
         now: Date;
         tell?: boolean;
+        /**
+         * Why the business cancelled the class (DEC-178, #1172): the
+         * waitlist's email says it. Left out, it reads as before.
+         */
+        reason?: string;
     },
 ): Promise<number> {
     const where = {
@@ -141,6 +146,7 @@ export async function closeSessionWaitlistInTx(
             kind: "WAITLIST_CLASS_CANCELLED",
             eventKey: waitlistClassCancelledKey(entry.id),
             waitlistEntryId: entry.id,
+            ...(input.reason ? { classCancelReason: input.reason } : {}),
         });
     }
     return count;

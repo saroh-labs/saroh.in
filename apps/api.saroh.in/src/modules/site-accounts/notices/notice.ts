@@ -171,6 +171,15 @@ export async function businessName(
     return org?.name ?? "";
 }
 
+/**
+ * A reason as a sentence: its own full stop, question or exclamation mark
+ * kept, else a full stop added. Plain text; the email escapes it.
+ */
+export function withStop(reason: string): string {
+    const said = reason.trim();
+    return /[.!?…]$/.test(said) ? said : `${said}.`;
+}
+
 /** Only a web address is ever a link; anything else stays words. */
 export function safeLink(url: string | null | undefined): string | null {
     if (!url) return null;

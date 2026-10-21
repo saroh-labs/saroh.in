@@ -62,6 +62,14 @@ export interface CustomerNotifyPayload {
      * as a whole (U17): "‹Business› cancelled this class".
      */
     classCancelled?: boolean;
+    /**
+     * A WAITLIST_CLASS_CANCELLED's reason, in the business's own words
+     * (DEC-178, #1172). The one place the payload carries words: a place
+     * in line keeps no record of why its class was cancelled, and the
+     * reason never changes after the cancel. A booking's reason is read
+     * from its CANCELLED event's `data` instead.
+     */
+    classCancelReason?: string;
     /** The "Tell me when it's back" a BACK_IN_STOCK notice tells (U23). */
     stockWatchId?: string;
     /** The pack purchase a PACK_* notice is about (U22). */

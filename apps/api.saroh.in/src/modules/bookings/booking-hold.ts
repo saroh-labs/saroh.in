@@ -15,7 +15,7 @@ import {
     writeDocumentLines,
 } from "../invoices/order-invoicing";
 import { mintPayToken } from "../invoices/pay-token";
-import { BookingEventType } from "./booking-event-type";
+import { BookingEventType, classCancelledData } from "./booking-event-type";
 import { seatsHeld } from "./held-seats";
 import { cancelUnsoldTreatmentInTx } from "./treatment-unsold";
 import { offerFreedPlaceInTx } from "./waitlist-queue";
@@ -268,6 +268,8 @@ export async function releaseHoldInTx(
          * the booker is told "‹Business› cancelled this class".
          */
         classCancelled?: boolean;
+        /** Why, in the business's words (DEC-178, #1172). */
+        classReason?: string;
     } = {},
 ): Promise<boolean> {
     await lockBookingInTx(tx, bookingId);
@@ -307,6 +309,9 @@ export async function releaseHoldInTx(
             type: lapsed ? BookingEventType.Lapsed : BookingEventType.Cancelled,
             actorUserId: lapsed ? null : actorUserId,
             fromStartAt: booking.startAt,
+            ...(!lapsed && options.classCancelled === true
+                ? { data: { ...classCancelledData(options.classReason) } }
+                : {}),
         },
         select: { id: true },
     });

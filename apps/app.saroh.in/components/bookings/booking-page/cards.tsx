@@ -9,7 +9,12 @@ import { FRONT_DESK_LINE } from "@/components/bookings/calendar/quick-look-one";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { readOnlyLine } from "@/components/shared/who-can-change";
 import { formatDate, formatDateTime } from "@/lib/format/datetime";
-import { namesWho, systemEventTitle } from "@/lib/services/booking-history";
+import {
+    classCancelReason,
+    isClassCancel,
+    namesWho,
+    systemEventTitle,
+} from "@/lib/services/booking-history";
 import type { MoneyRow } from "@/lib/services/booking-page-money";
 import type { BookingOutcome } from "@/lib/services/booking-state";
 import { BOOKING_WORDS } from "@/lib/services/booking-words";
@@ -292,7 +297,9 @@ export function PageNote({
 /** One line of What happened, in words rather than a state name. */
 export function eventTitle(event: BookingEvent, timeZone: string): string {
     if (event.type === "BOOKED") return "Booked";
-    if (event.type === "CANCELLED") return "Cancelled";
+    if (event.type === "CANCELLED") {
+        return isClassCancel(event) ? "Class cancelled" : "Cancelled";
+    }
     if (event.type === "ATTENDED") return "Marked as came";
     if (event.type === "NO_SHOW") return "Marked as didn't come";
     if (event.type === "PAID_AT_DESK") return "Paid at the desk";
@@ -353,8 +360,20 @@ export function HistoryCard({
                             <span className="size-2 rounded-full bg-border-strong" />
                         </span>
                         <span className="min-w-0 flex-1 min-[760px]:flex min-[760px]:items-baseline min-[760px]:gap-3">
-                            <span className="block font-medium min-[760px]:flex-1 min-[760px]:font-normal">
-                                {eventTitle(event, timezone)}
+                            <span className="block min-w-0 min-[760px]:flex-1">
+                                <span className="block font-medium min-[760px]:font-normal">
+                                    {eventTitle(event, timezone)}
+                                </span>
+                                {/* The reason the class was cancelled with
+                                    (DEC-178), as the business typed it. */}
+                                {classCancelReason(event) ? (
+                                    <span
+                                        data-ph-mask=""
+                                        className="mt-0.5 block break-words text-[13px] text-muted-foreground"
+                                    >
+                                        Reason: {classCancelReason(event)}
+                                    </span>
+                                ) : null}
                             </span>
                             <span
                                 data-ph-mask=""
