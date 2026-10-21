@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { isPrivateSitePath } from "@saroh/block-contract";
 import type { AnalyticsEvent, Job, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
@@ -6,6 +7,7 @@ import { planMeter } from "../billing/metering.service";
 import {
     ANALYTICS_RETENTION_DAYS,
     SITE_VIEW_TYPE,
+    sitePathOnly,
     VISIT_ORIGIN_TYPES,
 } from "./event-contract";
 import { isVisitSource, visitRefOf } from "./visit-source";
@@ -285,7 +287,12 @@ export class AnalyticsAggregateHandler {
         return buckets;
     }
 
-    /** Extract the `path` string from an event's validated properties, or null. */
+    /**
+     * Extract the `path` string from an event's validated properties, or
+     * null. Read again rather than trusted: a row stored before the contract
+     * cut paths and refused private pages (U15 privacy review) gets no
+     * `path` rollup for a query or a private page.
+     */
     private readPath(properties: unknown): string | null {
         if (
             typeof properties === "object" &&
@@ -294,7 +301,8 @@ export class AnalyticsAggregateHandler {
         ) {
             const value = (properties as Record<string, unknown>).path;
             if (typeof value === "string" && value !== "") {
-                return value;
+                const path = sitePathOnly(value);
+                return isPrivateSitePath(path) ? null : path;
             }
         }
         return null;

@@ -54,9 +54,31 @@ export interface VisitSourcesRead {
     countedFrom: Date | null;
     /** All five groups, in a fixed order, zeros included. */
     sources: VisitSourceRow[];
-    /** The merchant's own link labels seen in the range, most visits first. */
+    /**
+     * The merchant's own link labels seen in the range, most visits first.
+     * Labels with fewer than {@link MIN_VISITS_PER_LABEL} visits in the
+     * range are folded into one last row whose `ref` is
+     * {@link OTHER_LINKS_REF} (the screen reads it as "Other links").
+     */
     refs: VisitRefRow[];
 }
+
+/**
+ * A label shown on its own needs this many visits in the range (U15
+ * privacy review): a label one or two people came by could be a link sent
+ * to one person (`?ref=asha-wedding`), so it is shown only inside
+ * {@link OTHER_LINKS_REF}.
+ */
+export const MIN_VISITS_PER_LABEL = 3;
+
+/**
+ * The `ref` of the one row the small labels are folded into. Not a label's
+ * shape (`visitRefOf` allows no `_`), so no merchant's label can be it.
+ */
+export const OTHER_LINKS_REF = "_other";
+
+/** What the screen calls that row. */
+export const OTHER_LINKS_LABEL = "Other links";
 
 /** Which step an event type is. */
 const STEP_OF: Partial<Record<string, keyof VisitSteps | "refunded">> = {
@@ -127,15 +149,41 @@ export function foldVisitSources(
         paid: Math.max(0, steps.paid - refunded),
     });
 
+    const seen = [...byRef.entries()]
+        .map(([ref, counts]) => ({ ref, ...net(counts) }))
+        .filter((r) => r.visits + r.looked + r.started + r.paid > 0);
+    const shown = seen
+        .filter((r) => r.visits >= MIN_VISITS_PER_LABEL)
+        .sort((a, b) => b.visits - a.visits || a.ref.localeCompare(b.ref));
+    const small = seen.filter((r) => r.visits < MIN_VISITS_PER_LABEL);
+    const refs: VisitRefRow[] = [...shown];
+    if (small.length > 0) {
+        refs.push(
+            small.reduce<VisitRefRow>(
+                (sum, r) => ({
+                    ref: OTHER_LINKS_REF,
+                    visits: sum.visits + r.visits,
+                    looked: sum.looked + r.looked,
+                    started: sum.started + r.started,
+                    paid: sum.paid + r.paid,
+                }),
+                {
+                    ref: OTHER_LINKS_REF,
+                    visits: 0,
+                    looked: 0,
+                    started: 0,
+                    paid: 0,
+                },
+            ),
+        );
+    }
+
     return {
         sources: VISIT_SOURCES.map((source) => ({
             source,
             ...net(bySource.get(source) ?? zero()),
         })),
-        refs: [...byRef.entries()]
-            .map(([ref, counts]) => ({ ref, ...net(counts) }))
-            .filter((r) => r.visits + r.looked + r.started + r.paid > 0)
-            .sort((a, b) => b.visits - a.visits || a.ref.localeCompare(b.ref)),
+        refs,
     };
 }
 

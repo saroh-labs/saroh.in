@@ -62,6 +62,14 @@ describe("every personal field has a removal rule", () => {
         ).toEqual([]);
     });
 
+    it("clears where their visit came from off their orders (U15 privacy review)", () => {
+        expect(personalFields(schema)).toEqual(
+            expect.arrayContaining(["Order.visitSource", "Order.visitRef"]),
+        );
+        expect(PERSONAL_FIELDS["Order.visitSource"]?.rule).toBe("cleared");
+        expect(PERSONAL_FIELDS["Order.visitRef"]?.rule).toBe("cleared");
+    });
+
     it("keeps what the law and the tax records need, and says why", () => {
         for (const key of [
             "Invoice.billToName",

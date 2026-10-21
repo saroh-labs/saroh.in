@@ -29,7 +29,7 @@ import { ProductsService } from "../products/products.service";
 import { StoresService } from "../stores/stores.service";
 import { AnalyticsAggregateHandler } from "./analytics-aggregate.handler";
 import { AnalyticsService } from "./analytics.service";
-import { readVisitSources } from "./visit-sources";
+import { OTHER_LINKS_REF, readVisitSources } from "./visit-sources";
 
 const tag = `${process.pid}-${Date.now()}`;
 const flags = {
@@ -299,15 +299,33 @@ describe("site link tracking (U15)", () => {
             visits: 1,
             paid: 0,
         });
+        // Two visits by "diwali-post" is under the three a label needs to
+        // be shown on its own (U15 privacy review): it is in "Other links".
         expect(read.refs).toEqual([
             {
-                ref: "diwali-post",
+                ref: OTHER_LINKS_REF,
                 visits: 2,
                 looked: 1,
                 started: 1,
                 paid: 1,
             },
         ]);
+        // A visit's step is stored to the hour, at a random id, with no
+        // visitor (U15 privacy review).
+        const steps = await prisma.analyticsEvent.findMany({
+            where: {
+                organizationId: orgId,
+                type: { in: ["site.visit", "site.looked", "site.started"] },
+            },
+        });
+        expect(steps.length).toBeGreaterThan(0);
+        for (const step of steps) {
+            expect(step.occurredAt.getTime() % (60 * 60 * 1000)).toBe(0);
+            expect(step.receivedAt.getTime() % (60 * 60 * 1000)).toBe(0);
+            expect(step.visitorHash).toBeNull();
+            expect(step.consent).toBe("anonymous");
+            expect(step.dedupeKey).toBeNull();
+        }
         // Counted from the first day a visit's source was recorded.
         const first = await prisma.analyticsEvent.findFirstOrThrow({
             where: { organizationId: orgId, type: "site.visit" },

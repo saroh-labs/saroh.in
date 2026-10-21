@@ -10,7 +10,11 @@
  *   `whatsapp`, `direct` for "Typed your address", `other`) and, at most,
  *   one label the merchant chose for their own link (`?ref=diwali-post`),
  *   in a short safe shape: lower-case letters, digits and hyphens, no run
- *   of six digits (a phone number or an order number is no label).
+ *   of six digits and no more than six digits in all (a phone number or an
+ *   order number is no label), and never the shape of a record's id.
+ * - **The booking page's own `ref` is not a label.** `/book?step=done&ref=…`
+ *   names a booking, so `ref` is never read on `/book` (or under it), nor
+ *   on any address carrying the booking flow's `step=`.
  * - **The visit lives in this tab's memory only.** It is never written to
  *   a cookie, `localStorage`, `sessionStorage` or any other store, has no
  *   id, and nothing about it identifies the visitor. It ends when the tab
@@ -61,14 +65,36 @@ export const VISIT_IDLE_MS = 30 * 60 * 1000;
 
 const REF_SHAPE = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/;
 const DIGIT_RUN = /\d{6,}/;
+/** Seven digits anywhere in a label can spell a phone number, split up. */
+const MAX_DIGITS = 6;
+/** A record's id (a booking, an order): `c` and 24 more (a cuid). */
+const ID_SHAPE = /^c[a-z0-9]{24}$/;
 
-/** A label as it may be sent, or null. */
+/**
+ * A label as it may be sent, or null. The API checks the same
+ * (`analytics/visit-source.ts`).
+ */
 export function visitRefOf(value: string | null | undefined): string | null {
     if (typeof value !== "string") return null;
     const ref = value.trim().toLowerCase();
     if (ref.length === 0 || ref.length > 32) return null;
     if (!REF_SHAPE.test(ref) || DIGIT_RUN.test(ref)) return null;
+    if ((ref.match(/\d/g)?.length ?? 0) > MAX_DIGITS) return null;
+    if (ID_SHAPE.test(ref)) return null;
     return ref;
+}
+
+/** The booking page, whose own `ref` names a booking. */
+const BOOKING_PATH = "/book";
+
+/**
+ * Whether `ref` on this address could be the booking flow's own (a
+ * booking's id), never a merchant's label: on `/book` or under it, or with
+ * the flow's `step=` in the address.
+ */
+function refIsTheBookingFlows(path: string, params: URLSearchParams): boolean {
+    if (params.has("step")) return true;
+    return path === BOOKING_PATH || path.startsWith(`${BOOKING_PATH}/`);
 }
 
 /** A label that only names a group ("instagram", "ig", "wa"…). */
@@ -106,15 +132,19 @@ function referrerHost(referrer: string, ownHost: string): string | null {
     }
 }
 
-/** `ref`, then `utm_source`, as labels; nothing else in the query. */
-function labelsOf(search: string): string[] {
+/**
+ * `ref`, then `utm_source`, as labels; nothing else in the query. `ref` is
+ * left unread where it is the booking flow's own ({@link refIsTheBookingFlows}).
+ */
+function labelsOf(search: string, path: string): string[] {
     let params: URLSearchParams;
     try {
         params = new URLSearchParams(search);
     } catch {
         return [];
     }
-    return [params.get("ref"), params.get("utm_source")]
+    const ref = refIsTheBookingFlows(path, params) ? null : params.get("ref");
+    return [ref, params.get("utm_source")]
         .map((v) => visitRefOf(v))
         .filter((v): v is string => v !== null);
 }
@@ -131,8 +161,10 @@ export function classifyVisit(input: {
     referrer: string;
     ownHost: string;
     search: string;
+    /** The landing page's path (no query); `/` when not given. */
+    path?: string;
 }): VisitOrigin {
-    const labels = labelsOf(input.search);
+    const labels = labelsOf(input.search, input.path ?? "/");
     const host = referrerHost(input.referrer, input.ownHost);
     const named = labels
         .map((l) => LABEL_GROUPS[l])
@@ -182,7 +214,7 @@ export function registerVisitSender(send: VisitSender | null): void {
  */
 export function seeVisitPage(
     now: number,
-    page: { referrer: string; ownHost: string; search: string },
+    page: { referrer: string; ownHost: string; search: string; path?: string },
 ): VisitOrigin {
     const current = live(now);
     if (current) {

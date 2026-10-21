@@ -150,6 +150,29 @@ describe("AnalyticsAggregateHandler — org-isolated daily rollups", () => {
         });
     });
 
+    it("rolls no path up for a private page or a query a row stored before the contract cut it (U15 privacy review)", async () => {
+        eventFindMany.mockResolvedValue([
+            view("org_1", "site_1", "/pay/secret-token", "v1", at("09:00")),
+            view("org_1", "site_1", "/account/orders/x", "v1", at("09:10")),
+            view(
+                "org_1",
+                "site_1",
+                "/a?email=a@example.com",
+                "v2",
+                at("10:00"),
+            ),
+        ]);
+        aggregateUpsert.mockResolvedValue({});
+
+        await new AnalyticsAggregateHandler().handle(jobFor("org_1"));
+
+        const paths = aggregateUpsert.mock.calls
+            .map((c) => c[0].create)
+            .filter((row) => row.dimension === "path")
+            .map((row) => row.dimensionValue);
+        expect(new Set(paths)).toEqual(new Set(["/a"]));
+    });
+
     it("ORG ISOLATION: org_2's same-day event never leaks into org_1's rows", async () => {
         wireFindMany();
         const handler = new AnalyticsAggregateHandler();

@@ -71,6 +71,7 @@ export function SiteViewBeacon({
             referrer: document.referrer,
             ownHost: window.location.host,
             search: window.location.search,
+            path: pathname,
         });
         send(body);
     }, [pathname, siteId, apiUrl]);

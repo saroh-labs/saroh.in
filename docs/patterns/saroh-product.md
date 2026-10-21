@@ -667,16 +667,42 @@ organizations/:org/customers`: everyone who has paid (an order through a
   = "Typed your address", `other`) from the referrer's host and an allowed
   `ref` / `utm_source` value, plus at most one merchant link label of the
   allowed shape (`analytics/visit-source.ts`: lower-case letters, digits,
-  hyphens, 32 at most, no run of six digits); nothing else in the address is
-  read. Each step is sent once a visit, with the source only and no visitor
-  hash: `site.visit`, `site.looked` (a product or the booking page),
-  `site.started` (a checkout). The checkout copies the source onto the order
+  hyphens, 32 at most, no run of six digits, no more than six digits in all,
+  never an id's shape `c` + 24); nothing else in the address is read, and
+  `ref` is never read on `/book` (or under it) or beside the booking flow's
+  `step=`, where it is a booking's id. Each step is sent once a visit, with
+  the source only and no visitor hash: `site.visit`, `site.looked` (a
+  product or the booking page), `site.started` (a checkout: `/checkout`
+  sends no page view, being private, but does send this step, with its
+  group and label only). The checkout copies the source onto the order
   (`Order.visitSource`, `visitRef`) and `order.paid` / `order.refunded`
   carry it; `analytics.retention` clears it off orders past 400 days. The
   rollup adds `source` and `ref` dimensions; `analytics/visit-sources.ts`
   is the read (counted from the first day a source was recorded; paid is
-  the business's, not a site's). A paid order with no source was taken
-  another way, before tracking began, or from a visit that sent nothing.
+  the business's, not a site's; labels with fewer than 3 visits in the range
+  fold into one `OTHER_LINKS_REF` row, "Other links"). A paid order with no
+  source was taken another way, before tracking began, or from a visit that
+  sent nothing.
+- **Current** — **what visit tracking collects, where, for how long and who
+  sees it** (U15 privacy review, 21 Oct). The browser's word is never
+  trusted: each promise below is kept by the API too.
+
+    | What                                                                                                                                        | Where it is kept                                                                                                                                                                                       | For how long                                                                                                    | Who sees it                                                                                   |
+    | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+    | A page view: its path (cut at `?` and `#`), the referrer's origin, no title                                                                 | `AnalyticsEvent` `site.view`                                                                                                                                                                           | 400 days, then the retention sweep deletes it                                                                   | Nobody row by row; counted into Insights for `analytics:read`                                 |
+    | A visitor hash on a page view: `sha256(daily salt : site : address)`, the salt an HMAC of `ANALYTICS_IP_SALT` and the UTC day, never stored | `AnalyticsEvent.visitorHash`                                                                                                                                                                           | With the view (400 days); a new hash every day and on every site                                                | Nobody; only "unique visitors a day"                                                          |
+    | A visit's steps (`site.visit`, `site.looked`, `site.started`): a group and a label, no visitor, time to the hour, random id                 | `AnalyticsEvent`                                                                                                                                                                                       | 400 days                                                                                                        | Counted into Insights for `analytics:read`                                                    |
+    | Daily counts by path, source and label                                                                                                      | `AnalyticsDailyAggregate`                                                                                                                                                                              | Kept (they name no one)                                                                                         | `analytics:read`; labels under 3 visits only as "Other links"                                 |
+    | Where an order's visit came from (group, label)                                                                                             | `Order.visitSource`, `visitRef`, and its `order.paid` / `order.refunded` event                                                                                                                         | Cleared at 400 days (not while the business is on legal hold) and by the customer's removal (`PERSONAL_FIELDS`) | `cameFrom` on the order only with `analytics:read`; in the owner's data export (`orders.csv`) |
+    | Nothing at all                                                                                                                              | Private pages (`PRIVATE_PATH_PREFIXES` in `@saroh/block-contract`, one list for the site and the API, which refuses a view of one), Do Not Track or Global Privacy Control, previews and test releases |                                                                                                                 |                                                                                               |
+
+    Never kept: the address, a cookie or browser storage, the query string
+    beyond one allowed label, the referrer's path, a page title, a consent
+    value, a time or a dedupe key the browser sent (a public event is stored
+    `anonymous`, at the server's time). Views stored before the review under
+    a private path are removed by the one-off
+    `packages/database/src/backfill/private-path-views.cli.ts` (dry run
+    first).
 
 ## One word each
 

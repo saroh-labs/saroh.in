@@ -161,6 +161,63 @@ describe("Analytics retention sweep (DB)", () => {
         });
     });
 
+    it("never clears the source off a held business's orders, even by the UPDATE alone (U15 privacy review)", async () => {
+        const heldOrg = (
+            await prisma.organization.create({
+                data: {
+                    name: "Retention held",
+                    slug: `retention-held-${tag}`,
+                    legalHoldAt: new Date(),
+                },
+            })
+        ).id;
+        try {
+            const store = await prisma.store.create({
+                data: { organizationId: heldOrg, name: `Held ${tag}` },
+            });
+            const old = await prisma.order.create({
+                data: {
+                    storeId: store.id,
+                    organizationId: heldOrg,
+                    orderId: `RET-H-${tag}`,
+                    subtotal: "10.00",
+                    total: "10.00",
+                    createdAt: new Date(now.getTime() - 401 * DAY),
+                    visitSource: "instagram",
+                    visitRef: "diwali-post",
+                },
+            });
+
+            expect(await retention.sweepOrderSources(now)).toEqual({
+                cleared: 0,
+                more: false,
+            });
+            // The UPDATE checks the hold itself: run against this very row,
+            // as a sweep that read the orders before the hold was placed would.
+            const held = [heldOrg];
+            const ids = [old.id];
+            const count = await prisma.$executeRaw`
+                UPDATE "Order" SET "visitSource" = NULL, "visitRef" = NULL
+                WHERE "id" = ANY(${ids}::text[])
+                  AND "organizationId" <> ALL(${held}::text[])`;
+            expect(count).toBe(0);
+            await expect(
+                prisma.order.findUniqueOrThrow({ where: { id: old.id } }),
+            ).resolves.toMatchObject({
+                visitSource: "instagram",
+                visitRef: "diwali-post",
+            });
+        } finally {
+            await prisma.order.deleteMany({
+                where: { organizationId: heldOrg },
+            });
+            await prisma.store.deleteMany({
+                where: { organizationId: heldOrg },
+            });
+            await prisma.organization.delete({ where: { id: heldOrg } });
+        }
+    });
+
     it("drops a visit's step events past retention like any other event (U15)", async () => {
         const step = await prisma.analyticsEvent.create({
             data: {

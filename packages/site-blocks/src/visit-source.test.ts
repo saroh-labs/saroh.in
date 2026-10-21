@@ -95,6 +95,81 @@ describe("where a visit came from (U15)", () => {
     });
 });
 
+describe("labels that are no label (U15 privacy review)", () => {
+    const BOOKING_ID = "cmh2k9x0a0001qz8l3v5d7f9b";
+
+    it("never reads the booking page's own ref, a booking's id", () => {
+        // `/book?step=done&ref=<booking id>` is the booking flow's ticket.
+        expect(
+            classifyVisit({
+                ...page("", `?step=done&ref=${BOOKING_ID}`),
+                path: "/book",
+            }),
+        ).toEqual({ source: "direct", ref: null });
+        // On /book even a label-shaped ref is the flow's, not the merchant's.
+        expect(
+            classifyVisit({ ...page("", "?ref=diwali-post"), path: "/book" }),
+        ).toEqual({ source: "direct", ref: null });
+        expect(
+            classifyVisit({
+                ...page("", "?ref=diwali-post"),
+                path: "/book/haircut",
+            }).ref,
+        ).toBeNull();
+        // Any address with the flow's step= is the flow's, wherever it is.
+        expect(
+            classifyVisit({
+                ...page("", "?step=when&ref=diwali-post"),
+                path: "/",
+            }).ref,
+        ).toBeNull();
+        // utm_source is still read there; ref still is everywhere else.
+        expect(
+            classifyVisit({
+                ...page("", "?utm_source=ig&ref=diwali-post"),
+                path: "/book",
+            }),
+        ).toEqual({ source: "instagram", ref: null });
+        expect(
+            classifyVisit({
+                ...page("", "?ref=diwali-post"),
+                path: "/bookshop",
+            }).ref,
+        ).toBe("diwali-post");
+    });
+
+    it("the visit begun on the booking page's ticket keeps no label", () => {
+        const sent: unknown[] = [];
+        registerVisitSender((step, origin) => sent.push([step, origin]));
+        seeVisitPage(1, {
+            ...page("", `?step=done&ref=${BOOKING_ID}`),
+            path: "/book",
+        });
+        expect(sent).toEqual([["visit", { source: "direct", ref: null }]]);
+        forgetVisitForTests();
+    });
+
+    it("refuses an id's shape, wherever it lands", () => {
+        expect(visitRefOf(BOOKING_ID)).toBeNull();
+        expect(
+            classifyVisit({ ...page("", `?ref=${BOOKING_ID}`), path: "/shop" })
+                .ref,
+        ).toBeNull();
+        // An id with few digits is refused by its shape alone.
+        expect(visitRefOf("ckzqmabcdefghijklmnopqrst")).toBeNull();
+        // Not every label starting with c is an id.
+        expect(visitRefOf("christmas-sale")).toBe("christmas-sale");
+    });
+
+    it("refuses seven or more digits in all, however they are split", () => {
+        expect(visitRefOf("98765-43210")).toBeNull();
+        expect(visitRefOf("a1b2c3d4e5f6g7")).toBeNull();
+        expect(visitRefOf("call-987-654-3")).toBeNull();
+        expect(visitRefOf("sale-2026-10")).toBe("sale-2026-10");
+        expect(visitRefOf("a1b2c3d4e5f6")).toBe("a1b2c3d4e5f6");
+    });
+});
+
 describe("the visit, in this tab's memory (U15)", () => {
     afterEach(() => {
         forgetVisitForTests();

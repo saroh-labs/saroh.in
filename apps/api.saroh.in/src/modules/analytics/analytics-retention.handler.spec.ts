@@ -254,6 +254,42 @@ describe("AnalyticsRetentionHandler", () => {
             );
         });
 
+        it("the UPDATE checks the hold again, read again for the batch (U15 privacy review)", async () => {
+            findMany.mockResolvedValue([]);
+            // No hold when the events' sweep read it; one by the orders' batch.
+            held.mockResolvedValueOnce([]);
+            held.mockResolvedValue([{ id: "org_held" }]);
+            orderFindMany.mockResolvedValueOnce([{ id: "o1" }]);
+            executeRaw.mockResolvedValueOnce(1);
+
+            await new AnalyticsRetentionHandler().handle(run());
+
+            const [strings, ...values] = executeRaw.mock.calls[0] as [
+                TemplateStringsArray,
+                ...unknown[],
+            ];
+            expect(strings.join("?")).toMatch(
+                /"organizationId" <> ALL\(\?::text\[\]\)/,
+            );
+            expect(values).toContainEqual(["org_held"]);
+        });
+
+        it("the UPDATE's hold check holds nothing back when no business is held", async () => {
+            findMany.mockResolvedValue([]);
+            held.mockResolvedValue([]);
+            orderFindMany.mockResolvedValueOnce([{ id: "o1" }]);
+            executeRaw.mockResolvedValueOnce(1);
+
+            await new AnalyticsRetentionHandler().handle(run());
+
+            const [, ...values] = executeRaw.mock.calls[0] as [
+                TemplateStringsArray,
+                ...unknown[],
+            ];
+            // `x <> ALL('{}')` is true: an empty list keeps every order due.
+            expect(values).toContainEqual([]);
+        });
+
         it("comes back in a minute when orders are still due at the cap", async () => {
             findMany.mockResolvedValue([]);
             orderFindMany.mockResolvedValue(ids(ANALYTICS_RETENTION_BATCH));

@@ -165,17 +165,19 @@ export class AnalyticsRetentionHandler {
             now.getTime() - ANALYTICS_RETENTION_DAYS * DAY_MS,
         );
         let cleared = 0;
-        const held = await heldOrganizationIds(prisma);
-        const notHeld =
-            held.length > 0 ? { organizationId: { notIn: held } } : {};
-        const due = {
-            visitSource: { not: null },
-            createdAt: { lt: cutoff },
-            ...notHeld,
-        };
         for (let batch = 0; batch < ANALYTICS_RETENTION_MAX_BATCHES; batch++) {
+            // On legal hold: read again each batch, and checked again by the
+            // UPDATE itself (U15 privacy review), so a hold placed while a
+            // run is under way is never cleared past.
+            const held = await heldOrganizationIds(prisma);
             const rows = await prisma.order.findMany({
-                where: due,
+                where: {
+                    visitSource: { not: null },
+                    createdAt: { lt: cutoff },
+                    ...(held.length > 0
+                        ? { organizationId: { notIn: held } }
+                        : {}),
+                },
                 select: { id: true },
                 orderBy: { createdAt: "asc" },
                 take: ANALYTICS_RETENTION_BATCH,
@@ -188,7 +190,8 @@ export class AnalyticsRetentionHandler {
                 UPDATE "Order" SET "visitSource" = NULL, "visitRef" = NULL
                 WHERE "id" = ANY(${ids}::text[])
                   AND "visitSource" IS NOT NULL
-                  AND "createdAt" < ${utc(cutoff)}::timestamp`;
+                  AND "createdAt" < ${utc(cutoff)}::timestamp
+                  AND "organizationId" <> ALL(${held}::text[])`;
             cleared += count;
             if (rows.length < ANALYTICS_RETENTION_BATCH || count === 0) {
                 return { cleared, more: false };

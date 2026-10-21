@@ -173,6 +173,9 @@ async function order(
                 deliveryState: "Karnataka",
                 deliveryPostalCode: "560001",
                 notes: "Ring twice, Asha is upstairs",
+                // Where their visit came from (U15): a link sent to them.
+                visitSource: "whatsapp",
+                visitRef: "for-asha",
             },
         })
     ).id;
@@ -444,6 +447,9 @@ describe("removing a customer's details (DEC-042)", () => {
             deliveryCity: null,
             deliveryPostalCode: null,
             notes: null,
+            // Where their visit came from goes too (U15 privacy review).
+            visitSource: null,
+            visitRef: null,
         });
         expect(kept.total.toString()).toBe("450");
 

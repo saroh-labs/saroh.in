@@ -81,3 +81,27 @@ describe("serializeOrderDetail: what a line bills (E9)", () => {
         });
     });
 });
+
+describe("serializeOrderDetail: where its visit came from (U15 privacy review)", () => {
+    const placed = {
+        ...base,
+        visitSource: "instagram",
+        visitRef: "diwali-post",
+    };
+
+    it("shows it to someone who reads Insights", () => {
+        expect(
+            serializeOrderDetail(placed, { visitSource: true }).cameFrom,
+        ).toEqual({ source: "instagram", ref: "diwali-post" });
+        expect(
+            serializeOrderDetail(base, { visitSource: true }).cameFrom,
+        ).toBeNull();
+    });
+
+    it("leaves it out for everyone else, and by default", () => {
+        expect(
+            "cameFrom" in serializeOrderDetail(placed, { visitSource: false }),
+        ).toBe(false);
+        expect("cameFrom" in serializeOrderDetail(placed)).toBe(false);
+    });
+});

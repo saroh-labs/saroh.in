@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import type { AnalyticsDailyAggregate } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
-import { createHash } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
@@ -17,14 +17,22 @@ import {
     validateEventProperties,
     VISIT_STEP_TYPES,
 } from "./event-contract";
-
-/** The env var holding the IP-hashing salt (a platform secret, not per-org). */
-const IP_SALT_ENV = "ANALYTICS_IP_SALT";
-/** Dev fallback salt — production MUST set `ANALYTICS_IP_SALT` in the env. */
-const DEV_IP_SALT = "saroh-dev-analytics-ip-salt";
+import { visitorHashOf } from "./visitor-hash";
 
 /** ms in one day, for stamping `expiresAt` from the retention window. */
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** ms in one hour: a visit step's times are kept to the hour. */
+const HOUR_MS = 60 * 60 * 1000;
+
+/** The hour `at` falls in, from its start. */
+export function hourStartOf(at: Date): Date {
+    return new Date(Math.floor(at.getTime() / HOUR_MS) * HOUR_MS);
+}
+
+/** The end of the hour `at` falls in (the next hour's start). */
+export function hourEndOf(at: Date): Date {
+    return new Date(hourStartOf(at).getTime() + HOUR_MS);
+}
 
 /**
  * The authoritative write input for {@link AnalyticsService.record}. Used by both
@@ -44,7 +52,15 @@ export interface RecordEventInput {
     dedupeKey?: string | null;
 }
 
-/** The public-intake input — everything except the server-derived org/visitor. */
+/**
+ * The public-intake input — everything except the server-derived org/visitor.
+ *
+ * `consent`, `dedupeKey` and `occurredAt` are what the visitor's browser
+ * says, so they are read and IGNORED (U15 privacy review): a public event is
+ * always stored `anonymous`, at the server's time, with no key of the
+ * visitor's choosing. They stay in the type so an older beacon that sends
+ * them is still accepted.
+ */
 export interface PublicIngestInput {
     type: string;
     schemaVersion?: number;
@@ -80,7 +96,7 @@ export interface DashboardFilter {
  *
  * `ingestPublic` is the unauthenticated boundary: the owning org is derived from
  * the target Site row (NEVER the client), only `site.view` and a visit's
- * steps (U15) are accepted, the source IP is salted into both a `visitorHash` (for unique counts) and an
+ * steps (U15) are accepted, the source IP is hashed with the day's salt and the site (`visitor-hash.ts`) into both a `visitorHash` (for unique counts a day) and an
  * `ipHash` (for rate-limiting) and then discarded.
  *
  * `getDashboard` reads the pre-computed `AnalyticsDailyAggregate` rows for
@@ -130,10 +146,14 @@ export class AnalyticsService {
             );
         }
 
-        // Salt the source IP once: an ipHash for rate-limiting and a visitorHash
-        // for unique counts. The raw IP is used only to derive these and is
-        // never stored or passed on.
-        const ipHash = ip !== undefined ? this.hashIp(ip) : undefined;
+        // Hash the source IP once, with the day's salt and the site: an
+        // ipHash for rate-limiting and a visitorHash for unique counts a
+        // day (`visitor-hash.ts`). The raw IP is used only to derive it and
+        // is never stored or passed on.
+        const ipHash =
+            ip !== undefined
+                ? visitorHashOf(site.id, ip, new Date())
+                : undefined;
 
         if (ipHash !== undefined) {
             const allowed = this.rateLimiter.take(`${siteId}:${ipHash}`);
@@ -152,18 +172,20 @@ export class AnalyticsService {
             ? null
             : (ipHash ?? null);
 
+        // What the browser says about consent, its clock and its own dedupe
+        // key is never stored (U15 privacy review): a public event is
+        // anonymous, at the server's time, and keyed by nothing the visitor
+        // chose (a key would be an id they could follow).
         return this.record({
             organizationId: site.organizationId,
             siteId: site.id,
             type: input.type,
             schemaVersion: input.schemaVersion,
             properties: input.properties,
-            consent: input.consent,
+            consent: "anonymous",
             visitorHash,
-            occurredAt: input.occurredAt
-                ? new Date(input.occurredAt)
-                : undefined,
-            dedupeKey: input.dedupeKey ?? null,
+            occurredAt: undefined,
+            dedupeKey: null,
         });
     }
 
@@ -185,17 +207,28 @@ export class AnalyticsService {
         const now = new Date();
         // Bound the source-clock occurredAt to the server clock — never accept a
         // future timestamp (which would land in the wrong day bucket).
-        const occurredAt =
+        const bounded =
             input.occurredAt && input.occurredAt.getTime() < now.getTime()
                 ? input.occurredAt
                 : now;
+        // A visit's steps (U15) keep their time only to the hour, so a step
+        // can't be lined up with a page view (which keeps its visitor hash)
+        // to the millisecond (U15 privacy review). `occurredAt` goes back to
+        // the hour's start, keeping its day; `receivedAt` on to the hour's
+        // end, so the hourly rollup, which reads what was received since its
+        // last run, still finds it (a stamp in its past would be skipped).
+        // Its id is random, not a cuid, which would carry the millisecond.
+        const coarse = VISIT_STEP_TYPES.has(input.type);
+        const occurredAt = coarse ? hourStartOf(bounded) : bounded;
+        const receivedAt = coarse ? hourEndOf(now) : now;
         const expiresAt = new Date(
-            now.getTime() + ANALYTICS_RETENTION_DAYS * DAY_MS,
+            receivedAt.getTime() + ANALYTICS_RETENTION_DAYS * DAY_MS,
         );
 
         try {
             const event = await prisma.analyticsEvent.create({
                 data: {
+                    ...(coarse ? { id: randomUUID() } : {}),
                     organizationId: input.organizationId,
                     siteId: input.siteId ?? null,
                     projectId: input.projectId ?? null,
@@ -205,7 +238,7 @@ export class AnalyticsService {
                     consent: input.consent ?? "anonymous",
                     visitorHash: input.visitorHash ?? null,
                     occurredAt,
-                    receivedAt: now,
+                    receivedAt,
                     expiresAt,
                     dedupeKey: input.dedupeKey ?? null,
                 },
@@ -264,17 +297,5 @@ export class AnalyticsService {
             },
             orderBy: [{ date: "desc" }, { type: "asc" }],
         });
-    }
-
-    /**
-     * Salt-hash a source IP with `ANALYTICS_IP_SALT` (a dev fallback is used when
-     * unset). The output is a coarse, NON-reversible grouping token — the raw IP
-     * is NEVER persisted. Read via `globalThis.process.env[name]` (the same
-     * pattern billing's platform-secrets uses) so it goes straight to the env
-     * without touching the validated `env.ts` this ticket must not modify.
-     */
-    private hashIp(ip: string): string {
-        const salt = globalThis.process.env[IP_SALT_ENV] ?? DEV_IP_SALT;
-        return createHash("sha256").update(`${salt}:${ip}`).digest("hex");
     }
 }

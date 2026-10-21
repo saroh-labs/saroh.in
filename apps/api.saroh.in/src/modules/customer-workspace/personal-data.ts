@@ -68,6 +68,15 @@ export const PERSONAL_FIELDS: Readonly<Record<string, PersonalField>> = {
         why: "The GST place of supply when no bill-to state is set; tax records need it.",
     },
     "Order.notes": { rule: "cleared", why: "Free text about the order." },
+    // Where the visit that placed it came from (U15, #1099).
+    "Order.visitSource": {
+        rule: "cleared",
+        why: "How their visit reached the site; tied to them through the order.",
+    },
+    "Order.visitRef": {
+        rule: "cleared",
+        why: "The merchant's link label their visit came by, which can name a link sent to them.",
+    },
     // A walk-in who leaves only a name (B13) is the order's only record of
     // them: no customer or contact, so no removal ever reaches it. One who
     // gives a phone is a customer (B13b): the phone goes on the store
@@ -195,10 +204,11 @@ export const PERSONAL_FIELDS: Readonly<Record<string, PersonalField>> = {
 /**
  * Whether a column's name says it may hold a person's details: an email,
  * phone, name, address, delivery or booker field, a message address or
- * body, a note, or a snapshot that can copy any of these.
+ * body, a note, a snapshot that can copy any of these, or where their
+ * visit to a site came from (`visit*`, U15).
  */
 export function looksPersonal(field: string): boolean {
-    return /^(email|phone|firstName|lastName|displayName|toAddress|invitedTo|city|state|zipCode|postalCode|notes|body|error|intakeNote|snapshot|address.*|delivery.*|booker.*|.*Name|.*Email|.*Phone|.*Address)$/.test(
+    return /^(email|phone|firstName|lastName|displayName|toAddress|invitedTo|city|state|zipCode|postalCode|notes|body|error|intakeNote|snapshot|address.*|delivery.*|booker.*|visit.*|.*Name|.*Email|.*Phone|.*Address)$/.test(
         field,
     );
 }

@@ -119,10 +119,13 @@ test.describe("where a visit came from", { tag: "@serial" }, () => {
         browser,
     }, testInfo) => {
         test.setTimeout(180_000);
-        // This run's own label: lower-case letters and digits, as allowed.
+        // This run's own label: lower-case letters and hyphens, as allowed.
+        // Its digits are spelled as letters: a label with seven digits in
+        // all is refused as a possible phone number (U15 privacy review).
         const ref = `e2e-${testInfo.project.name}-${Date.now().toString(36)}`
             .toLowerCase()
-            .replace(/[^a-z0-9-]/g, "-")
+            .replace(/\d/g, (d) => "abcdefghij"[Number(d)] ?? "x")
+            .replace(/[^a-z-]/g, "-")
             .slice(0, 32)
             .replace(/-+$/, "");
 
@@ -280,7 +283,8 @@ test.describe("where a visit came from", { tag: "@serial" }, () => {
                 );
             }
 
-            // The team records it as paid; the order says where it came from.
+            // The team records it as paid; the order says where it came from
+            // to the owner, who reads Insights (`analytics:read`).
             await nw.patch(`/stores/${storeId}/orders/${orderId}`, {
                 paymentStatus: "PAID",
                 paidHow: "UPI",

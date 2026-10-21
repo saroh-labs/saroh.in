@@ -75,8 +75,17 @@ export interface OrderDetailDto extends OrderSummaryDto {
      * Where the website visit that placed it came from (U15): one of the
      * five groups and the merchant's own link label. `null` for an order
      * taken any other way, placed before tracking began, or past retention.
+     *
+     * Only for someone who reads Insights (`analytics:read`, U15 privacy
+     * review): absent for everyone else, who reads the order without it.
      */
-    cameFrom: VisitOrigin | null;
+    cameFrom?: VisitOrigin | null;
+}
+
+/** What the reader of an order detail may see beyond the order itself. */
+export interface OrderDetailSight {
+    /** `analytics:read`: where the visit that placed it came from. */
+    visitSource: boolean;
 }
 
 interface RawCustomer {
@@ -158,7 +167,10 @@ export function serializeOrderSummary(order: RawSummary): OrderSummaryDto {
     };
 }
 
-export function serializeOrderDetail(order: RawDetail): OrderDetailDto {
+export function serializeOrderDetail(
+    order: RawDetail,
+    sight: OrderDetailSight = { visitSource: false },
+): OrderDetailDto {
     return {
         ...serializeOrderSummary(order),
         updatedAt: order.updatedAt ?? null,
@@ -184,6 +196,8 @@ export function serializeOrderDetail(order: RawDetail): OrderDetailDto {
                   rule: ruleOf(order.discountRedemption),
               }
             : null,
-        cameFrom: visitOriginOf(order.visitSource, order.visitRef),
+        ...(sight.visitSource
+            ? { cameFrom: visitOriginOf(order.visitSource, order.visitRef) }
+            : {}),
     };
 }

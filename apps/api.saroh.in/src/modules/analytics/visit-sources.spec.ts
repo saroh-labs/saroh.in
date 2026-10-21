@@ -1,5 +1,9 @@
 import type { VisitSourceAggregate } from "./visit-sources";
-import { foldVisitSources } from "./visit-sources";
+import {
+    foldVisitSources,
+    MIN_VISITS_PER_LABEL,
+    OTHER_LINKS_REF,
+} from "./visit-sources";
 
 function row(
     type: string,
@@ -85,5 +89,40 @@ describe("foldVisitSources — the read U16 builds on (U15)", () => {
         expect(read.sources[4]).toMatchObject({ source: "other", paid: 0 });
         expect(read.sources.reduce((n, s) => n + s.visits, 0)).toBe(0);
         expect(read.refs).toEqual([]);
+    });
+
+    it("folds labels with fewer than three visits into one Other links row, last (U15 privacy review)", () => {
+        expect(MIN_VISITS_PER_LABEL).toBe(3);
+        const read = foldVisitSources([
+            row("site.visit", "ref", "diwali-post", 12),
+            row("site.visit", "ref", "story", 3),
+            // One or two people: maybe a link sent to one person.
+            row("site.visit", "ref", "asha-wedding", 1),
+            row("site.looked", "ref", "asha-wedding", 1),
+            row("order.paid", "ref", "asha-wedding", 1),
+            row("site.visit", "ref", "for-ravi", 2),
+            row("site.started", "ref", "for-ravi", 1),
+            // A paid order whose label had no visit in the range.
+            row("order.paid", "ref", "old-post", 1),
+        ]);
+        expect(read.refs).toEqual([
+            { ref: "diwali-post", visits: 12, looked: 0, started: 0, paid: 0 },
+            { ref: "story", visits: 3, looked: 0, started: 0, paid: 0 },
+            { ref: OTHER_LINKS_REF, visits: 3, looked: 1, started: 1, paid: 2 },
+        ]);
+        expect(JSON.stringify(read)).not.toMatch(/asha|ravi|old-post/);
+    });
+
+    it("the Other links row can't be taken for a merchant's label", () => {
+        // `_` is outside a label's shape, so no label is ever OTHER_LINKS_REF.
+        const read = foldVisitSources([
+            row("site.visit", "ref", OTHER_LINKS_REF, 50),
+        ]);
+        expect(read.refs).toEqual([]);
+    });
+
+    it("gives no Other links row when every label is shown", () => {
+        const read = foldVisitSources([row("site.visit", "ref", "story", 3)]);
+        expect(read.refs.map((r) => r.ref)).toEqual(["story"]);
     });
 });

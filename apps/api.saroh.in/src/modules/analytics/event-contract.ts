@@ -1,4 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
+import { isPrivateSitePath } from "@saroh/block-contract";
 
 import { isVisitSource, visitRefOf } from "./visit-source";
 
@@ -22,9 +23,6 @@ export const ANALYTICS_RETENTION_DAYS = 400;
 
 /** Max length for a free-form path/URL-ish string property. */
 const MAX_PATH_LEN = 2048;
-/** Max length for a short text property (title, etc.). */
-const MAX_TEXT_LEN = 1024;
-
 /** A pure validator: given raw props, return the normalized props or throw. */
 export type EventValidator = (
     props: Record<string, unknown>,
@@ -99,20 +97,57 @@ function requireNumber(props: Record<string, unknown>, field: string): number {
 }
 
 /**
+ * A page's path as it may be kept: cut at the query and the fragment (a
+ * pay link's token or a test release's key travels there), `/` when that
+ * leaves nothing.
+ */
+export function sitePathOnly(path: string): string {
+    return path.split(/[?#]/)[0] || "/";
+}
+
+/**
+ * A referrer as it may be kept: its origin (`https://l.instagram.com`),
+ * never the address it was on. Undefined when it isn't an http(s) address.
+ */
+export function referrerOriginOf(referrer: string): string | undefined {
+    try {
+        const url = new URL(referrer);
+        if (url.protocol !== "http:" && url.protocol !== "https:") {
+            return undefined;
+        }
+        return url.origin;
+    } catch {
+        return undefined;
+    }
+}
+
+/**
  * The `site.view` contract (v1): a page view on a published site.
- * `path` is required (≤2048); `referrer` and `title` are optional.
+ *
+ * The site's beacon already sends only this (`apps/saroh.app/lib/
+ * site-view.ts`); the server holds the same promises, so a forged or older
+ * beacon can't break them (U15 privacy review):
+ *
+ * - `path` is required (≤2048) and kept only up to its `?` or `#`;
+ * - a path under one of the private pages (`PRIVATE_PATH_PREFIXES`, one
+ *   list with the site, from `@saroh/block-contract`) is refused: those
+ *   paths name one customer's order, booking or token;
+ * - `referrer` is kept as its origin only, or dropped;
+ * - `title` is never kept (a page's title can name an order or a person).
  */
 const siteViewV1: EventValidator = (props) => {
-    const out: Record<string, unknown> = {
-        path: requireString(props, "path", MAX_PATH_LEN),
-    };
-    const referrer = optionalString(props, "referrer", MAX_PATH_LEN);
-    if (referrer !== undefined) {
-        out.referrer = referrer;
+    const path = sitePathOnly(requireString(props, "path", MAX_PATH_LEN));
+    if (isPrivateSitePath(path)) {
+        throw new BadRequestException(
+            `"path" is a private page; its views are not counted`,
+        );
     }
-    const title = optionalString(props, "title", MAX_TEXT_LEN);
-    if (title !== undefined) {
-        out.title = title;
+    const out: Record<string, unknown> = { path };
+    const referrer = optionalString(props, "referrer", MAX_PATH_LEN);
+    const origin =
+        referrer !== undefined ? referrerOriginOf(referrer) : undefined;
+    if (origin !== undefined) {
+        out.referrer = origin;
     }
     return out;
 };

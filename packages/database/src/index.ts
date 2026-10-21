@@ -62,6 +62,9 @@ export * from "./backfill/order-numbers";
 // integration suite can run it twice and check what it wrote, and for the
 // showcase seed, which gives its paid invoices their payments with it.
 export * from "./backfill/invoice-payments";
+// The U15 privacy review's one-off (#1099): page views stored under a
+// private page, exported so the API's integration suite can run it twice.
+export * from "./backfill/private-path-views";
 // Pricing catalogue versions (plan 2026-09-29 U1): store a published
 // snapshot and its Plan rows, and read which one is live.
 export * from "./pricing-catalogue";

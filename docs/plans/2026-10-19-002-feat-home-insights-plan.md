@@ -125,10 +125,19 @@ recommendation)**
 - **A12. Who sees suggestions:** anyone with Insights; the money-based ones
   (late bill, selling less) only with `payment:read`.
 - **A13. Link tracking and consent:** sources are counted for every visit
-  without identifying anyone (referrer origin and an allowed `ref` or
-  `utm_source` value only); a visit is tied to a paid order only through a
-  short-lived visit id never stored with the person; #889's banner can widen
-  this later. A privacy review happens before U15 merges.
+  without identifying anyone (the referrer's host and an allowed `ref` or
+  `utm_source` value only); #889's banner can widen this later.
+  _As built (U15 #1099, privacy review 21 Oct):_ there is **no visit id**.
+  The visit lives in the visitor's tab memory only and is tied to a paid
+  order by its group and label alone, copied onto the order at checkout
+  (`Order.visitSource`, `visitRef`). `ref` is never read on `/book` or with
+  the booking flow's `step=` (it is a booking's id there); a label with a
+  run of six digits, seven digits in all, or an id's shape is dropped by
+  the site and by the API. The steps (`site.visit`, `site.looked`,
+  `site.started`, which `/checkout` still sends with its group and label
+  only) carry no visitor hash and are stored to the hour; labels under 3
+  visits in a range read as "Other links". The privacy review's fixes are
+  listed in `docs/patterns/saroh-product.md` → Insights.
 - **A14. Low stock uses each stock level's own alert** (`lowStockAlert` on
   the inventory row), and no row appears for a product with no stock level.
   The row says how fast it sells ("sells about 9 a day") when it sold in

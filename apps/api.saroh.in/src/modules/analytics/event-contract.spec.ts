@@ -235,3 +235,75 @@ describe("event-contract — where a visit came from (U15)", () => {
         ).toThrow(BadRequestException);
     });
 });
+
+describe("event-contract — site.view keeps its promises on the server (U15 privacy review)", () => {
+    it("cuts the path at its query and fragment", () => {
+        expect(
+            validateEventProperties("site.view", 1, {
+                path: "/shop/bread?ref=diwali&email=a@example.com#top",
+            }),
+        ).toEqual({ path: "/shop/bread" });
+        expect(
+            validateEventProperties("site.view", 1, { path: "?token=abc" }),
+        ).toEqual({ path: "/" });
+        expect(
+            validateEventProperties("site.view", 1, { path: "/about#team" }),
+        ).toEqual({ path: "/about" });
+    });
+
+    it("keeps the referrer's origin only, and drops one that isn't an address", () => {
+        expect(
+            validateEventProperties("site.view", 1, {
+                path: "/",
+                referrer: "https://www.google.com/search?q=someone+9876543210",
+            }),
+        ).toEqual({ path: "/", referrer: "https://www.google.com" });
+        expect(
+            validateEventProperties("site.view", 1, {
+                path: "/",
+                referrer: "android-app://com.whatsapp/",
+            }),
+        ).toEqual({ path: "/" });
+        expect(
+            validateEventProperties("site.view", 1, {
+                path: "/",
+                referrer: "not an address",
+            }),
+        ).toEqual({ path: "/" });
+    });
+
+    it("never keeps a title", () => {
+        expect(
+            validateEventProperties("site.view", 1, {
+                path: "/",
+                title: "Order for Asha Rao",
+            }),
+        ).toEqual({ path: "/" });
+    });
+
+    it.each([
+        "/account",
+        "/account/orders/cmh2k9x0a0001qz8l3v5d7f9b",
+        "/checkout",
+        "/checkout/abc",
+        "/shop/order/abc",
+        "/pay/secret-token",
+        "/book/claim/token",
+        "/shop/stop-waiting/token",
+        "/q/abc",
+        "/autopay/x",
+        "/pay/secret?x=1",
+    ])("refuses a view of the private page %s", (path) => {
+        expect(() => validateEventProperties("site.view", 1, { path })).toThrow(
+            BadRequestException,
+        );
+    });
+
+    it("counts the public pages beside them", () => {
+        for (const path of ["/book", "/shop", "/quotes", "/payments-info"]) {
+            expect(validateEventProperties("site.view", 1, { path })).toEqual({
+                path,
+            });
+        }
+    });
+});

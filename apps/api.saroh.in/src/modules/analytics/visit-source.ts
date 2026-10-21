@@ -12,7 +12,8 @@
  *   never leave the browser.
  * - The browser's word is not trusted: the group must be one of
  *   {@link VISIT_SOURCES} and the label must have the shape of
- *   {@link visitRefOf}. Anything else is no source, never a refused order.
+ *   {@link visitRefOf} (no run of six digits, no more than six in all, never
+ *   a record's id). Anything else is no source, never a refused order.
  * - No visit id is ever sent or stored. A visit lives in the visitor's tab
  *   memory only; what ties a paid order to its visit is the visit's group and
  *   label, copied onto the order at checkout (`Order.visitSource`,
@@ -59,6 +60,19 @@ const REF_SHAPE = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/;
 const DIGIT_RUN = /\d{6,}/;
 
 /**
+ * Nor are seven digits in all, however they are split (`98765-43210`): a
+ * phone number broken up by hyphens is still one (U15 privacy review).
+ */
+export const VISIT_REF_MAX_DIGITS = 6;
+
+/**
+ * A record's id (cuid: `c` and 24 more), as the booking page's own
+ * `?ref=<booking id>` carries one: an id names one booking or order, so it
+ * is never a label, whatever the site sent (U15 privacy review).
+ */
+const ID_SHAPE = /^c[a-z0-9]{24}$/;
+
+/**
  * A merchant's own link label as it may be kept, or null. Lower-cased and
  * trimmed first, so `?ref=Diwali-Post` and `diwali-post` are one label.
  */
@@ -67,6 +81,8 @@ export function visitRefOf(value: unknown): string | null {
     const ref = value.trim().toLowerCase();
     if (ref.length === 0 || ref.length > VISIT_REF_MAX) return null;
     if (!REF_SHAPE.test(ref) || DIGIT_RUN.test(ref)) return null;
+    if ((ref.match(/\d/g)?.length ?? 0) > VISIT_REF_MAX_DIGITS) return null;
+    if (ID_SHAPE.test(ref)) return null;
     return ref;
 }
 
