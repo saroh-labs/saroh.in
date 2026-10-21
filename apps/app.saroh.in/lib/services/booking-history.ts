@@ -54,3 +54,25 @@ export function systemEventTitle(
             return null;
     }
 }
+
+/**
+ * The reason a whole class was cancelled with, on its place's CANCELLED
+ * line (DEC-178, #1172), in the business's own words; null for any other
+ * line, and for a class cancelled before reasons were asked.
+ */
+export function classCancelReason(
+    event: Pick<BookingEvent, "type" | "data">,
+): string | null {
+    if (event.type !== "CANCELLED") return null;
+    const reason = event.data?.reason;
+    return typeof reason === "string" && reason.trim() !== ""
+        ? reason.trim()
+        : null;
+}
+
+/** A place in a class the business cancelled as a whole (U17). */
+export function isClassCancel(
+    event: Pick<BookingEvent, "type" | "data">,
+): boolean {
+    return event.type === "CANCELLED" && event.data?.classCancelled === true;
+}

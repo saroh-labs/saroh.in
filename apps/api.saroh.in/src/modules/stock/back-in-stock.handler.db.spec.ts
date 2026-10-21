@@ -13,6 +13,10 @@
  * - Stopped before it was told: never told.
  * - The 501st watcher: told by the next run.
  * - A contact with the address who revoked email consent: suppressed.
+ * - DEC-178 (#1170): a "Tell me" sends "We'll email you when it's back"
+ *   once, with Stop waiting as a secret link (the stored body holds the
+ *   slot); none for an address already waiting, a switch turned off or a
+ *   provider gone; the back-in-stock email carries the same link.
  * - A hand-marked Sold out cleared queues the run too (every writer's
  *   call is checked by `on-sellable-again.guard.spec.ts`); a product
  *   nobody waits for queues nothing.
@@ -41,19 +45,29 @@ import {
 } from "../../../test/fixtures/stock-watch";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { CommunicationsService } from "../communications/communications.service";
+import type { MessageSendPayload } from "../communications/message-send.handler";
+import { MESSAGE_SEND_TYPE } from "../communications/message-send.handler";
+import { SECRET_LINK_SLOT } from "../communications/transactional";
+import { decryptSecret } from "../payments/crypto";
 import type { ProductAccess } from "../products/product-access";
 import { SoldOutService } from "../products/sold-out.service";
-import { CUSTOMER_NOTIFY_TYPE } from "../site-accounts/customer-notify-queue";
+import {
+    CUSTOMER_NOTIFY_TYPE,
+    enqueueCustomerNotice,
+} from "../site-accounts/customer-notify-queue";
 import {
     CustomerNotifyHandler,
     CustomerNotifyService,
 } from "../site-accounts/customer-notify.handler";
+import { siteCodeSecret } from "../site-accounts/site-secrets";
 import { BackInStockHandler } from "./back-in-stock.handler";
 import { onSellableAgain } from "./on-sellable-again";
 import {
     BACK_IN_STOCK_BATCH,
     BACK_IN_STOCK_DELAY_MS,
     BACK_IN_STOCK_TYPE,
+    backInStockWaitingNoticeKey,
+    verifyWatchToken,
 } from "./stock-watch-rules";
 import { StockWatchService } from "./stock-watch.service";
 import { recordEntry } from "./stock.service";
@@ -188,7 +202,9 @@ describe("back in stock (U23)", () => {
             for (const m of sent) {
                 expect(m.status).toBe("QUEUED");
                 expect(m.subject).toBe("Neem soap is back at Rye & Co.");
-                expect(m.body).toContain("only email you&#39;ll get about it");
+                expect(m.body).toContain("last email you&#39;ll get about it");
+                // An unpublished site has no address: no stop link.
+                expect(m.body).not.toContain(SECRET_LINK_SLOT);
             }
             expect(await waiting(soap.id)).toBe(0);
             // Never in an account thread: they may be nobody's account.
@@ -432,5 +448,197 @@ describe("back in stock (U23)", () => {
         const mug = await listedProduct(b, "Mug", { onHand: 0 });
         await move(b, mug.shelves[0], 5);
         expect(await pendingRuns(b.organizationId)).toHaveLength(0);
+    });
+});
+
+describe("We'll email you when it's back, and Stop waiting (DEC-178, #1170)", () => {
+    afterAll(() => prisma.$disconnect());
+
+    function sent(organizationId: string, template: string) {
+        return prisma.message.findMany({
+            where: { organizationId, template },
+            orderBy: { createdAt: "asc" },
+            select: {
+                id: true,
+                toAddress: true,
+                subject: true,
+                body: true,
+                status: true,
+            },
+        });
+    }
+
+    /** Every notice waiting for this business, as the job runner would. */
+    function runNotices(organizationId: string) {
+        return runAll(
+            organizationId,
+            CUSTOMER_NOTIFY_TYPE,
+            customerNotify.handle,
+        );
+    }
+
+    /** The link sealed into a message's send job, opened. */
+    async function sealedLink(messageId: string): Promise<string | null> {
+        const jobs = await prisma.job.findMany({
+            where: { type: MESSAGE_SEND_TYPE },
+        });
+        const job = jobs.find(
+            (j) =>
+                (j.payload as unknown as MessageSendPayload).messageId ===
+                messageId,
+        );
+        const link = (job?.payload as unknown as MessageSendPayload | undefined)
+            ?.link;
+        return link ? decryptSecret(link) : null;
+    }
+
+    function stopPathOf(b: ShopBusiness): RegExp {
+        return new RegExp(
+            `^https://${b.subdomain}\\.saroh\\.app/shop/stop-waiting/(v1\\.[^/]+)$`,
+        );
+    }
+
+    it("a Tell me sends one email with Stop waiting, sealed into the send and never stored", async () => {
+        const b = await shopBusiness("Rye & Co.", { published: true });
+        const soap = await listedProduct(b, "Neem soap", { onHand: 0 });
+        const taken = await tellMe(b, soap, "asha@example.com");
+        await runNotices(b.organizationId);
+        const [m, ...more] = await sent(
+            b.organizationId,
+            "BACK_IN_STOCK_WAITING",
+        );
+        expect(more).toHaveLength(0);
+        expect(m).toMatchObject({
+            toAddress: "asha@example.com",
+            status: "QUEUED",
+            subject: "We'll email you when Neem soap is back",
+        });
+        expect(m.body).toContain("Changed your mind? Stop waiting here:");
+        expect(m.body).toContain(SECRET_LINK_SLOT);
+        // The token is a credential: never in the stored body.
+        expect(m.body).not.toContain("stop-waiting");
+        expect(m.body).not.toContain(taken.stopToken ?? "-");
+        // The link the send puts in opens this watch's stop page.
+        const link = await sealedLink(m.id);
+        const token = stopPathOf(b).exec(link ?? "")?.[1];
+        const watch = await prisma.stockWatch.findFirstOrThrow({
+            where: { organizationId: b.organizationId },
+        });
+        expect(
+            verifyWatchToken(siteCodeSecret(), decodeURIComponent(token ?? "")),
+        ).toBe(watch.id);
+        // Never in an account thread.
+        expect(
+            await prisma.customerThreadMessage.count({
+                where: { organizationId: b.organizationId },
+            }),
+        ).toBe(0);
+    });
+
+    it("asking again, a job run twice, or another product while waiting: no second email", async () => {
+        const b = await shopBusiness("Linen House", { published: true });
+        const shirt = await listedProduct(b, "Linen shirt", { onHand: 0 });
+        const scarf = await listedProduct(b, "Scarf", { onHand: 0 });
+        const first = await tellMe(b, shirt, "asha@example.com");
+        const again = await tellMe(b, shirt, "asha@example.com");
+        expect(again.stopToken).toBeNull();
+        // Someone typing the same address on another product.
+        const other = await tellMe(b, scarf, "asha@example.com");
+        expect(other.stopToken).not.toBeNull();
+        expect(
+            await prisma.job.count({
+                where: {
+                    organizationId: b.organizationId,
+                    type: CUSTOMER_NOTIFY_TYPE,
+                },
+            }),
+        ).toBe(1);
+        await runNotices(b.organizationId);
+        // The same notice queued again, as a retried job would be.
+        const watchId = verifyWatchToken(siteCodeSecret(), first.stopToken);
+        await enqueueCustomerNotice(prisma, b.organizationId, {
+            kind: "BACK_IN_STOCK_WAITING",
+            eventKey: backInStockWaitingNoticeKey(watchId ?? ""),
+            stockWatchId: watchId ?? "",
+        });
+        await runNotices(b.organizationId);
+        expect(
+            await sent(b.organizationId, "BACK_IN_STOCK_WAITING"),
+        ).toHaveLength(1);
+        // Stopped by them, asked again: that is their own new ask.
+        await watches.stop(b.siteId, first.stopToken ?? "", "visitor");
+        await watches.stop(b.siteId, other.stopToken ?? "", "visitor");
+        await tellMe(b, shirt, "asha@example.com");
+        await runNotices(b.organizationId);
+        expect(
+            await sent(b.organizationId, "BACK_IN_STOCK_WAITING"),
+        ).toHaveLength(2);
+    });
+
+    it("the switch off, the provider gone or the watch stopped before it went: nothing sent", async () => {
+        const b = await shopBusiness("Pulse Fitness", { published: true });
+        const shaker = await listedProduct(b, "Shaker", { onHand: 0 });
+        const bottle = await listedProduct(b, "Bottle", { onHand: 0 });
+        const band = await listedProduct(b, "Band", { onHand: 0 });
+
+        await tellMe(b, shaker, "off@example.com");
+        await prisma.customerNoticeSetting.create({
+            data: {
+                organizationId: b.organizationId,
+                kind: "BACK_IN_STOCK",
+                enabled: false,
+            },
+        });
+        await runNotices(b.organizationId);
+        await prisma.customerNoticeSetting.deleteMany({
+            where: { organizationId: b.organizationId },
+        });
+
+        const stopped = await tellMe(b, bottle, "stopped@example.com");
+        await watches.stop(b.siteId, stopped.stopToken ?? "", "visitor");
+        await runNotices(b.organizationId);
+
+        await tellMe(b, band, "gone@example.com");
+        await prisma.communicationProvider.updateMany({
+            where: { organizationId: b.organizationId },
+            data: { status: "DISCONNECTED" },
+        });
+        await runNotices(b.organizationId);
+
+        expect(
+            await sent(b.organizationId, "BACK_IN_STOCK_WAITING"),
+        ).toHaveLength(0);
+    });
+
+    it("a site with no web address: no sign-up email, and none of its slot", async () => {
+        const b = await shopBusiness("Draft Co.");
+        const mug = await listedProduct(b, "Mug", { onHand: 0 });
+        await tellMe(b, mug, "asha@example.com");
+        await runNotices(b.organizationId);
+        expect(await sent(b.organizationId, "BACK_IN_STOCK_WAITING")).toEqual(
+            [],
+        );
+    });
+
+    it("the back-in-stock email carries the same Stop waiting link", async () => {
+        const b = await shopBusiness("Kavi Dental", { published: true });
+        const brush = await listedProduct(b, "Toothbrush", { onHand: 0 });
+        await tellMe(b, brush, "asha@example.com");
+        // The sign-up email goes at once.
+        await runNotices(b.organizationId);
+        await move(b, brush.shelves[0], 5);
+        await runBackInStock(b.organizationId);
+        const [m] = await sent(b.organizationId, "BACK_IN_STOCK");
+        expect(m.subject).toBe("Toothbrush is back at Kavi Dental");
+        expect(m.body).toContain("Changed your mind? Stop waiting here:");
+        expect(m.body).toContain(SECRET_LINK_SLOT);
+        expect(m.body).toContain(`https://${b.subdomain}.saroh.app/shop/`);
+        const [waitingEmail] = await sent(
+            b.organizationId,
+            "BACK_IN_STOCK_WAITING",
+        );
+        // The same stop page as the sign-up email's.
+        expect(await sealedLink(m.id)).toMatch(stopPathOf(b));
+        expect(await sealedLink(m.id)).toBe(await sealedLink(waitingEmail.id));
     });
 });

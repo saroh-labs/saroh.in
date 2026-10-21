@@ -197,9 +197,10 @@ test.describe("bookings calendar", () => {
             name: /^Today, .+\. Change the day or the view$/,
         });
         await expect(title).toBeVisible();
-        await title.click();
         const sheet = page.getByRole("dialog", { name: "Go to a day" });
-        await expect(sheet).toBeVisible();
+        // A press before the calendar hydrates is lost on CI's slower phone
+        // runs: press until the sheet answers (`fixtures/press.ts`).
+        await pressUntil(title, sheet);
         // Day, Week and List live under Show as, and nowhere else.
         const views = sheet.getByRole("navigation", { name: "Bookings view" });
         await expect(views.getByRole("link", { name: "Day" })).toHaveAttribute(

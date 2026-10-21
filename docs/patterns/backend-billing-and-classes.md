@@ -329,9 +329,14 @@ requireProvider: false })`), the email says "view it and download a copy",
   after an email one (or the other way) is a 429 with `retryAt`. Link, PDF
   and print don't count.
 - **Automatic overdue reminders** (DEC-174 D3, U20 #1151): opt-in, at
-  most two per invoice (3 and 10 days late, in the business's zone), and
-  inside the one-a-day rule: a hand or WhatsApp reminder in the last day
-  moves the automatic one to a later run. Only through
+  most two per invoice, and inside the one-a-day rule: a hand or WhatsApp
+  reminder in the last day moves the automatic one to a later run. When is
+  the business's (DEC-178, #1169): the days after the due date for each
+  (default 3 and 10) and the hours (default 9 am to 8 pm, its zone), one
+  `OverdueReminderTiming` row while it differs from the defaults
+  (`communications/overdue-timing.ts`). Each reminder may still go from
+  its day until the day before the next one's, a week at most
+  (`reminderWindows`). Only through
   `remindAutomatic`, never a send path of its own. The sweep and its
   claim are in `backend-jobs.md` → Customer notices.
 - **Remind many:** `POST invoices/reminders/preview` and `POST

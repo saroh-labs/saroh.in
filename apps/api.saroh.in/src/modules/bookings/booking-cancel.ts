@@ -10,7 +10,7 @@ import {
     reserveBookingRefundInTx,
 } from "../payments/booking-refund";
 import type { PaymentsService } from "../payments/payments.service";
-import { BookingEventType } from "./booking-event-type";
+import { BookingEventType, classCancelledData } from "./booking-event-type";
 import { lockBookingInTx, releaseHoldInTx } from "./booking-hold";
 import { PAID_ALREADY, retirePayLinkInTx } from "./booking-pay-link";
 import {
@@ -155,6 +155,12 @@ export async function cancelFoundBooking(
          * review #11): else 409 `THEY_JUST_PAID`, and nothing changes.
          */
         ifUnpaid?: boolean;
+        /**
+         * With `closesClass`: why the business cancelled it (DEC-178,
+         * #1172), kept on the CANCELLED event's `data` and told to its
+         * customers and its waitlist.
+         */
+        classReason?: string;
     },
     send: (refundId: string) => Promise<RefundStatus>,
 ): Promise<CancelledBooking> {
@@ -195,7 +201,9 @@ export async function cancelFoundBooking(
                 freesPlace: !options.closesClass,
                 // The whole class is off (U17): the booker of an unpaid
                 // hold in it hears so too.
-                ...(options.closesClass ? { classCancelled: true } : {}),
+                ...(options.closesClass
+                    ? { classCancelled: true, classReason: options.classReason }
+                    : {}),
             });
             if (options.closesClass) {
                 await closeSessionWaitlistInTx(tx, {
@@ -204,6 +212,7 @@ export async function cancelFoundBooking(
                     startAt: booking.startAt,
                     now,
                     tell: true,
+                    reason: options.classReason,
                 });
             }
             return {
@@ -264,7 +273,12 @@ export async function cancelFoundBooking(
         };
         if (options.closesClass) {
             // Everyone waiting for it hears the class is off (U17).
-            await closeSessionWaitlistInTx(tx, { ...session, now, tell: true });
+            await closeSessionWaitlistInTx(tx, {
+                ...session,
+                now,
+                tell: true,
+                reason: options.classReason,
+            });
         } else {
             await offerFreedPlaceInTx(tx, session);
         }
@@ -278,6 +292,11 @@ export async function cancelFoundBooking(
                 type: BookingEventType.Cancelled,
                 actorUserId: actor.userId,
                 fromStartAt: booking.startAt,
+                // The whole class (DEC-178, #1172): and why, in the
+                // business's words, for the email and the history.
+                ...(options.closesClass
+                    ? { data: { ...classCancelledData(options.classReason) } }
+                    : {}),
             },
             select: { id: true },
         });

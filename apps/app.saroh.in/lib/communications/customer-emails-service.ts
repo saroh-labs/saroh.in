@@ -1,7 +1,7 @@
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, mutate, orgBase } from "@/lib/api/http";
 
-import type { CustomerEmails } from "./customer-emails";
+import type { CustomerEmails, OverdueTiming } from "./customer-emails";
 import { isCustomerEmails } from "./customer-emails";
 
 const PATH = "/customer-notices/settings";
@@ -30,6 +30,26 @@ export function setCustomerEmail(change: {
         PATH,
         "PATCH",
         { kind: change.kind, on: change.on },
+        "Couldn't save that. Try again.",
+    );
+}
+
+/**
+ * When overdue reminders go: all four at once, so an Undo puts back exactly
+ * what was there (`comms:manage`; DEC-178, #1169).
+ */
+export function setOverdueTiming(
+    timing: OverdueTiming,
+): Promise<CrmResult<CustomerEmails>> {
+    return mutate<CustomerEmails>(
+        "/customer-notices/overdue-timing",
+        "PATCH",
+        {
+            firstDay: timing.firstDay,
+            secondDay: timing.secondDay,
+            fromHour: timing.fromHour,
+            untilHour: timing.untilHour,
+        },
         "Couldn't save that. Try again.",
     );
 }

@@ -48,6 +48,7 @@ import {
     recordInvoiceEvent,
     shareNames,
 } from "./invoice-events";
+import { payInstructionLines } from "./invoice-paper-view";
 import { isPastDue, leftToPayCents } from "./invoice-state";
 import { InvoicesService } from "./invoices.service";
 import { payLinkUrlFor } from "./pay-link-url";
@@ -685,6 +686,13 @@ export class InvoiceSendService {
                     "This invoice has been sent. Send a reminder instead.",
                 );
             }
+            // A renewal Saroh sends by itself that can't be paid online
+            // lists how to pay; with none set it waits for the business
+            // (DEC-178). A send by hand, or a reminder, is as it was.
+            const howToPay =
+                !ctx && !reminder && !view.payOnline
+                    ? await renewalHowToPay(tx, organizationId)
+                    : null;
             if (claim) await claimReminder(tx, organizationId, row, claim);
 
             const template: InvoiceTemplate = reminder
@@ -717,6 +725,9 @@ export class InvoiceSendService {
                                 : null,
                             overdue: isPastDue(row, now),
                             payOnline: view.payOnline,
+                            // A renewal sent by itself lists the lines
+                            // (DEC-178), put in when the email goes.
+                            ...(howToPay ? { howToPay: true } : {}),
                             // How to pay offline (R32), named, never the
                             // details: those stay on the invoice's page.
                             ...(view.payOnline
@@ -731,6 +742,7 @@ export class InvoiceSendService {
                                   }),
                         },
                         recipient: { kind: "INVOICE_BILL_TO", invoiceId: id },
+                        howToPay,
                         // A fresh link, as "New link" makes; the old one
                         // stops. With no way to pay online it is a view
                         // link: the same page, without a Pay button. On the
@@ -1021,4 +1033,30 @@ async function claimReminder(
 function sendKind(reminder: boolean, automatic: boolean): InvoiceEventKind {
     if (automatic) return reminder ? "AUTO_REMINDED" : "AUTO_SENT";
     return reminder ? "REMINDED" : "SENT";
+}
+
+/** Why a renewal didn't send itself: no way to pay was set (DEC-178). */
+export const NO_WAY_TO_PAY = "NO_WAY_TO_PAY";
+
+/**
+ * The "How to pay us" lines a renewal's email lists when it can't be paid
+ * online (DEC-178), the paper's own lines. None set: a 409 with
+ * `details.reason` {@link NO_WAY_TO_PAY}, which the auto-send writes on
+ * the invoice's history, and the business sends it by hand.
+ */
+async function renewalHowToPay(
+    tx: Db,
+    organizationId: string,
+): Promise<string[]> {
+    const lines = payInstructionLines(
+        await businessPayInstructionsOf(organizationId, tx),
+    );
+    if (!lines) {
+        throw new ConflictException({
+            message:
+                "Add how customers pay you, or connect payments, to send this renewal automatically.",
+            details: { reason: NO_WAY_TO_PAY },
+        });
+    }
+    return lines;
 }

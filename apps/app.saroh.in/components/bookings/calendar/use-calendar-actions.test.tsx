@@ -191,3 +191,40 @@ describe("cancel", () => {
         });
     });
 });
+
+describe("cancel the class (#1172)", () => {
+    it("sends every place the reason, once its ten seconds are up", async () => {
+        cancelBooking.mockResolvedValue({ ok: true });
+        draw();
+        const seats = [
+            booking({ id: "s1" }),
+            booking({ id: "s2", paidWith: "PACK" }),
+        ];
+        act(() =>
+            api().act.cancelClass(seats, "Mat Pilates", "Neha is unwell."),
+        );
+        expect(showUndo.mock.calls[0]?.[0]).toBe(
+            "Mat Pilates cancelled. 1 class given back.",
+        );
+        expect(cancelBooking).not.toHaveBeenCalled();
+        await run(HOLD_UNDO_MS);
+        expect(cancelBooking.mock.calls).toEqual([
+            [
+                "s1",
+                {
+                    returnCredit: true,
+                    closesClass: true,
+                    reason: "Neha is unwell.",
+                },
+            ],
+            [
+                "s2",
+                {
+                    returnCredit: true,
+                    closesClass: true,
+                    reason: "Neha is unwell.",
+                },
+            ],
+        ]);
+    });
+});

@@ -19,7 +19,8 @@ import { shopField, shopLink, shopPrimary } from "./look-shop";
 /**
  * "Tell me when it's back" (DEC-174, automatic notices U24, #1155): under a
  * sold-out product's button, an email field, the button and the opt-in in
- * one line ("‹Business› will email you once. Nothing else."). Once taken:
+ * one line ("‹Business› will email you now and when it's back. Nothing
+ * else."). Once taken:
  * "We'll email you at ‹email›", with "Stop waiting" when this visit made
  * the watch.
  *

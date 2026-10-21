@@ -2,6 +2,7 @@ import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common";
 import type { Job } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { overdueTiming } from "../communications/overdue-timing";
 import { BILLING_ORGANIZATION } from "../organizations/organization-lifecycle.policy";
 import { refusalReason } from "./invoice-auto-send.handler";
 import { CLAIM_REFUSED, InvoiceSendService } from "./invoice-send.service";
@@ -54,8 +55,10 @@ export interface OverdueRunCounts {
  * `invoice.overdue-remind` (automatic notices U20, DEC-174 D3): the
  * hourly sweep that reminds overdue invoices for the businesses that
  * turned "Overdue reminders" on (off by default). See `overdue-remind.ts`
- * for when: at most twice, 3 and 10 days after the due date, in the
- * business's time zone, between 9 am and 8 pm there.
+ * for when: at most twice, on the days after the due date the business
+ * chose (3 and 10 by default), in its time zone, inside the hours it chose
+ * (9 am to 8 pm by default; DEC-178, #1169). Its timing is read inside its
+ * own RLS context, each run, so a change applies from the next hour.
  *
  * Which invoices: the overdue bills (`overdueBillsWhere`, the one
  * definition: issued, past due, not an order's or a credit note, not a
@@ -164,8 +167,9 @@ export class OverdueRemindHandler {
         return runInOrgContext(organizationId, async () => {
             const out = new Map<string, OverdueOutcome>();
             const zone = await this.sends.zone(prisma, organizationId);
-            if (!inSendingHours(now, zone)) return out;
-            const { from, to } = dueWindow(now, zone);
+            const timing = await overdueTiming(prisma, organizationId);
+            if (!inSendingHours(now, zone, timing)) return out;
+            const { from, to } = dueWindow(now, zone, timing);
             const rows = await prisma.invoice.findMany({
                 where: {
                     AND: [
@@ -179,7 +183,7 @@ export class OverdueRemindHandler {
             });
             const due = rows.flatMap((row) => {
                 const stage = row.dueAt
-                    ? overdueStage(row.dueAt, now, zone)
+                    ? overdueStage(row.dueAt, now, zone, timing)
                     : null;
                 return stage && leftToPayCents(row) > 0
                     ? [{ id: row.id, stage }]

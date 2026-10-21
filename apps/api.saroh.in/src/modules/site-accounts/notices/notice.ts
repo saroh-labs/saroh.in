@@ -114,9 +114,11 @@ export interface NoticeDefinition<V extends NoticeVarsBase> {
      * email really goes (not for a customer who turned email off), and the
      * link is put in at send time: the stored body holds the slot, never
      * the token (`SECRET_LINK_SLOT`). The thread's sentence has none.
+     * `lead` null: this email has no secret link (a back-in-stock watch
+     * whose site has no address now), and `make` is never called.
      */
     secretLink?: {
-        lead(vars: V): string;
+        lead(vars: V): string | null;
         make(
             tx: Tx,
             organizationId: string,
@@ -167,6 +169,15 @@ export async function businessName(
         select: { name: true },
     });
     return org?.name ?? "";
+}
+
+/**
+ * A reason as a sentence: its own full stop, question or exclamation mark
+ * kept, else a full stop added. Plain text; the email escapes it.
+ */
+export function withStop(reason: string): string {
+    const said = reason.trim();
+    return /[.!?…]$/.test(said) ? said : `${said}.`;
 }
 
 /** Only a web address is ever a link; anything else stays words. */

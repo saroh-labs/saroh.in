@@ -23,12 +23,19 @@ import {
     customerEmailsRow,
     customerEmailsSheetLine,
     customerEmailWhy,
+    hourWords,
     isCustomerEmails,
+    overdueTimingChange,
+    overdueTimingOptions,
+    reminderDayWords,
     withCustomerEmail,
+    withOverdueTiming,
+    withTimingField,
 } from "./customer-emails";
 import {
     readCustomerEmails,
     setCustomerEmail,
+    setOverdueTiming,
 } from "./customer-emails-service";
 
 const email = (
@@ -323,6 +330,121 @@ describe("saving one", () => {
             "/customer-notices/settings",
             "PATCH",
             { kind: "MEMBERSHIP", on: false },
+            "Couldn't save that. Try again.",
+        );
+    });
+});
+
+describe("when overdue reminders go (DEC-178, #1169)", () => {
+    const timing = { firstDay: 3, secondDay: 10, fromHour: 9, untilHour: 20 };
+
+    it("reads an overdue switch with its timing, and an older API without one", () => {
+        const body = (t: unknown) => ({
+            notices: [email("OVERDUE_REMINDERS", { timing: t as never })],
+            canChange: true,
+            emailConnected: true,
+        });
+        expect(isCustomerEmails(body(timing))).toBe(true);
+        expect(isCustomerEmails(body(null))).toBe(true);
+        expect(isCustomerEmails(body(undefined))).toBe(true);
+        expect(isCustomerEmails(body({ ...timing, firstDay: "3" }))).toBe(
+            false,
+        );
+        expect(isCustomerEmails(body({ firstDay: 3 }))).toBe(false);
+    });
+
+    it("says days and hours in plain words", () => {
+        expect(reminderDayWords(1)).toBe("1 day after it's due");
+        expect(reminderDayWords(10)).toBe("10 days after it's due");
+        expect([0, 9, 12, 13, 20, 24].map((h) => hourWords(h))).toEqual([
+            "midnight",
+            "9 am",
+            "noon",
+            "1 pm",
+            "8 pm",
+            "midnight",
+        ]);
+    });
+
+    it("offers only choices that fit with the rest", () => {
+        const o = overdueTimingOptions(timing);
+        expect(o.firstDay.map((x) => Number(x.value))).toEqual(
+            Array.from({ length: 30 }, (_, i) => i + 1),
+        );
+        expect(o.secondDay[0]?.value).toBe("4");
+        expect(o.secondDay.at(-1)?.value).toBe("60");
+        expect(o.fromHour[0]).toEqual({ value: "0", label: "midnight" });
+        expect(o.fromHour.at(-1)?.value).toBe("23");
+        expect(o.untilHour[0]).toEqual({ value: "10", label: "10 am" });
+        expect(o.untilHour.at(-1)).toEqual({ value: "24", label: "midnight" });
+    });
+
+    it("one control changed keeps the rest fitting together", () => {
+        expect(withTimingField(timing, "firstDay", 5)).toEqual({
+            ...timing,
+            firstDay: 5,
+        });
+        expect(withTimingField(timing, "firstDay", 10)).toEqual({
+            ...timing,
+            firstDay: 10,
+            secondDay: 11,
+        });
+        expect(withTimingField(timing, "fromHour", 23)).toEqual({
+            ...timing,
+            fromHour: 23,
+            untilHour: 24,
+        });
+        expect(withTimingField(timing, "untilHour", 12)).toEqual({
+            ...timing,
+            untilHour: 12,
+        });
+    });
+
+    it("changes only the overdue switch's timing on the screen", () => {
+        const st = {
+            notices: [
+                email("REFUND", { timing: null }),
+                email("OVERDUE_REMINDERS", { timing }),
+            ],
+            canChange: true,
+            emailConnected: true,
+        };
+        const next = withOverdueTiming(st, { ...timing, firstDay: 5 });
+        expect(next.notices[0]?.timing).toBe(null);
+        expect(next.notices[1]?.timing).toEqual({ ...timing, firstDay: 5 });
+    });
+
+    it("says an audit row's timing change for Activity", () => {
+        expect(
+            overdueTimingChange({
+                field: "firstReminderDay",
+                before: 3,
+                after: 5,
+            }),
+        ).toEqual({
+            what: "first reminder",
+            before: "3 days after it's due",
+            after: "5 days after it's due",
+        });
+        expect(
+            overdueTimingChange({
+                field: "remindUntilHour",
+                before: 20,
+                after: 24,
+            }),
+        ).toEqual({ what: "until", before: "8 pm", after: "midnight" });
+        expect(
+            overdueTimingChange({ field: "noticeOn", before: 1, after: 2 }),
+        ).toBe(null);
+    });
+
+    it("saves all four together", async () => {
+        http.mutate.mockResolvedValue({ ok: true, data: {} });
+        await setOverdueTiming(timing);
+        expect(http.mutate).toHaveBeenCalledWith(
+            "/customer-notices/overdue-timing",
+            "PATCH",
+            timing,
             "Couldn't save that. Try again.",
         );
     });

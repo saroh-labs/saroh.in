@@ -1,6 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
 import type { ModuleKey } from "../capabilities/module-keys";
+import { DEFAULT_OVERDUE_TIMING, overdueSays } from "./overdue-timing";
 
 /**
  * The business's switches for its automatic customer notices (DEC-174,
@@ -161,11 +162,12 @@ export const NOTICE_WORDS: Record<NoticeKind, { label: string; says: string }> =
         },
         BACK_IN_STOCK: {
             label: "Back in stock",
-            says: "Customers who asked are emailed once when a sold-out product is back.",
+            says: "Customers who ask are emailed to say they're on the list, then once when a sold-out product is back.",
         },
         OVERDUE_REMINDERS: {
             label: "Overdue reminders",
-            says: "Up to 2 reminders for an unpaid invoice, 3 and 10 days after it's due.",
+            // The business's own days and hours replace these in the view.
+            says: overdueSays(DEFAULT_OVERDUE_TIMING),
         },
     };
 

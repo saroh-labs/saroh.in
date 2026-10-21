@@ -91,7 +91,12 @@ export async function replaceRules(
 
 export async function cancelBooking(
     bookingId: string,
-    options: { returnCredit?: boolean; closesClass?: boolean } = {},
+    options: {
+        returnCredit?: boolean;
+        closesClass?: boolean;
+        /** Why the whole class is cancelled (DEC-178, #1172). */
+        reason?: string;
+    } = {},
 ) {
     return cancelBookingApi(bookingId, options);
 }

@@ -87,6 +87,11 @@ export function eventLine(
                 : `Sent automatically${where(e)}`;
         }
         case "SEND_FAILED":
+            // A renewal that can't be paid online, with no way to pay set
+            // (DEC-178): it waits for the business, it didn't fail.
+            if (e.reason === "NO_WAY_TO_PAY") {
+                return "Not sent: add how customers pay you, or connect payments";
+            }
             if (e.reason) {
                 return `${failedWhat(e.template)} not sent automatically: ${notSentWhy(e.reason)}`;
             }

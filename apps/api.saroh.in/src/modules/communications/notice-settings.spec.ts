@@ -10,6 +10,11 @@ jest.mock("@saroh/database", () => ({
             deleteMany: jest.fn(),
         },
         communicationProvider: { findUnique: jest.fn() },
+        overdueReminderTiming: {
+            findUnique: jest.fn(),
+            upsert: jest.fn(),
+            deleteMany: jest.fn(),
+        },
     },
 }));
 
@@ -26,7 +31,7 @@ import { validationPipeOptions } from "../../common/validation";
 import type { AuditService } from "../audit/audit.service";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { MODULE_KEYS } from "../capabilities/module-registry";
-import { SetNoticeSettingDto } from "./dto";
+import { SetNoticeSettingDto, SetOverdueTimingDto } from "./dto";
 import type { NoticeSettingsReader } from "./notice-settings";
 import {
     defaultOn,
@@ -44,6 +49,7 @@ import { NoticeSettingsService } from "./notice-settings.service";
 const db = prisma as unknown as {
     customerNoticeSetting: Record<string, jest.Mock>;
     communicationProvider: Record<string, jest.Mock>;
+    overdueReminderTiming: Record<string, jest.Mock>;
 };
 
 const record = jest.fn();
@@ -97,6 +103,7 @@ beforeEach(() => {
     modules();
     email("CONNECTED");
     db.customerNoticeSetting.findMany.mockResolvedValue([]);
+    db.overdueReminderTiming.findUnique.mockResolvedValue(null);
 });
 
 describe("the kinds (pure)", () => {
@@ -464,5 +471,163 @@ describe("the request body", () => {
         await expect(validate(body)).rejects.toBeInstanceOf(
             BadRequestException,
         );
+    });
+});
+
+describe("when overdue reminders go (DEC-178, #1169)", () => {
+    const timing = {
+        firstDay: 5,
+        secondDay: 12,
+        fromHour: 10,
+        untilHour: 18,
+    };
+    const overdue = (view: { notices: { kind: string }[] }) =>
+        view.notices.find((n) => n.kind === "OVERDUE_REMINDERS") as
+            { timing: unknown; says: string } | undefined;
+
+    it("a business that never chose reads the defaults, said in its switch's sentence", async () => {
+        const view = await service().read(ctx());
+        expect(overdue(view)).toMatchObject({
+            timing: { firstDay: 3, secondDay: 10, fromHour: 9, untilHour: 20 },
+            says: "Up to 2 reminders for an unpaid invoice, 3 and 10 days after it's due, from 9 am to 8 pm your time.",
+        });
+        // Only overdue reminders are timed.
+        for (const n of view.notices) {
+            if (n.kind !== "OVERDUE_REMINDERS") expect(n.timing).toBeNull();
+        }
+    });
+
+    it("a stored choice is read back, and its sentence follows it", async () => {
+        db.overdueReminderTiming.findUnique.mockResolvedValue(timing);
+        expect(overdue(await service().read(ctx()))).toMatchObject({
+            timing,
+            says: "Up to 2 reminders for an unpaid invoice, 5 and 12 days after it's due, from 10 am to 6 pm your time.",
+        });
+        expect(db.overdueReminderTiming.findUnique).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { organizationId: "org_1" } }),
+        );
+    });
+
+    it("a change away from the defaults is one row, who did it, and an audit entry naming what moved", async () => {
+        await service().updateOverdueTiming(ctx(), timing);
+        expect(db.overdueReminderTiming.upsert).toHaveBeenCalledWith({
+            where: { organizationId: "org_1" },
+            create: {
+                organizationId: "org_1",
+                ...timing,
+                updatedByUserId: "user_1",
+            },
+            update: { ...timing, updatedByUserId: "user_1" },
+        });
+        expect(record).toHaveBeenCalledWith(
+            expect.objectContaining({
+                action: "customer-notices.setting",
+                organizationId: "org_1",
+                metadata: {
+                    kind: "OVERDUE_REMINDERS",
+                    changes: [
+                        { field: "firstReminderDay", before: 3, after: 5 },
+                        { field: "secondReminderDay", before: 10, after: 12 },
+                        { field: "remindFromHour", before: 9, after: 10 },
+                        { field: "remindUntilHour", before: 20, after: 18 },
+                    ],
+                },
+            }),
+        );
+    });
+
+    it("back to the defaults deletes the row; the same again writes no audit entry", async () => {
+        db.overdueReminderTiming.findUnique.mockResolvedValue(timing);
+        await service().updateOverdueTiming(ctx(), {
+            firstDay: 3,
+            secondDay: 10,
+            fromHour: 9,
+            untilHour: 20,
+        });
+        expect(db.overdueReminderTiming.deleteMany).toHaveBeenCalledWith({
+            where: { organizationId: "org_1" },
+        });
+        expect(db.overdueReminderTiming.upsert).not.toHaveBeenCalled();
+        expect(record).toHaveBeenCalledTimes(1);
+
+        record.mockClear();
+        db.overdueReminderTiming.findUnique.mockResolvedValue(null);
+        await service().updateOverdueTiming(ctx(), {
+            firstDay: 3,
+            secondDay: 10,
+            fromHour: 9,
+            untilHour: 20,
+        });
+        expect(record).not.toHaveBeenCalled();
+    });
+
+    it("a Member without comms:manage is refused (403), and nothing is written", async () => {
+        await expect(
+            service().updateOverdueTiming(
+                ctx({ role: "MEMBER", roleKey: "MEMBER" }),
+                timing,
+            ),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(db.overdueReminderTiming.upsert).not.toHaveBeenCalled();
+        expect(db.overdueReminderTiming.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        [
+            { firstDay: 10, secondDay: 10, fromHour: 9, untilHour: 20 },
+            "The second reminder goes after the first, at most 60 days after the due date.",
+        ],
+        [
+            { firstDay: 3, secondDay: 10, fromHour: 18, untilHour: 9 },
+            "Reminders stop later in the day than they start.",
+        ],
+        [
+            { firstDay: 3, secondDay: 10, fromHour: 9, untilHour: 9 },
+            "Reminders stop later in the day than they start.",
+        ],
+    ])(
+        "%j that doesn't fit together is refused in words (400)",
+        async (bad, words) => {
+            await expect(
+                service().updateOverdueTiming(ctx(), bad),
+            ).rejects.toThrow(new BadRequestException(words));
+            expect(db.overdueReminderTiming.upsert).not.toHaveBeenCalled();
+        },
+    );
+
+    it("not while Saroh doesn't send overdue reminders (409)", async () => {
+        NOTICE_SENDS.OVERDUE_REMINDERS = false;
+        await expect(
+            service().updateOverdueTiming(ctx(), timing),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(db.overdueReminderTiming.upsert).not.toHaveBeenCalled();
+    });
+
+    describe("the request body", () => {
+        const pipe = new ValidationPipe(validationPipeOptions);
+        const validate = (body: unknown) =>
+            pipe.transform(body, {
+                type: "body",
+                metatype: SetOverdueTimingDto,
+            });
+
+        it("takes four whole numbers", async () => {
+            await expect(validate(timing)).resolves.toEqual(timing);
+        });
+
+        it.each([
+            { ...timing, firstDay: 0 },
+            { ...timing, firstDay: 31 },
+            { ...timing, secondDay: 61 },
+            { ...timing, firstDay: 2.5 },
+            { ...timing, fromHour: -1 },
+            { ...timing, untilHour: 25 },
+            { ...timing, untilHour: "18" },
+            { firstDay: 5, secondDay: 12, fromHour: 10 },
+        ])("refuses %j (400)", async (body) => {
+            await expect(validate(body)).rejects.toBeInstanceOf(
+                BadRequestException,
+            );
+        });
     });
 });

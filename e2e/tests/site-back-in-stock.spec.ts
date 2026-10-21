@@ -34,7 +34,8 @@ import { asNewVisitor, expectNoZoomOnFocus } from "./site-codes";
  * Northwind's Back in stock switch (put back as it was), and one product
  * per test, "E2E Back In Stock …", untracked and marked sold out by hand,
  * removed after. Every watch it makes is stopped before the product is
- * available again, so nobody is emailed.
+ * available again, so nobody is told it's back; the short sign-up email
+ * with "Stop waiting" (DEC-178, #1170) goes to an `@example.com` address.
  *
  * @serial: it changes Northwind's switch, its site's storefront and, for
  * a look, its site style.
@@ -256,7 +257,7 @@ test.describe("Tell me when it's back", { tag: "@serial" }, () => {
             const form = page.locator('[data-back-in-stock="form"]');
             await expect(form).toBeVisible();
             await expect(form).toContainText(
-                "will email you once. Nothing else.",
+                "will email you now and when it's back. Nothing else.",
             );
             const field = page.getByLabel("Your email");
             await expectNoZoomOnFocus(field);

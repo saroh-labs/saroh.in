@@ -28,13 +28,30 @@ import { ignoreHTTPSErrors, urls } from "../playwright.config";
  * first test still pins that no row is drawn while nothing is offered,
  * and the second is skipped, saying why, if nothing is.
  *
+ * Overdue reminders, once on, say when they go (DEC-178, #1169): the two
+ * days after the due date and the hours, each choice saved as it is made
+ * with Undo, on a desk and a phone.
+ *
  * The words, the one-note rule, the read-only sheet and a refused save
  * are covered by `customer-emails*.test.ts(x)` beside the components; the
  * listing, the 403 and the 409 by the API's `notice-settings` specs.
  */
 
+interface Timing {
+    firstDay: number;
+    secondDay: number;
+    fromHour: number;
+    untilHour: number;
+}
+
 interface Listed {
-    notices: { kind: string; label: string; on: boolean; offered: boolean }[];
+    notices: {
+        kind: string;
+        label: string;
+        on: boolean;
+        offered: boolean;
+        timing?: Timing | null;
+    }[];
     canChange: boolean;
     emailConnected: boolean;
 }
@@ -258,5 +275,76 @@ test("overdue reminders are listed off, an owner turns them on, and Undo turns t
         )
         .toBe(false);
     await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await noSideways(page);
+});
+
+test("with overdue reminders on, an owner chooses when they go, and Undo puts it back (DEC-178)", async ({
+    page,
+}, testInfo) => {
+    const b = await makeBusiness(page, testInfo, "ce-timing");
+    const timing = async () =>
+        (await listed(page, b)).notices.find(
+            (n) => n.kind === "OVERDUE_REMINDERS",
+        )?.timing;
+    expect(await timing()).toEqual({
+        firstDay: 3,
+        secondDay: 10,
+        fromHour: 9,
+        untilHour: 20,
+    });
+
+    await openProviders(page, b);
+    const sheet = page.getByRole("dialog", {
+        name: "Emails to your customers",
+    });
+    await pressUntil(
+        block(page).getByRole("button", {
+            name: "Edit emails to your customers",
+        }),
+        sheet,
+    );
+    const when = sheet.getByRole("group", {
+        name: "When overdue reminders go",
+    });
+    // Off: no timing to choose.
+    await expect(when).toHaveCount(0);
+
+    await sheet
+        .getByRole("switch", { name: "Overdue reminders", exact: true })
+        .click();
+    await expect(when).toBeVisible();
+    await expect(
+        when.getByRole("combobox", { name: "First reminder" }),
+    ).toHaveText("3 days after it's due");
+    await expect(when.getByRole("combobox", { name: "Until" })).toHaveText(
+        "8 pm",
+    );
+    await noSideways(page);
+
+    await when.getByRole("combobox", { name: "First reminder" }).click();
+    await page
+        .getByRole("option", { name: "5 days after it's due", exact: true })
+        .filter({ visible: true })
+        .click();
+    await expect(
+        page.getByText("Overdue reminder timing saved."),
+    ).toBeVisible();
+    await expect.poll(async () => (await timing())?.firstDay).toBe(5);
+    await expect(
+        when.getByRole("combobox", { name: "First reminder" }),
+    ).toHaveText("5 days after it's due");
+    // The switch's sentence follows the days.
+    await expect(sheet).toContainText("5 and 10 days after it's due");
+
+    // The timing's own Undo: turning reminders on left a toast with one too.
+    await page
+        .locator("[data-sonner-toast]")
+        .filter({ hasText: "Overdue reminder timing saved." })
+        .getByRole("button", { name: "Undo" })
+        .click();
+    await expect.poll(async () => (await timing())?.firstDay).toBe(3);
+    await expect(
+        when.getByRole("combobox", { name: "First reminder" }),
+    ).toHaveText("3 days after it's due");
     await noSideways(page);
 });

@@ -110,6 +110,13 @@ export interface TransactionalSend {
      * retires the link the business already shared.
      */
     secretLink?: () => Promise<string>;
+    /**
+     * The business's "How to pay us" lines for a body with
+     * `HOW_TO_PAY_SLOT` (DEC-178): sealed into the job's payload with the
+     * secret link and put into the email only when it goes, so the stored
+     * body never carries an account number.
+     */
+    howToPay?: readonly string[] | null;
     /** The invoice it is about, recorded on the Message. */
     invoiceId?: string;
     /**
@@ -885,6 +892,9 @@ export class CommunicationsService {
             messageId: message.id,
             deliveryId: delivery.id,
             ...(link ? { link: encryptSecret(link) } : {}),
+            ...(input.howToPay?.length
+                ? { howToPay: encryptSecret(JSON.stringify(input.howToPay)) }
+                : {}),
             ...(input.attachInvoicePdf && input.invoiceId
                 ? { attach: INVOICE_PDF_ATTACHMENT }
                 : {}),

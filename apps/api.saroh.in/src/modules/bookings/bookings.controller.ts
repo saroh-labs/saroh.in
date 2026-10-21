@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     Body,
     Controller,
     Delete,
@@ -40,6 +41,7 @@ import {
     BookByHandDto,
     BookingsRangeQueryDto,
     BookVisitDto,
+    CancelBookingDto,
     CreateServiceDto,
     ReassignBookingDto,
     ReassignCandidatesQueryDto,
@@ -377,6 +379,11 @@ export class BookingsController {
      * `?ifUnpaid=true` is Home's Turn down (review #11): cancel only while
      * the booking still awaits payment, else 409 "They just paid".
      *
+     * The body's `reason` goes only with `closesClass` (DEC-178, #1172):
+     * why the business cancelled the class, 1 to 200 characters, which the
+     * customer's email and the booking's history say. Optional, so a cancel
+     * sent without one reads as before.
+     *
      * Not gated on Appointments (#117, owner 9 Oct): a business that
      * switched Appointments off can still cancel a booking already made,
      * and the refund its policy gives (DEC-058). `booking:*` still applies.
@@ -389,12 +396,20 @@ export class BookingsController {
         @Query("returnCredit") returnCredit?: string,
         @Query("closesClass") closesClass?: string,
         @Query("ifUnpaid") ifUnpaid?: string,
+        @Body() dto?: CancelBookingDto,
     ): Promise<WithoutIntakeNote<CancelledBooking>> {
+        const reason = dto?.reason;
+        if (reason !== undefined && closesClass !== "true") {
+            throw new BadRequestException(
+                "A reason is given only when the whole class is cancelled.",
+            );
+        }
         return this.bookings
             .cancelBooking(ctx, bookingId, undefined, {
                 returnCredit: returnCredit === "true",
                 closesClass: closesClass === "true",
                 ifUnpaid: ifUnpaid === "true",
+                ...(reason !== undefined ? { classReason: reason } : {}),
             })
             .then(withoutIntakeNote);
     }

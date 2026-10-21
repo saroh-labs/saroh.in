@@ -19,7 +19,12 @@ import {
     COMMS_PROVIDER_FACTORY,
     isCommsChannel,
 } from "./providers/provider.port";
-import { fillSecretLink, SECRET_LINK_SLOT } from "./transactional";
+import {
+    fillHowToPay,
+    fillSecretLink,
+    HOW_TO_PAY_SLOT,
+    SECRET_LINK_SLOT,
+} from "./transactional";
 
 /** The `type` this handler is registered under (matches the send producer). */
 export const MESSAGE_SEND_TYPE = "message.send";
@@ -41,12 +46,32 @@ export interface MessageSendPayload {
      */
     link?: EncryptedSecret;
     /**
+     * A renewal's "How to pay us" lines (DEC-178), as JSON, sealed as the
+     * link is: put into the body where the stored one has
+     * `HOW_TO_PAY_SLOT`, never logged or written back.
+     */
+    howToPay?: EncryptedSecret;
+    /**
      * Send the invoice's PDF with it (DEC-083): the message's own invoice,
      * drawn here at send time and never stored. Only where the provider
      * takes attachments; otherwise, or if it can't be drawn, the email goes
      * with its link alone.
      */
     attach?: typeof INVOICE_PDF_ATTACHMENT;
+}
+
+/** The sealed "How to pay us" lines, opened: strings only, or none. */
+function howToPayLinesOf(json: string): string[] {
+    try {
+        const parsed: unknown = JSON.parse(json);
+        return Array.isArray(parsed)
+            ? parsed.filter(
+                  (l): l is string => typeof l === "string" && l !== "",
+              )
+            : [];
+    } catch {
+        return [];
+    }
 }
 
 /** The one attachment a message can ask for: its invoice's PDF. */
@@ -109,7 +134,7 @@ export class MessageSendHandler {
 
     /** Bound {@link JobHandler} to register with the {@link JobHandlerRegistry}. */
     readonly handle = async (job: Job): Promise<void> => {
-        const { messageId, deliveryId, link, attach } =
+        const { messageId, deliveryId, link, howToPay, attach } =
             job.payload as unknown as MessageSendPayload;
 
         const delivery = await prisma.delivery.findUnique({
@@ -190,6 +215,21 @@ export class MessageSendHandler {
                 return;
             }
             body = fillSecretLink(body, decryptSecret(link));
+        }
+        // A renewal's "How to pay us" lines: none, and it goes nowhere.
+        if (body.includes(HOW_TO_PAY_SLOT)) {
+            const lines = howToPay
+                ? howToPayLinesOf(decryptSecret(howToPay))
+                : [];
+            if (lines.length === 0) {
+                await this.recordFailure(
+                    delivery.id,
+                    message.id,
+                    "how to pay missing",
+                );
+                return;
+            }
+            body = fillHowToPay(body, lines);
         }
 
         const credentials = this.openCredentials(providerRow);

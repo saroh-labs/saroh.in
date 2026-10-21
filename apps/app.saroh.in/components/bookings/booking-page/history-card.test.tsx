@@ -101,4 +101,36 @@ describe("HistoryCard (#1137)", () => {
         expect(failed).toContain("Refund failed");
         expect(failed).not.toContain("by the customer");
     });
+
+    it("a class cancelled with a reason says so, as typed (#1172)", () => {
+        const [withReason, before, plain] = lines([
+            event({
+                id: "c1",
+                type: "CANCELLED",
+                actor: { name: "Neha Kapoor" },
+                data: {
+                    classCancelled: true,
+                    reason: "Studio flooded <b>sorry</b>",
+                },
+            }),
+            // Cancelled with the class before reasons were asked.
+            event({
+                id: "c2",
+                type: "CANCELLED",
+                actor: { name: "Neha Kapoor" },
+                data: { classCancelled: true },
+            }),
+            event({ id: "c3", type: "CANCELLED", actor: { name: "Meera" } }),
+        ]);
+        expect(withReason).toContain("Class cancelled");
+        expect(withReason).toContain("Reason: Studio flooded <b>sorry</b>");
+        expect(withReason).toContain("Neha Kapoor");
+        // Typed words, never markup.
+        expect(host.querySelector("li b")).toBeNull();
+        expect(before).toContain("Class cancelled");
+        expect(before).not.toContain("Reason");
+        expect(plain).toContain("Cancelled");
+        expect(plain).not.toContain("Class cancelled");
+        expect(plain).not.toContain("Reason");
+    });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { ProgressBar } from "@saroh/ui/progress-bar";
+import { useState } from "react";
 
 import { formatClock } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
@@ -9,6 +10,7 @@ import { calendarHref } from "@/lib/services/calendar-href";
 import type { Block, LocalDate } from "@/lib/services/diary";
 import { liveSeats } from "@/lib/services/diary";
 
+import { CancelClassDialog } from "./cancel-class-dialog";
 import { ClassSeats } from "./class-seats";
 import type { MoreRow } from "./quick-look-more";
 import { QuickLookMore } from "./quick-look-more";
@@ -23,7 +25,8 @@ import type {
  * A class at a glance (BKMQuickLook "group class", BKDQuickLook): how
  * full it is, who is booked and how each paid, with Mark arrived and
  * Cancel a place on each; More holds Edit this class, See the whole day
- * and Cancel the class, last and in red.
+ * and Cancel the class, last and in red, which asks why first: the
+ * customers are told the reason (DEC-178, #1172).
  */
 export function ClassLook({
     block,
@@ -53,6 +56,7 @@ export function ClassLook({
     const cancelled = block.state === "cancelled";
     const canCancelClass = ctx.canBook && live.length > 0;
     const at = formatClock(block.start);
+    const [asking, setAsking] = useState(false);
 
     const rows: MoreRow[] = [
         ...(ctx.canEditService
@@ -88,7 +92,7 @@ export function ClassLook({
                       label: "Cancel the class",
                       icon: "cancel" as const,
                       danger: true,
-                      onSelect: () => act.cancelClass(live, s.service.name),
+                      onSelect: () => setAsking(true),
                   },
               ]
             : []),
@@ -156,6 +160,17 @@ export function ClassLook({
                     className="w-full min-[760px]:w-auto"
                 />
             </StepFoot>
+            <CancelClassDialog
+                open={asking && canCancelClass}
+                title={s.service.name}
+                at={at}
+                booked={live.length}
+                onClose={() => setAsking(false)}
+                onCancel={(reason) => {
+                    setAsking(false);
+                    act.cancelClass(live, s.service.name, reason);
+                }}
+            />
         </>
     );
 }

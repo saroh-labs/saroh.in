@@ -61,6 +61,12 @@ export const VALUE_FIELDS = [
     // One of the business's automatic customer notices on or off (DEC-174,
     // U1 #1132); the kind it is for is named beside it.
     "noticeOn",
+    // When overdue reminders go (DEC-178, #1169): the days after the due
+    // date and the hours of the day, as numbers.
+    "firstReminderDay",
+    "secondReminderDay",
+    "remindFromHour",
+    "remindUntilHour",
     // Booking rules, the business's and a person's own (DEC-170, #1038):
     // numbers and switches about how the diary is booked, never a person.
     "bookAheadDays",

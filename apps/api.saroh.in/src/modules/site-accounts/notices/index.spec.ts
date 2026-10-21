@@ -8,6 +8,7 @@ import {
     NOTICES,
     noticeSentence,
     renderNotice,
+    secretLinkLead,
     withLink,
 } from ".";
 import {
@@ -35,6 +36,16 @@ const SAMPLES: Record<(typeof NOTICE_TEMPLATES)[number], NoticeVars> = {
             business: "Rye <&> Co.",
             product: "Linen <shirt> (Blue / M)",
             link: "https://rye.saroh.app/shop/linen-shirt",
+            site: "https://rye.saroh.app",
+        },
+    },
+    BACK_IN_STOCK_WAITING: {
+        kind: "BACK_IN_STOCK_WAITING",
+        stock: {
+            business: "Rye <&> Co.",
+            product: "Linen <shirt> (Blue / M)",
+            link: "https://rye.saroh.app/shop/linen-shirt",
+            site: "https://rye.saroh.app",
         },
     },
     BOOKING_CONFIRMED: {
@@ -373,13 +384,13 @@ describe("the notice registry", () => {
         expect(withLink(SAMPLES.ORDER_PLACED, null)).toBe(SAMPLES.ORDER_PLACED);
     });
 
-    it("back in stock links the product, names the option and says it is the only email (U23)", () => {
+    it("back in stock links the product, names the option and says it is the last email (U23)", () => {
         const email = renderNotice(SAMPLES.BACK_IN_STOCK);
         expect(email.subject).toBe(
             "Linen <shirt> (Blue / M) is back at Rye <&> Co.",
         );
         expect(email.body).toContain("Linen &lt;shirt&gt; (Blue / M) is back");
-        expect(email.body).toContain("only email you&#39;ll get about it");
+        expect(email.body).toContain("last email you&#39;ll get about it");
         expect(email.body).toContain("See it here:");
         expect(email.body).toContain("https://rye.saroh.app/shop/linen-shirt");
         // No product page now: no link, still the email.
@@ -389,6 +400,44 @@ describe("the notice registry", () => {
         } as NoticeVars);
         expect(bare.body).not.toContain("See it here:");
         expect(bare.body).not.toContain("Hi ");
+    });
+
+    it("both back-in-stock emails carry Stop waiting as a slot, never the token (DEC-178)", () => {
+        for (const kind of [
+            "BACK_IN_STOCK",
+            "BACK_IN_STOCK_WAITING",
+        ] as const) {
+            const body = renderNotice(SAMPLES[kind]).body;
+            expect(body).toContain(
+                `Changed your mind? Stop waiting here:<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a>`,
+            );
+            expect(body).not.toContain("stop-waiting");
+            expect(secretLinkLead(SAMPLES[kind])).toBe(
+                "Changed your mind? Stop waiting here:",
+            );
+            // No site to stop on now: no slot, so the send needs no link.
+            const bare = {
+                kind,
+                stock: { ...SAMPLES[kind].stock, site: null, link: null },
+            } as NoticeVars;
+            expect(secretLinkLead(bare)).toBeNull();
+            expect(renderNotice(bare).body).not.toContain(SECRET_LINK_SLOT);
+        }
+    });
+
+    it("the sign-up email says it once, plainly, with no product link (DEC-178)", () => {
+        const vars = SAMPLES.BACK_IN_STOCK_WAITING;
+        const email = renderNotice(vars);
+        expect(email.subject).toBe(
+            "We'll email you when Linen <shirt> (Blue / M) is back",
+        );
+        expect(noticeSentence(vars)).toBe(
+            "You asked Rye <&> Co. to tell you when Linen <shirt> (Blue / M) is back. We'll email you once when it is, and that's all.",
+        );
+        expect(email.body).not.toContain("See it here:");
+        expect(email.body).not.toContain("Hi ");
+        // Every other kind with no secret link has no slot either.
+        expect(secretLinkLead(SAMPLES.ORDER_PLACED)).toBeNull();
     });
 
     it("a load for another kind's payload reads nothing", async () => {

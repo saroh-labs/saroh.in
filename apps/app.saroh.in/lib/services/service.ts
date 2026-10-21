@@ -187,12 +187,19 @@ export interface BookingEvent {
      */
     fromStaff?: { name: string } | null;
     toStaff?: { name: string } | null;
-    /** On REFUNDED and REFUND_FAILED (#1137): the refund's amount. */
+    /**
+     * On REFUNDED and REFUND_FAILED (#1137): the refund's amount. On the
+     * CANCELLED of a place in a class cancelled as a whole: that it was
+     * the class, and the reason the business gave (DEC-178, #1172), which
+     * a cancel made before has none of.
+     */
     data?: {
         amountCents?: number;
         currency?: string;
         refundId?: string;
         outcome?: string;
+        classCancelled?: boolean;
+        reason?: string;
     } | null;
     createdAt: string;
 }
@@ -810,7 +817,12 @@ export function justPaid(body: unknown): boolean {
 
 export function cancelBooking(
     bookingId: string,
-    options: { returnCredit?: boolean; closesClass?: boolean } = {},
+    options: {
+        returnCredit?: boolean;
+        closesClass?: boolean;
+        /** Why the whole class is cancelled (DEC-178, #1172). */
+        reason?: string;
+    } = {},
 ): Promise<CrmResult<CancelledBooking>> {
     // The business calling a class off gives a pack's class back even inside
     // the free-cancellation window (U15), and — for someone who may refund —
@@ -820,10 +832,16 @@ export function cancelBooking(
     if (options.returnCredit) params.set("returnCredit", "true");
     if (options.closesClass) params.set("closesClass", "true");
     const query = params.size > 0 ? `?${params.toString()}` : "";
+    // The class's reason travels in the body, never the address: the
+    // customers are told it, in the business's own words.
+    const body =
+        options.closesClass && options.reason
+            ? { reason: options.reason }
+            : undefined;
     return send<CancelledBooking>(
         `/bookings/${bookingId}${query}`,
         "DELETE",
-        undefined,
+        body,
         "Couldn't cancel the booking.",
     );
 }

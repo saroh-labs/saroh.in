@@ -12,7 +12,10 @@ import { InvoiceSendService, SEND_SELECT } from "./invoice-send.service";
 export type AutoSendOutcome =
     /** Sent, by email or into the account thread: AUTO_SENT. */
     | "SENT"
-    /** It couldn't go (no provider, no address, …): SEND_FAILED, with why. */
+    /**
+     * It couldn't go (no provider, no address, no way to pay when it can't
+     * be paid online, …): SEND_FAILED, with why.
+     */
     | "REFUSED"
     /** The business turned renewal invoices off meanwhile. */
     | "OFF"
@@ -52,7 +55,8 @@ export function refusalReason(err: HttpException): string {
  * was paid at the desk, voided or credited since, an autopay charge is
  * under way on it, it was already sent, or the business turned "Renewal
  * invoices" off. A send that can't go (no provider and no thread, no
- * address, the business details missing) is written on the invoice's
+ * address, the business details missing, or no "How to pay us" set when
+ * it can't be paid online: NO_WAY_TO_PAY, DEC-178) is written on the invoice's
  * history as SEND_FAILED with why, never thrown: a retry wouldn't change
  * it, and the merchant still has Send. Anything else (the database) is
  * thrown, and the worker retries; `alreadySent` keeps a retry to one send.

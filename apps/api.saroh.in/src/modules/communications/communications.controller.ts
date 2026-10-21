@@ -24,6 +24,7 @@ import {
     SetAccountUpdatesDto,
     SetConsentDto,
     SetNoticeSettingDto,
+    SetOverdueTimingDto,
 } from "./dto";
 import { NoticeSettingsService } from "./notice-settings.service";
 
@@ -193,5 +194,23 @@ export class CommunicationsController {
         @Body() dto: SetNoticeSettingDto,
     ) {
         return this.noticeSettings.update(ctx, { kind: dto.kind, on: dto.on });
+    }
+
+    /**
+     * When overdue reminders go (DEC-178, #1169): the two days after the
+     * due date and the hours, all four at once. `comms:manage`; answers
+     * with the switches, as the PATCH above.
+     */
+    @Patch("customer-notices/overdue-timing")
+    overdueTimingUpdate(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: SetOverdueTimingDto,
+    ) {
+        return this.noticeSettings.updateOverdueTiming(ctx, {
+            firstDay: dto.firstDay,
+            secondDay: dto.secondDay,
+            fromHour: dto.fromHour,
+            untilHour: dto.untilHour,
+        });
     }
 }

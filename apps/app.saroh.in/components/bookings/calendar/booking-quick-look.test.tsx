@@ -331,6 +331,22 @@ async function press(label: string | RegExp) {
     });
     await settle();
 }
+/** Type into the open dialog's reason, as React hears it. */
+async function typeReason(value: string) {
+    const area = document.querySelector<HTMLTextAreaElement>(
+        "[role=dialog] textarea",
+    );
+    if (!area) throw new Error(`No reason field: ${text()}`);
+    await act(async () => {
+        Object.getOwnPropertyDescriptor(
+            HTMLTextAreaElement.prototype,
+            "value",
+        )?.set?.call(area, value);
+        area.dispatchEvent(new Event("input", { bubbles: true }));
+        await Promise.resolve();
+    });
+    await settle();
+}
 async function more(row: string) {
     await press(/^More$/);
     await press(row);
@@ -713,7 +729,26 @@ describe.each([
             "Cancel the class",
         ]);
         await more("Cancel the class");
-        expect(act$.cancelClass).toHaveBeenCalledWith(seats, "Mat Pilates");
+        // It asks why first (DEC-178, #1172): nothing goes until it's said.
+        expect(act$.cancelClass).not.toHaveBeenCalled();
+        expect(document.body.textContent).toContain(
+            "Why is it cancelled? Your customers see this.",
+        );
+        expect(document.body.textContent).toContain(
+            "Mat Pilates at 6:00 pm: all 4 places booked will be cancelled.",
+        );
+        await press("Cancel the class");
+        expect(act$.cancelClass).not.toHaveBeenCalled();
+        expect(document.body.textContent).toContain(
+            "Say why the class is cancelled",
+        );
+        await typeReason("  Neha is unwell.\n  Sorry!  ");
+        await press("Cancel the class");
+        expect(act$.cancelClass).toHaveBeenCalledWith(
+            seats,
+            "Mat Pilates",
+            "Neha is unwell. Sorry!",
+        );
     });
 
     it("a visit of a treatment: its order, its visit, and the next visit on it", async () => {

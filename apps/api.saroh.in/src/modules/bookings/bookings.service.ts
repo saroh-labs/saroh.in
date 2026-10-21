@@ -898,6 +898,8 @@ export class BookingsService {
             returnCredit?: boolean;
             closesClass?: boolean;
             ifUnpaid?: boolean;
+            /** Why the whole class is cancelled (DEC-178, #1172). */
+            classReason?: string;
         } = {},
     ): Promise<CancelledBooking> {
         requireBookingPower(ctx, "booking:write");

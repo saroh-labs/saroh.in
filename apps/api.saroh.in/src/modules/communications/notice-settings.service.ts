@@ -1,4 +1,8 @@
-import { ConflictException, Injectable } from "@nestjs/common";
+import {
+    BadRequestException,
+    ConflictException,
+    Injectable,
+} from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
@@ -22,6 +26,13 @@ import {
     noticeOffer,
     settingOn,
 } from "./notice-settings";
+import type { OverdueTiming } from "./overdue-timing";
+import {
+    isDefaultTiming,
+    overdueSays,
+    overdueTiming,
+    overdueTimingProblem,
+} from "./overdue-timing";
 
 /** One switch, as the workspace draws it. */
 export interface NoticeSettingView {
@@ -38,6 +49,11 @@ export interface NoticeSettingView {
     /** Why it can't, when it can't: a code and the words. */
     reason: NoticeUnavailable | null;
     why: string | null;
+    /**
+     * When it goes, for the kinds the business times itself: overdue
+     * reminders' days and hours (DEC-178, #1169). Null for every other.
+     */
+    timing: OverdueTiming | null;
 }
 
 /** `GET /organizations/:id/customer-notices/settings`. */
@@ -60,6 +76,14 @@ export interface NoticeSettingChange {
     on: boolean;
 }
 
+/** The words for the timing's fields in Activity (the audit row). */
+const TIMING_FIELDS: Record<keyof OverdueTiming, string> = {
+    firstDay: "firstReminderDay",
+    secondDay: "secondReminderDay",
+    fromHour: "remindFromHour",
+    untilHour: "remindUntilHour",
+};
+
 /**
  * The business's switches for its automatic customer notices (DEC-174,
  * U1 #1132), read and written. The rules are `notice-settings.ts`.
@@ -74,6 +98,10 @@ export interface NoticeSettingChange {
  *   `NotificationPreference` does.
  * - **Every change** writes a settings-audit entry
  *   (`customer-notices.setting`).
+ * - **Overdue reminders' timing** (DEC-178, #1169) is read with the switch
+ *   and written on its own ({@link updateOverdueTiming}), by the same
+ *   rules: `comms:manage`, a row only while it differs from the default,
+ *   and an audit entry under the same action and kind.
  */
 @Injectable()
 export class NoticeSettingsService {
@@ -83,22 +111,26 @@ export class NoticeSettingsService {
     ) {}
 
     async read(ctx: OrganizationContext): Promise<NoticeSettingsView> {
-        const [{ offers, emailConnected }, stored] = await Promise.all([
+        const [{ offers, emailConnected }, stored, timing] = await Promise.all([
             this.listed(ctx),
             this.stored(ctx.organizationId),
+            overdueTiming(prisma, ctx.organizationId),
         ]);
         return {
             emailConnected,
             notices: offers.map(({ kind, offer }) => {
                 const reason = offer.offered ? null : offer.why;
+                const timed = kind === "OVERDUE_REMINDERS";
                 return {
                     kind,
                     ...NOTICE_WORDS[kind],
+                    ...(timed ? { says: overdueSays(timing) } : {}),
                     on: settingOn(stored, kind),
                     default: defaultOn(kind),
                     offered: offer.offered,
                     reason,
                     why: reason ? NOTICE_UNAVAILABLE_WORDS[reason] : null,
+                    timing: timed ? timing : null,
                 };
             }),
             canChange: allows(ctx, "comms:manage"),
@@ -158,6 +190,85 @@ export class NoticeSettingsService {
                 outcome: AuditOutcome.Success,
                 metadata: {
                     kind: change.kind,
+                    changes: changes as unknown as Prisma.InputJsonArray,
+                },
+            });
+        }
+        return this.read(ctx);
+    }
+
+    /**
+     * When overdue reminders go (DEC-178, #1169): the days after the due
+     * date and the hours, all four at once, so an Undo puts back exactly
+     * what was there. `comms:manage`; refused while overdue reminders are
+     * not offered (409), and in words when the four don't fit together
+     * (400). Saved whether the switch is on or off, for when it is.
+     */
+    async updateOverdueTiming(
+        ctx: OrganizationContext,
+        timing: OverdueTiming,
+    ): Promise<NoticeSettingsView> {
+        authorize(ctx, "comms:manage");
+        const listed = (await this.listed(ctx)).offers.find(
+            (o) => o.kind === "OVERDUE_REMINDERS",
+        );
+        if (!listed) {
+            throw new ConflictException(
+                "That email isn't one this business sends.",
+            );
+        }
+        if (!listed.offered) {
+            throw new ConflictException(
+                `${NOTICE_UNAVAILABLE_WORDS[listed.why]}.`,
+            );
+        }
+        const problem = overdueTimingProblem(timing);
+        if (problem) throw new BadRequestException(problem);
+
+        const organizationId = ctx.organizationId;
+        const next: OverdueTiming = {
+            firstDay: timing.firstDay,
+            secondDay: timing.secondDay,
+            fromHour: timing.fromHour,
+            untilHour: timing.untilHour,
+        };
+        const before = await overdueTiming(prisma, organizationId);
+        if (isDefaultTiming(next)) {
+            await prisma.overdueReminderTiming.deleteMany({
+                where: { organizationId },
+            });
+        } else {
+            await prisma.overdueReminderTiming.upsert({
+                where: { organizationId },
+                create: {
+                    organizationId,
+                    ...next,
+                    updatedByUserId: ctx.userId,
+                },
+                update: { ...next, updatedByUserId: ctx.userId },
+            });
+        }
+
+        const changes = recordableChanges(
+            (Object.keys(TIMING_FIELDS) as (keyof OverdueTiming)[]).map(
+                (key) => ({
+                    field: TIMING_FIELDS[key],
+                    before: before[key],
+                    after: next[key],
+                }),
+            ),
+        );
+        if (changes.length > 0) {
+            await this.audit.record({
+                action: AuditAction.CustomerNoticesSetting,
+                actorUserId: ctx.userId,
+                actorRoleKey: ctx.roleKey,
+                organizationId,
+                targetType: "organization",
+                targetId: organizationId,
+                outcome: AuditOutcome.Success,
+                metadata: {
+                    kind: "OVERDUE_REMINDERS",
                     changes: changes as unknown as Prisma.InputJsonArray,
                 },
             });

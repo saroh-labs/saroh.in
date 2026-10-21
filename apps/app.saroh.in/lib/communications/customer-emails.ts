@@ -34,6 +34,39 @@ export interface CustomerEmail {
     reason: string | null;
     /** The same, in words ("Connect your email first"). */
     why: string | null;
+    /**
+     * When it goes, for overdue reminders only (DEC-178, #1169); null for
+     * every other kind, and missing from an API before it.
+     */
+    timing?: OverdueTiming | null;
+}
+
+/**
+ * When overdue reminders go: the days after the due date for the first
+ * and second, and the hours of the day they may go in, the business's own
+ * time. `communications/overdue-timing.ts` in the API holds the rules.
+ */
+export interface OverdueTiming {
+    firstDay: number;
+    secondDay: number;
+    /** 9 is 9:00. */
+    fromHour: number;
+    /** Not included: 20 means before 8 pm; 24 is midnight. */
+    untilHour: number;
+}
+
+const whole = (v: unknown): v is number =>
+    typeof v === "number" && Number.isInteger(v);
+
+function isOverdueTiming(value: unknown): value is OverdueTiming {
+    if (typeof value !== "object" || value === null) return false;
+    const t = value as Record<string, unknown>;
+    return (
+        whole(t.firstDay) &&
+        whole(t.secondDay) &&
+        whole(t.fromHour) &&
+        whole(t.untilHour)
+    );
 }
 
 /** `GET …/customer-notices/settings`. */
@@ -57,7 +90,10 @@ function isCustomerEmail(value: unknown): value is CustomerEmail {
         typeof n.default === "boolean" &&
         typeof n.offered === "boolean" &&
         textOrNull(n.reason) &&
-        textOrNull(n.why)
+        textOrNull(n.why) &&
+        (n.timing === undefined ||
+            n.timing === null ||
+            isOverdueTiming(n.timing))
     );
 }
 
@@ -194,6 +230,111 @@ export function withCustomerEmail(
         ),
     };
 }
+
+/** The days each reminder may be set to, as the API allows them. */
+export const OVERDUE_FIRST_DAY_MAX = 30;
+export const OVERDUE_SECOND_DAY_MAX = 60;
+
+/** "9 am", "noon", "8 pm", "midnight" (0 and 24 both). */
+export function hourWords(hour: number): string {
+    if (hour === 0 || hour === 24) return "midnight";
+    if (hour === 12) return "noon";
+    return hour < 12 ? `${hour} am` : `${hour - 12} pm`;
+}
+
+/** "1 day after it's due", "3 days after it's due". */
+export function reminderDayWords(day: number): string {
+    return `${day} ${day === 1 ? "day" : "days"} after it's due`;
+}
+
+const range = (from: number, to: number) =>
+    Array.from({ length: to - from + 1 }, (_, i) => from + i);
+
+/**
+ * The choices each control offers, given the rest of the timing: the
+ * second day after the first, the end after the start, so no choice on
+ * the screen is one the API would refuse. Choosing the first day at or
+ * past the second moves the second along ({@link withTimingField}).
+ */
+export function overdueTimingOptions(t: OverdueTiming) {
+    const options = (values: number[], words: (n: number) => string) =>
+        values.map((n) => ({ value: String(n), label: words(n) }));
+    return {
+        firstDay: options(range(1, OVERDUE_FIRST_DAY_MAX), reminderDayWords),
+        secondDay: options(
+            range(t.firstDay + 1, OVERDUE_SECOND_DAY_MAX),
+            reminderDayWords,
+        ),
+        fromHour: options(range(0, 23), hourWords),
+        untilHour: options(range(t.fromHour + 1, 24), hourWords),
+    };
+}
+
+/**
+ * The timing with one control changed. A first day at or past the second
+ * moves the second to the day after; a start at or past the end moves the
+ * end to the hour after, so what is saved always fits together.
+ */
+export function withTimingField(
+    t: OverdueTiming,
+    field: keyof OverdueTiming,
+    value: number,
+): OverdueTiming {
+    const next = { ...t, [field]: value };
+    if (field === "firstDay" && next.secondDay <= value) {
+        next.secondDay = Math.min(value + 1, OVERDUE_SECOND_DAY_MAX);
+    }
+    if (field === "fromHour" && next.untilHour <= value) {
+        next.untilHour = Math.min(value + 1, 24);
+    }
+    return next;
+}
+
+/** The list with overdue reminders' timing changed, before the save lands. */
+export function withOverdueTiming(
+    state: CustomerEmails,
+    timing: OverdueTiming,
+): CustomerEmails {
+    return {
+        ...state,
+        notices: state.notices.map((n) =>
+            n.kind === "OVERDUE_REMINDERS" && n.timing ? { ...n, timing } : n,
+        ),
+    };
+}
+
+/** The audit row's names for the timing (the API's `TIMING_FIELDS`). */
+const TIMING_CHANGES: Readonly<
+    Record<string, { what: string; words: (n: number) => string }>
+> = {
+    firstReminderDay: { what: "first reminder", words: reminderDayWords },
+    secondReminderDay: { what: "second reminder", words: reminderDayWords },
+    remindFromHour: { what: "from", words: hourWords },
+    remindUntilHour: { what: "until", words: hourWords },
+};
+
+/**
+ * One recorded change to the timing, said for Settings › Activity: what
+ * moved and its values in words. Null for any other change.
+ */
+export function overdueTimingChange(change: {
+    field: string;
+    before: unknown;
+    after: unknown;
+}): { what: string; before: string | null; after: string | null } | null {
+    const known = TIMING_CHANGES[change.field] as
+        (typeof TIMING_CHANGES)[string] | undefined;
+    if (!known) return null;
+    const said = (v: unknown) => (whole(v) ? known.words(v) : null);
+    return {
+        what: known.what,
+        before: said(change.before),
+        after: said(change.after),
+    };
+}
+
+/** The toast after the timing is changed. */
+export const OVERDUE_TIMING_SAVED = "Overdue reminder timing saved.";
 
 /**
  * What each kind is called, for Settings › Activity, whose audit row holds

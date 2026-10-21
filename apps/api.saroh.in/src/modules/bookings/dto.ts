@@ -645,3 +645,33 @@ export class BookVisitDto {
     @MaxLength(64)
     staffId?: string;
 }
+
+/** The longest reason a class can be cancelled with (DEC-178, #1172). */
+export const CLASS_CANCEL_REASON_MAX = 200;
+
+/**
+ * One line, as the customer reads it: trimmed, and any run of spaces or
+ * line breaks inside made one space.
+ */
+export function oneLineReason(value: unknown): unknown {
+    return typeof value === "string"
+        ? value.trim().replace(/\s+/g, " ")
+        : value;
+}
+
+/**
+ * Cancelling a booking (`DELETE …/bookings/:id`). The body is optional:
+ * only cancelling a whole class (`?closesClass=true`) gives a reason
+ * (DEC-178, #1172), which its customers and its waitlist are told in the
+ * business's own words, and the booking's history keeps.
+ */
+export class CancelBookingDto {
+    @IsOptional()
+    @Transform(({ value }) => oneLineReason(value))
+    @IsString()
+    @MinLength(1, { message: "Say why the class is cancelled" })
+    @MaxLength(CLASS_CANCEL_REASON_MAX, {
+        message: `A reason can be at most ${CLASS_CANCEL_REASON_MAX} characters`,
+    })
+    reason?: string;
+}

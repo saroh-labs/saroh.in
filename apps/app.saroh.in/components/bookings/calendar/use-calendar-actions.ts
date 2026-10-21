@@ -157,7 +157,7 @@ export function useCalendarActions({
                 back,
             );
         },
-        cancelClass(seats, title) {
+        cancelClass(seats, title, reason) {
             const backs = new Map(
                 seats.map((b) => [
                     b.id,
@@ -183,6 +183,7 @@ export function useCalendarActions({
                             const res = await cancelBooking(b.id, {
                                 returnCredit: true,
                                 closesClass: true,
+                                reason,
                             });
                             ok = res.ok;
                         } catch {

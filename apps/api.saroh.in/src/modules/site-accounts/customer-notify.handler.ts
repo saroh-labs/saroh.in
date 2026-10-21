@@ -13,7 +13,12 @@ import { CUSTOMER_NOTIFY_TYPE } from "./customer-notify-queue";
 import { noticeLink } from "./notice-link";
 import { threadLive } from "./notice-reach";
 import type { NoticeVars } from "./notices";
-import { loadNotice, noticeDefinition, withLink } from "./notices";
+import {
+    loadNotice,
+    noticeDefinition,
+    secretLinkLead,
+    withLink,
+} from "./notices";
 import type { NoticeSubject as Subject } from "./notices/notice";
 import { appendMessage } from "./thread-store";
 
@@ -119,6 +124,8 @@ export class CustomerNotifyService {
         // back-in-stock watch, U23): no contact to resolve, no thread.
         if (subject.recipient) {
             if (!definition.emailOnly || provider === null) return NOTHING;
+            // A watch's stop link (DEC-178), made only if the email goes.
+            const secret = definition.secretLink;
             const queued = await this.comms.queueTransactional(
                 tx,
                 organizationId,
@@ -128,6 +135,12 @@ export class CustomerNotifyService {
                     provider,
                     recipient: subject.recipient,
                     createdByUserId: null,
+                    ...(secret && secretLinkLead(subject.vars) !== null
+                        ? {
+                              secretLink: () =>
+                                  secret.make(tx, organizationId, subject),
+                          }
+                        : {}),
                 },
             );
             await tx.customerNotice.update({
@@ -190,16 +203,17 @@ export class CustomerNotifyService {
             // A notice asking to be paid carries a fresh pay link (U10),
             // made only if the email really goes and sealed into its send.
             const secret = definition.secretLink;
+            const notice = withLink(subject.vars, link);
             const queued = await this.comms.queueTransactional(
                 tx,
                 organizationId,
                 {
                     template: payload.kind,
-                    notice: withLink(subject.vars, link),
+                    notice,
                     provider,
                     recipient: { kind: "CONTACT", contactId: contact.id },
                     createdByUserId: null,
-                    ...(secret
+                    ...(secret && secretLinkLead(notice) !== null
                         ? {
                               secretLink: () =>
                                   secret.make(tx, organizationId, subject),

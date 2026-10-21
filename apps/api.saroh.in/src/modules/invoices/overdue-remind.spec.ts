@@ -3,6 +3,7 @@ import {
     inSendingHours,
     overdueEventKey,
     overdueStage,
+    reminderWindows,
 } from "./overdue-remind";
 
 const IST = "Asia/Kolkata";
@@ -73,4 +74,63 @@ describe("inSendingHours", () => {
 it("one claim per invoice and reminder", () => {
     expect(overdueEventKey("inv_1", 1)).toBe("invoice-overdue:inv_1:1");
     expect(overdueEventKey("inv_1", 2)).toBe("invoice-overdue:inv_1:2");
+});
+
+describe("the business's own timing (DEC-178, #1169)", () => {
+    const later = { firstDay: 5, secondDay: 8, fromHour: 7, untilHour: 11 };
+
+    it("each reminder's window runs from its day to the day before the next, a week at most", () => {
+        expect(reminderWindows()).toEqual({
+            1: { from: 3, to: 9 },
+            2: { from: 10, to: 16 },
+        });
+        expect(reminderWindows(later)).toEqual({
+            1: { from: 5, to: 7 },
+            2: { from: 8, to: 14 },
+        });
+        expect(
+            reminderWindows({ ...later, firstDay: 1, secondDay: 30 }),
+        ).toEqual({ 1: { from: 1, to: 7 }, 2: { from: 30, to: 36 } });
+    });
+
+    it.each([
+        [4, null],
+        [5, 1],
+        [7, 1],
+        [8, 2],
+        [14, 2],
+        [15, null],
+    ])("%i days late → %p, with reminders on days 5 and 8", (days, stage) => {
+        expect(overdueStage(dueDaysAgo(days), NOW, IST, later)).toBe(stage);
+    });
+
+    it("the read's bound follows the chosen days", () => {
+        const { from, to } = dueWindow(NOW, IST, later);
+        for (const days of [5, 7, 8, 14]) {
+            const due = dueDaysAgo(days);
+            expect(due >= from && due < to).toBe(true);
+        }
+        expect(dueDaysAgo(4) < to).toBe(false);
+        expect(dueDaysAgo(15) >= from).toBe(false);
+    });
+
+    it.each([
+        ["2026-10-21T01:29:00.000Z", false], // 06:59 India
+        ["2026-10-21T01:30:00.000Z", true], // 07:00
+        ["2026-10-21T05:29:00.000Z", true], // 10:59
+        ["2026-10-21T05:30:00.000Z", false], // 11:00
+    ])("%s → %p in India, from 7 to 11", (at, open) => {
+        expect(inSendingHours(new Date(at), IST, later)).toBe(open);
+    });
+
+    it("until midnight takes the last hour of the day", () => {
+        const allDay = { ...later, fromHour: 0, untilHour: 24 };
+        // 23:30 and 00:10 India.
+        expect(
+            inSendingHours(new Date("2026-10-21T18:00:00.000Z"), IST, allDay),
+        ).toBe(true);
+        expect(
+            inSendingHours(new Date("2026-10-20T18:40:00.000Z"), IST, allDay),
+        ).toBe(true);
+    });
 });

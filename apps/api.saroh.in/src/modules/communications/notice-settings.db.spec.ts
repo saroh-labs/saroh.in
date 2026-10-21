@@ -260,6 +260,185 @@ describe("customer notice switches (real database)", () => {
         expect(await rows(other)).toEqual([]);
     });
 
+    describe("when overdue reminders go (DEC-178, #1169)", () => {
+        const timing = {
+            firstDay: 5,
+            secondDay: 12,
+            fromHour: 10,
+            untilHour: 18,
+        };
+        const timingRow = (b: Business) =>
+            prisma.overdueReminderTiming.findUnique({
+                where: { organizationId: b.organizationId },
+                select: {
+                    firstDay: true,
+                    secondDay: true,
+                    fromHour: true,
+                    untilHour: true,
+                    updatedByUserId: true,
+                },
+            });
+
+        it("a fresh business reads the defaults; a choice is one row, read back with its sentence; the defaults again delete it", async () => {
+            const b = await business();
+            const fresh = await settings.read(as(b, "owner"));
+            expect(
+                fresh.notices.find((x) => x.kind === "OVERDUE_REMINDERS")
+                    ?.timing,
+            ).toEqual({
+                firstDay: 3,
+                secondDay: 10,
+                fromHour: 9,
+                untilHour: 20,
+            });
+
+            const after = await settings.updateOverdueTiming(
+                as(b, "owner"),
+                timing,
+            );
+            expect(
+                after.notices.find((x) => x.kind === "OVERDUE_REMINDERS"),
+            ).toMatchObject({
+                timing,
+                says: "Up to 2 reminders for an unpaid invoice, 5 and 12 days after it's due, from 10 am to 6 pm your time.",
+            });
+            expect(await timingRow(b)).toEqual({
+                ...timing,
+                updatedByUserId: b.owner,
+            });
+
+            await settings.updateOverdueTiming(as(b, "owner"), {
+                firstDay: 3,
+                secondDay: 10,
+                fromHour: 9,
+                untilHour: 20,
+            });
+            expect(await timingRow(b)).toBeNull();
+        });
+
+        it("turning reminders off and on keeps the timing", async () => {
+            const b = await business();
+            await settings.update(as(b, "owner"), {
+                kind: "OVERDUE_REMINDERS",
+                on: true,
+            });
+            await settings.updateOverdueTiming(as(b, "owner"), timing);
+            await settings.update(as(b, "owner"), {
+                kind: "OVERDUE_REMINDERS",
+                on: false,
+            });
+            await settings.update(as(b, "owner"), {
+                kind: "OVERDUE_REMINDERS",
+                on: true,
+            });
+            const view = await settings.read(as(b, "owner"));
+            expect(
+                view.notices.find((x) => x.kind === "OVERDUE_REMINDERS"),
+            ).toMatchObject({ on: true, timing });
+        });
+
+        it("each change is an audit entry under the switch's action, naming what moved", async () => {
+            const b = await business();
+            await settings.updateOverdueTiming(as(b, "owner"), timing);
+            await settings.updateOverdueTiming(as(b, "owner"), timing);
+            const entries = await prisma.auditEvent.findMany({
+                where: {
+                    organizationId: b.organizationId,
+                    action: "customer-notices.setting",
+                },
+            });
+            expect(entries).toHaveLength(1);
+            expect(entries[0]).toMatchObject({
+                actorUserId: b.owner,
+                metadata: {
+                    kind: "OVERDUE_REMINDERS",
+                    changes: [
+                        { field: "firstReminderDay", before: 3, after: 5 },
+                        { field: "secondReminderDay", before: 10, after: 12 },
+                        { field: "remindFromHour", before: 9, after: 10 },
+                        { field: "remindUntilHour", before: 20, after: 18 },
+                    ],
+                },
+            });
+        });
+
+        it("a Member is refused (403); a second day before the first is refused in words (400); nothing is written", async () => {
+            const b = await business();
+            await expect(
+                settings.updateOverdueTiming(as(b, "member"), timing),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+            await expect(
+                settings.updateOverdueTiming(as(b, "owner"), {
+                    ...timing,
+                    secondDay: 4,
+                }),
+            ).rejects.toThrow(
+                "The second reminder goes after the first, at most 60 days after the due date.",
+            );
+            expect(await timingRow(b)).toBeNull();
+        });
+
+        it("one business's timing never reaches another's", async () => {
+            const a = await business("Rye & Co");
+            const other = await business("Pulse Fitness");
+            await settings.updateOverdueTiming(as(a, "owner"), timing);
+            const theirs = await settings.read(as(other, "owner"));
+            expect(
+                theirs.notices.find((x) => x.kind === "OVERDUE_REMINDERS")
+                    ?.timing,
+            ).toEqual({
+                firstDay: 3,
+                secondDay: 10,
+                fromHour: 9,
+                untilHour: 20,
+            });
+        });
+
+        // The policies and CHECKs exist only where the migrations ran.
+        (isRlsTestMode() ? it : it.skip)(
+            "under row-level security, a business sees and changes only its own timing, and the database refuses one that doesn't fit",
+            async () => {
+                const a = await business("Rye & Co");
+                const other = await business("Pulse Fitness");
+                await settings.updateOverdueTiming(as(a, "owner"), timing);
+                await settings.updateOverdueTiming(as(other, "owner"), timing);
+
+                const seen = await runInOrgContext(a.organizationId, () =>
+                    prisma.overdueReminderTiming.findMany({
+                        where: {
+                            organizationId: {
+                                in: [a.organizationId, other.organizationId],
+                            },
+                        },
+                        select: { organizationId: true },
+                    }),
+                );
+                expect(seen).toEqual([{ organizationId: a.organizationId }]);
+
+                const changed = await runInOrgContext(a.organizationId, () =>
+                    prisma.overdueReminderTiming.updateMany({
+                        where: { organizationId: other.organizationId },
+                        data: { firstDay: 1 },
+                    }),
+                );
+                expect(changed.count).toBe(0);
+
+                await expect(
+                    prisma.overdueReminderTiming.update({
+                        where: { organizationId: a.organizationId },
+                        data: { secondDay: 2 },
+                    }),
+                ).rejects.toThrow();
+                await expect(
+                    prisma.overdueReminderTiming.update({
+                        where: { organizationId: a.organizationId },
+                        data: { fromHour: 19 },
+                    }),
+                ).rejects.toThrow();
+            },
+        );
+    });
+
     // Row-level security itself: only where the policies exist.
     (isRlsTestMode() ? it : it.skip)(
         "under row-level security, a business sees and changes only its own rows",

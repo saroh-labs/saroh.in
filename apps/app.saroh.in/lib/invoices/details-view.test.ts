@@ -432,6 +432,29 @@ describe("historyLines with who did it (U9 #1140)", () => {
         ]);
     });
 
+    it("says a renewal waits for a way to pay (DEC-178), not that a payment failed", () => {
+        const lines = historyLines(
+            invoice({
+                events: [
+                    event({
+                        kind: "SEND_FAILED",
+                        actor: SAROH,
+                        at: at(-2),
+                        template: "INVOICE_SENT",
+                        reason: "NO_WAY_TO_PAY",
+                    }),
+                ],
+            }),
+            new Date(NOW),
+        );
+        expect(lines[0]).toEqual(
+            expect.objectContaining({
+                what: "Not sent: add how customers pay you, or connect payments",
+            }),
+        );
+        expect(lines[0]?.what).not.toMatch(/payment failed/i);
+    });
+
     it("dates a credit note with who made it, once", () => {
         const lines = historyLines(
             invoice({
