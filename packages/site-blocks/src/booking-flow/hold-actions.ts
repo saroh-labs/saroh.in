@@ -123,7 +123,16 @@ export function holdActions(ctx: FlowActionsContext) {
                 );
                 return;
             }
-            if (then !== "desk" || !service || !chosenStart) {
+            // The time the hold was for. Their own hold takes it off the
+            // public list, so a read of the days since (the site's server
+            // drawing the page again after they signed in) no longer offers
+            // it and `chosenStart` has fallen away: the start they chose,
+            // still kept, is booked when it is the held one.
+            const heldStart =
+                times.start?.startAt === held.booking.startAt
+                    ? times.start
+                    : null;
+            if (then !== "desk" || !service || !heldStart) {
                 backToChoosing();
                 return;
             }
@@ -133,10 +142,10 @@ export function holdActions(ctx: FlowActionsContext) {
                 ? await account
                       .book({
                           serviceId: service.id,
-                          startAt: chosenStart.startAt,
+                          startAt: heldStart.startAt,
                           ...nameFor(ctx.s.customer),
                           idempotencyKey: ctx.keys.deskKey.current,
-                          staffId: chosenStart.staffId ?? undefined,
+                          staffId: heldStart.staffId ?? undefined,
                           pay: "DESK",
                           ...ctx.extras,
                       })
