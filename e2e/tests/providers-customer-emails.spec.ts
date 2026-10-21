@@ -323,7 +323,7 @@ test("with overdue reminders on, an owner chooses when they go, and Undo puts it
 
     await when.getByRole("combobox", { name: "First reminder" }).click();
     await page
-        .getByRole("option", { name: "5 days after it's due" })
+        .getByRole("option", { name: "5 days after it's due", exact: true })
         .filter({ visible: true })
         .click();
     await expect(
