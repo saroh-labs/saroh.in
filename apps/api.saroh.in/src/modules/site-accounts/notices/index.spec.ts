@@ -254,6 +254,30 @@ const SAMPLES: Record<(typeof NOTICE_TEMPLATES)[number], NoticeVars> = {
             payOnline: true,
         },
     },
+    PACK_LOW: {
+        kind: "PACK_LOW",
+        pack: {
+            business: "Rye <&> Co.",
+            firstName: "Asha",
+            pack: "10-class <pack>",
+            left: 1,
+            unit: "class",
+            expiresAt: AT,
+            timeZone: "Asia/Kolkata",
+        },
+    },
+    PACK_EXPIRING: {
+        kind: "PACK_EXPIRING",
+        pack: {
+            business: "Rye <&> Co.",
+            firstName: null,
+            pack: "10-class <pack>",
+            left: 3,
+            unit: "class",
+            expiresAt: AT,
+            timeZone: "Asia/Kolkata",
+        },
+    },
 };
 
 /** One membership notice of each kind (U11). */
@@ -340,6 +364,8 @@ describe("the notice registry", () => {
             "WAITLIST_CLASS_CANCELLED",
             "COURSE_ENROLLED",
             "COURSE_CANCELLED",
+            "PACK_LOW",
+            "PACK_EXPIRING",
         ] as const) {
             const vars = withLink(SAMPLES[kind], "https://rye.saroh.app/x");
             expect(backLink(vars)).toBeNull();

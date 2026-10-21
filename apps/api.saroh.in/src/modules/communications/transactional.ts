@@ -70,6 +70,10 @@ export const NOTICE_TEMPLATES = [
     // "‹Product› is back" to someone who asked on the site (DEC-174 U23,
     // #1154): email only, behind the BACK_IN_STOCK switch.
     "BACK_IN_STOCK",
+    // Class packs (DEC-174 U22, #1153), behind the PACK_CREDITS switch:
+    // one credit left, and credits expiring in 7 days.
+    "PACK_LOW",
+    "PACK_EXPIRING",
 ] as const;
 export type NoticeTemplate = (typeof NOTICE_TEMPLATES)[number];
 
@@ -349,6 +353,11 @@ export interface ReceiptMailVars {
     /** "₹4,400"; "₹0" once paid in full. */
     leftToPay: string;
     paidInFull: boolean;
+    /**
+     * What a class pack's payment bought (DEC-174 U22): "10-class pack: 10
+     * classes, use them by 31 Dec 2026". Null or absent for anything else.
+     */
+    pack?: string | null;
 }
 
 /**
@@ -370,6 +379,7 @@ export function renderInvoiceReceipt(vars: ReceiptMailVars): RenderedMessage {
         vars.paidInFull
             ? `<p>Invoice ${number} is now paid in full (${escapeHtml(vars.total)}).</p>`
             : `<p>Paid so far: ${escapeHtml(vars.paidSoFar)} of ${escapeHtml(vars.total)}<br>Left to pay: ${escapeHtml(vars.leftToPay)}</p>`,
+        ...(vars.pack ? [`<p>${escapeHtml(vars.pack)}.</p>`] : []),
         `<p>${business}</p>`,
     ].join("\n");
     return {

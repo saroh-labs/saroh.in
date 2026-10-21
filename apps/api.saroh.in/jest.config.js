@@ -419,6 +419,8 @@ module.exports = {
         "<rootDir>/src/modules/class-packs/pack-checkout.spec.ts",
         // G20: a pack as the site's Prices page shows it. Pure.
         "<rootDir>/src/modules/class-packs/public-packs.spec.ts",
+        // DEC-174 U22: which purchases the expiry sweep tells. Pure.
+        "<rootDir>/src/modules/class-packs/pack-expiring.handler.spec.ts",
         "<rootDir>/src/modules/courses/courses.service.spec.ts",
         "<rootDir>/src/modules/subscriptions/dto.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",

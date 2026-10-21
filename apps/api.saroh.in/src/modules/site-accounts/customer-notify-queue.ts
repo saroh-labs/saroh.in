@@ -64,6 +64,10 @@ export interface CustomerNotifyPayload {
     classCancelled?: boolean;
     /** The "Tell me when it's back" a BACK_IN_STOCK notice tells (U23). */
     stockWatchId?: string;
+    /** The pack purchase a PACK_* notice is about (U22). */
+    packPurchaseId?: string;
+    /** The use-by date a PACK_EXPIRING was queued for, as ISO (U22). */
+    packExpiresAt?: string;
 }
 
 type Tx = Pick<Prisma.TransactionClient, "job">;

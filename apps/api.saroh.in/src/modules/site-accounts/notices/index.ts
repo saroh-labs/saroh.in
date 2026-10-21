@@ -18,6 +18,7 @@ import type { NoticeDefinition, NoticeSubject, NoticeVarsBase } from "./notice";
 import { safeLink } from "./notice";
 import { orderStepNotice, placedOrderNotice } from "./order";
 import { orderDeliveryNotice } from "./order-delivery";
+import { packNotice } from "./pack";
 import { refundSentNotice } from "./refund";
 import { teamReplyNotice } from "./thread-reply";
 import { waitlistNotice } from "./waitlist";
@@ -62,6 +63,9 @@ export const NOTICES = {
     ORDER_DELIVERED: orderDeliveryNotice,
     ORDER_SENT: orderDeliveryNotice,
     ORDER_TRACKING: orderDeliveryNotice,
+    // Class packs (U22, #1153).
+    PACK_EXPIRING: packNotice,
+    PACK_LOW: packNotice,
     REFUND_SENT: refundSentNotice,
     THREAD_REPLY: teamReplyNotice,
     WAITLIST_OFFER: waitlistNotice,

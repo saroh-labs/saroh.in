@@ -1784,7 +1784,9 @@ options, items, more }` and a sentence with the count, the first
   `PackExtension` row; a pack with nothing left can't be extended, and an
   expired one can if the new date is still to come. Every create, publish,
   change, sale, extension, archive and restore writes one `PackEvent` in
-  its own transaction (`pack-events.ts`, actors as `event-actors.ts`);
+  its own transaction (`pack-events.ts`, actors as `event-actors.ts`); a
+  pack bought online writes its SOLD as the CUSTOMER when the money lands
+  (`completePackDraftInTx`, DEC-174 U22);
   without a CREATED event the read says `earlierUnrecorded`. Pack Detail's
   reads (`GET class-packs/:id` with `overview`, `…/holders`, `…/used`,
   `…/sales`, `…/events`) need only `pack:read`, money included (DEC-039);

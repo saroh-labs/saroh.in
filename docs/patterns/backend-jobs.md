@@ -115,6 +115,7 @@ waits while holding one.
 | `commission-payout:<platformAdminId>`     | Putting a line in a teammate's statement month against Mark paid locking that month, so a line never lands in a month already paid; taken after the invoice's key                                                                                                                                                                        | `commission/commission-settle.ts`; `admin/admin-commission.service.ts` (`markPaid`) |
 | `job-chain:membership.ending-notice`      | Leaving one waiting run of the membership-ending sweep (DEC-174 U19), as the manager link sweep does                                                                                                                                                                                                                                     | `subscriptions/membership-ending.handler.ts` (`schedule`)                           |
 | `job-chain:commission.sweep`              | Leaving one waiting run of the commission sweep, as the manager link sweep does                                                                                                                                                                                                                                                          | `commission/commission-sweep.job.ts` (`schedule`)                                   |
+| `job-chain:class-packs.expiring`          | Leaving one waiting run of the pack expiry sweep (DEC-174 U22), as the manager link sweep does                                                                                                                                                                                                                                           | `class-packs/pack-expiring.handler.ts` (`schedule`)                                 |
 | `job-chain:invoice.overdue-remind`        | Leaving one waiting run of the overdue reminder sweep (automatic notices U20), as the manager link sweep does                                                                                                                                                                                                                            | `invoices/overdue-remind.handler.ts` (`schedule`)                                   |
 | `plan-meter:<organizationId>:<limitKey>`  | Writes that add to one plan limit (a product, a booking…)                                                                                                                                                                                                                                                                                | `billing/metering.service.ts` (`lockMeter`, U13)                                    |
 
@@ -501,6 +502,29 @@ the Privacy Policy states both.
   cancel's own outcome (`orderCancelMoney`), the one the sheet shows, and
   names only the refunds not refused. Money nobody is handing back is
   never said as refunded; desk money and a treatment visit's say nothing.
+- **Pack credits** (DEC-174 U22, #1153, `notices/pack.ts`), one
+  PACK_CREDITS switch, checked when queued and when run. **One credit
+  left** (`PACK_LOW`) is queued by `redeemPackInTx` on the booking's
+  transaction, under the purchase's row lock, when a spend leaves exactly
+  one; keyed `pack-low:<purchaseId>:<redemption rows>`, so a class given
+  back and the same booking paid again (its row reused) says nothing twice,
+  while a new booking that brings it to one again does. **Expiring in 7
+  days** (`PACK_EXPIRING`) is queued by the `class-packs.expiring` chain
+  (below), keyed `pack-expiring:<purchaseId>:<expiresAt>`, so an extension
+  is told again a week before the new date. Both re-read the purchase
+  when they run: back above one, nothing left, the date moved or already
+  past tells nobody. What a pack payment bought is a line on the payment's
+  receipt (DEC-173, `packReceiptLine` in `invoice-receipt.handler.ts`), not
+  a second email.
+- **`class-packs.expiring`** is self-rescheduling every 6 hours (one
+  waiting run under `job-chain:class-packs.expiring`, restarted by the
+  module's six-hour check and at boot). It reads purchases whose date is
+  within 8 days, in pages of 500 by id, and per business (its own
+  transaction and org context, after `noticeOn`) queues PACK_EXPIRING for
+  each whose use-by day is 7 days away in the business's zone (6 when a
+  day was missed), with classes left, and that was bought more than 7 days
+  before its date. A key already told or waiting is skipped. A business
+  that fails is logged and the rest go on.
 - **`customer-message.notify`** (UX-014) tells the team a customer wrote
   from their site account: one inbox notice (`message.new`, opening the
   customer's thread, unique on `(messageId, type)`) and an email to the
