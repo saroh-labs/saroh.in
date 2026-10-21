@@ -95,9 +95,9 @@ export type {
  * both `order:read` and `invoice:read` (`money`); it is left OUT for anyone
  * else, not sent for the screen to hide.
  *
- * "Spent" counts each rupee once: paid orders plus paid invoices that are not
- * an order's own invoice (ADR-008), each net of what went back to them
- * (`spent.sql.ts`, C14). Owed is unpaid issued invoices, again
+ * "Spent" counts each rupee once: paid orders plus what came in on the
+ * ledger of invoices that are not an order's own (ADR-008, the money-in
+ * rule, DEC-173), each net of what went back to them (`spent.sql.ts`, C14). Owed is unpaid issued invoices, again
  * leaving order invoices out — the order is the ledger for its own payment.
  */
 

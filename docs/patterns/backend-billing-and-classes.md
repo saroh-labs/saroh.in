@@ -233,7 +233,15 @@ requireProvider: false })`), the email says "view it and download a copy",
       reads `money-in.ts` and joins that spec. A spec that writes a PAID
       invoice straight to the database gives it its ledger row
       (`test/ledger-paid.ts` `onTheLedger`), as the app and the backfill
-      always do.
+      always do;
+    - a customer's **Spent** (the Customers list, Customer Detail, and
+      Insights' best customers and "came back") is the same rule per
+      contact: `spent.sql.ts` `spentLedgerRowsSql` reads
+      `moneyInPaymentSql()`, net of credit notes latest payment first, as
+      takings does; an order counts its total net of refunds. Who counts as
+      a customer is "has a payment that counts", never `status = 'PAID'`.
+      `customer-spent.money-in.db.spec.ts` pins the list, Detail and
+      Insights to `readMoneyIn`.
 - **"So far" compares with the same time of day** (DEC-171). Money in
   today, How it's going's sales and orders, and Insights' money in, this
   week so far and today all end the earlier window at the same moment

@@ -13,6 +13,8 @@
 import { ForbiddenException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { onTheLedger } from "../../../test/ledger-paid";
+
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { SellsService } from "./sells.service";
 
@@ -147,19 +149,22 @@ async function bill(
     paidAt: Date,
 ) {
     n += 1;
-    return prisma.invoice.create({
-        data: {
-            organizationId,
-            contactId,
-            number: `SL-INV-${n}-${tag}`,
-            status: "PAID",
-            currency: "INR",
-            subtotal: total,
-            total,
-            issuedAt: paidAt,
-            paidAt,
-        },
-    });
+    // Paid on its ledger (DEC-173): the money-in rule reads it.
+    return onTheLedger(
+        await prisma.invoice.create({
+            data: {
+                organizationId,
+                contactId,
+                number: `SL-INV-${n}-${tag}`,
+                status: "PAID",
+                currency: "INR",
+                subtotal: total,
+                total,
+                issuedAt: paidAt,
+                paidAt,
+            },
+        }),
+    );
 }
 
 async function serviceOf(
