@@ -28,6 +28,7 @@ import {
     CustomerNotifyHandler,
     CustomerNotifyService,
 } from "./customer-notify.handler";
+import { orderStepNotice } from "./notices/order";
 import { appendMessage } from "./thread-store";
 
 const threadFlag = accountThreadOn as jest.Mock;
@@ -71,8 +72,27 @@ function makeTx() {
                 .mockResolvedValue({ toStage: "READY", undoneAt: null }),
         },
         customerAccount: {
-            findFirst: jest.fn().mockResolvedValue({ contactId: "ct_1" }),
-            count: jest.fn().mockResolvedValue(1),
+            // By id: the account that placed an order. By contact: the
+            // live account whose verified address a notice goes to (A2).
+            findFirst: jest.fn(
+                (args: { where: { id?: string; contactId?: string } }) =>
+                    Promise.resolve(
+                        args.where.id
+                            ? { contactId: "ct_1" }
+                            : account.live
+                              ? { email: "asha@example.com" }
+                              : null,
+                    ),
+            ),
+            count: jest.fn(() => Promise.resolve(account.live ? 1 : 0)),
+        },
+        contact: {
+            findFirst: jest.fn(() =>
+                Promise.resolve({ email: account.contactEmail }),
+            ),
+        },
+        customerNoticeSetting: {
+            findUnique: jest.fn().mockResolvedValue(null),
         },
         customerIdentityLink: {
             findFirst: jest.fn().mockResolvedValue(null),
@@ -85,6 +105,9 @@ function makeTx() {
     };
 }
 type FakeTx = ReturnType<typeof makeTx>;
+
+/** Whether the contact has a live site account, and their own email. */
+const account = { live: true, contactEmail: "asha.own@example.com" };
 const asTx = (tx: FakeTx) => tx as unknown as Prisma.TransactionClient;
 
 const queueTransactional = jest.fn();
@@ -111,6 +134,8 @@ beforeEach(() => {
         }),
     );
     append.mockResolvedValue({ id: "ctm_1" });
+    account.live = true;
+    account.contactEmail = "asha.own@example.com";
     queueTransactional.mockResolvedValue({
         id: "msg_1",
         status: "QUEUED",
@@ -148,7 +173,7 @@ describe("customer.notify — what it writes", () => {
             // Through the business's own provider, read once and handed
             // over.
             provider: "RESEND",
-            recipient: { kind: "SITE_ACCOUNT", contactId: "ct_1" },
+            recipient: { kind: "CONTACT", contactId: "ct_1" },
             createdByUserId: null,
         });
         // The event is claimed before anything is written, then filled in.
@@ -223,9 +248,28 @@ describe("customer.notify — what it writes", () => {
         expect(threadFlag).not.toHaveBeenCalled();
     });
 
-    it("a customer without an account: waiting in the thread for their first sign-in, and no email", async () => {
+    it("a customer without an account but with an email (a desk, phone or guest booking): emailed to the contact, D1", async () => {
+        account.live = false;
         const tx = makeTx();
-        tx.customerAccount.count.mockResolvedValue(0);
+        const out = await service.notify(asTx(tx), ORG, READY, NOW);
+        expect(out).toMatchObject({
+            threadMessageId: "ctm_1",
+            messageId: "msg_1",
+        });
+        expect(queueTransactional).toHaveBeenCalledWith(
+            tx,
+            ORG,
+            expect.objectContaining({
+                provider: "RESEND",
+                recipient: { kind: "CONTACT", contactId: "ct_1" },
+            }),
+        );
+    });
+
+    it("a customer with no account and no email of their own: waiting in the thread for their first sign-in, and no email", async () => {
+        account.live = false;
+        account.contactEmail = "";
+        const tx = makeTx();
         const out = await service.notify(asTx(tx), ORG, READY, NOW);
         expect(out).toMatchObject({
             threadMessageId: "ctm_1",
@@ -234,10 +278,19 @@ describe("customer.notify — what it writes", () => {
         expect(queueTransactional).not.toHaveBeenCalled();
     });
 
+    it("a contact whose only email is a reserved placeholder is not emailed", async () => {
+        account.live = false;
+        account.contactEmail = "phone+1@phone.invalid";
+        const tx = makeTx();
+        await service.notify(asTx(tx), ORG, READY, NOW);
+        expect(queueTransactional).not.toHaveBeenCalled();
+    });
+
     it("nothing reaches anyone: the event is still claimed, so a rerun stays quiet", async () => {
         threadFlag.mockResolvedValue(false);
+        account.live = false;
+        account.contactEmail = "";
         const tx = makeTx();
-        tx.customerAccount.count.mockResolvedValue(0);
         const out = await service.notify(asTx(tx), ORG, READY, NOW);
         expect(out).toEqual({
             duplicate: false,
@@ -317,6 +370,45 @@ describe("customer.notify — no provider, no email (DEC-086 removed)", () => {
     });
 });
 
+describe("customer.notify — a kind with a switch (U1)", () => {
+    // No kind today has one (A1); the next units' kinds do. Stand one in.
+    beforeEach(() => {
+        jest.replaceProperty(orderStepNotice, "setting", "ORDER_DELIVERY");
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    it("turned off: nobody is told, nothing is claimed, read on the job's transaction", async () => {
+        const tx = makeTx();
+        tx.customerNoticeSetting.findUnique.mockResolvedValue({
+            enabled: false,
+        });
+        const out = await service.notify(asTx(tx), ORG, READY, NOW);
+        expect(out).toEqual({
+            duplicate: false,
+            threadMessageId: null,
+            messageId: null,
+        });
+        expect(tx.customerNoticeSetting.findUnique).toHaveBeenCalledWith({
+            where: {
+                organizationId_kind: {
+                    organizationId: ORG,
+                    kind: "ORDER_DELIVERY",
+                },
+            },
+            select: { enabled: true },
+        });
+        expect(tx.customerNotice.createMany).not.toHaveBeenCalled();
+        expect(append).not.toHaveBeenCalled();
+        expect(queueTransactional).not.toHaveBeenCalled();
+    });
+
+    it("at its default (on): told as any notice", async () => {
+        const tx = makeTx();
+        const out = await service.notify(asTx(tx), ORG, READY, NOW);
+        expect(out.messageId).toBe("msg_1");
+    });
+});
+
 describe("customer.notify — once, and only what still stands", () => {
     it("an event already handled writes nothing", async () => {
         const tx = makeTx();
@@ -360,7 +452,7 @@ describe("customer.notify — once, and only what still stands", () => {
         await service.notify(asTx(tx), ORG, READY, NOW);
         expect(append.mock.calls[0][1].contactId).toBe("ct_survivor");
         expect(queueTransactional.mock.calls[0][2].recipient).toEqual({
-            kind: "SITE_ACCOUNT",
+            kind: "CONTACT",
             contactId: "ct_survivor",
         });
     });
@@ -541,7 +633,7 @@ describe("customer.notify — a website order placed (UX-042)", () => {
         expect(queueTransactional.mock.calls[0][2]).toMatchObject({
             template: "ORDER_PLACED",
             provider: "RESEND",
-            recipient: { kind: "SITE_ACCOUNT", contactId: "ct_1" },
+            recipient: { kind: "CONTACT", contactId: "ct_1" },
         });
         expect(tx.customerNotice.createMany.mock.calls[0][0].data[0]).toEqual({
             organizationId: ORG,

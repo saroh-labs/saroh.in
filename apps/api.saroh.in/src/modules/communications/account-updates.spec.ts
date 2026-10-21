@@ -43,11 +43,24 @@ const provider = prisma.communicationProvider.findUnique as jest.Mock;
 const route = emailRoute as jest.Mock;
 const resolve = resolveContact as jest.Mock;
 
-/** A stand-in for the caller's transaction: who has an account, who agreed. */
-function db(accounts = 1) {
+/**
+ * A stand-in for the caller's transaction: who has an account, the
+ * contact's own email (none unless given), who agreed.
+ */
+function db(accounts = 1, contactEmail = "") {
     return {
         communicationProvider: { findUnique: jest.fn() },
-        customerAccount: { count: jest.fn().mockResolvedValue(accounts) },
+        customerAccount: {
+            count: jest.fn().mockResolvedValue(accounts),
+            findFirst: jest
+                .fn()
+                .mockResolvedValue(
+                    accounts > 0 ? { email: "asha@example.com" } : null,
+                ),
+        },
+        contact: {
+            findFirst: jest.fn().mockResolvedValue({ email: contactEmail }),
+        },
         consent: { findUnique: jest.fn().mockResolvedValue(null) },
         $queryRaw: jest.fn(),
     } as unknown as Prisma.TransactionClient;
@@ -176,6 +189,12 @@ describe("a notice's reach once the business has turned its updates off", () => 
 
     it("a customer with no account is not told it waits for their sign-in", async () => {
         expect(await contactReach(db(0), "org_1", "ct_1")).toBe("NONE");
+    });
+
+    it("a customer with no account but an email of their own is emailed (D1)", async () => {
+        expect(
+            await contactReach(db(0, "asha@example.com"), "org_1", "ct_1"),
+        ).toBe("EMAIL");
     });
 
     it("turned on again, the thread is a channel again", async () => {

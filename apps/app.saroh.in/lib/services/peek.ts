@@ -49,6 +49,8 @@ export interface PeekPerson {
      * read, and the peek then keeps its advice to tell them.
      */
     reach?: NoticeReach | null;
+    /** The address it is emailed to (DEC-174 D1); null when it isn't. */
+    emailTo?: string | null;
 }
 
 const KIND_WORD: Record<AttentionKind, string> = {

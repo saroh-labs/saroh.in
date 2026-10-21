@@ -6,13 +6,16 @@ import { isNoticeReach } from "./notice-reach";
 /**
  * How a notice about a customer's own booking or order reaches them
  * (round-2 A14): the business's channels, and, for a contact, that
- * customer's reach. `GET customer-notices/reach` under `contact:read`.
+ * customer's reach and `to`, the address it is emailed to (DEC-174 D1).
+ * `GET customer-notices/reach` under `contact:read`.
  * Server-only. Null when it can't be read (not permitted, or the API
  * failed): the screens then claim nothing either way.
  */
 export async function readNoticeReach(
     contactId?: string | null,
-): Promise<(NoticeChannels & { reach: NoticeReach | null }) | null> {
+): Promise<
+    (NoticeChannels & { reach: NoticeReach | null; to: string | null }) | null
+> {
     const base = await orgBase();
     if (!base) return null;
     try {
@@ -25,6 +28,7 @@ export async function readNoticeReach(
             email: unknown;
             thread: unknown;
             reach: unknown;
+            to: unknown;
         }>;
         if (typeof body.email !== "boolean" || typeof body.thread !== "boolean")
             return null;
@@ -32,6 +36,7 @@ export async function readNoticeReach(
             email: body.email,
             thread: body.thread,
             reach: isNoticeReach(body.reach) ? body.reach : null,
+            to: typeof body.to === "string" && body.to !== "" ? body.to : null,
         };
     } catch {
         return null;

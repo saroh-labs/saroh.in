@@ -472,6 +472,27 @@ the Privacy Policy states both.
   is written; each line goes through `order-stage-write.ts`, so every
   moved order gets its own `customer.notify`, and Undo all takes each one
   back or reports `told`.
+- **One file per notice** (DEC-174, U2 #1133). Each kind `customer.notify`
+  carries is a `defineNotice` file under `site-accounts/notices/` (what it
+  is about, read fresh; its sentence, subject line and links; the U1
+  switch that stops it, or null) and one line in `notices/index.ts`, with
+  its kind in `NOTICE_TEMPLATES`. The handler and the email's layout are
+  the same for every kind; never add a `case` to the handler.
+  `notices/index.spec.ts` fails for a template with no entry. A kind with
+  a switch is asked `noticeOn` on the job's transaction before anything is
+  claimed. A notice naming a switch flips that kind's `NOTICE_SENDS` line
+  (`notice-settings.ts`) in the same commit, so the switches screen offers
+  it; `notices/index.spec.ts` fails otherwise.
+- **Held for an Undo.** A notice whose change has an Undo is queued with
+  `enqueueHeldCustomerNotice` (ten seconds unless the Undo lasts longer)
+  and taken back with `cancelHeldCustomerNotice(eventKey)`, which says
+  whether the customer was already `told`. The order-step helpers call
+  them.
+- **To the contact's email** (DEC-174 D1). The email goes to the contact's
+  own address (`TransactionalRecipient` `CONTACT`, `contactNoticeAddress`):
+  a desk, phone or guest customer as much as a site account holder, whose
+  verified address wins when it differs (A2). A reserved placeholder is no
+  address. Consent is read as for every transactional send.
 - **Re-read, then decide.** A booking cancelled since isn't confirmed, an
   undone step isn't announced, and the contact goes through
   `resolveContact` (a merge lands on the survivor; a removed contact hears
@@ -479,7 +500,7 @@ the Privacy Policy states both.
 - **Only the business's own provider emails a customer notice.** With no
   connected EMAIL provider (`emailRoute` in `communications/email-route.ts`,
   read once by the handler and handed to `queueTransactional`), the notice
-  goes to the account thread alone. Saroh never sends one from its own
+  goes to the account thread alone, or nowhere. Saroh never sends one from its own
   address: DEC-086's route was reversed on 7 Oct 2026 and its code removed
   (#1134), and `no-saroh-customer-mail.spec.ts` fails if a customer-notice
   module imports one of Saroh's own senders. The `Message` statuses it

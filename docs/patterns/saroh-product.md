@@ -539,8 +539,10 @@ organizations/:org/customers`: everyone who has paid (an order through a
 - **Current** (round-2 A14) — A booking confirmed, moved or cancelled, and
   an order's Ready and handover, are told to the customer: in their account
   thread while it is live (`SITE_ACCOUNT_AREA`, the `ACCOUNT_THREAD`
-  flag, and the business's own choice, below), and by email to a verified
-  site account through the business's own provider. Nothing by SMS or
+  flag, and the business's own choice, below), and by email to the
+  contact's email through the business's own provider (DEC-174 D1: a desk,
+  phone or guest customer too; a site account's verified address wins
+  when it differs, A2). The peek names it: "emailed to ‹email›". Nothing by SMS or
   WhatsApp. **Copy names what is sent, from
   the API's reach** (`EMAIL_AND_ACCOUNT` | `EMAIL` | `ACCOUNT` |
   `ON_SIGN_IN` | `NONE`, `lib/messages/notice-reach.ts`): "Saroh doesn't

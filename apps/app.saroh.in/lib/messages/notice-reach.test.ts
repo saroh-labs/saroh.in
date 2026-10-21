@@ -59,13 +59,13 @@ describe("what the workspace says a customer is told (A14)", () => {
         );
         expect(classCancelText(null)).toBe("Saroh doesn't message them.");
         expect(classCancelText({ email: true, thread: false })).toBe(
-            "Those who've signed in on your site are emailed. Tell the others yourself.",
+            "Those with an email are emailed. Tell the others yourself.",
         );
         expect(classCancelText({ email: false, thread: true })).toBe(
             "Each of them sees it in their account on your site.",
         );
         expect(classCancelText({ email: true, thread: true })).toBe(
-            "Each of them sees it in their account on your site, and those who've signed in there are emailed.",
+            "Each of them sees it in their account on your site, and those with an email are emailed.",
         );
     });
 
@@ -107,6 +107,41 @@ describe("what the workspace says a customer is told (A14)", () => {
         );
         expect(readyUndoneText(undefined, "Asha", undefined, "Preparing")).toBe(
             "Back to preparing.",
+        );
+    });
+});
+
+describe("naming the address it is emailed to (DEC-174 D1)", () => {
+    it("Order Detail's Ready: Emailed to ‹email›", () => {
+        expect(readyNoticeText("EMAIL", "Asha", "asha@example.com")).toBe(
+            "Emailed to asha@example.com when it's ready.",
+        );
+        expect(
+            readyNoticeText("EMAIL_AND_ACCOUNT", "Asha", "asha@example.com"),
+        ).toBe(
+            "Emailed to asha@example.com, and Asha sees it in their account on your site.",
+        );
+        // No address in the read: the words without it, as before.
+        expect(readyNoticeText("EMAIL", "Asha", null)).toBe(
+            "Asha is emailed that it's ready.",
+        );
+        // An address never makes a reach that sends nothing say it sends.
+        expect(readyNoticeText("NONE", "Asha", "asha@example.com")).toBe(
+            "Nothing is sent to Asha. The step shows on the order.",
+        );
+    });
+
+    it("the booking peek: emailed to ‹email›", () => {
+        expect(bookingChangeText("EMAIL", "Asha", "asha@example.com")).toBe(
+            "If you move or cancel, it's emailed to asha@example.com.",
+        );
+        expect(
+            bookingChangeText("EMAIL_AND_ACCOUNT", "Asha", "asha@example.com"),
+        ).toBe(
+            "If you move or cancel, it's emailed to asha@example.com, and Asha sees it in their account on your site.",
+        );
+        expect(bookingChangeText("NONE", "Asha", "asha@example.com")).toBe(
+            "Saroh doesn't message Asha. Tell them yourself if you move or cancel.",
         );
     });
 });

@@ -11,13 +11,22 @@ import type { Prisma } from "@saroh/database";
 import { accountThreadOn } from "../communications/account-thread";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { accountAreaOn } from "./account-area";
-import { contactReach, noticeChannels, reachOf } from "./notice-reach";
+import {
+    contactNotice,
+    contactReach,
+    noticeChannels,
+    reachOf,
+} from "./notice-reach";
 
 const threadFlag = accountThreadOn as jest.Mock;
 const areaOn = accountAreaOn as jest.Mock;
 const resolve = resolveContact as jest.Mock;
 
-function makeDb(provider: string | null = "CONNECTED", accounts = 1) {
+function makeDb(
+    provider: string | null = "CONNECTED",
+    accounts = 1,
+    contactEmail: string | null = "asha@example.com",
+) {
     return {
         communicationProvider: {
             findUnique: jest
@@ -26,7 +35,21 @@ function makeDb(provider: string | null = "CONNECTED", accounts = 1) {
                     provider ? { status: provider, provider: "RESEND" } : null,
                 ),
         },
-        customerAccount: { count: jest.fn().mockResolvedValue(accounts) },
+        customerAccount: {
+            count: jest.fn().mockResolvedValue(accounts),
+            findFirst: jest
+                .fn()
+                .mockResolvedValue(
+                    accounts > 0 ? { email: "asha.account@example.com" } : null,
+                ),
+        },
+        contact: {
+            findFirst: jest
+                .fn()
+                .mockResolvedValue(
+                    contactEmail === null ? null : { email: contactEmail },
+                ),
+        },
         consent: { findUnique: jest.fn().mockResolvedValue(null) },
         $queryRaw: jest.fn(),
     };
@@ -50,20 +73,20 @@ beforeEach(() => {
 
 describe("how a notice reaches a customer (A14)", () => {
     it("the rule, every combination", () => {
+        // `email`: an email goes to this contact (provider, address, consent).
         expect(reachOf({ email: true, thread: true }, true)).toBe(
             "EMAIL_AND_ACCOUNT",
         );
         expect(reachOf({ email: true, thread: false }, true)).toBe("EMAIL");
         expect(reachOf({ email: false, thread: true }, true)).toBe("ACCOUNT");
-        expect(reachOf({ email: true, thread: true }, false)).toBe(
-            "ON_SIGN_IN",
-        );
+        // D1: no account needed for email.
+        expect(reachOf({ email: true, thread: true }, false)).toBe("EMAIL");
+        expect(reachOf({ email: true, thread: false }, false)).toBe("EMAIL");
         expect(reachOf({ email: false, thread: true }, false)).toBe(
             "ON_SIGN_IN",
         );
-        // Email goes only to a verified site account.
-        expect(reachOf({ email: true, thread: false }, false)).toBe("NONE");
         expect(reachOf({ email: false, thread: false }, true)).toBe("NONE");
+        expect(reachOf({ email: false, thread: false }, false)).toBe("NONE");
     });
 
     it("the thread is live only with the account area on and the business's flag on", async () => {
@@ -95,9 +118,10 @@ describe("how a notice reaches a customer (A14)", () => {
         expect(await contactReach(asDb(makeDb()), "org_1", "ct_1")).toBe(
             "EMAIL_AND_ACCOUNT",
         );
+        // D1: a contact with no account but an email of their own is emailed.
         expect(
             await contactReach(asDb(makeDb("CONNECTED", 0)), "org_1", "ct_1"),
-        ).toBe("ON_SIGN_IN");
+        ).toBe("EMAIL");
         expect(await contactReach(asDb(makeDb()), "org_1", null)).toBe("NONE");
         resolve.mockResolvedValueOnce(null);
         expect(await contactReach(asDb(makeDb()), "org_1", "ct_x")).toBe(
@@ -138,6 +162,66 @@ describe("how a notice reaches a customer (A14)", () => {
                 status: "ACTIVE",
             },
         });
+    });
+});
+
+describe("the contact's own email (DEC-174 D1, U2)", () => {
+    it("a desk or phone customer with an email and no account: emailed to their own address", async () => {
+        threadFlag.mockResolvedValue(false);
+        expect(
+            await contactNotice(asDb(makeDb("CONNECTED", 0)), "org_1", "ct_1"),
+        ).toEqual({ reach: "EMAIL", to: "asha@example.com" });
+    });
+
+    it("A2: a live site account's verified address wins over the contact's", async () => {
+        expect(await contactNotice(asDb(makeDb()), "org_1", "ct_1")).toEqual({
+            reach: "EMAIL_AND_ACCOUNT",
+            to: "asha.account@example.com",
+        });
+    });
+
+    it("a contact with no email, or only a placeholder, and no account: nothing by email", async () => {
+        threadFlag.mockResolvedValue(false);
+        expect(
+            await contactNotice(
+                asDb(makeDb("CONNECTED", 0, "")),
+                "org_1",
+                "ct_1",
+            ),
+        ).toEqual({ reach: "NONE", to: null });
+        expect(
+            await contactNotice(
+                asDb(makeDb("CONNECTED", 0, "phone+x@phone.invalid")),
+                "org_1",
+                "ct_1",
+            ),
+        ).toEqual({ reach: "NONE", to: null });
+        // With the thread live they see it when they sign in.
+        threadFlag.mockResolvedValue(true);
+        expect(
+            await contactReach(
+                asDb(makeDb("CONNECTED", 0, "")),
+                "org_1",
+                "ct_1",
+            ),
+        ).toBe("ON_SIGN_IN");
+    });
+
+    it("a revoked email consent: no address is named", async () => {
+        const db = makeDb("CONNECTED", 0);
+        db.consent.findUnique.mockResolvedValue({ status: "REVOKED" });
+        threadFlag.mockResolvedValue(false);
+        expect(await contactNotice(asDb(db), "org_1", "ct_1")).toEqual({
+            reach: "NONE",
+            to: null,
+        });
+    });
+
+    it("no provider: never said to be emailed, whatever address they have", async () => {
+        threadFlag.mockResolvedValue(false);
+        expect(
+            await contactNotice(asDb(makeDb(null, 0)), "org_1", "ct_1"),
+        ).toEqual({ reach: "NONE", to: null });
     });
 });
 

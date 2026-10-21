@@ -1,7 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
+import { orderNoticeKind } from "./notices/order";
 import type { NoticeKind } from "./notify-templates";
-import { orderNoticeKind } from "./notify-templates";
 
 /**
  * Enqueueing and cancelling `customer.notify` (round-2 A14, R15): the one
@@ -19,10 +19,13 @@ import { orderNoticeKind } from "./notify-templates";
 export const CUSTOMER_NOTIFY_TYPE = "customer.notify";
 
 /**
- * How long an order step's notice waits before it goes (plan A14; B6's
- * Undo): long enough for Undo to take it back unsent.
+ * How long a held notice waits before it goes (plan A14; B6's Undo): long
+ * enough for an Undo to take it back unsent.
  */
-export const ORDER_NOTICE_DELAY_MS = 10_000;
+export const HELD_NOTICE_DELAY_MS = 10_000;
+
+/** An order step's hold: {@link HELD_NOTICE_DELAY_MS}. */
+export const ORDER_NOTICE_DELAY_MS = HELD_NOTICE_DELAY_MS;
 
 /** What `customer.notify` carries: ids and the event, never the words. */
 export interface CustomerNotifyPayload {
@@ -75,6 +78,54 @@ export async function enqueueCustomerNotice(
 }
 
 /**
+ * Queue a notice held a few seconds, so the Undo beside the change that
+ * caused it can take it back unsent ({@link cancelHeldCustomerNotice}).
+ * Any notice whose change has an Undo uses this; the hold is
+ * {@link HELD_NOTICE_DELAY_MS} unless the caller's Undo lasts longer.
+ */
+export async function enqueueHeldCustomerNotice(
+    tx: Tx,
+    organizationId: string,
+    payload: CustomerNotifyPayload,
+    hold: { now: Date; ms?: number },
+): Promise<void> {
+    await enqueueCustomerNotice(
+        tx,
+        organizationId,
+        payload,
+        new Date(hold.now.getTime() + (hold.ms ?? HELD_NOTICE_DELAY_MS)),
+    );
+}
+
+/**
+ * An Undo: take back a held notice if it hasn't gone. `told` says whether
+ * the customer had already been told (a thread message or an email was
+ * written for it), which is when the Undo says "They've already been told".
+ */
+export async function cancelHeldCustomerNotice(
+    tx: Pick<Prisma.TransactionClient, "job" | "customerNotice">,
+    organizationId: string,
+    eventKey: string,
+): Promise<{ cancelled: boolean; told: boolean }> {
+    const { count } = await tx.job.deleteMany({
+        where: {
+            organizationId,
+            type: CUSTOMER_NOTIFY_TYPE,
+            status: "PENDING",
+            payload: { path: ["eventKey"], equals: eventKey },
+        },
+    });
+    const notice = await tx.customerNotice.findUnique({
+        where: { organizationId_eventKey: { organizationId, eventKey } },
+        select: { threadMessageId: true, messageId: true },
+    });
+    return {
+        cancelled: count > 0,
+        told: Boolean(notice?.threadMessageId ?? notice?.messageId),
+    };
+}
+
+/**
  * An order moved to a step the customer is told about (Ready, handed to
  * the courier, out for delivery): queue its notice, held for
  * {@link ORDER_NOTICE_DELAY_MS} so an Undo can take it back. Any other
@@ -92,7 +143,7 @@ export async function enqueueOrderStepNotice(
 ): Promise<boolean> {
     const kind = orderNoticeKind(input.stage);
     if (!kind) return false;
-    await enqueueCustomerNotice(
+    await enqueueHeldCustomerNotice(
         tx,
         input.organizationId,
         {
@@ -101,7 +152,7 @@ export async function enqueueOrderStepNotice(
             orderId: input.orderId,
             orderEventId: input.orderEventId,
         },
-        new Date(input.now.getTime() + ORDER_NOTICE_DELAY_MS),
+        { now: input.now, ms: ORDER_NOTICE_DELAY_MS },
     );
     return true;
 }
@@ -124,32 +175,15 @@ export async function enqueueOrderPlacedNotice(
     });
 }
 
-/**
- * An order step undone (B6): take back its notice if it hasn't gone.
- * `told` says whether the customer had already been told — a thread
- * message or an email was written for it — which is when Undo says
- * "They've already been told".
- */
+/** An order step undone (B6): {@link cancelHeldCustomerNotice} for it. */
 export async function cancelOrderStepNotice(
     tx: Pick<Prisma.TransactionClient, "job" | "customerNotice">,
     organizationId: string,
     orderEventId: string,
 ): Promise<{ cancelled: boolean; told: boolean }> {
-    const eventKey = orderNoticeKey(orderEventId);
-    const { count } = await tx.job.deleteMany({
-        where: {
-            organizationId,
-            type: CUSTOMER_NOTIFY_TYPE,
-            status: "PENDING",
-            payload: { path: ["eventKey"], equals: eventKey },
-        },
-    });
-    const notice = await tx.customerNotice.findUnique({
-        where: { organizationId_eventKey: { organizationId, eventKey } },
-        select: { threadMessageId: true, messageId: true },
-    });
-    return {
-        cancelled: count > 0,
-        told: Boolean(notice?.threadMessageId ?? notice?.messageId),
-    };
+    return cancelHeldCustomerNotice(
+        tx,
+        organizationId,
+        orderNoticeKey(orderEventId),
+    );
 }

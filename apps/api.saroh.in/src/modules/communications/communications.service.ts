@@ -30,11 +30,12 @@ import type {
     NoticeChannels,
     NoticeReach,
 } from "../site-accounts/notice-reach";
-import { contactReach, noticeChannels } from "../site-accounts/notice-reach";
+import { contactNotice, noticeChannels } from "../site-accounts/notice-reach";
 import type { NoticeVars } from "../site-accounts/notify-templates";
 import { renderNotice } from "../site-accounts/notify-templates";
 import type { AccountUpdatesView } from "./account-updates";
 import { readAccountUpdates, writeAccountUpdates } from "./account-updates";
+import { contactNoticeAddress } from "./contact-address";
 import { emailRoute } from "./email-route";
 import type { EmailSetup } from "./email-setup";
 import { readEmailSetup } from "./email-setup";
@@ -64,9 +65,11 @@ import { renderTransactional } from "./transactional";
 type Db = Prisma.TransactionClient;
 
 /**
- * Who a transactional message may go to — only ever one of three
+ * Who a transactional message may go to — only ever one of four
  * addresses (D17): the bill-to email the invoice kept when it was issued,
- * the email a customer verified when they made their site account, or (a
+ * the email a customer verified when they made their site account, a
+ * contact's own email for a notice about their own booking or order
+ * (DEC-174 D1; their account's address winning, A2), or (a
  * review invitation, D11) the email the order's storefront customer gave
  * when they ordered. (The team's own alerts go from Saroh, not this path:
  * `notifications/team-alert.handler.ts`, DEC-011 amended 2026-10-07.) Never an address the caller typed, so the path cannot be
@@ -80,6 +83,12 @@ type Db = Prisma.TransactionClient;
 export type TransactionalRecipient =
     | { kind: "INVOICE_BILL_TO"; invoiceId: string }
     | { kind: "SITE_ACCOUNT"; contactId: string }
+    /**
+     * A customer notice about their own booking, order or waitlist place
+     * (DEC-174 D1, U2): the contact's own email, a live site account's
+     * verified address winning (A2, `contactNoticeAddress`).
+     */
+    | { kind: "CONTACT"; contactId: string }
     | { kind: "ORDER_CUSTOMER"; orderId: string };
 
 /**
@@ -752,6 +761,14 @@ export class CommunicationsService {
             });
             return { address: email, contactId: link?.contactId ?? null };
         }
+        if (recipient.kind === "CONTACT") {
+            const address = await contactNoticeAddress(
+                db,
+                organizationId,
+                recipient.contactId,
+            );
+            return address ? { address, contactId: recipient.contactId } : null;
+        }
         let contactId: string | null;
         let candidate: string | null = null;
         if (recipient.kind === "INVOICE_BILL_TO") {
@@ -904,7 +921,8 @@ export class CommunicationsService {
     /**
      * How a notice about a customer's own booking reaches them (A14,
      * R17): the business's channels, and for `contactId` that customer's
-     * reach (`site-accounts/notice-reach.ts`). `contact:read`, as the
+     * reach and `to`, the address it is emailed to ("Emailed to ‹email›",
+     * `contactNotice`). `contact:read`, as the
      * booking peek and the class cancel that ask it. Another business's
      * contact reads as reaching nobody, never as a 404 that would confirm
      * it exists.
@@ -912,18 +930,24 @@ export class CommunicationsService {
     async noticeReach(
         ctx: OrganizationContext,
         contactId: string | null,
-    ): Promise<NoticeChannels & { reach: NoticeReach | null }> {
+    ): Promise<
+        NoticeChannels & { reach: NoticeReach | null; to: string | null }
+    > {
         authorize(ctx, "contact:read");
         const channels = await noticeChannels(prisma, ctx.organizationId);
-        const reach = contactId
-            ? await contactReach(
+        const notice = contactId
+            ? await contactNotice(
                   prisma,
                   ctx.organizationId,
                   contactId,
                   channels,
               )
             : null;
-        return { ...channels, reach };
+        return {
+            ...channels,
+            reach: notice?.reach ?? null,
+            to: notice?.to ?? null,
+        };
     }
 
     /**

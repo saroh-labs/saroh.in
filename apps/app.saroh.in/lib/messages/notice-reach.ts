@@ -5,7 +5,9 @@
  * own booking or order reaches them (`site-accounts/notice-reach.ts`):
  *
  * - `EMAIL_AND_ACCOUNT`: emailed, and it shows in their account;
- * - `EMAIL`: emailed (the account thread isn't live);
+ * - `EMAIL`: emailed to the contact's own address (DEC-174 D1: a desk,
+ *   phone or guest customer too, no account needed), the read naming it
+ *   (`to`): "Emailed to ‹email›";
  * - `ACCOUNT`: shown in their account on the business's site;
  * - `ON_SIGN_IN`: no account yet; they see it when they sign in;
  * - `NONE`: nothing is sent.
@@ -36,18 +38,23 @@ export function isNoticeReach(value: unknown): value is NoticeReach {
 
 /**
  * The Ready hold's line on Order Detail: what marking it ready tells the
- * customer. Unknown (an API before A14, or a failed read) says only what is
+ * customer, naming the address when the read gives it. Unknown (an API before A14, or a failed read) says only what is
  * recorded, and claims nothing either way.
  */
 export function readyNoticeText(
     reach: NoticeReach | null | undefined,
     first: string,
+    to?: string | null,
 ): string {
     switch (reach) {
         case "EMAIL_AND_ACCOUNT":
-            return `${first} is emailed and sees it in their account on your site.`;
+            return to
+                ? `Emailed to ${to}, and ${first} sees it in their account on your site.`
+                : `${first} is emailed and sees it in their account on your site.`;
         case "EMAIL":
-            return `${first} is emailed that it's ready.`;
+            return to
+                ? `Emailed to ${to} when it's ready.`
+                : `${first} is emailed that it's ready.`;
         case "ACCOUNT":
             return "Shown in their account on your site.";
         case "ON_SIGN_IN":
@@ -105,17 +112,23 @@ export function readyUndoneText(
 
 /**
  * The booking peek's line on moving or cancelling (the design's "‹First› is
- * told"). Unknown keeps the old advice, which asks the merchant to tell them.
+ * told"), naming the address when the read gives it ("emailed to ‹email›").
+ * Unknown keeps the old advice, which asks the merchant to tell them.
  */
 export function bookingChangeText(
     reach: NoticeReach | null | undefined,
     first: string,
+    to?: string | null,
 ): string {
     switch (reach) {
         case "EMAIL_AND_ACCOUNT":
-            return `If you move or cancel, ${first} is emailed and sees it in their account on your site.`;
+            return to
+                ? `If you move or cancel, it's emailed to ${to}, and ${first} sees it in their account on your site.`
+                : `If you move or cancel, ${first} is emailed and sees it in their account on your site.`;
         case "EMAIL":
-            return `If you move or cancel, ${first} is emailed.`;
+            return to
+                ? `If you move or cancel, it's emailed to ${to}.`
+                : `If you move or cancel, ${first} is emailed.`;
         case "ACCOUNT":
             return `If you move or cancel, it shows in ${first}'s account on your site.`;
         case "ON_SIGN_IN":
@@ -133,13 +146,13 @@ export function classCancelText(
     channels: NoticeChannels | null | undefined,
 ): string {
     if (channels?.thread && channels.email) {
-        return "Each of them sees it in their account on your site, and those who've signed in there are emailed.";
+        return "Each of them sees it in their account on your site, and those with an email are emailed.";
     }
     if (channels?.thread) {
         return "Each of them sees it in their account on your site.";
     }
     if (channels?.email) {
-        return "Those who've signed in on your site are emailed. Tell the others yourself.";
+        return "Those with an email are emailed. Tell the others yourself.";
     }
     return "Saroh doesn't message them.";
 }
