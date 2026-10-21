@@ -120,6 +120,8 @@ test.describe("Needs you groups: a booking awaiting payment (U7)", () => {
         page,
     }, testInfo) => {
         test.setTimeout(90_000);
+        // The page's own clock, so the hold is run out, not slept (#24).
+        await page.clock.install();
         // Signed in first: the API calls below are the owner's.
         await openNorthwindAs(page, "owner");
         const request = page.request;
@@ -167,7 +169,7 @@ test.describe("Needs you groups: a booking awaiting payment (U7)", () => {
                 row.getByRole("button", { name: "Turn down", exact: true }),
             ).toBeVisible();
             // Past where the hold would have ended, it still stands.
-            await page.waitForTimeout(11_000);
+            await page.clock.runFor(11_000);
             const after = await readBooking(request, bookingId ?? "");
             expect(after.status).not.toBe("CANCELLED");
         } finally {

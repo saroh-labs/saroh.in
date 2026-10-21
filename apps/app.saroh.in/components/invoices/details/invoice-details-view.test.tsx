@@ -14,6 +14,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ActionDoes } from "@/components/invoices/details/action-bar";
+import { shareInvoice } from "@/lib/invoices/actions";
 import type { InvoiceActionId } from "@/lib/invoices/detail-actions";
 import type { InvoiceDetails } from "@/lib/invoices/details";
 import type { Invoice, InvoicePayment } from "@/lib/invoices/service";
@@ -472,5 +473,76 @@ describe("every action does something (§15)", () => {
         const got = does as ActionDoes | null;
         const missing = EVERY.filter((id) => !got?.[id] && !got?.hrefs?.[id]);
         expect(missing).toEqual([]);
+    });
+});
+
+describe("Email the receipt (review #13)", () => {
+    const PRESS = { id: "emailReceipt", label: "Email the receipt" } as const;
+    it("a second tap while it goes sends nothing, and the item is off", async () => {
+        let answer: (v: unknown) => void = () => undefined;
+        vi.mocked(shareInvoice).mockReturnValueOnce(
+            new Promise<unknown>((resolve) => {
+                answer = resolve;
+            }) as ReturnType<typeof shareInvoice>,
+        );
+        let got: ReturnType<typeof useDetailsActions> | null = null;
+        const paid = details({
+            standing: "PAID",
+            status: "PAID",
+            paidAt: at(-5),
+            leftToPay: "0.00",
+            paidSoFar: "8400.00",
+            chequeWaiting: true,
+            send: {
+                channels: [],
+                reason: "NOT_OWED",
+                payOnline: true,
+                nextReminderAt: null,
+            },
+            payments: [
+                cash({
+                    amount: "8400.00",
+                    method: "CHEQUE",
+                    bankStatus: "WAITING",
+                }),
+            ],
+        });
+        function Probe() {
+            got = useDetailsActions({
+                details: paid,
+                onChanged: vi.fn(),
+                print: vi.fn(),
+            });
+            return null;
+        }
+        const now = () => got;
+        const item = () =>
+            [
+                ...(now()?.actions.share ?? []),
+                ...(now()?.actions.more ?? []),
+            ].find((a) => a.id === "emailReceipt");
+        act(() => root.render(<Probe />));
+        expect(item()).toBeTruthy();
+        expect(item()?.disabled).toBeFalsy();
+
+        // Two taps in the same frame: one send.
+        act(() => {
+            now()?.does.emailReceipt?.(PRESS);
+            now()?.does.emailReceipt?.(PRESS);
+        });
+        expect(shareInvoice).toHaveBeenCalledTimes(1);
+        expect(item()).toMatchObject({ label: "Sending…", disabled: true });
+        act(() => now()?.does.emailReceipt?.(PRESS));
+        expect(shareInvoice).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+            answer({
+                ok: true,
+                data: { email: { to: "vivek@example.com" } },
+            });
+            for (let i = 0; i < 5; i++) await Promise.resolve();
+        });
+        expect(item()?.disabled).toBeFalsy();
+        expect(item()?.label).toBe("Email the receipt");
     });
 });

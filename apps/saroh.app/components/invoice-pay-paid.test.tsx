@@ -239,6 +239,34 @@ describe("the pay page once money has come in", () => {
         expect(html).toMatch(/<button [^>]*>Pay ₹8,400\.00<\/button>/);
     });
 
+    it("a cheque returned after it was banked says so (#7)", () => {
+        const [returned] = payPaymentsOf([
+            {
+                ...CHEQUE_8400("BOUNCED"),
+                cheque: {
+                    number: "004512",
+                    bank: "HDFC Bank",
+                    status: "BOUNCED",
+                    returnedAfterBanking: true,
+                },
+            },
+        ]);
+        expect(returned.cheque?.returnedAfterBanking).toBe(true);
+        const t = text(
+            render({
+                ...VIVEK,
+                status: "OVERDUE",
+                paidSoFar: "0.00",
+                leftToPay: "8400.00",
+                payments: [returned],
+            }),
+        );
+        expect(t).toContain(
+            "Cheque 004512 · HDFC Bank was returned by the bank after it was banked",
+        );
+        expect(t).toContain("The ₹8,400.00 it paid is due again.");
+    });
+
     it("an older API with none of the new fields reads as before", () => {
         const { paidSoFar: _p, leftToPay: _l, payments: _ps, ...older } = VIVEK;
         const html = render(older);

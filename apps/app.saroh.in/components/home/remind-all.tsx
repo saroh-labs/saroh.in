@@ -8,6 +8,7 @@ import { useState } from "react";
 
 import { FailedRead } from "@/components/shared/failed-read";
 import { FormSheet } from "@/components/shared/form-sheet";
+import { useLatestCall } from "@/components/shared/use-latest-call";
 import { formatMoney } from "@/lib/format/money";
 import type { RemindAllBill, RemindAllPreview } from "@/lib/home/remind-all";
 import {
@@ -58,8 +59,11 @@ export function RemindAll({
 }) {
     const [open, setOpen] = useState(false);
     const [read, setRead] = useState<RemindAllRead>({ status: "loading" });
+    // Only the newest read lands: a close, reopen or retry drops the older one.
+    const latest = useLatestCall();
 
     async function load() {
+        const current = latest.begin();
         setRead({ status: "loading" });
         try {
             const ask = group.remind;
@@ -68,6 +72,7 @@ export function RemindAll({
                 return;
             }
             const res = await previewReminders(ask);
+            if (!current()) return;
             setRead(
                 res.ok
                     ? {
@@ -80,7 +85,7 @@ export function RemindAll({
                     : { status: "failed" },
             );
         } catch {
-            setRead({ status: "failed" });
+            if (current()) setRead({ status: "failed" });
         }
     }
 
@@ -117,7 +122,10 @@ export function RemindAll({
                 setOpen(true);
                 void load();
             }}
-            onClose={() => setOpen(false)}
+            onClose={() => {
+                latest.drop();
+                setOpen(false);
+            }}
             eyebrow="Unpaid bills"
             title="Remind all"
             description={describe(read)}

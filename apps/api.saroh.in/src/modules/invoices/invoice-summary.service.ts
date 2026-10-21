@@ -1,20 +1,19 @@
 import { Injectable } from "@nestjs/common";
-import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
 import { toMinor } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { businessTimezone } from "../bookings/staff-availability";
 import { allows, authorize } from "../organizations/organization-policy";
 import {
     isPastDue,
     leftToPayCents,
-    LIVE_PAYMENT_WHERE,
     NOT_A_BOOKING_HOLD,
     OWED_VIEW_WHERE,
     WAITING_CHEQUE_WHERE,
 } from "./invoice-state";
-import { DEFAULT_TIMEZONE } from "./numbering";
+import { readMoneyIn } from "./money-in";
 
 type Db = typeof prisma;
 
@@ -115,20 +114,6 @@ export async function readChequesWaiting(
     return { count, totals: sorted(by) };
 }
 
-/** The zone a business keeps its days in, India's when it set none. */
-export async function invoiceZoneOf(
-    db: Db,
-    organizationId: string,
-): Promise<string> {
-    const profile = await db.businessProfile.findUnique({
-        where: { organizationId },
-        select: { timezone: true },
-    });
-    // "" included, as older rows stored it.
-    const zone = profile?.timezone?.trim() ?? "";
-    return zone.length > 0 ? zone : DEFAULT_TIMEZONE;
-}
-
 /** Midnight at the start of `date` (`2026-10-01`) in `zone`. */
 export function startOfDayIn(date: string, zone: string): Date {
     return DateTime.fromISO(date, { zone }).startOf("day").toJSDate();
@@ -157,56 +142,36 @@ export class InvoiceSummaryService {
         authorize(ctx, "invoice:read");
         const money = allows(ctx, "payment:read");
         const organizationId = ctx.organizationId;
-        const zone = await invoiceZoneOf(prisma, organizationId);
+        const zone = await businessTimezone(prisma, organizationId);
         const month = monthStartIn(now, zone);
 
-        const [owedBills, drafts, paidIn, orderPaper, cheques] =
-            await Promise.all([
-                prisma.invoice.findMany({
-                    where: { organizationId, ...OWED_VIEW_WHERE },
-                    select: {
-                        currency: true,
-                        total: true,
-                        paidCents: true,
-                        status: true,
-                        dueAt: true,
-                    },
-                }),
-                prisma.invoice.groupBy({
-                    by: ["currency"],
-                    where: {
-                        organizationId,
-                        status: "DRAFT",
-                        ...NOT_A_BOOKING_HOLD,
-                    },
-                    _sum: { total: true },
-                    _count: { _all: true },
-                    orderBy: { currency: "asc" },
-                }),
-                // Payments that count, received this month, on any paper
-                // but a credit note; an order's paper has none.
-                prisma.invoicePayment.findMany({
-                    where: {
-                        organizationId,
-                        ...paymentsFrom(month.from),
-                    },
-                    select: {
-                        invoiceId: true,
-                        currency: true,
-                        amountCents: true,
-                    },
-                }),
-                prisma.invoice.findMany({
-                    where: {
-                        organizationId,
-                        orderId: { not: null },
-                        kind: { not: "CREDIT_NOTE" },
-                        paidAt: { gte: month.from },
-                    },
-                    select: { id: true, currency: true, total: true },
-                }),
-                readChequesWaiting(prisma, organizationId),
-            ]);
+        const [owedBills, drafts, paidIn, cheques] = await Promise.all([
+            prisma.invoice.findMany({
+                where: { organizationId, ...OWED_VIEW_WHERE },
+                select: {
+                    currency: true,
+                    total: true,
+                    paidCents: true,
+                    status: true,
+                    dueAt: true,
+                },
+            }),
+            prisma.invoice.groupBy({
+                by: ["currency"],
+                where: {
+                    organizationId,
+                    status: "DRAFT",
+                    ...NOT_A_BOOKING_HOLD,
+                },
+                _sum: { total: true },
+                _count: { _all: true },
+                orderBy: { currency: "asc" },
+            }),
+            // Money in this month, by the one rule Home and Insights
+            // read too (`money-in.ts`).
+            readMoneyIn(prisma, organizationId, month.from),
+            readChequesWaiting(prisma, organizationId),
+        ]);
 
         const owed = new Map<string, number>();
         const overdue = new Map<string, number>();
@@ -220,17 +185,6 @@ export class InvoiceSummaryService {
                 add(overdue, bill.currency, left);
                 overdueCount += 1;
             }
-        }
-
-        const paid = new Map<string, number>();
-        const paidOn = new Set<string>();
-        for (const p of paidIn) {
-            add(paid, p.currency, p.amountCents);
-            paidOn.add(p.invoiceId);
-        }
-        for (const inv of orderPaper) {
-            add(paid, inv.currency, toMinor(inv.total));
-            paidOn.add(inv.id);
         }
 
         const draftTotals = new Map<string, number>();
@@ -260,7 +214,7 @@ export class InvoiceSummaryService {
             money,
             owed: figure(owedBills.length, owed, { view: "owed" }),
             overdue: figure(overdueCount, overdue, { view: "overdue" }),
-            paidThisMonth: figure(paidOn.size, paid, {
+            paidThisMonth: figure(paidIn.invoiceIds.size, paidIn.totals, {
                 paidFrom: month.date,
             }),
             drafts: figure(draftCount, draftTotals, { view: "draft" }),
@@ -272,16 +226,4 @@ export class InvoiceSummaryService {
                     : null,
         };
     }
-}
-
-/**
- * Payments that count, received from `from` on, not on a credit note: the
- * ledger side of the list's `paidFrom` (`paidFromWhere`).
- */
-function paymentsFrom(from: Date): Prisma.InvoicePaymentWhereInput {
-    return {
-        ...LIVE_PAYMENT_WHERE,
-        receivedAt: { gte: from },
-        invoice: { kind: { not: "CREDIT_NOTE" } },
-    };
 }

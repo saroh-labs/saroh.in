@@ -5,6 +5,7 @@ import {
     formatMoney,
     formatMoneyMajor,
     formatNumber,
+    minorOf,
     moneySign,
 } from "./money";
 import { count, plural } from "./plural";
@@ -103,5 +104,21 @@ describe("a count", () => {
         expect(plural(1, "is", "are")).toBe("is");
         expect(plural(2, "is", "are")).toBe("are");
         expect(plural(2, "day")).toBe("days");
+    });
+});
+
+describe("minorOf", () => {
+    it("reads a Decimal string as minor units, exactly", () => {
+        expect(minorOf("11250.00")).toBe(1125000);
+        expect(minorOf("480.5")).toBe(48050);
+        expect(minorOf("7")).toBe(700);
+        expect(minorOf(" 1125.50 ")).toBe(112550);
+        expect(minorOf("-480.5")).toBe(-48050);
+        // A float sum would read 0.29 as 28.999…: never here.
+        expect(minorOf("0.29")).toBe(29);
+        expect(minorOf("1.005")).toBeNull();
+        expect(minorOf(undefined)).toBeNull();
+        expect(minorOf(null)).toBeNull();
+        expect(minorOf("abc")).toBeNull();
     });
 });

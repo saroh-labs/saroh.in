@@ -37,7 +37,7 @@ import { bookedPriceMode } from "./service-price";
 type Tx = Prisma.TransactionClient;
 
 /** How a booking is already paid, so a link would charge twice. */
-const PAID_ALREADY = ["PAID", "PACK", "MEMBERSHIP"];
+export const PAID_ALREADY = ["PAID", "PACK", "MEMBERSHIP"];
 
 interface Snapshot {
     service?: { priceCents?: unknown; currency?: unknown };

@@ -26,6 +26,7 @@ import {
     recordLedgerPaymentInTx,
 } from "./invoice-ledger";
 import { InvoicePaymentsService } from "./invoice-payments.service";
+import { INVOICE_RECEIPT_TYPE } from "./invoice-receipt";
 import { InvoicesService } from "./invoices.service";
 
 const payments = new InvoicePaymentsService();
@@ -350,12 +351,59 @@ describe("cheques", () => {
         await expect(
             payments.cleared(rye, id, recorded.paymentId, {}),
         ).rejects.toBeInstanceOf(ConflictException);
-        await expect(
-            payments.bounced(rye, id, recorded.paymentId, {}),
-        ).rejects.toBeInstanceOf(ConflictException);
         expect((await auditsOf(id)).map((a) => a.action)).toEqual([
             AuditAction.InvoicePaymentRecorded,
             AuditAction.InvoiceChequeCleared,
+        ]);
+    });
+
+    it("in the bank, then returned days later: bounced, owed again, its banked date kept (#7)", async () => {
+        const id = await issued(rye, "8400.00");
+        const { recorded } = await payments.record(rye, id, {
+            method: "CHEQUE",
+            chequeNumber: "004520",
+            receivedAt: new Date(Date.now() - 4 * DAY).toISOString(),
+        });
+        const clearedAt = new Date(Date.now() - 3 * DAY).toISOString();
+        await payments.cleared(rye, id, recorded.paymentId, { clearedAt });
+        // Not before it went in.
+        await expect(
+            payments.bounced(rye, id, recorded.paymentId, {
+                bouncedAt: new Date(Date.now() - 3.5 * DAY).toISOString(),
+            }),
+        ).rejects.toMatchObject({
+            response: { details: { field: "bouncedAt" } },
+        });
+        const bounced = await payments.bounced(rye, id, recorded.paymentId, {
+            reason: "Returned unpaid",
+        });
+        expect(bounced).toMatchObject({
+            status: "ISSUED",
+            paidSoFar: "0.00",
+            leftToPay: "8400.00",
+            payments: [
+                {
+                    bankStatus: "BOUNCED",
+                    clearedAt,
+                    bounceReason: "Returned unpaid",
+                    // A bounced cheque already doesn't count: nothing to remove (#10).
+                    canRemove: false,
+                },
+            ],
+        });
+        expect(bounced.payments?.[0].bouncedAt).not.toBeNull();
+        expect(await invoiceRow(id)).toMatchObject({
+            status: "ISSUED",
+            paidCents: 0,
+            paidAt: null,
+        });
+        await expect(
+            payments.bounced(rye, id, recorded.paymentId, {}),
+        ).rejects.toThrow("This cheque already bounced.");
+        expect((await auditsOf(id)).map((a) => a.action)).toEqual([
+            AuditAction.InvoicePaymentRecorded,
+            AuditAction.InvoiceChequeCleared,
+            AuditAction.InvoiceChequeBounced,
         ]);
     });
 
@@ -647,6 +695,97 @@ describe("what the ledger refuses", () => {
     });
 });
 
+describe("money that moved while the screen was open (review, 20 Oct)", () => {
+    it("cancel on an invoice paid meanwhile is refused, and nothing is credited (#2)", async () => {
+        const id = await issued(rye, "2500.00");
+        // The merchant opens Cancel on it unpaid; a pay link pays it.
+        await payments.record(rye, id, { method: "UPI" });
+        const seen = {
+            expectStatus: "ISSUED" as const,
+            expectPaidSoFar: "0.00",
+        };
+        await expect(
+            invoices.credit(rye, id, { reason: "Wrong person", ...seen }),
+        ).rejects.toThrow("This invoice was just paid. Reload it.");
+        await expect(
+            invoices.creditAndRewrite(rye, id, {
+                reason: "Wrong person",
+                ...seen,
+            }),
+        ).rejects.toThrow("This invoice was just paid. Reload it.");
+        expect(await invoiceRow(id)).toMatchObject({ status: "PAID" });
+        expect(
+            await prisma.invoice.count({
+                where: { relatedInvoiceId: id },
+            }),
+        ).toBe(0);
+        expect(
+            await prisma.invoice.count({ where: { reissuedFromId: id } }),
+        ).toBe(0);
+    });
+
+    it("refund on a paid invoice still credits it when the screen saw it paid", async () => {
+        const id = await issued(rye, "2500.00");
+        await payments.record(rye, id, { method: "UPI" });
+        const note = await invoices.credit(rye, id, {
+            reason: "Refunded",
+            expectStatus: "PAID",
+            expectPaidSoFar: "2500.00",
+        });
+        expect(note.kind).toBe("CREDIT_NOTE");
+        expect(await invoiceRow(id)).toMatchObject({ status: "CREDITED" });
+    });
+
+    it("cancel is refused while a cheque on it waits for the bank (#5)", async () => {
+        const id = await issued(rye, "8400.00");
+        const { recorded } = await payments.record(rye, id, {
+            method: "CHEQUE",
+            chequeNumber: "004530",
+        });
+        await expect(
+            invoices.credit(rye, id, { reason: "Wrong amount" }),
+        ).rejects.toThrow("Wait for the cheque to clear or bounce.");
+        await expect(invoices.creditPreview(rye, id)).rejects.toThrow(
+            "Wait for the cheque to clear or bounce.",
+        );
+        await payments.cleared(rye, id, recorded.paymentId, {});
+        const note = await invoices.credit(rye, id, { reason: "Wrong amount" });
+        expect(note.kind).toBe("CREDIT_NOTE");
+    });
+
+    it("a cheque on a credited invoice can't go into the bank, and leaves the cheques line (#5)", async () => {
+        const id = await issued(rye, "8400.00");
+        const { recorded } = await payments.record(rye, id, {
+            method: "CHEQUE",
+            chequeNumber: "004531",
+        });
+        const before = await invoices.list(rye, { view: "cheques" });
+        expect(before.some((i) => i.id === id)).toBe(true);
+        await prisma.invoice.update({
+            where: { id },
+            data: { status: "CREDITED" },
+        });
+        await expect(
+            payments.cleared(rye, id, recorded.paymentId, {}),
+        ).rejects.toThrow(/credited/);
+        expect(await rowsOf(id)).toMatchObject([{ bankStatus: "WAITING" }]);
+        // No receipt was queued for it.
+        expect(
+            await prisma.job.count({
+                where: {
+                    type: INVOICE_RECEIPT_TYPE,
+                    payload: {
+                        path: ["paymentId"],
+                        equals: recorded.paymentId,
+                    },
+                },
+            }),
+        ).toBe(0);
+        const after = await invoices.list(rye, { view: "cheques" });
+        expect(after.some((i) => i.id === id)).toBe(false);
+    });
+});
+
 describe("a role without the money permission", () => {
     const member = (): OrganizationContext => ({ ...rye, role: "MEMBER" });
 
@@ -671,82 +810,121 @@ describe("a role without the money permission", () => {
 });
 
 describe("repeats", () => {
-    it("the same record twice within ten minutes is one payment", async () => {
+    it("two real ₹500 cash payments within minutes both count (#6)", async () => {
         const id = await issued(rye, "2500.00");
         const first = await payments.record(rye, id, {
             method: "CASH",
-            amount: "1000",
+            amount: "500",
+            idempotencyKey: "sheet-opening-1",
         });
+        const second = await payments.record(rye, id, {
+            method: "CASH",
+            amount: "500",
+            idempotencyKey: "sheet-opening-2",
+        });
+        expect(second.recorded.replayed).toBe(false);
+        expect(second.recorded.paymentId).not.toBe(first.recorded.paymentId);
+        expect(await rowsOf(id)).toHaveLength(2);
+        expect(second.paidSoFar).toBe("1000.00");
+        // Undo on the second takes the second, never the first.
+        const undone = await payments.remove(
+            rye,
+            id,
+            second.recorded.paymentId,
+            {},
+        );
+        expect(undone.paidSoFar).toBe("500.00");
+        expect(
+            (await rowsOf(id)).find((r) => r.id === first.recorded.paymentId)
+                ?.removedAt,
+        ).toBeNull();
+    });
+
+    it("with no key, the same record twice is two payments", async () => {
+        const id = await issued(rye, "2500.00");
+        await payments.record(rye, id, { method: "CASH", amount: "500" });
         const again = await payments.record(rye, id, {
             method: "CASH",
-            amount: "1000",
-        });
-        expect(again.recorded).toEqual({
-            paymentId: first.recorded.paymentId,
-            replayed: true,
-        });
-        expect(await rowsOf(id)).toHaveLength(1);
-        expect(again.paidSoFar).toBe("1000.00");
-    });
-
-    it("a double tap on 'all that is left' answers as the first, not 'already paid'", async () => {
-        const id = await issued(rye, "2500.00");
-        const first = await payments.record(rye, id, { method: "UPI" });
-        const again = await payments.record(rye, id, { method: "UPI" });
-        expect(again.recorded).toEqual({
-            paymentId: first.recorded.paymentId,
-            replayed: true,
-        });
-        expect(await rowsOf(id)).toHaveLength(1);
-    });
-
-    it("'the rest' after a part payment by the same method is a new payment", async () => {
-        const id = await issued(rye, "2500.00");
-        await payments.record(rye, id, { method: "CASH", amount: "1000" });
-        const rest = await payments.record(rye, id, { method: "CASH" });
-        expect(rest.recorded.replayed).toBe(false);
-        expect(rest.status).toBe("PAID");
-    });
-
-    it("a different reference, or an older payment, is not a repeat", async () => {
-        const id = await issued(rye, "2500.00");
-        const first = await payments.record(rye, id, {
-            method: "UPI",
             amount: "500",
-            reference: "UTR 1",
-        });
-        const other = await payments.record(rye, id, {
-            method: "UPI",
-            amount: "500",
-            reference: "UTR 2",
-        });
-        expect(other.recorded.replayed).toBe(false);
-        await prisma.invoicePayment.update({
-            where: { id: first.recorded.paymentId },
-            data: { createdAt: new Date(Date.now() - 11 * 60 * 1000) },
-        });
-        const later = await payments.record(rye, id, {
-            method: "UPI",
-            amount: "500",
-            reference: "UTR 1",
-        });
-        expect(later.recorded.replayed).toBe(false);
-        expect(await rowsOf(id)).toHaveLength(3);
-    });
-
-    it("a removed payment is not repeated: recording it again writes it again", async () => {
-        const id = await issued(rye, "2500.00");
-        const first = await payments.record(rye, id, {
-            method: "CASH",
-            amount: "1000",
-        });
-        await payments.remove(rye, id, first.recorded.paymentId, {});
-        const again = await payments.record(rye, id, {
-            method: "CASH",
-            amount: "1000",
         });
         expect(again.recorded.replayed).toBe(false);
+        expect(await rowsOf(id)).toHaveLength(2);
+    });
+
+    it("a retry with the same key answers with the first payment, and writes nothing", async () => {
+        const id = await issued(rye, "2500.00");
+        const first = await payments.record(rye, id, {
+            method: "CASH",
+            amount: "1000",
+            idempotencyKey: "sheet-opening-3",
+        });
+        const again = await payments.record(rye, id, {
+            method: "CASH",
+            amount: "1000",
+            idempotencyKey: "sheet-opening-3",
+        });
+        expect(again.recorded).toEqual({
+            paymentId: first.recorded.paymentId,
+            replayed: true,
+        });
+        expect(await rowsOf(id)).toHaveLength(1);
         expect(again.paidSoFar).toBe("1000.00");
+    });
+
+    it("a retry of 'all that is left' answers as the first, not 'already paid'", async () => {
+        const id = await issued(rye, "2500.00");
+        const first = await payments.record(rye, id, {
+            method: "UPI",
+            idempotencyKey: "sheet-opening-4",
+        });
+        const again = await payments.record(rye, id, {
+            method: "UPI",
+            idempotencyKey: "sheet-opening-4",
+        });
+        expect(again.recorded).toEqual({
+            paymentId: first.recorded.paymentId,
+            replayed: true,
+        });
+        expect(await rowsOf(id)).toHaveLength(1);
+    });
+
+    it("two retries racing with one key write one payment", async () => {
+        const id = await issued(rye, "2500.00");
+        const both = await Promise.all([
+            payments.record(rye, id, {
+                method: "CASH",
+                amount: "700",
+                idempotencyKey: "sheet-opening-5",
+            }),
+            payments.record(rye, id, {
+                method: "CASH",
+                amount: "700",
+                idempotencyKey: "sheet-opening-5",
+            }),
+        ]);
+        expect(both.map((b) => b.recorded.replayed).sort()).toEqual([
+            false,
+            true,
+        ]);
+        expect(both[0].recorded.paymentId).toBe(both[1].recorded.paymentId);
+        expect(await rowsOf(id)).toHaveLength(1);
+        expect(await invoiceRow(id)).toMatchObject({ paidCents: 70000 });
+    });
+
+    it("one key on two invoices is two payments", async () => {
+        const one = await issued(rye, "2500.00");
+        const two = await issued(rye, "2500.00");
+        await payments.record(rye, one, {
+            method: "CASH",
+            amount: "100",
+            idempotencyKey: "sheet-opening-6",
+        });
+        const other = await payments.record(rye, two, {
+            method: "CASH",
+            amount: "100",
+            idempotencyKey: "sheet-opening-6",
+        });
+        expect(other.recorded.replayed).toBe(false);
     });
 });
 

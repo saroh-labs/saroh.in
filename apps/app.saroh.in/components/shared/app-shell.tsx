@@ -28,7 +28,7 @@ import {
 import { accountsUrl } from "@/lib/accounts";
 import { mayChangePlan } from "@/lib/billing/plan-access";
 import { businessZone } from "@/lib/format/business-zone";
-import { getHome } from "@/lib/home/service";
+import { getHomeRail } from "@/lib/home/service";
 import { listModules } from "@/lib/modules/service";
 import { RAIL_COLLAPSED, RAIL_COOKIE } from "@/lib/nav/rail-cookie";
 import { unreadNotificationCount } from "@/lib/notifications/service";
@@ -141,10 +141,11 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     ] = await Promise.all([
         unreadNotificationCount(),
         listModules().catch(() => null),
-        // The rail's work counts come from the same ranked read model Home uses,
-        // so the two can never disagree. Non-fatal: a rail without badges is a
-        // working rail, and this renders on every page.
-        getHome().catch(() => null),
+        // The rail's work counts come from the same ranked actions Home ranks,
+        // so the two can never disagree, through the rail's own read: none of
+        // what only Home's page draws (review #16). Non-fatal: a rail without
+        // badges is a working rail, and this renders on every page.
+        getHomeRail().catch(() => null),
         /*
          * The merchant's own sites, for the command palette's jump to one.
          *

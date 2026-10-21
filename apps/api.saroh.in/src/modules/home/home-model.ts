@@ -257,7 +257,7 @@ export interface HomeWeekTakings {
     /** The same days last week, in the same currency. */
     lastWeekMinor: number;
     change: HomeWeekChange;
-    /** The invoices paid since Monday. */
+    /** The invoices money came in on since Monday. */
     href: string;
 }
 
@@ -448,6 +448,20 @@ export interface HomeModel {
      */
     going?: HomeGoing | null;
 }
+
+/**
+ * The rail's read (`GET home?parts=rail`, review #16): the ranked actions
+ * the shell's badges count, and what failed. The workspace shell reads it
+ * on every page, so it skips everything only Home's page draws (today, the
+ * last 24 hours, the week, Home A's tiles, groups and How it's going).
+ */
+export interface HomeRail {
+    actions: HomeAction[];
+    unavailable: HomeUnavailable[];
+}
+
+/** Which of Home's reads a caller wants: all of it, or the rail's. */
+export type HomeParts = "all" | "rail";
 
 export interface HomeInput {
     organizationId: string;

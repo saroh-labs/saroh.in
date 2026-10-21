@@ -13,7 +13,7 @@ import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess, showUndo, UNDO_MS } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { ChipGroup } from "@/components/shared/choice-group";
 import { FormSheet } from "@/components/shared/form-sheet";
@@ -49,6 +49,18 @@ import { offerWhatsAppReceipt } from "./whatsapp-share";
 
 /** The reason a payment taken back by Undo is kept with in the history. */
 export const UNDONE_REASON = "Undone straight after recording";
+
+/** A retry of a record already made (#6): said, with no Undo. */
+export const ALREADY_RECORDED = "Already recorded";
+export const ALREADY_RECORDED_NOTE =
+    "This payment was recorded a moment ago, so nothing new was added.";
+
+/** A fresh key for one opening of the sheet. */
+function newRecordKey(): string {
+    return typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `rp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
 
 /** What opens the sheet: an invoice read in full, or one to read on opening. */
 export type RecordPaymentInvoice = PaymentTarget | { id: string; who: string };
@@ -108,6 +120,7 @@ export function RecordPaymentSheet({
         setWasOpen(open);
         if (open) setOpening((n) => n + 1);
     }
+    const shareHere = useShareHere(invoice.id, onShareReceipt);
     return (
         <RecordPaymentDraft
             key={opening}
@@ -115,10 +128,43 @@ export function RecordPaymentSheet({
             onOpenChange={onOpenChange}
             invoice={invoice}
             onRecorded={onRecorded}
-            onShareReceipt={onShareReceipt}
+            onShareReceipt={onShareReceipt ? shareHere : undefined}
             returnFocusTo={returnFocusTo}
         />
     );
+}
+
+/**
+ * The receipt's share sheet, only while the screen that offered it is
+ * still here and still on that invoice (review #14). The offer's toast
+ * comes ten seconds after the payment; by then the details may have closed,
+ * or moved on to the next invoice, whose share sheet would open on the
+ * wrong receipt. It answers false then, and the toast opens WhatsApp itself.
+ */
+function useShareHere(
+    invoiceId: string,
+    share: (() => void) | undefined,
+): (forInvoice: string) => boolean {
+    const here = useRef({ mounted: false, invoiceId, share });
+    useEffect(() => {
+        here.current.invoiceId = invoiceId;
+        here.current.share = share;
+    }, [invoiceId, share]);
+    useEffect(() => {
+        const now = here.current;
+        now.mounted = true;
+        return () => {
+            now.mounted = false;
+        };
+    }, []);
+    return useCallback((forInvoice: string) => {
+        const now = here.current;
+        if (!now.mounted || now.invoiceId !== forInvoice || !now.share) {
+            return false;
+        }
+        now.share();
+        return true;
+    }, []);
 }
 
 type Load =
@@ -138,7 +184,8 @@ function RecordPaymentDraft({
     onOpenChange: (open: boolean) => void;
     invoice: RecordPaymentInvoice;
     onRecorded?: (invoice: Invoice) => void;
-    onShareReceipt?: () => void;
+    /** The receipt's share sheet; false when its screen has gone. */
+    onShareReceipt?: (invoiceId: string) => boolean;
     returnFocusTo?: string | (() => HTMLElement | null | undefined);
 }) {
     const [load, setLoad] = useState<Load>(
@@ -251,7 +298,7 @@ function RecordPaymentForm({
     onOpenChange: (open: boolean) => void;
     target: PaymentTarget;
     onRecorded?: (invoice: Invoice) => void;
-    onShareReceipt?: () => void;
+    onShareReceipt?: (invoiceId: string) => boolean;
     returnFocusTo?: string | (() => HTMLElement | null | undefined);
 }) {
     const router = useRouter();
@@ -277,6 +324,10 @@ function RecordPaymentForm({
     const [picked, setPicked] = useState<Date | undefined>(undefined);
     const [note, setNote] = useState("");
     const [busy, setBusy] = useState(false);
+    // One key per opening (each opening mounts this form afresh): a retry
+    // of this record answers with the payment already written, while a
+    // second real payment, recorded from a fresh opening, counts (#6).
+    const [idempotencyKey] = useState(newRecordKey);
     const [problems, setProblems] = useState<
         Partial<Record<FieldName, ReactNode>>
     >({});
@@ -335,6 +386,7 @@ function RecordPaymentForm({
             () =>
                 recordPayment(target.id, {
                     method,
+                    idempotencyKey,
                     amount: fromPaise(check.paise),
                     receivedAt: receivedAt.toISOString(),
                     ...(reference.trim()
@@ -378,6 +430,13 @@ function RecordPaymentForm({
         onRecorded?.(recorded);
         router.refresh();
 
+        // A retry of a record already made: nothing new was written, so
+        // there is nothing to Undo and no receipt to offer again.
+        if (recorded.recorded?.replayed) {
+            showSuccess(ALREADY_RECORDED, ALREADY_RECORDED_NOTE);
+            return;
+        }
+
         // Where the receipt can't be emailed, it is offered on WhatsApp
         // once Undo has passed; a cheque's waits for the bank.
         const takeBackOffer =
@@ -386,7 +445,9 @@ function RecordPaymentForm({
                       target.id,
                       target.who,
                       UNDO_MS,
-                      onShareReceipt,
+                      onShareReceipt
+                          ? () => onShareReceipt(target.id)
+                          : undefined,
                   )
                 : () => undefined;
         const words = recordedToast({

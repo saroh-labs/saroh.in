@@ -1,4 +1,5 @@
 import { formatDay, localDateKey } from "@/lib/format/datetime";
+import { minorOf } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
 
 import type { OwedAge } from "./reads";
@@ -56,8 +57,6 @@ export function owedAgeOf(dueAt: string | null, now: Date): OwedAge {
     return "lateOver30";
 }
 
-const minorOf = (amount: string) => Math.round(Number(amount) * 100);
-
 /**
  * The bills of `age`, most late first, then the most owed: what someone
  * chasing them reads first.
@@ -78,7 +77,7 @@ export function owedBills(
                 owedAgeOf(i.dueAt, now) === age,
         )
         .map((i) => {
-            const leftMinor = minorOf(i.leftToPay ?? i.total);
+            const leftMinor = minorOf(i.leftToPay ?? i.total) ?? 0;
             const daysLate =
                 i.dueAt && new Date(i.dueAt).getTime() < now.getTime()
                     ? Math.max(

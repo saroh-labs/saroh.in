@@ -15,7 +15,6 @@ import {
     heldToast,
     introWords,
     lateWords,
-    minorOf,
     noneWords,
     remindLine,
     resultWords,
@@ -95,6 +94,7 @@ describe("Remind all's words", () => {
                             ...bill,
                             invoiceId: "s",
                             reason: "RECENT",
+                            why: "REMINDED_RECENTLY",
                             words: "Reminded yesterday",
                         },
                     ],
@@ -116,6 +116,7 @@ describe("Remind all's words", () => {
                             ...bill,
                             invoiceId: "w",
                             reason: "WHATSAPP",
+                            why: "NO_EMAIL",
                             words: "No email address · WhatsApp from the bill",
                         },
                     ],
@@ -135,9 +136,13 @@ describe("Remind all's words", () => {
                         ...bill,
                         invoiceId: "s",
                         reason,
+                        why:
+                            reason === "NO_PROVIDER"
+                                ? ("UNREACHABLE_NOT_CONNECTED" as const)
+                                : ("REMINDED_RECENTLY" as const),
                         words:
                             reason === "NO_PROVIDER"
-                                ? "No email provider connected"
+                                ? "No phone, and no email provider connected"
                                 : "Reminded yesterday",
                     },
                 ],
@@ -264,8 +269,12 @@ describe("Remind all's words", () => {
         ).toEqual([
             ["c", "RECENT", "Reminded 2 days ago"],
             ["d", "NO_WAY", "No email or phone to reach them"],
-            ["e", "WHATSAPP", "Turned email off · WhatsApp from the bill"],
-            ["f", "NOT_OVERDUE", "No longer overdue"],
+            [
+                "e",
+                "WHATSAPP",
+                "Turned off email from you · WhatsApp from the bill",
+            ],
+            ["f", "NOT_OVERDUE", "Paid already"],
             ["g", "AUTOPAY", "Autopay is taking it now"],
         ]);
     });
@@ -322,13 +331,15 @@ describe("Remind all's words", () => {
                     invoiceId: "b",
                     name: "N",
                     reason: "NO_WAY",
-                    words: "Turned email off",
+                    why: "EMAIL_OFF",
+                    words: "Turned off email from you",
                 },
                 {
                     invoiceId: "c",
                     name: "N",
                     reason: "RECENT",
-                    words: "Reminded today",
+                    why: "REMINDED_TODAY",
+                    words: "Reminded today. Next one tomorrow (one a day).",
                 },
                 {
                     invoiceId: "d",
@@ -338,13 +349,5 @@ describe("Remind all's words", () => {
                 },
             ],
         });
-    });
-
-    it("reads a Decimal string as minor units", () => {
-        expect(minorOf("11250.00")).toBe(1125000);
-        expect(minorOf("480.5")).toBe(48050);
-        expect(minorOf("7")).toBe(700);
-        expect(minorOf(undefined)).toBeNull();
-        expect(minorOf("abc")).toBeNull();
     });
 });

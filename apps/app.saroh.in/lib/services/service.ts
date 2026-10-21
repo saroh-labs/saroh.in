@@ -758,6 +758,44 @@ export async function readReassignCandidates(
     };
 }
 
+/**
+ * Turn down a booking awaiting payment (Home's A7, review #11): the
+ * booking's own cancel, refused by the API with 409 and `details.reason`
+ * "paid" when the customer paid in the meantime — the ten seconds Undo
+ * was offered. That refusal comes back as `paid`, so the row can say
+ * "They just paid" rather than show an error.
+ */
+export async function turnDownBooking(
+    bookingId: string,
+): Promise<
+    ApiResult<CancelledBooking> | { ok: false; error: string; paid: true }
+> {
+    const base = await orgBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(
+        `${base}/services/bookings/${encodeURIComponent(bookingId)}?ifUnpaid=true`,
+        { method: "DELETE" },
+    );
+    const data: unknown = await res.json().catch(() => null);
+    if (res.ok) return { ok: true, data: (data ?? {}) as CancelledBooking };
+    const failure = toFailure(data, "Couldn't turn the booking down.");
+    if (res.status === 409 && justPaid(data)) {
+        return { ok: false, error: failure.error, paid: true };
+    }
+    return failure;
+}
+
+/** The API's "They just paid" refusal: `error.details.reason` is "paid". */
+export function justPaid(body: unknown): boolean {
+    if (!body || typeof body !== "object") return false;
+    const { error } = body as { error?: { details?: { reason?: unknown } } };
+    return error?.details?.reason === "paid";
+}
+
 export function cancelBooking(
     bookingId: string,
     options: { returnCredit?: boolean; closesClass?: boolean } = {},

@@ -1,5 +1,7 @@
 import type { prisma } from "@saroh/database";
 
+import type { UnpaidBillsRead } from "../analytics/unpaid-bills";
+
 import { readGoing } from "./home-going";
 import type {
     HomeAction,
@@ -57,6 +59,8 @@ export function readTodayFirst(
         narrow: HomeNarrow;
         today: TodayScope | null;
         week: WeekScope | null;
+        /** The build's one read of the unpaid bills (review #16). */
+        unpaid?: UnpaidBillsRead;
     },
 ): Promise<
     [
@@ -113,6 +117,7 @@ export function readTodayFirst(
                       readGoing(db, input.organizationId, week, clock, {
                           money,
                           storeIds: narrow.storeIds,
+                          unpaid: ctx.unpaid,
                       }),
                   null,
               )

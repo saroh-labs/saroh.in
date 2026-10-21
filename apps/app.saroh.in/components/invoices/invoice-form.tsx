@@ -129,6 +129,8 @@ export function InvoiceForm({
         then: "issue it",
         continueLabel: "Save and issue",
         onFile: detailsOnFile,
+        // Saved here, the editor stays drawn (review #15).
+        inPlace: true,
     });
     const ids = { preview: useId(), why: useId() };
     // Which button is working, for its label. Never what a submit does:
@@ -253,6 +255,9 @@ export function InvoiceForm({
             // Missing details are asked for at once, before the save (#838):
             // asked after it, the sheet waited on a save, a refusal and a
             // read. Closed without saving, the draft is still kept.
+            // What was typed in the last moments is saved first, so no
+            // save the step makes can lose it (review #15).
+            if (want === "issue") await saving.flush();
             const detailsReady =
                 want === "issue" ? await details.ensure() : true;
             const saved = await kept();
@@ -410,6 +415,7 @@ export function InvoiceForm({
                         disabled={busy}
                         canSetDefault={canSetDefault && biz !== null}
                         onSettings={onSettings}
+                        flush={saving.flush}
                     />
                 ) : (
                     <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_440px]">

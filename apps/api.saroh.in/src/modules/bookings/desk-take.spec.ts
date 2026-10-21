@@ -4,7 +4,7 @@ import {
     DESK_REFUSED,
     deskTake,
     paidAtDesk,
-    paidOnlineOf,
+    paidOnPaperCents,
 } from "./desk-take";
 
 /*
@@ -13,7 +13,7 @@ import {
  */
 
 const DESK = { status: "CONFIRMED", paidWith: "DESK" };
-const PRICE = { priceCents: 50_000, paidOnlineCents: 0, paidAtDeskCents: 0 };
+const PRICE = { priceCents: 50_000 };
 
 function paper(over: Partial<BookingPaperRow> = {}): BookingPaperRow {
     return {
@@ -68,8 +68,30 @@ describe("paidAtDesk", () => {
     });
 });
 
-describe("paidOnlineOf and chargingOnly", () => {
-    it("sums the succeeded payments on the booking's own paid invoice", () => {
+describe("paidOnPaperCents and chargingOnly", () => {
+    it("reads what was paid from the paper's ledger, however it was paid (DEC-173)", () => {
+        expect(
+            paidOnPaperCents([
+                // Paid in full: its total, online, by hand or both.
+                paper({ total: "400.00", paymentMethod: "ONLINE" }),
+                // Part paid by hand on Invoices: what its ledger holds.
+                paper({
+                    kind: "SUPPLEMENTARY",
+                    status: "ISSUED",
+                    paymentMethod: null,
+                    total: "300.00",
+                    paidCents: 10_000,
+                }),
+                // Credited since: what it took before.
+                paper({ status: "CREDITED", total: "50.00", paidCents: 5_000 }),
+                // A draft or a voided invoice took nothing.
+                paper({ status: "DRAFT", paidCents: 99_999 }),
+                paper({ status: "VOID", paidCents: 99_999 }),
+            ]),
+        ).toBe(55_000);
+    });
+
+    it("keeps only the payments going through online right now", () => {
         const rows = [
             {
                 kind: "INVOICE",
@@ -79,18 +101,7 @@ describe("paidOnlineOf and chargingOnly", () => {
                     { status: "PROCESSING", amountCents: 100 },
                 ],
             },
-            {
-                kind: "SUPPLEMENTARY",
-                status: "PAID",
-                paymentIntents: [{ status: "SUCCEEDED", amountCents: 999 }],
-            },
-            {
-                kind: "INVOICE",
-                status: "ISSUED",
-                paymentIntents: [{ status: "SUCCEEDED", amountCents: 999 }],
-            },
         ];
-        expect(paidOnlineOf(rows)).toBe(40_000);
         expect(chargingOnly(rows)[0]?.paymentIntents).toEqual([
             { status: "PROCESSING", amountCents: 100 },
         ]);
@@ -121,11 +132,30 @@ describe("deskTake", () => {
                 {
                     ...PRICE,
                     priceCents: 80_000,
-                    paidOnlineCents: 40_000,
                     paper: [paper({ paymentMethod: "ONLINE", total: "400" })],
                 },
             ),
         ).toEqual({ cents: 40_000, byLink: false });
+    });
+
+    it("refuses a booking its pay link's invoice was paid in full by hand and online together (DEC-173)", () => {
+        // ₹400 recorded by hand on Invoices, then the ₹100 left paid
+        // online: PAID, and its legacy method reads ONLINE. The ledger
+        // says it is paid; the desk never takes the hand part again.
+        expect(
+            deskTake(
+                { status: "CONFIRMED", paidWith: null },
+                {
+                    ...PRICE,
+                    paper: [
+                        paper({
+                            paymentMethod: "ONLINE",
+                            paidCents: 50_000,
+                        }),
+                    ],
+                },
+            ),
+        ).toEqual({ refusal: DESK_REFUSED.paid });
     });
 
     it("takes what a pay link already out asks for", () => {
@@ -213,7 +243,6 @@ describe("deskTake", () => {
         expect(
             deskTake(DESK, {
                 ...PRICE,
-                paidAtDeskCents: 50_000,
                 paper: [paper()],
             }),
         ).toEqual({ refusal: DESK_REFUSED.paid });
@@ -222,7 +251,6 @@ describe("deskTake", () => {
                 { status: "CONFIRMED", paidWith: "PAID" },
                 {
                     ...PRICE,
-                    paidOnlineCents: 50_000,
                     paper: [paper({ paymentMethod: "ONLINE" })],
                 },
             ),

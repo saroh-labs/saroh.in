@@ -1,4 +1,4 @@
-import type { prisma } from "@saroh/database";
+import type { Prisma, prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
 import { isPastDue, leftToPayCents } from "../invoices/invoice-state";
@@ -318,8 +318,12 @@ export async function overdueInvoices(
     organizationId: string,
     now: Date,
     zone = "Asia/Kolkata",
+    // A Home build works the where out once and hands it to Remind all's
+    // bills too (review #16).
+    overdueWhere?: Promise<Prisma.InvoiceWhereInput>,
 ): Promise<HomeAction | null> {
-    const where = await overdueBillsWhere(db, organizationId, now);
+    const where = await (overdueWhere ??
+        overdueBillsWhere(db, organizationId, now));
 
     const [count, rows] = await Promise.all([
         db.invoice.count({ where }),

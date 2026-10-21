@@ -3,18 +3,19 @@ import { Prisma } from "@saroh/database";
 import { RESERVED_CONTACT_EMAIL_DOMAINS } from "../contacts/contact-email";
 import { openSql } from "../orders/order-list-filters";
 import type { CustomerChip, CustomerSort } from "./customers-list.dto";
-import { PAID_NON_ORDER_INVOICE, spentRowsSql } from "./spent.sql";
+import { spentLedgerRowsSql, spentRowsSql } from "./spent.sql";
 
-// Spent's rule lives in `spent.sql.ts` (C14: net of refunds), which
-// Customer Detail reads too.
-export { PAID_NON_ORDER_INVOICE, spentRowsSql };
+// Spent's rule lives in `spent.sql.ts` (C14: net of refunds; an invoice's
+// ledger by the money-in rule, DEC-173), which Customer Detail reads too.
+export { spentRowsSql };
 
 /**
  * The Customers list as SQL (DEC-041, C3). Pure: builds `Prisma.Sql`, runs
  * nothing; `customers-list.service.ts` runs it.
  *
  * A customer is a contact who has paid — an order through a store customer
- * linked to them, a paid invoice that isn't an order's own, a subscription
+ * linked to them, a payment that counts on an invoice that isn't an order's
+ * own (part of one is enough; a bounced cheque isn't), a subscription
  * or a class pack — or who signs in on the business's site (a live
  * `CustomerAccount`, A1), or whom the merchant added on the list itself
  * (`ADDED_AS_CUSTOMER`, DEC-056). Leads, Pipeline and Contacts are not asked.
@@ -95,12 +96,9 @@ export function peopleCte(opts: PeopleOptions): Prisma.Sql {
         GROUP BY l."contactId"
     ),
     inv AS (
-        SELECT i."contactId", COUNT(*)::int AS paid_invoices
-        FROM "Invoice" i
-        WHERE i."organizationId" = ${org}
-          AND i."contactId" IS NOT NULL
-          AND ${PAID_NON_ORDER_INVOICE}
-        GROUP BY i."contactId"
+        SELECT x."contactId", COUNT(DISTINCT x."invoiceId")::int AS paid_invoices
+        FROM (${spentLedgerRowsSql(org)}) x
+        GROUP BY x."contactId"
     ),
     spent AS (
         SELECT s."contactId", SUM(s.amount) AS spent

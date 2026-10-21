@@ -30,7 +30,7 @@ import type {
     ShareChannel,
     ShareInvoiceDto,
 } from "./invoice-share.dto";
-import { isPastDue } from "./invoice-state";
+import { CHEQUE_PAYMENT_METHOD, isPastDue } from "./invoice-state";
 import { InvoicesService } from "./invoices.service";
 import { payLinkUrlFor } from "./pay-link-url";
 import { invoicePayOnline } from "./pay-online";
@@ -58,6 +58,12 @@ export interface InvoiceShareResult {
 
 /** The channels that make a fresh link, as a send does (DEC-110). */
 const MINTS: readonly ShareChannel[] = ["WHATSAPP", "LINK"];
+
+/**
+ * The words a 409 says when the only payment to thank them for is a cheque
+ * not in the bank yet (#9): its receipt goes when it clears.
+ */
+export const CHEQUE_NOT_IN_BANK_YET = "This cheque isn't in the bank yet.";
 
 /** The words a 409 says when a receipt can't be emailed. */
 export const RECEIPT_NEEDS_EMAIL =
@@ -166,7 +172,7 @@ export class InvoiceShareService {
                     payOnline,
                     payment:
                         kind === "RECEIPT"
-                            ? await lastLivePayment(tx, row.id)
+                            ? await receiptPaymentOrRefuse(tx, row.id)
                             : null,
                 });
             }
@@ -222,7 +228,7 @@ export class InvoiceShareService {
             if (!(await this.comms.emailConnected(tx, organizationId))) {
                 throw new ConflictException(RECEIPT_NEEDS_EMAIL);
             }
-            const payment = await lastLivePayment(tx, row.id);
+            const payment = await receiptPaymentOrRefuse(tx, row.id);
             if (!payment) {
                 throw new ConflictException(
                     "Nothing has been paid on this invoice yet.",
@@ -341,8 +347,14 @@ function paidCentsOf(row: SendRow): number {
     return row.status === "PAID" ? totalCentsOf(row) : row.paidCents;
 }
 
-/** The last live payment on an invoice: what a receipt thanks them for. */
-async function lastLivePayment(
+/**
+ * The last payment a receipt can thank them for: live, and not a cheque
+ * still waiting for the bank (#9). A waiting cheque's receipt goes when it
+ * is marked as in the bank (DEC-173); emailing one before would also mark
+ * it sent, and its real receipt would never go. When live payments exist
+ * but every one is a waiting cheque, a 409 says so; with none at all, null.
+ */
+async function receiptPaymentOrRefuse(
     tx: Tx,
     invoiceId: string,
 ): Promise<{ id: string; amountCents: number; method: string } | null> {
@@ -358,8 +370,20 @@ async function lastLivePayment(
         },
         take: 20,
     });
-    const live = rows.find(isLive);
-    return live
-        ? { id: live.id, amountCents: live.amountCents, method: live.method }
-        : null;
+    const live = rows.filter(isLive);
+    const thanked = live.find((r) => !isWaitingCheque(r));
+    if (thanked) {
+        return {
+            id: thanked.id,
+            amountCents: thanked.amountCents,
+            method: thanked.method,
+        };
+    }
+    if (live.length > 0) throw new ConflictException(CHEQUE_NOT_IN_BANK_YET);
+    return null;
+}
+
+/** A cheque received and not in the bank yet. */
+function isWaitingCheque(row: { method: string; bankStatus: string | null }) {
+    return row.method === CHEQUE_PAYMENT_METHOD && row.bankStatus === "WAITING";
 }

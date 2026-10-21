@@ -341,6 +341,61 @@ describe("Send", () => {
     });
 });
 
+describe("many at once (review #17, #34)", () => {
+    it("one unexpected error fails only that row; the rest are reminded", async () => {
+        const a = await owed(rye, { first: "Arun" });
+        const broken = await owed(rye, { first: "Bhavna" });
+        const c = await owed(rye, { first: "Charu" });
+        const remind = sending.remind.bind(sending);
+        const spy = jest
+            .spyOn(sending, "remind")
+            .mockImplementation((ctx, id, batch) =>
+                id === broken
+                    ? Promise.reject(new Error("connection reset"))
+                    : remind(ctx, id, batch),
+            );
+        try {
+            const { invoices: rows } = await reminders.send(rye, {
+                invoiceIds: [a, broken, c],
+            });
+            expect(rows.map((r) => [r.invoiceId, r.outcome])).toEqual([
+                [a, "EMAILED"],
+                [broken, "FAILED"],
+                [c, "EMAILED"],
+            ]);
+            expect(rows[1]?.message).toBe("Couldn't send this one just now.");
+            expect(await remindersOf(a)).toHaveLength(1);
+            expect(await remindersOf(broken)).toHaveLength(0);
+            expect(await remindersOf(c)).toHaveLength(1);
+        } finally {
+            spy.mockRestore();
+        }
+    });
+
+    it("reads the business once and each invoice's sends in one batch, however many are picked", async () => {
+        const ids: string[] = [];
+        for (let i = 0; i < 12; i += 1) {
+            ids.push(await owed(rye, { first: `Many${i}` }));
+        }
+        const connected = jest.spyOn(comms, "emailConnected");
+        const one = jest.spyOn(sending, "nextReminderAt");
+        const many = jest.spyOn(sending, "nextReminderAtMany");
+        try {
+            const preview = await reminders.preview(rye, { invoiceIds: ids });
+            expect(preview.invoices.every((r) => r.way === "EMAIL")).toBe(true);
+            // The provider once for the business, not once per invoice.
+            expect(connected).toHaveBeenCalledTimes(1);
+            // When each was last sent: one batch for all twelve.
+            expect(one).not.toHaveBeenCalled();
+            expect(many).toHaveBeenCalledTimes(1);
+        } finally {
+            connected.mockRestore();
+            one.mockRestore();
+            many.mockRestore();
+        }
+    });
+});
+
 describe("limits", () => {
     it("takes at most 100 at a time, and at least one", async () => {
         const many = plainToInstance(BulkRemindersDto, {

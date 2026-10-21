@@ -1,10 +1,8 @@
 import type { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
-import {
-    paidSinceFilter,
-    refundedBetweenWhere,
-} from "../invoices/invoice-state";
+import { refundedBetweenWhere } from "../invoices/invoice-state";
+import { readMoneyIn } from "../invoices/money-in";
 import { realOrderWhere } from "../orders/open-orders";
 import type { HomeInput, HomeLastDay, HomeSinceItem } from "./home-model";
 import { holds } from "./home-model";
@@ -118,15 +116,6 @@ export const SINCE_PATHS = {
     PAYMENTS: "/billing/invoices",
 } as const;
 
-/**
- * The paid invoices the money figure adds up — each rupee once. The
- * Invoices list's `?paidSince=` reads the same, so its link opens exactly
- * the invoices counted.
- */
-export function paidSinceWhere(organizationId: string, since: Date) {
-    return { organizationId, ...paidSinceFilter(since) };
-}
-
 /** The end of an open window: nothing is issued after it. */
 const FAR_FUTURE = new Date("9999-12-31T00:00:00.000Z");
 
@@ -158,15 +147,11 @@ export async function readSince(
             ? db.booking.count({ where: { ...newSince, status: "CONFIRMED" } })
             : 0,
         scope.reviews ? db.productReview.count({ where: inTheirs }) : 0,
-        scope.money
-            ? db.invoice.groupBy({
-                  by: ["currency"],
-                  where: paidSinceWhere(organizationId, since),
-                  _sum: { total: true },
-                  _count: { _all: true },
-                  orderBy: { currency: "asc" },
-              })
-            : [],
+        // Money in by the one rule the strip and Insights read
+        // (`money-in.ts`, DEC-173): each payment on the day it came in, an
+        // order's paper on the day it was paid. The Invoices list's
+        // `?paidSince=` reads the same, so the link opens what it counts.
+        scope.money ? readMoneyIn(db, organizationId, since) : null,
         // Money handed back in the window comes off what was taken
         // (UX-061), as the week's takings read it: "taken" is net.
         scope.money
@@ -210,18 +195,17 @@ export async function readSince(
             Math.round(Number(r._sum.total ?? 0) * 100),
         ]),
     );
-    for (const row of money) {
-        // Decimal in MAJOR units on the row; the wire is minor units. Net
-        // of what went back meanwhile (UX-061).
+    const currencies = [...(money?.totals.keys() ?? [])].sort();
+    for (const currency of currencies) {
+        // Minor units on the wire. Net of what went back meanwhile (UX-061).
         const amountMinor =
-            Math.round(Number(row._sum.total ?? 0) * 100) -
-            (back.get(row.currency) ?? 0);
+            (money?.totals.get(currency) ?? 0) - (back.get(currency) ?? 0);
         if (amountMinor <= 0) continue;
         items.push({
             kind: "PAYMENTS",
-            count: row._count._all,
+            count: money?.payments.get(currency) ?? 0,
             amountMinor,
-            currency: row.currency,
+            currency,
             href:
                 scope.moneyIn === "calendar"
                     ? MONEY_ON_THE_CALENDAR

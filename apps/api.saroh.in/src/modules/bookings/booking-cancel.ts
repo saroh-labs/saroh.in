@@ -1,5 +1,6 @@
 import type { Logger } from "@nestjs/common";
-import type { Booking } from "@saroh/database";
+import { ConflictException } from "@nestjs/common";
+import type { Booking, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { reversePackInTx } from "../class-packs/redeem-pack";
@@ -11,7 +12,7 @@ import {
 import type { PaymentsService } from "../payments/payments.service";
 import { BookingEventType } from "./booking-event-type";
 import { lockBookingInTx, releaseHoldInTx } from "./booking-hold";
-import { retirePayLinkInTx } from "./booking-pay-link";
+import { PAID_ALREADY, retirePayLinkInTx } from "./booking-pay-link";
 import {
     isLateCancel,
     loadBookingRules,
@@ -56,6 +57,43 @@ export interface CancelMoney {
 }
 
 export const NOTHING_MOVED: CancelMoney = { refund: null, kept: null };
+
+/**
+ * Home's Turn down (review #11) cancels only a booking still awaiting its
+ * money. When the customer paid in the ten seconds Undo was offered, the
+ * cancel is refused with this, and the row says so: the booking stands.
+ */
+export const THEY_JUST_PAID = "They just paid. The booking stands.";
+/** `details.reason` on that refusal, which the app answers in place. */
+export const JUST_PAID_REASON = "paid";
+
+/**
+ * Whether a booking still waits on its money, under its locks: a pay-now
+ * hold (PENDING), or a confirmed booking not paid another way whose own
+ * invoice is still issued (Home's "awaiting payment",
+ * `home-pending-bookings.ts`). A webhook that confirmed the hold, or paid
+ * the link's invoice, ends it.
+ */
+async function awaitsPaymentInTx(
+    tx: Prisma.TransactionClient,
+    booking: Booking,
+): Promise<boolean> {
+    if (booking.status === "PENDING") return true;
+    if (booking.status !== "CONFIRMED") return false;
+    if (booking.paidWith && PAID_ALREADY.includes(booking.paidWith)) {
+        return false;
+    }
+    const issued = await tx.invoice.findFirst({
+        where: {
+            bookingId: booking.id,
+            kind: "INVOICE",
+            source: "BOOKING",
+            status: "ISSUED",
+        },
+        select: { id: true },
+    });
+    return issued !== null;
+}
 
 /**
  * A cancelled booking, and what happened to its money. `told`: the cancel
@@ -109,7 +147,15 @@ export async function cancelFoundBooking(
     found: Booking,
     actor: CancelActor,
     now: Date,
-    options: { returnCredit?: boolean; closesClass?: boolean },
+    options: {
+        returnCredit?: boolean;
+        closesClass?: boolean;
+        /**
+         * Cancel only while it still awaits payment (Home's Turn down,
+         * review #11): else 409 `THEY_JUST_PAID`, and nothing changes.
+         */
+        ifUnpaid?: boolean;
+    },
     send: (refundId: string) => Promise<RefundStatus>,
 ): Promise<CancelledBooking> {
     if (found.status === "CANCELLED") {
@@ -132,6 +178,14 @@ export async function cancelFoundBooking(
             (await tx.booking.findUnique({ where: { id: found.id } })) ?? found;
         if (booking.status === "CANCELLED") {
             return { booking, money: NOTHING_MOVED, send: null, told: false };
+        }
+        // Turned down from Home after ten seconds of Undo: a payment that
+        // landed meanwhile (the webhook takes the same locks first) wins.
+        if (options.ifUnpaid && !(await awaitsPaymentInTx(tx, booking))) {
+            throw new ConflictException({
+                message: THEY_JUST_PAID,
+                details: { reason: JUST_PAID_REASON },
+            });
         }
         // A pay-now hold nobody has paid: let it go as the booker would,
         // so its draft invoice is voided and its pay link stops working.

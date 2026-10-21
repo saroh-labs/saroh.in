@@ -28,6 +28,8 @@ jest.mock("../../env", () => ({
 import { ForbiddenException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { onTheLedger } from "../../../test/ledger-paid";
+
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { ContactsService } from "../contacts/contacts.service";
@@ -200,19 +202,21 @@ beforeAll(async () => {
             status: "DELIVERED",
         },
     });
-    await prisma.invoice.create({
-        data: {
-            organizationId: orgId,
-            contactId: asha,
-            kind: "INVOICE",
-            status: "PAID",
-            number: `C13-INV-${tag}`,
-            currency: "INR",
-            subtotal: "900",
-            total: "900",
-            paidAt: new Date(),
-        },
-    });
+    await onTheLedger(
+        await prisma.invoice.create({
+            data: {
+                organizationId: orgId,
+                contactId: asha,
+                kind: "INVOICE",
+                status: "PAID",
+                number: `C13-INV-${tag}`,
+                currency: "INR",
+                subtotal: "900",
+                total: "900",
+                paidAt: new Date(),
+            },
+        }),
+    );
     await prisma.contactAttention.createMany({
         data: [
             {

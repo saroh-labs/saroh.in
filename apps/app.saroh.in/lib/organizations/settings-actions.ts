@@ -62,6 +62,24 @@ export async function saveOrganizationSettings(
 }
 
 /**
+ * The same save, made from the invoice editor (review #15, 20 Oct 2026):
+ * "Make this my default", How to pay us and the business-details step
+ * before Issue. It revalidates nothing. Any revalidation makes the router
+ * read the page it is on again, and once a new invoice has its own address
+ * (`/<id>/edit`) that is another page than the one drawn (`/new`): the
+ * editor was thrown away and drawn again, closing the Style sheet and
+ * losing what was typed in the last 800 ms. The editor takes the answer
+ * itself (`onSettings`), and a screen opened afterwards reads the settings
+ * from the API (no fetch is cached, `lib/api/http.ts`), as
+ * `updateInvoice` does.
+ */
+export async function saveOrganizationSettingsInPlace(
+    input: OrganizationSettingsInput,
+): Promise<SettingsResult<OrganizationSettings>> {
+    return updateOrganizationSettings(input);
+}
+
+/**
  * What switching the business to "GST is added to my prices" would do to
  * its products' MRPs (12 Oct 2026, `lib/gst-rates/over-mrp.ts`): read by
  * that sheet when the choice is picked, before anything is saved. Null
@@ -90,6 +108,13 @@ export async function saveBusinessLogo(
     // Invoices print it at the top.
     if (result.ok) revalidatePath("/settings/organization");
     return result;
+}
+
+/** The logo, set from the invoice editor: nothing revalidated (review #15). */
+export async function saveBusinessLogoInPlace(
+    mediaId: string | null,
+): Promise<SettingsResult<OrganizationSettings>> {
+    return updateBusinessLogo(mediaId);
 }
 
 /*

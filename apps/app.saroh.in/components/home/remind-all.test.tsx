@@ -556,4 +556,61 @@ describe("Remind all", () => {
         expect(page().querySelector("[data-remind-status]")).toBeNull();
         expect(hasButton("Remind all")).toBe(true);
     });
+
+    // Review #12: a read from an earlier opening that answers last must not
+    // overwrite the newer one, or the old list is what gets sent.
+    it("keeps the newest read when an older one answers last", async () => {
+        draw();
+        let answerOld: (v: unknown) => void = () => undefined;
+        calls.previewReminders.mockReturnValueOnce(
+            new Promise((resolve) => {
+                answerOld = resolve;
+            }),
+        );
+        act(() => button("Remind all").click());
+        await settle();
+        act(() => button("Cancel").click());
+        await settle();
+
+        calls.previewReminders.mockResolvedValueOnce({
+            ok: true,
+            data: preview(),
+        });
+        act(() => button("Remind all").click());
+        await settle();
+        expect(hasButton("Send 7 reminders")).toBe(true);
+
+        // The first opening's read lands now, with only one person on it.
+        answerOld({
+            ok: true,
+            data: preview({ invoices: [GOING[0]] }),
+        });
+        await settle();
+        expect(hasButton("Send 7 reminders")).toBe(true);
+        expect(hasButton("Send 1 reminder")).toBe(false);
+    });
+
+    it("a retry's answer wins over the failed read it replaced", async () => {
+        draw();
+        let answerOld: (v: unknown) => void = () => undefined;
+        calls.previewReminders.mockReturnValueOnce(
+            new Promise((resolve) => {
+                answerOld = resolve;
+            }),
+        );
+        act(() => button("Remind all").click());
+        await settle();
+        act(() => button("Cancel").click());
+        await settle();
+        calls.previewReminders.mockResolvedValueOnce({
+            ok: true,
+            data: preview(),
+        });
+        act(() => button("Remind all").click());
+        await settle();
+        answerOld({ ok: false, error: "The server didn't answer." });
+        await settle();
+        expect(sheet()?.textContent).not.toContain("Nothing was sent.");
+        expect(hasButton("Send 7 reminders")).toBe(true);
+    });
 });

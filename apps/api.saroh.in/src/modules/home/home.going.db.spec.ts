@@ -8,6 +8,7 @@
  */
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { onTheLedger } from "../../../test/ledger-paid";
 import { readGoing } from "./home-going";
 
 const tag = `${process.pid}-${Date.now()}`;
@@ -66,17 +67,19 @@ describe("Home A How it's going (DB)", () => {
         data: Record<string, unknown>,
     ) {
         n += 1;
-        await prisma.invoice.create({
-            data: {
-                organizationId,
-                number: `GO-${n}-${tag}`,
-                currency: "INR",
-                subtotal: "1000.00",
-                total: "1000.00",
-                issuedAt: new Date(NOW.getTime() - 60 * DAY),
-                ...data,
-            },
-        });
+        await onTheLedger(
+            await prisma.invoice.create({
+                data: {
+                    organizationId,
+                    number: `GO-${n}-${tag}`,
+                    currency: "INR",
+                    subtotal: "1000.00",
+                    total: "1000.00",
+                    issuedAt: new Date(NOW.getTime() - 60 * DAY),
+                    ...data,
+                },
+            }),
+        );
     }
 
     beforeAll(async () => {
@@ -171,8 +174,10 @@ describe("Home A How it's going (DB)", () => {
             {
                 currency: "INR",
                 amountMinor: 300_000,
-                beforeMinor: 200_000,
-                // Two payments before: too few to compare.
+                // The 7 before end at 09:00 last Monday, the same time of
+                // day as now: the ₹1,000 at 22:00 that night is after it.
+                beforeMinor: 100_000,
+                // Too few payments before to compare.
                 change: { kind: "THIN" },
                 href: `/billing/invoices?since=${encodeURIComponent(
                     "2026-10-12T18:30:00.000Z",

@@ -20,7 +20,7 @@ import { useInlineActions } from "./use-inline-actions";
 const calls = vi.hoisted(() => ({
     moveStage: vi.fn(),
     undoStage: vi.fn(),
-    cancelBooking: vi.fn(),
+    turnDownBooking: vi.fn(),
     makePayLink: vi.fn(),
     replyAction: vi.fn(),
     replyToReview: vi.fn(),
@@ -51,7 +51,7 @@ vi.mock("@/lib/orders/actions", () => ({
     undoStage: calls.undoStage,
 }));
 vi.mock("@/lib/services/actions", () => ({
-    cancelBooking: calls.cancelBooking,
+    turnDownBooking: calls.turnDownBooking,
 }));
 vi.mock("@/components/bookings/pay-link-panel", () => ({
     makePayLink: calls.makePayLink,
@@ -86,7 +86,7 @@ beforeEach(() => {
     for (const fn of [
         calls.moveStage,
         calls.undoStage,
-        calls.cancelBooking,
+        calls.turnDownBooking,
         calls.makePayLink,
         calls.replyAction,
         calls.replyToReview,
@@ -623,7 +623,7 @@ describe("NeedGroupBody: inline actions", () => {
         act(() => buttonIn(rowOf("Kavya"), "Undo").click());
         await settle();
         await holdEnds();
-        expect(calls.cancelBooking).not.toHaveBeenCalled();
+        expect(calls.turnDownBooking).not.toHaveBeenCalled();
         expect(calls.toast.showSuccess).toHaveBeenCalledWith(
             "Not turned down. The booking stands.",
         );
@@ -631,20 +631,41 @@ describe("NeedGroupBody: inline actions", () => {
     });
 
     it("Turn down, left to run, cancels the booking through its own cancel", async () => {
-        calls.cancelBooking.mockResolvedValue({ ok: true, data: {} });
+        calls.turnDownBooking.mockResolvedValue({ ok: true, data: {} });
         draw(AWAITING);
         act(() => buttonIn(rowOf("Kavya"), "Turn down").click());
         act(() => buttonIn(confirmIn(rowOf("Kavya")), "Turn down").click());
         await settle();
         await holdEnds();
-        expect(calls.cancelBooking).toHaveBeenCalledWith("b1", {});
+        expect(calls.turnDownBooking).toHaveBeenCalledWith("b1");
         const row = rowOf("Kavya");
         expect(row.textContent).toContain("Turned down");
         expect(hasButton(row, "Undo")).toBe(false);
     });
 
+    it("a booking paid during the hold stands, and the row says They just paid (review #11)", async () => {
+        calls.turnDownBooking.mockResolvedValue({
+            ok: false,
+            error: "They just paid. The booking stands.",
+            paid: true,
+        });
+        draw(AWAITING);
+        act(() => buttonIn(rowOf("Kavya"), "Turn down").click());
+        act(() => buttonIn(confirmIn(rowOf("Kavya")), "Turn down").click());
+        await settle();
+        await holdEnds();
+        const row = rowOf("Kavya");
+        expect(row.textContent).toContain("They just paid");
+        expect(row.textContent).not.toContain("Turned down");
+        expect(calls.toast.showError).not.toHaveBeenCalled();
+        expect(calls.toast.showSuccess).toHaveBeenCalledWith(
+            "They just paid",
+            "The booking stands.",
+        );
+    });
+
     it("a refused Turn down puts the row back and says why", async () => {
-        calls.cancelBooking.mockResolvedValue({
+        calls.turnDownBooking.mockResolvedValue({
             ok: false,
             error: "This booking has already started.",
         });

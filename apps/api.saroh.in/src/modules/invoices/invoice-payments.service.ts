@@ -7,9 +7,14 @@ import {
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { AuditAction } from "../audit/audit.service";
 import { authorize } from "../organizations/organization-policy";
+import {
+    autopayChargeInProgress,
+    chargeUnderWayOn,
+} from "../payments/charge-under-way";
 import {
     assertLedgerPaper,
     ledgerLeftCents,
@@ -34,12 +39,6 @@ import { toCents } from "./totals";
 
 type Tx = Prisma.TransactionClient;
 
-/**
- * A repeat of the same record within this long answers as the first did
- * (the desk-take rule), so a double tap can't record a payment twice.
- */
-export const REPEAT_WINDOW_MS = 10 * 60 * 1000;
-
 /** How far ahead a date may be, for a phone a time zone ahead of the API. */
 const FUTURE_SLACK_MS = 24 * 60 * 60 * 1000;
 
@@ -49,9 +48,13 @@ export const DEFAULT_REMOVE_REASON = "Recorded by mistake";
 /** The invoice after a payment was recorded, and which payment it was. */
 export type RecordedPaymentView = InvoiceViewModel & {
     recorded: {
-        /** The payment written, or the one a repeat matched: what Undo removes. */
+        /** The payment written, or the one a retry matched: what Undo removes. */
         paymentId: string;
-        /** A repeat of a record made moments ago: nothing new was written. */
+        /**
+         * A retry of a record already made (the same idempotency key):
+         * nothing new was written. The app says "Already recorded" and
+         * offers no Undo.
+         */
         replayed: boolean;
     };
 };
@@ -78,7 +81,11 @@ const PAYMENT_SELECT = {
     receivedAt: true,
     bankStatus: true,
     removedAt: true,
+    clearedAt: true,
 } as const;
+
+/** Words for a cheque that is in the bank, or was, when asked to bounce. */
+export const CHEQUE_ALREADY_BOUNCED = "This cheque already bounced.";
 
 /**
  * Payments on an invoice, recorded by hand (DEC-173, U2 #1114): part
@@ -124,35 +131,56 @@ export class InvoicePaymentsService {
             dto.receivedAt ? "receivedAt" : "paidAt",
         );
         const actor = actorOf(ctx);
+        const key = dto.idempotencyKey ?? null;
 
-        const recorded = await prisma.$transaction(async (tx) => {
-            const invoice = await lockInvoiceForLedgerOr404(
-                tx,
-                ctx.organizationId,
-                invoiceId,
-            );
-            assertLedgerPaper(invoice);
-            const again = await this.repeatOf(tx, invoice.id, {
-                method: dto.method,
-                reference: dto.reference ?? null,
-                chequeNumber: cheque ? (dto.chequeNumber ?? null) : null,
-                amountCents,
-                nothingLeft: ledgerLeftCents(invoice) === 0,
-                now,
+        let recorded: { paymentId: string; replayed: boolean };
+        try {
+            recorded = await prisma.$transaction(async (tx) => {
+                const invoice = await lockInvoiceForLedgerOr404(
+                    tx,
+                    ctx.organizationId,
+                    invoiceId,
+                );
+                assertLedgerPaper(invoice);
+                // A retry of this very record (the sheet's key, one per
+                // opening) answers with what it wrote. Two real payments
+                // of the same amount carry two keys, and both count.
+                if (key) {
+                    const again = await keyedPayment(tx, invoice.id, key);
+                    if (again) return { paymentId: again, replayed: true };
+                }
+                // One charge at a time (D13): Pay, Remind and the desk wait
+                // while autopay is charging this invoice, and so does this.
+                if (
+                    await chargeUnderWayOn(tx, ctx.organizationId, invoice.id)
+                ) {
+                    throw autopayChargeInProgress();
+                }
+                const { paymentId } = await recordLedgerPaymentInTx(
+                    tx,
+                    invoice,
+                    {
+                        amountCents: amountCents ?? ledgerLeftCents(invoice),
+                        method: dto.method,
+                        reference: dto.reference,
+                        note: dto.note,
+                        receivedAt,
+                        chequeNumber: dto.chequeNumber,
+                        chequeBank: dto.chequeBank,
+                        idempotencyKey: key,
+                        actor,
+                    },
+                );
+                return { paymentId, replayed: false };
             });
-            if (again) return { paymentId: again, replayed: true };
-            const { paymentId } = await recordLedgerPaymentInTx(tx, invoice, {
-                amountCents: amountCents ?? ledgerLeftCents(invoice),
-                method: dto.method,
-                reference: dto.reference,
-                note: dto.note,
-                receivedAt,
-                chequeNumber: dto.chequeNumber,
-                chequeBank: dto.chequeBank,
-                actor,
-            });
-            return { paymentId, replayed: false };
-        });
+        } catch (err) {
+            // Two of the same retry raced past the lookup: the unique index
+            // kept one, and this answers with it.
+            if (!key || prismaErrorCode(err) !== "P2002") throw err;
+            const again = await keyedPayment(prisma, invoiceId, key);
+            if (!again) throw err;
+            recorded = { paymentId: again, replayed: true };
+        }
         return {
             ...(await this.read(ctx.organizationId, invoiceId)),
             recorded,
@@ -223,6 +251,9 @@ export class InvoicePaymentsService {
                 invoiceId,
             );
             const payment = await this.waitingCheque(tx, invoice, paymentId);
+            // A credited or void invoice's payments stand as they were: no
+            // cheque goes into the bank on it, and no "paid" receipt goes.
+            this.assertMoneyCanMove(invoice.status);
             if (clearedAt < payment.receivedAt) {
                 fieldError(
                     "A cheque goes into the bank after it is received.",
@@ -244,8 +275,11 @@ export class InvoicePaymentsService {
     }
 
     /**
-     * A waiting cheque marked as bounced: it leaves the live sum, so what
-     * it paid is owed again (and overdue once past due). No bounce charge.
+     * A cheque marked as bounced: it leaves the live sum, so what it paid is
+     * owed again (and overdue once past due). No bounce charge. A cheque
+     * already marked as in the bank can bounce too: banks return cheques
+     * days later. It keeps its `clearedAt`, so its history and the pay page
+     * say it was returned after it was banked.
      */
     async bounced(
         ctx: OrganizationContext,
@@ -261,11 +295,17 @@ export class InvoicePaymentsService {
                 ctx.organizationId,
                 invoiceId,
             );
-            const payment = await this.waitingCheque(tx, invoice, paymentId);
+            const payment = await this.livingCheque(tx, invoice, paymentId);
             this.assertMoneyCanMove(invoice.status);
             if (bouncedAt < payment.receivedAt) {
                 fieldError(
                     "A cheque bounces after it is received.",
+                    "bouncedAt",
+                );
+            }
+            if (payment.clearedAt && bouncedAt < payment.clearedAt) {
+                fieldError(
+                    "A cheque in the bank comes back after it went in.",
                     "bouncedAt",
                 );
             }
@@ -288,46 +328,6 @@ export class InvoicePaymentsService {
     }
 
     // — internals —————————————————————————————————————————————————
-
-    /**
-     * The payment a repeat of this record matches, if any: not removed,
-     * written within the window, by the same method with the same reference
-     * (and cheque number), for the same amount. With no amount sent ("what
-     * is left"), it matches only once nothing is left: the first tap paid
-     * it, and the second would otherwise be refused as already paid.
-     */
-    private async repeatOf(
-        tx: Tx,
-        invoiceId: string,
-        r: {
-            method: string;
-            reference: string | null;
-            chequeNumber: string | null;
-            amountCents: number | undefined;
-            nothingLeft: boolean;
-            now: Date;
-        },
-    ): Promise<string | null> {
-        if (r.amountCents === undefined && !r.nothingLeft) return null;
-        const last = await tx.invoicePayment.findFirst({
-            where: {
-                invoiceId,
-                removedAt: null,
-                method: r.method,
-                reference: r.reference,
-                chequeNumber: r.chequeNumber,
-                createdAt: {
-                    gte: new Date(r.now.getTime() - REPEAT_WINDOW_MS),
-                },
-                ...(r.amountCents !== undefined
-                    ? { amountCents: r.amountCents }
-                    : {}),
-            },
-            orderBy: { createdAt: "desc" },
-            select: { id: true },
-        });
-        return last?.id ?? null;
-    }
 
     /** One payment on this invoice; another invoice's (or business's) is a 404. */
     private async payment(
@@ -353,6 +353,22 @@ export class InvoicePaymentsService {
         invoice: { id: string; organizationId: string },
         paymentId: string,
     ) {
+        const payment = await this.livingCheque(tx, invoice, paymentId);
+        if (payment.bankStatus === "CLEARED") {
+            throw new ConflictException("This cheque is already in the bank.");
+        }
+        return payment;
+    }
+
+    /**
+     * A cheque, not removed and not bounced, or the reason it isn't one.
+     * Waiting or in the bank, it can still come back unpaid.
+     */
+    private async livingCheque(
+        tx: Tx,
+        invoice: { id: string; organizationId: string },
+        paymentId: string,
+    ) {
         const payment = await this.payment(tx, invoice, paymentId);
         if (payment.method !== CHEQUE_PAYMENT_METHOD) {
             throw new ConflictException("Only a cheque goes to the bank.");
@@ -360,11 +376,8 @@ export class InvoicePaymentsService {
         if (payment.removedAt) {
             throw new ConflictException("This payment was removed.");
         }
-        if (payment.bankStatus === "CLEARED") {
-            throw new ConflictException("This cheque is already in the bank.");
-        }
         if (payment.bankStatus === "BOUNCED") {
-            throw new ConflictException("This cheque already bounced.");
+            throw new ConflictException(CHEQUE_ALREADY_BOUNCED);
         }
         return payment;
     }
@@ -393,6 +406,19 @@ export class InvoicePaymentsService {
         if (!row) throw new NotFoundException("Invoice not found");
         return serializeInvoice(row, new Date(), { detail: true });
     }
+}
+
+/** The payment this invoice already has under this key, if any. */
+async function keyedPayment(
+    db: Pick<Tx, "invoicePayment">,
+    invoiceId: string,
+    idempotencyKey: string,
+): Promise<string | null> {
+    const row = await db.invoicePayment.findUnique({
+        where: { invoiceId_idempotencyKey: { invoiceId, idempotencyKey } },
+        select: { id: true },
+    });
+    return row?.id ?? null;
 }
 
 function actorOf(ctx: OrganizationContext): LedgerActor {

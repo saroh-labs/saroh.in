@@ -6960,8 +6960,16 @@ model InvoicePayment {
   // forever when there was no email provider or the payment was removed.
   receiptMessageId String?
 
+  // The Record payment sheet's key, one per opening (#6 review, 20 Oct): a
+  // retry of the same record answers with this row instead of writing a
+  // second, while two real payments of the same amount both count. Null
+  // for every other writer (the webhook, the desk, a backfill, Undo's put
+  // back).
+  idempotencyKey String?
+
   createdAt DateTime @default(now())
 
+  @@unique([invoiceId, idempotencyKey])
   @@index([invoiceId])
   @@index([organizationId, receivedAt])
   @@index([organizationId, bankStatus])

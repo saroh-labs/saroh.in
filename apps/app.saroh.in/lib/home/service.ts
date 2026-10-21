@@ -310,12 +310,37 @@ const EMPTY: HomeModel = {
 };
 
 /**
- * Home's read model, once per request (H-4). The app shell reads it on every
- * page for the rail's badges, and Home's page reads it again for itself;
- * `cache()` makes the two one `GET /home` in the same render. A failed read
- * is cached as the rejection, which each caller handles as it did.
+ * Home's read model, once per request (H-4), for Home's own page. A failed
+ * read is cached as the rejection, which the page handles.
  */
 export const getHome = cache(readHome);
+
+/**
+ * The rail's badges (review #16): the ranked actions alone, which is all
+ * the shell counts. The shell reads this on every page, hard load and
+ * refresh, so it asks `GET /home?parts=rail`, which skips everything only
+ * Home's page draws, rather than the whole of Home. Once per request.
+ */
+export interface HomeRail {
+    actions: HomeAction[];
+    unavailable: HomeUnavailable[];
+}
+
+export const getHomeRail = cache(readHomeRail);
+
+async function readHomeRail(): Promise<HomeRail> {
+    const base = await orgBase();
+    if (!base) return { actions: [], unavailable: [] };
+    const res = await apiFetch(`${base}/home?parts=rail`);
+    if (!res.ok) {
+        throw new Error(`GET home rail failed: ${res.status}`);
+    }
+    const read = (await res.json()) as Partial<HomeRail>;
+    return {
+        actions: Array.isArray(read.actions) ? read.actions : [],
+        unavailable: Array.isArray(read.unavailable) ? read.unavailable : [],
+    };
+}
 
 async function readHome(projectId?: string): Promise<HomeModel> {
     const base = await orgBase();

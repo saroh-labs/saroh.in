@@ -144,20 +144,6 @@ export const NOT_A_BOOKING_HOLD = {
 } satisfies Prisma.InvoiceWhereInput;
 
 /**
- * Invoices paid from `since` on, credit notes never — the money Home's
- * "Last 24 hours" adds up, and what the list's `?paidSince=` shows. An
- * order's own invoice is stamped paid with the order (ADR-008), and every
- * order has one, so the invoices alone count each rupee once.
- */
-export function paidSinceFilter(since: Date) {
-    return {
-        paidAt: { gte: since },
-        kind: { not: "CREDIT_NOTE" },
-        ...NOT_A_BOOKING_HOLD,
-    } satisfies Prisma.InvoiceWhereInput;
-}
-
-/**
  * The where for money handed back in `[from, to)`: a credit note issued
  * then, on an order (a refund, or an edit down that gave money back — the
  * calendar's takings read them the same) or made by a refund of an
@@ -221,13 +207,19 @@ export const LIVE_PAYMENT_WHERE = {
     OR: [{ bankStatus: null }, { bankStatus: { not: "BOUNCED" } }],
 } satisfies Prisma.InvoicePaymentWhereInput;
 
+/** The invoices whose money still moves: a cheque on any other stands. */
+const MONEY_MOVES_STATUSES = ["ISSUED", "PAID"];
+
 /**
- * A cheque received and not in the bank yet (DEC-173): waiting, and not
- * removed. "Cheques not in the bank" on the list and on Home counts these.
+ * A cheque received and not in the bank yet (DEC-173): waiting, not
+ * removed, on an invoice whose money still moves (ISSUED or PAID). A
+ * credited or void invoice's cheque stands as it was and can't be marked,
+ * so "Cheques not in the bank" on the list and on Home leaves it out (#5).
  */
 export const WAITING_CHEQUE_WHERE = {
     removedAt: null,
     bankStatus: "WAITING",
+    invoice: { status: { in: MONEY_MOVES_STATUSES } },
 } satisfies Prisma.InvoicePaymentWhereInput;
 
 /**
@@ -263,7 +255,11 @@ export function viewWhere(
         case "owed":
             return { ...OWED_VIEW_WHERE };
         case "cheques":
-            return { payments: { some: WAITING_CHEQUE_WHERE } };
+            // As `WAITING_CHEQUE_WHERE`, read from the invoice's side.
+            return {
+                status: { in: MONEY_MOVES_STATUSES },
+                payments: { some: { removedAt: null, bankStatus: "WAITING" } },
+            };
     }
 }
 

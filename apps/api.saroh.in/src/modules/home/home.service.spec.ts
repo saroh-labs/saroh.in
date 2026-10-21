@@ -941,6 +941,156 @@ describe("HomeService: Home A (DEC-171)", () => {
         });
     });
 
+    describe("reads shared within one build (review #16)", () => {
+        type Args = { where?: Record<string, unknown>; select?: object };
+        function invoiceReads(service: HomeService) {
+            const db = (
+                service as unknown as {
+                    db: Record<string, Record<string, jest.Mock>>;
+                }
+            ).db;
+            return () =>
+                db.invoice.findMany.mock.calls.map((c) => c[0] as Args);
+        }
+
+        it("reads the unpaid bills once for This week and How it's going", async () => {
+            const service = build(VIEWS);
+            const calls = invoiceReads(service);
+            const home = await service.build(INPUT);
+            // Both figures came, from the one read.
+            expect(home.week).not.toBeNull();
+            expect(home.going).not.toBeNull();
+            const unpaidReads = calls().filter(
+                (a) =>
+                    a.select !== undefined &&
+                    Object.keys(a.select).sort().join() ===
+                        "currency,dueAt,paidCents,status,total",
+            );
+            expect(unpaidReads).toHaveLength(1);
+        });
+
+        it("works the overdue bills' where out once for the row and Remind all", async () => {
+            const service = build(VIEWS);
+            const db = (
+                service as unknown as {
+                    db: Record<string, Record<string, jest.Mock>>;
+                }
+            ).db;
+            db.invoice.count.mockResolvedValue(1);
+            db.invoice.findMany.mockImplementation((args: Args) =>
+                Promise.resolve(
+                    args.where?.status === "ISSUED" && args.where.dueAt
+                        ? [
+                              {
+                                  id: "inv_1",
+                                  number: "RC/0056",
+                                  status: "ISSUED",
+                                  total: "1800.00",
+                                  paidCents: 0,
+                                  currency: "INR",
+                                  dueAt: new Date("2026-09-22T00:00:00.000Z"),
+                                  billToName: "Arjun Mehta",
+                                  subscriptionId: null,
+                                  contact: null,
+                                  lines: [],
+                              },
+                          ]
+                        : [],
+                ),
+            );
+            db.message = { findMany: jest.fn().mockResolvedValue([]) };
+            db.customerThreadMessage = {
+                findMany: jest.fn().mockResolvedValue([]),
+            };
+            db.invoiceShare = { findMany: jest.fn().mockResolvedValue([]) };
+            const home = await service.build(INPUT);
+            const bills = home.needGroups?.find((g) => g.kind === "BILLS");
+            expect(bills?.remind?.invoiceIds).toEqual(["inv_1"]);
+            // `overdueBillsWhere`'s own read: the live subscriptions' bills.
+            const whereReads = invoiceReads(service)().filter(
+                (a) =>
+                    a.select !== undefined &&
+                    Object.keys(a.select).sort().join() === "id,subscriptionId",
+            );
+            expect(whereReads).toHaveLength(1);
+        });
+    });
+
+    describe("the rail's read (review #16)", () => {
+        it("sends the ranked actions alone, as the full build ranks them", async () => {
+            const service = build(VIEWS, { orders: [OPEN_ORDER] });
+            const rail = await service.rail(INPUT);
+            const home = await build(VIEWS, { orders: [OPEN_ORDER] }).build(
+                INPUT,
+            );
+            expect(Object.keys(rail).sort()).toEqual([
+                "actions",
+                "unavailable",
+            ]);
+            expect(
+                rail.actions.map((a) => [a.code, a.severity, a.count]),
+            ).toEqual(home.actions.map((a) => [a.code, a.severity, a.count]));
+            expect(rail.actions.map((a) => a.code)).toContain(
+                "COMMERCE_OPEN_ORDERS",
+            );
+            // A source that failed is named as the full build names it.
+            expect(home.unavailable).toEqual(
+                expect.arrayContaining(rail.unavailable),
+            );
+        });
+
+        it("asks none of the sources only Home's page draws", async () => {
+            const service = build(VIEWS, { orders: [OPEN_ORDER] });
+            const db = (
+                service as unknown as {
+                    db: Record<string, Record<string, jest.Mock>>;
+                }
+            ).db;
+            await service.rail(INPUT);
+            // The schedule, Today, This week, How it's going and bookings
+            // awaiting payment all read bookings; the rail reads none.
+            expect(db.booking.count).not.toHaveBeenCalled();
+            expect(db.booking.findMany).not.toHaveBeenCalled();
+            // Nor the unpaid bills This week and How it's going fold.
+            const unpaidReads = db.invoice.findMany.mock.calls.filter(
+                ([a]) =>
+                    (a as { select?: object }).select !== undefined &&
+                    Object.keys((a as { select: object }).select)
+                        .sort()
+                        .join() === "currency,dueAt,paidCents,status,total",
+            );
+            expect(unpaidReads).toHaveLength(0);
+        });
+
+        it("names a failed action source, as the full build does", async () => {
+            const service = build(VIEWS, { orders: [OPEN_ORDER] });
+            const db = (
+                service as unknown as {
+                    db: Record<string, Record<string, jest.Mock>>;
+                }
+            ).db;
+            db.order.count.mockRejectedValue(new Error("down"));
+            db.order.findMany.mockRejectedValue(new Error("down"));
+            const rail = await service.rail(INPUT);
+            expect(rail.unavailable).toContainEqual({
+                moduleKey: "COMMERCE",
+                label: "Open orders",
+            });
+            expect(rail.actions.map((a) => a.code)).not.toContain(
+                "COMMERCE_OPEN_ORDERS",
+            );
+        });
+
+        it("reads nothing for a Reviewer", async () => {
+            const service = build(VIEWS);
+            const rail = await service.rail({
+                ...INPUT,
+                organizationRole: "REVIEWER",
+            });
+            expect(rail).toEqual({ actions: [], unavailable: [] });
+        });
+    });
+
     it("sends no To pack tile when the open orders read failed", async () => {
         const service = build(VIEWS, { orders: [OPEN_ORDER] });
         const db = (

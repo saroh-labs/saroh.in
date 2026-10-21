@@ -535,7 +535,9 @@ export async function checkShowcase(
     );
     // The ledger's rows are ones the API writes (DEC-173, #1129): a cheque
     // has its number and a bank status, WAITING until it cleared or
-    // bounced; nothing else has either. Every amount is above 0.
+    // bounced (a bounced cheque may keep the day it went in: banks return
+    // cheques after they were banked); nothing else has either. Every
+    // amount is above 0.
     fail(
         "invoice payments whose cheque fields don't fit",
         await prisma.$queryRaw<Row[]>`
@@ -545,7 +547,8 @@ export async function checkShowcase(
                 CASE WHEN p.method = 'CHEQUE' THEN
                     p."chequeNumber" IS NOT NULL
                     AND p."bankStatus" IN ('WAITING', 'CLEARED', 'BOUNCED')
-                    AND (p."bankStatus" = 'CLEARED') = (p."clearedAt" IS NOT NULL)
+                    AND (p."bankStatus" <> 'CLEARED' OR p."clearedAt" IS NOT NULL)
+                    AND (p."clearedAt" IS NULL OR p."bankStatus" IN ('CLEARED', 'BOUNCED'))
                     AND (p."bankStatus" = 'BOUNCED') = (p."bouncedAt" IS NOT NULL)
                     AND COALESCE(p."clearedAt", p."bouncedAt", p."receivedAt") >= p."receivedAt"
                 ELSE p."bankStatus" IS NULL AND p."chequeNumber" IS NULL

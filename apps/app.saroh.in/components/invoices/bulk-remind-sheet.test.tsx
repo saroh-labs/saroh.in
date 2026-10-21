@@ -393,6 +393,96 @@ describe("step 2: how each one goes", () => {
     });
 });
 
+describe("step 2's read: only the newest pick lands (review #12)", () => {
+    function later() {
+        let answer: (v: unknown) => void = () => undefined;
+        const promise = new Promise((resolve) => {
+            answer = resolve;
+        });
+        return { promise, answer: (v: unknown) => answer(v) };
+    }
+
+    const forIds = (ids: string[]): ReminderPreview => ({
+        message: null,
+        invoices: ids.map((id) =>
+            reply({
+                invoiceId: id,
+                name: `Person ${id}`,
+                email: `${id}@example.com`,
+            }),
+        ),
+    });
+
+    it("Next, Back, untick, Next: the older preview landing last is dropped", async () => {
+        draw();
+        const first = later();
+        calls.previewReminders.mockReturnValueOnce(first.promise);
+        act(() => button("Next: how each one goes").click());
+        await settle();
+        act(() => button("Back").click());
+        const boxes = page().querySelectorAll<HTMLButtonElement>(
+            '[data-remind-pick] button[role="checkbox"]',
+        );
+        act(() => boxes[0].click());
+
+        calls.previewReminders.mockResolvedValueOnce({
+            ok: true,
+            data: forIds(["0135", "0136"]),
+        });
+        act(() => button("Next: how each one goes").click());
+        await settle();
+        expect(group("email")).toEqual(["Person 0135", "Person 0136"]);
+
+        // The first pick's preview, with Vivek on it, answers now.
+        first.answer({ ok: true, data: forIds(["0106", "0135", "0136"]) });
+        await settle();
+        expect(group("email")).toEqual(["Person 0135", "Person 0136"]);
+        expect(hasButton("Send 2 emails")).toBe(true);
+
+        // And Send sends the newer pick, never the old list.
+        calls.sendReminders.mockResolvedValue({
+            ok: true,
+            data: EMAILED(["0135", "0136"]),
+        });
+        act(() => button("Send 2 emails").click());
+        await settle();
+        await holdEnds();
+        expect(calls.sendReminders).toHaveBeenCalledWith({
+            invoiceIds: ["0135", "0136"],
+        });
+    });
+
+    it("a read from before a close and reopen answers to nobody", async () => {
+        draw();
+        const first = later();
+        calls.previewReminders.mockReturnValueOnce(first.promise);
+        act(() => button("Next: how each one goes").click());
+        await settle();
+        act(() => button("Not now").click());
+        await settle();
+        act(() => button("reopen").click());
+        await settle();
+        expect(step()).toBe("pick");
+        const boxes = page().querySelectorAll<HTMLButtonElement>(
+            '[data-remind-pick] button[role="checkbox"]',
+        );
+        act(() => boxes[0].click());
+        const second = later();
+        calls.previewReminders.mockReturnValueOnce(second.promise);
+        act(() => button("Next: how each one goes").click());
+        await settle();
+
+        // The first opening's read answers while the second is still out.
+        first.answer({ ok: true, data: forIds(["0106", "0135", "0136"]) });
+        await settle();
+        expect(group("email")).toEqual([]);
+
+        second.answer({ ok: true, data: forIds(["0135", "0136"]) });
+        await settle();
+        expect(group("email")).toEqual(["Person 0135", "Person 0136"]);
+    });
+});
+
 describe("step 3: send", () => {
     it("holds the emails ten seconds, walks WhatsApp, and ends with the tally", async () => {
         draw();

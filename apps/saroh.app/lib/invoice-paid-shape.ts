@@ -23,6 +23,8 @@ export interface PayPayment {
         number: string | null;
         bank: string | null;
         status: PayBankStatus;
+        /** Bounced after it was marked as in the bank; false when not said. */
+        returnedAfterBanking?: boolean;
     } | null;
 }
 
@@ -66,6 +68,9 @@ export function payPaymentsOf(v: unknown): PayPayment[] {
                       number: shortTextOf(c.number),
                       bank: shortTextOf(c.bank),
                       status: c.status as PayBankStatus,
+                      returnedAfterBanking:
+                          c.status === "BOUNCED" &&
+                          c.returnedAfterBanking === true,
                   }
                 : null;
         // A cheque without its status can't be said truthfully.

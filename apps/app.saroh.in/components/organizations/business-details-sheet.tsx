@@ -41,6 +41,7 @@ import {
 import {
     readBusinessDetails,
     saveOrganizationSettings,
+    saveOrganizationSettingsInPlace,
 } from "@/lib/organizations/settings-actions";
 
 const FIELDS = [
@@ -83,6 +84,7 @@ export function BusinessDetailsSheet({
     then,
     continueLabel,
     onDone,
+    inPlace = false,
 }: {
     /** What is on file; the sheet is open while there is something. */
     onFile: DetailsOnFile | null;
@@ -93,6 +95,11 @@ export function BusinessDetailsSheet({
     continueLabel: string;
     /** Saved (carry on), or closed without saving. */
     onDone: (saved: boolean) => void;
+    /**
+     * Saved from a screen that must stay drawn (the invoice editor): the
+     * save revalidates nothing (review #15).
+     */
+    inPlace?: boolean;
 }) {
     // A role that can't read the settings can't read the kind either: it
     // reads in a business's words.
@@ -109,6 +116,7 @@ export function BusinessDetailsSheet({
                     onFile={onFile}
                     continueLabel={continueLabel}
                     onDone={onDone}
+                    inPlace={inPlace}
                 />
             ) : null}
         </FormSheet>
@@ -123,10 +131,12 @@ function DetailsBody({
     onFile,
     continueLabel,
     onDone,
+    inPlace,
 }: {
     onFile: DetailsOnFile;
     continueLabel: string;
     onDone: (saved: boolean) => void;
+    inPlace: boolean;
 }) {
     if (onFile.state === "ready") {
         return (
@@ -135,6 +145,7 @@ function DetailsBody({
                 inIndia={onFile.inIndia}
                 continueLabel={continueLabel}
                 onDone={onDone}
+                inPlace={inPlace}
             />
         );
     }
@@ -157,11 +168,13 @@ function DetailsForm({
     inIndia: indian,
     continueLabel,
     onDone,
+    inPlace,
 }: {
     initial: BusinessDetailsValues;
     inIndia: boolean;
     continueLabel: string;
     onDone: (saved: boolean) => void;
+    inPlace: boolean;
 }) {
     const [refusal, setRefusal] = useState<string | null>(null);
     const schema = z
@@ -191,9 +204,10 @@ function DetailsForm({
 
     async function onSubmit(values: BusinessDetailsValues) {
         setRefusal(null);
-        const res = await saveOrganizationSettings(
-            detailsInput(values, initial),
-        );
+        const save = inPlace
+            ? saveOrganizationSettingsInPlace
+            : saveOrganizationSettings;
+        const res = await save(detailsInput(values, initial));
         if (!res.ok) {
             const field = FIELDS.find((f) => f === res.field);
             if (field) {

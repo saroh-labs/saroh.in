@@ -162,6 +162,24 @@ export class CreditInvoiceDto {
     @MinLength(1, { message: "Say why it is being cancelled" })
     @MaxLength(500)
     reason!: string;
+
+    /**
+     * What the merchant saw when they opened Cancel (#2 review): its status
+     * and what had been paid. Checked again under the ledger's lock, so an
+     * invoice paid meanwhile (a pay-link webhook) is never credited, or
+     * written again, on a stale screen. Left out, the API's own read just
+     * before is used.
+     */
+    @IsOptional()
+    @IsIn(["ISSUED", "OVERDUE", "PAID"])
+    expectStatus?: "ISSUED" | "OVERDUE" | "PAID";
+
+    /** Paid so far, as the screen showed it ("0.00"). */
+    @IsOptional()
+    @Matches(/^\d{1,10}(\.\d{1,2})?$/, {
+        message: "An amount has at most two decimal places",
+    })
+    expectPaidSoFar?: string;
 }
 
 export class VoidInvoiceDto {

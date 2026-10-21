@@ -161,6 +161,55 @@ describe("historyLines", () => {
         );
     });
 
+    it("offers Bounced on a cheque in the bank, and says when one came back after it was banked (#7)", () => {
+        const banked = payment({
+            amount: "8400.00",
+            method: "CHEQUE",
+            cheque: { number: "004512", bank: "HDFC Bank" },
+            bankStatus: "CLEARED",
+            clearedAt: at(-3),
+        });
+        const inBank = historyLines(
+            invoice({ standing: "PAID", payments: [banked] }),
+        );
+        expect(inBank.find((l) => l.bounceable)?.bounceable).toBe(banked);
+        expect(inBank.map((l) => l.what)).toContain(
+            "Cheque 004512 is in the bank",
+        );
+
+        const returned = historyLines(
+            invoice({
+                payments: [
+                    {
+                        ...banked,
+                        bankStatus: "BOUNCED",
+                        bouncedAt: at(-1),
+                        canRemove: false,
+                    },
+                ],
+            }),
+        );
+        expect(returned[0]).toMatchObject({
+            what: "Cheque 004512 bounced after it was banked · ₹8,400 owed again",
+            tone: "bad",
+        });
+        expect(returned.map((l) => l.what)).toContain(
+            "Cheque 004512 went in the bank",
+        );
+        // Bounced already: neither Bounced nor Remove is offered again (#10).
+        expect(returned.some((l) => l.bounceable ?? l.removable)).toBe(false);
+
+        // A waiting cheque bounces from the money card, not the history.
+        const waiting = historyLines(
+            invoice({
+                payments: [
+                    { ...banked, bankStatus: "WAITING", clearedAt: null },
+                ],
+            }),
+        );
+        expect(waiting.some((l) => l.bounceable)).toBe(false);
+    });
+
     it("lists shares by hand, never as sent on WhatsApp", () => {
         const lines = historyLines(
             invoice({

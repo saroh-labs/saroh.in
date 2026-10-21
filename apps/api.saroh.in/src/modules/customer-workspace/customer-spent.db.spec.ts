@@ -7,6 +7,8 @@
 import { ConflictException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { onTheLedger } from "../../../test/ledger-paid";
+
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { CustomerAddService } from "./customer-add.service";
@@ -106,24 +108,29 @@ async function invoice(
         source?: string;
     },
 ) {
+    // Paid on its ledger (DEC-173): Spent reads the money-in rule.
     return (
-        await prisma.invoice.create({
-            data: {
-                organizationId,
-                contactId: data.contactId,
-                orderId: data.orderId,
-                relatedInvoiceId: data.relatedInvoiceId,
-                kind: data.kind ?? "INVOICE",
-                status: data.status ?? "PAID",
-                source: data.source ?? "MANUAL",
-                number: `INV-${next()}`,
-                currency: "INR",
-                subtotal: data.total,
-                total: data.total,
-                paidAt:
-                    data.status === "PAID" || !data.status ? new Date() : null,
-            },
-        })
+        await onTheLedger(
+            await prisma.invoice.create({
+                data: {
+                    organizationId,
+                    contactId: data.contactId,
+                    orderId: data.orderId,
+                    relatedInvoiceId: data.relatedInvoiceId,
+                    kind: data.kind ?? "INVOICE",
+                    status: data.status ?? "PAID",
+                    source: data.source ?? "MANUAL",
+                    number: `INV-${next()}`,
+                    currency: "INR",
+                    subtotal: data.total,
+                    total: data.total,
+                    paidAt:
+                        data.status === "PAID" || !data.status
+                            ? new Date()
+                            : null,
+                },
+            }),
+        )
     ).id;
 }
 
