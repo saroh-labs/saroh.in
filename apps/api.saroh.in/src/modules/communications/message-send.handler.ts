@@ -3,6 +3,7 @@ import type { Job, Message } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { isKeysRefused } from "../../common/providers/provider-attention";
+import { recordInvoiceSendFailed } from "../invoices/invoice-events";
 import { IssuedInvoicePdf } from "../invoices/issued-invoice-pdf";
 import type { EncryptedSecret } from "../payments/crypto";
 import { decryptSecret } from "../payments/crypto";
@@ -229,7 +230,14 @@ export class MessageSendHandler {
             // Adapter errors are already sanitized (HTTP status only). Record
             // the failure, then re-throw so the worker retries with backoff.
             const reason = err instanceof Error ? err.message : "send failed";
-            await this.recordFailure(delivery.id, message.id, reason);
+            // Only the last attempt is a failed send on an invoice's
+            // history: an earlier one may yet go.
+            await this.recordFailure(
+                delivery.id,
+                message.id,
+                reason,
+                job.attempts + 1 >= job.maxAttempts,
+            );
             // The provider refused the keys: the connection needs attention
             // and the team hears of it once (UX-012).
             if (isKeysRefused(err)) await this.flag(providerRow);
@@ -323,6 +331,9 @@ export class MessageSendHandler {
         deliveryId: string,
         messageId: string,
         error: string,
+        // Nothing will try it again (U9 #1140): an invoice's email is
+        // then a failed send on its history.
+        final = true,
     ): Promise<void> {
         await prisma.delivery.update({
             where: { id: deliveryId },
@@ -336,6 +347,20 @@ export class MessageSendHandler {
             where: { id: messageId },
             data: { status: "FAILED" },
         });
+        if (final) await this.invoiceSendFailed(messageId);
+    }
+
+    /** An invoice email failed for good: told on its history, never thrown. */
+    private async invoiceSendFailed(messageId: string): Promise<void> {
+        try {
+            await recordInvoiceSendFailed(messageId);
+        } catch (err) {
+            this.logger.warn(
+                `message.send: message ${messageId}'s failed send couldn't be written on its invoice (${
+                    err instanceof Error ? err.message : "unknown"
+                })`,
+            );
+        }
     }
 
     /** Decrypt the org's sealed credential blob into an in-memory string map. */

@@ -381,6 +381,46 @@ invoices/reminders` (`InvoiceRemindersService`, `invoice:write`, at most
   `invoice-reminders.db.spec.ts`, `invoice-receipt.db.spec.ts` and
   `rls/invoice-shares-rls.db.spec.ts`, plain and under `TEST_RLS=on`.
 
+## An invoice's history: who did what — **Current** (automatic notices U9 #1140, DEC-174)
+
+- **`InvoiceEvent`** (`invoices/invoice-events.ts`, migration
+  `20261223140000_invoice_events`): `kind` ISSUED, SENT, REMINDED,
+  AUTO_SENT, AUTO_REMINDED, SEND_FAILED, VOIDED, CREDITED, REISSUED,
+  PAY_ATTEMPT_FAILED, LINK_MADE; `actorKind` USER (with `actorUserId`),
+  JOB (Saroh, on the business's behalf) or CUSTOMER; `channel` EMAIL or
+  THREAD; `messageId`; small `data` (address, reason, credit note, draft;
+  never a token). Its own RLS policy and CHECKs, including "USER exactly
+  when there is a person". `AuditEvent` can't hold it: its actor is
+  required and an automatic send has none.
+- **Written with `recordInvoiceEvent(tx, …)` in the change's own
+  transaction**: `issue` and `issueInTx` (a person, else JOB), `voidInTx`,
+  `creditInTx`, `draftFromInTx` (reissue, credit and rewrite, Write again
+  are REISSUED with the draft), a link made by hand (`createPayLink` /
+  `createViewLink`, now on a transaction; a member's own new link is
+  CUSTOMER), `send` / `remind` (one event per send, with the Message id
+  and SUPPRESSED when the customer turned email off), the webhook's
+  `applyInvoiceFailure` (CUSTOMER, or JOB for autopay). A link a send or a
+  share mints is told by that send or share, not as LINK_MADE.
+- **Automatic sends** pass `{ automatic: true }` to `send` / `remind`
+  (renewals U10, overdue reminders U20): AUTO_SENT / AUTO_REMINDED, actor
+  JOB. Every rule of a send still applies.
+- **A failed send is told once**: the `message.send` handler calls
+  `recordInvoiceSendFailed` only on the last attempt (or a failure it
+  won't retry), for an invoice's own emails; a partial unique index on
+  `(messageId, kind)` keeps a re-run to one line.
+- **Reads.** The detail read carries `events[]` (newest 50, with the
+  person's name now) and `shared[].byName`; the app's `historyLines` draws
+  them (`lib/invoices/event-words.ts`), dates a credit note from its
+  CREDITED event, and skips a `sent[]` email its event already tells.
+  `GET :invoiceId/history` (`invoice:read`) merges events, shares, the
+  ledger's payment audit rows (amounts only with `payment:read`), emails
+  from before events, and the invoice's own dates for what no row
+  records. No backfill (A16): older invoices read their dates without
+  names. In the data export as `invoice-history.csv`.
+- **Tests:** `invoice-events.db.spec.ts`,
+  `rls/invoice-events-rls.db.spec.ts`, plain and under `TEST_RLS=on`;
+  `lib/invoices/details-view.test.ts`; `e2e/tests/invoices-history.spec.ts`.
+
 ## Invoice styles: Classic, Band, Compact, frozen at issue — **Current** (DEC-173, U6 #1118)
 
 - **Three styles in the business's colour.** `PAPER_STYLES` (CLASSIC, BAND,

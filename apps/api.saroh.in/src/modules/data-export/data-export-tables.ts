@@ -42,6 +42,8 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
     // Credit notes are invoices of kind CREDIT_NOTE (`kind` says which).
     { file: "invoices-and-credit-notes.csv", model: "Invoice", where: OWN },
     { file: "invoice-lines.csv", model: "InvoiceLine", where: OWN },
+    // Who issued, sent, reminded, voided or credited each (U9 #1140).
+    { file: "invoice-history.csv", model: "InvoiceEvent", where: OWN },
     { file: "payments.csv", model: "PaymentIntent", where: OWN },
     { file: "refunds.csv", model: "PaymentRefund", where: OWN },
     { file: "bookings.csv", model: "Booking", where: OWN },

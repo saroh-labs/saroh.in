@@ -16,6 +16,11 @@ import {
 import { confirmHoldInTx } from "../bookings/booking-hold";
 import { markBookingPaidInTx } from "../bookings/booking-pay-link";
 import { completePackDraftInTx } from "../class-packs/pack-checkout";
+import {
+    CUSTOMER_ACTOR,
+    JOB_ACTOR,
+    recordInvoiceEvent,
+} from "../invoices/invoice-events";
 import type { OnlinePayment } from "../invoices/invoice-ledger";
 import { recordOnlinePaymentInTx } from "../invoices/invoice-ledger";
 import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
@@ -868,6 +873,15 @@ export class WebhooksService {
     ): Promise<{ applied: boolean }> {
         const result = await this.applyIntentFailure(tx, intent);
         if (result.applied) {
+            // On the invoice's history (U9 #1140): the customer's attempt
+            // on the pay page, or the autopay charge Saroh asked for.
+            await recordInvoiceEvent(tx, {
+                organizationId: intent.organizationId,
+                invoiceId,
+                kind: "PAY_ATTEMPT_FAILED",
+                actor: intent.viaMandateId ? JOB_ACTOR : CUSTOMER_ACTOR,
+                data: { reason, autopay: !!intent.viaMandateId },
+            });
             // A renewal's autopay charge declined (D13): RENEWAL_FAILED,
             // which Home reads as "Payment failed"; the pay link opens again.
             if (intent.viaMandateId) {

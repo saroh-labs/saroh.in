@@ -353,6 +353,7 @@ model Organization {
   invoiceSequences      InvoiceSequence[]
   invoicePayments       InvoicePayment[]
   invoiceShares         InvoiceShare[]
+  invoiceEvents         InvoiceEvent[]
   courses               Course[]
   courseSessions        CourseSession[]
   courseEnrollments     CourseEnrollment[]
@@ -6866,6 +6867,9 @@ model Invoice {
   // or printed. Emails are the Message rows; this is everything else.
   shares InvoiceShare[]
 
+  // Who issued, sent, reminded, voided or credited it, and when (U9 #1140).
+  events InvoiceEvent[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -7006,6 +7010,42 @@ model InvoiceShare {
   createdAt DateTime @default(now())
 
   @@index([invoiceId, createdAt])
+}
+
+/// One thing that happened to an invoice, with who did it (U9 #1140,
+/// DEC-174): issued, sent, reminded, sent or reminded automatically, a send
+/// that failed, voided, credited, written again, a failed pay attempt, a
+/// new link. Written in the change's own transaction. Payments are the
+/// ledger's audit rows and hand shares are `InvoiceShare`; the history
+/// read merges them, so nothing is written twice. Older invoices have no
+/// rows: their history comes from their own dates.
+model InvoiceEvent {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoiceId      String
+  invoice        Invoice      @relation(fields: [invoiceId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // ISSUED | SENT | REMINDED | AUTO_SENT | AUTO_REMINDED | SEND_FAILED |
+  // VOIDED | CREDITED | REISSUED | PAY_ATTEMPT_FAILED | LINK_MADE
+  kind        String
+  // USER (a person; `actorUserId`) | JOB (Saroh, on the business's
+  // behalf) | CUSTOMER (on the pay page)
+  actorKind   String
+  // Not a foreign key: someone who leaves keeps their lines.
+  actorUserId String?
+  // EMAIL | THREAD, for a send.
+  channel     String?
+  // The email it was, for a send or a failed one.
+  messageId   String?
+  // Small context: the address, a reason, a credit note's id. Never a
+  // token, and no amounts beyond what the invoice already shows.
+  data        Json?
+  createdAt   DateTime @default(now())
+
+  @@index([invoiceId, createdAt])
+  // A failed send is told once per email, however often its job retries.
+  @@unique([messageId, kind], map: "InvoiceEvent_message_kind_key", where: raw("\"messageId\" IS NOT NULL"))
 }
 
 model InvoiceLine {

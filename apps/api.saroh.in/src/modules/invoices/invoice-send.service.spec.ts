@@ -43,6 +43,12 @@ jest.mock("@saroh/database", () => {
         },
         // DEC-173: a WhatsApp reminder counts towards one a day.
         invoiceShare: { findFirst: jest.fn(), findMany: jest.fn() },
+        // The invoice's history (U9 #1140): sends write it, the read reads it.
+        invoiceEvent: {
+            createMany: jest.fn(),
+            findMany: jest.fn().mockResolvedValue([]),
+        },
+        user: { findMany: jest.fn().mockResolvedValue([]) },
         merchantPaymentProvider: { findFirst: jest.fn() },
         // DEC-070: Payments on or off decides a pay link or a view link.
         organizationModule: { findFirst: jest.fn() },

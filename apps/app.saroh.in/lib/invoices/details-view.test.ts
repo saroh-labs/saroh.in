@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { historyLines, neighbours, nextLabel, nextStep } from "./details-view";
-import type { Invoice, InvoicePayment } from "./service";
+import type { Invoice, InvoiceEvent, InvoicePayment } from "./service";
 
 /**
  * What an invoice's details draw that isn't a rule of its state (DEC-173,
@@ -44,6 +44,31 @@ function invoice(over: Partial<Invoice> = {}): Invoice {
         createdAt: at(-29),
         updatedAt: at(-1),
         summary: null,
+        ...over,
+    };
+}
+
+const RAVI = { kind: "USER" as const, userId: "u_ravi", name: "Ravi Kumar" };
+const SAROH = { kind: "JOB" as const, userId: null, name: null };
+
+function event(over: Partial<InvoiceEvent>): InvoiceEvent {
+    return {
+        id: `e_${over.kind ?? "ISSUED"}`,
+        kind: "ISSUED",
+        at: at(-1),
+        actor: RAVI,
+        channel: null,
+        messageId: null,
+        to: null,
+        status: null,
+        thread: false,
+        reason: null,
+        creditNoteId: null,
+        creditNoteNumber: null,
+        draftId: null,
+        template: null,
+        autopay: false,
+        view: false,
         ...over,
     };
 }
@@ -236,6 +261,201 @@ describe("historyLines", () => {
             }),
         );
         expect(lines[0]?.what).toBe("Paid by UPI · 4581");
+    });
+});
+
+describe("historyLines with who did it (U9 #1140)", () => {
+    it("says issue, send, remind and void with Ravi's name, newest first, and no line twice", () => {
+        const lines = historyLines(
+            invoice({
+                standing: "VOID",
+                status: "VOID",
+                voidedAt: at(-1),
+                voidReason: "Billed twice",
+                events: [
+                    event({
+                        kind: "VOIDED",
+                        at: at(-1),
+                        reason: "Billed twice",
+                    }),
+                    event({
+                        kind: "REMINDED",
+                        at: at(-5),
+                        channel: "EMAIL",
+                        messageId: "m2",
+                        to: "asha@example.com",
+                        status: "QUEUED",
+                    }),
+                    event({
+                        kind: "SENT",
+                        at: at(-20),
+                        channel: "EMAIL",
+                        messageId: "m1",
+                        to: "asha@example.com",
+                        status: "QUEUED",
+                    }),
+                    event({ kind: "ISSUED", at: at(-28) }),
+                ],
+                sent: [
+                    {
+                        id: "m2",
+                        channel: "email",
+                        to: "asha@example.com",
+                        at: at(-5),
+                        reminder: true,
+                        status: "SENT",
+                    },
+                    {
+                        id: "m1",
+                        channel: "email",
+                        to: "asha@example.com",
+                        at: at(-20),
+                        reminder: false,
+                        status: "SENT",
+                    },
+                ],
+            }),
+            new Date(NOW),
+        );
+        expect(lines.map((l) => l.what)).toEqual([
+            "Voided by Ravi Kumar: Billed twice",
+            "Reminder sent by Ravi Kumar to asha@example.com",
+            "Sent by Ravi Kumar to asha@example.com",
+            "RC/26-27/0106 issued by Ravi Kumar",
+            "Drafted",
+        ]);
+    });
+
+    it("reads an automatic send and reminder as sent automatically", () => {
+        const lines = historyLines(
+            invoice({
+                events: [
+                    event({
+                        kind: "AUTO_REMINDED",
+                        actor: SAROH,
+                        at: at(-2),
+                        channel: "EMAIL",
+                        to: "asha@example.com",
+                    }),
+                    event({
+                        kind: "AUTO_SENT",
+                        actor: SAROH,
+                        at: at(-9),
+                        channel: "EMAIL",
+                        to: "asha@example.com",
+                        thread: true,
+                    }),
+                ],
+            }),
+            new Date(NOW),
+        );
+        expect(lines.map((l) => l.what)).toContain(
+            "Reminder sent automatically to asha@example.com",
+        );
+        expect(lines.map((l) => l.what)).toContain(
+            "Sent automatically to asha@example.com and to their Messages",
+        );
+    });
+
+    it("shows a bounced email and a failed pay attempt as gone wrong", () => {
+        const lines = historyLines(
+            invoice({
+                events: [
+                    event({
+                        kind: "SEND_FAILED",
+                        actor: SAROH,
+                        at: at(-2),
+                        to: "asha@example.com",
+                        template: "INVOICE_SENT",
+                    }),
+                    event({
+                        kind: "PAY_ATTEMPT_FAILED",
+                        actor: { kind: "CUSTOMER", userId: null, name: null },
+                        at: at(-3),
+                    }),
+                ],
+            }),
+            new Date(NOW),
+        );
+        expect(lines.slice(0, 2)).toEqual([
+            expect.objectContaining({
+                what: "Invoice to asha@example.com didn't go: the email provider refused it",
+                tone: "bad",
+            }),
+            expect.objectContaining({
+                what: "A payment on the pay page didn't go through",
+                tone: "bad",
+            }),
+        ]);
+    });
+
+    it("dates a credit note with who made it, once", () => {
+        const lines = historyLines(
+            invoice({
+                standing: "CREDITED",
+                corrections: [
+                    {
+                        id: "cn_1",
+                        kind: "CREDIT_NOTE",
+                        number: "CN-0004",
+                        total: "8400.00",
+                    },
+                ] as Invoice["corrections"],
+                events: [
+                    event({
+                        kind: "CREDITED",
+                        at: at(-2),
+                        creditNoteId: "cn_1",
+                        creditNoteNumber: "CN-0004",
+                        reason: "Wrong rate",
+                    }),
+                    event({ kind: "REISSUED", at: at(-2), draftId: "inv_2" }),
+                ],
+            }),
+            new Date(NOW),
+        );
+        const credit = lines.filter((l) => l.what.includes("Credit"));
+        expect(credit).toHaveLength(1);
+        expect(credit[0]).toMatchObject({ when: at(-2) });
+        expect(credit[0]?.what).toMatch(
+            /^Credit note CN-0004 for .*8,400.* by Ravi Kumar$/,
+        );
+        expect(lines.map((l) => l.what)).toContain(
+            "Written again as a new draft by Ravi Kumar",
+        );
+    });
+
+    it("leaves out a name it doesn't know, and names who shared it", () => {
+        const lines = historyLines(
+            invoice({
+                events: [
+                    event({
+                        kind: "LINK_MADE",
+                        at: at(-2),
+                        actor: { kind: "USER", userId: "u_gone", name: null },
+                        view: true,
+                    }),
+                ],
+                shared: [
+                    {
+                        id: "s1",
+                        channel: "PDF",
+                        kind: "NEW",
+                        byUserId: "u_ravi",
+                        byName: "Ravi Kumar",
+                        at: at(-1),
+                    },
+                ],
+            }),
+            new Date(NOW),
+        );
+        expect(lines[0]?.what).toBe("PDF downloaded by Ravi Kumar");
+        expect(lines[1]?.what).toBe("New link made");
+    });
+
+    it("an older invoice with no events keeps its dates, without names", () => {
+        const lines = historyLines(invoice(), new Date(NOW));
+        expect(lines.map((l) => l.what)).toContain("RC/26-27/0106 issued");
     });
 });
 

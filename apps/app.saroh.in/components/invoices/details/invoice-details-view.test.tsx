@@ -413,6 +413,61 @@ describe("What happened", () => {
         show(details({ payments: [cash()] }, { read: true, write: false }));
         expect(document.body.textContent).not.toContain("Remove this payment");
     });
+
+    it("names who sent it, says what went automatically, and keeps Remove on the payment (U9 #1140)", () => {
+        const who = {
+            kind: "USER" as const,
+            userId: "u_ravi",
+            name: "Ravi Kumar",
+        };
+        const base = {
+            channel: "EMAIL" as const,
+            messageId: null,
+            to: "asha@example.com",
+            status: "QUEUED",
+            thread: false,
+            reason: null,
+            creditNoteId: null,
+            creditNoteNumber: null,
+            draftId: null,
+            template: null,
+            autopay: false,
+            view: false,
+        };
+        show(
+            details({
+                payments: [cash()],
+                events: [
+                    {
+                        ...base,
+                        id: "e2",
+                        kind: "AUTO_REMINDED",
+                        at: at(-2),
+                        actor: { kind: "JOB", userId: null, name: null },
+                    },
+                    { ...base, id: "e1", kind: "SENT", at: at(-9), actor: who },
+                ],
+            }),
+        );
+        const lines = Array.from(
+            document.querySelectorAll("[data-history-line]"),
+        ).map((l) => l.textContent);
+        expect(
+            lines.some((l) =>
+                l.includes("Sent by Ravi Kumar to asha@example.com"),
+            ),
+        ).toBe(true);
+        expect(
+            lines.some((l) =>
+                l.includes("Reminder sent automatically to asha@example.com"),
+            ),
+        ).toBe(true);
+        expect(
+            Array.from(document.querySelectorAll("button")).filter(
+                (b) => b.textContent === "Remove this payment",
+            ),
+        ).toHaveLength(1);
+    });
 });
 
 describe("in the side sheet", () => {

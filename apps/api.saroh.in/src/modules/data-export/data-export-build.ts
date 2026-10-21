@@ -66,6 +66,9 @@ const README = (businessName: string, made: Date) =>
         "Dates and times are in UTC. Amounts are in the currency named on the same row:",
         "a column ending in Cents is in the smallest unit (paise), the others in rupees.",
         "Credit notes are in invoices-and-credit-notes.csv, with kind CREDIT_NOTE.",
+        "invoice-history.csv lists what happened to each invoice: issued, sent, reminded,",
+        "voided, credited and so on, with when, and actorUserId for the person who did it",
+        "(actorKind JOB means Saroh did it for you; CUSTOMER, your customer on the pay page).",
         // Which price a "price" column is (12 Oct 2026): the headers are
         // the same word in every file, so the file says which it holds.
         "",

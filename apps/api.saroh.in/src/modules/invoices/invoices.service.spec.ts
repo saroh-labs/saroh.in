@@ -41,6 +41,10 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn().mockResolvedValue([]),
         },
         invoiceSequence: { upsert: jest.fn() },
+        // The invoice's history (U9 #1140).
+        invoiceEvent: { createMany: jest.fn() },
+        // A link made by hand runs on its own transaction (U9 #1140).
+        organizationModule: { findFirst: jest.fn().mockResolvedValue(null) },
         // No cheque waits unless a test says so (#5).
         invoicePayment: { count: jest.fn().mockResolvedValue(0) },
         contact: { findFirst: jest.fn() },
@@ -1340,6 +1344,11 @@ describe("GST (ADR-008)", () => {
 
     it("an order's invoice has no pay link and is not paid here", async () => {
         db.invoice.findFirst!.mockResolvedValue({
+            ...orderInvoice(),
+            status: "ISSUED",
+        });
+        // A link made by hand is minted on its own transaction (U9).
+        tx.invoice!.findFirst!.mockResolvedValueOnce({
             ...orderInvoice(),
             status: "ISSUED",
         });

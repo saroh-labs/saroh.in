@@ -38,6 +38,14 @@ import {
     chargeUnderWayOn,
 } from "../payments/charge-under-way";
 import { assertBusinessDetails } from "./business-details";
+import type { InvoiceEventKind, InvoiceEventView } from "./invoice-events";
+import {
+    JOB_ACTOR,
+    personActor,
+    readInvoiceEvents,
+    recordInvoiceEvent,
+    shareNames,
+} from "./invoice-events";
 import { isPastDue, leftToPayCents } from "./invoice-state";
 import { InvoicesService } from "./invoices.service";
 import { payLinkUrlFor } from "./pay-link-url";
@@ -51,6 +59,15 @@ import type {
 } from "./send-view";
 
 type Db = Prisma.TransactionClient;
+
+/**
+ * How a send is made: by the person pressing Send (the default), or by
+ * Saroh on the business's behalf (`automatic`: a renewal's invoice, an
+ * overdue reminder), which the history reads as "sent automatically".
+ */
+export interface SendOptions {
+    automatic?: boolean;
+}
 
 export interface InvoiceSendResult {
     channels: SendChannel[];
@@ -246,8 +263,9 @@ export class InvoiceSendService {
         send: InvoiceSendView;
         sent: InvoiceSentView[];
         shared: InvoiceSharedView[];
+        events: InvoiceEventView[];
     }> {
-        const [row, sent, shared] = await Promise.all([
+        const [row, sent, shared, events] = await Promise.all([
             prisma.invoice.findFirst({
                 where: { id: invoiceId, organizationId },
                 select: SEND_SELECT,
@@ -280,8 +298,14 @@ export class InvoiceSendService {
                     createdAt: true,
                 },
             }),
+            // Who issued, sent, reminded, voided or credited it (U9 #1140).
+            readInvoiceEvents(prisma, organizationId, invoiceId),
         ]);
         if (!row) notFound();
+        const names = await shareNames(
+            prisma,
+            shared.map((s) => s.byUserId),
+        );
         return {
             send: await this.sendChannels(prisma, organizationId, row, now),
             sent: sent.map((m) => ({
@@ -297,8 +321,10 @@ export class InvoiceSendService {
                 channel: s.channel as InvoiceSharedView["channel"],
                 kind: s.kind as InvoiceSharedView["kind"],
                 byUserId: s.byUserId,
+                byName: s.byUserId ? (names.get(s.byUserId) ?? null) : null,
                 at: s.createdAt.toISOString(),
             })),
+            events,
         };
     }
 
@@ -508,8 +534,12 @@ export class InvoiceSendService {
     }
 
     /** `POST :id/send`: the first send, with its pay link. */
-    send(ctx: OrganizationContext, id: string): Promise<InvoiceSendResult> {
-        return this.dispatch(ctx, id, false);
+    send(
+        ctx: OrganizationContext,
+        id: string,
+        options: SendOptions = {},
+    ): Promise<InvoiceSendResult> {
+        return this.dispatch(ctx, id, false, undefined, options);
     }
 
     /**
@@ -522,8 +552,9 @@ export class InvoiceSendService {
         ctx: OrganizationContext,
         id: string,
         batch?: { shared: ReachShared; detailsChecked: true },
+        options: SendOptions = {},
     ): Promise<InvoiceSendResult> {
-        return this.dispatch(ctx, id, true, batch);
+        return this.dispatch(ctx, id, true, batch, options);
     }
 
     private async dispatch(
@@ -531,6 +562,7 @@ export class InvoiceSendService {
         id: string,
         reminder: boolean,
         batch?: { shared: ReachShared; detailsChecked: true },
+        options: SendOptions = {},
     ): Promise<InvoiceSendResult> {
         authorize(ctx, "invoice:write");
         const organizationId = ctx.organizationId;
@@ -583,6 +615,7 @@ export class InvoiceSendService {
                 ? "INVOICE_REMINDER"
                 : "INVOICE_SENT";
             let email: InvoiceSendResult["email"] = null;
+            let messageId: string | null = null;
             if (view.channels.includes("email")) {
                 const org = await tx.organization.findUnique({
                     where: { id: organizationId },
@@ -649,6 +682,7 @@ export class InvoiceSendService {
                     },
                 );
                 email = { status: queued.status, to: queued.toAddress };
+                messageId = queued.id;
             }
 
             let thread = false;
@@ -666,6 +700,19 @@ export class InvoiceSendService {
                 });
                 thread = true;
             }
+            // On the invoice's history, in the send's own transaction:
+            // who, where, and whether the customer had turned email off.
+            await recordInvoiceEvent(tx, {
+                organizationId,
+                invoiceId: id,
+                kind: sendKind(reminder, options.automatic === true),
+                actor: options.automatic ? JOB_ACTOR : personActor(ctx),
+                channel: email ? "EMAIL" : "THREAD",
+                messageId,
+                data: email
+                    ? { to: email.to, status: email.status, thread }
+                    : { thread },
+            });
             return { channels: view.channels, email, thread };
         });
     }
@@ -840,4 +887,10 @@ export function firstName(row: SendRow): string | null {
             .filter(Boolean)
             .join(" ");
     return name.trim().split(/\s+/)[0] || null;
+}
+
+/** The history's word for a send: by hand or automatic, first or reminder. */
+function sendKind(reminder: boolean, automatic: boolean): InvoiceEventKind {
+    if (automatic) return reminder ? "AUTO_REMINDED" : "AUTO_SENT";
+    return reminder ? "REMINDED" : "SENT";
 }
