@@ -83,10 +83,11 @@ export function useKeptChoice({
             live.date,
             live.time,
             isClass,
+            waitlistOn,
         );
         if (found) setStart(found);
         else sayError(INITIAL_TIME_GONE);
-    }, [live, daysState, isClass, setStart, setPending, sayError]);
+    }, [live, daysState, isClass, waitlistOn, setStart, setPending, sayError]);
 
     // What was kept for this address, brought back once as the page opens.
     useEffect(() => {

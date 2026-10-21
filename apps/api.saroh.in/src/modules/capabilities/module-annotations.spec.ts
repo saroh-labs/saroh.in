@@ -78,6 +78,8 @@ const CLASS_LEVEL: Record<string, string> = {
     "collections/collections.controller.ts": "COMMERCE",
     // #514: stock levels, the log, counts, moves and checks.
     "stock/stock.controller.ts": "COMMERCE",
+    // U23: who waits for a product to be back, for the workspace.
+    "stock/stock-watches.controller.ts": "COMMERCE",
     "imports/imports.controller.ts": "COMMERCE",
 };
 
@@ -233,6 +235,10 @@ const NEVER: Record<string, string> = {
     // DEC-172: "Ask to remove my data" in the account's Your details.
     "site-accounts/account-data-request.controller.ts":
         "a signed-in customer asking to remove their own data — no module may hide it",
+    // U18 (#1149): a waitlist offer's claim link, read with no session;
+    // Appointments off reads as "This spot has gone".
+    "site-accounts/waitlist-claim.controller.ts":
+        "a waitlist offer's claim link on a published site — Appointments checked by the read",
     "site-accounts/account-waitlist.controller.ts":
         "a signed-in customer joining a class's waitlist on a published site — Appointments checked per service",
     // A5: the customer's account area. It lists only the modules the
@@ -286,6 +292,9 @@ const NEVER: Record<string, string> = {
     // (`commerceOpen`), which answers 404, as a site with no shop does.
     "products/public-catalogue.controller.ts":
         "a published site's shop and product pages — Commerce checked by the service",
+    // U23: "Tell me when it's back" and its stop page on a published site.
+    "stock/stock-watch.controller.ts":
+        "a published site's back-in-stock sign-up and stop page — Commerce checked by the service",
     // G13: a site's bag and checkout. Never module-gated off mid-payment;
     // the service asks `commerceOpen` before it starts a checkout, and a
     // payment already made still lands through the webhook.

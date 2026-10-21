@@ -25,6 +25,8 @@ import {
 } from "../communications/account-thread";
 import type { TransactionalAddress } from "../communications/communications.service";
 import { CommunicationsService } from "../communications/communications.service";
+import type { NoticeKind } from "../communications/notice-settings";
+import { noticeOn } from "../communications/notice-settings";
 import type { InvoiceTemplate } from "../communications/transactional";
 import {
     businessPayInstructionsOf,
@@ -38,6 +40,14 @@ import {
     chargeUnderWayOn,
 } from "../payments/charge-under-way";
 import { assertBusinessDetails } from "./business-details";
+import type { InvoiceEventKind, InvoiceEventView } from "./invoice-events";
+import {
+    JOB_ACTOR,
+    personActor,
+    readInvoiceEvents,
+    recordInvoiceEvent,
+    shareNames,
+} from "./invoice-events";
 import { isPastDue, leftToPayCents } from "./invoice-state";
 import { InvoicesService } from "./invoices.service";
 import { payLinkUrlFor } from "./pay-link-url";
@@ -51,6 +61,43 @@ import type {
 } from "./send-view";
 
 type Db = Prisma.TransactionClient;
+
+/**
+ * How a send is made: by the person pressing Send (the default), or by
+ * Saroh on the business's behalf (`automatic`: a renewal's invoice, an
+ * overdue reminder), which the history reads as "sent automatically".
+ */
+export interface SendOptions {
+    automatic?: boolean;
+}
+
+/**
+ * An automatic reminder's claim (overdue reminders, U20): the
+ * `CustomerNotice` written on the send's own transaction, under the
+ * invoice's lock and after every other check, so a run that sends claims,
+ * a run delivered twice sends once, and a reminder that can't go yet (one
+ * a day) claims nothing and goes later. Its switch is asked there too, so
+ * one turned off while the sweep ran stops it.
+ */
+export interface ReminderClaim {
+    eventKey: string;
+    kind: string;
+    switchKind: NoticeKind;
+}
+
+/** What a refused claim says, as `details.reason` on its 409. */
+export const CLAIM_REFUSED = {
+    taken: "ALREADY_REMINDED",
+    off: "NOTICE_OFF",
+} as const;
+
+/**
+ * Who sends: a person in the workspace (their context, authorized), or
+ * Saroh on the business's behalf with nobody behind it (a renewal's
+ * invoice, automatic notices U10), which is always automatic.
+ */
+type Sender =
+    { ctx: OrganizationContext } | { job: true; organizationId: string };
 
 export interface InvoiceSendResult {
     channels: SendChannel[];
@@ -246,8 +293,9 @@ export class InvoiceSendService {
         send: InvoiceSendView;
         sent: InvoiceSentView[];
         shared: InvoiceSharedView[];
+        events: InvoiceEventView[];
     }> {
-        const [row, sent, shared] = await Promise.all([
+        const [row, sent, shared, events] = await Promise.all([
             prisma.invoice.findFirst({
                 where: { id: invoiceId, organizationId },
                 select: SEND_SELECT,
@@ -280,8 +328,14 @@ export class InvoiceSendService {
                     createdAt: true,
                 },
             }),
+            // Who issued, sent, reminded, voided or credited it (U9 #1140).
+            readInvoiceEvents(prisma, organizationId, invoiceId),
         ]);
         if (!row) notFound();
+        const names = await shareNames(
+            prisma,
+            shared.map((s) => s.byUserId),
+        );
         return {
             send: await this.sendChannels(prisma, organizationId, row, now),
             sent: sent.map((m) => ({
@@ -297,8 +351,10 @@ export class InvoiceSendService {
                 channel: s.channel as InvoiceSharedView["channel"],
                 kind: s.kind as InvoiceSharedView["kind"],
                 byUserId: s.byUserId,
+                byName: s.byUserId ? (names.get(s.byUserId) ?? null) : null,
                 at: s.createdAt.toISOString(),
             })),
+            events,
         };
     }
 
@@ -508,8 +564,27 @@ export class InvoiceSendService {
     }
 
     /** `POST :id/send`: the first send, with its pay link. */
-    send(ctx: OrganizationContext, id: string): Promise<InvoiceSendResult> {
-        return this.dispatch(ctx, id, false);
+    send(
+        ctx: OrganizationContext,
+        id: string,
+        options: SendOptions = {},
+    ): Promise<InvoiceSendResult> {
+        return this.dispatch({ ctx }, id, false, undefined, options);
+    }
+
+    /**
+     * The first send, made by Saroh for the business (a membership's
+     * renewal invoice, automatic notices U10, DEC-174): every rule of a
+     * send by hand (the business details, the provider, the address,
+     * consent, the autopay charge, "already sent"), its refusals thrown as
+     * they are to a person, and the history's AUTO_SENT with actor JOB.
+     * Nobody is authorized: only a job calls it.
+     */
+    sendAutomatic(
+        organizationId: string,
+        id: string,
+    ): Promise<InvoiceSendResult> {
+        return this.dispatch({ job: true, organizationId }, id, false);
     }
 
     /**
@@ -522,18 +597,50 @@ export class InvoiceSendService {
         ctx: OrganizationContext,
         id: string,
         batch?: { shared: ReachShared; detailsChecked: true },
+        options: SendOptions = {},
     ): Promise<InvoiceSendResult> {
-        return this.dispatch(ctx, id, true, batch);
+        return this.dispatch({ ctx }, id, true, batch, options);
+    }
+
+    /**
+     * A reminder made by Saroh for the business (an overdue invoice, U20,
+     * DEC-174 D3): every rule of `remind` (one a day counting email,
+     * thread and WhatsApp, the provider, the address, consent, the
+     * business details, the autopay charge, not paid, voided or credited),
+     * refused as it is to a person, and AUTO_REMINDED with actor JOB on
+     * the history. `claim` is written on the same transaction; a claim
+     * already taken, or the switch off, is a 409 with `details.reason`
+     * from {@link CLAIM_REFUSED}. Nobody is authorized: only a job calls it.
+     */
+    remindAutomatic(
+        organizationId: string,
+        id: string,
+        claim: ReminderClaim,
+    ): Promise<InvoiceSendResult> {
+        return this.dispatch(
+            { job: true, organizationId },
+            id,
+            true,
+            undefined,
+            {},
+            claim,
+        );
     }
 
     private async dispatch(
-        ctx: OrganizationContext,
+        sender: Sender,
         id: string,
         reminder: boolean,
         batch?: { shared: ReachShared; detailsChecked: true },
+        options: SendOptions = {},
+        claim?: ReminderClaim,
     ): Promise<InvoiceSendResult> {
-        authorize(ctx, "invoice:write");
-        const organizationId = ctx.organizationId;
+        const ctx = "ctx" in sender ? sender.ctx : null;
+        if (ctx) authorize(ctx, "invoice:write");
+        const organizationId =
+            "ctx" in sender ? sender.ctx.organizationId : sender.organizationId;
+        const automatic = !ctx || options.automatic === true;
+        const userId = ctx?.userId ?? null;
         const now = new Date();
         // It asks to be paid: the business details first (DEC-068).
         if (!batch?.detailsChecked) {
@@ -578,11 +685,13 @@ export class InvoiceSendService {
                     "This invoice has been sent. Send a reminder instead.",
                 );
             }
+            if (claim) await claimReminder(tx, organizationId, row, claim);
 
             const template: InvoiceTemplate = reminder
                 ? "INVOICE_REMINDER"
                 : "INVOICE_SENT";
             let email: InvoiceSendResult["email"] = null;
+            let messageId: string | null = null;
             if (view.channels.includes("email")) {
                 const org = await tx.organization.findUnique({
                     where: { id: organizationId },
@@ -627,28 +736,37 @@ export class InvoiceSendService {
                         // link: the same page, without a Pay button. On the
                         // business's own address (DEC-069, L7), read on
                         // this transaction as the message is composed.
-                        secretLink: async () =>
-                            payLinkUrlFor(
+                        secretLink: async () => {
+                            const link = { requireProvider: view.payOnline };
+                            const made = ctx
+                                ? await this.invoices.createPayLinkInTx(
+                                      tx,
+                                      ctx,
+                                      id,
+                                      link,
+                                  )
+                                : await this.invoices.payLinkForJobInTx(
+                                      tx,
+                                      organizationId,
+                                      id,
+                                      link,
+                                  );
+                            return payLinkUrlFor(
                                 organizationId,
-                                (
-                                    await this.invoices.createPayLinkInTx(
-                                        tx,
-                                        ctx,
-                                        id,
-                                        { requireProvider: view.payOnline },
-                                    )
-                                ).token,
+                                made.token,
                                 tx,
-                            ),
+                            );
+                        },
                         invoiceId: id,
                         // Its PDF goes with it (DEC-083): drawn by the send
                         // job, where the business's provider takes
                         // attachments; otherwise the link alone, as before.
                         attachInvoicePdf: true,
-                        createdByUserId: ctx.userId,
+                        createdByUserId: userId,
                     },
                 );
                 email = { status: queued.status, to: queued.toAddress };
+                messageId = queued.id;
             }
 
             let thread = false;
@@ -662,9 +780,28 @@ export class InvoiceSendService {
                     contactId: row.contactId,
                     invoiceId: id,
                     kind: template,
-                    actorUserId: ctx.userId,
+                    actorUserId: userId,
                 });
                 thread = true;
+            }
+            // On the invoice's history, in the send's own transaction:
+            // who, where, and whether the customer had turned email off.
+            await recordInvoiceEvent(tx, {
+                organizationId,
+                invoiceId: id,
+                kind: sendKind(reminder, automatic),
+                actor: ctx && !automatic ? personActor(ctx) : JOB_ACTOR,
+                channel: email ? "EMAIL" : "THREAD",
+                messageId,
+                data: email
+                    ? { to: email.to, status: email.status, thread }
+                    : { thread },
+            });
+            if (claim && messageId) {
+                await tx.customerNotice.updateMany({
+                    where: { organizationId, eventKey: claim.eventKey },
+                    data: { messageId },
+                });
             }
             return { channels: view.channels, email, thread };
         });
@@ -779,7 +916,8 @@ export class InvoiceSendService {
         return out;
     }
 
-    private async alreadySent(db: Db, invoiceId: string): Promise<boolean> {
+    /** Sent before, by email or into the account thread: Send is refused. */
+    async alreadySent(db: Db, invoiceId: string): Promise<boolean> {
         const [emails, posts] = await Promise.all([
             db.message.count({
                 where: {
@@ -840,4 +978,47 @@ export function firstName(row: SendRow): string | null {
             .filter(Boolean)
             .join(" ");
     return name.trim().split(/\s+/)[0] || null;
+}
+
+/**
+ * Write an automatic reminder's claim, or refuse: its switch turned off,
+ * or the claim already taken by a run before this one. `createMany` with
+ * `skipDuplicates`, never insert-and-catch: a Postgres transaction can't
+ * carry on after a caught P2002.
+ */
+async function claimReminder(
+    tx: Db,
+    organizationId: string,
+    row: SendRow,
+    claim: ReminderClaim,
+): Promise<void> {
+    if (!(await noticeOn(tx, organizationId, claim.switchKind))) {
+        throw new ConflictException({
+            message: "Automatic reminders are turned off.",
+            details: { reason: CLAIM_REFUSED.off },
+        });
+    }
+    const made = await tx.customerNotice.createMany({
+        data: [
+            {
+                organizationId,
+                eventKey: claim.eventKey,
+                kind: claim.kind,
+                contactId: row.contactId,
+            },
+        ],
+        skipDuplicates: true,
+    });
+    if (made.count === 0) {
+        throw new ConflictException({
+            message: "Already reminded.",
+            details: { reason: CLAIM_REFUSED.taken },
+        });
+    }
+}
+
+/** The history's word for a send: by hand or automatic, first or reminder. */
+function sendKind(reminder: boolean, automatic: boolean): InvoiceEventKind {
+    if (automatic) return reminder ? "AUTO_REMINDED" : "AUTO_SENT";
+    return reminder ? "REMINDED" : "SENT";
 }

@@ -4,6 +4,7 @@ import { prisma } from "@saroh/database";
 
 import { toMinor } from "../../common/money";
 import { dayWords, moneyWordsMinor } from "../../common/words-format";
+import { readPackKind } from "../class-packs/pack-kind";
 import type { TransactionalResult } from "../communications/communications.service";
 import { CommunicationsService } from "../communications/communications.service";
 import { renderInvoiceReceipt } from "../communications/transactional";
@@ -51,6 +52,14 @@ export async function queueReceiptInTx(
                     paidCents: true,
                     billToName: true,
                     contact: { select: { firstName: true, lastName: true } },
+                    // A pack's receipt says what was bought (DEC-174 U22).
+                    packPurchase: {
+                        select: {
+                            credits: true,
+                            expiresAt: true,
+                            pack: { select: { name: true, kind: true } },
+                        },
+                    },
                 },
             },
         },
@@ -67,6 +76,7 @@ export async function queueReceiptInTx(
         }),
     ]);
     const invoice = payment.invoice;
+    const zone = profile?.timezone ?? DEFAULT_ZONE;
     const totalCents = toMinor(invoice.total);
     const paidCents = paidSoFarCents(invoice);
     const leftCents = Math.max(0, totalCents - paidCents);
@@ -84,15 +94,14 @@ export async function queueReceiptInTx(
             number: invoice.number ?? "",
             amount: money(payment.amountCents),
             method: paymentMethodWords(payment.method),
-            receivedOn: dayWords(
-                payment.receivedAt,
-                profile?.timezone ?? DEFAULT_ZONE,
-                { year: true },
-            ),
+            receivedOn: dayWords(payment.receivedAt, zone, { year: true }),
             paidSoFar: money(paidCents),
             total: money(totalCents),
             leftToPay: money(leftCents),
             paidInFull: leftCents === 0,
+            pack: invoice.packPurchase
+                ? packReceiptLine(invoice.packPurchase, zone)
+                : null,
         }),
         recipient: { kind: "INVOICE_BILL_TO", invoiceId: invoice.id },
         invoiceId: invoice.id,
@@ -100,6 +109,33 @@ export async function queueReceiptInTx(
         attachInvoicePdf: true,
         createdByUserId: input.createdByUserId,
     });
+}
+
+/**
+ * What a pack's receipt says it bought, in the business's zone: "10-class
+ * pack: 10 classes, use them by 31 Dec 2026" (DEC-174 U22). The purchase's
+ * own credits and date, so a pack extended before the receipt goes says
+ * the new date.
+ */
+export function packReceiptLine(
+    purchase: {
+        credits: number;
+        expiresAt: Date;
+        pack: { name: string; kind: string };
+    },
+    timeZone: string,
+): string {
+    const n = purchase.credits;
+    const unit =
+        readPackKind(purchase.pack.kind) === "ONE_TO_ONE"
+            ? n === 1
+                ? "session"
+                : "sessions"
+            : n === 1
+              ? "class"
+              : "classes";
+    const by = dayWords(purchase.expiresAt, timeZone, { year: true });
+    return `${purchase.pack.name}: ${n} ${unit}, use ${n === 1 ? "it" : "them"} by ${by}`;
 }
 
 /**

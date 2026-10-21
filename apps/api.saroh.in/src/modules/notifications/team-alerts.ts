@@ -23,6 +23,21 @@ export const TEAM_ALERT_TYPE = "team.alert";
  * - `order`: an order placed — paid online, or taken by the team.
  *   `actorUserId` is who took it, who isn't emailed about their own order.
  * - `failed`: a payment on an invoice's pay link that didn't go through.
+ * - `order-failed`: an order's online payment that didn't go through
+ *   (#1139), on the Payment failed row. Keyed to the payment intent.
+ * - `mismatch`: money captured at an amount or currency Saroh didn't ask
+ *   for (PAY-06, #1139), on an order or an invoice, with both figures.
+ *   Queued where the capture is recorded as owed back
+ *   (`recordCaptureMismatchInTx`), once per captured payment (`attemptId`);
+ *   on the Payment failed row.
+ * - `paid-by-link`: an order the team made, paid online by the customer
+ *   (#1139), on the New order row. Keyed to the payment intent.
+ * - `refund`: an online refund that sent no money back (U12, #1143), on
+ *   the Payment failed row: `change` "refused" when the provider said no
+ *   to Saroh's call, "failed" when it took it and it failed later. Queued
+ *   only by the write that moved the refund to FAILED
+ *   (`payments/refund-notices.ts`); keyed to the refund and the change.
+ *   `actorUserId` asked for it and saw the refusal, so isn't told.
  * - `team`: someone accepted an invitation and joined the team. Keyed to
  *   the invitation, so someone who leaves and is invited back is told of
  *   again.
@@ -65,14 +80,55 @@ export const TEAM_ALERT_TYPE = "team.alert";
  * - `request`: a customer asked the business to remove their data from
  *   their site account (DEC-172, `data-request-alerts.ts`). Keyed to the
  *   request; told to whoever can run a customer removal, on its own row.
+ * - `booking-mine`: a booking with someone on the diary who has a login was
+ *   made, moved or cancelled (DEC-174, #1138), told to that one person
+ *   (`userId`) in their own alerts and by email, on "Bookings with you".
+ *   Queued by `booking.notify` for the person the event is about, never
+ *   the one who did it. `change` "moved-away" and a "new" from a
+ *   reassignment (#1157) are email only: the reassigning write put the
+ *   bell's notice in their alerts already. Keyed to the event and person.
+ * - `member`: a member cancelled or paused their own membership from their
+ *   account (`eventId`, the SubscriptionEvent), or their bank cancelled its
+ *   autopay (`mandateId`, once per mandate), DEC-174 U19 (#1150), on the
+ *   Members row. Queued only for the member's own doing
+ *   (`subscription-events.ts`) and the bank's (`mandate-events.ts`), never
+ *   for a change the team made.
  */
 export type TeamAlertPayload =
     | { event: "order"; orderId: string; actorUserId?: string | null }
     | { event: "failed"; invoiceId: string; paymentIntentId: string }
+    | { event: "order-failed"; orderId: string; paymentIntentId: string }
+    | { event: "mismatch"; paymentIntentId: string; attemptId: string }
+    | { event: "paid-by-link"; orderId: string; paymentIntentId: string }
+    | {
+          event: "refund";
+          refundId: string;
+          change: "failed" | "refused";
+          actorUserId?: string | null;
+      }
     | { event: "team"; userId: string; invitationId: string }
     | { event: "booking"; notificationId: string }
     | { event: "uncollected"; orderId: string }
     | { event: "request"; requestId: string }
+    | {
+          event: "member";
+          change: "cancelled" | "paused";
+          subscriptionId: string;
+          eventId: string;
+      }
+    | {
+          event: "member";
+          change: "autopay_off";
+          subscriptionId: string;
+          mandateId: string;
+      }
+    | {
+          event: "booking-mine";
+          bookingId: string;
+          eventId: string;
+          userId: string;
+          change: "new" | "moved" | "moved-away" | "cancelled";
+      }
     | {
           event: "provider";
           channel: "PAYMENTS" | "EMAIL";
@@ -192,4 +248,10 @@ export interface WordedAlert extends NoticeColumns {
     emailUserIds?: readonly string[];
     /** Why they got it, when it isn't a row's choice (`emailUserIds`). */
     footer?: string;
+    /**
+     * A personal alert (#1138, "Bookings with you"): the bell's notice is
+     * this person's alone (`Notification.userId`), and only they are
+     * emailed, on the row's choices.
+     */
+    forUserId?: string;
 }

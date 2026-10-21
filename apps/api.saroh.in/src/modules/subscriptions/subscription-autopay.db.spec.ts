@@ -671,7 +671,10 @@ describe("telling the customer their autopay was cancelled (D14)", () => {
         expect(note?.body).toContain(
             "Pulse Fitness has turned off autopay for Monthly unlimited.",
         );
-        expect(note?.body).toContain("an invoice with a link to pay it");
+        // Renewal invoices are sent by themselves (U10): it says so.
+        expect(note?.body).toContain(
+            "From your next renewal, Pulse Fitness emails you an invoice with a link to pay.",
+        );
         expect(
             await prisma.job.count({
                 where: {
@@ -680,6 +683,30 @@ describe("telling the customer their autopay was cancelled (D14)", () => {
                 },
             }),
         ).toBe(1);
+    });
+
+    it("with renewal invoices turned off, it doesn't promise one (U10)", async () => {
+        await prisma.customerNoticeSetting.create({
+            data: {
+                organizationId: owner.organizationId,
+                kind: "RENEWAL_INVOICE",
+                enabled: false,
+            },
+        });
+        try {
+            const m = await member();
+            await activeMandate(m);
+            await staff.cancel(owner, m.subscriptionId);
+            const [note] = await cancelledNotes(m.subscriptionId);
+            expect(note?.body).toContain(
+                "From your next renewal, Pulse Fitness will tell you how to pay.",
+            );
+            expect(note?.body).not.toContain("link to pay");
+        } finally {
+            await prisma.customerNoticeSetting.deleteMany({
+                where: { organizationId: owner.organizationId },
+            });
+        }
     });
 
     it("a revoked email consent is recorded, not sent, and not claimed", async () => {

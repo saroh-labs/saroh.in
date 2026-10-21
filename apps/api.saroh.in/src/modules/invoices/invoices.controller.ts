@@ -30,6 +30,7 @@ import {
     OwedQueryDto,
     VoidInvoiceDto,
 } from "./dto";
+import { readInvoiceHistory } from "./invoice-events";
 import {
     ChequeBouncedDto,
     ChequeClearedDto,
@@ -135,6 +136,22 @@ export class InvoicesController {
             ...invoice,
             ...(await this.sending.readFor(ctx.organizationId, id)),
         };
+    }
+
+    /**
+     * Everything that happened to it, newest first, with who did it (U9
+     * #1140): issued, sent, reminded (by hand or automatically), a send
+     * that failed, voided, credited, written again, a failed pay attempt,
+     * a new link, its shares and its payments. An older invoice reads its
+     * own dates, without names. `invoice:read`; amounts need
+     * `payment:read`.
+     */
+    @Get(":invoiceId/history")
+    history(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+    ) {
+        return readInvoiceHistory(ctx, id);
     }
 
     /**

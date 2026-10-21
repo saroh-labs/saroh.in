@@ -513,8 +513,10 @@ organizations/:org/customers`: everyone who has paid (an order through a
   billing, the waitlist, alerts to a business's own team (enquiries, and
   the team alerts — new order, booking, failed payment, someone joining, a
   go-live, a custom domain that stopped working (#917) — for every business, provider or not, in fixed words with the
-  business's names cleaned; built, #849), a site's customer sign-in codes and the email-changed notice
-  with Saroh's built-in customer accounts (ADR-011), and a template test
+  business's names cleaned; built, #849), a site's customer sign-in codes, the email-changed notice
+  and the "Ask to remove my data" acknowledgement and its done or closed email
+  with Saroh's built-in customer accounts (ADR-011; DEC-172, #1106), all under one footer that names
+  them (`siteAccountEmailFooter`, #1156), and a template test
   sent to the signed-in user's own verified address. A business that brings
   its own login system sends its own codes (not built). With no email
   provider, owners and admins who can act are asked to connect one — "Your
@@ -529,14 +531,18 @@ organizations/:org/customers`: everyone who has paid (an order through a
   customer's own order, booking or invoice goes into their account on the
   business's site, unless the business has turned those updates off (below).
   It goes out by email, SMS or WhatsApp only through the business's connected
-  provider. Saroh's own email sends a site's sign-in codes and nothing else.
+  provider. Saroh's own email sends a site's sign-in codes and notices about
+  the customer's own account there (a changed email, a request to remove
+  their data), and nothing else.
   Until those messages ship, the honest copy ("Saroh doesn't send this") stays.
   Invoices went first (D17): see Money above.
 - **Current** (round-2 A14) — A booking confirmed, moved or cancelled, and
   an order's Ready and handover, are told to the customer: in their account
   thread while it is live (`SITE_ACCOUNT_AREA`, the `ACCOUNT_THREAD`
-  flag, and the business's own choice, below), and by email to a verified
-  site account through the business's own provider. Nothing by SMS or
+  flag, and the business's own choice, below), and by email to the
+  contact's email through the business's own provider (DEC-174 D1: a desk,
+  phone or guest customer too; a site account's verified address wins
+  when it differs, A2). The peek names it: "emailed to ‹email›". Nothing by SMS or
   WhatsApp. **Copy names what is sent, from
   the API's reach** (`EMAIL_AND_ACCOUNT` | `EMAIL` | `ACCOUNT` |
   `ON_SIGN_IN` | `NONE`, `lib/messages/notice-reach.ts`): "Saroh doesn't
@@ -565,6 +571,51 @@ organizations/:org/customers`: everyone who has paid (an order through a
   while the first two hold (`offered`), so nobody is offered a switch that
   does nothing, and it says what a business with no email provider is left
   with: no other way to tell a customer their order is ready.
+- **Current** (DEC-174, U1 #1132) — **Every automatic customer notice
+  added by DEC-174 has a switch the business can turn off.** The kinds,
+  their defaults, the module each belongs to and their words are one pure
+  module, `communications/notice-settings.ts`: renewal invoices, failed
+  autopay charges, membership emails, refunds, team replies, enquiry
+  replies, delivery updates, course emails, pack credits and back in stock
+  start on; overdue reminders start off (D3 is opt-in). A business's choice
+  is a `CustomerNoticeSetting` row only while it differs from the default,
+  as `NotificationPreference` is; a write equal to the default deletes it.
+  **Every sender asks `noticeOn(tx, organizationId, kind)` inside its own
+  transaction, and only that**: never a gate of its own. `noticeOn` says
+  only whether the business sends the kind; the provider, consent and the
+  account thread stay the send path's. `GET` and
+  `PATCH …/customer-notices/settings`: anyone in the business reads them
+  (`canChange` says whether they may change them), a change needs
+  `comms:manage` and writes `customer-notices.setting` to the audit stream.
+  A kind whose module is off is not listed (DEC-057); the enquiry reply is
+  listed but not offered without a connected email provider ("Connect your
+  email first"), and a change to a kind not offered is refused (409).
+  Booking and order notices, and the fixes, have no switch here.
+  **A kind is not listed until Saroh sends it** (`NOTICE_SENDS`, U4
+  #1135): every kind starts false, and the unit that ships a kind's sender
+  flips its own line in the same commit, so no switch ever does nothing.
+- **Current** (DEC-174, U4 #1135) — **Settings › Providers' "Emails to
+  your customers"**, under "Updates in Messages"
+  (`components/providers/customer-emails-row.tsx`, words in
+  `lib/communications/customer-emails.ts`): a read row ("9 on, 1 off",
+  "Not sent: Overdue reminders.") and at most one quiet line under it (no
+  email provider: "None of these go out until your email is connected";
+  else, for someone without `comms:manage`, why they can only read them).
+  The page's own email prompt carries Connect, so the row never repeats
+  it. Edit (View, read-only) opens a side sheet of switches, one per kind
+  offered with what the customer gets; each saves as it is flipped, with
+  Undo (`useSettingsUndo`), and Done closes it. The sheet holds one note at
+  most. No row at all while the business is offered none. A change is told
+  in Settings › Activity ("turned Membership emails off for customers").
+
+- **Current** (DEC-174, U14 #1145) — **A team reply in a customer's
+  Messages is emailed to them** through the business's own email, a minute
+  after it is sent; replies inside that minute go as one email, quoting
+  each. The line under the reply box (and Home's Reply) names the address
+  ("Emailed to ‹email› a minute after you send"), and says "Nothing is
+  emailed or texted" only when nothing is: no email connected, "Your
+  replies in Messages" turned off, no address, or email turned off by the
+  customer.
 
 ## Analytics
 

@@ -380,6 +380,49 @@ describe("a full class on the booking page (A12)", () => {
         expect(wl.join).not.toHaveBeenCalled();
     });
 
+    it("opens on the held session from the offer's claim link, and books it (#1149)", async () => {
+        const wl = waitlist({
+            places: [
+                {
+                    startAt: START,
+                    status: "OFFERED",
+                    placeInLine: null,
+                    offeredUntil: "2026-10-05T09:30:00.000Z",
+                },
+            ],
+        });
+        const acc = account({ waitlist: wl });
+        // `/book?service=&date=&start=`: 18:30 in Kolkata, full to everyone
+        // else, held for Asha.
+        render(
+            <BookingFlow
+                page={PAGE}
+                account={acc}
+                apiUrl="x"
+                initialServiceId="svc_hiit"
+                initialDate="2026-10-05"
+                initialStart="18:30"
+            />,
+        );
+        // Chosen as the page opens, and read as theirs.
+        const held = await screen.findByRole("radio", {
+            name: /Held for you until 3:00 pm/,
+        });
+        await waitFor(() =>
+            expect(held).toHaveAttribute("aria-checked", "true"),
+        );
+        fireEvent.click(confirmButton(/Book and pay at the desk/));
+        expect(
+            await screen.findByRole("heading", {
+                name: "You're booked, Asha.",
+            }),
+        ).toBeInTheDocument();
+        expect(acc.book).toHaveBeenCalledWith(
+            expect.objectContaining({ startAt: START, pay: "DESK" }),
+        );
+        expect(screen.queryByText(/That time has gone/)).toBeNull();
+    });
+
     it("lets them leave a line they are in", async () => {
         const wl = waitlist({
             places: [

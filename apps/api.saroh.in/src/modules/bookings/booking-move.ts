@@ -357,6 +357,12 @@ export async function moveFoundBooking(
                                 contactId: booking.contactId,
                                 reason: reassign ? "reassigned" : "rescheduled",
                                 eventId: event.id,
+                                // Still a hold awaiting its payment (#1137):
+                                // the customer hears the time when it is
+                                // paid, not "has moved" now.
+                                ...(moved.status === "PENDING"
+                                    ? { held: true }
+                                    : {}),
                             },
                         },
                         select: { id: true },

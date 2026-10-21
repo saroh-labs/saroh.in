@@ -35,6 +35,19 @@ const WRITTEN: {
         href: "/commerce/orders/o1",
     },
     { type: "booking.new", kind: "booking", id: "b1", href: "/bookings/b1" },
+    // Bookings with you (#1138), in that person's own alerts.
+    {
+        type: "booking.mine.new",
+        kind: "booking",
+        id: "b1",
+        href: "/bookings/b1",
+    },
+    {
+        type: "booking.mine.cancelled",
+        kind: "booking",
+        id: "b1",
+        href: "/bookings/b1",
+    },
     {
         type: "booking.moved",
         kind: "booking",
@@ -165,6 +178,20 @@ const WRITTEN: {
         kind: "customer-request",
         id: null,
         href: "/commerce/customers?tab=requests",
+    },
+    // #1150: a member's own cancel or pause, or autopay off at their bank,
+    // opens the person's Memberships.
+    {
+        type: "member.cancelled",
+        kind: "member",
+        id: "con_1",
+        href: "/contacts/con_1?tab=sub",
+    },
+    {
+        type: "member.autopay_off",
+        kind: "member",
+        id: null,
+        href: "/billing/subscriptions",
     },
 ];
 

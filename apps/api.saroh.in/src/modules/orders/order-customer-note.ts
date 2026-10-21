@@ -5,6 +5,8 @@ import { prisma } from "@saroh/database";
 import { moneyWordsMinor } from "../../common/words-format";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { accountAreaOn } from "../site-accounts/account-area";
+import type { CancelMoney } from "../site-accounts/notices/cancel-money";
+import { cancelMoneyWords } from "../site-accounts/notices/cancel-money";
 import { appendMessage } from "../site-accounts/thread-store";
 import type { FulfilmentType } from "./fulfilment";
 
@@ -130,35 +132,84 @@ const said = (cents: number, currency: string) =>
     moneyWordsMinor(Math.abs(cents), currency);
 
 /**
+ * How a lower delivery charge reaches the customer (U5, #1136), so the note
+ * never says money "is coming back" when it isn't:
+ *
+ * - `REFUNDED`: the provider took the refund of `refundCents`;
+ * - `REFUND_FAILED`: the refund of `refundCents` didn't go through (yet);
+ * - `COUNTER`: paid by hand, so it is given back by hand;
+ * - `NOT_PAID`: nothing was paid, or nothing is left to hand back, so the
+ *   total is simply lower.
+ */
+export type FulfilmentHandBack =
+    | { kind: "REFUNDED" | "REFUND_FAILED"; refundCents: number }
+    | { kind: "COUNTER" | "NOT_PAID" };
+
+/**
  * "Your order #1063 is now for local delivery. There's ₹40.00 more to pay
- * for delivery." What changed for them, and the money it moved.
+ * for delivery." What changed for them, and the money it moved — only as
+ * far as it actually moved.
  */
 export function fulfilmentNote(input: {
     orderNumber: string;
     currency: string;
     type: FulfilmentType;
     differenceCents: number;
+    handBack: FulfilmentHandBack;
 }): string {
     const d = input.differenceCents;
-    const money =
-        d > 0
-            ? ` There's ${said(d, input.currency)} more to pay for delivery.`
-            : d < 0
-              ? ` ${said(d, input.currency)} of the delivery charge is coming back to you.`
-              : "";
+    let money = "";
+    if (d > 0) {
+        money = ` There's ${said(d, input.currency)} more to pay for delivery.`;
+    } else if (d < 0) {
+        const back = input.handBack;
+        switch (back.kind) {
+            case "REFUNDED":
+                money = ` ${said(back.refundCents, input.currency)} of the delivery charge is coming back to you.`;
+                break;
+            case "REFUND_FAILED":
+                money = ` We'll refund ${said(back.refundCents, input.currency)}; it hasn't gone through yet.`;
+                break;
+            case "COUNTER":
+                money = ` We'll give you ${said(d, input.currency)} of the delivery charge back.`;
+                break;
+            case "NOT_PAID":
+                money = ` Your total is ${said(d, input.currency)} less.`;
+                break;
+        }
+    }
     return `Your order #${input.orderNumber} is now ${FOR_TYPE[input.type]}.${money}`;
 }
 
 /**
+ * What the customer's note may say about a lower charge (U5): the refund
+ * only when the provider took it, "hasn't gone through yet" when it failed.
+ */
+export function handBackOf(
+    result: { settleCents: number; byHand: boolean },
+    refund: { amountCents: number } | null,
+    moneyError: string | null,
+): FulfilmentHandBack {
+    if (result.byHand) return { kind: "COUNTER" };
+    if (result.settleCents >= 0) return { kind: "NOT_PAID" };
+    if (moneyError || !refund) {
+        return { kind: "REFUND_FAILED", refundCents: -result.settleCents };
+    }
+    return { kind: "REFUNDED", refundCents: refund.amountCents };
+}
+
+/**
  * "Your order #1063 has been cancelled. ₹610.00 is being refunded to how
- * you paid."
+ * you paid." What the cancel did with the money (U13, #1144) in the words
+ * every cancel notice uses (`notices/cancel-money.ts`): the part refunded,
+ * the part the business returns by hand, or that no payment was taken.
  */
 export function cancelNote(
     orderNumber: string,
-    refund?: { amountCents: number; currency: string },
+    money: CancelMoney | null,
+    business: string,
 ): string {
     const first = `Your order #${orderNumber} has been cancelled.`;
-    return refund && refund.amountCents > 0
-        ? `${first} ${said(refund.amountCents, refund.currency)} is being refunded to how you paid.`
-        : first;
+    const words = cancelMoneyWords(money, business);
+    return words ? `${first} ${words}` : first;
 }

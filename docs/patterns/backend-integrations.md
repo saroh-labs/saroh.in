@@ -99,10 +99,10 @@ a note saying so.
   credentials, webhooks or contracts (DEC-010).
 - **Current** — **The Organization connects its own messaging provider** for real
   sends; Saroh-owned email is only for identity mail and a template test to the
-  signed-in user's own verified address (DEC-011) — and, while a business has
-  no email provider, its booking notices, sent from `notify.saroh.in` under
-  one rule (`emailRoute` → `sarohDecision`) and counted against its plan's
-  `sarohEmailsPerMonth`, failing closed (DEC-086).
+  signed-in user's own verified address (DEC-011). A business's customers
+  are never emailed from Saroh's address: with no provider of its own, they
+  are not emailed (DEC-086 reversed; its code removed in #1134, and
+  `no-saroh-customer-mail.spec.ts` keeps it out).
 - **Current** — **Settings → Providers is one row per provider, connected
   first** (DEC-036): a disconnected one stays listed as theirs, only what the
   API can connect is offered, and a row shows only what the API sends as
@@ -240,8 +240,7 @@ a note saying so.
   transaction: fixed templates (`communications/transactional.ts`), only to
   the bill-to email or a verified site-account email (never a typed
   address, never a DEC-049 placeholder), only through the business's own
-  EMAIL provider (409 otherwise; a booking notice given as its values may go
-  through Saroh instead, DEC-086), no marketing opt-in, and a revoked email
+  EMAIL provider (409 otherwise), no marketing opt-in, and a revoked email
   consent still suppresses it. A secret link in it (a pay link) is sealed
   into the `message.send` job with the credentials' key and filled in only
   as the email goes to the provider; the stored body keeps a slot, so
@@ -641,6 +640,12 @@ Test mode, 2026-09-29, on a business's own connection (Northwind). Docs:
   400 `pre_debit_notification_not_sent` (`NOT_YET`). **Razorpay sends the
   pre-debit notice** to the customer's UPI app; Saroh sends none. A
   renewal's invoice must be raised at least ~26 hours before its charge.
+- **Card and eMandate pre-debit notice (D6, U21).** Card: the issuing bank
+  sends the notice (SMS or email) when the debit is asked for, and Razorpay
+  debits ~36 hours later (an AFA link instead above ₹15,000); the order
+  needs no `notification`. eMandate: no notice is sent by anyone; the RBI
+  framework covers cards, PPIs and UPI only. Evidence and open questions:
+  `docs/architecture/research/2026-10-pre-debit-notice.md`, DEC-174.
 - **Unanswered charges.** A UPI debit can take 24–36 hours to be answered,
   more when the notice fails; some banks leave the payment `created`.
   Razorpay doesn't retry a failed debit on an order with `notification`;

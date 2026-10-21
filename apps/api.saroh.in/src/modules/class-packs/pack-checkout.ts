@@ -18,6 +18,7 @@ import {
 import type { SaleCharge } from "../invoices/sale-price";
 import { toCents } from "../invoices/totals";
 import { assertFirstPackAllowed } from "./first-pack";
+import { recordPackEvent } from "./pack-events";
 
 /**
  * A class pack bought online by a signed-in customer (round-2 A11, R12;
@@ -31,7 +32,9 @@ import { assertFirstPackAllowed } from "./first-pack";
  * invoice payment path; nothing is bought until its webhook arrives. Then,
  * under the invoice's row lock, {@link completePackDraftInTx} numbers the
  * invoice PAID and makes the `PackPurchase` from the snapshot, so a pack the
- * merchant changed or archived meanwhile still sells on the terms shown.
+ * merchant changed or archived meanwhile still sells on the terms shown,
+ * with its SOLD event by the customer (U22). The payment's receipt
+ * (DEC-173) says what was bought; no second email.
  *
  * An unpaid draft is voided after {@link PACK_DRAFT_HOURS} by the hold sweep
  * ({@link discardStalePackDrafts}). It never had a number, so the series has
@@ -331,6 +334,21 @@ export async function completePackDraftInTx(
             paidBy: "ONLINE",
         },
         select: { id: true },
+    });
+    // Its "Sold" row in the pack's history, as a desk sale writes one, by
+    // the customer themselves (DEC-174 U22).
+    await recordPackEvent(tx, {
+        organizationId,
+        packId: pack.id,
+        purchaseId: purchase.id,
+        kind: "SOLD",
+        actor: { actorKind: "CUSTOMER", actorUserId: null },
+        details: {
+            price: packPay(terms),
+            currency: terms.currency,
+            credits: terms.credits,
+            paidBy: "ONLINE",
+        },
     });
     const profile = await loadTaxProfile(tx, organizationId);
     const number = await numberFor(tx, organizationId, profile, "INVOICE", now);

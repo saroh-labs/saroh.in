@@ -1,6 +1,11 @@
 // A subscription's log (D9): what an action records, who it names, and how
 // the log is read a page at a time. The database is mocked;
 // subscription-events.db.spec.ts writes and reads real rows.
+// The member's notice (U11) is queued with each event; it has its own
+// specs (`membership-notices.db.spec.ts`), so it is stubbed here.
+jest.mock("./membership-notices", () => ({
+    queueMembershipNotice: jest.fn().mockResolvedValue("none"),
+}));
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     return {
@@ -38,11 +43,16 @@ const db = prisma as unknown as Record<string, Mocked>;
 
 describe("what an action records", () => {
     const create = jest.fn();
+    const jobCreate = jest.fn();
     const tx = {
         subscriptionEvent: { create },
+        job: { create: jobCreate },
     } as unknown as Prisma.TransactionClient;
 
-    beforeEach(() => create.mockReset());
+    beforeEach(() => {
+        create.mockReset().mockResolvedValue({ id: "sev_1" });
+        jobCreate.mockReset();
+    });
 
     it("writes one row with who, the invoice, a note and its data", async () => {
         await recordSubscriptionEvent(
@@ -93,6 +103,53 @@ describe("what an action records", () => {
             actorKind: "CUSTOMER",
             customerAccountId: "acct_1",
         });
+        // The member's own pause tells the team (#1150).
+        expect(jobCreate).toHaveBeenCalledWith({
+            data: {
+                organizationId: "org_1",
+                type: "team.alert",
+                payload: {
+                    event: "member",
+                    change: "paused",
+                    subscriptionId: "sub_1",
+                    eventId: "sev_1",
+                },
+            },
+        });
+    });
+
+    it("tells the team of a member's own cancel, never of the team's own (#1150)", async () => {
+        const customer = {
+            actorKind: "CUSTOMER" as const,
+            actorUserId: null,
+            customerAccountId: "acct_1",
+        };
+        await recordSubscriptionEvent(
+            tx,
+            "org_1",
+            "sub_1",
+            "CANCEL_SCHEDULED",
+            customer,
+        );
+        expect(jobCreate.mock.calls[0]![0].data.payload).toMatchObject({
+            event: "member",
+            change: "cancelled",
+        });
+        jobCreate.mockReset();
+        // Not a change the team hears of, or not the member's doing.
+        await recordSubscriptionEvent(
+            tx,
+            "org_1",
+            "sub_1",
+            "RESUMED",
+            customer,
+        );
+        await recordSubscriptionEvent(tx, "org_1", "sub_1", "CANCELLED", {
+            actorKind: "TEAM",
+            actorUserId: "user_1",
+        });
+        await recordSubscriptionEvent(tx, "org_1", "sub_1", "PAUSED", JOB);
+        expect(jobCreate).not.toHaveBeenCalled();
     });
 
     it("keeps only the collection fields that changed", () => {

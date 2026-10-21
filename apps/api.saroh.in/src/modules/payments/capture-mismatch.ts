@@ -1,6 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
 import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
+import { enqueueTeamAlert } from "../notifications/team-alerts";
 
 /**
  * A captured payment whose amount or currency is not what Saroh asked for
@@ -69,6 +70,11 @@ export function describeMismatch(
  * one payment, a look-up may find it too, and a replay repeats them.
  * Returns whether this call wrote it. The caller holds the intent's row
  * lock.
+ *
+ * The team hears of it with the record (#1139): `team.alert`
+ * `{ event: "mismatch" }`, both figures, on the Payment failed row — so
+ * every path that finds one (the webhook, a look-up, an autopay charge's)
+ * tells it once.
  */
 export async function recordCaptureMismatchInTx(
     tx: Tx,
@@ -91,7 +97,7 @@ export async function recordCaptureMismatchInTx(
         select: { id: true },
     });
     if (recorded) return false;
-    await tx.paymentAttempt.create({
+    const attempt = await tx.paymentAttempt.create({
         data: {
             organizationId: intent.organizationId,
             paymentIntentId: intent.id,
@@ -107,6 +113,12 @@ export async function recordCaptureMismatchInTx(
                 capturedCurrency: captured.currency ?? null,
             },
         },
+        select: { id: true },
+    });
+    await enqueueTeamAlert(tx, intent.organizationId, {
+        event: "mismatch",
+        paymentIntentId: intent.id,
+        attemptId: attempt.id,
     });
     return true;
 }

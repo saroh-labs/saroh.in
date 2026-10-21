@@ -13,7 +13,7 @@ import { LookPay, LookWhat, LookWho } from "./look-steps";
 import type { LookStep } from "./look-words";
 import { momentText } from "./look-words";
 import type { BookingPageData, BookingStart } from "./model";
-import { laterSkip } from "./model";
+import { laterSkip, sessionsOnShow } from "./model";
 import { FlowMessageLine } from "./steps/flow-message";
 import { WhenBody } from "./steps/when-step";
 import type { BookingFlowEngine } from "./use-booking-flow";
@@ -95,8 +95,22 @@ export function LookStepBody({
                         days={times.days}
                         isClass={times.isClass}
                         day={times.day}
-                        sessions={times.sessions.slice(0, times.sessionsShown)}
-                        more={times.sessions.length > times.sessionsShown}
+                        sessions={times.sessions.slice(
+                            0,
+                            sessionsOnShow(
+                                times.sessions,
+                                times.sessionsShown,
+                                chosen?.startAt,
+                            ),
+                        )}
+                        more={
+                            times.sessions.length >
+                            sessionsOnShow(
+                                times.sessions,
+                                times.sessionsShown,
+                                chosen?.startAt,
+                            )
+                        }
                         zone={zone}
                         service={service}
                         chosen={chosen}

@@ -203,6 +203,28 @@ describe("noticeTargetOf (what the inbox is told)", () => {
         ).toEqual({ kind: "domain", id: "site_1" });
     });
 
+    it("the money alerts open the order, or the invoice the money was for (#1139)", () => {
+        for (const type of [
+            "order.payment_failed",
+            "payment.mismatch",
+            "order.paid_by_link",
+        ]) {
+            expect(noticeTargetOf({ type, orderId: "ord_1" })).toEqual({
+                kind: "order",
+                id: "ord_1",
+            });
+        }
+        expect(
+            noticeTargetOf({
+                type: "payment.mismatch.invoice",
+                invoiceId: "inv_1",
+            }),
+        ).toEqual({ kind: "invoice", id: "inv_1" });
+        expect(() => noticeHeadOf({ type: "order.payment_failed" })).toThrow(
+            /must set orderId/,
+        );
+    });
+
     it("opens what an unlisted type's columns say, else nothing known", () => {
         expect(
             noticeTargetOf({ type: "order.shipped", orderId: "ord_1" }),

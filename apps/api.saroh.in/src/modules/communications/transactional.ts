@@ -26,12 +26,54 @@ export const NOTICE_TEMPLATES = [
     "BOOKING_CONFIRMED",
     "BOOKING_MOVED",
     "BOOKING_CANCELLED",
+    // An unpaid hold whose time ran out (#1137), with a way to book again.
+    "BOOKING_LAPSED",
     // A website order the customer placed (UX-042): paid, or to pay on
     // handover.
     "ORDER_PLACED",
     "ORDER_READY",
     "ORDER_HANDED_OVER",
     "WAITLIST_OFFER",
+    // "We got your message" to someone who sent an enquiry (DEC-174 U15,
+    // #1146): email only, behind the ENQUIRY_REPLY switch.
+    "ENQUIRY_RECEIVED",
+    // Delivery updates (DEC-174 U16, #1147), behind the ORDER_DELIVERY
+    // switch: a delivered order, a digital order sent, and tracking added
+    // or changed after the handover.
+    "ORDER_DELIVERED",
+    "ORDER_SENT",
+    "ORDER_TRACKING",
+    // A member's membership changed (DEC-174 U11, #1142), each keyed to its
+    // SubscriptionEvent, under the MEMBERSHIP switch.
+    "MEMBERSHIP_JOINED",
+    "MEMBERSHIP_PAUSED",
+    "MEMBERSHIP_RESUMED",
+    "MEMBERSHIP_PLAN_CHANGED",
+    "MEMBERSHIP_CANCELLED",
+    "MEMBERSHIP_KEPT",
+    // A membership set to end is a week away (DEC-174 U19, #1150).
+    "MEMBERSHIP_ENDING",
+    // A team reply in the customer's Messages thread (DEC-174 U14, #1145):
+    // email only, held a minute and coalesced, under the TEAM_REPLY switch.
+    "THREAD_REPLY",
+    // A renewal's autopay charge failed, with a fresh link to pay (U10).
+    "AUTOPAY_FAILED",
+    // "₹X is on its way back to how you paid" (DEC-174 U12, #1143): an
+    // online refund the provider took, behind the REFUND switch.
+    "REFUND_SENT",
+    // Courses and classes (DEC-174 U17, #1148): enrolled, with every
+    // session, and an enrolment cancelled, under the COURSE switch; and a
+    // class the business cancelled told to those waiting for it (no switch).
+    "COURSE_ENROLLED",
+    "COURSE_CANCELLED",
+    "WAITLIST_CLASS_CANCELLED",
+    // "‹Product› is back" to someone who asked on the site (DEC-174 U23,
+    // #1154): email only, behind the BACK_IN_STOCK switch.
+    "BACK_IN_STOCK",
+    // Class packs (DEC-174 U22, #1153), behind the PACK_CREDITS switch:
+    // one credit left, and credits expiring in 7 days.
+    "PACK_LOW",
+    "PACK_EXPIRING",
 ] as const;
 export type NoticeTemplate = (typeof NOTICE_TEMPLATES)[number];
 
@@ -220,6 +262,12 @@ export interface AutopayCancelledVars {
     /** "Asha", or null when there's no name. */
     firstName: string | null;
     plan: string;
+    /**
+     * The business sends renewal invoices by itself ("Renewal invoices" on,
+     * automatic notices U10). Off, nobody sends one unless the team does,
+     * so the note doesn't promise it.
+     */
+    invoiceSent: boolean;
 }
 
 /**
@@ -227,7 +275,10 @@ export interface AutopayCancelledVars {
  * autopay (D14). Plain text: a thread message is never rendered as HTML.
  */
 export function autopayCancelledSentence(vars: AutopayCancelledVars): string {
-    return `${vars.business} turned off autopay for ${vars.plan}. Nothing more is taken automatically. Your next renewal comes as an invoice with a link to pay.`;
+    const next = vars.invoiceSent
+        ? "Your next renewal comes as an invoice with a link to pay."
+        : `${vars.business} will tell you how to pay your next renewal.`;
+    return `${vars.business} turned off autopay for ${vars.plan}. Nothing more is taken automatically. ${next}`;
 }
 
 /**
@@ -246,7 +297,9 @@ export function renderAutopayCancelled(
     const body = [
         `<p>${greeting}</p>`,
         `<p>${business} has turned off autopay for ${plan}. Nothing more will be taken automatically.</p>`,
-        `<p>Your plan carries on. From your next renewal, ${business} sends you an invoice with a link to pay it.</p>`,
+        vars.invoiceSent
+            ? `<p>Your plan carries on. From your next renewal, ${business} emails you an invoice with a link to pay.</p>`
+            : `<p>Your plan carries on. From your next renewal, ${business} will tell you how to pay.</p>`,
         `<p>${business}</p>`,
     ].join("\n");
     return {
@@ -300,6 +353,11 @@ export interface ReceiptMailVars {
     /** "₹4,400"; "₹0" once paid in full. */
     leftToPay: string;
     paidInFull: boolean;
+    /**
+     * What a class pack's payment bought (DEC-174 U22): "10-class pack: 10
+     * classes, use them by 31 Dec 2026". Null or absent for anything else.
+     */
+    pack?: string | null;
 }
 
 /**
@@ -321,6 +379,7 @@ export function renderInvoiceReceipt(vars: ReceiptMailVars): RenderedMessage {
         vars.paidInFull
             ? `<p>Invoice ${number} is now paid in full (${escapeHtml(vars.total)}).</p>`
             : `<p>Paid so far: ${escapeHtml(vars.paidSoFar)} of ${escapeHtml(vars.total)}<br>Left to pay: ${escapeHtml(vars.leftToPay)}</p>`,
+        ...(vars.pack ? [`<p>${escapeHtml(vars.pack)}.</p>`] : []),
         `<p>${business}</p>`,
     ].join("\n");
     return {

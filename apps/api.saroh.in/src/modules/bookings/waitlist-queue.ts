@@ -1,5 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
+import { enqueueCustomerNotice } from "../site-accounts/customer-notify-queue";
+
 /**
  * Enqueueing `waitlist.offer` (round-2 A12): a place in a class freed — a
  * booking cancelled or moved away, a pay-now hold let go or run out, an
@@ -23,6 +25,11 @@ export interface WaitlistOfferPayload {
 }
 
 type Tx = Pick<Prisma.TransactionClient, "job" | "classWaitlistEntry">;
+
+/** A class-cancelled notice's key (U17): once per place in line. */
+export function waitlistClassCancelledKey(entryId: string): string {
+    return `waitlist-class-cancelled:${entryId}`;
+}
 
 /**
  * A place in this session may have freed: queue an offer when anyone is in
@@ -95,27 +102,46 @@ export async function acceptWaitlistInTx(
 }
 
 /**
- * The class itself is cancelled (the team cancelled every place in it):
- * nobody in line can be offered a place, so each live entry is CLOSED and
- * nothing is queued.
+ * The class itself is cancelled (the team cancelled every place in it), or
+ * is off sale: nobody in line can be offered a place, so each live entry is
+ * CLOSED and no offer is queued.
+ *
+ * `tell` (U17, #1148): the business cancelled the class, so everyone still
+ * in line hears it is off (`customer.notify` WAITLIST_CLASS_CANCELLED, once
+ * per entry). A class taken off sale says nothing.
  */
 export async function closeSessionWaitlistInTx(
-    tx: Pick<Prisma.TransactionClient, "classWaitlistEntry">,
+    tx: Pick<Prisma.TransactionClient, "classWaitlistEntry" | "job">,
     input: {
         organizationId: string;
         serviceId: string;
         startAt: Date;
         now: Date;
+        tell?: boolean;
     },
 ): Promise<number> {
+    const where = {
+        organizationId: input.organizationId,
+        serviceId: input.serviceId,
+        startAt: input.startAt,
+        status: { in: ["WAITING" as const, "OFFERED" as const] },
+    };
+    const live = input.tell
+        ? await tx.classWaitlistEntry.findMany({
+              where,
+              select: { id: true },
+          })
+        : [];
     const { count } = await tx.classWaitlistEntry.updateMany({
-        where: {
-            organizationId: input.organizationId,
-            serviceId: input.serviceId,
-            startAt: input.startAt,
-            status: { in: ["WAITING", "OFFERED"] },
-        },
+        where: input.tell ? { id: { in: live.map((e) => e.id) } } : where,
         data: { status: "CLOSED", closedAt: input.now },
     });
+    for (const entry of live) {
+        await enqueueCustomerNotice(tx, input.organizationId, {
+            kind: "WAITLIST_CLASS_CANCELLED",
+            eventKey: waitlistClassCancelledKey(entry.id),
+            waitlistEntryId: entry.id,
+        });
+    }
     return count;
 }

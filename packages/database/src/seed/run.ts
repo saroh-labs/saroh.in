@@ -55,7 +55,6 @@ import {
 import { seedPlanEndingBusiness } from "./plan-ending";
 import { seedPreviousAddress } from "./previous-address";
 import { seedPlanId } from "./pricing";
-import { seedSarohEmailBusinesses } from "./saroh-email";
 import { seedStaff } from "./staff";
 import {
     PLACEHOLDER_CREDENTIALS,
@@ -336,9 +335,6 @@ export async function seed(): Promise<void> {
             `[seed] the operator console as staff: ${STAFF_EMAIL} / ${passwordHint(seedPassword())}`,
         );
     }
-    // Two of Asha's that Saroh sends booking emails for, flags on for them
-    // alone (DEC-086; `providers-saroh-email.spec.ts`).
-    await seedSarohEmailBusinesses(prisma, founderId, now);
     // Three with no email of their own, Communications rolled out for them
     // alone, one on an enforced entry plan (#850; `email-setup-prompt.spec.ts`).
     await seedEmailPromptBusinesses(prisma, founderId, now);

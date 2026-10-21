@@ -71,6 +71,9 @@ function makeTx() {
         },
         paymentIntent: { findFirst: jest.fn() },
         invoice: { findFirst: jest.fn() },
+        // A capture recorded at the wrong amount (PAY-06): none by default.
+        paymentAttempt: { findFirst: jest.fn().mockResolvedValue(null) },
+        paymentRefund: { findMany: jest.fn().mockResolvedValue([]) },
         membership: {
             findUnique: jest.fn(),
             // The reviewer reads no orders, money or team: never emailed on
@@ -104,8 +107,15 @@ function makeTx() {
             findFirst: jest.fn(),
         },
         customerDataRequest: { findFirst: jest.fn() },
+        booking: { findFirst: jest.fn() },
+        bookingEvent: { findFirst: jest.fn() },
+        staffMember: { findFirst: jest.fn() },
         merchantPaymentProvider: { findFirst: jest.fn() },
         communicationProvider: { findFirst: jest.fn() },
+        // Members (#1150).
+        customerSubscription: { findFirst: jest.fn() },
+        subscriptionEvent: { findFirst: jest.fn() },
+        paymentMandate: { findFirst: jest.fn() },
         $executeRaw: jest.fn().mockResolvedValue(0),
     };
 }
@@ -332,13 +342,14 @@ describe("a failed payment", () => {
             // The row opens the invoice.
             invoiceId: "inv_1",
             title: "Payment failed on invoice INV-0042",
-            body: "Meera Iyer's payment of ₹2,400 didn't go through. They can try again from the same link.",
+            // Every send replaces the link (DEC-110): never "the same link".
+            body: "Meera Iyer's payment of ₹2,400 didn't go through. They'll need a new link: open the invoice to share one.",
         });
         expect(recipients(out)).toEqual(["u_owner", "u_admin"]);
         // The bell names the customer; Saroh's email doesn't.
         expect(out.emails[0].mail).toMatchObject({
             heading: "Payment failed on invoice INV-0042",
-            body: "A payment of ₹2,400 didn't go through. The customer can try again from the same link.",
+            body: "A payment of ₹2,400 didn't go through. The customer will need a new link: open the invoice to share one.",
         });
     });
 
@@ -393,6 +404,300 @@ describe("a failed payment", () => {
             paymentIntentId: "pi_1",
         });
         expect(out.told).toBe(false);
+    });
+});
+
+describe("a failed invoice payment that no longer stands (#1139)", () => {
+    function failing(tx: FakeTx, status: string) {
+        tx.paymentIntent.findFirst.mockResolvedValue({
+            status: "FAILED",
+            amountCents: 240000,
+            currency: "INR",
+            viaMandateId: null,
+        });
+        tx.invoice.findFirst.mockResolvedValue({
+            id: "inv_1",
+            number: "INV-0042",
+            status,
+            billToName: "Meera Iyer",
+            contact: null,
+        });
+    }
+    const failed = {
+        event: "failed",
+        invoiceId: "inv_1",
+        paymentIntentId: "pi_1",
+    } as const;
+
+    it("paid in cash before the alert ran: nothing is said", async () => {
+        const tx = makeTx();
+        failing(tx, "PAID");
+        expect(await tellTeam(asTx(tx), ORG, failed)).toEqual({
+            told: false,
+            emails: [],
+        });
+        expect(tx.customerNotice.createMany).not.toHaveBeenCalled();
+    });
+
+    it("credited in full since: nothing is said", async () => {
+        const tx = makeTx();
+        failing(tx, "CREDITED");
+        expect((await tellTeam(asTx(tx), ORG, failed)).told).toBe(false);
+    });
+
+    it("taken at the wrong amount: the mismatch alert tells it, not 'didn't go through'", async () => {
+        const tx = makeTx();
+        failing(tx, "ISSUED");
+        tx.paymentAttempt.findFirst.mockResolvedValue({ id: "att_1" });
+        expect((await tellTeam(asTx(tx), ORG, failed)).told).toBe(false);
+    });
+});
+
+describe("an order's payment that didn't go through (#1139)", () => {
+    function order(tx: FakeTx, over: Record<string, unknown> = {}) {
+        tx.paymentIntent.findFirst.mockResolvedValue({
+            status: "FAILED",
+            amountCents: 120000,
+            currency: "INR",
+        });
+        tx.order.findFirst.mockResolvedValue({
+            id: "ord_1",
+            orderId: "#1042",
+            status: "PENDING",
+            paymentStatus: "FAILED",
+            placedOnline: false,
+            payOnHandover: false,
+            customerId: "cus_1",
+            walkInName: null,
+            customer: { firstName: "Asha", lastName: "Rao", email: null },
+            ...over,
+        });
+    }
+    const failedOrder = {
+        event: "order-failed",
+        orderId: "ord_1",
+        paymentIntentId: "pi_1",
+    } as const;
+
+    it("rings the bell on the order, and emails whoever has email on for Failed", async () => {
+        const tx = makeTx();
+        order(tx);
+        const out = await tellTeam(asTx(tx), ORG, failedOrder);
+        expect(
+            tx.customerNotice.createMany.mock.calls[0][0].data[0],
+        ).toMatchObject({
+            eventKey: "team:order-failed:pi_1",
+            orderId: "ord_1",
+        });
+        expect(tx.notification.create.mock.calls[0][0].data).toEqual({
+            organizationId: ORG,
+            type: "order.payment_failed",
+            orderId: "ord_1",
+            title: "Payment for order #1042 didn't go through",
+            body: "Asha Rao's payment of ₹1,200 didn't go through. They'll need a new link: open the order to share one.",
+        });
+        // Failed's email is on by default: the owner and admin.
+        expect(recipients(out)).toEqual(["u_owner", "u_admin"]);
+        expect(out.emails[0].mail).toMatchObject({
+            heading: "Payment for order #1042 didn't go through",
+            body: "A payment of ₹1,200 didn't go through. The customer will need a new link: open the order to share one.",
+            url: "https://app.saroh.localhost/commerce/orders/ord_1",
+        });
+        expect(out.emails[0].mail.body).not.toContain("Asha");
+        expect(out.emails[0].mail.footer).toContain("Payment failed");
+    });
+
+    it("says nothing once paid, cancelled, gone through after all, or for a site checkout", async () => {
+        for (const [over, intent] of [
+            [{ paymentStatus: "PAID" }, "FAILED"],
+            [{ status: "CANCELLED" }, "FAILED"],
+            [{}, "SUCCEEDED"],
+            [{ placedOnline: true, paymentStatus: "UNPAID" }, "FAILED"],
+        ] as const) {
+            const tx = makeTx();
+            order(tx, over);
+            tx.paymentIntent.findFirst.mockResolvedValue({
+                status: intent,
+                amountCents: 120000,
+                currency: "INR",
+            });
+            expect((await tellTeam(asTx(tx), ORG, failedOrder)).told).toBe(
+                false,
+            );
+        }
+    });
+
+    it("the webhook redelivered: claimed already, so told once", async () => {
+        const tx = makeTx();
+        order(tx);
+        tx.customerNotice.createMany.mockResolvedValue({ count: 0 });
+        expect(await tellTeam(asTx(tx), ORG, failedOrder)).toEqual({
+            told: false,
+            emails: [],
+        });
+        expect(tx.notification.create).not.toHaveBeenCalled();
+    });
+});
+
+describe("money that doesn't match (#1139, PAY-06)", () => {
+    const mismatch = {
+        event: "mismatch",
+        paymentIntentId: "pi_1",
+        attemptId: "att_1",
+    } as const;
+    const RAW = {
+        invoiceStatus: "AMOUNT_MISMATCH",
+        askedAmountCents: 120000,
+        askedCurrency: "INR",
+        capturedAmountCents: 118000,
+        capturedCurrency: "INR",
+    };
+    function onOrder(tx: FakeTx) {
+        tx.paymentAttempt.findFirst.mockResolvedValue({
+            rawResponse: RAW,
+            paymentIntent: {
+                amountCents: 120000,
+                currency: "INR",
+                invoice: null,
+                order: {
+                    id: "ord_1",
+                    orderId: "#1042",
+                    status: "PENDING",
+                    paymentStatus: "FAILED",
+                    placedOnline: false,
+                    payOnHandover: false,
+                    customerId: null,
+                    walkInName: "Ravi",
+                    customer: null,
+                },
+            },
+        });
+    }
+
+    it("₹1,180 taken against ₹1,200 due: both figures, on the order", async () => {
+        const tx = makeTx();
+        onOrder(tx);
+        const out = await tellTeam(asTx(tx), ORG, mismatch);
+        expect(
+            tx.customerNotice.createMany.mock.calls[0][0].data[0],
+        ).toMatchObject({ eventKey: "team:mismatch:pi_1:att_1" });
+        expect(tx.notification.create.mock.calls[0][0].data).toEqual({
+            organizationId: ORG,
+            type: "payment.mismatch",
+            orderId: "ord_1",
+            title: "Payment for order #1042 didn't match",
+            body: "Ravi paid, but ₹1,180 was taken against ₹1,200 due. It isn't counted as paid, and it's owed back to the customer: refund it from Home.",
+        });
+        expect(recipients(out)).toEqual(["u_owner", "u_admin"]);
+        expect(out.emails[0].mail).toMatchObject({
+            heading: "Payment for order #1042 didn't match",
+            body: "₹1,180 was taken against ₹1,200 due. It isn't counted as paid, and it's owed back to the customer: refund it from Home.",
+        });
+    });
+
+    it("on an invoice (a booking paid at booking): opens the invoice", async () => {
+        const tx = makeTx();
+        tx.paymentAttempt.findFirst.mockResolvedValue({
+            rawResponse: RAW,
+            paymentIntent: {
+                amountCents: 120000,
+                currency: "INR",
+                order: null,
+                invoice: {
+                    id: "inv_1",
+                    number: "INV-0042",
+                    billToName: null,
+                    contact: { firstName: "Meera", lastName: "Iyer" },
+                },
+            },
+        });
+        await tellTeam(asTx(tx), ORG, mismatch);
+        expect(tx.notification.create.mock.calls[0][0].data).toMatchObject({
+            type: "payment.mismatch.invoice",
+            invoiceId: "inv_1",
+            title: "Payment on invoice INV-0042 didn't match",
+            body: expect.stringContaining(
+                "Meera Iyer paid, but ₹1,180 was taken against ₹1,200 due.",
+            ),
+        });
+    });
+
+    it("says nothing once a refund of it is on its way, or for the ₹1 autopay check", async () => {
+        const tx = makeTx();
+        onOrder(tx);
+        tx.paymentRefund.findMany.mockResolvedValue([
+            {
+                id: "ref_1",
+                status: "PENDING",
+                idempotencyKey: "amount-mismatch:att_1",
+            },
+        ]);
+        expect((await tellTeam(asTx(tx), ORG, mismatch)).told).toBe(false);
+
+        const check = makeTx();
+        check.paymentAttempt.findFirst.mockResolvedValue({
+            rawResponse: RAW,
+            paymentIntent: {
+                amountCents: 100,
+                currency: "INR",
+                order: null,
+                invoice: null,
+            },
+        });
+        expect((await tellTeam(asTx(check), ORG, mismatch)).told).toBe(false);
+    });
+});
+
+describe("a team order paid by its link (#1139)", () => {
+    function paid(tx: FakeTx, over: Record<string, unknown> = {}) {
+        tx.paymentIntent.findFirst.mockResolvedValue({
+            status: "SUCCEEDED",
+            amountCents: 124000,
+            currency: "INR",
+        });
+        tx.order.findFirst.mockResolvedValue({
+            id: "ord_1",
+            orderId: "ORD-012",
+            status: "PENDING",
+            paymentStatus: "PAID",
+            placedOnline: false,
+            payOnHandover: false,
+            customerId: "cus_1",
+            walkInName: null,
+            customer: { firstName: "Asha", lastName: "Rao", email: null },
+            ...over,
+        });
+    }
+    const byLink = {
+        event: "paid-by-link",
+        orderId: "ord_1",
+        paymentIntentId: "pi_1",
+    } as const;
+
+    it("rings the New order row's bell; nobody is emailed by default", async () => {
+        const tx = makeTx();
+        paid(tx);
+        const out = await tellTeam(asTx(tx), ORG, byLink);
+        expect(tx.notification.create.mock.calls[0][0].data).toEqual({
+            organizationId: ORG,
+            type: "order.paid_by_link",
+            orderId: "ord_1",
+            title: "Order ORD-012 was paid online",
+            body: "Asha Rao paid ₹1,240 online.",
+        });
+        expect(out).toMatchObject({ told: true, emails: [] });
+    });
+
+    it("says nothing for a site order, or one no longer paid", async () => {
+        for (const over of [
+            { placedOnline: true },
+            { paymentStatus: "REFUNDED" },
+            { status: "CANCELLED" },
+        ]) {
+            const tx = makeTx();
+            paid(tx, over);
+            expect((await tellTeam(asTx(tx), ORG, byLink)).told).toBe(false);
+        }
     });
 });
 
@@ -1321,5 +1626,631 @@ describe("a customer asks to remove their data", () => {
             expect(out).toEqual({ told: false, emails: [] });
             expect(tx.notification.create).not.toHaveBeenCalled();
         }
+    });
+});
+
+describe("a booking with you (#1138)", () => {
+    const AT = new Date("2026-10-27T05:30:00.000Z");
+    const WAS = new Date("2026-10-26T05:30:00.000Z");
+    const booking = {
+        id: "bk_1",
+        status: "CONFIRMED",
+        startAt: AT,
+        timezone: "Asia/Kolkata",
+        staffId: "st_ravi",
+        bookerName: "Asha R",
+        service: { name: "Physio" },
+        contact: { firstName: "Asha", lastName: "Rao" },
+    };
+    const event = {
+        id: "ev_1",
+        type: "BOOKED",
+        fromStartAt: null,
+        toStartAt: AT,
+        fromStaffId: null,
+        toStaffId: null,
+        toStaff: null,
+    };
+
+    /** Ravi is u_kitchen, a Member on the diary. */
+    function ravi(tx: FakeTx, over: Partial<typeof event> = {}) {
+        tx.booking.findFirst.mockResolvedValue(booking);
+        tx.bookingEvent.findFirst.mockResolvedValue({ ...event, ...over });
+        tx.staffMember.findFirst.mockResolvedValue({
+            membership: { userId: "u_kitchen" },
+        });
+    }
+
+    it("rings Ravi's own bell, and emails Ravi alone, with no customer's name", async () => {
+        const tx = makeTx();
+        ravi(tx);
+        const out = await tellTeam(asTx(tx), ORG, {
+            event: "booking-mine",
+            bookingId: "bk_1",
+            eventId: "ev_1",
+            userId: "u_kitchen",
+            change: "new",
+        });
+        expect(
+            tx.customerNotice.createMany.mock.calls[0][0].data[0].eventKey,
+        ).toBe("team:booking-mine:ev_1:u_kitchen");
+        expect(tx.notification.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                organizationId: ORG,
+                userId: "u_kitchen",
+                type: "booking.mine.new",
+                bookingId: "bk_1",
+                title: "Asha Rao booked Physio with you",
+            }),
+            select: { id: true },
+        });
+        // Only Ravi, though the owner and admin read bookings too.
+        expect(recipients(out)).toEqual(["u_kitchen"]);
+        const mail = out.emails[0].mail;
+        expect(mail.heading).toBe("A booking with you: Physio");
+        expect(mail.body).toBe(
+            "Physio, Tue 27 Oct at 11:00 am. Open it in Saroh to see who.",
+        );
+        expect(JSON.stringify(mail)).not.toContain("Asha");
+        expect(mail.url).toBe("https://app.saroh.localhost/bookings/bk_1");
+        expect(mail.footer).toContain("“Bookings with you”");
+    });
+
+    it("Ravi turned email off: the bell only", async () => {
+        const tx = makeTx();
+        ravi(tx);
+        tx.notificationPreference.findMany.mockResolvedValue([
+            {
+                userId: "u_kitchen",
+                event: "mine",
+                channel: "email",
+                enabled: false,
+            },
+        ]);
+        const out = await tellTeam(asTx(tx), ORG, {
+            event: "booking-mine",
+            bookingId: "bk_1",
+            eventId: "ev_1",
+            userId: "u_kitchen",
+            change: "new",
+        });
+        expect(out.told).toBe(true);
+        expect(tx.notification.create).toHaveBeenCalledTimes(1);
+        expect(out.emails).toEqual([]);
+    });
+
+    it("moved: says the new time and the old", async () => {
+        const tx = makeTx();
+        ravi(tx, { type: "RESCHEDULED", fromStartAt: WAS });
+        const out = await tellTeam(asTx(tx), ORG, {
+            event: "booking-mine",
+            bookingId: "bk_1",
+            eventId: "ev_1",
+            userId: "u_kitchen",
+            change: "moved",
+        });
+        expect(tx.notification.create.mock.calls[0][0].data).toMatchObject({
+            type: "booking.mine.moved",
+            title: "Asha Rao's Physio with you was moved",
+            body: "Now Tue 27 Oct at 11:00 am. It was Mon 26 Oct at 11:00 am.",
+        });
+        expect(out.emails[0].mail.heading).toBe("A booking with you was moved");
+    });
+
+    it("cancelled: told even though the booking is cancelled now", async () => {
+        const tx = makeTx();
+        ravi(tx, { type: "CANCELLED", fromStartAt: AT, toStartAt: null });
+        tx.booking.findFirst.mockResolvedValue({
+            ...booking,
+            status: "CANCELLED",
+        });
+        const out = await tellTeam(asTx(tx), ORG, {
+            event: "booking-mine",
+            bookingId: "bk_1",
+            eventId: "ev_1",
+            userId: "u_kitchen",
+            change: "cancelled",
+        });
+        expect(tx.notification.create.mock.calls[0][0].data.type).toBe(
+            "booking.mine.cancelled",
+        );
+        expect(out.emails[0].mail.body).toBe(
+            "Physio, Tue 27 Oct at 11:00 am. It's off your diary.",
+        );
+    });
+
+    it("given to Meera: Ravi's is email only, the bell was written with the move (#1157)", async () => {
+        const tx = makeTx();
+        ravi(tx, {
+            type: "REASSIGNED",
+            fromStartAt: AT,
+            fromStaffId: "st_ravi",
+            toStaffId: "st_meera",
+            toStaff: { name: "Meera" } as never,
+        });
+        const out = await tellTeam(asTx(tx), ORG, {
+            event: "booking-mine",
+            bookingId: "bk_1",
+            eventId: "ev_1",
+            userId: "u_kitchen",
+            change: "moved-away",
+        });
+        expect(tx.staffMember.findFirst.mock.calls[0][0].where.id).toBe(
+            "st_ravi",
+        );
+        expect(tx.notification.create).not.toHaveBeenCalled();
+        expect(out.emails[0].mail).toMatchObject({
+            heading: "A booking was given to someone else",
+            body: "Physio, Tue 27 Oct at 11:00 am, is now with Meera. It's off your diary.",
+        });
+    });
+
+    it("says nothing when it no longer stands", async () => {
+        const cases: [string, (tx: FakeTx) => void][] = [
+            [
+                "someone else has it now",
+                (tx) => {
+                    tx.staffMember.findFirst.mockResolvedValue({
+                        membership: { userId: "u_admin" },
+                    });
+                },
+            ],
+            [
+                "Ravi left the team",
+                (tx) => {
+                    tx.staffMember.findFirst.mockResolvedValue({
+                        membership: null,
+                    });
+                },
+            ],
+            [
+                "the new booking was cancelled since",
+                (tx) => {
+                    tx.booking.findFirst.mockResolvedValue({
+                        ...booking,
+                        status: "CANCELLED",
+                    });
+                },
+            ],
+            [
+                "the booking is gone",
+                (tx) => {
+                    tx.booking.findFirst.mockResolvedValue(null);
+                },
+            ],
+        ];
+        for (const [, change] of cases) {
+            const tx = makeTx();
+            ravi(tx);
+            change(tx);
+            const out = await tellTeam(asTx(tx), ORG, {
+                event: "booking-mine",
+                bookingId: "bk_1",
+                eventId: "ev_1",
+                userId: "u_kitchen",
+                change: "new",
+            });
+            expect(out).toEqual({ told: false, emails: [] });
+            expect(tx.customerNotice.createMany).not.toHaveBeenCalled();
+        }
+    });
+
+    it("a job run twice tells once", async () => {
+        const tx = makeTx();
+        ravi(tx);
+        tx.customerNotice.createMany.mockResolvedValue({ count: 0 });
+        const out = await tellTeam(asTx(tx), ORG, {
+            event: "booking-mine",
+            bookingId: "bk_1",
+            eventId: "ev_1",
+            userId: "u_kitchen",
+            change: "new",
+        });
+        expect(out).toEqual({ told: false, emails: [] });
+        expect(tx.notification.create).not.toHaveBeenCalled();
+    });
+
+    it("the job skips a payload with no person or an unknown change", async () => {
+        const handler = new TeamAlertHandler();
+        for (const payload of [
+            { event: "booking-mine", bookingId: "bk_1", eventId: "ev_1" },
+            {
+                event: "booking-mine",
+                bookingId: "bk_1",
+                eventId: "ev_1",
+                userId: "u_kitchen",
+                change: "lost",
+            },
+        ]) {
+            await handler.handle({
+                id: "job_m",
+                organizationId: ORG,
+                payload,
+            } as unknown as Job);
+        }
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+});
+
+describe("members (#1150)", () => {
+    const END = new Date("2026-10-28T18:30:00.000Z");
+    const sub = (over: Record<string, unknown> = {}) => ({
+        id: "sub_1",
+        status: "ACTIVE",
+        cancelAtPeriodEnd: true,
+        currentPeriodEnd: END,
+        pausedUntil: null,
+        timezone: "Asia/Kolkata",
+        contactId: "con_1",
+        plan: { name: "Monthly yoga" },
+        contact: { firstName: "Asha", lastName: "Rao" },
+        ...over,
+    });
+    const cancelled = {
+        event: "member" as const,
+        change: "cancelled" as const,
+        subscriptionId: "sub_1",
+        eventId: "sev_1",
+    };
+
+    it("a member's own cancel rings the bell on the person, email off by default", async () => {
+        const tx = makeTx();
+        tx.customerSubscription.findFirst.mockResolvedValue(sub());
+        tx.subscriptionEvent.findFirst.mockResolvedValue({
+            id: "sev_1",
+            kind: "CANCEL_SCHEDULED",
+        });
+        const out = await tellTeam(asTx(tx), ORG, cancelled);
+        // Only the member's own doing is ever worded.
+        expect(tx.subscriptionEvent.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ actorKind: "CUSTOMER" }),
+            }),
+        );
+        expect(tx.customerNotice.createMany).toHaveBeenCalledWith({
+            data: [
+                expect.objectContaining({
+                    eventKey: "team:member:sev_1",
+                    kind: "TEAM_TOLD",
+                }),
+            ],
+            skipDuplicates: true,
+        });
+        expect(tx.notification.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "member.cancelled",
+                contactId: "con_1",
+                title: "Asha Rao cancelled their Monthly yoga membership",
+                body: "It ends on 29 Oct 2026. Nothing more will be charged.",
+            }),
+            select: { id: true },
+        });
+        expect(out.emails).toEqual([]);
+    });
+
+    it("emails who turned email on, naming nobody", async () => {
+        const tx = makeTx();
+        tx.customerSubscription.findFirst.mockResolvedValue(sub());
+        tx.subscriptionEvent.findFirst.mockResolvedValue({
+            id: "sev_1",
+            kind: "CANCELLED",
+        });
+        tx.notificationPreference.findMany.mockResolvedValue([
+            {
+                userId: "u_owner",
+                event: "member",
+                channel: "email",
+                enabled: true,
+            },
+        ]);
+        const out = await tellTeam(asTx(tx), ORG, cancelled);
+        expect(recipients(out)).toEqual(["u_owner"]);
+        const mail = out.emails[0].mail;
+        expect(mail.subject).toBe(
+            "Rye & Co: A member cancelled their membership",
+        );
+        expect(mail.body).not.toContain("Asha");
+        expect(mail.body).toContain("It has ended.");
+        expect(mail.url).toBe(
+            "https://app.saroh.localhost/billing/subscriptions/sub_1",
+        );
+        expect(mail.footer).toContain("“Members”");
+    });
+
+    it("a cancel kept since says nothing", async () => {
+        const tx = makeTx();
+        tx.customerSubscription.findFirst.mockResolvedValue(
+            sub({ cancelAtPeriodEnd: false }),
+        );
+        tx.subscriptionEvent.findFirst.mockResolvedValue({
+            id: "sev_1",
+            kind: "CANCEL_SCHEDULED",
+        });
+        expect(await tellTeam(asTx(tx), ORG, cancelled)).toEqual({
+            told: false,
+            emails: [],
+        });
+    });
+
+    it("a change the team made (no CUSTOMER event) says nothing", async () => {
+        const tx = makeTx();
+        tx.customerSubscription.findFirst.mockResolvedValue(sub());
+        tx.subscriptionEvent.findFirst.mockResolvedValue(null);
+        expect((await tellTeam(asTx(tx), ORG, cancelled)).told).toBe(false);
+    });
+
+    it("a pause says until when, and says nothing once started again", async () => {
+        const tx = makeTx();
+        tx.customerSubscription.findFirst.mockResolvedValue(
+            sub({
+                status: "PAUSED",
+                cancelAtPeriodEnd: false,
+                pausedUntil: new Date("2026-11-11T18:30:00.000Z"),
+            }),
+        );
+        tx.subscriptionEvent.findFirst.mockResolvedValue({
+            id: "sev_2",
+            kind: "PAUSED",
+        });
+        const paused = { ...cancelled, change: "paused" as const };
+        await tellTeam(asTx(tx), ORG, paused);
+        expect(tx.notification.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "member.paused",
+                title: "Asha Rao paused their Monthly yoga membership",
+                body: "Until 12 Nov 2026. No charges until then, and their classes are on hold.",
+            }),
+            select: { id: true },
+        });
+
+        const again = makeTx();
+        again.customerSubscription.findFirst.mockResolvedValue(
+            sub({ status: "ACTIVE", cancelAtPeriodEnd: false }),
+        );
+        again.subscriptionEvent.findFirst.mockResolvedValue({
+            id: "sev_2",
+            kind: "PAUSED",
+        });
+        expect((await tellTeam(asTx(again), ORG, paused)).told).toBe(false);
+    });
+
+    describe("autopay turned off at the bank", () => {
+        const off = {
+            event: "member" as const,
+            change: "autopay_off" as const,
+            subscriptionId: "sub_1",
+            mandateId: "man_1",
+        };
+
+        it("tells the team once per mandate", async () => {
+            const tx = makeTx();
+            tx.customerSubscription.findFirst.mockResolvedValue(
+                sub({ cancelAtPeriodEnd: false }),
+            );
+            tx.paymentMandate.findFirst
+                .mockResolvedValueOnce({
+                    status: "CANCELLED",
+                    cancelReason: "PROVIDER",
+                })
+                .mockResolvedValueOnce(null);
+            await tellTeam(asTx(tx), ORG, off);
+            expect(tx.customerNotice.createMany).toHaveBeenCalledWith({
+                data: [
+                    expect.objectContaining({
+                        eventKey: "team:member:autopay_off:man_1",
+                    }),
+                ],
+                skipDuplicates: true,
+            });
+            expect(tx.notification.create).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    type: "member.autopay_off",
+                    contactId: "con_1",
+                    title: "Asha Rao turned off autopay for Monthly yoga at their bank",
+                }),
+                select: { id: true },
+            });
+        });
+
+        it("says nothing once autopay is set up again, or the membership ended", async () => {
+            const again = makeTx();
+            again.customerSubscription.findFirst.mockResolvedValue(
+                sub({ cancelAtPeriodEnd: false }),
+            );
+            again.paymentMandate.findFirst
+                .mockResolvedValueOnce({
+                    status: "CANCELLED",
+                    cancelReason: "PROVIDER",
+                })
+                .mockResolvedValueOnce({ id: "man_2" });
+            expect((await tellTeam(asTx(again), ORG, off)).told).toBe(false);
+
+            const ended = makeTx();
+            ended.customerSubscription.findFirst.mockResolvedValue(
+                sub({ status: "CANCELLED" }),
+            );
+            ended.paymentMandate.findFirst.mockResolvedValueOnce({
+                status: "CANCELLED",
+                cancelReason: "PROVIDER",
+            });
+            expect((await tellTeam(asTx(ended), ORG, off)).told).toBe(false);
+        });
+
+        it("a mandate the team or Saroh ended says nothing", async () => {
+            const tx = makeTx();
+            tx.customerSubscription.findFirst.mockResolvedValue(sub());
+            tx.paymentMandate.findFirst.mockResolvedValueOnce({
+                status: "CANCELLED",
+                cancelReason: "STAFF",
+            });
+            expect((await tellTeam(asTx(tx), ORG, off)).told).toBe(false);
+        });
+    });
+});
+
+describe("a refund that sent no money back (#1143)", () => {
+    const refused = {
+        event: "refund",
+        refundId: "ref_1",
+        change: "refused",
+    } as const;
+    const failed = { ...refused, change: "failed" } as const;
+    const ORDER = {
+        id: "ord_1",
+        orderId: "#1042",
+        paymentStatus: "PAID",
+        customerId: "cus_1",
+        walkInName: null,
+        customer: { firstName: "Asha", lastName: "Rao", email: null },
+    };
+    function refundTx(
+        intent: Partial<{
+            order: unknown;
+            invoice: unknown;
+            purpose: string | null;
+            refunds: { amountCents: number }[];
+        }>,
+        status = "FAILED",
+    ) {
+        const tx = makeTx();
+        const withRefunds = tx as FakeTx & {
+            paymentRefund: { findFirst: jest.Mock };
+            customerNotice: { findUnique: jest.Mock };
+        };
+        withRefunds.paymentRefund.findFirst = jest.fn().mockResolvedValue({
+            id: "ref_1",
+            status,
+            amountCents: 50000,
+            currency: "INR",
+            paymentIntent: {
+                amountCents: 120000,
+                purpose: null,
+                refunds: [],
+                order: null,
+                invoice: null,
+                ...intent,
+            },
+        });
+        withRefunds.customerNotice.findUnique = jest
+            .fn()
+            .mockResolvedValue(null);
+        return withRefunds;
+    }
+
+    it("refused on an order: the bell opens the order, keyed to the refund, on the Payment failed row", async () => {
+        const tx = refundTx({ order: ORDER });
+        const out = await tellTeam(asTx(tx), ORG, refused);
+        expect(
+            tx.customerNotice.createMany.mock.calls[0][0].data[0],
+        ).toMatchObject({ eventKey: "team:refund:refused:ref_1" });
+        expect(tx.notification.create.mock.calls[0][0].data).toEqual({
+            organizationId: ORG,
+            type: "refund.refused",
+            orderId: "ord_1",
+            title: "Refund on order #1042 was refused",
+            body: "Asha Rao's refund of ₹500 was refused by your payment provider. No money went back to the customer. Open the order to refund it again.",
+        });
+        expect(recipients(out)).toEqual(["u_owner", "u_admin"]);
+        // Saroh's email names no customer.
+        expect(out.emails[0].mail.body).not.toContain("Asha");
+        expect(out.emails[0].mail.body).toContain("₹500");
+    });
+
+    it("whoever asked for it and saw the refusal isn't emailed; the rest are", async () => {
+        const tx = refundTx({ order: ORDER });
+        const out = await tellTeam(asTx(tx), ORG, {
+            ...refused,
+            actorUserId: "u_owner",
+        });
+        expect(recipients(out)).toEqual(["u_admin"]);
+    });
+
+    it("a booking's automatic refund refused: opens the booking", async () => {
+        const tx = refundTx({
+            invoice: {
+                id: "inv_1",
+                number: "INV-0042",
+                billToName: null,
+                contact: null,
+                booking: {
+                    id: "bk_1",
+                    bookerName: "Meera",
+                    service: { name: "Haircut" },
+                    contact: { firstName: "Meera", lastName: "Iyer" },
+                },
+            },
+        });
+        const out = await tellTeam(asTx(tx), ORG, refused);
+        expect(tx.notification.create.mock.calls[0][0].data).toMatchObject({
+            type: "refund.refused.booking",
+            bookingId: "bk_1",
+            title: "Refund for Meera Iyer's Haircut was refused",
+        });
+        expect(out.emails[0].mail).toMatchObject({
+            heading: "Refund on a booking was refused",
+            body: expect.stringContaining(
+                "A refund of ₹500 on a Haircut booking was refused",
+            ),
+        });
+        expect(out.emails[0].mail.body).not.toContain("Meera");
+    });
+
+    it("failed later on an invoice, after the customer was told: says so", async () => {
+        const tx = refundTx({
+            invoice: {
+                id: "inv_1",
+                number: "INV-0042",
+                billToName: "Rao Traders",
+                contact: null,
+                booking: null,
+            },
+        });
+        tx.customerNotice.findUnique.mockResolvedValue({
+            threadMessageId: null,
+            messageId: "msg_1",
+        });
+        await tellTeam(asTx(tx), ORG, failed);
+        expect(
+            tx.customerNotice.createMany.mock.calls[0][0].data[0],
+        ).toMatchObject({ eventKey: "team:refund:failed:ref_1" });
+        expect(tx.notification.create.mock.calls[0][0].data).toMatchObject({
+            type: "refund.failed.invoice",
+            invoiceId: "inv_1",
+            title: "Refund on invoice INV-0042 failed",
+            body: "Rao Traders's refund of ₹500 failed at your payment provider after it was sent. No money went back, though the customer was told it was on its way.",
+        });
+    });
+
+    it("says nothing once it went back after all, money was handed back since, or for the autopay check", async () => {
+        const settled = refundTx({ order: ORDER }, "SUCCEEDED");
+        expect((await tellTeam(asTx(settled), ORG, failed)).told).toBe(false);
+
+        const handedBack = refundTx({
+            order: ORDER,
+            refunds: [{ amountCents: 120000 }],
+        });
+        expect((await tellTeam(asTx(handedBack), ORG, refused)).told).toBe(
+            false,
+        );
+
+        const check = refundTx({ purpose: "AUTHORISATION" });
+        expect((await tellTeam(asTx(check), ORG, refused)).told).toBe(false);
+        expect(check.notification.create).not.toHaveBeenCalled();
+    });
+
+    it("a refund alert job with no refund or an unknown change is dropped", async () => {
+        const job = (payload: unknown) =>
+            ({
+                id: "job_1",
+                organizationId: ORG,
+                type: TEAM_ALERT_TYPE,
+                payload,
+            }) as unknown as Job;
+        const handler = new TeamAlertHandler();
+        await handler.handle(job({ event: "refund", change: "refused" }));
+        await handler.handle(
+            job({ event: "refund", refundId: "ref_1", change: "maybe" }),
+        );
+        expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 });

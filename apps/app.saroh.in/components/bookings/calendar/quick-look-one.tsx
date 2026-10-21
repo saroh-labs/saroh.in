@@ -181,7 +181,7 @@ export function OneLook({
         state === "cancelled"
             ? `Cancelled${b.cancelledLate ? " late" : ""}.`
             : open
-              ? `${rule !== null ? `Free to cancel until ${count(rule, "hour")} before. ` : ""}${bookingChangeText(read?.reach, first || "they")}`
+              ? `${rule !== null ? `Free to cancel until ${count(rule, "hour")} before. ` : ""}${bookingChangeText(read?.reach, first || "they", read?.emailTo)}`
               : null;
 
     const rows: MoreRow[] = moreItems(facts, { first, amount }).map((item) => ({

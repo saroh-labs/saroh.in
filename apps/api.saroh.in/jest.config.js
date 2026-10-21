@@ -231,6 +231,12 @@ module.exports = {
         "<rootDir>/src/modules/stock/stock.gate.spec.ts",
         // The stock lists' numbered pages: the window and the DTOs — pure.
         "<rootDir>/src/modules/stock/stock-paging.spec.ts",
+        // U23 back in stock: the stop link and the address (pure), the
+        // public routes' limits and refusals (mocked), and the scan that
+        // every stock writer calls the one hook.
+        "<rootDir>/src/modules/stock/stock-watch-rules.spec.ts",
+        "<rootDir>/src/modules/stock/stock-watch.controller.spec.ts",
+        "<rootDir>/src/modules/stock/on-sellable-again.guard.spec.ts",
         "<rootDir>/src/modules/catalogue/catalogue-defaults.spec.ts",
         "<rootDir>/src/modules/catalogue/sku-pattern.spec.ts",
         "<rootDir>/src/modules/catalogue/field-rules.spec.ts",
@@ -370,6 +376,8 @@ module.exports = {
         // GST on plans, class packs and courses (12 Oct 2026): what one is
         // charged, pure and with a jest-mocked Prisma for the terms read.
         "<rootDir>/src/modules/invoices/sale-price.spec.ts",
+        // Overdue reminders: which one, when, and the hours (U20).
+        "<rootDir>/src/modules/invoices/overdue-remind.spec.ts",
         // ADR-007 subscriptions: the period calendar, the service and the
         // renewal job with a jest-mocked Prisma. subscriptions.db.spec.ts needs
         // Postgres and runs in integration.
@@ -411,6 +419,8 @@ module.exports = {
         "<rootDir>/src/modules/class-packs/pack-checkout.spec.ts",
         // G20: a pack as the site's Prices page shows it. Pure.
         "<rootDir>/src/modules/class-packs/public-packs.spec.ts",
+        // DEC-174 U22: which purchases the expiry sweep tells. Pure.
+        "<rootDir>/src/modules/class-packs/pack-expiring.handler.spec.ts",
         "<rootDir>/src/modules/courses/courses.service.spec.ts",
         "<rootDir>/src/modules/subscriptions/dto.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",

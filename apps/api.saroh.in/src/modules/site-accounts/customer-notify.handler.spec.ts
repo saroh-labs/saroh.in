@@ -21,7 +21,6 @@ import { prisma, runInOrgContext } from "@saroh/database";
 
 import { accountThreadOn } from "../communications/account-thread";
 import type { CommunicationsService } from "../communications/communications.service";
-import * as sarohRule from "../communications/saroh-may-send";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { accountAreaOn } from "./account-area";
 import type { CustomerNotifyPayload } from "./customer-notify-queue";
@@ -29,6 +28,7 @@ import {
     CustomerNotifyHandler,
     CustomerNotifyService,
 } from "./customer-notify.handler";
+import { orderStepNotice } from "./notices/order";
 import { appendMessage } from "./thread-store";
 
 const threadFlag = accountThreadOn as jest.Mock;
@@ -72,9 +72,30 @@ function makeTx() {
                 .mockResolvedValue({ toStage: "READY", undoneAt: null }),
         },
         customerAccount: {
-            findFirst: jest.fn().mockResolvedValue({ contactId: "ct_1" }),
-            count: jest.fn().mockResolvedValue(1),
+            // By id: the account that placed an order. By contact: the
+            // live account whose verified address a notice goes to (A2).
+            findFirst: jest.fn(
+                (args: { where: { id?: string; contactId?: string } }) =>
+                    Promise.resolve(
+                        args.where.id
+                            ? { contactId: "ct_1" }
+                            : account.live
+                              ? { email: "asha@example.com" }
+                              : null,
+                    ),
+            ),
+            count: jest.fn(() => Promise.resolve(account.live ? 1 : 0)),
         },
+        contact: {
+            findFirst: jest.fn(() =>
+                Promise.resolve({ email: account.contactEmail }),
+            ),
+        },
+        customerNoticeSetting: {
+            findUnique: jest.fn().mockResolvedValue(null),
+        },
+        // Nobody revoked email (U16's promise reads it).
+        consent: { findUnique: jest.fn().mockResolvedValue(null) },
         customerIdentityLink: {
             findFirst: jest.fn().mockResolvedValue(null),
         },
@@ -86,6 +107,9 @@ function makeTx() {
     };
 }
 type FakeTx = ReturnType<typeof makeTx>;
+
+/** Whether the contact has a live site account, and their own email. */
+const account = { live: true, contactEmail: "asha.own@example.com" };
 const asTx = (tx: FakeTx) => tx as unknown as Prisma.TransactionClient;
 
 const queueTransactional = jest.fn();
@@ -112,6 +136,8 @@ beforeEach(() => {
         }),
     );
     append.mockResolvedValue({ id: "ctm_1" });
+    account.live = true;
+    account.contactEmail = "asha.own@example.com";
     queueTransactional.mockResolvedValue({
         id: "msg_1",
         status: "QUEUED",
@@ -146,10 +172,10 @@ describe("customer.notify — what it writes", () => {
                     number: "ORD-1019",
                 }) as unknown,
             }) as unknown,
-            // Through the business's own provider, decided once and handed
-            // over: Saroh never asked.
-            route: { route: "PROVIDER", provider: "RESEND" },
-            recipient: { kind: "SITE_ACCOUNT", contactId: "ct_1" },
+            // Through the business's own provider, read once and handed
+            // over.
+            provider: "RESEND",
+            recipient: { kind: "CONTACT", contactId: "ct_1" },
             createdByUserId: null,
         });
         // The event is claimed before anything is written, then filled in.
@@ -224,9 +250,28 @@ describe("customer.notify — what it writes", () => {
         expect(threadFlag).not.toHaveBeenCalled();
     });
 
-    it("a customer without an account: waiting in the thread for their first sign-in, and no email", async () => {
+    it("a customer without an account but with an email (a desk, phone or guest booking): emailed to the contact, D1", async () => {
+        account.live = false;
         const tx = makeTx();
-        tx.customerAccount.count.mockResolvedValue(0);
+        const out = await service.notify(asTx(tx), ORG, READY, NOW);
+        expect(out).toMatchObject({
+            threadMessageId: "ctm_1",
+            messageId: "msg_1",
+        });
+        expect(queueTransactional).toHaveBeenCalledWith(
+            tx,
+            ORG,
+            expect.objectContaining({
+                provider: "RESEND",
+                recipient: { kind: "CONTACT", contactId: "ct_1" },
+            }),
+        );
+    });
+
+    it("a customer with no account and no email of their own: waiting in the thread for their first sign-in, and no email", async () => {
+        account.live = false;
+        account.contactEmail = "";
+        const tx = makeTx();
         const out = await service.notify(asTx(tx), ORG, READY, NOW);
         expect(out).toMatchObject({
             threadMessageId: "ctm_1",
@@ -235,10 +280,19 @@ describe("customer.notify — what it writes", () => {
         expect(queueTransactional).not.toHaveBeenCalled();
     });
 
+    it("a contact whose only email is a reserved placeholder is not emailed", async () => {
+        account.live = false;
+        account.contactEmail = "phone+1@phone.invalid";
+        const tx = makeTx();
+        await service.notify(asTx(tx), ORG, READY, NOW);
+        expect(queueTransactional).not.toHaveBeenCalled();
+    });
+
     it("nothing reaches anyone: the event is still claimed, so a rerun stays quiet", async () => {
         threadFlag.mockResolvedValue(false);
+        account.live = false;
+        account.contactEmail = "";
         const tx = makeTx();
-        tx.customerAccount.count.mockResolvedValue(0);
         const out = await service.notify(asTx(tx), ORG, READY, NOW);
         expect(out).toEqual({
             duplicate: false,
@@ -287,7 +341,7 @@ describe("customer.notify — what it writes", () => {
     });
 });
 
-describe("customer.notify — Saroh's plan-meter lock (DEC-086)", () => {
+describe("customer.notify — no provider, no email (DEC-086 removed)", () => {
     const MOVED: CustomerNotifyPayload = {
         kind: "BOOKING_MOVED",
         eventKey: "booking:ev_2",
@@ -295,15 +349,9 @@ describe("customer.notify — Saroh's plan-meter lock (DEC-086)", () => {
         bookingEventId: "ev_2",
     };
 
-    it("taken when Saroh will email it, before the claim or any other write, and the route handed over", async () => {
-        const saroh = {
-            route: "SAROH",
-            allowance: { moduleId: "saroh-emails", state: "on", limit: 5 },
-        } as unknown as Extract<sarohRule.EmailRoute, { route: "SAROH" }>;
-        const spy = jest
-            .spyOn(sarohRule, "emailRoute")
-            .mockResolvedValue(saroh);
+    it("a booking notice at a business with no provider goes to the thread alone: no email, no lock", async () => {
         const tx = makeTx();
+        tx.communicationProvider.findUnique.mockResolvedValue(null);
         tx.booking.findFirst.mockResolvedValue({
             id: "bk_1",
             status: "CONFIRMED",
@@ -317,34 +365,49 @@ describe("customer.notify — Saroh's plan-meter lock (DEC-086)", () => {
             contact: { firstName: "Asha" },
         });
         tx.bookingEvent.findFirst.mockResolvedValue(null);
-        await service.notify(asTx(tx), ORG, MOVED, NOW);
-        expect(spy).toHaveBeenCalledTimes(1);
-        expect(tx.$executeRaw.mock.calls[0][1]).toBe(
-            `plan-meter:${ORG}:sarohEmailsPerMonth`,
-        );
-        expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
-            tx.customerNotice.createMany.mock.invocationCallOrder[0],
-        );
-        expect(queueTransactional.mock.calls[0][2]).toMatchObject({
-            route: saroh,
-            bookingId: "bk_1",
+        const out = await service.notify(asTx(tx), ORG, MOVED, NOW);
+        expect(out.messageId).toBeNull();
+        expect(queueTransactional).not.toHaveBeenCalled();
+        expect(tx.$executeRaw).not.toHaveBeenCalled();
+    });
+});
+
+describe("customer.notify — a kind with a switch (U1)", () => {
+    // No kind today has one (A1); the next units' kinds do. Stand one in.
+    beforeEach(() => {
+        jest.replaceProperty(orderStepNotice, "setting", "ORDER_DELIVERY");
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    it("turned off: nobody is told, nothing is claimed, read on the job's transaction", async () => {
+        const tx = makeTx();
+        tx.customerNoticeSetting.findUnique.mockResolvedValue({
+            enabled: false,
         });
-        spy.mockRestore();
+        const out = await service.notify(asTx(tx), ORG, READY, NOW);
+        expect(out).toEqual({
+            duplicate: false,
+            threadMessageId: null,
+            messageId: null,
+        });
+        expect(tx.customerNoticeSetting.findUnique).toHaveBeenCalledWith({
+            where: {
+                organizationId_kind: {
+                    organizationId: ORG,
+                    kind: "ORDER_DELIVERY",
+                },
+            },
+            select: { enabled: true },
+        });
+        expect(tx.customerNotice.createMany).not.toHaveBeenCalled();
+        expect(append).not.toHaveBeenCalled();
+        expect(queueTransactional).not.toHaveBeenCalled();
     });
 
-    it("not taken when its own provider emails it, or nobody does", async () => {
-        for (const route of [
-            { route: "PROVIDER" as const, provider: "RESEND" },
-            { route: null, refusal: "SWITCHED_OFF" as const },
-        ]) {
-            const spy = jest
-                .spyOn(sarohRule, "emailRoute")
-                .mockResolvedValue(route);
-            const tx = makeTx();
-            await service.notify(asTx(tx), ORG, MOVED, NOW);
-            expect(tx.$executeRaw).not.toHaveBeenCalled();
-            spy.mockRestore();
-        }
+    it("at its default (on): told as any notice", async () => {
+        const tx = makeTx();
+        const out = await service.notify(asTx(tx), ORG, READY, NOW);
+        expect(out.messageId).toBe("msg_1");
     });
 });
 
@@ -391,7 +454,7 @@ describe("customer.notify — once, and only what still stands", () => {
         await service.notify(asTx(tx), ORG, READY, NOW);
         expect(append.mock.calls[0][1].contactId).toBe("ct_survivor");
         expect(queueTransactional.mock.calls[0][2].recipient).toEqual({
-            kind: "SITE_ACCOUNT",
+            kind: "CONTACT",
             contactId: "ct_survivor",
         });
     });
@@ -566,13 +629,13 @@ describe("customer.notify — a website order placed (UX-042)", () => {
         expect(append.mock.calls[0][1]).toMatchObject({
             contactId: "ct_1",
             author: "SYSTEM",
-            body: "We have your order ORD-1019. You pay at pick-up. We'll tell you when it's ready for pick-up.",
+            body: "We have your order ORD-1019. You pay at pick-up. We'll email you when it's ready for pick-up.",
             event: "ORDER_PLACED",
         });
         expect(queueTransactional.mock.calls[0][2]).toMatchObject({
             template: "ORDER_PLACED",
-            route: { route: "PROVIDER", provider: "RESEND" },
-            recipient: { kind: "SITE_ACCOUNT", contactId: "ct_1" },
+            provider: "RESEND",
+            recipient: { kind: "CONTACT", contactId: "ct_1" },
         });
         expect(tx.customerNotice.createMany.mock.calls[0][0].data[0]).toEqual({
             organizationId: ORG,
@@ -592,17 +655,37 @@ describe("customer.notify — a website order placed (UX-042)", () => {
         });
         await service.notify(asTx(tx), ORG, PLACED, NOW);
         expect(append.mock.calls[0][1].body).toBe(
-            "We have your order ORD-1019, and it's paid. We'll tell you when it's on its way.",
+            "We have your order ORD-1019, and it's paid. We'll email you when it's on its way, and when it's delivered.",
         );
     });
 
-    it("no provider: the thread only, and Saroh never sends it (DEC-086 is booking notices)", async () => {
+    it("delivery updates off: promises only the handover (U16)", async () => {
+        const tx = makeTx();
+        placed(tx, {
+            payOnHandover: false,
+            paymentStatus: "PAID",
+            fulfilment: "SHIPPING",
+        });
+        tx.customerNoticeSetting.findUnique.mockResolvedValue({
+            enabled: false,
+        });
+        await service.notify(asTx(tx), ORG, PLACED, NOW);
+        expect(append.mock.calls[0][1].body).toBe(
+            "We have your order ORD-1019, and it's paid. We'll email you when it's on its way.",
+        );
+    });
+
+    it("no provider: the thread only, never emailed", async () => {
         const tx = makeTx();
         placed(tx);
         tx.communicationProvider.findUnique.mockResolvedValue(null);
         const out = await service.notify(asTx(tx), ORG, PLACED, NOW);
         expect(out.threadMessageId).toBe("ctm_1");
         expect(out.messageId).toBeNull();
+        // No email goes, so none is promised (U16).
+        expect(append.mock.calls[0][1].body).toBe(
+            "We have your order ORD-1019. You pay at pick-up. We'll tell you when it's ready for pick-up.",
+        );
         expect(queueTransactional).not.toHaveBeenCalled();
         expect(tx.$executeRaw).not.toHaveBeenCalled();
     });

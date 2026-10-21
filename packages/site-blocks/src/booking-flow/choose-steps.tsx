@@ -8,7 +8,7 @@ import type {
     BookingWhere,
     BookPay,
 } from "./model";
-import { laterSkip } from "./model";
+import { laterSkip, sessionsOnShow } from "./model";
 import { DetailsStep } from "./steps/details-step";
 import type { FlowMessage } from "./steps/flow-message";
 import { FlowMessageLine } from "./steps/flow-message";
@@ -88,8 +88,22 @@ export function ChooseSteps({
                     days={times.days}
                     isClass={times.isClass}
                     day={times.day}
-                    sessions={times.sessions.slice(0, times.sessionsShown)}
-                    more={times.sessions.length > times.sessionsShown}
+                    sessions={times.sessions.slice(
+                        0,
+                        sessionsOnShow(
+                            times.sessions,
+                            times.sessionsShown,
+                            chosen?.startAt,
+                        ),
+                    )}
+                    more={
+                        times.sessions.length >
+                        sessionsOnShow(
+                            times.sessions,
+                            times.sessionsShown,
+                            chosen?.startAt,
+                        )
+                    }
                     zone={times.zone}
                     service={service}
                     chosen={chosen}

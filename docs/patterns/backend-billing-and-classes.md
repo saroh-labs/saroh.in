@@ -328,6 +328,12 @@ requireProvider: false })`), the email says "view it and download a copy",
   and WhatsApp NEW or REMINDER shares together, so a WhatsApp reminder
   after an email one (or the other way) is a 429 with `retryAt`. Link, PDF
   and print don't count.
+- **Automatic overdue reminders** (DEC-174 D3, U20 #1151): opt-in, at
+  most two per invoice (3 and 10 days late, in the business's zone), and
+  inside the one-a-day rule: a hand or WhatsApp reminder in the last day
+  moves the automatic one to a later run. Only through
+  `remindAutomatic`, never a send path of its own. The sweep and its
+  claim are in `backend-jobs.md` → Customer notices.
 - **Remind many:** `POST invoices/reminders/preview` and `POST
 invoices/reminders` (`InvoiceRemindersService`, `invoice:write`, at most
   100 ids, duplicates once). Each invoice is EMAIL when an email can go
@@ -380,6 +386,67 @@ invoices/reminders` (`InvoiceRemindersService`, `invoice:write`, at most
 - **Tests:** `invoice-share-words.spec.ts`, `invoice-share.db.spec.ts`,
   `invoice-reminders.db.spec.ts`, `invoice-receipt.db.spec.ts` and
   `rls/invoice-shares-rls.db.spec.ts`, plain and under `TEST_RLS=on`.
+
+## An invoice's history: who did what — **Current** (automatic notices U9 #1140, DEC-174)
+
+- **`InvoiceEvent`** (`invoices/invoice-events.ts`, migration
+  `20261223140000_invoice_events`): `kind` ISSUED, SENT, REMINDED,
+  AUTO_SENT, AUTO_REMINDED, SEND_FAILED, VOIDED, CREDITED, REISSUED,
+  PAY_ATTEMPT_FAILED, LINK_MADE; `actorKind` USER (with `actorUserId`),
+  JOB (Saroh, on the business's behalf) or CUSTOMER; `channel` EMAIL or
+  THREAD; `messageId`; small `data` (address, reason, credit note, draft;
+  never a token). Its own RLS policy and CHECKs, including "USER exactly
+  when there is a person". `AuditEvent` can't hold it: its actor is
+  required and an automatic send has none.
+- **Written with `recordInvoiceEvent(tx, …)` in the change's own
+  transaction**: `issue` and `issueInTx` (a person, else JOB), `voidInTx`,
+  `creditInTx`, `draftFromInTx` (reissue, credit and rewrite, Write again
+  are REISSUED with the draft), a link made by hand (`createPayLink` /
+  `createViewLink`, now on a transaction; a member's own new link is
+  CUSTOMER), `send` / `remind` (one event per send, with the Message id
+  and SUPPRESSED when the customer turned email off), the webhook's
+  `applyInvoiceFailure` (CUSTOMER, or JOB for autopay). A link a send or a
+  share mints is told by that send or share, not as LINK_MADE.
+- **Automatic sends** pass `{ automatic: true }` to `send` / `remind`
+  (renewals U10, overdue reminders U20): AUTO_SENT / AUTO_REMINDED, actor
+  JOB. Every rule of a send still applies.
+- **A renewal's invoice is sent by Saroh** (U10 #1141, DEC-174 R3).
+  `renewOne`, `renewEarlyOne` and a restart when a pause's end date comes
+  queue `invoice.auto-send` (`invoice-auto-send.ts`) on the renewal's
+  transaction through `sendRenewalUnlessCharged`
+  (`subscriptions/renewal-send.ts`): not when live autopay will charge it
+  (`queueInTx` QUEUED) or the customer has a checkout open, and only while
+  `noticeOn(RENEWAL_INVOICE)`. The handler re-reads the invoice and calls
+  `InvoiceSendService.sendAutomatic` (no person: the job's pay link is
+  `payLinkForJobInTx`); paid, voided, under a charge, already sent or
+  switched off sends nothing, and a refusal is SEND_FAILED with
+  `data.reason` (NO_EMAIL_PROVIDER, NO_EMAIL_ADDRESS,
+  BUSINESS_DETAILS_MISSING, REFUSED), never thrown. Hand-made invoices are
+  never auto-sent. The autopay-cancelled note's words follow the switch.
+- **A failed autopay charge tells the customer** (U10): every place that
+  writes RENEWAL_FAILED for a decline (`failMandateChargeInTx`, the charge
+  job's give-up, the webhook's `applyInvoiceFailure`) calls
+  `enqueueAutopayFailedNotice` (`site-accounts/notices/autopay-failed.ts`);
+  CHECKOUT_OPEN and AMOUNT_MISMATCH are not told. Its email carries a pay
+  link minted only as it goes (the notice's `secretLink`, sealed into the
+  send, DEC-110), recorded as LINK_MADE (JOB) and PAY_LINK_EMAILED on the
+  subscription.
+- **A failed send is told once**: the `message.send` handler calls
+  `recordInvoiceSendFailed` only on the last attempt (or a failure it
+  won't retry), for an invoice's own emails; a partial unique index on
+  `(messageId, kind)` keeps a re-run to one line.
+- **Reads.** The detail read carries `events[]` (newest 50, with the
+  person's name now) and `shared[].byName`; the app's `historyLines` draws
+  them (`lib/invoices/event-words.ts`), dates a credit note from its
+  CREDITED event, and skips a `sent[]` email its event already tells.
+  `GET :invoiceId/history` (`invoice:read`) merges events, shares, the
+  ledger's payment audit rows (amounts only with `payment:read`), emails
+  from before events, and the invoice's own dates for what no row
+  records. No backfill (A16): older invoices read their dates without
+  names. In the data export as `invoice-history.csv`.
+- **Tests:** `invoice-events.db.spec.ts`,
+  `rls/invoice-events-rls.db.spec.ts`, plain and under `TEST_RLS=on`;
+  `lib/invoices/details-view.test.ts`; `e2e/tests/invoices-history.spec.ts`.
 
 ## Invoice styles: Classic, Band, Compact, frozen at issue — **Current** (DEC-173, U6 #1118)
 
@@ -1492,6 +1559,21 @@ options, items, more }` and a sentence with the count, the first
 - **A hold is only ever let go through `releaseHoldInTx`** — the sweep, the
   booker, and the team cancelling it (`cancelBooking`) — so its draft is
   always voided and its pay token cleared with it.
+- **A hold whose time ran out is a lapse, not a cancel** (#1137, DEC-174).
+  `releaseHoldInTx`'s `why` says which: `let-go` (the booker or the team:
+  CANCELLED, with the team member as actor), `lapsed` (the sweep: a
+  `LAPSED` BookingEvent with no actor, and one `booking.notify` with reason
+  `lapsed` when there is a contact and it is not a course's session — the
+  booker hears "Your hold on ‹service›, ‹time› has lapsed because it wasn't
+  paid", `BOOKING_LAPSED`, with "Book again:" and `/book?service=…`), or
+  `paid-late` (money came after the place was taken: `LAPSED`, owed back,
+  no notice). Nothing that reads "cancelled by the customer" (a null actor
+  on CANCELLED) counts a lapse: the team gets no bell for it.
+- **A hold that moves is not told "has moved"** (#1137): the move's
+  `booking.notify` carries `held: true` while the booking is PENDING, and
+  the handler sends no BOOKING_MOVED for it (the team still hears a move
+  the customer made). The payment's confirmation reads the booking's time
+  then, so it gives the new one.
 - **Lock a booking that may be a hold invoice first, then booking**
   (`lockBookingInTx`), the webhook's order. The other way round, a release
   and a payment arriving together deadlock (#508).
@@ -1535,6 +1617,15 @@ options, items, more }` and a sentence with the count, the first
   settles it and makes the credit note on the booking's invoice
   (`creditNoteForRefund`, DEC-023). A late cancel keeps the money; the
   business's `returnCredit` override refunds it only with `payment:manage`.
+  **The refund is in the booking's history** (#1137): once sent, a
+  `REFUNDED` BookingEvent ("Refunded ₹500 to how they paid"), or
+  `REFUND_FAILED` ("Refund failed") when the provider refused it, with
+  `data: { amountCents, currency, refundId, outcome }`
+  (`recordBookingRefundInTx`). The refund row's status decides which, under
+  its lock, and a line already the newest for that refund is not written
+  again; the refund webhook's settle and fail (and a refund made in the
+  provider's dashboard) call the same helper, so a refund that fails later
+  appends "Refund failed". Only a booking's own invoice (no order).
   A visit of a treatment has no booking invoice, so it never refunds here
   (DEC-050): its money goes back through the order.
 - **Money taken at the desk is the booking's paper, paid by hand** (round-2
@@ -1693,7 +1784,9 @@ options, items, more }` and a sentence with the count, the first
   `PackExtension` row; a pack with nothing left can't be extended, and an
   expired one can if the new date is still to come. Every create, publish,
   change, sale, extension, archive and restore writes one `PackEvent` in
-  its own transaction (`pack-events.ts`, actors as `event-actors.ts`);
+  its own transaction (`pack-events.ts`, actors as `event-actors.ts`); a
+  pack bought online writes its SOLD as the CUSTOMER when the money lands
+  (`completePackDraftInTx`, DEC-174 U22);
   without a CREATED event the read says `earlierUnrecorded`. Pack Detail's
   reads (`GET class-packs/:id` with `overview`, `…/holders`, `…/used`,
   `…/sales`, `…/events`) need only `pack:read`, money included (DEC-039);
@@ -1879,6 +1972,20 @@ options, items, more }` and a sentence with the count, the first
 - **Contact deletion** cancels the person's future course and pack-paid
   bookings and deletes their enrolments **before** the contact (a booking
   references both; one cascade trips a foreign key — `DEV_LEARNINGS.md`).
+- **Course and class notices** (DEC-174 U17, #1148). `enrol` and
+  `cancelEnrollment` queue COURSE_ENROLLED / COURSE_CANCELLED once per
+  enrolment (`queueCourseNotice`, `site-accounts/notices/course.ts`) on
+  their own transaction, only while `noticeOn(COURSE)`. The enrolment
+  lists every session as booked; the cancel's money line reads the
+  enrolment's invoice when it runs (paid and not refunded, still open,
+  voided, credited), since a cancel refunds nothing itself. A course's
+  sessions are still never told one by one. A class the business cancels
+  (`closesClass`) is not behind COURSE: each place's `booking.notify`
+  carries `classCancelled` ("‹Business› cancelled this class", money read
+  when it runs: `notices/class-cancel.ts`), an unpaid hold in it is told
+  too, and `closeSessionWaitlistInTx` with `tell` queues
+  WAITLIST_CLASS_CANCELLED for everyone still in line. A class taken off
+  sale closes its line silently.
 
 ## Modules and routes — **Current**
 

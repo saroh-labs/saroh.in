@@ -62,7 +62,14 @@ export function useOrderChanges({
             setPanel(null);
             const d = res.data;
             const now = `Now ${label.toLowerCase()}.`;
-            if (d.moneyError) {
+            if (d.moneyError && d.settleCents < 0) {
+                // The change stands; the refund didn't go (U5). Say so, and
+                // where to send it again.
+                showError(
+                    `${now} The ${money(d.settleCents)} refund didn't go through.`,
+                    `${/[.!?]$/.test(d.moneyError) ? d.moneyError : `${d.moneyError}.`} To try again, use Refund… on this order with that amount.`,
+                );
+            } else if (d.moneyError) {
                 showError(`${now} The money didn't settle.`, d.moneyError);
             } else if (d.settleCents > 0) {
                 showSuccess(

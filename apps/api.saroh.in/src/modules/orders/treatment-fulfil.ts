@@ -15,6 +15,9 @@ import { treatmentProgressInTx } from "../bookings/visits";
  * - Corrected afterwards (the last visit said No-show after all), the order
  *   goes back to where it was before it was fulfilled.
  * - A cancelled order is left alone: its visits no longer change it.
+ * - Nobody is told: a treatment's Delivered is not a parcel arriving, so
+ *   it queues no "delivered" notice (U16, #1147). Only a kitchen step does
+ *   (`order-stage-write.ts`).
  */
 
 type Tx = Prisma.TransactionClient;

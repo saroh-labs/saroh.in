@@ -37,6 +37,27 @@ describe("AdminFlagsService", () => {
         expect(audit).not.toHaveBeenCalled();
     });
 
+    it("ignores stored rows for a flag no longer registered (SAROH_BUSINESS_EMAIL, #1134)", async () => {
+        newest.mockResolvedValue([]);
+        (prisma.featureFlag.findMany as jest.Mock).mockResolvedValue([
+            { key: "SAROH_BUSINESS_EMAIL", enabledByDefault: false },
+        ]);
+        (prisma.featureFlagOverride.findMany as jest.Mock).mockResolvedValue([
+            {
+                flagKey: "SAROH_BUSINESS_EMAIL",
+                enabled: true,
+                organizationId: "org_1",
+                organization: { name: "Rye & Co." },
+            },
+        ]);
+        const flags = await service.list();
+        expect(flags).toHaveLength(FLAG_KEYS.length);
+        expect(flags.map((flag) => flag.key)).not.toContain(
+            "SAROH_BUSINESS_EMAIL",
+        );
+        expect(flags.every((flag) => flag.overrides.length === 0)).toBe(true);
+    });
+
     it("gives each flag its newest change and who made it", async () => {
         (prisma.featureFlag.findMany as jest.Mock).mockResolvedValue([]);
         (prisma.featureFlagOverride.findMany as jest.Mock).mockResolvedValue(

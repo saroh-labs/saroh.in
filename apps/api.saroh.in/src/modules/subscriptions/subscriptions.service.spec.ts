@@ -25,6 +25,16 @@ jest.mock("../invoices/business-details", () => ({
     assertBusinessDetails: jest.fn().mockResolvedValue(undefined),
 }));
 
+// The member's notice (U11) is queued with each event; it has its own
+// specs (`membership-notices.db.spec.ts`), so it is stubbed here.
+jest.mock("./membership-notices", () => ({
+    queueMembershipNotice: jest.fn().mockResolvedValue("none"),
+}));
+// The renewal's automatic send (U10) has its own specs
+// (`subscriptions.renew.db.spec.ts`), so it is stubbed here.
+jest.mock("./renewal-send", () => ({
+    sendRenewalUnlessCharged: jest.fn().mockResolvedValue(false),
+}));
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const tx = {

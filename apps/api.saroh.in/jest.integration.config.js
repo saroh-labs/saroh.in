@@ -105,6 +105,9 @@ module.exports = {
         "<rootDir>/src/modules/products/merge-report.service.spec.ts",
         "<rootDir>/src/modules/stock/stock-words.spec.ts",
         "<rootDir>/src/modules/stock/stock.gate.spec.ts",
+        "<rootDir>/src/modules/stock/stock-watch-rules.spec.ts",
+        "<rootDir>/src/modules/stock/stock-watch.controller.spec.ts",
+        "<rootDir>/src/modules/stock/on-sellable-again.guard.spec.ts",
         "<rootDir>/src/modules/products/product-rules.spec.ts",
         // GST is part of MRP (12 Oct 2026): pure, or a jest-mocked Prisma.
         // mrp-includes-gst.db.spec.ts runs here.
@@ -170,6 +173,8 @@ module.exports = {
         // DEC-068: which business details are missing — pure (the refusals
         // and the flag after money are in business-details.db.spec.ts).
         "<rootDir>/src/modules/invoices/business-details.spec.ts",
+        // Overdue reminders, pure (U20): the unit project.
+        "<rootDir>/src/modules/invoices/overdue-remind.spec.ts",
         "<rootDir>/src/modules/payments/public-invoices.service.spec.ts",
         // D20: mocked Prisma; the real rows are in mandates.db.spec.ts.
         "<rootDir>/src/modules/payments/mandates.service.spec.ts",

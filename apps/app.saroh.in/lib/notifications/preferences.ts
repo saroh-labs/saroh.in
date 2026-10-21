@@ -75,6 +75,22 @@ export const ALERTS = [
         label: "Data removal requests",
         note: "When a customer asks you to remove their details",
     },
+    // Not in the design: the person a booking is with hears about it
+    // (DEC-174, #1138), only to them. The API offers it only to someone
+    // on the diary.
+    {
+        key: "mine",
+        label: "Bookings with you",
+        note: "When a booking with you is made, moved or cancelled",
+    },
+    // Not in the design: a member's own cancel or pause, and autopay
+    // cancelled at their bank (DEC-174, #1150). The API offers it to who
+    // reads memberships, while Payments is on.
+    {
+        key: "member",
+        label: "Members",
+        note: "When a member cancels or pauses, or turns off autopay at their bank",
+    },
 ] as const;
 export type AlertKey = (typeof ALERTS)[number]["key"];
 
@@ -160,9 +176,15 @@ export function alertGrid(read: AlertPreferencesRead): AlertGrid {
             columns: [...ALERT_CHANNELS],
             // The design's rows only: the Website row is offered by the API
             // alone, to who can publish with test releases on (DEC-057), and
-            // the data removal row to who can remove a customer's details.
+            // the data removal row to who can remove a customer's details,
+            // Bookings with you to someone on the diary (#1138), and Members
+            // to who reads memberships with Payments on (#1150).
             rows: ALERTS.filter(
-                (alert) => alert.key !== "site" && alert.key !== "request",
+                (alert) =>
+                    alert.key !== "site" &&
+                    alert.key !== "request" &&
+                    alert.key !== "mine" &&
+                    alert.key !== "member",
             ).map((alert) => ({
                 key: alert.key,
                 label: alert.label,

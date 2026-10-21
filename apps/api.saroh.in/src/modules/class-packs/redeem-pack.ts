@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
+import { queuePackLowNotice } from "../site-accounts/notices/pack";
 import { classPacksOn } from "./class-packs-on";
 import { packKindFor, purchasesPayingFor, readPackKind } from "./pack-kind";
 
@@ -239,6 +240,11 @@ export async function redeemPackInTx(
         where: { id: input.bookingId },
         data: { paidWith: "PACK", subscriptionId: null },
     });
+    // Down from two to one: the holder hears it's their last (DEC-174 U22),
+    // read again when it goes. Still under the purchase's row lock.
+    if ((await creditsLeft(tx, chosen)) === 1) {
+        await queuePackLowNotice(tx, input.organizationId, chosen.id);
+    }
     return { purchaseId: chosen.id, packName: chosen.packName };
 }
 

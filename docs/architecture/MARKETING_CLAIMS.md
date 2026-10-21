@@ -795,8 +795,8 @@ Two rules decided what was left off, beside the usual one:
 
 - **Nothing that waits for a switch.** The online shop (`SITE_SHOP`), the
   customer's account area (`SITE_ACCOUNT_AREA`), autopay
-  (`RAZORPAY_AUTOPAY`) and Saroh sending a business's email
-  (`SAROH_BUSINESS_EMAIL`) are off by default, so neither page leans on one.
+  (`RAZORPAY_AUTOPAY`) are off by default, so neither page leans on one.
+  (Saroh sending a business's email, DEC-086, was removed in #1134.)
 - **Nothing about a template** (DEC-135) **or a plan** (DEC-136) before
   launch. The one plan sentence (W4) is a point's `openNote`, drawn only
   once the launch switch is open.

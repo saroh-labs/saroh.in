@@ -70,3 +70,9 @@ b0b12141037c74bc4edf462a64c9cae7147bb904:apps/saroh.app/lib/shop-checkout-shape.
 ac41556585e5d71344e4f7ef0c3c0bf8684808c8:apps/api.saroh.in/src/modules/orders/offline-checkout-start.spec.ts:generic-api-key:351
 # A made-up idempotency key in the order-note checkout test (UX audit, 10 Oct).
 ae05dc24cc6d252d43e1a5de2344ad29f2bb2106:apps/saroh.app/lib/shop-checkout-shape.test.ts:generic-api-key:245
+# A made-up Razorpay webhook secret in the refund notices db spec (notices U12,
+# #1143): a self-describing test string, marked gitleaks:allow since.
+f90cd00f372a595a1370072e50dd9becbd4be966:apps/api.saroh.in/src/modules/payments/refund-notices.db.spec.ts:generic-api-key:72
+# A made-up Razorpay webhook secret in the renewal notices test fixture
+# (notices U10, #1141): a self-describing test string, marked gitleaks:allow since.
+4f5a9d42e7e49b42a747ac9f65fbd2c8150ea8a5:apps/api.saroh.in/test/fixtures/renewal-notices.ts:generic-api-key:50

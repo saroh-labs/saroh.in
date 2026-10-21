@@ -110,8 +110,6 @@ export class AccountBookingsController {
                 prisma,
                 customer.organizationId,
                 customer.contactId,
-                undefined,
-                "BOOKING_CONFIRMED",
             )
                 .then((reach) => ({ reach }))
                 .catch(() => ({}))),

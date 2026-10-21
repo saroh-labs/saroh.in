@@ -9,6 +9,7 @@ import {
     MinLength,
 } from "class-validator";
 
+import { NOTICE_KINDS } from "./notice-settings";
 import { COMMS_CHANNELS } from "./providers/provider.port";
 
 const trim = ({ value }: { value: unknown }) =>
@@ -137,6 +138,20 @@ export class SendMessageDto {
  * real boolean, or a 400: nothing is converted (`common/validation.ts`).
  */
 export class SetAccountUpdatesDto {
+    @IsBoolean({ message: "Choose on or off" })
+    on!: boolean;
+}
+
+/**
+ * Turn one automatic customer notice on or off (DEC-174, U1 #1132). The
+ * kind exactly as `NOTICE_KINDS` spells it, and a real boolean, or a 400.
+ */
+export class SetNoticeSettingDto {
+    @IsIn(NOTICE_KINDS, {
+        message: `kind must be one of: ${NOTICE_KINDS.join(", ")}`,
+    })
+    kind!: (typeof NOTICE_KINDS)[number];
+
     @IsBoolean({ message: "Choose on or off" })
     on!: boolean;
 }

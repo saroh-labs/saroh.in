@@ -3,6 +3,7 @@ import type { Prisma } from "@saroh/database";
 import { recordOnlinePaymentInTx } from "../invoices/invoice-ledger";
 import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
+import { enqueueAutopayFailedNotice } from "../site-accounts/notices/autopay-failed";
 import type { SubscriptionEventKind } from "../subscriptions/subscription-events";
 import {
     JOB,
@@ -22,8 +23,9 @@ import { providerName } from "./mandate-rules";
  * - **Charged:** CHARGED on the subscription's log (actor JOB).
  * - **Failed:** RENEWAL_FAILED (`data.reason`); Home's failed-renewal
  *   source reads it ("Payment failed"), the pay link opens again, and a
- *   decline tells the team as a failed pay link does (F14). Saroh sends
- *   the customer nothing.
+ *   decline tells the team as a failed pay link does (F14), and the
+ *   customer with a link to pay (`AUTOPAY_FAILED`, automatic notices U10),
+ *   when the business sends it.
  * - **Limit too low:** MANDATE_LIMIT_LOW (`data.limit`, `data.amount`), and
  *   nothing is charged.
  */
@@ -81,7 +83,8 @@ export async function recordChargeEventInTx(
 /**
  * A charge's debit was declined: the intent moves to FAILED (only from an
  * open state, so a capture committed meanwhile stands), RENEWAL_FAILED is
- * written and the team is told. Returns whether it moved.
+ * written, the team is told, and so is the customer when the business
+ * sends "Failed autopay charges" (U10). Returns whether it moved.
  */
 export async function failMandateChargeInTx(
     tx: Tx,
@@ -113,6 +116,11 @@ export async function failMandateChargeInTx(
         event: "failed",
         invoiceId: intent.invoiceId,
         paymentIntentId: intentId,
+    });
+    await enqueueAutopayFailedNotice(tx, organizationId, {
+        invoiceId: intent.invoiceId,
+        paymentIntentId: intentId,
+        reason,
     });
     return true;
 }

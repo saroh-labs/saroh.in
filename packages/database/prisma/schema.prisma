@@ -353,6 +353,7 @@ model Organization {
   invoiceSequences      InvoiceSequence[]
   invoicePayments       InvoicePayment[]
   invoiceShares         InvoiceShare[]
+  invoiceEvents         InvoiceEvent[]
   courses               Course[]
   courseSessions        CourseSession[]
   courseEnrollments     CourseEnrollment[]
@@ -428,6 +429,11 @@ model Organization {
   packExtensions           PackExtension[]
   // The notices told about a customer's bookings and orders (round-2 A14).
   customerNotices          CustomerNotice[]
+  // Which automatic customer notices it has turned off or on, where that
+  // differs from the default in code (DEC-174, U1 #1132).
+  customerNoticeSettings   CustomerNoticeSetting[]
+  // "Tell me when it's back" (DEC-174 U23).
+  stockWatches             StockWatch[]
   // Places in line for full classes (round-2 A12).
   classWaitlistEntries     ClassWaitlistEntry[]
   // Customers' "Ask to remove my data" requests (DEC-172, #1106).
@@ -1105,6 +1111,9 @@ model Product {
   fieldValues ProductFieldValue[]
   allergens   ProductAllergen[]
 
+  // Customers waiting for it to be back (DEC-174 U23).
+  stockWatches StockWatch[]
+
   // How it can be fulfilled (B12, DEC-045): PICKUP, LOCAL_DELIVERY, SHIPPING
   // or DIGITAL (never an appointment type). Empty: every way its storefronts offer
   // (StoreSettings.fulfilmentTypes). An order offers only the types every
@@ -1150,6 +1159,7 @@ model ProductVariant {
   listings     ProductListingVariant[]
   stockLevels  StockLevel[]
   stockEntries StockEntry[]
+  stockWatches StockWatch[]
 
   createdAt DateTime @default(now())
 
@@ -1663,6 +1673,49 @@ model StockEntry {
   @@index([variantId])
   @@index([orderId])
   @@index([pairId])
+}
+
+// "Tell me when it's back" (DEC-174 U23, #1154): someone who found a product,
+// or one option of it, sold out on the business's site and left their email
+// to hear once when it can be bought again. The opt-in is consent for that one
+// email only: the address never becomes a contact or a marketing subscriber,
+// and `contactId` is set only when a contact with that email already exists
+// (so a revoked email consent still stops it). Told once (`toldAt`), or
+// stopped from the email's link (`cancelledAt`); a new sell-out needs a new
+// "Tell me". One open watch per address per product or option, by two
+// partial unique indexes (a NULL variant would otherwise never collide).
+model StockWatch {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product         @relation(fields: [productId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  // One option of it; null: the product, whichever option comes back.
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId, productId], references: [id, productId], onDelete: Cascade)
+  // The site it was asked on: its storefront says whether it sells, and the
+  // email links back to it.
+  siteId    String
+  site      Site            @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  // Trimmed and lower-cased when written.
+  email     String
+  // A contact that already had this email; informational, no FK, as
+  // CustomerNotice's: a merge or removal is resolved when it is told.
+  contactId String?
+  // When they ticked the opt-in: consent to this one email.
+  consentAt DateTime
+
+  createdAt   DateTime  @default(now())
+  toldAt      DateTime?
+  cancelledAt DateTime?
+
+  @@unique([organizationId, productId, email], map: "StockWatch_open_product_key", where: raw("\"variantId\" IS NULL AND \"toldAt\" IS NULL AND \"cancelledAt\" IS NULL"))
+  @@unique([organizationId, productId, variantId, email], map: "StockWatch_open_variant_key", where: raw("\"variantId\" IS NOT NULL AND \"toldAt\" IS NULL AND \"cancelledAt\" IS NULL"))
+  @@index([organizationId, productId])
+  @@index([siteId])
+  @@index([variantId])
 }
 
 // ============================================================================
@@ -3693,6 +3746,8 @@ model Site {
   trackingSettings SiteTrackingSettings?
   // The site's QR codes: short links at `/q/<code>` on its Saroh address.
   qrCodes          QrCode[]
+  // "Tell me when it's back" asked on this site (DEC-174 U23).
+  stockWatches     StockWatch[]
 
   // "Publishing needs approval" (DEC-071, amends DEC-047). Off: approval is
   // advisory and a bypass is recorded. On: Publish, restore and Go live
@@ -5429,7 +5484,10 @@ model BookingEvent {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  type String // BOOKED | RESCHEDULED | CANCELLED | ATTENDED | NO_SHOW
+  // BOOKED | RESCHEDULED | CANCELLED | ATTENDED | NO_SHOW | PAID_AT_DESK |
+  // REASSIGNED | LAPSED (an unpaid hold whose time ran out: nobody's
+  // choice) | REFUNDED | REFUND_FAILED (#1137)
+  type String
 
   // Who did it. Null when the booker did it themselves through the public
   // form, which is exactly the difference between "they booked it" and "we
@@ -5452,6 +5510,11 @@ model BookingEvent {
   fromStaff   StaffMember? @relation("BookingEventFromStaff", fields: [fromStaffId], references: [id], onDelete: SetNull)
   toStaffId   String?
   toStaff     StaffMember? @relation("BookingEventToStaff", fields: [toStaffId], references: [id], onDelete: SetNull)
+
+  // What a money line says (#1137): on REFUNDED and REFUND_FAILED,
+  // `{ amountCents, currency, refundId, outcome }` — the refund it is about
+  // and where it stood when written. Null on every other kind.
+  data Json?
 
   createdAt DateTime @default(now())
 
@@ -6855,6 +6918,9 @@ model Invoice {
   // or printed. Emails are the Message rows; this is everything else.
   shares InvoiceShare[]
 
+  // Who issued, sent, reminded, voided or credited it, and when (U9 #1140).
+  events InvoiceEvent[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -6995,6 +7061,42 @@ model InvoiceShare {
   createdAt DateTime @default(now())
 
   @@index([invoiceId, createdAt])
+}
+
+/// One thing that happened to an invoice, with who did it (U9 #1140,
+/// DEC-174): issued, sent, reminded, sent or reminded automatically, a send
+/// that failed, voided, credited, written again, a failed pay attempt, a
+/// new link. Written in the change's own transaction. Payments are the
+/// ledger's audit rows and hand shares are `InvoiceShare`; the history
+/// read merges them, so nothing is written twice. Older invoices have no
+/// rows: their history comes from their own dates.
+model InvoiceEvent {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoiceId      String
+  invoice        Invoice      @relation(fields: [invoiceId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // ISSUED | SENT | REMINDED | AUTO_SENT | AUTO_REMINDED | SEND_FAILED |
+  // VOIDED | CREDITED | REISSUED | PAY_ATTEMPT_FAILED | LINK_MADE
+  kind        String
+  // USER (a person; `actorUserId`) | JOB (Saroh, on the business's
+  // behalf) | CUSTOMER (on the pay page)
+  actorKind   String
+  // Not a foreign key: someone who leaves keeps their lines.
+  actorUserId String?
+  // EMAIL | THREAD, for a send.
+  channel     String?
+  // The email it was, for a send or a failed one.
+  messageId   String?
+  // Small context: the address, a reason, a credit note's id. Never a
+  // token, and no amounts beyond what the invoice already shows.
+  data        Json?
+  createdAt   DateTime @default(now())
+
+  @@index([invoiceId, createdAt])
+  // A failed send is told once per email, however often its job retries.
+  @@unique([messageId, kind], map: "InvoiceEvent_message_kind_key", where: raw("\"messageId\" IS NOT NULL"))
 }
 
 model InvoiceLine {
@@ -7766,6 +7868,29 @@ model CustomerNotice {
   @@index([messageId])
   // One booking's notices: Saroh's cap of emails per booking a day (DEC-086).
   @@index([organizationId, bookingId, createdAt])
+}
+
+// A business's choice about one kind of automatic customer notice (DEC-174,
+// U1 #1132): renewal invoices, membership emails, refunds and so on. The
+// kinds and their defaults are code (`communications/notice-settings.ts`);
+// a row is kept only while the business's choice differs from the default,
+// as NotificationPreference does, so a switch put back removes it.
+model CustomerNoticeSetting {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // A NoticeKind: RENEWAL_INVOICE | AUTOPAY_FAILED | MEMBERSHIP | ... .
+  kind    String
+  enabled Boolean
+
+  // Who made the choice. Informational, no FK: the choice outlives them.
+  updatedByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, kind])
 }
 
 // ============================================================================

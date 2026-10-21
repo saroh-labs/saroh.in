@@ -1,5 +1,4 @@
-import type { Logger } from "@nestjs/common";
-import { ConflictException } from "@nestjs/common";
+import { ConflictException, Logger } from "@nestjs/common";
 import type { Booking, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
@@ -7,6 +6,7 @@ import { reversePackInTx } from "../class-packs/redeem-pack";
 import {
     bookingPaymentInTx,
     lockBookingIntentsInTx,
+    recordBookingRefundInTx,
     reserveBookingRefundInTx,
 } from "../payments/booking-refund";
 import type { PaymentsService } from "../payments/payments.service";
@@ -193,6 +193,9 @@ export async function cancelFoundBooking(
         if (booking.status === "PENDING") {
             await releaseHoldInTx(tx, booking.id, now, actor.userId, {
                 freesPlace: !options.closesClass,
+                // The whole class is off (U17): the booker of an unpaid
+                // hold in it hears so too.
+                ...(options.closesClass ? { classCancelled: true } : {}),
             });
             if (options.closesClass) {
                 await closeSessionWaitlistInTx(tx, {
@@ -200,6 +203,7 @@ export async function cancelFoundBooking(
                     serviceId: booking.serviceId,
                     startAt: booking.startAt,
                     now,
+                    tell: true,
                 });
             }
             return {
@@ -259,7 +263,8 @@ export async function cancelFoundBooking(
             startAt: booking.startAt,
         };
         if (options.closesClass) {
-            await closeSessionWaitlistInTx(tx, { ...session, now });
+            // Everyone waiting for it hears the class is off (U17).
+            await closeSessionWaitlistInTx(tx, { ...session, now, tell: true });
         } else {
             await offerFreedPlaceInTx(tx, session);
         }
@@ -291,6 +296,11 @@ export async function cancelFoundBooking(
                         contactId: booking.contactId,
                         reason: "cancelled",
                         eventId: event.id,
+                        // The business cancelled the whole class (U17):
+                        // "‹Business› cancelled this class", and the money.
+                        ...(options.closesClass
+                            ? { classCancelled: true }
+                            : {}),
                     },
                 },
                 select: { id: true },
@@ -319,8 +329,36 @@ export async function cancelFoundBooking(
     // Phase two, after commit: the provider, under the row's id.
     if (done.send && done.money.refund) {
         done.money.refund.status = await send(done.send);
+        await recordRefundOutcome(done.send, done.money.refund.status);
     }
     return { ...done.booking, money: done.money, told: done.told };
+}
+
+const logger = new Logger("BookingCancel");
+
+/**
+ * The cancel's refund in the booking's history (#1137): "Refunded ₹X"
+ * once sent or awaiting the provider, "Refund failed" when refused. Under
+ * the refund row's lock, which the refund webhook takes too, so whichever
+ * writes first the line follows the row. Never throws: the cancel and the
+ * refund have happened, and the webhook writes the final line regardless.
+ */
+async function recordRefundOutcome(
+    refundId: string,
+    status: RefundStatus,
+): Promise<void> {
+    try {
+        await prisma.$transaction(async (tx) => {
+            await tx.$queryRaw`SELECT id FROM "PaymentRefund" WHERE id = ${refundId} FOR UPDATE`;
+            await recordBookingRefundInTx(tx, refundId, status);
+        });
+    } catch (err) {
+        logger.warn(
+            `Refund ${refundId}: not written to the booking's history (${
+                err instanceof Error ? err.message : String(err)
+            }); the refund webhook writes it`,
+        );
+    }
 }
 
 /**

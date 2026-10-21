@@ -128,7 +128,6 @@ beforeEach(() => {
         id: "m_1",
         status: "QUEUED",
         toAddress: "ananya@example.com",
-        route: "PROVIDER",
     });
 });
 

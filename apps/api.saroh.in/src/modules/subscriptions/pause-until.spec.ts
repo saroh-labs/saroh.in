@@ -1,6 +1,12 @@
 // A pause with an end date (D8): when it ends, how many days it took, and
 // what the job's resume does on that date. Pure, with a jest-mocked
 // transaction; the real rows are in subscriptions.db.spec.ts.
+// The member's notice (U11) is queued with each event; it has its own
+// specs (`membership-notices.db.spec.ts`), so it is stubbed here.
+jest.mock("./membership-notices", () => ({
+    queueMembershipNotice: jest.fn().mockResolvedValue("none"),
+}));
+
 import { BadRequestException } from "@nestjs/common";
 
 import {

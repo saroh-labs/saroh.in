@@ -16,6 +16,9 @@ import { TRACKING_LOCKED, untrackedShort } from "@/lib/products/tracking";
 import type { ProductStock } from "@/lib/stock/product-stock";
 import { stockFootnote } from "@/lib/stock/product-stock";
 import type { StockCheck, StockLogEntry } from "@/lib/stock/service";
+import type { WaitingCount } from "@/lib/stock/waiting";
+
+import { WaitingLine } from "@/components/commerce/stock/waiting-line";
 
 import { PanelFailed, TabState } from "./panel-state";
 import { StockSheetButton } from "./sheets/stock-sheet";
@@ -32,6 +35,10 @@ import { VariantDrawer } from "./variant-drawer";
  * it, and its recent changes. A row opens that size's own page.
  *
  * Untracked (#515), there is no count: the sizes and their prices only.
+ *
+ * Whichever it is, "3 people waiting for it" (DEC-174, U24) says how many
+ * customers asked the site to tell them when it's back, and for which
+ * option, while anyone waits.
  */
 export function ProductStockTab({
     overview,
@@ -44,6 +51,7 @@ export function ProductStockTab({
     retryHref,
     ordersHref,
     now,
+    waiting = null,
 }: {
     overview: ProductOverview;
     storeId: string;
@@ -56,6 +64,8 @@ export function ProductStockTab({
     retryHref: string;
     ordersHref: string;
     now: Date;
+    /** Who waits for it to be back; null when nobody does or it's unread. */
+    waiting?: WaitingCount | null;
 }) {
     const { product } = overview;
     const [openId, setOpenId] = useState<string | null>(null);
@@ -64,6 +74,12 @@ export function ProductStockTab({
     const counts = tracking.counts;
     const counted =
         overview.stock.mode === "variant" || overview.stock.product !== null;
+
+    const titleOf = (id: string) =>
+        product.variants.find((v) => v.id === id)?.title ?? null;
+    const waitingLine = (className?: string) => (
+        <WaitingLine count={waiting} titleOf={titleOf} className={className} />
+    );
 
     const drawer = (
         <VariantDrawer
@@ -103,6 +119,7 @@ export function ProductStockTab({
                         />
                     ) : null}
                 </TabState>
+                {waitingLine()}
                 {product.variants.length > 0 ? (
                     <Card className="rounded-[12px] p-0">
                         <ul
@@ -144,33 +161,36 @@ export function ProductStockTab({
 
     if (!counted) {
         return (
-            <TabState
-                data-ph-mask=""
-                icon={Box}
-                title="No stock count yet"
-                description={
-                    product.variants.length
-                        ? `Each of the ${product.variants.length} ${optionNoun(product.option?.name, product.variants.length)} gets its own count, so one can run out before another.`
-                        : "Add a count to see how many you have and get a warning when it runs low."
-                }
-            >
-                {canStartCounting(overview, product.variants.length) ? (
-                    <StockSheetButton
-                        overview={overview}
-                        storeId={storeId}
-                        stock={stock}
-                        counts
-                        label="Add stock"
-                        openFromAddress
-                    />
-                ) : overview.canStock ? (
-                    // With variants, the first count is the switch to
-                    // counting each one: the API asks store:write for it.
-                    <p className="max-w-[46ch] text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
-                        {SPLIT_NEEDS_WRITE}
-                    </p>
-                ) : null}
-            </TabState>
+            <div className="flex flex-col gap-3">
+                <TabState
+                    data-ph-mask=""
+                    icon={Box}
+                    title="No stock count yet"
+                    description={
+                        product.variants.length
+                            ? `Each of the ${product.variants.length} ${optionNoun(product.option?.name, product.variants.length)} gets its own count, so one can run out before another.`
+                            : "Add a count to see how many you have and get a warning when it runs low."
+                    }
+                >
+                    {canStartCounting(overview, product.variants.length) ? (
+                        <StockSheetButton
+                            overview={overview}
+                            storeId={storeId}
+                            stock={stock}
+                            counts
+                            label="Add stock"
+                            openFromAddress
+                        />
+                    ) : overview.canStock ? (
+                        // With variants, the first count is the switch to
+                        // counting each one: the API asks store:write for it.
+                        <p className="max-w-[46ch] text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
+                            {SPLIT_NEEDS_WRITE}
+                        </p>
+                    ) : null}
+                </TabState>
+                {waitingLine()}
+            </div>
         );
     }
 
@@ -203,6 +223,7 @@ export function ProductStockTab({
                         />
                     ) : null}
                 </div>
+                {waitingLine("px-[18px] pb-2 pt-1")}
                 <StockTable
                     product={product}
                     stock={stock}

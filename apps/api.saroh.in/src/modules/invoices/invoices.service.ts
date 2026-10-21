@@ -35,6 +35,13 @@ import { exemptInvoiceIds } from "./exempt-invoices";
 import { isGstRate, notGstRateMessage, rateToBps } from "./gst";
 import { assertRatesSet } from "./gst-rate-required";
 import { gstinProblem, stateCode } from "./gst-states";
+import type { InvoiceActor } from "./invoice-events";
+import {
+    actorOrJob,
+    CUSTOMER_ACTOR,
+    personActor,
+    recordInvoiceEvent,
+} from "./invoice-events";
 import { lockInvoiceForLedger } from "./invoice-ledger";
 import type { RecordedPaymentView } from "./invoice-payments.service";
 import { InvoicePaymentsService } from "./invoice-payments.service";
@@ -65,7 +72,7 @@ import {
 import type { PaperColumns } from "./paper-styles";
 import { paperWrite, resolvePaper } from "./paper-styles";
 import { invoiceOnlineBlocker } from "./pay-online";
-import { mintPayToken } from "./pay-token";
+import { replacePayTokenInTx } from "./pay-token";
 import { assertPaymentsOn } from "./payments-on";
 import type {
     InvoiceOnlineView,
@@ -381,7 +388,7 @@ export class InvoicesService {
         ctx: OrganizationContext,
         id: string,
     ): Promise<MadeLink> {
-        return this.payLink(prisma, ctx, id, PAY_LINK);
+        return this.madeByHand(ctx, id, PAY_LINK);
     }
 
     /**
@@ -397,7 +404,30 @@ export class InvoicesService {
         ctx: OrganizationContext,
         id: string,
     ): Promise<MadeLink> {
-        return this.payLink(prisma, ctx, id, VIEW_LINK);
+        return this.madeByHand(ctx, id, VIEW_LINK);
+    }
+
+    /**
+     * "Copy link" or "New link" pressed: the link, and LINK_MADE on the
+     * history in the same transaction. A link minted by a send or a share
+     * is told by that send or share instead.
+     */
+    private async madeByHand(
+        ctx: OrganizationContext,
+        id: string,
+        options: LinkOptions,
+    ): Promise<MadeLink> {
+        return prisma.$transaction(async (tx) => {
+            const made = await this.payLink(tx, ctx, id, options);
+            await recordInvoiceEvent(tx, {
+                organizationId: ctx.organizationId,
+                invoiceId: id,
+                kind: "LINK_MADE",
+                actor: personActor(ctx),
+                ...(options.requireProvider ? {} : { data: { view: true } }),
+            });
+            return made;
+        });
     }
 
     /**
@@ -418,6 +448,21 @@ export class InvoicesService {
         return this.payLink(tx, ctx, id, options);
     }
 
+    /**
+     * {@link createPayLinkInTx} for a send Saroh makes on the business's
+     * behalf (a renewal's invoice, automatic notices U10): every check a
+     * person's link makes, with nobody to authorize. Never reached from a
+     * request.
+     */
+    async payLinkForJobInTx(
+        tx: Tx,
+        organizationId: string,
+        id: string,
+        options: LinkOptions = PAY_LINK,
+    ): Promise<MadeLink> {
+        return this.checkedLink(tx, organizationId, id, options);
+    }
+
     private async payLink(
         db: Tx,
         ctx: OrganizationContext,
@@ -425,25 +470,34 @@ export class InvoicesService {
         options: LinkOptions,
     ): Promise<MadeLink> {
         authorize(ctx, "invoice:write");
+        return this.checkedLink(db, ctx.organizationId, id, options);
+    }
+
+    private async checkedLink(
+        db: Tx,
+        organizationId: string,
+        id: string,
+        options: LinkOptions,
+    ): Promise<MadeLink> {
         // A link asks to be paid: the business details first (DEC-068). A
         // member's own "Pay now" is never refused for it.
-        await assertBusinessDetails(db, ctx.organizationId);
+        await assertBusinessDetails(db, organizationId);
         // Taking money online is Payments' (DEC-070); a view link isn't.
         if (options.requireProvider) {
-            await assertPaymentsOn(db, ctx.organizationId, "make a pay link");
+            await assertPaymentsOn(db, organizationId, "make a pay link");
             // And the plan's (403 MODULE_LOCKED), except for a renewal of a
             // subscription the business already has: that stays payable.
-            if (!(await planTakesOnlinePayment(ctx.organizationId))) {
+            if (!(await planTakesOnlinePayment(organizationId))) {
                 const paper = await db.invoice.findFirst({
-                    where: { id, organizationId: ctx.organizationId },
+                    where: { id, organizationId },
                     select: { subscriptionId: true },
                 });
                 if (!isRenewalInvoice(paper)) {
-                    await assertPlanTakesOnlinePayment(ctx.organizationId);
+                    await assertPlanTakesOnlinePayment(organizationId);
                 }
             }
         }
-        return this.mintInvoiceLink(db, ctx.organizationId, id, options);
+        return this.mintInvoiceLink(db, organizationId, id, options);
     }
 
     /**
@@ -458,7 +512,19 @@ export class InvoicesService {
         organizationId: string,
         id: string,
     ): Promise<MadeLink> {
-        return this.mintInvoiceLink(db, organizationId, id, PAY_LINK);
+        const made = await this.mintInvoiceLink(
+            db,
+            organizationId,
+            id,
+            PAY_LINK,
+        );
+        await recordInvoiceEvent(db, {
+            organizationId,
+            invoiceId: id,
+            kind: "LINK_MADE",
+            actor: CUSTOMER_ACTOR,
+        });
+        return made;
     }
 
     /**
@@ -497,22 +563,16 @@ export class InvoicesService {
         if (await chargeUnderWayOn(db, ctx.organizationId, id)) {
             throw autopayChargeInProgress();
         }
-        const { token, tokenHash } = mintPayToken();
-        const payLinkCreatedAt = new Date();
-        const { count } = await db.invoice.updateMany({
-            where: {
-                id,
-                organizationId: ctx.organizationId,
-                status: paidView ? "PAID" : "ISSUED",
-                orderId: null,
-                kind: { not: "CREDIT_NOTE" },
-            },
-            data: { payTokenHash: tokenHash, payLinkCreatedAt },
-        });
-        if (count === 0) {
+        const made = await replacePayTokenInTx(
+            db,
+            ctx.organizationId,
+            id,
+            paidView ? "PAID" : "ISSUED",
+        );
+        if (!made) {
             throw new ConflictException("This invoice changed. Reload it.");
         }
-        return { token, payLinkCreatedAt };
+        return made;
     }
 
     /**
@@ -855,6 +915,12 @@ export class InvoicesService {
             if (count === 0) this.assertDraft("ISSUED", "issued again");
             await tx.invoiceLine.deleteMany({ where: { invoiceId: id } });
             await writeDocumentLines(tx, ctx.organizationId, id, doc);
+            await recordInvoiceEvent(tx, {
+                organizationId: ctx.organizationId,
+                invoiceId: id,
+                kind: "ISSUED",
+                actor: personActor(ctx),
+            });
         });
         return this.read(ctx.organizationId, id);
     }
@@ -866,7 +932,13 @@ export class InvoicesService {
     ): Promise<InvoiceViewModel> {
         authorize(ctx, "invoice:write");
         await prisma.$transaction((tx) =>
-            this.voidInTx(tx, ctx.organizationId, id, dto.reason),
+            this.voidInTx(
+                tx,
+                ctx.organizationId,
+                id,
+                dto.reason,
+                personActor(ctx),
+            ),
         );
         return this.read(ctx.organizationId, id);
     }
@@ -970,7 +1042,13 @@ export class InvoicesService {
     ): Promise<InvoiceViewModel> {
         authorize(ctx, "invoice:write");
         const draftId = await prisma.$transaction(async (tx) => {
-            await this.voidInTx(tx, ctx.organizationId, id, dto.reason);
+            await this.voidInTx(
+                tx,
+                ctx.organizationId,
+                id,
+                dto.reason,
+                personActor(ctx),
+            );
             return this.draftFromInTx(tx, ctx, id);
         });
         return this.read(ctx.organizationId, draftId);
@@ -1118,6 +1196,17 @@ export class InvoicesService {
                 "Nothing is left on this invoice to credit.",
             );
         }
+        await recordInvoiceEvent(tx, {
+            organizationId: ctx.organizationId,
+            invoiceId: id,
+            kind: "CREDITED",
+            actor: personActor(ctx),
+            data: {
+                reason,
+                creditNoteId: note.id,
+                creditNoteNumber: note.number,
+            },
+        });
         return note;
     }
 
@@ -1199,6 +1288,15 @@ export class InvoicesService {
                 invoiceId: draft.id,
                 ...l,
             })),
+        });
+        // Written again (reissue, credit and rewrite, Write again): on the
+        // history of the invoice it replaces, naming the draft.
+        await recordInvoiceEvent(tx, {
+            organizationId: ctx.organizationId,
+            invoiceId: id,
+            kind: "REISSUED",
+            actor: personActor(ctx),
+            data: { draftId: draft.id },
         });
         return draft.id;
     }
@@ -1284,6 +1382,13 @@ export class InvoicesService {
             select: { id: true },
         });
         await writeDocumentLines(tx, organizationId, created.id, doc);
+        // By the person who sold it, else by Saroh (a renewal).
+        await recordInvoiceEvent(tx, {
+            organizationId,
+            invoiceId: created.id,
+            kind: "ISSUED",
+            actor: actorOrJob(input.createdByUserId),
+        });
         return { id: created.id, number };
     }
 
@@ -1383,6 +1488,7 @@ export class InvoicesService {
         organizationId: string,
         id: string,
         reason: string,
+        actor: InvoiceActor,
     ): Promise<void> {
         const row = await tx.invoice.findFirst({
             where: { id, organizationId },
@@ -1435,6 +1541,13 @@ export class InvoicesService {
         if (count === 0) {
             throw new ConflictException("This invoice changed. Reload it.");
         }
+        await recordInvoiceEvent(tx, {
+            organizationId,
+            invoiceId: id,
+            kind: "VOIDED",
+            actor,
+            data: { reason },
+        });
     }
 
     /**

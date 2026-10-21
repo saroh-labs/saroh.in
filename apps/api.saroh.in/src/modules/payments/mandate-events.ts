@@ -1,6 +1,7 @@
 import { Logger } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
+import { enqueueTeamAlert } from "../notifications/team-alerts";
 import type { SubscriptionActor } from "../subscriptions/subscription-events";
 import {
     customerActor,
@@ -184,6 +185,14 @@ export async function applyMandateChangeInTx(
                 JOB,
                 { data: { reason: "PROVIDER" } },
             );
+            // The team hears the member stopped autopay at their bank
+            // (U19, #1150): once per mandate, as this move is.
+            await enqueueTeamAlert(tx, organizationId, {
+                event: "member",
+                change: "autopay_off",
+                subscriptionId: row.subscriptionId,
+                mandateId: row.id,
+            });
             return { applied: true };
         }
         default:

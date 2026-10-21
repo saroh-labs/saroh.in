@@ -40,6 +40,9 @@ export function confirmationVia(
         case "ORDER_PLACED":
         case "ORDER_READY":
         case "ORDER_HANDED_OVER":
+        case "ORDER_DELIVERED":
+        case "ORDER_SENT":
+        case "ORDER_TRACKING":
             return "ORDER_CONFIRMATION";
         default:
             return null;

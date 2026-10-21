@@ -16,6 +16,11 @@ import {
 import { confirmHoldInTx } from "../bookings/booking-hold";
 import { markBookingPaidInTx } from "../bookings/booking-pay-link";
 import { completePackDraftInTx } from "../class-packs/pack-checkout";
+import {
+    CUSTOMER_ACTOR,
+    JOB_ACTOR,
+    recordInvoiceEvent,
+} from "../invoices/invoice-events";
 import type { OnlinePayment } from "../invoices/invoice-ledger";
 import { recordOnlinePaymentInTx } from "../invoices/invoice-ledger";
 import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
@@ -39,6 +44,7 @@ import {
     captureCheckInTx,
     failCheckInTx,
 } from "../payments/authorisation-check";
+import { recordBookingRefundInTx } from "../payments/booking-refund";
 import type { CapturedAmount } from "../payments/capture-mismatch";
 import {
     AMOUNT_MISMATCH,
@@ -58,8 +64,13 @@ import {
 } from "../payments/mandate-events";
 import { settleMismatchRefundInTx } from "../payments/mismatch-refund";
 import { PaymentsService } from "../payments/payments.service";
+import {
+    enqueueRefundAlert,
+    enqueueRefundSentNotice,
+} from "../payments/refund-notices";
 import { enqueueRefundSendInTx } from "../payments/send-refund.handler";
 import { enqueueOrderPlacedNotice } from "../site-accounts/customer-notify-queue";
+import { enqueueAutopayFailedNotice } from "../site-accounts/notices/autopay-failed";
 import { lockOrderShelves, settleRefundStock } from "../stock/reserve";
 import { completePlanJoinInTx } from "../subscriptions/plan-join";
 import { linkMandateInTx } from "./mandate-link";
@@ -726,6 +737,15 @@ export class WebhooksService {
                 reference:
                     event.providerPaymentRef ?? intent.providerIntentId ?? null,
             });
+            // An order the team made, paid by the customer online (#1139):
+            // the New order row's bell. A site order has its own alert.
+            if (placed && !placed.placedOnline) {
+                await enqueueTeamAlert(tx, intent.organizationId, {
+                    event: "paid-by-link",
+                    orderId,
+                    paymentIntentId: intent.id,
+                });
+            }
         } else if (intent.status !== "SUCCEEDED") {
             // A second payment on a paid order — an edit's difference —
             // settles the supplementary invoice that edit wrote, and its pay
@@ -833,7 +853,8 @@ export class WebhooksService {
         intent: IntentRow,
         orderId: string,
     ): Promise<{ applied: boolean }> {
-        let { applied } = await this.applyIntentFailure(tx, intent);
+        const failedNow = (await this.applyIntentFailure(tx, intent)).applied;
+        let applied = failedNow;
         // Move Order UNPAID→FAILED only. A stray failure after a capture (PAID)
         // is IGNORED rather than forced through an illegal transition.
         const order = await tx.order.findUnique({
@@ -851,6 +872,16 @@ export class WebhooksService {
             const changed = await this.moveOrderPayment(tx, orderId, "FAILED");
             applied = applied || changed;
         }
+        // The team hears an order's payment failed (#1139), once per
+        // attempt that actually failed. Not a site checkout's: until it is
+        // paid it is no order (G13). The alert re-reads it when it runs.
+        if (failedNow && order && !holdsOnPayment(order)) {
+            await enqueueTeamAlert(tx, intent.organizationId, {
+                event: "order-failed",
+                orderId,
+                paymentIntentId: intent.id,
+            });
+        }
         return { applied };
     }
 
@@ -867,6 +898,15 @@ export class WebhooksService {
     ): Promise<{ applied: boolean }> {
         const result = await this.applyIntentFailure(tx, intent);
         if (result.applied) {
+            // On the invoice's history (U9 #1140): the customer's attempt
+            // on the pay page, or the autopay charge Saroh asked for.
+            await recordInvoiceEvent(tx, {
+                organizationId: intent.organizationId,
+                invoiceId,
+                kind: "PAY_ATTEMPT_FAILED",
+                actor: intent.viaMandateId ? JOB_ACTOR : CUSTOMER_ACTOR,
+                data: { reason, autopay: !!intent.viaMandateId },
+            });
             // A renewal's autopay charge declined (D13): RENEWAL_FAILED,
             // which Home reads as "Payment failed"; the pay link opens again.
             if (intent.viaMandateId) {
@@ -877,6 +917,12 @@ export class WebhooksService {
                     "RENEWAL_FAILED",
                     { reason },
                 );
+                // The customer is told too, with a link to pay (U10).
+                await enqueueAutopayFailedNotice(tx, intent.organizationId, {
+                    invoiceId,
+                    paymentIntentId: intent.id,
+                    reason,
+                });
             }
             await enqueueTeamAlert(tx, intent.organizationId, {
                 event: "failed",
@@ -889,7 +935,7 @@ export class WebhooksService {
 
     /**
      * A failed attempt moves the intent only. An invoice stays as it was —
-     * the customer can try again from the same link.
+     * the customer pays again from a new link (DEC-110: a link is shown once).
      */
     private async applyIntentFailure(
         tx: Tx,
@@ -1178,6 +1224,18 @@ export class WebhooksService {
                     },
                 });
             }
+            // A booking's refund in its history (#1137), unless the cancel
+            // already wrote it so.
+            await recordBookingRefundInTx(tx, existing.id, "SETTLED");
+            // The customer hears it is on its way (U12), if the refund
+            // call's answer didn't tell them already: keyed to the refund,
+            // so once. A FAILED row the provider says went back after all
+            // is told now, truthfully.
+            await enqueueRefundSentNotice(
+                tx,
+                intent.organizationId,
+                existing.id,
+            );
             return { applied: true, refundId: existing.id, settledNow: true };
         }
         // Made outside Saroh (the provider's dashboard): recorded at what the
@@ -1203,6 +1261,9 @@ export class WebhooksService {
                 providerRefundId: event.providerRefundId,
             },
         });
+        // A refund of a booking's payment made in the provider's own
+        // dashboard is in the booking's history too (#1137).
+        await recordBookingRefundInTx(tx, created.id, "SETTLED");
         return { applied: true, refundId: created.id, settledNow: true };
     }
 
@@ -1237,6 +1298,19 @@ export class WebhooksService {
                     existing.providerRefundId ?? event.providerRefundId ?? null,
             },
         });
+        // A booking's refund that never went back (#1137): "Refund failed"
+        // in its history, after the "Refunded" its cancel wrote.
+        await recordBookingRefundInTx(tx, existing.id, "FAILED");
+        // The team hears no money went back (U12): queued only by the write
+        // that moved it to FAILED, so a redelivered webhook, which finds
+        // the row FAILED, tells nobody again. The customer may have been
+        // told it was on its way; the team chooses what to say.
+        await enqueueRefundAlert(
+            tx,
+            intent.organizationId,
+            existing.id,
+            "failed",
+        );
         return { applied: true };
     }
 

@@ -23,7 +23,11 @@ import {
     reviewEmailSetup,
     reviewSummary,
 } from "@/lib/product-reviews/service";
-import { canStockProducts, canWriteProducts } from "@/lib/products/access";
+import {
+    canReadOrders,
+    canStockProducts,
+    canWriteProducts,
+} from "@/lib/products/access";
 import { choicesFrom } from "@/lib/products/filter-choices";
 import {
     catalogueFilter,
@@ -278,6 +282,7 @@ export default async function CataloguePage({
                         : null
                 }
                 canStock={canStockProducts(organization)}
+                canOrders={canReadOrders(organization)}
                 collectionCount={collections ? collections.length : null}
                 collectionsPanel={
                     active === "collections" ? (

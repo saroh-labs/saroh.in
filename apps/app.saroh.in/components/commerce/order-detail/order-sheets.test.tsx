@@ -712,6 +712,45 @@ describe("a save", () => {
     });
 });
 
+describe("a lower delivery charge whose refund failed says so (U5)", () => {
+    it("names the failed refund and where to try again", async () => {
+        actions.changeFulfilment.mockResolvedValue({
+            ok: true,
+            data: {
+                settleCents: -4000,
+                differenceCents: -4000,
+                byHand: false,
+                told: false,
+                refund: null,
+                moneyError: "Razorpay refused the refund",
+            },
+        });
+        render(
+            order({
+                fulfilmentType: "LOCAL_DELIVERY",
+                fulfilmentLabel: "Local delivery",
+            }),
+        );
+        await press(button("Change how it's fulfilled…"));
+        const pickup = await vi.waitFor(() => {
+            const found = Array.from(
+                dialog()?.querySelectorAll<HTMLElement>("[role=radio]") ?? [],
+            ).find((r) => r.textContent === "Pick-up");
+            if (!found) throw new Error("No Pick-up");
+            return found;
+        });
+        await press(pickup);
+        await press(button("Save", dialog()));
+
+        expect(actions.changeFulfilment).toHaveBeenCalledTimes(1);
+        expect(toast.showSuccess).not.toHaveBeenCalled();
+        expect(toast.showError).toHaveBeenCalledWith(
+            "Now pick-up. The ₹40 refund didn't go through.",
+            "Razorpay refused the refund. To try again, use Refund… on this order with that amount.",
+        );
+    });
+});
+
 describe("a refund and a cancel are held on the page, with Undo", () => {
     it("closes the refund sheet into the ten-second hold, and Undo sends nothing", async () => {
         render();
@@ -780,5 +819,135 @@ describe("a refund and a cancel are held on the page, with Undo", () => {
             "Not cancelled. Nothing was sent back.",
         );
         expect(actions.cancelOrder).not.toHaveBeenCalled();
+    });
+});
+
+describe('the cancel sheet\'s "Tell the customer" (U13, #1144)', () => {
+    const tick = () =>
+        dialog()?.querySelector<HTMLElement>("[role=checkbox]") ?? null;
+
+    it("starts ticked when a note would reach them", async () => {
+        render(order({ next: { ...order().next, tell: true } }));
+        await press(button("Cancel order…"));
+        expect(dialog()?.textContent).toContain("Tell Priya in their messages");
+        expect(tick()?.getAttribute("aria-checked")).toBe("true");
+    });
+
+    it("offers no tick, and says nothing is sent, when nothing would reach them", async () => {
+        render();
+        await press(button("Cancel order…"));
+        expect(tick()).toBe(null);
+        expect(dialog()?.textContent).toContain("Nothing is sent to Priya.");
+    });
+});
+
+describe("Ready says what the customer hears, and Undo takes it back (U5)", () => {
+    const preparing = (customerNotice: OrderRead["customerNotice"]) =>
+        order({
+            stage: "PREPARING",
+            stepIndex: 1,
+            customerNotice,
+            next: {
+                stages: ["READY"],
+                undo: null,
+                editable: false,
+                cancel: { refusal: null, pending: false },
+            },
+        });
+
+    async function markReadyNow() {
+        await press(button("Mark ready"));
+        await press(button("Mark now"));
+    }
+
+    it("emailed: told in ten seconds, and Undo inside them says Not sent", async () => {
+        actions.moveStage.mockResolvedValue({
+            ok: true,
+            data: { eventId: "e9" },
+        });
+        actions.undoStage.mockResolvedValue({
+            ok: true,
+            data: { stage: "PREPARING", told: false },
+        });
+        render(preparing("EMAIL"));
+        await markReadyNow();
+
+        expect(actions.moveStage).toHaveBeenCalledWith("o1", { to: "READY" });
+        expect(toast.showSuccess).not.toHaveBeenCalled();
+        expect(toast.showUndo).toHaveBeenCalledWith(
+            "Marked ready.",
+            expect.any(Function),
+            {
+                description: "Priya will be told in 10 seconds.",
+                duration: 10_000,
+            },
+        );
+        const undo = toast.showUndo.mock.calls[0]?.[1] as () => void;
+        await act(async () => {
+            undo();
+            await new Promise((r) => setTimeout(r, 0));
+        });
+        expect(actions.undoStage).toHaveBeenCalledWith("o1", "e9");
+        expect(toast.showInfo).toHaveBeenCalledWith(
+            "Back to preparing. Not sent.",
+        );
+    });
+
+    it("no way to reach them: says they aren't told, never that it was sent", async () => {
+        actions.moveStage.mockResolvedValue({
+            ok: true,
+            data: { eventId: "e9" },
+        });
+        actions.undoStage.mockResolvedValue({
+            ok: true,
+            data: { stage: "PREPARING", told: false },
+        });
+        render(preparing("NONE"));
+        await markReadyNow();
+
+        expect(toast.showUndo).toHaveBeenCalledWith(
+            "Marked ready.",
+            expect.any(Function),
+            {
+                description: "Priya isn't told. It shows on the order.",
+                duration: 10_000,
+            },
+        );
+        const undo = toast.showUndo.mock.calls[0]?.[1] as () => void;
+        await act(async () => {
+            undo();
+            await new Promise((r) => setTimeout(r, 0));
+        });
+        expect(toast.showInfo).toHaveBeenCalledWith("Back to preparing.");
+    });
+
+    it("an Undo after the notice went says they've been told", async () => {
+        actions.moveStage.mockResolvedValue({
+            ok: true,
+            data: { eventId: "e9" },
+        });
+        actions.undoStage.mockResolvedValue({
+            ok: true,
+            data: { stage: "PREPARING", told: true },
+        });
+        render(preparing("ACCOUNT"));
+        await markReadyNow();
+
+        expect(toast.showUndo).toHaveBeenCalledWith(
+            "Marked ready.",
+            expect.any(Function),
+            {
+                description: "Priya sees it in their account in 10 seconds.",
+                duration: 10_000,
+            },
+        );
+        const undo = toast.showUndo.mock.calls[0]?.[1] as () => void;
+        await act(async () => {
+            undo();
+            await new Promise((r) => setTimeout(r, 0));
+        });
+        expect(toast.showInfo).toHaveBeenCalledWith(
+            "Back to preparing. Priya has already been told.",
+        );
     });
 });

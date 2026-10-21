@@ -9,6 +9,7 @@ import { FRONT_DESK_LINE } from "@/components/bookings/calendar/quick-look-one";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { readOnlyLine } from "@/components/shared/who-can-change";
 import { formatDate, formatDateTime } from "@/lib/format/datetime";
+import { namesWho, systemEventTitle } from "@/lib/services/booking-history";
 import type { MoneyRow } from "@/lib/services/booking-page-money";
 import type { BookingOutcome } from "@/lib/services/booking-state";
 import { BOOKING_WORDS } from "@/lib/services/booking-words";
@@ -296,6 +297,8 @@ export function eventTitle(event: BookingEvent, timeZone: string): string {
     if (event.type === "NO_SHOW") return "Marked as didn't come";
     if (event.type === "PAID_AT_DESK") return "Paid at the desk";
     if (event.type === "REASSIGNED") return reassignedTitle(event, timeZone);
+    const system = systemEventTitle(event);
+    if (system) return system;
     const from = event.fromStartAt
         ? formatDateTime(event.fromStartAt, timeZone, { weekday: "short" })
         : null;
@@ -361,10 +364,13 @@ export function HistoryCard({
                                     weekday: "short",
                                 })}
                                 {/* Null actor: the booker did it, on the
-                                    booking page. */}
-                                {event.actor?.name
-                                    ? ` · ${event.actor.name}`
-                                    : " · by the customer"}
+                                    booking page — unless nobody did (a
+                                    lapse, a refund, #1137). */}
+                                {!namesWho(event)
+                                    ? null
+                                    : event.actor?.name
+                                      ? ` · ${event.actor.name}`
+                                      : " · by the customer"}
                             </span>
                         </span>
                     </li>

@@ -41,6 +41,7 @@ import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { allows } from "../organizations/organization-policy";
 import type { UpdatePersonRulesDto } from "./dto";
 import {
+    clearRequestNoticeInTx,
     lockWaitingInTx,
     replaceWaitingInTx,
     tellAskerInTx,
@@ -95,7 +96,9 @@ const DECIDES_REFUSAL =
  * admins in the inbox and by email; an approval or a turn-down tells the
  * person who asked, in their own alerts and by email, with the reason
  * (DEC-170, `notifications/ask-alerts.ts`). The notices are written, and
- * the emails queued, on the request's own transaction.
+ * the emails queued, on the request's own transaction. The waiting notice
+ * shows only to who may approve it (`service:write`), and leaves the bell
+ * once the request is approved, turned down, withdrawn or replaced (#1138).
  */
 @Injectable()
 export class StaffRulesService {
@@ -310,6 +313,9 @@ export class StaffRulesService {
                 },
                 include: { staff: { select: { name: true } } },
             });
+            // Answered or withdrawn: off the bell of whoever may decide it
+            // (#1138).
+            await clearRequestNoticeInTx(tx, ctx.organizationId, row.staffId);
             if (next === "APPROVED" || next === "TURNED_DOWN") {
                 await this.answerInTx(tx, ctx, row, next, reason);
             }
@@ -407,6 +413,12 @@ export class StaffRulesService {
                       })
                     : { count: 0 };
                 if (waiting && replaced.count === 1) {
+                    // Its bell notice goes with it; the new one replaces it.
+                    await clearRequestNoticeInTx(
+                        tx,
+                        ctx.organizationId,
+                        person.id,
+                    );
                     await recordPersonRulesInTx(tx, ctx, person, {
                         action: AuditAction.StaffRulesWithdrawn,
                         requestId: waiting.id,

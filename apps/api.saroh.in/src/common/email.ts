@@ -5,6 +5,7 @@ import { declaredNodeEnv, env } from "../env";
 import {
     codeSenderName,
     codeSubject,
+    siteAccountEmailFooter,
 } from "../modules/site-accounts/sender-name";
 import type { WelcomeMail } from "./email-welcome";
 import { welcomeEmail } from "./email-welcome";
@@ -1106,15 +1107,7 @@ export async function sendSiteSignInCodeEmail(
     }
 }
 
-/**
- * The code email's body; every value in it is escaped.
- *
- * TODO(#1156): its footer says this address sends only sign-in codes and
- * the email-changed notice. Since DEC-172 it also sends a customer's
- * data-removal acknowledgement and its done notice
- * (`site-accounts/data-request-emails.ts`); #1156 rewords this footer and
- * the email-changed one.
- */
+/** The code email's body; every value in it is escaped. */
 export function siteCodeEmail(
     businessName: string,
     code: string,
@@ -1126,7 +1119,7 @@ export function siteCodeEmail(
   <p>Enter this code on ${name}'s website to confirm it's you.</p>
   <p style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:32px;font-weight:700;letter-spacing:8px;padding:16px 0">${esc(code)}</p>
   <p style="color:#666;font-size:12px">This code expires in ${minutes} minutes. If you didn't ask for it, you can ignore this email.</p>
-  <p style="color:#666;font-size:12px">${name}'s website runs on Saroh. This address sends only sign-in codes, and a notice if your sign-in email changes.</p>
+  <p style="color:#666;font-size:12px">${siteAccountEmailFooter(name)}</p>
 </div>`;
 }
 
@@ -1226,6 +1219,6 @@ export function siteEmailChangedEmail(businessName: string): string {
   <h2>Your sign-in email changed</h2>
   <p>The email you use to sign in on ${name}'s website was changed to another address. This address won't sign you in there any more.</p>
   <p>If you didn't make this change, contact ${name} straight away.</p>
-  <p style="color:#666;font-size:12px">${name}'s website runs on Saroh. This address sends only sign-in codes, and a notice like this one if your sign-in email changes.</p>
+  <p style="color:#666;font-size:12px">${siteAccountEmailFooter(name)}</p>
 </div>`;
 }

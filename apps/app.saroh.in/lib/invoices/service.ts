@@ -92,7 +92,51 @@ export interface InvoiceShared {
     kind: "NEW" | "REMINDER" | "RECEIPT";
     /** Who shared it; null once they have left the business. */
     byUserId: string | null;
+    /** Their name, for "by Ravi"; null or absent (an older API) when unknown. */
+    byName?: string | null;
     at: string;
+}
+
+/**
+ * One thing that happened to an invoice, with who did it (automatic
+ * notices U9 #1140): issued, sent, reminded (by hand or automatically), a
+ * send that failed, voided, credited, written again, a failed pay attempt,
+ * a new link. On the detail read, newest first.
+ */
+export interface InvoiceEvent {
+    id: string;
+    kind:
+        | "ISSUED"
+        | "SENT"
+        | "REMINDED"
+        | "AUTO_SENT"
+        | "AUTO_REMINDED"
+        | "SEND_FAILED"
+        | "VOIDED"
+        | "CREDITED"
+        | "REISSUED"
+        | "PAY_ATTEMPT_FAILED"
+        | "LINK_MADE";
+    at: string;
+    actor: {
+        kind: "USER" | "JOB" | "CUSTOMER";
+        userId: string | null;
+        /** Null when unknown: the line then names no one. */
+        name: string | null;
+    };
+    channel: "EMAIL" | "THREAD" | null;
+    messageId: string | null;
+    to: string | null;
+    /** QUEUED or SUPPRESSED on a send. */
+    status: string | null;
+    thread: boolean;
+    reason: string | null;
+    creditNoteId: string | null;
+    creditNoteNumber: string | null;
+    draftId: string | null;
+    template: string | null;
+    autopay: boolean;
+    view: boolean;
 }
 
 /** One payment taken online through the invoice's payment link. */
@@ -366,6 +410,8 @@ export interface Invoice {
     sent?: InvoiceSent[];
     /** On the detail read only: every share by hand, newest first. */
     shared?: InvoiceShared[];
+    /** On the detail read only; absent from an API before U9 (#1140). */
+    events?: InvoiceEvent[];
     /**
      * "How to pay us" (R32, #833), on the detail read of an unpaid invoice:
      * the paper prints it, as the PDF does. Null when none is set; absent

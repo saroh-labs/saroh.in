@@ -1,4 +1,5 @@
 import { escapeHtml } from "../communications/transactional";
+import { siteAccountEmailFooter } from "./sender-name";
 
 /**
  * The two emails Saroh sends a customer about their "Ask to remove my data"
@@ -11,7 +12,8 @@ import { escapeHtml } from "../communications/transactional";
  * fixed words and the business's name, already cleaned
  * (`sender-name.ts`, `cleanBusinessName`) and escaped again here. Never the
  * business's free-text reason for closing it, and never anything the
- * customer typed.
+ * customer typed. They carry the code email's footer
+ * (`siteAccountEmailFooter`), which names these emails.
  *
  * Pure, so every word is tested (`data-request-emails.spec.ts`).
  */
@@ -79,23 +81,11 @@ export function dataRequestEmail(
     }
 }
 
-/**
- * The footer every identity email from a business's site carries.
- *
- * TODO(#1156): the sign-in email footer says this address sends "only
- * sign-in codes, and a notice if your sign-in email changes"
- * (`common/email.ts`). It now sends these two notices too; #1156 rewords
- * that footer for all of them. Until then this one says what it sends.
- */
-export function dataRequestFooter(name: string): string {
-    return `${name}'s website runs on Saroh. This address sends only sign-in codes and notices about your account there.`;
-}
-
 /** The body, every value already escaped. */
 function frame(heading: string, lines: string[], name: string): string {
     return `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
   <h2>${heading}</h2>
 ${lines.map((line) => `  <p>${line}</p>`).join("\n")}
-  <p style="color:#666;font-size:12px">${dataRequestFooter(name)}</p>
+  <p style="color:#666;font-size:12px">${siteAccountEmailFooter(name)}</p>
 </div>`;
 }

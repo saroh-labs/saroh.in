@@ -45,6 +45,8 @@ import { SignInCodesService } from "./sign-in-codes.service";
 import { SignInController } from "./sign-in.controller";
 import { SiteRelayGuard } from "./site-relay";
 import { ThreadsService } from "./threads.service";
+import { WaitlistClaimController } from "./waitlist-claim.controller";
+import { WaitlistClaimService } from "./waitlist-claim.service";
 
 /**
  * A business's customers signing in on its own site (ADR-011, DEC-037;
@@ -86,6 +88,8 @@ import { ThreadsService } from "./threads.service";
         AccountDetailsController,
         // "Ask to remove my data" (DEC-172).
         AccountDataRequestController,
+        // A waitlist offer's claim link (#1149): no sign-in to see it.
+        WaitlistClaimController,
     ],
     providers: [
         AccountOrdersService,
@@ -98,6 +102,7 @@ import { ThreadsService } from "./threads.service";
         EmailChangeService,
         AccountDataRequestService,
         DataRequestEmailHandler,
+        WaitlistClaimService,
         // Health notes: open since A13 worded C12's staff card per source.
         { provide: CUSTOMER_NOTES_OPEN, useValue: CUSTOMER_NOTES_OPEN_DEFAULT },
         { provide: EMAIL_CHANGED_SENDER, useValue: sendSiteEmailChangedEmail },

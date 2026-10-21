@@ -139,6 +139,40 @@ describe("AlertsGrid", () => {
         });
     });
 
+    it("Bookings with you: email off, the bell stays on (#1138)", async () => {
+        const mine = (email: boolean): AlertPreferences =>
+            prefs({
+                alerts: [
+                    {
+                        key: "mine",
+                        channels: { bell: true, email, whatsapp: false },
+                    },
+                ],
+            });
+        saveAlert.mockResolvedValue({ ok: true, data: mine(false) });
+        render(mine(true));
+
+        expect(host.textContent).toContain("Bookings with you");
+        const email = switchFor("Bookings with you by Email");
+        expect(email.getAttribute("aria-checked")).toBe("true");
+        await act(async () => {
+            email.click();
+            await Promise.resolve();
+        });
+
+        expect(saveAlert).toHaveBeenCalledWith({
+            alert: "mine",
+            channel: "email",
+            on: false,
+        });
+        expect(offer.mock.calls[0]?.[0]).toBe(
+            "Email off for Bookings with you",
+        );
+        expect(
+            switchFor("Bookings with you by Bell").getAttribute("aria-checked"),
+        ).toBe("true");
+    });
+
     it("an Undo refused says why", async () => {
         saveAlert.mockResolvedValue({ ok: true, data: prefs() });
         undoAlert.mockResolvedValue({

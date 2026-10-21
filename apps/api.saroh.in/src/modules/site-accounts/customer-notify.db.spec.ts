@@ -6,7 +6,10 @@
  * thread alone; a failed send leaving the thread message and stamping
  * nothing; a booking confirmation stamping the booker's email verified (and
  * a reserved placeholder never); the customer's own cancel telling the
- * team; and every job run twice telling once.
+ * team; and every job run twice telling once. D1 (U2): a desk booking
+ * for a contact with no site account emailed at the contact's own address,
+ * the account's address winning, consent still read, and a notice held for
+ * an Undo taken back unsent.
  *
  * Only the app env is stubbed (the credential key, and the account area
  * on); the email provider is the network-free fake. Runs in the
@@ -34,7 +37,11 @@ import {
     FakeCommsProviderFactory,
 } from "../communications/providers/fake.provider";
 import { OrderKitchenService } from "../orders/order-kitchen.service";
-import { CUSTOMER_NOTIFY_TYPE } from "./customer-notify-queue";
+import {
+    CUSTOMER_NOTIFY_TYPE,
+    cancelHeldCustomerNotice,
+    enqueueHeldCustomerNotice,
+} from "./customer-notify-queue";
 import {
     CustomerNotifyHandler,
     CustomerNotifyService,
@@ -610,5 +617,297 @@ describe("a booking (real database)", () => {
             where: { organizationId: b.owner.organizationId },
         });
         expect(message.template).toBe("BOOKING_CANCELLED");
+    });
+});
+
+describe("the contact's own email (DEC-174 D1, U2)", () => {
+    /** A business with a contact who has no site account. */
+    async function deskBusiness(
+        opts: { email?: boolean; contactEmail?: string } = {},
+    ) {
+        seq += 1;
+        const org = await prisma.organization.create({
+            data: {
+                name: "Rye & Co.",
+                slug: `notify-d1-${process.pid}-${seq}`,
+            },
+        });
+        const owner: OrganizationContext = {
+            organizationId: org.id,
+            userId: staffId,
+            role: "OWNER",
+        };
+        const contact = await prisma.contact.create({
+            data: {
+                organizationId: org.id,
+                email: opts.contactEmail ?? "asha@example.com",
+                firstName: "Asha",
+            },
+        });
+        if (opts.email !== false) {
+            await comms.connectProvider(owner, {
+                channel: "EMAIL",
+                provider: "RESEND",
+                fromAddress: "hello@rye.example",
+                credentials: { apiKey: "re_test_key" },
+            });
+        }
+        return { owner, contactId: contact.id };
+    }
+
+    /** A booking the team made at the desk, and its confirmation queued. */
+    async function deskBooking(organizationId: string, contactId: string) {
+        const service = await prisma.service.create({
+            data: {
+                organizationId,
+                name: "Check-up",
+                durationMinutes: 30,
+                capacity: 1,
+                currency: "INR",
+                timezone: "Asia/Kolkata",
+            },
+        });
+        const startAt = new Date(Date.now() + 3 * 24 * 3600_000);
+        const row = await prisma.booking.create({
+            data: {
+                organizationId,
+                serviceId: service.id,
+                contactId,
+                startAt,
+                endAt: new Date(startAt.getTime() + 30 * 60_000),
+                timezone: "Asia/Kolkata",
+                status: "CONFIRMED",
+                snapshot: {},
+                bookerName: "Asha Rao",
+            },
+        });
+        const event = await prisma.bookingEvent.create({
+            data: {
+                bookingId: row.id,
+                organizationId,
+                type: "BOOKED",
+                toStartAt: startAt,
+                actorUserId: staffId,
+            },
+        });
+        return { booking: row, eventId: event.id };
+    }
+
+    async function confirm(
+        organizationId: string,
+        contactId: string,
+    ): Promise<string> {
+        const { booking, eventId } = await deskBooking(
+            organizationId,
+            contactId,
+        );
+        await prisma.$transaction((tx) =>
+            notices.notify(
+                tx,
+                organizationId,
+                {
+                    kind: "BOOKING_CONFIRMED",
+                    eventKey: `booking:${eventId}`,
+                    bookingId: booking.id,
+                    bookingEventId: eventId,
+                },
+                new Date(),
+            ),
+        );
+        return eventId;
+    }
+
+    async function messagesOf(organizationId: string) {
+        return prisma.message.findMany({ where: { organizationId } });
+    }
+
+    it("a desk booking for a contact with an email and no site account is emailed through the business's provider; reach EMAIL", async () => {
+        const b = await deskBusiness();
+        await confirm(b.owner.organizationId, b.contactId);
+
+        const [message] = await messagesOf(b.owner.organizationId);
+        expect(message).toMatchObject({
+            template: "BOOKING_CONFIRMED",
+            toAddress: "asha@example.com",
+            contactId: b.contactId,
+            status: "QUEUED",
+        });
+        const fake = await sendAll(b.owner.organizationId);
+        expect(fake.calls).toHaveLength(1);
+        expect(fake.calls[0]).toMatchObject({
+            to: "asha@example.com",
+            from: "hello@rye.example",
+        });
+        expect(await comms.noticeReach(b.owner, b.contactId)).toMatchObject({
+            reach: "EMAIL",
+            to: "asha@example.com",
+        });
+    });
+
+    it("with a live site account and the thread on: EMAIL_AND_ACCOUNT, one email to the account's verified address (A2), one thread post", async () => {
+        await threadOn();
+        const b = await deskBusiness({ contactEmail: "asha.old@example.com" });
+        await prisma.customerAccount.create({
+            data: {
+                organizationId: b.owner.organizationId,
+                contactId: b.contactId,
+                email: "asha@example.com",
+                emailVerifiedAt: new Date(),
+            },
+        });
+        await confirm(b.owner.organizationId, b.contactId);
+
+        const messages = await messagesOf(b.owner.organizationId);
+        expect(messages.map((m) => m.toAddress)).toEqual(["asha@example.com"]);
+        expect(await threadMessages(b.owner.organizationId)).toHaveLength(1);
+        expect(await comms.noticeReach(b.owner, b.contactId)).toMatchObject({
+            reach: "EMAIL_AND_ACCOUNT",
+            to: "asha@example.com",
+        });
+    });
+
+    it("no provider: nothing is emailed, by the business or by Saroh; the thread alone, or nothing", async () => {
+        await threadOn();
+        const b = await deskBusiness({ email: false });
+        await confirm(b.owner.organizationId, b.contactId);
+        expect(await messagesOf(b.owner.organizationId)).toHaveLength(0);
+        expect(
+            await prisma.delivery.count({
+                where: { organizationId: b.owner.organizationId },
+            }),
+        ).toBe(0);
+        expect(await threadMessages(b.owner.organizationId)).toHaveLength(1);
+        expect((await comms.noticeReach(b.owner, b.contactId)).reach).toBe(
+            "ON_SIGN_IN",
+        );
+
+        await prisma.featureFlag.deleteMany({
+            where: { key: "ACCOUNT_THREAD" },
+        });
+        expect(await comms.noticeReach(b.owner, b.contactId)).toMatchObject({
+            reach: "NONE",
+            to: null,
+        });
+    });
+
+    it("email consent revoked: SUPPRESSED, no Delivery, and never said to be emailed", async () => {
+        const b = await deskBusiness();
+        await prisma.consent.create({
+            data: {
+                organizationId: b.owner.organizationId,
+                contactId: b.contactId,
+                channel: "EMAIL",
+                status: "REVOKED",
+            },
+        });
+        await confirm(b.owner.organizationId, b.contactId);
+        const [message] = await messagesOf(b.owner.organizationId);
+        expect(message.status).toBe("SUPPRESSED");
+        expect(
+            await prisma.delivery.count({
+                where: { organizationId: b.owner.organizationId },
+            }),
+        ).toBe(0);
+        expect(await comms.noticeReach(b.owner, b.contactId)).toMatchObject({
+            reach: "NONE",
+            to: null,
+        });
+    });
+
+    it("a contact with no email (a phone placeholder) and no account: NONE, and nothing is written", async () => {
+        const b = await deskBusiness({
+            contactEmail: "phone+d1@phone.invalid",
+        });
+        await confirm(b.owner.organizationId, b.contactId);
+        expect(await messagesOf(b.owner.organizationId)).toHaveLength(0);
+        expect((await comms.noticeReach(b.owner, b.contactId)).reach).toBe(
+            "NONE",
+        );
+    });
+
+    it("a contact merged into another: the survivor's address", async () => {
+        const b = await deskBusiness({ contactEmail: "asha.new@example.com" });
+        const tomb = await prisma.contact.create({
+            data: {
+                organizationId: b.owner.organizationId,
+                email: "asha.tomb@example.com",
+                firstName: "Asha",
+                mergedIntoId: b.contactId,
+                mergedAt: new Date(),
+            },
+        });
+        await confirm(b.owner.organizationId, tomb.id);
+        const [message] = await messagesOf(b.owner.organizationId);
+        expect(message).toMatchObject({
+            toAddress: "asha.new@example.com",
+            contactId: b.contactId,
+        });
+    });
+
+    it("the job delivered twice: one Message", async () => {
+        const b = await deskBusiness();
+        const { booking, eventId } = await deskBooking(
+            b.owner.organizationId,
+            b.contactId,
+        );
+        const payload = {
+            kind: "BOOKING_CONFIRMED" as const,
+            eventKey: `booking:${eventId}`,
+            bookingId: booking.id,
+            bookingEventId: eventId,
+        };
+        for (let i = 0; i < 2; i += 1) {
+            await prisma.$transaction((tx) =>
+                notices.notify(tx, b.owner.organizationId, payload, new Date()),
+            );
+        }
+        expect(await messagesOf(b.owner.organizationId)).toHaveLength(1);
+    });
+
+    it("held for an Undo: cancelled inside the hold, the job is gone and nobody was told; after it ran, told", async () => {
+        const b = await deskBusiness();
+        const organizationId = b.owner.organizationId;
+        const { booking, eventId } = await deskBooking(
+            organizationId,
+            b.contactId,
+        );
+        const payload = {
+            kind: "BOOKING_CONFIRMED" as const,
+            eventKey: `booking:${eventId}`,
+            bookingId: booking.id,
+            bookingEventId: eventId,
+        };
+        const now = new Date();
+        await prisma.$transaction((tx) =>
+            enqueueHeldCustomerNotice(tx, organizationId, payload, {
+                now,
+                ms: 10_000,
+            }),
+        );
+        const [held] = await jobsOf(organizationId, CUSTOMER_NOTIFY_TYPE);
+        expect(held.runAt.getTime() - now.getTime()).toBe(10_000);
+
+        const undone = await prisma.$transaction((tx) =>
+            cancelHeldCustomerNotice(tx, organizationId, payload.eventKey),
+        );
+        expect(undone).toEqual({ cancelled: true, told: false });
+        expect(await jobsOf(organizationId, CUSTOMER_NOTIFY_TYPE)).toHaveLength(
+            0,
+        );
+
+        // Queued again and run: an Undo now finds it already told.
+        await prisma.$transaction((tx) =>
+            enqueueHeldCustomerNotice(tx, organizationId, payload, { now }),
+        );
+        const [again] = await jobsOf(organizationId, CUSTOMER_NOTIFY_TYPE);
+        await customerNotify.handle(again);
+        await prisma.job.update({
+            where: { id: again.id },
+            data: { status: "DONE" },
+        });
+        const late = await prisma.$transaction((tx) =>
+            cancelHeldCustomerNotice(tx, organizationId, payload.eventKey),
+        );
+        expect(late).toEqual({ cancelled: false, told: true });
     });
 });

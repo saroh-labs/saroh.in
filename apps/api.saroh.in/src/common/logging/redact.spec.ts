@@ -130,6 +130,27 @@ describe("redactUrl", () => {
         );
     });
 
+    it("hides a waitlist offer's claim token (U18, #1149)", () => {
+        expect(
+            redactUrl("/public/sites/site_1/waitlist-claim/v1.cl1.1.sig?x=1"),
+        ).toBe("/public/sites/site_1/waitlist-claim/[token]?x=1");
+        expect(redactUrl("/public/sites/site_1/visit")).toBe(
+            "/public/sites/site_1/visit",
+        );
+    });
+
+    it("hides a back-in-stock stop link's token (U23, #1154)", () => {
+        expect(redactUrl("/public/sites/site_1/stock-watch/v1.cl1.sig")).toBe(
+            "/public/sites/site_1/stock-watch/[token]",
+        );
+        expect(
+            redactUrl("/public/sites/site_1/stock-watch/v1.cl1.sig/stop"),
+        ).toBe("/public/sites/site_1/stock-watch/[token]/stop");
+        expect(redactUrl("/public/sites/site_1/products/p_1/watch")).toBe(
+            "/public/sites/site_1/products/p_1/watch",
+        );
+    });
+
     it("hides a pay-now hold's token (U19)", () => {
         expect(redactUrl("/public/services/holds/tok_ABC-123")).toBe(
             "/public/services/holds/[token]",

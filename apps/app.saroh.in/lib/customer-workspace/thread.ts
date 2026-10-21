@@ -29,6 +29,12 @@ export interface CustomerThread {
     signsIn: boolean;
     /** The viewer may answer (`message:write`). */
     canReply: boolean;
+    /**
+     * Where a reply is emailed (DEC-174 U14): the business's own email,
+     * its "Your replies in Messages" switch on, an address and their
+     * consent. Null or missing: it isn't emailed.
+     */
+    emailedTo?: string | null;
 }
 
 /** The longest reply the API takes (`MESSAGE_MAX`). */
@@ -58,11 +64,22 @@ export function messageFrom(
 }
 
 /**
- * The line under the reply box: where the answer goes. Honest about the
- * one thing that is sent — a message in their account on the business's
- * site — and about a customer who hasn't signed in there.
+ * The line under the reply box: where the answer goes. Honest about what is
+ * sent: a message in their account on the business's site, and an email
+ * a minute later where the business's own email sends it (DEC-174 U14;
+ * replies inside that minute go as one email). Never claims an email that
+ * won't go, and says so for a customer who hasn't signed in there.
  */
-export function replyNote(signsIn: boolean, firstName: string): string {
+export function replyNote(
+    signsIn: boolean,
+    firstName: string,
+    emailedTo?: string | null,
+): string {
+    if (emailedTo) {
+        return signsIn
+            ? `Emailed to ${emailedTo} a minute after you send. ${firstName} also sees it in Messages on your site.`
+            : `Emailed to ${emailedTo} a minute after you send. ${firstName} can also read it when they sign in on your site.`;
+    }
     return signsIn
         ? `${firstName} sees your reply in Messages when they're signed in on your site. Nothing is emailed or texted.`
         : `${firstName} doesn't sign in on your site yet. They'll see it when they sign in on your site.`;

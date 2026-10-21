@@ -67,5 +67,7 @@ export interface InvoiceSharedView {
     kind: "NEW" | "REMINDER" | "RECEIPT";
     /** Who shared it; null if they have since been removed. */
     byUserId: string | null;
+    /** Their name, for "Shared on WhatsApp by Ravi"; null when unknown. */
+    byName: string | null;
     at: string;
 }

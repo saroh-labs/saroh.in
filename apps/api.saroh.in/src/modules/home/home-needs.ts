@@ -1,7 +1,7 @@
 import { DateTime } from "luxon";
 
 import { timeWords } from "../../common/words-format";
-import { NO_EMAIL_PLAN_SUB, NO_EMAIL_SUB } from "./home-email-setup";
+import { noEmailSub } from "./home-email-setup";
 import type {
     HomeAction,
     HomeEvidence,
@@ -348,10 +348,12 @@ const SINGLE: Partial<Record<string, { rank: Rank; sub: string }>> = {
         rank: 2,
         sub: "Payments are still recorded, but every invoice should print it. Add it once and the next ones will.",
     },
-    // DEC-011 (7 Oct): no email provider, so customers get no emails.
-    COMMUNICATIONS_NO_EMAIL: { rank: 2, sub: NO_EMAIL_SUB },
+    // DEC-011 (7 Oct): no email provider, so customers get no emails. The
+    // action carries the line true for its business (U5); this one claims
+    // only what isn't emailed.
+    COMMUNICATIONS_NO_EMAIL: { rank: 2, sub: noEmailSub(null, false) },
     // The same on a plan that can't connect one (DEC-091): setting up.
-    COMMUNICATIONS_NO_EMAIL_PLAN: { rank: 4, sub: NO_EMAIL_PLAN_SUB },
+    COMMUNICATIONS_NO_EMAIL_PLAN: { rank: 4, sub: noEmailSub(null, true) },
     // D8: pauses that ended while Payments is off.
     PAYMENTS_PAUSES_WAITING: {
         rank: 2,
@@ -403,7 +405,7 @@ export function rowsOf(action: HomeAction, zone: string): Ranked[] {
     if (single) {
         return [
             {
-                ...actionRow(action, single.rank, single.sub),
+                ...actionRow(action, single.rank, action.sub ?? single.sub),
                 source,
                 things: 1,
             },

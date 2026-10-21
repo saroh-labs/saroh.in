@@ -171,7 +171,12 @@ export interface BookingEvent {
         | "ATTENDED"
         | "NO_SHOW"
         | "PAID_AT_DESK"
-        | "REASSIGNED";
+        | "REASSIGNED"
+        // An unpaid hold whose time ran out, and the money paid online
+        // going back or refused (#1137): nobody's hand, no actor.
+        | "LAPSED"
+        | "REFUNDED"
+        | "REFUND_FAILED";
     /** Null when the booker did it themselves through the public form. */
     actor: { name: string | null } | null;
     fromStartAt: string | null;
@@ -182,6 +187,13 @@ export interface BookingEvent {
      */
     fromStaff?: { name: string } | null;
     toStaff?: { name: string } | null;
+    /** On REFUNDED and REFUND_FAILED (#1137): the refund's amount. */
+    data?: {
+        amountCents?: number;
+        currency?: string;
+        refundId?: string;
+        outcome?: string;
+    } | null;
     createdAt: string;
 }
 

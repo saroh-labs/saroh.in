@@ -30,21 +30,11 @@ import { FlagKey, isKnownFlagKey } from "../feature-flags/flags";
 import type { OrgAction } from "../organizations/organization-policy";
 import { ORG_ACTIONS } from "../organizations/organization-policy";
 
-/** The optional-module set. AI is excluded under DEC-015. */
-export const MODULE_KEYS = [
-    "WEBSITE",
-    "CRM",
-    "APPOINTMENTS",
-    "COURSES",
-    "CLASS_PACKS",
-    "COMMERCE",
-    "PAYMENTS",
-    "COMMUNICATIONS",
-    "AUTOMATIONS",
-    "INSIGHTS",
-] as const;
+import type { ModuleKey } from "./module-keys";
+import { MODULE_KEYS } from "./module-keys";
 
-export type ModuleKey = (typeof MODULE_KEYS)[number];
+export { MODULE_KEYS } from "./module-keys";
+export type { ModuleKey } from "./module-keys";
 
 /** Persisted lifecycle values (Task 2 stores these; readiness is NOT one). */
 export type ModuleLifecycle = "DISABLED" | "ENABLED" | "ARCHIVED";

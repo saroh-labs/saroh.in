@@ -3,6 +3,8 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { enqueueTeamAlert } from "../notifications/team-alerts";
+import { MEMBERSHIP_NOTICE_OF } from "../site-accounts/notices/membership";
 import { PLAN_EVENTS_PAGE_MAX } from "./dto";
 import type {
     EventActor,
@@ -15,6 +17,7 @@ import {
     JOB_ACTOR,
     teamNames,
 } from "./event-actors";
+import { queueMembershipNotice } from "./membership-notices";
 
 /**
  * A subscription's log (plan 2026-09-26-004, D9): one event for everything
@@ -54,6 +57,12 @@ export const SUBSCRIPTION_EVENT_KINDS = [
     "RENEWED",
     /** "Retry now": a new pay link for `invoiceId`. */
     "RETRIED",
+    /**
+     * Saroh emailed the customer a fresh link to pay `invoiceId` (automatic
+     * notices U10): `data.reason` AUTOPAY_FAILED, after a failed charge.
+     * Never the link itself.
+     */
+    "PAY_LINK_EMAILED",
     /**
      * A pause's end date came, but the resume would restart billing with
      * Payments off (D8): `data.until`, `data.reason` PAYMENTS_OFF. Once a pause.
@@ -127,7 +136,25 @@ export interface SubscriptionEventInput {
     data?: SubscriptionEventData;
 }
 
-/** Write one event. Called inside the action's own transaction. */
+/**
+ * What the team is told of when the member does it themselves from their
+ * account (DEC-174 U19, #1150), on the Members row. Never the team's own
+ * changes.
+ */
+const MEMBER_ALERT_OF: Partial<
+    Record<SubscriptionEventKind, "cancelled" | "paused">
+> = {
+    CANCELLED: "cancelled",
+    CANCEL_SCHEDULED: "cancelled",
+    PAUSED: "paused",
+};
+
+/**
+ * Write one event. Called inside the action's own transaction. A change
+ * the member is told about (joined, paused, resumed, cancelled, kept, a
+ * plan change) queues their notice with it (`membership-notices.ts`, U11);
+ * a cancel or pause the member made themselves also alerts the team (U19).
+ */
 export async function recordSubscriptionEvent(
     tx: Prisma.TransactionClient,
     organizationId: string,
@@ -136,7 +163,7 @@ export async function recordSubscriptionEvent(
     actor: SubscriptionActor,
     input: SubscriptionEventInput = {},
 ): Promise<void> {
-    await tx.subscriptionEvent.create({
+    const event = await tx.subscriptionEvent.create({
         data: {
             organizationId,
             subscriptionId,
@@ -149,6 +176,23 @@ export async function recordSubscriptionEvent(
             data: input.data ?? {},
         },
     });
+    if (MEMBERSHIP_NOTICE_OF[kind]) {
+        await queueMembershipNotice(tx, organizationId, {
+            event,
+            subscriptionId,
+            kind,
+            actorKind: actor.actorKind,
+        });
+    }
+    const memberAlert = MEMBER_ALERT_OF[kind];
+    if (memberAlert && actor.actorKind === "CUSTOMER") {
+        await enqueueTeamAlert(tx, organizationId, {
+            event: "member",
+            change: memberAlert,
+            subscriptionId,
+            eventId: event.id,
+        });
+    }
 }
 
 /**

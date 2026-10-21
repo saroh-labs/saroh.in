@@ -451,7 +451,11 @@ export function OrderDetail({
                         hold={hold}
                         title={(s) => `Marking ready in ${s}s`}
                         note="Leave this page and it's marked ready straight away. Undo is only here."
-                        body={readyNoticeText(order.customerNotice, first)}
+                        body={readyNoticeText(
+                            order.customerNotice,
+                            first,
+                            order.customerNoticeTo,
+                        )}
                         nowLabel="Mark now"
                         onUndo={() =>
                             kitchen.cancelHold(

@@ -93,6 +93,7 @@ export function CatalogueScreen({
     choices,
     canWrite,
     canStock,
+    canOrders = false,
     collectionsPanel,
     collectionCount = null,
     meter = null,
@@ -114,6 +115,8 @@ export function CatalogueScreen({
     canWrite: boolean;
     /** Count and move stock: "+N · Add" in the quick look. */
     canStock: boolean;
+    /** `order:read`: the quick look links a short product's open orders. */
+    canOrders?: boolean;
     /** The Collections chip's cards and sheet (#524), under the chips. */
     collectionsPanel?: ReactNode;
     /** How many collections there are; null when they couldn't be read. */
@@ -601,6 +604,7 @@ export function CatalogueScreen({
                 storeId={query.storefront}
                 canWrite={canWrite}
                 canStock={canStock}
+                canOrders={canOrders}
                 need={open ? (needById.get(open.id) ?? null) : null}
                 focusAdd={focusAdd}
                 atFirst={openIndex <= 0}

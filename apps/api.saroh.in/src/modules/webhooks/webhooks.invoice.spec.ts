@@ -49,6 +49,12 @@ jest.mock("@saroh/database", () => {
             findUnique: jest.fn().mockResolvedValue(null),
             update: jest.fn(),
         },
+        // The invoice's history (U9 #1140): a failed attempt is written.
+        invoiceEvent: { createMany: jest.fn() },
+        // The business's notice switches (U12): none stored, so on.
+        customerNoticeSetting: { findUnique: jest.fn() },
+        // The customer's refund notice (U12), queued on the transaction.
+        job: { create: jest.fn() },
         // The intent's row lock, then the invoice's; [] keeps the status read.
         $queryRaw: jest.fn().mockResolvedValue([]),
     };
@@ -489,6 +495,40 @@ describe("webhook failure on an invoice intent", () => {
         expect(invoiceFindFirst).not.toHaveBeenCalled();
         expect(invoiceUpdate).not.toHaveBeenCalled();
         expect(orderFindUnique).not.toHaveBeenCalled();
+    });
+
+    it("writes a failed pay attempt by the customer on the invoice's history (U9)", async () => {
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        intentUpdateMany.mockResolvedValue({ count: 1 });
+
+        await deliver(
+            bodyOf({ eventType: "payment.failed", outcome: "FAILED" }),
+        );
+
+        expect(prisma.invoiceEvent.createMany).toHaveBeenCalledWith({
+            data: [
+                expect.objectContaining({
+                    organizationId: INTENT.organizationId,
+                    invoiceId: INTENT.invoiceId,
+                    kind: "PAY_ATTEMPT_FAILED",
+                    actorKind: "CUSTOMER",
+                    actorUserId: null,
+                    data: { reason: "DECLINED", autopay: false },
+                }),
+            ],
+            skipDuplicates: true,
+        });
+    });
+
+    it("writes no failed attempt when the late failure changed nothing", async () => {
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        intentUpdateMany.mockResolvedValue({ count: 0 });
+
+        await deliver(
+            bodyOf({ eventType: "payment.failed", outcome: "FAILED" }),
+        );
+
+        expect(prisma.invoiceEvent.createMany).not.toHaveBeenCalled();
     });
 
     it("queues the team's Payment failed alert with the failure (F14)", async () => {

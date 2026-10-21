@@ -1023,3 +1023,19 @@ export function googleCalendarHref(input: {
     if (input.location?.trim()) params.set("location", input.location.trim());
     return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
+
+/**
+ * How many sessions are on show: what "Show more" has opened, and never
+ * fewer than reach the chosen one, so a session chosen by the address (a
+ * waitlist claim link, #1149) is always in the list it is chosen from.
+ */
+export function sessionsOnShow(
+    sessions: readonly { startAt: string }[],
+    shown: number,
+    chosenStartAt: string | null | undefined,
+): number {
+    const at = chosenStartAt
+        ? sessions.findIndex((s) => s.startAt === chosenStartAt)
+        : -1;
+    return Math.max(shown, at + 1);
+}

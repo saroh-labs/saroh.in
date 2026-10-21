@@ -27,7 +27,27 @@ export const NOTICE_KINDS = {
     "booking.cancelled": "booking",
     // Given to someone else (#1157): in the two people's own alerts.
     "booking.reassigned": "booking",
+    // A booking with you made, moved or cancelled (#1138): in that
+    // person's own alerts.
+    "booking.mine.new": "booking",
+    "booking.mine.moved": "booking",
+    "booking.mine.cancelled": "booking",
     "payment.failed": "invoice",
+    // Money alerts (#1139): an order's payment that didn't go through, a
+    // capture at the wrong amount (on an order, or on an invoice), and a
+    // team-made order paid by its link.
+    "order.payment_failed": "order",
+    "payment.mismatch": "order",
+    "payment.mismatch.invoice": "invoice",
+    "order.paid_by_link": "order",
+    // A refund that sent no money back (#1143): refused by the provider,
+    // or failed after it was sent; on an order, a booking or an invoice.
+    "refund.refused": "order",
+    "refund.refused.booking": "booking",
+    "refund.refused.invoice": "invoice",
+    "refund.failed": "order",
+    "refund.failed.booking": "booking",
+    "refund.failed.invoice": "invoice",
     "site.live": "site",
     "site.not_live": "site",
     "site.review.approved": "site",
@@ -49,6 +69,11 @@ export const NOTICE_KINDS = {
     // The answer, to the Member who asked alone (`userId`): approved, or
     // turned down with the reason. Their own Hours and time off.
     "hours.rule-answer": "hours",
+    // A member's own cancel or pause, or autopay cancelled at their bank
+    // (#1150): their Memberships on the person page.
+    "member.cancelled": "member",
+    "member.paused": "member",
+    "member.autopay_off": "member",
     "plan.limit": "plan",
     "plan.changed": "plan",
     "plan.ending": "plan",
@@ -76,6 +101,7 @@ interface TargetColumns {
     plan: Record<never, never>;
     products: Record<never, never>;
     "customer-request": { contactId: string | null };
+    member: { contactId: string };
 }
 
 /** What a notice of type `T` must point at. */
@@ -125,6 +151,7 @@ const COLUMN_OF: Partial<Record<NoticeKind, keyof NoticeColumns>> = {
     invoice: "invoiceId",
     site: "siteId",
     hours: "staffId",
+    member: "contactId",
 };
 
 /**
@@ -207,6 +234,7 @@ const ID_OF: Record<NoticeKind, (n: StoredNotice) => string | null> = {
     plan: () => null,
     products: () => null,
     "customer-request": (n) => n.contactId ?? null,
+    member: (n) => n.contactId ?? null,
 };
 
 /**

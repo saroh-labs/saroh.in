@@ -20,6 +20,10 @@ jest.mock("@saroh/database", () => {
         job: { create: jest.fn() },
         activity: { create: jest.fn() },
         analyticsEvent: { create: jest.fn() },
+        // The auto-reply (U15): no email provider by default, so none is
+        // queued and the job counts below are the team's alone.
+        communicationProvider: { findUnique: jest.fn() },
+        customerNoticeSetting: { findUnique: jest.fn() },
     };
     return {
         ...actual,
@@ -464,5 +468,57 @@ describe("EnquiryService.submit — rate limiting", () => {
         await expect(
             service.submit("form_1", validData, undefined, "ip_b"),
         ).resolves.toMatchObject({ leadId: "lead_1" });
+    });
+});
+
+describe("EnquiryService.submit — the auto-reply (U15)", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    const providerFind = prisma.communicationProvider.findUnique as jest.Mock;
+
+    it("with the business's own email connected, queues one customer.notify beside the team's job, keyed to the submission", async () => {
+        const service = new EnquiryService();
+        wireHappyPath();
+        providerFind.mockResolvedValue({
+            status: "CONNECTED",
+            provider: "RESEND",
+        });
+
+        await service.submit("form_1", validData, undefined, undefined);
+
+        const types = jobCreate.mock.calls.map(
+            (c: [{ data: { type: string } }]) => c[0].data.type,
+        );
+        expect(types).toEqual([
+            "enquiry.notify",
+            "customer.notify",
+            "automation.run",
+        ]);
+        expect(jobCreate.mock.calls[1][0].data).toMatchObject({
+            organizationId: "org_FORM",
+            payload: {
+                kind: "ENQUIRY_RECEIVED",
+                eventKey: "enquiry-received:sub_1",
+                submissionId: "sub_1",
+            },
+        });
+    });
+
+    it("an obvious spam submission queues no reply, and the team's jobs as ever", async () => {
+        const service = new EnquiryService();
+        wireHappyPath();
+        providerFind.mockResolvedValue({
+            status: "CONNECTED",
+            provider: "RESEND",
+        });
+
+        await service.submit(
+            "form_1",
+            { ...validData, name: "Visit https://cheap.example.com" },
+            undefined,
+            undefined,
+        );
+
+        expect(jobCreate).toHaveBeenCalledTimes(2);
     });
 });

@@ -4,6 +4,8 @@ import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { useEffect, useId, useRef, useState } from "react";
 
+import type { NoticeReach } from "@/lib/messages/notice-reach";
+import { courierNoticeText } from "@/lib/messages/notice-reach";
 import type { CourierFields, Shipment } from "@/lib/orders/courier";
 import {
     COURIER_FIELD_MAX,
@@ -27,8 +29,10 @@ import {
 /**
  * The courier's details (B10, DEC-045): who took it, their tracking number
  * and, if they gave one, the tracking link — every one optional, since the
- * number often comes after the parcel goes. Saroh books no pickup and sends
- * no message: what is typed stays on the order, where the team can see it.
+ * number often comes after the parcel goes. Saroh books no pickup. What is
+ * typed stays on the order, and the sheet says what reaches the customer
+ * (U16, `courierNoticeText`): the handover's notice carries it, and
+ * tracking added later is told while the business sends delivery updates.
  *
  * `handover` is the "Hand to courier" step itself (the design's panel);
  * `change` fills them in or corrects them afterwards — "No tracking number
@@ -52,7 +56,15 @@ export function CourierPanel({
             description={
                 handover
                     ? `To ${draft.to}`
-                    : `Add or correct what the courier gave you. It stays on the order. Nothing is sent to ${draft.first}.`
+                    : `Add or correct what the courier gave you. ${courierNoticeText(
+                          draft.reach,
+                          draft.first,
+                          {
+                              mode: "change",
+                              to: draft.noticeTo,
+                              deliveryUpdates: draft.deliveryUpdates,
+                          },
+                      )}`
             }
             busy={draft.busy}
             onClose={draft.onCancel}
@@ -68,6 +80,12 @@ interface CourierProps {
     /** Where it is going, one line. */
     to: string;
     first: string;
+    /** How the order's notices reach the customer (A14); null: unknown. */
+    reach?: NoticeReach | null;
+    /** The address they are emailed at, when they are. */
+    noticeTo?: string | null;
+    /** The business sends delivery updates (U16); null: unknown. */
+    deliveryUpdates?: boolean | null;
     busy: boolean;
     /** What the order already has — `change` only. */
     before?: Pick<Shipment, "courier" | "number" | "url">;
@@ -81,6 +99,8 @@ interface CourierProps {
 function CourierDraft({
     mode,
     first,
+    reach,
+    noticeTo,
     busy,
     before,
     onPrint,
@@ -183,7 +203,15 @@ function CourierDraft({
                                     ? "That isn't a web address. Paste the whole link, starting https://."
                                     : null
                             }
-                            hint={`Paste the link ${name || "the courier"} gave you. It stays on the order. Nothing is sent to ${first}.`}
+                            hint={
+                                handover
+                                    ? `Paste the link ${name || "the courier"} gave you. ${courierNoticeText(
+                                          reach,
+                                          first,
+                                          { mode: "handover", to: noticeTo },
+                                      )}`
+                                    : `Paste the link ${name || "the courier"} gave you.`
+                            }
                         >
                             <Input
                                 type="url"

@@ -11,6 +11,7 @@ import type { AnswerOutcome } from "../notifications/ask-alerts";
 import {
     answerTitle,
     RULE_ANSWER_NOTIFICATION_TYPE,
+    RULE_REQUEST_NOTIFICATION_TYPE,
 } from "../notifications/ask-alerts";
 import { noticeOf } from "../notifications/notice-target";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
@@ -72,6 +73,29 @@ export async function tellAskerInTx(
         step: "answered",
         notificationId: notice.id,
     });
+}
+
+/**
+ * Take a person's rules request off the bell (#1138): the business's
+ * notice that it waits, once it is approved, turned down, withdrawn or
+ * replaced. Deleted rather than marked read, so it leaves the list too:
+ * the answer is the asker's own notice, and the history keeps the rest.
+ * On the closing transaction. Answers how many were removed.
+ */
+export async function clearRequestNoticeInTx(
+    tx: Tx,
+    organizationId: string,
+    staffId: string,
+): Promise<number> {
+    const { count } = await tx.notification.deleteMany({
+        where: {
+            organizationId,
+            userId: null,
+            type: RULE_REQUEST_NOTIFICATION_TYPE,
+            staffId,
+        },
+    });
+    return count;
 }
 
 /** The bell's words for a request closed by a newer change. */
@@ -139,6 +163,7 @@ export async function replaceWaitingInTx(
             select: { id: true },
         });
         const asked = changesWords(storedRuleChanges(row.changes));
+        await clearRequestNoticeInTx(tx, ctx.organizationId, row.staffId);
         await tellAskerInTx(
             tx,
             ctx.organizationId,

@@ -1,3 +1,4 @@
+import { customerEmailLabel } from "@/lib/communications/customer-emails";
 import { formatDateTime, timeZoneName } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
 import {
@@ -233,6 +234,22 @@ function detailRows(
                 alert && channel
                     ? `${alert} by ${ALERT_CHANNEL_LABELS[channel]}`
                     : "An alert";
+            return {
+                rows: (recordedChanges(meta) ?? []).map((c) =>
+                    row(
+                        label,
+                        shown(c.field, c.before),
+                        shown(c.field, c.after),
+                    ),
+                ),
+                withoutValues: false,
+            };
+        }
+        case "customer-notices.setting": {
+            // One of the business's automatic customer emails (DEC-174):
+            // "Membership emails", On or Off.
+            const label =
+                customerEmailLabel(meta.kind) ?? "An email to customers";
             return {
                 rows: (recordedChanges(meta) ?? []).map((c) =>
                     row(

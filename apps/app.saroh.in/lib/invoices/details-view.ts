@@ -1,5 +1,6 @@
 import { formatMoneyMajor, minorOf } from "@/lib/format/money";
 
+import { byWhom, eventIsBad, eventLine } from "./event-words";
 import { sentLine } from "./send";
 import type { Invoice, InvoicePayment } from "./service";
 import type { InvoiceTab } from "./status";
@@ -46,15 +47,52 @@ export function historyLines(
 ): HistoryLine[] {
     const money = (a: string) => formatMoneyMajor(a, i.currency);
     const lines: HistoryLine[] = [];
+    // Who did what (U9 #1140). An API before it sends none, and an older
+    // invoice has none: their lines come from the invoice's own dates.
+    const events = i.events ?? [];
+    const has = (kind: string) => events.some((e) => e.kind === kind);
+    const told = new Set(events.map((e) => e.messageId).filter(Boolean));
+    const creditOf = new Map(
+        events
+            .filter((e) => e.kind === "CREDITED" && e.creditNoteId)
+            .map((e) => [e.creditNoteId, e]),
+    );
     for (const c of i.corrections ?? []) {
+        // A credit note this invoice's history made: dated, with who.
+        const credit = creditOf.get(c.id);
         lines.push({
             key: c.id,
-            what: `${c.kind === "CREDIT_NOTE" ? "Credit note" : "Supplementary invoice"} ${c.number ?? ""} for ${money(c.total)}`,
-            when: null,
+            what: `${c.kind === "CREDIT_NOTE" ? "Credit note" : "Supplementary invoice"} ${c.number ?? ""} for ${money(c.total)}${credit ? byWhom(credit) : ""}`,
+            when: credit?.at ?? null,
             tone: "plain",
         });
     }
-    if (i.voidedAt) {
+    const drawnCredits = new Set(
+        (i.corrections ?? []).map((c) => c.id).filter((id) => creditOf.has(id)),
+    );
+    // Only a subscription's paper is issued by the renewal; a booking, a
+    // pack or a course bought online is issued automatically too.
+    const issuedBy = i.order
+        ? ` for order #${i.order.number}`
+        : i.issuedAutomatically && i.source === "SUBSCRIPTION"
+          ? " by the subscription renewal"
+          : "";
+    for (const e of events) {
+        if (
+            e.kind === "CREDITED" &&
+            e.creditNoteId &&
+            drawnCredits.has(e.creditNoteId)
+        ) {
+            continue;
+        }
+        lines.push({
+            key: `event:${e.id}`,
+            what: eventLine(e, i.number, issuedBy),
+            when: e.at,
+            tone: eventIsBad(e) ? "bad" : "plain",
+        });
+    }
+    if (i.voidedAt && !has("VOIDED")) {
         lines.push({
             key: "void",
             what: `Voided${i.voidReason ? `: ${i.voidReason}` : ""}`,
@@ -103,12 +141,14 @@ export function historyLines(
     for (const s of i.shared ?? []) {
         lines.push({
             key: s.id,
-            what: sharedLine(s),
+            what: `${sharedLine(s)}${s.byName ? ` by ${s.byName}` : ""}`,
             when: s.at,
             tone: "plain",
         });
     }
     for (const s of i.sent ?? []) {
+        // A send its event tells is told once, by the event.
+        if (told.has(s.id)) continue;
         lines.push({ key: s.id, what: sentLine(s), when: s.at, tone: "plain" });
     }
     if (
@@ -123,17 +163,10 @@ export function historyLines(
             tone: "bad",
         });
     }
-    if (i.issuedAt) {
-        // Only a subscription's paper is issued by the renewal; a booking,
-        // a pack or a course bought online is issued automatically too.
-        const by = i.order
-            ? ` for order #${i.order.number}`
-            : i.issuedAutomatically && i.source === "SUBSCRIPTION"
-              ? " by the subscription renewal"
-              : "";
+    if (i.issuedAt && !has("ISSUED")) {
         lines.push({
             key: "issued",
-            what: `${i.number ?? "It"} issued${by}`,
+            what: `${i.number ?? "It"} issued${issuedBy}`,
             when: i.issuedAt,
             tone: "plain",
         });

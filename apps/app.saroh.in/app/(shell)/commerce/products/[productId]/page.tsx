@@ -45,6 +45,7 @@ import {
     getStockLevels,
     getStockLog,
     getStockTracking,
+    getWaitingCount,
 } from "@/lib/stock/service";
 
 // One read for the tab's title and the page: the business's product, as
@@ -182,6 +183,7 @@ export default async function ProductPage({
         collections,
         priceHistory,
         allergens,
+        waiting,
     ] = await Promise.all([
         // Its shelves at every storefront — optional: without them, the
         // Overview shows the address's storefront and the Stock tab says
@@ -212,6 +214,11 @@ export default async function ProductPage({
         // A business that keeps an allergen list sells food: the
         // description card says ingredients, else materials.
         onOverview ? listAllergens().catch(() => null) : Promise.resolve(null),
+        // Who waits for it to be back (DEC-174, U24): the Stock tab's
+        // "3 people waiting for it". Optional: unread, it is left out.
+        view === "team" && tab === "stock"
+            ? getWaitingCount(productId)
+            : Promise.resolve(null),
     ]);
     const stock: ProductStock | null = levels
         ? productStock(levels, productId)
@@ -317,6 +324,7 @@ export default async function ProductPage({
                                 retryHref={href("stock")}
                                 ordersHref={href("orders")}
                                 now={now}
+                                waiting={waiting}
                             />
                         ) : null}
                         {tab === "photos" ? (
