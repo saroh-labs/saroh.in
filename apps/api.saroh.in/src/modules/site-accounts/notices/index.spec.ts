@@ -402,27 +402,28 @@ describe("the notice registry", () => {
         expect(bare.body).not.toContain("Hi ");
     });
 
-    it("both back-in-stock emails carry Stop waiting as a slot, never the token (DEC-178)", () => {
-        for (const kind of [
-            "BACK_IN_STOCK",
-            "BACK_IN_STOCK_WAITING",
-        ] as const) {
-            const body = renderNotice(SAMPLES[kind]).body;
-            expect(body).toContain(
-                `Changed your mind? Stop waiting here:<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a>`,
-            );
-            expect(body).not.toContain("stop-waiting");
-            expect(secretLinkLead(SAMPLES[kind])).toBe(
-                "Changed your mind? Stop waiting here:",
-            );
-            // No site to stop on now: no slot, so the send needs no link.
-            const bare = {
-                kind,
-                stock: { ...SAMPLES[kind].stock, site: null, link: null },
-            } as NoticeVars;
-            expect(secretLinkLead(bare)).toBeNull();
-            expect(renderNotice(bare).body).not.toContain(SECRET_LINK_SLOT);
-        }
+    it("the sign-up email carries Stop waiting as a slot, never the token; the back-in-stock email has none (DEC-178)", () => {
+        const kind = "BACK_IN_STOCK_WAITING";
+        const body = renderNotice(SAMPLES[kind]).body;
+        expect(body).toContain(
+            `Changed your mind? Stop waiting here:<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a>`,
+        );
+        expect(body).not.toContain("stop-waiting");
+        expect(secretLinkLead(SAMPLES[kind])).toBe(
+            "Changed your mind? Stop waiting here:",
+        );
+        // No site to stop on now: no slot, so the send needs no link.
+        const bare = {
+            kind,
+            stock: { ...SAMPLES[kind].stock, site: null, link: null },
+        } as NoticeVars;
+        expect(secretLinkLead(bare)).toBeNull();
+        expect(renderNotice(bare).body).not.toContain(SECRET_LINK_SLOT);
+        // The back-in-stock email: the watch is told, nothing to stop.
+        const told = renderNotice(SAMPLES.BACK_IN_STOCK).body;
+        expect(told).not.toContain("Stop waiting");
+        expect(told).not.toContain(SECRET_LINK_SLOT);
+        expect(secretLinkLead(SAMPLES.BACK_IN_STOCK)).toBeNull();
     });
 
     it("the sign-up email says it once, plainly, with no product link (DEC-178)", () => {

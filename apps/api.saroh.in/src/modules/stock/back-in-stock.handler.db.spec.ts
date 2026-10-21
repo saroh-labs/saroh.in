@@ -16,7 +16,7 @@
  * - DEC-178 (#1170): a "Tell me" sends "We'll email you when it's back"
  *   once, with Stop waiting as a secret link (the stored body holds the
  *   slot); none for an address already waiting, a switch turned off or a
- *   provider gone; the back-in-stock email carries the same link.
+ *   provider gone; the back-in-stock email itself has no stop link.
  * - A hand-marked Sold out cleared queues the run too (every writer's
  *   call is checked by `on-sellable-again.guard.spec.ts`); a product
  *   nobody waits for queues nothing.
@@ -620,25 +620,23 @@ describe("We'll email you when it's back, and Stop waiting (DEC-178, #1170)", ()
         );
     });
 
-    it("the back-in-stock email carries the same Stop waiting link", async () => {
+    it("the back-in-stock email has no Stop waiting: the watch is told, nothing is left to stop", async () => {
         const b = await shopBusiness("Kavi Dental", { published: true });
         const brush = await listedProduct(b, "Toothbrush", { onHand: 0 });
         await tellMe(b, brush, "asha@example.com");
-        // The sign-up email goes at once.
+        // The sign-up email goes at once, with its Stop waiting.
         await runNotices(b.organizationId);
         await move(b, brush.shelves[0], 5);
         await runBackInStock(b.organizationId);
         const [m] = await sent(b.organizationId, "BACK_IN_STOCK");
         expect(m.subject).toBe("Toothbrush is back at Kavi Dental");
-        expect(m.body).toContain("Changed your mind? Stop waiting here:");
-        expect(m.body).toContain(SECRET_LINK_SLOT);
+        expect(m.body).not.toContain("Stop waiting");
+        expect(m.body).not.toContain(SECRET_LINK_SLOT);
         expect(m.body).toContain(`https://${b.subdomain}.saroh.app/shop/`);
         const [waitingEmail] = await sent(
             b.organizationId,
             "BACK_IN_STOCK_WAITING",
         );
-        // The same stop page as the sign-up email's.
-        expect(await sealedLink(m.id)).toMatch(stopPathOf(b));
-        expect(await sealedLink(m.id)).toBe(await sealedLink(waitingEmail.id));
+        expect(await sealedLink(waitingEmail.id)).toMatch(stopPathOf(b));
     });
 });

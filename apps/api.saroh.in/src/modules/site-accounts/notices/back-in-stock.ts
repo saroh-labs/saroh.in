@@ -32,12 +32,13 @@ import { defineNotice } from "./notice";
  * the watch, so their revoked email consent still stops it. Each is read
  * again when it runs: a watch stopped since tells nobody.
  *
- * Both carry "Stop waiting" (DEC-178): the stop page on the site the watch
- * was taken on, with its signed token (`stock-watch-rules.ts`). The token
- * is a credential, so it is a secret link: the stored body holds the slot,
- * and the link is sealed into the send job and put in only when the email
- * goes. A site with no address now: no stop link, and no "We'll email
- * you" at all.
+ * "We'll email you" carries "Stop waiting" (DEC-178): the stop page on the
+ * site the watch was taken on, with its signed token (`stock-watch-rules.ts`).
+ * The token is a credential, so it is a secret link: the stored body holds
+ * the slot, and the link is sealed into the send job and put in only when
+ * the email goes. A site with no address now: no "We'll email you" at all.
+ * The back-in-stock email has none: by then the watch is told, so there is
+ * nothing left to stop (owner, 21 Oct).
  */
 
 type Tx = Prisma.TransactionClient;
@@ -106,7 +107,7 @@ const STOP_LEAD = "Changed your mind? Stop waiting here:";
  * time only; never stored, never logged.
  */
 function stopLink(
-    subject: NoticeSubject<BackInStockNotice | BackInStockWaitingNotice>,
+    subject: NoticeSubject<BackInStockWaitingNotice>,
 ): Promise<string> {
     const { site } = subject.vars.stock;
     const watchId = subject.recipient?.watchId;
@@ -143,10 +144,6 @@ export const backInStockNotice = defineNotice<BackInStockNotice>({
     links: ({ stock }) =>
         stock.link ? [{ lead: "See it here:", url: stock.link }] : [],
     names: ({ stock }) => ({ business: stock.business, firstName: null }),
-    secretLink: {
-        lead: ({ stock }) => (stock.site ? STOP_LEAD : null),
-        make: (_tx, _organizationId, subject) => stopLink(subject),
-    },
 });
 
 export const backInStockWaitingNotice = defineNotice<BackInStockWaitingNotice>({
