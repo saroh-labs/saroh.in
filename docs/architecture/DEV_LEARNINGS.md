@@ -12,6 +12,188 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Seed — a seed's must-show item left to chance broke on 21 Oct
+
+**Symptom**: 21 Oct 2026, the gate's `db:seed:showcase` stopped with
+`[seed] Aarohan Academy is missing what its demo shows: an upcoming demo
+class` and exit 1. Nothing in the seed had changed since it last passed.
+**Cause**: the diary is drawn at random (`planBookings`, a fixed rng,
+`fromDay: -90` to `toDay: 14` relative to `now`), and the demo class runs
+only Saturday 16:00 and Sunday 11:00 — four slots in the fortnight ahead.
+Whether one of them drew a booking that `bookingRows` then wrote as
+confirmed depended on the date: with the rng fixed and `now` moving, 18 of
+120 runs over 60 days had none. Desk 42's "day passes / the room / the booth
+booked ahead" were drawn the same way, just with better odds.
+**Fix**: `planBookings` takes `showAhead`, the services the demo must show
+booked ahead. After the draws, a service with nothing confirmed after `now`
+gets one booking chosen without chance (`guaranteeAhead`): its first slot
+from tomorrow, in the business's zone and hours, with room left after the
+courses' places, for a free prospect (or regular), rolled to be confirmed.
+The status thresholds `bookingRows` uses are named once (`confirmsAhead`).
+Aarohan (`SA_DIARY`) and Desk 42 (`DK_DIARY`) pass theirs.
+`showcase/show-ahead.test.ts` plans both diaries at two hours of every day
+for 60 days and proves each must-show booking is there, confirmed, on a
+real slot, within its room, with nobody double-booked.
+**Rule**: anything a seed's check requires (`requireStates`, a minimum) is
+placed on purpose, never left to the draws; a seed planned relative to
+`now` gets a test that plans it for many `now`s (`bakery-any-day.test.ts`,
+`clinic.test.ts`, `show-ahead.test.ts`).
+
+## Sites — closing a look's booking left the hold standing, and the panel and the save disagreed on paid styles
+
+**Symptom**: 20 Oct 2026, review of the looks release (#20, #22). On a
+look's pay step, Escape or Close left for the page the booking came from
+and the time stayed held for 15 minutes, free to nobody; pressed mid-Book,
+the answer landed on a page that had gone, and a reload booked again under
+a new idempotency key. Separately, Website › Style could mark a typeface or
+colourway "Paid plans" and refuse it while the save would have taken it, or
+the other way round.
+**Cause**: the frames' Close called the router directly, with no idea of a
+hold; the attempt's key lived in a ref, gone with the component. The
+free/paid rule was written twice: the app took a saved style's default
+pair from the options list's first and matched a colourway by colours and
+type, the API used `DEFAULT_FONT_PAIR` and the exact palette.
+**Fix**: Close and Escape run `letGoToLeave` first (paid meanwhile, the
+ticket shows; a hold that won't let go stays and says so) and do nothing
+mid-Book; the key is kept in `sessionStorage` (`saroh.booking-attempt`,
+nothing about the person) until its answer comes. The style rule lives once
+in `@saroh/block-contract` (`style-access.ts`), and `STYLE_ACCESS_CASES`
+run through the API's and the app's tests alike.
+**Rule**: a rule both the app and the API apply is one function in a shared
+package, with one set of fixtures both sides' tests run; leaving a flow
+lets go of what the flow holds.
+
+## E2E — the data-removal specs passed by skipping themselves
+
+**Symptom**: 20 Oct 2026, review of the looks release (#25).
+`customers-data-requests.spec.ts` and `site-account-data-request.spec.ts`
+were green in CI and in the gate, and had never run: each skips unless
+`SITE_ACCOUNT_AREA === "on"` in the runner's env, which neither CI's e2e
+job nor `scripts/prepush.sh` set. So did `site-account.spec.ts`'s signed-in
+half, `site-account-looks`, `customer-detail`'s account test and the
+account half of `site-looks-chrome`.
+**Cause**: the account area ships dark behind an environment switch, and
+the specs were written for a stack started with it on. Production and
+development have had it on since 14 Oct; the e2e stacks were never moved.
+**Fix**: `SITE_ACCOUNT_AREA=on` in CI's e2e env and in prepush's e2e
+exports, which the API, saroh.app and the runner all read, as
+`NEXT_PUBLIC_TEMPLATES` and `E2E_DOMAIN_HOSTING` are. `site-account.spec`'s
+"area off" test now skips instead; the off path stays covered by the API's
+db specs (every account route a 404).
+**Rule**: a spec that skips on a switch names a switch the e2e stack sets,
+in `ci.yml` and `prepush.sh` both; turn the stack's switch on when
+production's is.
+
+## Database — a new migration dated before development's would not apply
+
+**Symptom**: 20 Oct 2026, the looks release. The data-removal requests
+migration was written as `20261029…`, while development already held
+migrations stamped in December. Caught by eye at the merge and renamed by
+hand to `20261220100000` (review #39).
+**Cause**: Prisma replays migration folders in name order. A database that
+has run development's later migrations sees an older-dated new one as out
+of order, and `migrate deploy` refuses it or applies it after schema it was
+written before. `check:migration-ids` only checked that each stamp was
+unique.
+**Fix**: `scripts/check-migration-ids.mjs` now also fails a migration
+folder that is new on the branch and sorts before the latest one on the
+base branch (`MIGRATION_BASE`, else `origin/development`; CI passes the
+PR's base). Without that ref it says the order wasn't checked.
+**Rule**: `.agents/skills/saroh-migrations/SKILL.md`: a new migration's
+stamp is later than every one already on development; take it when the
+unit is merged into the batch, not when the unit started.
+
+## Docs — DECISIONS.md had three decisions twice after a merge
+
+**Symptom**: 20 Oct 2026, review of the looks release (#23). DEC-171,
+DEC-173 and DEC-174 were each written twice, the second copies after
+DEC-172, DEC-173 ended in eleven stacked "Rules:" lines, DEC-174 carried one
+of DEC-173's, and DEC-172 had a copy of DEC-170's owner answers (the
+commission paragraph). Nobody could tell which copy was the decision.
+**Cause**: each unit appended its own Rules line to the same decision, and
+the batch merges resolved the conflicts by keeping both sides. Nothing
+checked that a decision number appears once.
+**Fix**: one copy of each, in number order; DEC-173 keeps its fullest
+Rules line (U17's "as built"), plus U15's and U16's own; DEC-176 is
+marked reserved for the GST branch (PR #1164). `pnpm run
+check:decision-ids` fails on a DEC heading written twice, in prepush and CI.
+DEC-163 is allowed twice: two decisions took it on 17 Oct and both are cited
+in code.
+**Rule**: a unit that adds rules to a decision rewrites the one Rules line,
+never appends another; resolve a DECISIONS.md conflict by hand, never by
+keeping both sides. `scripts/check-decision-ids.mjs`.
+
+## Bookings — a free time called fully booked when bookings landed together
+
+**Symptom**: 20 Oct 2026, the looks release gate. `public-booking.spec.ts`
+failed now and then, desk or phone: after signing in, "That time is fully
+booked." for a time the page still showed free, and no payment intent. The
+API answered 409 in 352ms beside four other Northwind bookings.
+**Cause**: the reservation is a serializable transaction, and Postgres
+aborts the loser of any overlap it sees, a booking of another time too
+(P2034). A site booking without a credit or a treatment did not retry, so
+the lost race was told to the visitor as "fully booked". The parallel
+specs book Northwind at once, which a busy business does too.
+**Fix**: a site booking always tries once more after a lost race
+(`retryOnce: true` in `public-bookings.service.ts`); the second attempt's
+capacity check gives the true answer. Its unit spec books on one P2034 and
+answers 409 on two.
+**Also**: `page.waitForURL` throws `net::ERR_ABORTED` when a navigation on
+the way is replaced by the next (accounts' sign-in redirects), though the
+page lands where it should: `auth.spec.ts` polls the URL instead.
+**Rule**: `backend-billing-and-classes.md` → Race safety already said a
+lost race is retried once; a plain site booking now follows it. In a spec,
+assert where the page ends up, not each navigation on the way.
+
+## Sites — the looks' first browser run: 45 serial failures, five app bugs
+
+**Symptom**: 20 Oct 2026, the Saroh looks release (batch-2026-10-20-3). The
+look specs had been written by agents that could not run Playwright, so the
+local gate was their first run: 45 serial failures and a parallel one on
+every try (`site-booking-steps` "a pay-now hold survives a step back": Back
+from paying landed on When, not Your details).
+**Cause**, the app (five):
+
+- `StickyActions` counted every `[data-site-primary]` on the page as the
+  page's own button, and the root itself carries `data-site-primary` to say
+  whether one is shown. Once a rescan watched `<html>`, it was always in
+  view and the phone's Book bar never came.
+- The hero's next free slot reserved 64px; the fresh line's mixed faces
+  made its line box 21px, not its 20px line-height, so the slot grew to 67.
+- Closing the booking put focus back on the link that opened it by `href`,
+  but the hero's way in is a live fact: "See times" while the read is out,
+  then "Book this time" with another `href`. Focus landed nowhere.
+- Quiet's step button sits under the column on a desk, so a fortnight of
+  times pushed the step's one filled button out of the first view.
+- The step-in-the-address hook writes with `history.pushState`, which
+  Next's router follows. Signing in with the code is a Server Action that
+  sets a cookie, so Next refreshes at the address its router last knew,
+  and its history sync pushed an earlier step's address over the one on
+  screen. Next also copies its `__NA` mark into every write that passes its
+  patch, so the mark alone can't tell its writes from the page's.
+  **Cause**, the specs: one read of a colour right after a click, while the
+  button eased into the accent (150ms); two `boundingBox` reads of a banner
+  mid-rise; `getByLabel("Code")` also matching "Country code"; a selector
+  that matched both the desk's and the phone's copy (CSS shows one); `if
+(count > 0)` skipping a choice that hadn't drawn yet; `main a[...]` on a site
+  page, which has no `<main>`; and assumptions about the seed (Northwind has
+  no public phone or place, so no "Visit us"; its site's storefront is
+  unanswered; its storefronts are online, so no Pick-up; its home is too short
+  for the Book bar to show).
+  **Fix**: `[data-site-primary]:not(html)`; the slot's line held to `h-5` and
+  66px reserved; return focus follows the live slot's link for 8 s unless the
+  visitor moves it (`book-return.ts`); Quiet's desk bar is sticky at the foot;
+  `useStepHistory` wraps the History API while the page is up and keeps a
+  router write of an address it has left on the current one, in place,
+  passing its own writes through (`writingOwn`). Each has a unit test. The
+  specs poll, read both boxes in one frame, match labels exactly, filter to
+  the visible copy, wait for the choice, and give Northwind what each test
+  needs and put it back (a phone, the site's storefront, a pick-up place,
+  three more text sections).
+  **Rule**: the saroh-browser-tests skill's Traps. A spec is not done until
+  it has run once against the stack; an agent that cannot run Playwright says
+  so in its hand-off and the spec is marked unrun.
+
 ## E2E — the product editor's Sections strip and a long field value failed a new phone check
 
 **Symptom**: 21 Oct 2026. The new `gst-rate-picker.spec.ts` failed on
