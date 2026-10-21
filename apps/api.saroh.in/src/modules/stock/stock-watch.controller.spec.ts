@@ -9,11 +9,13 @@ const stockWatch = {
     createManyAndReturn: jest.fn(),
 };
 const contact = { findFirst: jest.fn() };
+// The sign-up email (#1170) is queued on the same transaction.
+const job = { create: jest.fn() };
 jest.mock("@saroh/database", () => ({
     prisma: {
         site,
         $transaction: (fn: (tx: unknown) => unknown) =>
-            fn({ stockWatch, contact }),
+            fn({ stockWatch, contact, job }),
     },
     runInOrgContext: (_org: string, fn: () => unknown) => fn(),
 }));
