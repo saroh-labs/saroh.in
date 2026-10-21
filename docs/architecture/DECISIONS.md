@@ -2298,3 +2298,17 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - Before the looks reach production, the owner turns the themes row on for the paid plans, ticks the free typefaces and colourways in admin, and publishes (`SITE_LOOKS_ROLLOUT.md`).
 - Rules: `docs/patterns/backend-auth-and-access.md` → "A look, typeface or colourway is free or paid, and the catalogue says which"; `docs/patterns/frontend-design-system.md` → "A paid style is refused in the Style panel, and every look can be previewed".
 - Rules: `docs/patterns/backend-data-and-money.md` → Money (the ledger in integer paise, U1 #1113); the rest added as each unit is built.
+
+## DEC-178 Automatic notices, owner follow-ups: reminder timing, a stop link for back in stock, how to pay on a renewal, and a reason when a class is cancelled
+
+**Status: Accepted — 2026-10-21** · owner · follows DEC-174 (automatic notices, PR #1168)
+
+- Context:
+    - After the automatic notices build merged, four choices the units made on their own were put to the owner.
+- Decision:
+    - **Overdue reminders: the business sets the timing.** The 9 am to 8 pm window is right as the default. In the Overdue reminders setting the business chooses which days after the due date the two reminders go (default 3 and 10) and the hours they may go in (default 9 am to 8 pm, in the business's time zone). The one-a-day rule and the two-reminder cap stay.
+    - **Back in stock gets a stop link.** Asking to be told sends a short "We'll email you when ‹product› is back" with "Stop waiting", and the back-in-stock email carries the same link. Stopping stays a page and a button, never a link that acts when opened.
+    - **A renewal the business can't take online says how to pay.** With no payment provider connected, the renewal email lists the business's "How to pay us" (UPI ID, bank transfer). If none is filled in, the invoice is not sent by itself: the business is told to add how to pay or connect payments, and sends it by hand.
+    - **Cancelling a class asks for a reason.** The business gives a short reason when it cancels a class; the customer's email says "‹Business› cancelled this class: ‹reason›", and the booking's history keeps it. The words stay the business's own; nothing is written for them.
+- Consequences:
+    - A reminder-timing setting, a sign-up email for back in stock, a renewal check on "How to pay us", and a reason field in the cancel-class flow and the API.
