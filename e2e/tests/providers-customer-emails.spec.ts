@@ -336,7 +336,12 @@ test("with overdue reminders on, an owner chooses when they go, and Undo puts it
     // The switch's sentence follows the days.
     await expect(sheet).toContainText("5 and 10 days after it's due");
 
-    await page.getByRole("button", { name: "Undo" }).click();
+    // The timing's own Undo: turning reminders on left a toast with one too.
+    await page
+        .locator("[data-sonner-toast]")
+        .filter({ hasText: "Overdue reminder timing saved." })
+        .getByRole("button", { name: "Undo" })
+        .click();
     await expect.poll(async () => (await timing())?.firstDay).toBe(3);
     await expect(
         when.getByRole("combobox", { name: "First reminder" }),
