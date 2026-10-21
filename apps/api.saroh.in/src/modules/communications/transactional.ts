@@ -125,6 +125,13 @@ export function isNoticeTemplate(value: unknown): value is NoticeTemplate {
 /** Where a secret link goes in a stored body; filled in at send time. */
 export const SECRET_LINK_SLOT = "{{secret_link}}";
 
+/**
+ * Where a renewal's "How to pay us" lines go in a stored body (DEC-178):
+ * filled in at send time from the job's sealed payload, as the secret
+ * link is, so a stored body never carries an account number.
+ */
+export const HOW_TO_PAY_SLOT = "{{how_to_pay}}";
+
 /** What an invoice email says. Money and dates arrive formatted. */
 export interface InvoiceMailVars {
     business: string;
@@ -150,6 +157,13 @@ export interface InvoiceMailVars {
      * they are there. Null or absent: the plain view-and-download line.
      */
     payWays?: string | null;
+    /**
+     * List the business's "How to pay us" lines above the view link
+     * (DEC-178: a renewal sent by itself that can't be paid online). Only
+     * with `payOnline: false`. The lines go into {@link HOW_TO_PAY_SLOT}
+     * at send time; the stored body keeps the slot.
+     */
+    howToPay?: boolean;
 }
 
 export interface RenderedMessage {
@@ -196,6 +210,9 @@ export function renderTransactional(
     const body = [
         `<p>${greeting}</p>`,
         `<p>${lead}</p>`,
+        vars.payOnline === false && vars.howToPay
+            ? `<p>How to pay ${business}:<br>${HOW_TO_PAY_SLOT}</p>`
+            : "",
         vars.payOnline === false && vars.payWays
             ? `<p>You can view it, download a copy and see how to pay ${business} ${escapeHtml(vars.payWays)} here:<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a></p>`
             : vars.payOnline === false
@@ -394,4 +411,11 @@ export function renderInvoiceReceipt(vars: ReceiptMailVars): RenderedMessage {
 /** The stored body with the link put back, for the provider only. */
 export function fillSecretLink(body: string, link: string): string {
     return body.split(SECRET_LINK_SLOT).join(escapeHtml(link));
+}
+
+/** Put the "How to pay us" lines into the body, one a line (DEC-178). */
+export function fillHowToPay(body: string, lines: readonly string[]): string {
+    return body
+        .split(HOW_TO_PAY_SLOT)
+        .join(lines.map((line) => escapeHtml(line)).join("<br>"));
 }

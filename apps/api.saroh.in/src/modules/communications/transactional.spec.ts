@@ -3,7 +3,9 @@
 // a slot in the stored body. Pure.
 import {
     autopayCancelledSentence,
+    fillHowToPay,
     fillSecretLink,
+    HOW_TO_PAY_SLOT,
     renderAutopayCancelled,
     renderAutopaySetupLink,
     renderReviewInvitation,
@@ -122,6 +124,53 @@ describe("fillSecretLink", () => {
         const filled = fillSecretLink(body, "https://saroh.app/pay/abc");
         expect(filled).not.toContain(SECRET_LINK_SLOT);
         expect(filled.match(/https:\/\/saroh\.app\/pay\/abc/g)).toHaveLength(2);
+    });
+});
+
+describe("a renewal's How to pay us lines (DEC-178)", () => {
+    it("go above the view link, as a slot filled when it is sent", () => {
+        const { body } = renderTransactional("INVOICE_SENT", {
+            ...vars,
+            payOnline: false,
+            payWays: "by UPI",
+            howToPay: true,
+        });
+        expect(body).toContain(
+            `How to pay Rye &amp; Co.:<br>${HOW_TO_PAY_SLOT}`,
+        );
+        expect(body.indexOf(HOW_TO_PAY_SLOT)).toBeLessThan(
+            body.indexOf(`href="${SECRET_LINK_SLOT}"`),
+        );
+    });
+
+    it("are never asked for on a pay link, or when not asked", () => {
+        expect(
+            renderTransactional("INVOICE_SENT", {
+                ...vars,
+                payOnline: true,
+                howToPay: true,
+            }).body,
+        ).not.toContain(HOW_TO_PAY_SLOT);
+        expect(
+            renderTransactional("INVOICE_SENT", { ...vars, payOnline: false })
+                .body,
+        ).not.toContain(HOW_TO_PAY_SLOT);
+    });
+
+    it("are filled one a line, escaped", () => {
+        const { body } = renderTransactional("INVOICE_SENT", {
+            ...vars,
+            payOnline: false,
+            howToPay: true,
+        });
+        const filled = fillHowToPay(body, [
+            "UPI: rye@okhdfc",
+            "Pay <b>cash</b> at the desk",
+        ]);
+        expect(filled).not.toContain(HOW_TO_PAY_SLOT);
+        expect(filled).toContain(
+            "UPI: rye@okhdfc<br>Pay &lt;b&gt;cash&lt;/b&gt; at the desk",
+        );
     });
 });
 

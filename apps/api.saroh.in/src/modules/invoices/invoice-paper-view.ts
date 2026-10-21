@@ -366,7 +366,19 @@ export function howToPayLines(
     pay: PayInstructionsView | null | undefined,
 ): string[] | null {
     const owed = i.standing === "ISSUED" || i.standing === "OVERDUE";
-    if (!owed || i.kind === "CREDIT_NOTE" || !pay) return null;
+    if (!owed || i.kind === "CREDIT_NOTE") return null;
+    return payInstructionLines(pay);
+}
+
+/**
+ * The business's "How to pay us" as lines, whatever the invoice: the
+ * paper's lines (`howToPayLines`), and the same lines a renewal's email
+ * lists when it can't be paid online (DEC-178). Null when none is set.
+ */
+export function payInstructionLines(
+    pay: PayInstructionsView | null | undefined,
+): string[] | null {
+    if (!pay) return null;
     const lines: string[] = [];
     if (pay.upiId) lines.push(`UPI: ${pay.upiId}`);
     if (pay.bankAccountNumber && pay.bankIfsc && pay.bankAccountName) {

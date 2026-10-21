@@ -24,7 +24,10 @@ import { ConflictException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { renewalHarness } from "../../../test/fixtures/renewal-notices";
-import { SECRET_LINK_SLOT } from "../communications/transactional";
+import {
+    HOW_TO_PAY_SLOT,
+    SECRET_LINK_SLOT,
+} from "../communications/transactional";
 import { INVOICE_AUTO_SEND_TYPE } from "./invoice-auto-send";
 import { hashPayToken } from "./pay-token";
 
@@ -64,6 +67,8 @@ describe("a renewal's invoice, sent by Saroh", () => {
         expect(message.createdByUserId).toBeNull();
         expect(message.body).toContain(SECRET_LINK_SLOT);
         expect(message.body).toContain("₹1,200");
+        // Payable online: no "How to pay us" lines (DEC-178).
+        expect(message.body).not.toContain(HOW_TO_PAY_SLOT);
         const [send] = await prisma.job.findMany({
             where: {
                 organizationId: org,
@@ -212,5 +217,117 @@ describe("a renewal's invoice, sent by Saroh", () => {
         expect(
             await prisma.message.count({ where: { invoiceId: invoice!.id } }),
         ).toBe(0);
+    });
+});
+
+/** Payments not connected: the renewal's link is a view link (DEC-070). */
+const noOnlinePayment = (org: string) =>
+    prisma.merchantPaymentProvider.updateMany({
+        where: { organizationId: org },
+        data: { status: "DISABLED" },
+    });
+
+/** The business's "How to pay us" (R32). */
+const howToPay = (org: string) =>
+    prisma.businessProfile.update({
+        where: { organizationId: org },
+        data: {
+            payUpiId: "pulse@okhdfc",
+            payBankAccountName: "Pulse & Co.",
+            payBankAccountNumber: "123456789012",
+            payBankIfsc: "HDFC0001234",
+            payBankName: "HDFC Bank",
+        },
+    });
+
+describe("a renewal the business can't take online (DEC-178)", () => {
+    it("lists how to pay above the view link, put in only when the email goes", async () => {
+        const { org, invoiceId } = await renewed();
+        await noOnlinePayment(org);
+        await howToPay(org);
+        expect(await run(org, invoiceId)).toBe("SENT");
+
+        const message = await prisma.message.findFirstOrThrow({
+            where: { organizationId: org, invoiceId, template: "INVOICE_SENT" },
+        });
+        // The stored body keeps the slot: never an account number.
+        expect(message.body).toContain(HOW_TO_PAY_SLOT);
+        expect(message.body).not.toContain("123456789012");
+        expect(message.body).not.toContain("1234 5678 9012");
+        const [send] = await prisma.job.findMany({
+            where: {
+                organizationId: org,
+                type: "message.send",
+                payload: { path: ["messageId"], equals: message.id },
+            },
+        });
+        expect(JSON.stringify(send.payload)).not.toContain("okhdfc");
+
+        await h.deliverEmails(org);
+        const sent = h.email.calls.at(-1)?.body ?? "";
+        expect(sent).not.toContain(HOW_TO_PAY_SLOT);
+        expect(sent).toContain("How to pay Pulse &amp; Co.:");
+        expect(sent).toContain("UPI: pulse@okhdfc");
+        expect(sent).toContain(
+            "Bank transfer: Pulse &amp; Co. · A/c 1234 5678 9012 · IFSC HDFC0001234 · HDFC Bank",
+        );
+        // Above the view link, which offers no Pay button.
+        const link = sent.indexOf("https://saroh.app/pay/");
+        expect(link).toBeGreaterThan(sent.indexOf("UPI: pulse@okhdfc"));
+        expect(sent).not.toContain("pay it by UPI or card");
+        expect((await eventsOf(invoiceId)).map((e) => e.kind)).toEqual([
+            "ISSUED",
+            "AUTO_SENT",
+        ]);
+    });
+
+    it("a note alone is a way to pay", async () => {
+        const { org, invoiceId } = await renewed();
+        await noOnlinePayment(org);
+        await prisma.businessProfile.update({
+            where: { organizationId: org },
+            data: { payNote: "Pay at the front desk." },
+        });
+        expect(await run(org, invoiceId)).toBe("SENT");
+        await h.deliverEmails(org);
+        expect(h.email.calls.at(-1)?.body).toContain("Pay at the front desk.");
+    });
+
+    it("none set: not sent, the history says why, and it can still be sent by hand", async () => {
+        const { biz, org, invoiceId, job } = await renewed();
+        await noOnlinePayment(org);
+        await expect(h.runJob(job, h.autoSend.handle)).resolves.toBeUndefined();
+        expect(await prisma.message.count({ where: { invoiceId } })).toBe(0);
+        const failed = (await eventsOf(invoiceId)).find(
+            (e) => e.kind === "SEND_FAILED",
+        );
+        expect(failed).toMatchObject({
+            actorKind: "JOB",
+            data: { reason: "NO_WAY_TO_PAY", template: "INVOICE_SENT" },
+        });
+        // Nothing failed with a payment, and Send is still there.
+        expect((await h.sending.readFor(org, invoiceId)).send.channels).toEqual(
+            expect.arrayContaining(["email"]),
+        );
+
+        // Sends by hand are unchanged: no lines, no refusal.
+        await h.sending.send(biz.owner, invoiceId);
+        const message = await prisma.message.findFirstOrThrow({
+            where: { organizationId: org, invoiceId, template: "INVOICE_SENT" },
+        });
+        expect(message.body).not.toContain(HOW_TO_PAY_SLOT);
+        expect(message.createdByUserId).toBe(biz.owner.userId);
+    });
+
+    it("a send by hand with how to pay set still names the ways only", async () => {
+        const { biz, org, invoiceId } = await renewed();
+        await noOnlinePayment(org);
+        await howToPay(org);
+        await h.sending.send(biz.owner, invoiceId);
+        const message = await prisma.message.findFirstOrThrow({
+            where: { organizationId: org, invoiceId, template: "INVOICE_SENT" },
+        });
+        expect(message.body).not.toContain(HOW_TO_PAY_SLOT);
+        expect(message.body).toContain("by UPI or bank transfer");
     });
 });
