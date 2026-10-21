@@ -641,6 +641,12 @@ Test mode, 2026-09-29, on a business's own connection (Northwind). Docs:
   400 `pre_debit_notification_not_sent` (`NOT_YET`). **Razorpay sends the
   pre-debit notice** to the customer's UPI app; Saroh sends none. A
   renewal's invoice must be raised at least ~26 hours before its charge.
+- **Card and eMandate pre-debit notice (D6, U21).** Card: the issuing bank
+  sends the notice (SMS or email) when the debit is asked for, and Razorpay
+  debits ~36 hours later (an AFA link instead above ₹15,000); the order
+  needs no `notification`. eMandate: no notice is sent by anyone; the RBI
+  framework covers cards, PPIs and UPI only. Evidence and open questions:
+  `docs/architecture/research/2026-10-pre-debit-notice.md`, DEC-174.
 - **Unanswered charges.** A UPI debit can take 24–36 hours to be answered,
   more when the notice fails; some banks leave the payment `created`.
   Razorpay doesn't retry a failed debit on an order with `notification`;
