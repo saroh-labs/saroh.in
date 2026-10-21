@@ -2328,3 +2328,16 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - A notice job keyed to the charge, run ahead of `debitAfter` for EMANDATE only; the charge job checks the notice went before it debits.
 - Built (#1175): the eMandate debit is planned at least 26 h after its charge is prepared, the email is queued 26 h before it, and the debit goes no sooner than 24 h after the email went (a late email moves the debit, never shortens the notice). A period not taken is NOT_CHARGED_NO_NOTICE on the subscription's history with why.
 - Rules: `docs/patterns/backend-integrations.md` → "eMandate: Saroh's notice, or no debit".
+
+## DEC-181 Where a visit came from is counted only as totals, from links the business made in Saroh, like a cookieless analytics tool
+
+**Status: Accepted — 2026-10-21** · owner · follows the U15 privacy review (#1099); amends DEC-171 and plan A13
+
+- Context:
+    - The privacy review of site link tracking found that any `?ref=` value could be recorded (a booking id, a person's name) and that the visit's source was kept on the order, which makes it personal data once the order names a customer. The owner asked how Plausible does it: no cookies, no visitor id, a daily-rotating salt, totals only, and one line in the site owner's privacy policy instead of a banner.
+- Decision:
+    - **Totals only.** Saroh counts visits, steps and paid by source as totals. Nothing about a visit is kept on an order or a customer: no `Order.visitSource` or `visitRef`, no "came from" on the order. Paid is counted by the visitor's own confirmation page sending a "paid" step with the group and label only, never the order, so a payment made later another way is not counted to a source.
+    - **Only links the business made in Saroh.** The business names a link on Insights › Where customers come from ("diwali-post") and copies it; only those labels are counted, checked by the server against the site's list. Any other `ref` counts as its group with no label.
+    - **No banner.** Like a cookieless analytics tool: no pop-up and no new footer link. The site's cookie notice stops saying it uses "no analytics tools", and Saroh's privacy policy says in one line that sites on Saroh count visits without cookies or personal data, as totals only. The owner sees the exact words before they ship.
+- Consequences:
+    - The order fields and their migration go before release (never applied to an environment). A site's link list (name, label, made by, when) is new. The privacy-review fixes stay (daily per-site salt, server-side cleaning, private pages silent, hour-only step times).
