@@ -33,6 +33,7 @@ import {
     isNoticeKind,
     NOTICE_KINDS,
     NOTICE_MODULE,
+    NOTICE_SENDS,
     NOTICE_WORDS,
     noticeOffer,
     noticeOn,
@@ -82,8 +83,17 @@ function email(status: string | null) {
     );
 }
 
+// The rest of this file reads every kind as one Saroh sends; which kinds
+// are hidden until their sender ships is "a kind Saroh doesn't send yet".
+const asCommitted = { ...NOTICE_SENDS };
+const everyKindSent = () => {
+    for (const kind of NOTICE_KINDS) NOTICE_SENDS[kind] = true;
+};
+afterAll(() => Object.assign(NOTICE_SENDS, asCommitted));
+
 beforeEach(() => {
     jest.clearAllMocks();
+    everyKindSent();
     modules();
     email("CONNECTED");
     db.customerNoticeSetting.findMany.mockResolvedValue([]);
@@ -163,6 +173,43 @@ describe("the kinds (pure)", () => {
         });
         // The module comes first: no CRM, no row at all.
         expect(noticeOffer("ENQUIRY_REPLY", has(false, false))).toBeNull();
+    });
+});
+
+describe("a kind Saroh doesn't send yet", () => {
+    const has = { moduleOn: () => true, emailConnected: true };
+
+    it("every kind has a line saying whether Saroh sends it", () => {
+        expect(Object.keys(asCommitted).sort()).toEqual(
+            [...NOTICE_KINDS].sort(),
+        );
+        for (const kind of NOTICE_KINDS) {
+            expect(typeof asCommitted[kind]).toBe("boolean");
+        }
+    });
+
+    it("isn't listed, as a kind whose module is off isn't", () => {
+        NOTICE_SENDS.REFUND = false;
+        expect(noticeOffer("REFUND", has)).toBeNull();
+        expect(noticeOffer("MEMBERSHIP", has)).toEqual({ offered: true });
+    });
+
+    it("isn't read, and can't be changed (409), until its sender ships", async () => {
+        NOTICE_SENDS.MEMBERSHIP = false;
+        const kinds = (await service().read(ctx())).notices.map((n) => n.kind);
+        expect(kinds).not.toContain("MEMBERSHIP");
+        expect(kinds).toContain("REFUND");
+        await expect(
+            service().update(ctx(), { kind: "MEMBERSHIP", on: false }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(db.customerNoticeSetting.upsert).not.toHaveBeenCalled();
+        expect(record).not.toHaveBeenCalled();
+    });
+
+    it("with none sent, nothing is listed", async () => {
+        Object.assign(NOTICE_SENDS, asCommitted);
+        for (const kind of NOTICE_KINDS) NOTICE_SENDS[kind] = false;
+        expect((await service().read(ctx())).notices).toEqual([]);
     });
 });
 
@@ -254,6 +301,14 @@ describe("reading the switches", () => {
         expect(
             again.notices.find((n) => n.kind === "ENQUIRY_REPLY")?.offered,
         ).toBe(false);
+    });
+
+    it("says whether the business has its own email connected", async () => {
+        expect((await service().read(ctx())).emailConnected).toBe(true);
+        email(null);
+        expect((await service().read(ctx())).emailConnected).toBe(false);
+        email("ERROR");
+        expect((await service().read(ctx())).emailConnected).toBe(false);
     });
 
     it("shows a stored choice", async () => {

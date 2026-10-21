@@ -4,6 +4,7 @@ import { OnlinePaymentsLockNotice } from "@/components/billing/online-payments-l
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { EmailPromptBlock } from "@/components/communications/email-prompt";
 import { AccountUpdatesBlock } from "@/components/providers/account-updates-row";
+import { CustomerEmailsBlock } from "@/components/providers/customer-emails-row";
 import { ProviderList } from "@/components/providers/provider-list";
 import {
     SettingsPanel,
@@ -11,6 +12,7 @@ import {
 } from "@/components/settings/settings-panel";
 import { whoCanChange } from "@/components/shared/who-can-change";
 import { readAccountUpdates } from "@/lib/communications/account-updates-service";
+import { readCustomerEmails } from "@/lib/communications/customer-emails-service";
 import { emailPrompt } from "@/lib/communications/email-setup";
 import { readEmailSetup } from "@/lib/communications/email-setup-service";
 import { listOrgDomains } from "@/lib/domains/service";
@@ -40,6 +42,10 @@ export const metadata = { title: "Providers · Settings" };
 
 export default async function ProvidersSettingsPage() {
     await requireSession();
+    // The business's automatic emails to its customers (DEC-174, U4),
+    // read beside everything else. Anyone in the business may read them;
+    // never throws, and null draws no row.
+    const customerEmailsRead = readCustomerEmails();
     const [result, org] = await Promise.all([
         listProviderHealth(),
         resolveActiveOrganization(),
@@ -87,6 +93,8 @@ export default async function ProvidersSettingsPage() {
                   // when unread or not this person's: no row is drawn.
                   readAccountUpdates(),
               ]);
+    const customerEmails =
+        result.status === "denied" ? null : await customerEmailsRead;
     const view =
         result.status === "denied"
             ? null
@@ -146,6 +154,11 @@ export default async function ProvidersSettingsPage() {
                 customers' Messages: drawn only while it can have an effect. */}
             {accountUpdates?.offered ? (
                 <AccountUpdatesBlock state={accountUpdates} />
+            ) : null}
+            {/* The automatic emails Saroh sends its customers from its own
+                email, one switch each: drawn only while one is offered. */}
+            {customerEmails ? (
+                <CustomerEmailsBlock state={customerEmails} />
             ) : null}
         </SettingsPanel>
     );

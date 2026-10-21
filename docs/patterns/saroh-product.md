@@ -585,6 +585,22 @@ organizations/:org/customers`: everyone who has paid (an order through a
   listed but not offered without a connected email provider ("Connect your
   email first"), and a change to a kind not offered is refused (409).
   Booking and order notices, and the fixes, have no switch here.
+  **A kind is not listed until Saroh sends it** (`NOTICE_SENDS`, U4
+  #1135): every kind starts false, and the unit that ships a kind's sender
+  flips its own line in the same commit, so no switch ever does nothing.
+- **Current** (DEC-174, U4 #1135) — **Settings › Providers' "Emails to
+  your customers"**, under "Updates in Messages"
+  (`components/providers/customer-emails-row.tsx`, words in
+  `lib/communications/customer-emails.ts`): a read row ("9 on, 1 off",
+  "Not sent: Overdue reminders.") and at most one quiet line under it (no
+  email provider: "None of these go out until your email is connected";
+  else, for someone without `comms:manage`, why they can only read them).
+  The page's own email prompt carries Connect, so the row never repeats
+  it. Edit (View, read-only) opens a side sheet of switches, one per kind
+  offered with what the customer gets; each saves as it is flipped, with
+  Undo (`useSettingsUndo`), and Done closes it. The sheet holds one note at
+  most. No row at all while the business is offered none. A change is told
+  in Settings › Activity ("turned Membership emails off for customers").
 
 ## Analytics
 

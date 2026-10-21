@@ -15,7 +15,7 @@ import { isRlsTestMode } from "../../../test/rls-mode";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { AuditService } from "../audit/audit.service";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
-import { NOTICE_KINDS, noticeOn } from "./notice-settings";
+import { NOTICE_KINDS, NOTICE_SENDS, noticeOn } from "./notice-settings";
 import { NoticeSettingsService } from "./notice-settings.service";
 
 let n = 0;
@@ -32,6 +32,13 @@ const availability = {
 } as unknown as ModuleAvailabilityService;
 
 const settings = new NoticeSettingsService(availability, new AuditService());
+
+// Every kind read as one Saroh sends: which are hidden until their sender
+// ships is the unit spec's. Jest gives each file its own modules, so
+// nothing else reads this.
+beforeAll(() => {
+    for (const kind of NOTICE_KINDS) NOTICE_SENDS[kind] = true;
+});
 
 interface Business {
     organizationId: string;
@@ -95,6 +102,7 @@ describe("customer notice switches (real database)", () => {
         const view = await settings.read(as(b, "owner"));
 
         expect(view.canChange).toBe(true);
+        expect(view.emailConnected).toBe(true);
         expect(
             Object.fromEntries(view.notices.map((x) => [x.kind, x.on])),
         ).toEqual(
@@ -195,6 +203,7 @@ describe("customer notice switches (real database)", () => {
         const b = await business();
 
         const before = await settings.read(as(b, "owner"));
+        expect(before.emailConnected).toBe(false);
         expect(
             before.notices.find((x) => x.kind === "ENQUIRY_REPLY"),
         ).toMatchObject({

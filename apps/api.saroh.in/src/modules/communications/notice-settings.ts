@@ -50,6 +50,31 @@ export function defaultOn(kind: NoticeKind): boolean {
 }
 
 /**
+ * Whether Saroh sends each kind yet. A kind is not listed until it does,
+ * as a kind whose module is off is not: a switch for an email Saroh never
+ * sends would do nothing, and the screen would say something untrue.
+ *
+ * Every kind starts false. The unit that ships a kind's sender (U10 the
+ * renewal invoice and failed autopay, U11 memberships, U12 refunds, U14
+ * team replies, U15 the enquiry reply, U16 delivery updates, U17 courses,
+ * U22 pack credits, U23 back in stock, U20 overdue reminders) flips its
+ * own line here, in the same commit as the sender, and nothing else.
+ */
+export const NOTICE_SENDS: Record<NoticeKind, boolean> = {
+    RENEWAL_INVOICE: false,
+    AUTOPAY_FAILED: false,
+    MEMBERSHIP: false,
+    REFUND: false,
+    TEAM_REPLY: false,
+    ENQUIRY_REPLY: false,
+    ORDER_DELIVERY: false,
+    COURSE: false,
+    PACK_CREDITS: false,
+    BACK_IN_STOCK: false,
+    OVERDUE_REMINDERS: false,
+};
+
+/**
  * The module a kind belongs to, when it has one. A module the business
  * hasn't turned on, or that Saroh hasn't rolled out to it, has no switch
  * at all (DEC-057: never name a module that is off).
@@ -157,7 +182,8 @@ export function settingOn(
 
 /**
  * Whether the business is offered a kind, given what it has on:
- * - `null`: not listed at all, its module being off (DEC-057);
+ * - `null`: not listed at all, its module being off (DEC-057), or Saroh
+ *   not sending it yet ({@link NOTICE_SENDS});
  * - `{ offered: false, why }`: listed, but it can't be changed yet;
  * - `{ offered: true }`: the business chooses.
  */
@@ -165,6 +191,7 @@ export function noticeOffer(
     kind: NoticeKind,
     has: { moduleOn: (key: ModuleKey) => boolean; emailConnected: boolean },
 ): { offered: true } | { offered: false; why: NoticeUnavailable } | null {
+    if (!NOTICE_SENDS[kind]) return null;
     const module = NOTICE_MODULE[kind];
     if (module !== null && !has.moduleOn(module)) return null;
     if (NOTICE_NEEDS_EMAIL.includes(kind) && !has.emailConnected) {

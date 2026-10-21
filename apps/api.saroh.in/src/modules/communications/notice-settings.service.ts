@@ -46,6 +46,12 @@ export interface NoticeSettingsView {
     notices: NoticeSettingView[];
     /** Whether this person may change them (`comms:manage`). */
     canChange: boolean;
+    /**
+     * Whether the business has its own email provider connected. Without
+     * one none of these reach a customer's inbox, and the workspace says
+     * so once (DEC-011).
+     */
+    emailConnected: boolean;
 }
 
 /** One switch flipped. */
@@ -77,11 +83,12 @@ export class NoticeSettingsService {
     ) {}
 
     async read(ctx: OrganizationContext): Promise<NoticeSettingsView> {
-        const [offers, stored] = await Promise.all([
-            this.offers(ctx),
+        const [{ offers, emailConnected }, stored] = await Promise.all([
+            this.listed(ctx),
             this.stored(ctx.organizationId),
         ]);
         return {
+            emailConnected,
             notices: offers.map(({ kind, offer }) => {
                 const reason = offer.offered ? null : offer.why;
                 return {
@@ -103,7 +110,7 @@ export class NoticeSettingsService {
         change: NoticeSettingChange,
     ): Promise<NoticeSettingsView> {
         authorize(ctx, "comms:manage");
-        const listed = (await this.offers(ctx)).find(
+        const listed = (await this.listed(ctx)).offers.find(
             (o) => o.kind === change.kind,
         );
         if (!listed) {
@@ -158,8 +165,11 @@ export class NoticeSettingsService {
         return this.read(ctx);
     }
 
-    /** The kinds listed for this business, and whether each can change. */
-    private async offers(ctx: OrganizationContext) {
+    /**
+     * The kinds listed for this business, whether each can change, and
+     * whether it has its own email connected.
+     */
+    private async listed(ctx: OrganizationContext) {
         const modules = [
             ...new Set(
                 NOTICE_KINDS.map((k) => NOTICE_MODULE[k]).filter(
@@ -189,10 +199,11 @@ export class NoticeSettingsService {
             moduleOn: (key: ModuleKey) => on.get(key) === true,
             emailConnected: provider?.status === "CONNECTED",
         };
-        return NOTICE_KINDS.flatMap((kind) => {
+        const offers = NOTICE_KINDS.flatMap((kind) => {
             const offer = noticeOffer(kind, has);
             return offer ? [{ kind, offer, ...offer }] : [];
         });
+        return { offers, emailConnected: has.emailConnected };
     }
 
     /**
