@@ -70,7 +70,7 @@ export const NOTICE_SENDS: Record<NoticeKind, boolean> = {
     ORDER_DELIVERY: true,
     COURSE: true,
     PACK_CREDITS: false,
-    BACK_IN_STOCK: false,
+    BACK_IN_STOCK: true,
     OVERDUE_REMINDERS: false,
 };
 
@@ -104,9 +104,13 @@ export const NOTICE_MODULE: Record<NoticeKind, ModuleKey | null> = {
 /**
  * Kinds offered only while the business has its own email provider
  * connected. The enquiry reply goes to someone who is not yet a customer
- * and has no account thread, so with no provider it reaches nobody.
+ * and has no account thread, so with no provider it reaches nobody; so
+ * does back in stock, to an address that is no customer's (U23).
  */
-export const NOTICE_NEEDS_EMAIL: readonly NoticeKind[] = ["ENQUIRY_REPLY"];
+export const NOTICE_NEEDS_EMAIL: readonly NoticeKind[] = [
+    "ENQUIRY_REPLY",
+    "BACK_IN_STOCK",
+];
 
 /** Why a kind is listed but can't be changed yet. */
 export type NoticeUnavailable = "NO_EMAIL";

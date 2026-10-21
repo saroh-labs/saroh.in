@@ -105,6 +105,9 @@ module.exports = {
         "<rootDir>/src/modules/products/merge-report.service.spec.ts",
         "<rootDir>/src/modules/stock/stock-words.spec.ts",
         "<rootDir>/src/modules/stock/stock.gate.spec.ts",
+        "<rootDir>/src/modules/stock/stock-watch-rules.spec.ts",
+        "<rootDir>/src/modules/stock/stock-watch.controller.spec.ts",
+        "<rootDir>/src/modules/stock/on-sellable-again.guard.spec.ts",
         "<rootDir>/src/modules/products/product-rules.spec.ts",
         // GST is part of MRP (12 Oct 2026): pure, or a jest-mocked Prisma.
         // mrp-includes-gst.db.spec.ts runs here.

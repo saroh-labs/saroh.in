@@ -8,6 +8,10 @@ import {
     lockProductStock,
     lockStockLevels,
 } from "../products/stock-levels";
+import {
+    onSellableAgain,
+    onSellableAgainForBusiness,
+} from "./on-sellable-again";
 import { clearSoldOut } from "./sold-out";
 import { promisedRefusal, TRACKING_OFF_NOTE } from "./stock-words";
 import type { StockActor } from "./stock.service";
@@ -263,6 +267,9 @@ export async function setProductTracking(
             data: { stockTracked: true, stockTrackedAt: new Date() },
         });
         const soldOutCleared = await clearSoldOut(tx, { productId });
+        // Counting or not, it may sell again: anyone waiting is told if
+        // it does (U23).
+        await onSellableAgain(tx, organizationId, productId);
         await recordProductTracking(tx, actor, productId, {
             tracked: true,
             product: product.name,
@@ -278,6 +285,9 @@ export async function setProductTracking(
         where: { id: productId },
         data: { stockTracked: false },
     });
+    // Counting or not, it may sell again: anyone waiting is told if
+    // it does (U23).
+    await onSellableAgain(tx, organizationId, productId);
     await recordProductTracking(tx, actor, productId, {
         tracked: false,
         product: product.name,
@@ -346,6 +356,9 @@ export async function setBusinessTracking(
             organizationId,
             product: { stockTracked: true },
         });
+        // Every product may sell again: anyone waiting is told if it does
+        // (U23).
+        await onSellableAgainForBusiness(tx, organizationId);
         await recordBusinessTracking(tx, actor, {
             tracked: true,
             products: restarted.count,
@@ -376,6 +389,9 @@ export async function setBusinessTracking(
     const products = await tx.product.count({
         where: { organizationId, stockTracked: true },
     });
+    // Every product may sell again: anyone waiting is told if it does
+    // (U23).
+    await onSellableAgainForBusiness(tx, organizationId);
     await recordBusinessTracking(tx, actor, {
         tracked: false,
         products,

@@ -65,6 +65,9 @@ export const NOTICE_TEMPLATES = [
     "COURSE_ENROLLED",
     "COURSE_CANCELLED",
     "WAITLIST_CLASS_CANCELLED",
+    // "‹Product› is back" to someone who asked on the site (DEC-174 U23,
+    // #1154): email only, behind the BACK_IN_STOCK switch.
+    "BACK_IN_STOCK",
 ] as const;
 export type NoticeTemplate = (typeof NOTICE_TEMPLATES)[number];
 

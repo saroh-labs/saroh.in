@@ -115,6 +115,37 @@ export class CustomerNotifyService {
 
         const subject = await loadNotice(tx, organizationId, payload, now);
         if (!subject) return NOTHING;
+        // An email-only notice to the address its own record holds (a
+        // back-in-stock watch, U23): no contact to resolve, no thread.
+        if (subject.recipient) {
+            if (!definition.emailOnly || provider === null) return NOTHING;
+            const queued = await this.comms.queueTransactional(
+                tx,
+                organizationId,
+                {
+                    template: payload.kind,
+                    notice: subject.vars,
+                    provider,
+                    recipient: subject.recipient,
+                    createdByUserId: null,
+                },
+            );
+            await tx.customerNotice.update({
+                where: {
+                    organizationId_eventKey: {
+                        organizationId,
+                        eventKey: payload.eventKey,
+                    },
+                },
+                data: { contactId: subject.contactId, messageId: queued.id },
+            });
+            return {
+                duplicate: false,
+                threadMessageId: null,
+                messageId: queued.id,
+            };
+        }
+        if (!subject.contactId) return NOTHING;
         const contact = await resolveContact(
             tx,
             subject.contactId,

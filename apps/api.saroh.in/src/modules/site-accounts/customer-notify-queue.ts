@@ -60,6 +60,8 @@ export interface CustomerNotifyPayload {
      * as a whole (U17): "‹Business› cancelled this class".
      */
     classCancelled?: boolean;
+    /** The "Tell me when it's back" a BACK_IN_STOCK notice tells (U23). */
+    stockWatchId?: string;
 }
 
 type Tx = Pick<Prisma.TransactionClient, "job">;

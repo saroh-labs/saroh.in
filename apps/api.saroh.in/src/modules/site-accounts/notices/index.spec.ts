@@ -29,6 +29,14 @@ const AT = new Date("2026-10-06T05:30:00.000Z");
 
 /** One notice of every kind, with values a person typed. */
 const SAMPLES: Record<(typeof NOTICE_TEMPLATES)[number], NoticeVars> = {
+    BACK_IN_STOCK: {
+        kind: "BACK_IN_STOCK",
+        stock: {
+            business: "Rye <&> Co.",
+            product: "Linen <shirt> (Blue / M)",
+            link: "https://rye.saroh.app/shop/linen-shirt",
+        },
+    },
     BOOKING_CONFIRMED: {
         kind: "BOOKING_CONFIRMED",
         booking: {
@@ -326,6 +334,24 @@ describe("the notice registry", () => {
             expect(backLink(vars)).toBeNull();
         }
         expect(withLink(SAMPLES.ORDER_PLACED, null)).toBe(SAMPLES.ORDER_PLACED);
+    });
+
+    it("back in stock links the product, names the option and says it is the only email (U23)", () => {
+        const email = renderNotice(SAMPLES.BACK_IN_STOCK);
+        expect(email.subject).toBe(
+            "Linen <shirt> (Blue / M) is back at Rye <&> Co.",
+        );
+        expect(email.body).toContain("Linen &lt;shirt&gt; (Blue / M) is back");
+        expect(email.body).toContain("only email you&#39;ll get about it");
+        expect(email.body).toContain("See it here:");
+        expect(email.body).toContain("https://rye.saroh.app/shop/linen-shirt");
+        // No product page now: no link, still the email.
+        const bare = renderNotice({
+            kind: "BACK_IN_STOCK",
+            stock: { ...SAMPLES.BACK_IN_STOCK.stock, link: null },
+        } as NoticeVars);
+        expect(bare.body).not.toContain("See it here:");
+        expect(bare.body).not.toContain("Hi ");
     });
 
     it("a load for another kind's payload reads nothing", async () => {

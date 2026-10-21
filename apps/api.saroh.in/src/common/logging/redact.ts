@@ -118,6 +118,8 @@ const TOKEN_PATHS = [
     /^(\/public\/sites\/preview\/)[^/?#]+/,
     // A waitlist offer's claim link (U18, #1149).
     /^(\/public\/sites\/[^/?#]+\/waitlist-claim\/)[^/?#]+/,
+    // A back-in-stock watch's stop link (U23, #1154).
+    /^(\/public\/sites\/[^/?#]+\/stock-watch\/)[^/?#]+/,
 ];
 
 /**

@@ -89,7 +89,13 @@ export type TransactionalRecipient =
      * verified address winning (A2, `contactNoticeAddress`).
      */
     | { kind: "CONTACT"; contactId: string }
-    | { kind: "ORDER_CUSTOMER"; orderId: string };
+    | { kind: "ORDER_CUSTOMER"; orderId: string }
+    /**
+     * "Tell me when it's back" (DEC-174 U23): the address the person gave
+     * on the business's site when they asked, which the watch holds; the
+     * contact that already had it, if any, for consent.
+     */
+    | { kind: "STOCK_WATCH"; watchId: string };
 
 /**
  * What a transactional message says: an invoice's template with its
@@ -760,6 +766,15 @@ export class CommunicationsService {
                 select: { contactId: true },
             });
             return { address: email, contactId: link?.contactId ?? null };
+        }
+        if (recipient.kind === "STOCK_WATCH") {
+            const watch = await db.stockWatch.findFirst({
+                where: { id: recipient.watchId, organizationId },
+                select: { email: true, contactId: true },
+            });
+            const email = watch?.email.trim();
+            if (!email || isReservedContactEmail(email)) return null;
+            return { address: email, contactId: watch?.contactId ?? null };
         }
         if (recipient.kind === "CONTACT") {
             const address = await contactNoticeAddress(

@@ -432,6 +432,8 @@ model Organization {
   // Which automatic customer notices it has turned off or on, where that
   // differs from the default in code (DEC-174, U1 #1132).
   customerNoticeSettings   CustomerNoticeSetting[]
+  // "Tell me when it's back" (DEC-174 U23).
+  stockWatches             StockWatch[]
   // Places in line for full classes (round-2 A12).
   classWaitlistEntries     ClassWaitlistEntry[]
   // Customers' "Ask to remove my data" requests (DEC-172, #1106).
@@ -1109,6 +1111,9 @@ model Product {
   fieldValues ProductFieldValue[]
   allergens   ProductAllergen[]
 
+  // Customers waiting for it to be back (DEC-174 U23).
+  stockWatches StockWatch[]
+
   // How it can be fulfilled (B12, DEC-045): PICKUP, LOCAL_DELIVERY, SHIPPING
   // or DIGITAL (never an appointment type). Empty: every way its storefronts offer
   // (StoreSettings.fulfilmentTypes). An order offers only the types every
@@ -1154,6 +1159,7 @@ model ProductVariant {
   listings     ProductListingVariant[]
   stockLevels  StockLevel[]
   stockEntries StockEntry[]
+  stockWatches StockWatch[]
 
   createdAt DateTime @default(now())
 
@@ -1667,6 +1673,49 @@ model StockEntry {
   @@index([variantId])
   @@index([orderId])
   @@index([pairId])
+}
+
+// "Tell me when it's back" (DEC-174 U23, #1154): someone who found a product,
+// or one option of it, sold out on the business's site and left their email
+// to hear once when it can be bought again. The opt-in is consent for that one
+// email only: the address never becomes a contact or a marketing subscriber,
+// and `contactId` is set only when a contact with that email already exists
+// (so a revoked email consent still stops it). Told once (`toldAt`), or
+// stopped from the email's link (`cancelledAt`); a new sell-out needs a new
+// "Tell me". One open watch per address per product or option, by two
+// partial unique indexes (a NULL variant would otherwise never collide).
+model StockWatch {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product         @relation(fields: [productId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  // One option of it; null: the product, whichever option comes back.
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId, productId], references: [id, productId], onDelete: Cascade)
+  // The site it was asked on: its storefront says whether it sells, and the
+  // email links back to it.
+  siteId    String
+  site      Site            @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  // Trimmed and lower-cased when written.
+  email     String
+  // A contact that already had this email; informational, no FK, as
+  // CustomerNotice's: a merge or removal is resolved when it is told.
+  contactId String?
+  // When they ticked the opt-in: consent to this one email.
+  consentAt DateTime
+
+  createdAt   DateTime  @default(now())
+  toldAt      DateTime?
+  cancelledAt DateTime?
+
+  @@unique([organizationId, productId, email], map: "StockWatch_open_product_key", where: raw("\"variantId\" IS NULL AND \"toldAt\" IS NULL AND \"cancelledAt\" IS NULL"))
+  @@unique([organizationId, productId, variantId, email], map: "StockWatch_open_variant_key", where: raw("\"variantId\" IS NOT NULL AND \"toldAt\" IS NULL AND \"cancelledAt\" IS NULL"))
+  @@index([organizationId, productId])
+  @@index([siteId])
+  @@index([variantId])
 }
 
 // ============================================================================
@@ -3697,6 +3746,8 @@ model Site {
   trackingSettings SiteTrackingSettings?
   // The site's QR codes: short links at `/q/<code>` on its Saroh address.
   qrCodes          QrCode[]
+  // "Tell me when it's back" asked on this site (DEC-174 U23).
+  stockWatches     StockWatch[]
 
   // "Publishing needs approval" (DEC-071, amends DEC-047). Off: approval is
   // advisory and a bypass is recorded. On: Publish, restore and Go live

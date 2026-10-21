@@ -12,6 +12,7 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { onSellableAgain } from "../stock/on-sellable-again";
 import { NOT_SOLD_THERE, SOLD_OUT_NEEDS_UNTRACKED } from "../stock/sold-out";
 import { tracksStock } from "../stock/tracking";
 import type { ProductScope } from "./product-access";
@@ -120,6 +121,10 @@ export class SoldOutService {
                         ? { soldOutAt: new Date(), soldOutByUserId: userId }
                         : { soldOutAt: null, soldOutByUserId: null },
                 });
+                // Available again: anyone waiting for it is told (U23).
+                if (!soldOut) {
+                    await onSellableAgain(tx, organizationId, productId);
+                }
             }
             return {
                 changed: was !== soldOut,

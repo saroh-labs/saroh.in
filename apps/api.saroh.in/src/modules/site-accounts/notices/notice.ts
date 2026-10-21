@@ -1,6 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
 import { dayWords, isTimeZone, timeWords } from "../../../common/words-format";
+import type { TransactionalRecipient } from "../../communications/communications.service";
 import type { NoticeKind as NoticeSettingKind } from "../../communications/notice-settings";
 import type { NoticeTemplate } from "../../communications/transactional";
 import type { CustomerNotifyPayload } from "../customer-notify-queue";
@@ -28,7 +29,18 @@ export interface NoticeVarsBase {
 
 /** What a notice is about, read fresh when it runs. */
 export interface NoticeSubject<V extends NoticeVarsBase = NoticeVarsBase> {
-    contactId: string;
+    /**
+     * The contact it is about. Null only with {@link recipient}: someone
+     * who is no contact (a back-in-stock watch's address, U23).
+     */
+    contactId: string | null;
+    /**
+     * An email-only notice to the address its own record holds, not a
+     * contact's (a back-in-stock watch, U23): it goes there as it is, with
+     * no contact resolved and no thread. Its `contactId`, when set, is the
+     * contact whose consent is read.
+     */
+    recipient?: NoticeRecipient;
     vars: V;
     bookingId?: string;
     orderId?: string;
@@ -37,6 +49,12 @@ export interface NoticeSubject<V extends NoticeVarsBase = NoticeVarsBase> {
     /** The invoice it asks to be paid, recorded on the email (U10). */
     invoiceId?: string;
 }
+
+/** Where a notice goes that isn't a contact's own address. */
+export type NoticeRecipient = Extract<
+    TransactionalRecipient,
+    { kind: "STOCK_WATCH" }
+>;
 
 /** A link in the email, with the words above it. */
 export interface NoticeLinkLine {

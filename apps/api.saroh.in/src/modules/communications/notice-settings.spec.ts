@@ -173,6 +173,15 @@ describe("the kinds (pure)", () => {
         });
         // The module comes first: no CRM, no row at all.
         expect(noticeOffer("ENQUIRY_REPLY", has(false, false))).toBeNull();
+        // Back in stock goes to an address that is no customer's (U23):
+        // with no email of its own, it reaches nobody.
+        expect(noticeOffer("BACK_IN_STOCK", has(true, false))).toEqual({
+            offered: false,
+            why: "NO_EMAIL",
+        });
+        expect(noticeOffer("BACK_IN_STOCK", has(true, true))).toEqual({
+            offered: true,
+        });
     });
 });
 

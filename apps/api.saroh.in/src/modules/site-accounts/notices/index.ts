@@ -8,6 +8,7 @@ import {
 } from "../../communications/transactional";
 import type { CustomerNotifyPayload } from "../customer-notify-queue";
 import { autopayFailedNotice } from "./autopay-failed";
+import { backInStockNotice } from "./back-in-stock";
 import { bookingNotice } from "./booking";
 import { courseNotice } from "./course";
 import { enquiryReceivedNotice } from "./enquiry-received";
@@ -35,6 +36,7 @@ import { waitlistNotice } from "./waitlist";
  */
 export const NOTICES = {
     AUTOPAY_FAILED: autopayFailedNotice,
+    BACK_IN_STOCK: backInStockNotice,
     BOOKING_CANCELLED: bookingNotice,
     BOOKING_CONFIRMED: bookingNotice,
     BOOKING_LAPSED: bookingNotice,

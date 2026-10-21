@@ -246,16 +246,16 @@ describe("customer notice switches (real database)", () => {
         const a = await business("Rye & Co");
         const other = await business("Pulse Fitness");
         await settings.update(as(a, "owner"), {
-            kind: "BACK_IN_STOCK",
+            kind: "PACK_CREDITS",
             on: false,
         });
 
         const theirs = await settings.read(as(other, "owner"));
-        expect(theirs.notices.find((x) => x.kind === "BACK_IN_STOCK")?.on).toBe(
+        expect(theirs.notices.find((x) => x.kind === "PACK_CREDITS")?.on).toBe(
             true,
         );
         expect(
-            await noticeOn(prisma, other.organizationId, "BACK_IN_STOCK"),
+            await noticeOn(prisma, other.organizationId, "PACK_CREDITS"),
         ).toBe(true);
         expect(await rows(other)).toEqual([]);
     });

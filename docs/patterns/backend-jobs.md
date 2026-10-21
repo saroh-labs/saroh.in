@@ -465,6 +465,18 @@ the Privacy Policy states both.
   action (resume, Keep, cancel the plan change), which withdraws the
   untold notice and queues none of its own. The run re-reads the
   membership: a change undone since tells nobody.
+- **Back in stock** (DEC-174 U23, #1154, `notices/back-in-stock.ts`): a
+  "Tell me" on a sold-out product (`stock/stock-watch.service.ts`, public,
+  rate-limited per visitor and per address) makes a `StockWatch`, never a
+  contact. Every stock writer that can make a product sellable calls
+  `onSellableAgain` (`stock/on-sellable-again.ts`; a source scan,
+  `on-sellable-again.guard.spec.ts`, fails a writer that doesn't), which
+  queues one `stock.back-in-stock` run held 10 minutes while anyone waits.
+  The run re-reads the stock as the site's shop does (`watchable.ts`),
+  marks up to 500 watches told and queues a `customer.notify`
+  BACK_IN_STOCK per watch (`back-in-stock:<watchId>`), re-queuing for the
+  rest. Email only, to the watch's own address (`STOCK_WATCH` recipient),
+  through the business's own provider, behind the BACK_IN_STOCK switch.
 - **`customer-message.notify`** (UX-014) tells the team a customer wrote
   from their site account: one inbox notice (`message.new`, opening the
   customer's thread, unique on `(messageId, type)`) and an email to the

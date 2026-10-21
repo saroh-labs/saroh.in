@@ -65,6 +65,10 @@ const REFUSED = [
     "POST public/sites/:siteId/checkout",
     "POST public/orders/:orderId/payment-intent",
     "POST public/order-pay/:token/payment-intent",
+    // Back in stock (U23): a watch stores an address and later emails it;
+    // stopping one changes it.
+    "POST public/sites/:siteId/products/:productId/watch",
+    "POST public/sites/:siteId/stock-watch/:token/stop",
     "POST public/invoices/:token/payment-intent",
     "POST public/invoices/:token/autopay",
     // Bookings, holds and waitlists.
