@@ -8,7 +8,7 @@ import {
 } from "../../communications/transactional";
 import type { CustomerNotifyPayload } from "../customer-notify-queue";
 import { autopayFailedNotice } from "./autopay-failed";
-import { backInStockNotice } from "./back-in-stock";
+import { backInStockNotice, backInStockWaitingNotice } from "./back-in-stock";
 import { bookingNotice } from "./booking";
 import { courseNotice } from "./course";
 import { enquiryReceivedNotice } from "./enquiry-received";
@@ -39,6 +39,8 @@ import { waitlistNotice } from "./waitlist";
 export const NOTICES = {
     AUTOPAY_FAILED: autopayFailedNotice,
     BACK_IN_STOCK: backInStockNotice,
+    // "We'll email you when it's back", with Stop waiting (DEC-178, #1170).
+    BACK_IN_STOCK_WAITING: backInStockWaitingNotice,
     BOOKING_CANCELLED: bookingNotice,
     BOOKING_CONFIRMED: bookingNotice,
     BOOKING_LAPSED: bookingNotice,
@@ -124,6 +126,14 @@ export function withLink(vars: NoticeVars, link: string | null): NoticeVars {
     return link && def.withLink ? def.withLink(vars, link) : vars;
 }
 
+/**
+ * The words above the email's secret link, or null: this email carries
+ * none, so its body holds no slot and nothing is made at send time.
+ */
+export function secretLinkLead(vars: NoticeVars): string | null {
+    return noticeDefinition(vars.kind).secretLink?.lead(vars) ?? null;
+}
+
 /** The email: subject and HTML body, everything typed escaped. */
 export function renderNotice(vars: NoticeVars): RenderedMessage {
     const def = noticeDefinition(vars.kind);
@@ -141,9 +151,11 @@ export function renderNotice(vars: NoticeVars): RenderedMessage {
     ];
     // A secret link (a fresh pay link) is a slot here, filled in only when
     // the send job hands the email to the provider.
-    const secret = def.secretLink
-        ? `<p>${escapeHtml(def.secretLink.lead(vars))}<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a></p>`
-        : null;
+    const secretLead = secretLinkLead(vars);
+    const secret =
+        secretLead !== null
+            ? `<p>${escapeHtml(secretLead)}<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a></p>`
+            : null;
     // Words they wrote, quoted back as plain text (the enquiry reply).
     const quote = def.quote?.(vars) ?? null;
     // A list under the lead (a course's sessions).

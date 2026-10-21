@@ -114,9 +114,11 @@ export interface NoticeDefinition<V extends NoticeVarsBase> {
      * email really goes (not for a customer who turned email off), and the
      * link is put in at send time: the stored body holds the slot, never
      * the token (`SECRET_LINK_SLOT`). The thread's sentence has none.
+     * `lead` null: this email has no secret link (a back-in-stock watch
+     * whose site has no address now), and `make` is never called.
      */
     secretLink?: {
-        lead(vars: V): string;
+        lead(vars: V): string | null;
         make(
             tx: Tx,
             organizationId: string,

@@ -492,6 +492,13 @@ the Privacy Policy states both.
   BACK_IN_STOCK per watch (`back-in-stock:<watchId>`), re-queuing for the
   rest. Email only, to the watch's own address (`STOCK_WATCH` recipient),
   through the business's own provider, behind the BACK_IN_STOCK switch.
+  A "Tell me" that makes a watch also queues BACK_IN_STOCK_WAITING
+  (`back-in-stock-waiting:<watchId>`, DEC-178 #1170): "We'll email you
+  when ‹product› is back", unless that address already waits for something
+  at the business. Both emails carry "Stop waiting" as a secret link
+  (`secretLink`): the stored body holds the slot, the signed stop token is
+  sealed into the send job. A site with no web address: no stop link, and
+  no sign-up email.
   The site side (U24, #1155): the product page asks whether "Tell me" is
   offered for the option on screen in the browser, through a server
   action (`backInStockOffer`), never on the server, so the cached page

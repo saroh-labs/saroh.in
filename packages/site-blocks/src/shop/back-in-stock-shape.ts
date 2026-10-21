@@ -129,9 +129,12 @@ export const WATCH_WORDS = {
     stopFailed: "We couldn't stop it. Try again.",
 } as const;
 
-/** Under the button: the opt-in, said plainly. */
+/**
+ * Under the button: the opt-in, said plainly. Two emails since DEC-178: a
+ * short one now, with "Stop waiting", and the one when it's back.
+ */
 export function consentLine(business: string): string {
-    return `${business} will email you once. Nothing else.`;
+    return `${business} will email you now and when it's back. Nothing else.`;
 }
 
 /** Once the address is taken. */

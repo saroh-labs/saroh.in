@@ -70,6 +70,9 @@ export const NOTICE_TEMPLATES = [
     // "‹Product› is back" to someone who asked on the site (DEC-174 U23,
     // #1154): email only, behind the BACK_IN_STOCK switch.
     "BACK_IN_STOCK",
+    // "We'll email you when ‹product› is back" with Stop waiting, right
+    // after a "Tell me" (DEC-178, #1170): email only, same switch.
+    "BACK_IN_STOCK_WAITING",
     // Class packs (DEC-174 U22, #1153), behind the PACK_CREDITS switch:
     // one credit left, and credits expiring in 7 days.
     "PACK_LOW",

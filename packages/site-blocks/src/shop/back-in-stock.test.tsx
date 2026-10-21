@@ -97,7 +97,7 @@ describe("the words", () => {
 
     it("names the business in the opt-in", () => {
         expect(consentLine("Northwind Goods")).toBe(
-            "Northwind Goods will email you once. Nothing else.",
+            "Northwind Goods will email you now and when it's back. Nothing else.",
         );
     });
 

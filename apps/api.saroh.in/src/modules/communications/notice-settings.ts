@@ -161,7 +161,7 @@ export const NOTICE_WORDS: Record<NoticeKind, { label: string; says: string }> =
         },
         BACK_IN_STOCK: {
             label: "Back in stock",
-            says: "Customers who asked are emailed once when a sold-out product is back.",
+            says: "Customers who ask are emailed to say they're on the list, then once when a sold-out product is back.",
         },
         OVERDUE_REMINDERS: {
             label: "Overdue reminders",

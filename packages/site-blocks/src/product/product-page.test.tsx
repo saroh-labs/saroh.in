@@ -797,7 +797,9 @@ describe("Tell me when it's back", () => {
         expect(a.offer).toHaveBeenCalledWith("prd_dress", "s");
         expect(screen.getByLabelText("Your email")).toBeInTheDocument();
         expect(
-            screen.getByText("Tanvi Studio will email you once. Nothing else."),
+            screen.getByText(
+                "Tanvi Studio will email you now and when it's back. Nothing else.",
+            ),
         ).toBeInTheDocument();
     });
 

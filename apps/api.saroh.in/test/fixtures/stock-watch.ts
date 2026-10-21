@@ -19,11 +19,21 @@ export interface ShopBusiness {
     organizationId: string;
     storeId: string;
     siteId: string;
+    /** `https://<address>.saroh.app`; set only when published. */
+    subdomain: string;
 }
 
 export async function shopBusiness(
     name = "Rye & Co.",
-    opts: { email?: boolean; comms?: CommunicationsService } = {},
+    opts: {
+        email?: boolean;
+        comms?: CommunicationsService;
+        /**
+         * The site published, so it has a web address: the emails' links
+         * and "Stop waiting" (DEC-178) need one.
+         */
+        published?: boolean;
+    } = {},
 ): Promise<ShopBusiness> {
     const org = await prisma.organization.create({
         data: { name, slug: uniq("u23-org") },
@@ -55,6 +65,21 @@ export async function shopBusiness(
             storefrontId: store.id,
         },
     });
+    if (opts.published) {
+        const publication = await prisma.publication.create({
+            data: {
+                siteId: site.id,
+                organizationId: org.id,
+                snapshot: { pages: [] },
+                templateId: "blank",
+                templateVersion: 1,
+            },
+        });
+        await prisma.site.update({
+            where: { id: site.id },
+            data: { currentPublicationId: publication.id },
+        });
+    }
     const owner: OrganizationContext = {
         organizationId: org.id,
         userId: "u_owner",
@@ -76,6 +101,7 @@ export async function shopBusiness(
         organizationId: org.id,
         storeId: store.id,
         siteId: site.id,
+        subdomain: site.subdomain ?? "",
     };
 }
 

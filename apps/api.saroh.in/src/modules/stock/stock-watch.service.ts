@@ -15,9 +15,11 @@ import { emailRoute } from "../communications/email-route";
 import { noticeOn } from "../communications/notice-settings";
 import { isReservedContactEmail } from "../contacts/contact-email";
 import { authorize } from "../organizations/organization-policy";
+import { enqueueCustomerNotice } from "../site-accounts/customer-notify-queue";
 import { siteCodeSecret } from "../site-accounts/site-secrets";
 import type { WatchRefusal, WatchState } from "./stock-watch-rules";
 import {
+    backInStockWaitingNoticeKey,
     signWatchToken,
     verifyWatchToken,
     WATCH_REFUSAL_WORDS,
@@ -99,7 +101,10 @@ function notFound(): never {
  *   that already has it is named only so their revoked email consent stops
  *   it.
  * - **Once:** one open watch per address per product or option; asking
- *   again is the same watch. Each is emailed once (`back-in-stock.handler.ts`).
+ *   again is the same watch. Each is emailed once when it's back
+ *   (`back-in-stock.handler.ts`). A new watch also gets "We'll email you
+ *   when it's back" with Stop waiting (DEC-178), unless that address
+ *   already waits for something here: one such email while they wait.
  * - **Abuse:** limited per visitor (the relayed address, as the shop's
  *   reads) and per address, as the enquiry form is.
  * - **Stop:** a signed token, read by a page with a button, never a link
@@ -224,12 +229,32 @@ export class StockWatchService {
                 skipDuplicates: true,
                 select: { id: true },
             });
+            if (made.length === 0) return { state: "waiting", stopToken: null };
+            const watchId = made[0].id;
+            // "We'll email you when it's back", with Stop waiting (DEC-178):
+            // only for an address with nothing else waiting here, so
+            // typing someone's address on product after product mails them
+            // once while they wait, however often it is sent.
+            const waitingElse = await tx.stockWatch.findFirst({
+                where: {
+                    organizationId,
+                    email,
+                    toldAt: null,
+                    cancelledAt: null,
+                    id: { not: watchId },
+                },
+                select: { id: true },
+            });
+            if (!waitingElse) {
+                await enqueueCustomerNotice(tx, organizationId, {
+                    kind: "BACK_IN_STOCK_WAITING",
+                    eventKey: backInStockWaitingNoticeKey(watchId),
+                    stockWatchId: watchId,
+                });
+            }
             return {
                 state: "waiting",
-                stopToken:
-                    made.length > 0
-                        ? signWatchToken(siteCodeSecret(), made[0].id)
-                        : null,
+                stopToken: signWatchToken(siteCodeSecret(), watchId),
             };
         });
     }

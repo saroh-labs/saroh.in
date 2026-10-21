@@ -15,7 +15,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  * site sign-in code secret (`site-accounts/site-secrets.ts`); the purpose
  * line keeps it apart from every other HMAC under that key (the waitlist
  * claim's). Nothing is stored. It never expires: stopping a watch that was
- * told or already stopped changes nothing.
+ * told or already stopped changes nothing. The emails carry it as a secret
+ * link (DEC-178): the stored body holds a slot, never the token.
  */
 
 /** The job that tells a product's watchers, held after stock comes back. */
@@ -38,6 +39,14 @@ export interface BackInStockPayload {
 /** A customer notice's once-only key: once per watch. */
 export function backInStockNoticeKey(watchId: string): string {
     return `back-in-stock:${watchId}`;
+}
+
+/**
+ * The "We'll email you when it's back" key (DEC-178, #1170): once per
+ * watch, so a job run twice sends it once.
+ */
+export function backInStockWaitingNoticeKey(watchId: string): string {
+    return `back-in-stock-waiting:${watchId}`;
 }
 
 /** The longest address a watch keeps (RFC 5321's path limit). */
