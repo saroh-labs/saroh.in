@@ -44,7 +44,8 @@ const saved: SiteStyle = {
 
 const access = (paidIncluded: boolean): SiteStyleAccess => ({
     free: {
-        looks: ["quiet", "folio", "live"],
+        // Classic is the only free look (DEC-177, owner 21 Oct).
+        looks: [],
         fontPairs: ["system", "own"],
         colourways: ["kesar"],
     },
@@ -56,7 +57,8 @@ describe("styleChoiceRules", () => {
         const rules = styleChoiceRules(access(false), saved, options);
         expect(rules.isPaid("fontPair", "paid")).toBe(true);
         expect(rules.isPaid("fontPair", "own")).toBe(false);
-        expect(rules.isPaid("look", "folio")).toBe(false);
+        expect(rules.isPaid("look", "folio")).toBe(true);
+        expect(rules.refuses("look", "quiet")).toBe(true);
         expect(rules.refuses("fontPair", "paid")).toBe(true);
         expect(rules.refuses("colourway", "mauve")).toBe(true);
         expect(rules.refuses("colourway", "kesar")).toBe(false);
@@ -67,6 +69,17 @@ describe("styleChoiceRules", () => {
         expect(rules.isPaid("fontPair", "paid")).toBe(true);
         expect(rules.refuses("fontPair", "paid")).toBe(false);
         expect(rules.refuses("colourway", "mauve")).toBe(false);
+        expect(rules.refuses("look", "quiet")).toBe(false);
+    });
+
+    it("frees a look the owner ticks in admin", () => {
+        const ticked = {
+            ...access(false),
+            free: { ...access(false).free, looks: ["quiet" as const] },
+        };
+        const rules = styleChoiceRules(ticked, saved, options);
+        expect(rules.refuses("look", "quiet")).toBe(false);
+        expect(rules.refuses("look", "folio")).toBe(true);
     });
 
     it("never refuses what the server holds, or the live site's look", () => {
@@ -75,11 +88,7 @@ describe("styleChoiceRules", () => {
             fontPair: "paid",
             palette: { bg: "#eeeeee" },
         } as unknown as SiteStyle;
-        const paidLooks = {
-            ...access(false),
-            free: { ...access(false).free, looks: [] },
-        };
-        const rules = styleChoiceRules(paidLooks, has, options, "folio");
+        const rules = styleChoiceRules(access(false), has, options, "folio");
         expect(rules.refuses("fontPair", "paid")).toBe(false);
         expect(rules.refuses("colourway", "mauve")).toBe(false);
         expect(rules.refuses("look", "folio")).toBe(false);

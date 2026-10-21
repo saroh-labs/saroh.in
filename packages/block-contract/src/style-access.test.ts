@@ -53,6 +53,17 @@ describe("the shared style rule", () => {
         expect(parts.length > 0).toBe(c.refused);
     });
 
+    it("always allows going back to Classic from a paid look", () => {
+        expect(
+            paidStyleParts(stored, {
+                stored: { ...stored, look: "quiet" },
+                templateId: F.templateId,
+                colourways,
+                free,
+            }),
+        ).toEqual([]);
+    });
+
     it("holds the system font when no pair is saved, never a list's first", () => {
         expect(heldStyleIds({}, colourways).fontPair).toBe("system");
     });
