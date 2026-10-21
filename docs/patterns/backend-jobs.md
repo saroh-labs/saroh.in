@@ -114,6 +114,7 @@ waits while holding one.
 | `commission-invoice:<sarohInvoiceId>`     | Writing and moving one payment's commission lines (DEC-169, admin console U21): the line job, the refund job, the sweep and a rate set all settle through it                                                                                                                                                                             | `commission/commission-settle.ts` (`settleInvoiceInTx`)                             |
 | `commission-payout:<platformAdminId>`     | Putting a line in a teammate's statement month against Mark paid locking that month, so a line never lands in a month already paid; taken after the invoice's key                                                                                                                                                                        | `commission/commission-settle.ts`; `admin/admin-commission.service.ts` (`markPaid`) |
 | `job-chain:commission.sweep`              | Leaving one waiting run of the commission sweep, as the manager link sweep does                                                                                                                                                                                                                                                          | `commission/commission-sweep.job.ts` (`schedule`)                                   |
+| `job-chain:invoice.overdue-remind`        | Leaving one waiting run of the overdue reminder sweep (automatic notices U20), as the manager link sweep does                                                                                                                                                                                                                            | `invoices/overdue-remind.handler.ts` (`schedule`)                                   |
 | `plan-meter:<organizationId>:<limitKey>`  | Writes that add to one plan limit (a product, a booking…)                                                                                                                                                                                                                                                                                | `billing/metering.service.ts` (`lockMeter`, U13)                                    |
 
 Race tests wait on an advisory lock with `waitUntilAdvisoryBlockedBy`
@@ -584,6 +585,28 @@ the Privacy Policy states both.
   one is never written. The Messages tab and Home's Reply say where it is
   emailed (`teamReplyEmailedTo`, the same reads as the send), or that
   nothing is.
+
+- **Overdue reminders** (DEC-174 D3, U20 #1151, `OVERDUE_REMINDERS`, the
+  one switch off by default). `invoice.overdue-remind` is an hourly
+  self-rescheduling sweep (one waiting run under
+  `job-chain:invoice.overdue-remind`, restarted by the invoices module's
+  15-minute check and at boot; in `CANCEL_REFUSED`). For each business
+  with the switch on (and a lifecycle that bills), between 9 am and 8 pm
+  in its time zone, it reads the overdue bills (`overdueBillsWhere`, the
+  one definition: never an order's invoice, a credit note or a live
+  subscription's latest period invoice, so never one autopay will charge)
+  with something left to pay, and sends at most two automatic reminders:
+  the first in days 3 to 9 after the due date, the second in days 10 to
+  16, counted in whole days in the business's zone (`overdue-remind.ts`).
+  Each goes through `InvoiceSendService.remindAutomatic`, the one remind
+  path (its lock, one a day counting email, thread and WhatsApp shares,
+  the business's own provider only, what is left to pay, AUTO_REMINDED
+  with actor JOB), which writes the claim `invoice-overdue:<id>:<1|2>`
+  (`CustomerNotice` kind `INVOICE_OVERDUE`) and asks `noticeOn` on the
+  send's own transaction after every other check: a run that runs twice
+  sends once, and a 429 claims nothing, so a later run sends it. A
+  reminder that can't go (no provider, no address) is left quietly, never
+  written as SEND_FAILED every hour; the business still has Send reminder.
 
 ## Autopay charges — **Current** (D13)
 

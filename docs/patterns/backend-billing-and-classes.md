@@ -328,6 +328,12 @@ requireProvider: false })`), the email says "view it and download a copy",
   and WhatsApp NEW or REMINDER shares together, so a WhatsApp reminder
   after an email one (or the other way) is a 429 with `retryAt`. Link, PDF
   and print don't count.
+- **Automatic overdue reminders** (DEC-174 D3, U20 #1151): opt-in, at
+  most two per invoice (3 and 10 days late, in the business's zone), and
+  inside the one-a-day rule: a hand or WhatsApp reminder in the last day
+  moves the automatic one to a later run. Only through
+  `remindAutomatic`, never a send path of its own. The sweep and its
+  claim are in `backend-jobs.md` → Customer notices.
 - **Remind many:** `POST invoices/reminders/preview` and `POST
 invoices/reminders` (`InvoiceRemindersService`, `invoice:write`, at most
   100 ids, duplicates once). Each invoice is EMAIL when an email can go

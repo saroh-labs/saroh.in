@@ -173,6 +173,8 @@ module.exports = {
         // DEC-068: which business details are missing — pure (the refusals
         // and the flag after money are in business-details.db.spec.ts).
         "<rootDir>/src/modules/invoices/business-details.spec.ts",
+        // Overdue reminders, pure (U20): the unit project.
+        "<rootDir>/src/modules/invoices/overdue-remind.spec.ts",
         "<rootDir>/src/modules/payments/public-invoices.service.spec.ts",
         // D20: mocked Prisma; the real rows are in mandates.db.spec.ts.
         "<rootDir>/src/modules/payments/mandates.service.spec.ts",

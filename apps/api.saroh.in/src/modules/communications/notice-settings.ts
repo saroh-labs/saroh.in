@@ -71,7 +71,7 @@ export const NOTICE_SENDS: Record<NoticeKind, boolean> = {
     COURSE: true,
     PACK_CREDITS: false,
     BACK_IN_STOCK: true,
-    OVERDUE_REMINDERS: false,
+    OVERDUE_REMINDERS: true,
 };
 
 /**

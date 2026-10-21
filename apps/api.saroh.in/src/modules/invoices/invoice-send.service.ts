@@ -25,6 +25,8 @@ import {
 } from "../communications/account-thread";
 import type { TransactionalAddress } from "../communications/communications.service";
 import { CommunicationsService } from "../communications/communications.service";
+import type { NoticeKind } from "../communications/notice-settings";
+import { noticeOn } from "../communications/notice-settings";
 import type { InvoiceTemplate } from "../communications/transactional";
 import {
     businessPayInstructionsOf,
@@ -68,6 +70,26 @@ type Db = Prisma.TransactionClient;
 export interface SendOptions {
     automatic?: boolean;
 }
+
+/**
+ * An automatic reminder's claim (overdue reminders, U20): the
+ * `CustomerNotice` written on the send's own transaction, under the
+ * invoice's lock and after every other check, so a run that sends claims,
+ * a run delivered twice sends once, and a reminder that can't go yet (one
+ * a day) claims nothing and goes later. Its switch is asked there too, so
+ * one turned off while the sweep ran stops it.
+ */
+export interface ReminderClaim {
+    eventKey: string;
+    kind: string;
+    switchKind: NoticeKind;
+}
+
+/** What a refused claim says, as `details.reason` on its 409. */
+export const CLAIM_REFUSED = {
+    taken: "ALREADY_REMINDED",
+    off: "NOTICE_OFF",
+} as const;
 
 /**
  * Who sends: a person in the workspace (their context, authorized), or
@@ -580,12 +602,38 @@ export class InvoiceSendService {
         return this.dispatch({ ctx }, id, true, batch, options);
     }
 
+    /**
+     * A reminder made by Saroh for the business (an overdue invoice, U20,
+     * DEC-174 D3): every rule of `remind` (one a day counting email,
+     * thread and WhatsApp, the provider, the address, consent, the
+     * business details, the autopay charge, not paid, voided or credited),
+     * refused as it is to a person, and AUTO_REMINDED with actor JOB on
+     * the history. `claim` is written on the same transaction; a claim
+     * already taken, or the switch off, is a 409 with `details.reason`
+     * from {@link CLAIM_REFUSED}. Nobody is authorized: only a job calls it.
+     */
+    remindAutomatic(
+        organizationId: string,
+        id: string,
+        claim: ReminderClaim,
+    ): Promise<InvoiceSendResult> {
+        return this.dispatch(
+            { job: true, organizationId },
+            id,
+            true,
+            undefined,
+            {},
+            claim,
+        );
+    }
+
     private async dispatch(
         sender: Sender,
         id: string,
         reminder: boolean,
         batch?: { shared: ReachShared; detailsChecked: true },
         options: SendOptions = {},
+        claim?: ReminderClaim,
     ): Promise<InvoiceSendResult> {
         const ctx = "ctx" in sender ? sender.ctx : null;
         if (ctx) authorize(ctx, "invoice:write");
@@ -637,6 +685,7 @@ export class InvoiceSendService {
                     "This invoice has been sent. Send a reminder instead.",
                 );
             }
+            if (claim) await claimReminder(tx, organizationId, row, claim);
 
             const template: InvoiceTemplate = reminder
                 ? "INVOICE_REMINDER"
@@ -748,6 +797,12 @@ export class InvoiceSendService {
                     ? { to: email.to, status: email.status, thread }
                     : { thread },
             });
+            if (claim && messageId) {
+                await tx.customerNotice.updateMany({
+                    where: { organizationId, eventKey: claim.eventKey },
+                    data: { messageId },
+                });
+            }
             return { channels: view.channels, email, thread };
         });
     }
@@ -923,6 +978,43 @@ export function firstName(row: SendRow): string | null {
             .filter(Boolean)
             .join(" ");
     return name.trim().split(/\s+/)[0] || null;
+}
+
+/**
+ * Write an automatic reminder's claim, or refuse: its switch turned off,
+ * or the claim already taken by a run before this one. `createMany` with
+ * `skipDuplicates`, never insert-and-catch: a Postgres transaction can't
+ * carry on after a caught P2002.
+ */
+async function claimReminder(
+    tx: Db,
+    organizationId: string,
+    row: SendRow,
+    claim: ReminderClaim,
+): Promise<void> {
+    if (!(await noticeOn(tx, organizationId, claim.switchKind))) {
+        throw new ConflictException({
+            message: "Automatic reminders are turned off.",
+            details: { reason: CLAIM_REFUSED.off },
+        });
+    }
+    const made = await tx.customerNotice.createMany({
+        data: [
+            {
+                organizationId,
+                eventKey: claim.eventKey,
+                kind: claim.kind,
+                contactId: row.contactId,
+            },
+        ],
+        skipDuplicates: true,
+    });
+    if (made.count === 0) {
+        throw new ConflictException({
+            message: "Already reminded.",
+            details: { reason: CLAIM_REFUSED.taken },
+        });
+    }
 }
 
 /** The history's word for a send: by hand or automatic, first or reminder. */

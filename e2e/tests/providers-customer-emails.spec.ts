@@ -209,3 +209,54 @@ test("an owner turns one off, Undo turns it back on, and the sheet fits", async 
         read.notices.every((n) => n.on) ? "All on" : "on",
     );
 });
+
+test("overdue reminders are listed off, an owner turns them on, and Undo turns them off again (U20)", async ({
+    page,
+}, testInfo) => {
+    // Invoices belong to every business: no module to turn on first.
+    const b = await makeBusiness(page, testInfo, "ce-overdue");
+    const read = await listed(page, b);
+    const overdue = read.notices.find((n) => n.kind === "OVERDUE_REMINDERS");
+    expect(overdue).toMatchObject({ on: false, offered: true });
+
+    await openProviders(page, b);
+    const sheet = page.getByRole("dialog", {
+        name: "Emails to your customers",
+    });
+    await pressUntil(
+        block(page).getByRole("button", {
+            name: "Edit emails to your customers",
+        }),
+        sheet,
+    );
+    const toggle = sheet.getByRole("switch", {
+        name: "Overdue reminders",
+        exact: true,
+    });
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await noSideways(page);
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByText("Overdue reminders turned on.")).toBeVisible();
+    await expect
+        .poll(
+            async () =>
+                (await listed(page, b)).notices.find(
+                    (n) => n.kind === "OVERDUE_REMINDERS",
+                )?.on,
+        )
+        .toBe(true);
+
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect
+        .poll(
+            async () =>
+                (await listed(page, b)).notices.find(
+                    (n) => n.kind === "OVERDUE_REMINDERS",
+                )?.on,
+        )
+        .toBe(false);
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await noSideways(page);
+});

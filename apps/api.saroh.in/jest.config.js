@@ -376,6 +376,8 @@ module.exports = {
         // GST on plans, class packs and courses (12 Oct 2026): what one is
         // charged, pure and with a jest-mocked Prisma for the terms read.
         "<rootDir>/src/modules/invoices/sale-price.spec.ts",
+        // Overdue reminders: which one, when, and the hours (U20).
+        "<rootDir>/src/modules/invoices/overdue-remind.spec.ts",
         // ADR-007 subscriptions: the period calendar, the service and the
         // renewal job with a jest-mocked Prisma. subscriptions.db.spec.ts needs
         // Postgres and runs in integration.
