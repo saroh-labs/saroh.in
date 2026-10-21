@@ -80,5 +80,11 @@ describe("findInitialStart", () => {
             ],
         };
         expect(findInitialStart(full, "2026-09-18", "10:15", true)).toBeNull();
+        // With its waitlist on, the full session is still chosen: a claim
+        // link (#1149) opens on the place held for them, which reads as
+        // full to everyone else.
+        expect(findInitialStart(full, "2026-09-18", "10:15", true, true)).toBe(
+            full.days[0]?.starts[0],
+        );
     });
 });

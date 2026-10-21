@@ -505,6 +505,15 @@ the Privacy Policy states both.
   a desk, phone or guest customer as much as a site account holder, whose
   verified address wins when it differs (A2). A reserved placeholder is no
   address. Consent is read as for every transactional send.
+- **A link back is never a sign-in.** An email's way back to what it is
+  about is built from the contact's site (`notice-link.ts`
+  `contactSiteOrigin`). A link that must open something without a session
+  is a signed token, never a stored secret: the waitlist offer's claim link
+  (#1149, `site-accounts/waitlist-claim.ts`) names the entry and its
+  `offeredUntil` under an HMAC with its own purpose line, opens only while
+  the entry is OFFERED (so it is spent once booked), is read for the site
+  it is opened on (another business's site is a 404), and is limited per
+  visitor and redacted from logs like the other token paths.
 - **Re-read, then decide.** A booking cancelled since isn't confirmed, an
   undone step isn't announced, and the contact goes through
   `resolveContact` (a merge lands on the survivor; a removed contact hears

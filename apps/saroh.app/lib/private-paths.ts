@@ -4,6 +4,10 @@
  * and a pay link. Search engines are kept out of them (`robots.txt`, #890),
  * and they never appear in the sitemap.
  *
+ * A waitlist offer's claim page (`/book/claim/<token>`, #1149) is one
+ * customer's held place, and its token is the link: never kept, never
+ * crawled, while `/book` itself stays public.
+ *
  * `/q` is here too: a QR code's short link (`/q/<code>`) is not a page at
  * all. It counts a scan and forwards, so a crawler following it would add
  * scans nobody made, and it must never be kept by the page cache.
@@ -17,6 +21,7 @@ export const PRIVATE_PATH_PREFIXES = [
     "/autopay",
     "/shop/order",
     "/pay",
+    "/book/claim",
     "/q",
 ] as const;
 

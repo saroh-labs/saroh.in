@@ -276,6 +276,17 @@ export type {
     BookingFlowProps,
 } from "./booking-flow/booking-flow";
 export { initialDateOf, initialTimeOf } from "./booking-flow/initial-start";
+// A waitlist offer's claim page (automatic notices U18, #1149).
+export {
+    claimBookHref,
+    claimWords,
+    isWaitlistClaim,
+} from "./booking-flow/waitlist-claim";
+export type {
+    WaitlistClaim,
+    WaitlistClaimState,
+} from "./booking-flow/waitlist-claim";
+export { WaitlistClaimPage } from "./booking-flow/waitlist-claim-page";
 // The booking step in the address (site templates v2 U9).
 export {
     isBookResult,

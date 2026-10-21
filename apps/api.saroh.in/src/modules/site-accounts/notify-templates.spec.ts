@@ -416,3 +416,47 @@ describe("a lapsed hold (#1137)", () => {
         expect(mail.body).toContain("&lt;b&gt;Cut&lt;/b&gt;");
     });
 });
+
+describe("a waitlist offer's claim link (#1149)", () => {
+    const offer = (link?: string | null): NoticeVars => ({
+        kind: "WAITLIST_OFFER",
+        waitlist: {
+            business: "Pulse Fitness",
+            firstName: "Sneha",
+            service: "Spin",
+            startAt: AT,
+            heldUntil: WAS,
+            timeZone: "Asia/Kolkata",
+            ...(link === undefined ? {} : { link }),
+        },
+    });
+
+    it("emails the hold with a link to book the place before it ends", () => {
+        const url = "https://pulse.saroh.app/book/claim/v1.cl1.1.sig";
+        const mail = renderNotice(offer(url));
+        expect(mail.subject).toBe("A place opened at Pulse Fitness");
+        expect(mail.body).toContain("held for you until");
+        expect(mail.body).toContain("Book your place before then:");
+        expect(mail.body).toContain(`href="${url}"`);
+    });
+
+    it("has no link line with no site to claim it on", () => {
+        for (const link of [undefined, null]) {
+            expect(renderNotice(offer(link)).body).not.toContain(
+                "Book your place",
+            );
+        }
+    });
+
+    it("never links anything but a web address", () => {
+        expect(renderNotice(offer("javascript:alert(1)")).body).not.toContain(
+            "Book your place",
+        );
+    });
+
+    it("keeps the link out of the thread's sentence", () => {
+        expect(
+            noticeSentence(offer("https://pulse.saroh.app/book/claim/x")),
+        ).not.toContain("https://");
+    });
+});

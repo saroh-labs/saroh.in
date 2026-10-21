@@ -116,6 +116,8 @@ const TOKEN_PATHS = [
     // A pay-now hold's pay token (U19), read and released by it.
     /^(\/public\/services\/holds\/)[^/?#]+/,
     /^(\/public\/sites\/preview\/)[^/?#]+/,
+    // A waitlist offer's claim link (U18, #1149).
+    /^(\/public\/sites\/[^/?#]+\/waitlist-claim\/)[^/?#]+/,
 ];
 
 /**

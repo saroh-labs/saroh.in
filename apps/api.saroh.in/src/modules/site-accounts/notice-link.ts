@@ -43,26 +43,38 @@ export async function noticeLink(
     const path = pathOf(subject);
     if (!path) return null;
     try {
-        const session = await db.customerSession.findFirst({
-            where: {
-                organizationId,
-                account: { contactId: subject.contactId },
-            },
-            orderBy: { createdAt: "desc" },
-            select: { siteId: true },
-        });
-        const origin =
-            (session
-                ? await siteOriginOf(
-                      organizationId,
-                      { siteId: session.siteId },
-                      db,
-                  )
-                : null) ?? (await siteOriginOf(organizationId, {}, db));
+        const origin = await contactSiteOrigin(
+            db,
+            organizationId,
+            subject.contactId,
+        );
         return origin ? `${origin}${path}` : null;
     } catch {
         return null;
     }
+}
+
+/**
+ * The business's site a contact's emails lead back to: the one they last
+ * signed in on, else its first published one, at its primary address
+ * (`siteOriginOf`). Null when there is no published site. Shared by every
+ * notice's link (the waitlist offer's claim link too, `waitlist-claim.ts`).
+ */
+export async function contactSiteOrigin(
+    db: Db,
+    organizationId: string,
+    contactId: string,
+): Promise<string | null> {
+    const session = await db.customerSession.findFirst({
+        where: { organizationId, account: { contactId } },
+        orderBy: { createdAt: "desc" },
+        select: { siteId: true },
+    });
+    return (
+        (session
+            ? await siteOriginOf(organizationId, { siteId: session.siteId }, db)
+            : null) ?? (await siteOriginOf(organizationId, {}, db))
+    );
 }
 
 /** The page a notice leads back to; null for a notice with none. */

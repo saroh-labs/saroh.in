@@ -130,6 +130,15 @@ describe("redactUrl", () => {
         );
     });
 
+    it("hides a waitlist offer's claim token (U18, #1149)", () => {
+        expect(
+            redactUrl("/public/sites/site_1/waitlist-claim/v1.cl1.1.sig?x=1"),
+        ).toBe("/public/sites/site_1/waitlist-claim/[token]?x=1");
+        expect(redactUrl("/public/sites/site_1/visit")).toBe(
+            "/public/sites/site_1/visit",
+        );
+    });
+
     it("hides a pay-now hold's token (U19)", () => {
         expect(redactUrl("/public/services/holds/tok_ABC-123")).toBe(
             "/public/services/holds/[token]",

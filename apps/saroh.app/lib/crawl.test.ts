@@ -99,6 +99,7 @@ describe("robotsTxt", () => {
             "/autopay",
             "/shop/order",
             "/pay",
+            "/book/claim",
         ]) {
             expect(text).toContain(`Disallow: ${path}\n`);
         }
@@ -140,5 +141,9 @@ describe("isPrivateSitePath", () => {
         expect(isPrivateSitePath("/q/h7c")).toBe(true);
         expect(isPrivateSitePath("/quotes")).toBe(false);
         expect(isPrivateSitePath("/qr")).toBe(false);
+        // A waitlist offer's claim link (#1149), never the booking page.
+        expect(isPrivateSitePath("/book/claim/v1.cl1.1.sig")).toBe(true);
+        expect(isPrivateSitePath("/book")).toBe(false);
+        expect(isPrivateSitePath("/book/classes")).toBe(false);
     });
 });
