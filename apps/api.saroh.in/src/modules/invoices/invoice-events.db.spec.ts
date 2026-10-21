@@ -168,7 +168,6 @@ describe("an invoice's history (real database)", () => {
         await sending.send(pulse, id);
         await backdate(id, 2);
         await sending.remind(pulse, id);
-        await new Promise((r) => setTimeout(r, 5));
         await invoices.voidInvoice(pulse, id, { reason: "Billed twice" });
 
         const events = await readInvoiceEvents(

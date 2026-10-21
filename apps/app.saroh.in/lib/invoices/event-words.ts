@@ -103,9 +103,9 @@ export function eventLine(
                 : "A payment on the pay page didn't go through";
         case "LINK_MADE":
             if (e.actor.kind === "CUSTOMER") {
-                return "The customer asked for a new pay link";
+                return "The customer asked for a new payment link";
             }
-            return e.view ? `New link made${by}` : `New pay link made${by}`;
+            return e.view ? `New link made${by}` : `New payment link made${by}`;
     }
 }
 
