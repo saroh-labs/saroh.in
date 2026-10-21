@@ -20,7 +20,6 @@
  * | `sites`            | websites not deleted                                                   |
  * | `storageGb`        | photos and videos uploaded and checked (`Media.status` READY), in GB  |
  * | `visitsPerMonth`   | this month's site views (`site.view`), from the daily rollup          |
- * | `sarohEmailsPerMonth` | emails Saroh queued for the business this month (`SAROH` deliveries), unless stopped before they went or failed with no try left (DEC-086) |
  *
  * A cap inside one thing (a product's variants, `variantsPerProduct`) is
  * not counted here: it has no total across the business, so it is no meter
@@ -42,7 +41,6 @@ import { LIMIT_WORDS, MODULE_MAP } from "@saroh/pricing-catalog";
 import { DateTime } from "luxon";
 
 import { businessTimezone } from "../bookings/staff-availability";
-import { COUNTED_SAROH_DELIVERIES } from "../communications/saroh-delivery";
 import { BOOKABLE_STAFF, countedOnDiary } from "./seats";
 
 /** The limit keys metering counts, in `MODULE_MAP`'s words. */
@@ -57,7 +55,6 @@ export const METERED_LIMIT_KEYS = [
     "sites",
     "storageGb",
     "visitsPerMonth",
-    "sarohEmailsPerMonth",
 ] as const;
 export type MeteredLimitKey = (typeof METERED_LIMIT_KEYS)[number];
 
@@ -169,7 +166,6 @@ export type MeterDb = Pick<
     | "site"
     | "media"
     | "analyticsDailyAggregate"
-    | "delivery"
 >;
 
 /**
@@ -268,15 +264,6 @@ export function standingBookings(since: Date): Prisma.BookingWhereInput {
 }
 
 /**
- * Saroh's emails that count (DEC-086): queued this month, unless stopped
- * before they went or failed with no try left (`COUNTED_SAROH_DELIVERIES`).
- * A business's own provider is never counted.
- */
-export function countedSarohEmails(since: Date): Prisma.DeliveryWhereInput {
-    return { ...COUNTED_SAROH_DELIVERIES, createdAt: { gte: since } };
-}
-
-/**
  * How much of one limit a business uses now. Monthly keys count from the
  * start of this month in the business's zone.
  */
@@ -357,13 +344,6 @@ export async function countUsage(
                 _sum: { sizeBytes: true },
             });
             return bytesToGb(Number(sum._sum.sizeBytes ?? 0));
-        }
-        case "sarohEmailsPerMonth": {
-            const zone = await businessTimezone(db, organizationId);
-            const { start } = monthWindow(now, zone);
-            return db.delivery.count({
-                where: { organizationId, ...countedSarohEmails(start) },
-            });
         }
         case "visitsPerMonth": {
             const zone = await businessTimezone(db, organizationId);

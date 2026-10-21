@@ -17,11 +17,7 @@ jest.mock("../site-accounts/account-area", () => ({
 jest.mock("../customer-workspace/resolve-contact", () => ({
     resolveContact: jest.fn(),
 }));
-jest.mock("./saroh-may-send", () => ({
-    ...jest.requireActual<object>("./saroh-may-send"),
-    emailRoute: jest.fn(),
-    sarohRoomLeft: jest.fn(),
-}));
+jest.mock("./email-route", () => ({ emailRoute: jest.fn() }));
 jest.mock("@saroh/database", () => ({
     prisma: {
         businessProfile: { findUnique: jest.fn(), upsert: jest.fn() },
@@ -38,7 +34,7 @@ import { accountAreaOn } from "../site-accounts/account-area";
 import { contactReach, noticeChannels } from "../site-accounts/notice-reach";
 import { readAccountUpdates, writeAccountUpdates } from "./account-updates";
 import { CommunicationsService } from "./communications.service";
-import { emailRoute } from "./saroh-may-send";
+import { emailRoute } from "./email-route";
 
 const areaOn = accountAreaOn as jest.Mock;
 const profile = prisma.businessProfile.findUnique as jest.Mock;
@@ -73,7 +69,7 @@ beforeEach(() => {
     profile.mockResolvedValue({ accountUpdates: true });
     upsert.mockResolvedValue({});
     provider.mockResolvedValue({ status: "CONNECTED" });
-    route.mockResolvedValue({ route: "PROVIDER", provider: "RESEND" });
+    route.mockResolvedValue("RESEND");
     resolve.mockImplementation((_db: unknown, id: string) =>
         Promise.resolve({
             id,
@@ -170,7 +166,7 @@ describe("a notice's reach once the business has turned its updates off", () => 
     });
 
     it("with no email provider: nothing is sent, and it is said so", async () => {
-        route.mockResolvedValue({ route: null, refusal: null });
+        route.mockResolvedValue(null);
         expect(await noticeChannels(db(), "org_1")).toEqual({
             email: false,
             thread: false,

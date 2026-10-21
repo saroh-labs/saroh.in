@@ -1,8 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
 import { accountThreadOn } from "../communications/account-thread";
-import { emailRoute, sarohRoomLeft } from "../communications/saroh-may-send";
-import type { NoticeTemplate } from "../communications/transactional";
+import { emailRoute } from "../communications/email-route";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { accountAreaOn } from "./account-area";
 
@@ -19,19 +18,15 @@ import { accountAreaOn } from "./account-area";
  *   is `accountThreadOn`. A customer with a live site account sees it
  *   there; one without sees it when they first sign in.
  * - **Email** goes only to a live site account's verified email, through
- *   the business's own connected EMAIL provider (D17, default 10) — or,
- *   for a booking notice at a business with none, through Saroh when
- *   the one rule (`emailRoute`) says so and its monthly allowance has room (DEC-086).
- *   So email reach is per notice kind.
+ *   the business's own connected EMAIL provider (D17, default 10;
+ *   `emailRoute`). Saroh never emails a business's customers itself
+ *   (DEC-086 reversed, its code removed in #1134).
  *   Nothing goes by SMS or WhatsApp this round.
  */
 
 /** What the business can use at all. */
 export interface NoticeChannels {
-    /**
-     * A notice of the kind asked about is emailed: its own EMAIL provider
-     * is connected, or (a booking notice) Saroh sends it (DEC-086).
-     */
+    /** A notice is emailed: the business's own EMAIL provider is connected. */
     email: boolean;
     /** The account thread is live for it. */
     thread: boolean;
@@ -52,23 +47,6 @@ type Db = Pick<
     "communicationProvider" | "customerAccount" | "consent" | "$queryRaw"
 >;
 
-/** Who emails a notice: the business's provider, Saroh, or nobody. */
-export type NoticeEmailRoute = "PROVIDER" | "SAROH" | null;
-
-/**
- * Who would email a notice of `kind` for this business now: its own
- * connected provider; else, for a booking notice, Saroh when the one rule
- * says so; else nobody (`emailRoute`). With no `kind`, the provider alone,
- * as before Saroh sent anything.
- */
-export async function noticeEmailRoute(
-    db: Pick<Prisma.TransactionClient, "communicationProvider">,
-    organizationId: string,
-    kind?: NoticeTemplate,
-): Promise<NoticeEmailRoute> {
-    return (await emailRoute(db, organizationId, kind)).route;
-}
-
 /**
  * Whether Saroh posts to the business's account threads: the one rule
  * (`accountThreadOn`: the account area, the rollout flag and the business's
@@ -82,26 +60,12 @@ export async function threadLive(organizationId: string): Promise<boolean> {
 export async function noticeChannels(
     db: Pick<Prisma.TransactionClient, "communicationProvider">,
     organizationId: string,
-    kind?: NoticeTemplate,
 ): Promise<NoticeChannels> {
-    const now = new Date();
-    const [route, thread] = await Promise.all([
-        emailRoute(db, organizationId, kind, now),
+    const [provider, thread] = await Promise.all([
+        emailRoute(db, organizationId),
         threadLive(organizationId),
     ]);
-    // Saroh's route says "emailed" only while this month's allowance has
-    // room: past it, the notice is recorded as not emailed (U3). The row
-    // the rule read is counted against, not read again.
-    const email =
-        route.route === "PROVIDER" ||
-        (route.route === "SAROH" &&
-            (await sarohRoomLeft(
-                organizationId,
-                now,
-                undefined,
-                route.allowance,
-            )));
-    return { email, thread };
+    return { email: provider !== null, thread };
 }
 
 /** The rule itself, from what the business can use and the contact has. */
@@ -139,13 +103,12 @@ export async function contactReach(
     organizationId: string,
     contactId: string | null,
     channels?: NoticeChannels,
-    kind?: NoticeTemplate,
 ): Promise<NoticeReach> {
     if (!contactId) return "NONE";
     const contact = await resolveContact(db, contactId, organizationId);
     if (!contact || contact.removed) return "NONE";
     const [can, account, consent] = await Promise.all([
-        channels ?? noticeChannels(db, organizationId, kind),
+        channels ?? noticeChannels(db, organizationId),
         hasLiveAccount(db, organizationId, contact.id),
         db.consent.findUnique({
             where: {

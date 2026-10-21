@@ -165,16 +165,6 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         limitKey: null,
         legacyEntitlementKey: null,
     },
-    /**
-     * Booking emails Saroh sends for a business with no email provider of
-     * its own (DEC-086), a month. Under no registry module: the allowance
-     * never gates Communications or the business's own provider.
-     */
-    "saroh-emails": {
-        registry: null,
-        limitKey: "sarohEmailsPerMonth",
-        legacyEntitlementKey: null,
-    },
 };
 
 /**
@@ -184,8 +174,15 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
  *
  * - `reviewers`: the separate allowance for people who only look. Everyone
  *   uses one team seat now, on `members` (DEC-155).
+ * - `saroh-emails`: booking emails Saroh sent for a business with no email
+ *   of its own (DEC-086). Reversed before it was ever on; its code went in
+ *   #1134, and a business's customers are emailed only through its own
+ *   provider.
  */
-export const RETIRED_MODULE_IDS: ReadonlySet<string> = new Set(["reviewers"]);
+export const RETIRED_MODULE_IDS: ReadonlySet<string> = new Set([
+    "reviewers",
+    "saroh-emails",
+]);
 
 /**
  * The catalogue rows that sit under one registry module, in `MODULE_MAP`'s

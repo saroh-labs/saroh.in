@@ -43,16 +43,12 @@ describe("limit words", () => {
         expect(limitWordsFor("toString")).toBeNull();
     });
 
-    it("leads Saroh's emails with connecting the business's own, monthly", () => {
-        const words = limitWordsFor("saroh-emails");
-        expect(words?.monthly).toBe(true);
-        expect(words?.action).toMatchObject({
-            label: "Connect your email",
-            href: "/settings/providers",
-        });
-        // Only Saroh's emails name their own way out.
-        for (const [key, w] of Object.entries(LIMIT_WORDS)) {
-            if (key !== "sarohEmailsPerMonth") expect(w.action).toBeUndefined();
+    it("has none for Saroh's booking emails, retired with DEC-086 (#1134)", () => {
+        expect(limitWordsFor("saroh-emails")).toBeNull();
+        expect(LIMIT_WORDS).not.toHaveProperty("sarohEmailsPerMonth");
+        // No limit names a way out of its own now.
+        for (const w of Object.values(LIMIT_WORDS)) {
+            expect(w.action).toBeUndefined();
         }
     });
 });

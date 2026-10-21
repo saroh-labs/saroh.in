@@ -314,8 +314,6 @@ export class CheckoutConfirmationService {
                         prisma,
                         customer.organizationId,
                         customer.contactId,
-                        undefined,
-                        "ORDER_PLACED",
                     ),
                     prisma.customerAccount.findFirst({
                         where: {

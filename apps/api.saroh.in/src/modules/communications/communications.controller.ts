@@ -68,16 +68,6 @@ export class CommunicationsController {
     }
 
     /**
-     * Saroh sending the business's booking emails while it has no email of
-     * its own (DEC-086): OFF, SENDING, NEAR, PAUSED or UNREAD. Not
-     * module-gated: it says what is sent, which is also "nothing".
-     */
-    @Get("comms-providers/saroh-email")
-    sarohEmail(@OrgContext() ctx: OrganizationContext) {
-        return this.comms.sarohEmail(ctx);
-    }
-
-    /**
      * Whether the business has its own email provider, and if not whether
      * its plan lets it connect one (DEC-091): the workspace's prompt to
      * connect one. Not module-gated: it says what is true either way.

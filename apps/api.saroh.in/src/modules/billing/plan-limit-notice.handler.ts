@@ -61,7 +61,6 @@ export function nextMonthStarts(now: Date, zone: string): string {
 function overBody(key: MeteredLimitKey, soft: boolean): string {
     if (key === "ordersPerMonth")
         return "Your site kept taking orders, so no customer was turned away.";
-    if (key === "sarohEmailsPerMonth") return METER_WORDS[key].paused;
     // A soft cap's own words say nothing was stopped (`LIMIT_WORDS.paused`).
     if (soft) return METER_WORDS[key].paused;
     return "What you already have stays as it is.";

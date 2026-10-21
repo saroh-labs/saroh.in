@@ -2,11 +2,9 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { Job, Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
-import { lockMeter } from "../billing/metering.service";
 import { BookingEventType } from "../bookings/booking-event-type";
 import { CommunicationsService } from "../communications/communications.service";
-import { SAROH_EMAILS_KEY } from "../communications/saroh-delivery";
-import { emailRoute } from "../communications/saroh-may-send";
+import { emailRoute } from "../communications/email-route";
 import { isNoticeTemplate } from "../communications/transactional";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { holdsOnPayment } from "../orders/online-checkout";
@@ -65,11 +63,11 @@ const NOTHING: NoticeOutcome = {
  *     email provider is connected, is also emailed through D17's one
  *     transactional path (`CommunicationsService.queueTransactional`): a
  *     `Message` and `Delivery` sent by `message.send`, which retries a
- *     failed send and leaves the thread message standing. A booking notice
- *     at a business with no provider goes through Saroh instead when
- *     the one rule says so (`emailRoute`, DEC-086). Who emails is decided
- *     here, once and first, and handed to the call, so the path's "connect
- *     an email provider" 409 can never roll this transaction back.
+ *     failed send and leaves the thread message standing. Saroh never
+ *     emails it itself: with no provider, nothing is emailed. Who emails
+ *     is read here, once and first (`emailRoute`), and handed to the call,
+ *     so the path's "connect an email provider" 409 can never roll this
+ *     transaction back.
  *
  * Nothing goes by SMS or WhatsApp: there is no verified phone this round.
  */
@@ -84,15 +82,9 @@ export class CustomerNotifyService {
         payload: CustomerNotifyPayload,
         now: Date,
     ): Promise<NoticeOutcome> {
-        // Who would email it, decided once (DEC-086). Saroh's route is
-        // counted against its email allowance, so only then is the
-        // plan-meter lock taken — here, the one place it is, before any
-        // row this transaction writes (`backend-jobs.md`, advisory lock
-        // registry; `booking.notify` writes nothing before calling this).
-        const route = await emailRoute(tx, organizationId, payload.kind, now);
-        if (route.route === "SAROH") {
-            await lockMeter(tx, organizationId, SAROH_EMAILS_KEY);
-        }
+        // Who would email it, read once: the business's own provider, or
+        // nobody.
+        const provider = await emailRoute(tx, organizationId);
         const claimed = await tx.customerNotice.createMany({
             data: [
                 {
@@ -135,7 +127,7 @@ export class CustomerNotifyService {
         }
 
         let messageId: string | null = null;
-        if (account && route.route !== null) {
+        if (account && provider !== null) {
             // The email carries the way back to the order or the booking
             // on the business's own site; the thread's sentence doesn't
             // need one, since it is read there.
@@ -151,11 +143,7 @@ export class CustomerNotifyService {
                 {
                     template: payload.kind,
                     notice: withLink(subject.vars, link),
-                    route,
-                    // Saroh's cap per booking counts by it (DEC-086).
-                    ...(subject.bookingId
-                        ? { bookingId: subject.bookingId }
-                        : {}),
+                    provider,
                     recipient: { kind: "SITE_ACCOUNT", contactId: contact.id },
                     createdByUserId: null,
                 },

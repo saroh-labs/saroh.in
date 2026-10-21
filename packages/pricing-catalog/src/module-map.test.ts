@@ -43,16 +43,12 @@ describe("module map (KTD-8)", () => {
         expect(MODULE_MAP.members.limitKey).toBe("teamMembers");
         expect(MODULE_MAP.reviewers).toBeUndefined();
         expect(RETIRED_MODULE_IDS.has("reviewers")).toBe(true);
+        // Saroh's booking emails (DEC-086), removed in #1134.
+        expect(RETIRED_MODULE_IDS.has("saroh-emails")).toBe(true);
         for (const id of Array.from(RETIRED_MODULE_IDS))
             expect(MODULE_MAP[id]).toBeUndefined();
         // Invoicing needs no module (DEC-070), so nothing it governs can lock.
         expect(MODULE_MAP.invoicing.registry).toBeNull();
-        // Saroh's emails (DEC-086) count, but never gate Communications.
-        expect(MODULE_MAP["saroh-emails"]).toEqual({
-            registry: null,
-            limitKey: "sarohEmailsPerMonth",
-            legacyEntitlementKey: null,
-        });
         expect(catalogueModulesFor("COMMUNICATIONS")).toEqual([]);
         // A merchant's own trackers (DEC-108) are a switch under no module.
         expect(MODULE_MAP["site-trackers"]).toEqual({

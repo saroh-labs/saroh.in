@@ -165,6 +165,17 @@ test("with no email provider, the owner is asked to connect one on Home and Prov
         await openProviders(page);
         const prompt = page.getByRole("region", { name: TITLE });
         await expect(prompt).toContainText(MISSED);
+        // Saroh never sends them instead: no "Booking emails" block, and
+        // its read is gone (DEC-086 removed, #1134).
+        await expect(
+            page.getByRole("heading", { name: "Booking emails" }),
+        ).toHaveCount(0);
+        await expect(page.getByText(/Saroh sends your booking/)).toHaveCount(0);
+        const gone = await page.request.get(
+            api(org, "/comms-providers/saroh-email"),
+            { headers: headers(org) },
+        );
+        expect(gone.status()).toBe(404);
         const connect = prompt.getByRole("link", {
             name: "Connect your email",
         });

@@ -16,11 +16,9 @@ import { readEmailSetup } from "@/lib/communications/email-setup-service";
 import { listOrgDomains } from "@/lib/domains/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listProviderHealth } from "@/lib/provider-health/service";
-import { CONNECT_EMAIL_ANCHOR } from "@/lib/providers/booking-emails";
 import { connectLocksOf } from "@/lib/providers/connect-lock";
-import { buildProvidersView } from "@/lib/providers/rows";
+import { buildProvidersView, CONNECT_EMAIL_ANCHOR } from "@/lib/providers/rows";
 import {
-    getSarohEmail,
     listCommsProviders,
     listPaymentProviders,
     listPaymentWebhooks,
@@ -62,13 +60,12 @@ export default async function ProvidersSettingsPage() {
         domains,
         checkout,
         webhooks,
-        sarohEmail,
         access,
         emailSetup,
         accountUpdates,
     ] =
         result.status === "denied"
-            ? [null, null, null, [], null, null, null, null, null]
+            ? [null, null, null, [], null, null, null, null]
             : await Promise.all([
                   listPaymentProviders(),
                   listCommsProviders(),
@@ -77,9 +74,6 @@ export default async function ProvidersSettingsPage() {
                   // The address to register and the last payment update
                   // (DEC-063). Best-effort: it never fails the page.
                   listPaymentWebhooks(),
-                  // Saroh sending booking emails (DEC-086). Never throws:
-                  // a failed read is UNREAD, said in its own notice.
-                  getSarohEmail(),
                   // What the plan lets the business connect (DEC-091):
                   // locked payment rows offer See plans in place of
                   // Connect, before any key form opens. Best-effort.
@@ -103,7 +97,6 @@ export default async function ProvidersSettingsPage() {
                   domains,
                   checkout,
                   webhooks,
-                  sarohEmail,
                   locks: connectLocksOf(access, emailSetup),
               });
     // Connect jumps to the first email provider to connect on this page.

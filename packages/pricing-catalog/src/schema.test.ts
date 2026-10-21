@@ -112,6 +112,58 @@ describe("the catalogue schema", () => {
         });
     });
 
+    // A version published while DEC-086's allowance was in the sample
+    // catalogue still carries its "saroh-emails" row and its monthly limit;
+    // #1134 removed the code, and stored catalogues (local, dev and
+    // production) must still read.
+    describe("a stored snapshot with the removed saroh-emails row", () => {
+        const stored = () => {
+            const input = fixtureInput();
+            input.modules.push({
+                id: "saroh-emails",
+                name: "Booking emails Saroh sends",
+                group: "g2",
+                what: "Booking emails Saroh sends your customers.",
+                cells: {
+                    a: { inc: true, text: "7 a month", card: "", limit: 7 },
+                    b: { inc: true, text: "77 a month", card: "", limit: 77 },
+                    c: {
+                        inc: true,
+                        text: "777",
+                        card: "777 emails",
+                        limit: 777,
+                    },
+                },
+            });
+            // As stored: JSON, read back.
+            return JSON.parse(JSON.stringify(input)) as unknown;
+        };
+
+        it("still parses, without the row", () => {
+            expect(validateCatalog(stored()).ok).toBe(true);
+            const c = parseCatalog(stored());
+            expect(c.modules.map((m) => m.id)).toEqual(
+                fixture().modules.map((m) => m.id),
+            );
+        });
+
+        it("caps, counts and shows nothing for it", () => {
+            const c = catalogSchema.parse(stored());
+            const access = { catalog: c, planId: "a", now: new Date(0) };
+            expect(
+                resolveAllAccess(access).map((m) => m.moduleId),
+            ).not.toContain("saroh-emails");
+            expect(resolveAccess(access, "saroh-emails")).toMatchObject({
+                state: "on",
+                limit: null,
+            });
+            expect(entitlementsFor(c, "c")).not.toHaveProperty("saroh-emails");
+            expect(cardLines(c, "c").lines.map((l) => l.t)).not.toContain(
+                "777 emails",
+            );
+        });
+    });
+
     it("rejects two highlighted plans", () => {
         const input = fixtureInput();
         input.plans[2].featured = true;

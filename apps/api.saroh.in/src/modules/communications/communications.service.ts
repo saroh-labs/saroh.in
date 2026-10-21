@@ -35,6 +35,7 @@ import type { NoticeVars } from "../site-accounts/notify-templates";
 import { renderNotice } from "../site-accounts/notify-templates";
 import type { AccountUpdatesView } from "./account-updates";
 import { readAccountUpdates, writeAccountUpdates } from "./account-updates";
+import { emailRoute } from "./email-route";
 import type { EmailSetup } from "./email-setup";
 import { readEmailSetup } from "./email-setup";
 import type { MessageSendPayload } from "./message-send.handler";
@@ -49,13 +50,6 @@ import {
     isCommsChannel,
     isSupportedComms,
 } from "./providers/provider.port";
-import type { NotEmailed } from "./saroh-delivery";
-import { SAROH_REPRESENTATIVE_NOTICE } from "./saroh-delivery";
-import type { SarohEmailState } from "./saroh-email-state";
-import { sarohEmailState } from "./saroh-email-state";
-import type { EmailRoute } from "./saroh-may-send";
-import { emailRoute } from "./saroh-may-send";
-import { queueSarohInTx, renderForSaroh } from "./saroh-queue";
 import type {
     AutopayTemplate,
     InvoiceMailVars,
@@ -106,27 +100,17 @@ export type TransactionalWords =
       }
     | {
           /**
-           * A14's notice with its values, worded here: through the
-           * business's provider as `renderNotice` words it, or (a booking
-           * notice with no provider, DEC-086) as Saroh sends it, its names
-           * cleaned and Saroh's footer added (`renderSarohNotice`).
+           * A14's notice with its values, worded here as `renderNotice`
+           * words it, for the business's own provider to send.
            */
           template: NoticeTemplate;
           notice: NoticeVars;
           /**
-           * Who emails it, when the caller already decided on this
-           * transaction (`emailRoute`, the notify handler): not decided
-           * again, so a switch flipped since can't turn it into a 409
-           * inside the caller's transaction, and the provider and plan
-           * aren't read twice. A route of nobody is still refused.
+           * The business's connected provider, when the caller already
+           * read it on this transaction (`emailRoute`, the notify handler):
+           * not read again. Null is still refused.
            */
-          route?: EmailRoute;
-          /**
-           * The booking the notice is about, for Saroh's cap per booking
-           * (`SAROH_EMAILS_PER_BOOKING_PER_DAY`); a business's own
-           * provider has none.
-           */
-          bookingId?: string | null;
+          provider?: string | null;
       };
 
 /** Input for {@link CommunicationsService.queueTransactional}. */
@@ -159,27 +143,7 @@ export interface TransactionalResult {
     /** SUPPRESSED: they turned email off. */
     status: "QUEUED" | "SUPPRESSED";
     toAddress: string;
-    /** Who sends it: the business's own provider, or Saroh (DEC-086). */
-    route?: "PROVIDER" | "SAROH";
 }
-
-/**
- * A notice given as its values: it may go through Saroh (DEC-086), where it
- * can also be recorded and not emailed — ALLOWANCE_USED, NO_ALLOWANCE or
- * BOOKING_LIMIT (`saroh-queue.ts`).
- */
-export interface NoticeTransactionalResult extends Omit<
-    TransactionalResult,
-    "status"
-> {
-    status: TransactionalResult["status"] | NotEmailed;
-}
-
-/** {@link TransactionalInput} given as a notice's values. */
-export type NoticeTransactionalInput = Extract<
-    TransactionalInput,
-    { notice: NoticeVars }
->;
 
 /** Where an email for this recipient would go, with the contact it is for. */
 export interface TransactionalAddress {
@@ -407,13 +371,6 @@ export class CommunicationsService {
     }
 
     /**
-     * Whether Saroh sends the business's booking emails for it, and how
-     * much of the month's allowance is used (DEC-086), for Settings →
-     * Providers. `comms:manage`, as the provider list beside it. The same
-     * rule as the send (`saroh-email-state.ts`); a failed lookup reads as
-     * UNREAD, never as off or a zero.
-     */
-    /**
      * Whether the business has its own email provider, and if not whether
      * its plan lets it connect one (DEC-011, amended 2026-10-07; DEC-091):
      * what the workspace's "connect your email" prompt is drawn from. For
@@ -425,11 +382,6 @@ export class CommunicationsService {
             authorize(ctx, "comms:manage");
         }
         return readEmailSetup(prisma, ctx.organizationId);
-    }
-
-    async sarohEmail(ctx: OrganizationContext): Promise<SarohEmailState> {
-        authorize(ctx, "comms:manage");
-        return sarohEmailState(prisma, ctx.organizationId);
     }
 
     /**
@@ -851,18 +803,8 @@ export class CommunicationsService {
     async queueTransactional(
         tx: Db,
         organizationId: string,
-        input: NoticeTransactionalInput,
-    ): Promise<NoticeTransactionalResult>;
-    async queueTransactional(
-        tx: Db,
-        organizationId: string,
-        input: Exclude<TransactionalInput, { notice: NoticeVars }>,
-    ): Promise<TransactionalResult>;
-    async queueTransactional(
-        tx: Db,
-        organizationId: string,
         input: TransactionalInput,
-    ): Promise<NoticeTransactionalResult> {
+    ): Promise<TransactionalResult> {
         const to = await this.transactionalAddress(
             tx,
             organizationId,
@@ -873,30 +815,24 @@ export class CommunicationsService {
                 "There's no email address to send this to.",
             );
         }
-        // Who emails it, read once (DEC-086): the business's own connected
-        // provider; else, for a booking notice, Saroh when the one rule
-        // says so; anything else with no provider is refused as ever.
-        const route =
-            ("notice" in input ? input.route : undefined) ??
-            (await emailRoute(
-                tx,
-                organizationId,
-                "notice" in input ? input.template : undefined,
-            ));
-        if (route.route === null) {
+        // Who emails it: the business's own connected provider, read once
+        // (or as the caller read it); with none it is refused. Saroh never
+        // sends it (DEC-086 removed, #1134).
+        const provider =
+            ("notice" in input ? input.provider : undefined) ??
+            (await emailRoute(tx, organizationId));
+        if (provider === null) {
             throw new ConflictException(
                 "Connect an email provider in Settings to send this.",
             );
         }
-        const saroh = route.route === "SAROH" && "notice" in input;
 
-        const { subject, body } = saroh
-            ? await renderForSaroh(tx, organizationId, input)
-            : "notice" in input
-              ? renderNotice(input.notice)
-              : "rendered" in input
-                ? input.rendered
-                : renderTransactional(input.template, input.vars);
+        const { subject, body } =
+            "notice" in input
+                ? renderNotice(input.notice)
+                : "rendered" in input
+                  ? input.rendered
+                  : renderTransactional(input.template, input.vars);
         const base = {
             organizationId,
             channel: "EMAIL",
@@ -928,18 +864,7 @@ export class CommunicationsService {
                 id: suppressed.id,
                 status: "SUPPRESSED",
                 toAddress: to.address,
-                route: route.route,
             };
-        }
-
-        if (route.route === "SAROH") {
-            return queueSarohInTx(
-                tx,
-                organizationId,
-                base,
-                { bookingId: "notice" in input ? input.bookingId : null },
-                { allowance: route.allowance },
-            );
         }
 
         const link = input.secretLink ? await input.secretLink() : null;
@@ -950,7 +875,7 @@ export class CommunicationsService {
             data: {
                 organizationId,
                 messageId: message.id,
-                provider: route.provider,
+                provider,
                 status: "QUEUED",
             },
         });
@@ -973,7 +898,6 @@ export class CommunicationsService {
             id: message.id,
             status: "QUEUED",
             toAddress: to.address,
-            route: "PROVIDER",
         };
     }
 
@@ -981,21 +905,16 @@ export class CommunicationsService {
      * How a notice about a customer's own booking reaches them (A14,
      * R17): the business's channels, and for `contactId` that customer's
      * reach (`site-accounts/notice-reach.ts`). `contact:read`, as the
-     * booking peek and the class cancel that ask it. A booking notice, so
-     * email counts Saroh's sending too (DEC-086): every booking notice
-     * kind reads the same. Another business's contact reads as reaching
-     * nobody, never as a 404 that would confirm it exists.
+     * booking peek and the class cancel that ask it. Another business's
+     * contact reads as reaching nobody, never as a 404 that would confirm
+     * it exists.
      */
     async noticeReach(
         ctx: OrganizationContext,
         contactId: string | null,
     ): Promise<NoticeChannels & { reach: NoticeReach | null }> {
         authorize(ctx, "contact:read");
-        const channels = await noticeChannels(
-            prisma,
-            ctx.organizationId,
-            SAROH_REPRESENTATIVE_NOTICE,
-        );
+        const channels = await noticeChannels(prisma, ctx.organizationId);
         const reach = contactId
             ? await contactReach(
                   prisma,

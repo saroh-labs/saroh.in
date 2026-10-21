@@ -110,9 +110,7 @@ describe("module availability: the plan step (U12)", () => {
         expect(moduleIncluded).not.toHaveBeenCalled();
     });
 
-    it("a plan without Saroh's email allowance still lists Communications as available (DEC-086)", async () => {
-        // The row counts Saroh's emails but sits under no registry module.
-        expect(MODULE_MAP["saroh-emails"].registry).toBeNull();
+    it("Communications is available on any plan: no catalogue row sits under it", async () => {
         const { service, moduleIncluded } = build({ included: false });
 
         await expect(

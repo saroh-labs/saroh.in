@@ -89,7 +89,7 @@ export function ProviderRowView({
     anchorId,
 }: {
     entry: ProviderEntry;
-    /** An id to jump to this row by (the booking-emails block's Connect). */
+    /** An id to jump to this row by (the email prompt's Connect). */
     anchorId?: string;
     payments: ConnectedPaymentProvider[];
     messaging: ConnectedCommsProvider[];

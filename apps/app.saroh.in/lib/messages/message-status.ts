@@ -2,12 +2,12 @@
  * What a message's status says to the owner (message history, S6-002), in
  * words: never the API's raw code, and never "Sent" for mail that didn't go.
  *
- * Saroh's booking emails (DEC-086) add statuses a business's own provider
- * never had: three for a notice Saroh recorded but didn't email (the
- * month's allowance used, a plan with none, the booking's limit for the
- * day), STOPPED (switched off before it went) and UNKNOWN (the connection
- * dropped after the email was handed over: it may have arrived, and is
- * never sent twice).
+ * Saroh's booking emails (DEC-086, removed in #1134) wrote statuses a
+ * business's own provider never has: three for a notice Saroh recorded but
+ * didn't email (the month's allowance used, a plan with none, the
+ * booking's limit for the day), STOPPED (switched off before it went) and
+ * UNKNOWN (it may have arrived). Nothing writes them now; their words stay
+ * so any row already written still reads.
  */
 
 export type MessageStatusVariant =

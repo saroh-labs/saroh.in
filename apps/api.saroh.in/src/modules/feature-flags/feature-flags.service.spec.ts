@@ -371,6 +371,24 @@ describe("FeatureFlagService.list", () => {
             source: "fallback",
         });
     });
+
+    it("ignores stored rows for a flag no longer registered (SAROH_BUSINESS_EMAIL, #1134)", async () => {
+        // Its rows may still be in a database: the registry decides.
+        flagFindMany.mockResolvedValue([
+            { key: "SAROH_BUSINESS_EMAIL", enabledByDefault: true },
+        ]);
+        overrideFindMany.mockResolvedValue([
+            { flagKey: "SAROH_BUSINESS_EMAIL", enabled: true },
+        ]);
+
+        const result = await service.list("org_1");
+
+        expect(result).toHaveLength(FLAG_KEYS.length);
+        expect(result.map((f) => f.key)).not.toContain("SAROH_BUSINESS_EMAIL");
+        expect(
+            result.every((f) => f.enabled === false && f.source === "fallback"),
+        ).toBe(true);
+    });
 });
 
 describe("FeatureFlagService.clearOverride", () => {
