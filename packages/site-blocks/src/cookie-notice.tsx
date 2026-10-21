@@ -41,8 +41,8 @@ export function CookieNotice({
             </h1>
             {tools.length === 0 ? (
                 <p className="mt-4 text-[16px] leading-relaxed">
-                    {siteName} uses no analytics or advertising tools on this
-                    site.
+                    {siteName} uses no cookies for tracking or advertising on
+                    this site.
                 </p>
             ) : (
                 <>

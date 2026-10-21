@@ -10,7 +10,9 @@
  * (DEC-156), the owner's agreed sentence, rev 74; page visits, 14 Oct
  * (DEC-160), the owner's agreed wording; Razorpay registers each business
  * at sign-up, 17 Oct (DEC-165), the owner's agreed wording; the account
- * manager's link cookie, 19 Oct (DEC-169), the owner agreed it in chat). Published VERBATIM at
+ * manager's link cookie, 19 Oct (DEC-169), the owner agreed it in chat;
+ * Saroh's own cookieless visit counting on customers' sites, 21 Oct
+ * (DEC-181), the owner's agreed wording). Published VERBATIM at
  * /privacy: do not reword it here. A change comes from the owner's text,
  * and moves `publishOn`, which is the "Last updated" date the page shows.
  *
@@ -39,6 +41,8 @@ This policy covers saroh.in, app.saroh.in, accounts.saroh.in and the emails we s
 
 If your website uses analytics or advertising tools that you connect (such as Google Analytics, Meta Pixel or Microsoft Clarity), they run on your site on your behalf. Your business chose them and decides how what they collect is used. Saroh asks your visitors before any of them sets cookies, never loads them on checkout, payment or account pages, and stores only the tools' public IDs.
 
+Sites on Saroh also count visits for your business without cookies or personal data: which pages were opened and where visits came from (Instagram, Google, WhatsApp, a link you made in Saroh, or typed in), kept only as totals. Nothing that identifies a visitor is stored, and nothing is counted when a browser asks not to be tracked.
+
 ## What we collect
 
 | What | Examples | Why |
@@ -49,7 +53,7 @@ If your website uses analytics or advertising tools that you connect (such as Go
 | Waitlist and tool emails | Email, kind of business, where you heard of us, your country (worked out from your connection, never asked); for the link preview tool, the link you checked | To send what you asked for: the launch invite, the link report, or the link back to the QR code maker |
 | Messages | What you write to contact@saroh.in | To help you |
 | Security logs | IP address, browser, sign-in times, errors | To keep accounts safe and fix problems. Kept 1 year |
-| Website visits | Pages visited on saroh.in, rough location, device, through Google Analytics cookies | To learn which pages help people. Only on saroh.in. Your customers' sites run only the tools you connect yourself |
+| Website visits | Pages visited on saroh.in, rough location, device, through Google Analytics cookies | To learn which pages help people. Only on saroh.in. Your customers' sites set no tracking cookies of their own: they count visits only as totals, and run other tools only if you connect them. |
 | Product usage | Which setup steps your business has completed (a first product, a first order), and errors that happen while you use Saroh. Never your customers' details | To fix problems and make Saroh easier to use |
 | Recordings of use and page visits | On saroh.in, only if you accept the cookie notice: what you click, scroll and open, and which pages are opened and for how long. In the workspace: how signed-in people use the screens, and which pages are opened and for how long, kept against an internal id, not your name or email. Saroh's own buttons, menus and labels show; your customers' details, your figures and anything you type are hidden, and pictures are left out | To find what is confusing or broken, and to make Saroh easier. You can turn this off for the workspace in Settings › Your profile |
 

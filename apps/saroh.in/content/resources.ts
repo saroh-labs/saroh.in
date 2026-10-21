@@ -117,7 +117,7 @@ export const LEGAL_PAGES: readonly ResourcePage[] = [
         // 14 Oct: page visits (DEC-160). 17 Oct: Razorpay registers each
         // business at sign-up (DEC-165). 19 Oct: the account manager's link
         // cookie (DEC-169).
-        publishOn: "2026-10-19",
+        publishOn: "2026-10-21",
     },
     {
         id: "terms",
