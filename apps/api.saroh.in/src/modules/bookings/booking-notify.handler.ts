@@ -44,6 +44,11 @@ export interface BookingNotifyPayload {
      * this runs — the payment's confirmation gives the new time.
      */
     held?: boolean;
+    /**
+     * A place in a class the business cancelled as a whole (U17, #1148):
+     * the customer hears "‹Business› cancelled this class".
+     */
+    classCancelled?: boolean;
 }
 
 type Tx = Prisma.TransactionClient;
@@ -188,6 +193,10 @@ export async function tellAboutBooking(
                 eventKey: bookingNoticeKey(key),
                 bookingId: booking.id,
                 bookingEventId: event?.id ?? null,
+                ...(kind === "BOOKING_CANCELLED" &&
+                payload.classCancelled === true
+                    ? { classCancelled: true }
+                    : {}),
             },
             input.now,
         );

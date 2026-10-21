@@ -193,6 +193,9 @@ export async function cancelFoundBooking(
         if (booking.status === "PENDING") {
             await releaseHoldInTx(tx, booking.id, now, actor.userId, {
                 freesPlace: !options.closesClass,
+                // The whole class is off (U17): the booker of an unpaid
+                // hold in it hears so too.
+                ...(options.closesClass ? { classCancelled: true } : {}),
             });
             if (options.closesClass) {
                 await closeSessionWaitlistInTx(tx, {
@@ -200,6 +203,7 @@ export async function cancelFoundBooking(
                     serviceId: booking.serviceId,
                     startAt: booking.startAt,
                     now,
+                    tell: true,
                 });
             }
             return {
@@ -259,7 +263,8 @@ export async function cancelFoundBooking(
             startAt: booking.startAt,
         };
         if (options.closesClass) {
-            await closeSessionWaitlistInTx(tx, { ...session, now });
+            // Everyone waiting for it hears the class is off (U17).
+            await closeSessionWaitlistInTx(tx, { ...session, now, tell: true });
         } else {
             await offerFreedPlaceInTx(tx, session);
         }
@@ -291,6 +296,11 @@ export async function cancelFoundBooking(
                         contactId: booking.contactId,
                         reason: "cancelled",
                         eventId: event.id,
+                        // The business cancelled the whole class (U17):
+                        // "‹Business› cancelled this class", and the money.
+                        ...(options.closesClass
+                            ? { classCancelled: true }
+                            : {}),
                     },
                 },
                 select: { id: true },

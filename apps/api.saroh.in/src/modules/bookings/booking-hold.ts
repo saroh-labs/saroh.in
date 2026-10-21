@@ -260,7 +260,15 @@ export async function releaseHoldInTx(
     bookingId: string,
     now: Date,
     actorUserId: string | null = null,
-    options: { freesPlace?: boolean; why?: HoldRelease } = {},
+    options: {
+        freesPlace?: boolean;
+        why?: HoldRelease;
+        /**
+         * The team let it go because the whole class is cancelled (U17):
+         * the booker is told "‹Business› cancelled this class".
+         */
+        classCancelled?: boolean;
+    } = {},
 ): Promise<boolean> {
     await lockBookingInTx(tx, bookingId);
     const booking = await tx.booking.findUnique({
@@ -302,10 +310,15 @@ export async function releaseHoldInTx(
         },
         select: { id: true },
     });
-    // The booker hears their hold lapsed, with a way to book again — only
-    // when there is someone to tell: a contact, and not a course's session
-    // (told as the course). A late payment is not "wasn't paid".
-    if (why === "lapsed" && booking.contactId && !booking.courseEnrollmentId) {
+    // The booker hears their hold lapsed, with a way to book again, or
+    // that the business cancelled the class (U17) — only when there is
+    // someone to tell: a contact, and not a course's session (told as the
+    // course). A late payment is not "wasn't paid".
+    const told =
+        (why === "lapsed" || (!lapsed && options.classCancelled === true)) &&
+        booking.contactId !== null &&
+        !booking.courseEnrollmentId;
+    if (told) {
         await tx.job.create({
             data: {
                 organizationId: booking.organizationId,
@@ -314,8 +327,9 @@ export async function releaseHoldInTx(
                     bookingId: booking.id,
                     serviceId: booking.serviceId,
                     contactId: booking.contactId,
-                    reason: "lapsed",
+                    reason: lapsed ? "lapsed" : "cancelled",
                     eventId: event.id,
+                    ...(lapsed ? {} : { classCancelled: true }),
                 },
             },
             select: { id: true },

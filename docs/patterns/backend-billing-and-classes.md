@@ -1964,6 +1964,20 @@ options, items, more }` and a sentence with the count, the first
 - **Contact deletion** cancels the person's future course and pack-paid
   bookings and deletes their enrolments **before** the contact (a booking
   references both; one cascade trips a foreign key — `DEV_LEARNINGS.md`).
+- **Course and class notices** (DEC-174 U17, #1148). `enrol` and
+  `cancelEnrollment` queue COURSE_ENROLLED / COURSE_CANCELLED once per
+  enrolment (`queueCourseNotice`, `site-accounts/notices/course.ts`) on
+  their own transaction, only while `noticeOn(COURSE)`. The enrolment
+  lists every session as booked; the cancel's money line reads the
+  enrolment's invoice when it runs (paid and not refunded, still open,
+  voided, credited), since a cancel refunds nothing itself. A course's
+  sessions are still never told one by one. A class the business cancels
+  (`closesClass`) is not behind COURSE: each place's `booking.notify`
+  carries `classCancelled` ("‹Business› cancelled this class", money read
+  when it runs: `notices/class-cancel.ts`), an unpaid hold in it is told
+  too, and `closeSessionWaitlistInTx` with `tell` queues
+  WAITLIST_CLASS_CANCELLED for everyone still in line. A class taken off
+  sale closes its line silently.
 
 ## Modules and routes — **Current**
 

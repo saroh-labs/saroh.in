@@ -190,6 +190,41 @@ const SAMPLES: Record<(typeof NOTICE_TEMPLATES)[number], NoticeVars> = {
             timeZone: "Asia/Kolkata",
         },
     },
+    // Courses and classes (U17, #1148).
+    COURSE_ENROLLED: {
+        kind: "COURSE_ENROLLED",
+        course: {
+            business: "Rye <&> Co.",
+            firstName: "Asha",
+            course: "Beginners' wheel",
+            sessions: [AT, AT],
+            timeZone: "Asia/Kolkata",
+            online: false,
+            money: null,
+        },
+    },
+    COURSE_CANCELLED: {
+        kind: "COURSE_CANCELLED",
+        course: {
+            business: "Rye <&> Co.",
+            firstName: "Asha",
+            course: "Beginners' wheel",
+            sessions: [AT],
+            timeZone: "Asia/Kolkata",
+            online: false,
+            money: { state: "PAID", amountMinor: 800000, currency: "INR" },
+        },
+    },
+    WAITLIST_CLASS_CANCELLED: {
+        kind: "WAITLIST_CLASS_CANCELLED",
+        waitlist: {
+            business: "Rye <&> Co.",
+            firstName: "Asha",
+            service: "Yoga",
+            startAt: AT,
+            timeZone: "Asia/Kolkata",
+        },
+    },
     AUTOPAY_FAILED: {
         kind: "AUTOPAY_FAILED",
         autopay: {
@@ -277,11 +312,15 @@ describe("the notice registry", () => {
         expect(
             backLink(withLink(SAMPLES.ORDER_PLACED, "javascript:alert(1)")),
         ).toBeNull();
-        // A cancelled booking, a step and a waitlist offer have none.
+        // A cancelled booking, a step, a waitlist offer, a class called
+        // off and a course's notices have none.
         for (const kind of [
             "BOOKING_CANCELLED",
             "ORDER_READY",
             "WAITLIST_OFFER",
+            "WAITLIST_CLASS_CANCELLED",
+            "COURSE_ENROLLED",
+            "COURSE_CANCELLED",
         ] as const) {
             const vars = withLink(SAMPLES[kind], "https://rye.saroh.app/x");
             expect(backLink(vars)).toBeNull();

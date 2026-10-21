@@ -2,6 +2,8 @@ import type { Prisma } from "@saroh/database";
 
 import { BookingEventType } from "../../bookings/booking-event-type";
 import type { CustomerNotifyPayload } from "../customer-notify-queue";
+import type { ClassCancelMoney } from "./class-cancel";
+import { classCancelMoney, classCancelMoneyWords } from "./class-cancel";
 import type { NoticeSubject } from "./notice";
 import {
     businessName,
@@ -42,6 +44,13 @@ export interface BookingNoticeVars {
      */
     reassigned?: boolean;
     /**
+     * A place in a class the business cancelled as a whole (U17, #1148):
+     * "‹Business› cancelled this class", with what happened to the money.
+     */
+    classCancelled?: boolean;
+    /** The class-cancelled notice's money, read when it runs. */
+    money?: ClassCancelMoney | null;
+    /**
      * Their bookings on the business's own site, where they can move or
      * cancel it, or for a lapsed hold the booking page to book again
      * (`notice-link.ts`); null or absent: the email has no link.
@@ -70,7 +79,9 @@ export const bookingNotice = defineNotice<BookingNotice>({
                     ? `Your booking with ${b.business} is now with ${b.staff}`
                     : `Your booking with ${b.business} has moved`;
             case "BOOKING_CANCELLED":
-                return `Your booking with ${b.business} is cancelled`;
+                return b.classCancelled
+                    ? `${b.business} cancelled your class`
+                    : `Your booking with ${b.business} is cancelled`;
             case "BOOKING_LAPSED":
                 return `Your hold with ${b.business} has lapsed`;
         }
@@ -111,10 +122,15 @@ function bookingSentence(kind: BookingNoticeKind, b: BookingNoticeVars) {
                 : "";
             return `Your ${b.service}${withWhom} has moved to ${when}.${was}`;
         }
-        case "BOOKING_CANCELLED":
+        case "BOOKING_CANCELLED": {
+            if (b.classCancelled) {
+                const money = classCancelMoneyWords(b.money, b.business);
+                return `${b.business} cancelled this class: ${b.service} on ${when}. Your place in it is cancelled.${money ? ` ${money}` : ""}`;
+            }
             return b.byCustomer
                 ? `You cancelled your ${b.service} on ${when}.`
                 : `Your ${b.service} on ${when} has been cancelled.`;
+        }
         case "BOOKING_LAPSED":
             // An unpaid hold whose time ran out (#1137); the email adds
             // "Book again:" and the booking page.
@@ -165,6 +181,9 @@ async function loadBooking(
             bookerName: true,
             courseEnrollmentId: true,
             serviceId: true,
+            paidWith: true,
+            holdExpiresAt: true,
+            cancelledLate: true,
             service: { select: { name: true } },
             staff: { select: { name: true } },
             contact: { select: { firstName: true } },
@@ -211,6 +230,9 @@ async function loadBooking(
             : kind === "BOOKING_MOVED"
               ? (event?.toStartAt ?? booking.startAt)
               : booking.startAt;
+    // A class the business cancelled (U17): its words, and the money.
+    const classCancelled =
+        kind === "BOOKING_CANCELLED" && payload.classCancelled === true;
     return {
         contactId: booking.contactId,
         bookingId: booking.id,
@@ -234,6 +256,16 @@ async function loadBooking(
                 ...(reassigned ? { reassigned: true } : {}),
                 timeZone: booking.timezone,
                 byCustomer: event ? event.actorUserId === null : false,
+                ...(classCancelled
+                    ? {
+                          classCancelled: true,
+                          money: await classCancelMoney(
+                              tx,
+                              organizationId,
+                              booking,
+                          ),
+                      }
+                    : {}),
             },
         },
     };

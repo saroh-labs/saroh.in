@@ -39,6 +39,9 @@ jest.mock("@saroh/database", () => {
         businessProfile: { findUnique: jest.fn() },
         // A course's price history entry, written with its save.
         auditEvent: { create: jest.fn() },
+        // The student's notice (U17): the COURSE switch, and its job.
+        customerNoticeSetting: { findUnique: jest.fn() },
+        job: { create: jest.fn() },
     };
     // Making a course is one transaction with its first price history
     // entry: the specs read the create off either client.
@@ -251,6 +254,20 @@ describe("enrolling", () => {
                         unitPrice: "8000.00",
                     },
                 ],
+            }),
+        );
+        // One notice for the whole course (U17), never one per session.
+        expect(tx.job!.create).toHaveBeenCalledTimes(1);
+        expect(tx.job!.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    type: "customer.notify",
+                    payload: {
+                        kind: "COURSE_ENROLLED",
+                        eventKey: "course-enrolled:enr_1",
+                        courseEnrollmentId: "enr_1",
+                    },
+                }),
             }),
         );
     });
@@ -476,6 +493,32 @@ describe("cancelling an enrolment", () => {
             ],
         });
         expect(issueInTx).not.toHaveBeenCalled();
+        // The student is told (U17), keyed to the enrolment.
+        expect(tx.job!.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    type: "customer.notify",
+                    payload: {
+                        kind: "COURSE_CANCELLED",
+                        eventKey: "course-cancelled:enr_1",
+                        courseEnrollmentId: "enr_1",
+                    },
+                }),
+            }),
+        );
+    });
+
+    it("with Course emails off, a cancel queues no notice (U17)", async () => {
+        tx.courseEnrollment!.findFirst!.mockResolvedValue({
+            id: "enr_1",
+            status: "ACTIVE",
+        });
+        tx.booking!.findMany!.mockResolvedValue([]);
+        tx.customerNoticeSetting!.findUnique!.mockResolvedValueOnce({
+            enabled: false,
+        });
+        await service.cancelEnrollment(owner, "course_1", "enr_1");
+        expect(tx.job!.create).not.toHaveBeenCalled();
     });
 
     it("refuses one already cancelled", async () => {

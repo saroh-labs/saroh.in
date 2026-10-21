@@ -53,6 +53,13 @@ export interface CustomerNotifyPayload {
     invoiceId?: string;
     /** The online refund the customer is told is on its way (U12). */
     refundId?: string;
+    /** The course enrolment a COURSE_* notice is about (U17). */
+    courseEnrollmentId?: string;
+    /**
+     * A BOOKING_CANCELLED for a place in a class the business cancelled
+     * as a whole (U17): "‹Business› cancelled this class".
+     */
+    classCancelled?: boolean;
 }
 
 type Tx = Pick<Prisma.TransactionClient, "job">;

@@ -79,6 +79,12 @@ export interface NoticeDefinition<V extends NoticeVarsBase> {
      */
     quote?(vars: V): NoticeQuote | null;
     /**
+     * A list the email carries under its lead (a course's sessions, U17),
+     * with the words above it; null: none. Plain text, the thread's
+     * sentence has none.
+     */
+    list?(vars: V): NoticeList | null;
+    /**
      * Email only, never the account thread: someone the notice answers is
      * not yet a customer with an account (the enquiry auto-reply). With no
      * provider it reaches nobody, so nothing is claimed or written.
@@ -105,6 +111,12 @@ export interface NoticeDefinition<V extends NoticeVarsBase> {
 export interface NoticeQuote {
     lead: string;
     text: string;
+}
+
+/** A list in the email: the words above it, and one line per item. */
+export interface NoticeList {
+    lead: string;
+    items: string[];
 }
 
 /** Declare a notice: only checks its shape. */

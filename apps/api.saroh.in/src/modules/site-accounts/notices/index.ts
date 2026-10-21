@@ -9,6 +9,7 @@ import {
 import type { CustomerNotifyPayload } from "../customer-notify-queue";
 import { autopayFailedNotice } from "./autopay-failed";
 import { bookingNotice } from "./booking";
+import { courseNotice } from "./course";
 import { enquiryReceivedNotice } from "./enquiry-received";
 import { membershipNotice } from "./membership";
 import type { NoticeDefinition, NoticeSubject, NoticeVarsBase } from "./notice";
@@ -38,6 +39,10 @@ export const NOTICES = {
     BOOKING_CONFIRMED: bookingNotice,
     BOOKING_LAPSED: bookingNotice,
     BOOKING_MOVED: bookingNotice,
+    // Courses and classes (U17, #1148).
+    COURSE_CANCELLED: courseNotice,
+    COURSE_ENROLLED: courseNotice,
+    WAITLIST_CLASS_CANCELLED: waitlistNotice,
     ENQUIRY_RECEIVED: enquiryReceivedNotice,
     MEMBERSHIP_CANCELLED: membershipNotice,
     MEMBERSHIP_JOINED: membershipNotice,
@@ -132,10 +137,18 @@ export function renderNotice(vars: NoticeVars): RenderedMessage {
         : null;
     // Words they wrote, quoted back as plain text (the enquiry reply).
     const quote = def.quote?.(vars) ?? null;
+    // A list under the lead (a course's sessions).
+    const list = def.list?.(vars) ?? null;
     const body = [
         `<p>${greeting}</p>`,
         `<p>${escapeHtml(def.sentence(vars))}</p>`,
         ...(secret ? [secret] : []),
+        ...(list && list.items.length > 0
+            ? [
+                  `<p>${escapeHtml(list.lead)}</p>`,
+                  `<ul>${list.items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`,
+              ]
+            : []),
         ...(quote
             ? [
                   `<p>${escapeHtml(quote.lead)}</p>`,

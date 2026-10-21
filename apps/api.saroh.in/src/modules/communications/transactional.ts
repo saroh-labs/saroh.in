@@ -59,6 +59,12 @@ export const NOTICE_TEMPLATES = [
     // "₹X is on its way back to how you paid" (DEC-174 U12, #1143): an
     // online refund the provider took, behind the REFUND switch.
     "REFUND_SENT",
+    // Courses and classes (DEC-174 U17, #1148): enrolled, with every
+    // session, and an enrolment cancelled, under the COURSE switch; and a
+    // class the business cancelled told to those waiting for it (no switch).
+    "COURSE_ENROLLED",
+    "COURSE_CANCELLED",
+    "WAITLIST_CLASS_CANCELLED",
 ] as const;
 export type NoticeTemplate = (typeof NOTICE_TEMPLATES)[number];
 

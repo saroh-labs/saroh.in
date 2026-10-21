@@ -47,6 +47,7 @@ import {
 import { contactName } from "../invoices/serialize";
 import { toCents } from "../invoices/totals";
 import { allows, authorize } from "../organizations/organization-policy";
+import { queueCourseNotice } from "../site-accounts/notices/course";
 import type {
     AddSessionDto,
     CourseInputDto,
@@ -785,6 +786,14 @@ export class CoursesService {
                     createdByUserId: ctx.userId,
                 });
             }
+            // They hear they're on it, with every session (U17), unless
+            // the business has Course emails off.
+            await queueCourseNotice(
+                tx,
+                organizationId,
+                "COURSE_ENROLLED",
+                enrollment.id,
+            );
             return enrollment.id;
         }, "That changed while you were enrolling them. Try again.").catch(
             (err: unknown) => {
@@ -803,7 +812,8 @@ export class CoursesService {
     /**
      * Take someone off a course: their sessions still to come are cancelled
      * and their seat frees up. Past sessions stay as they were, and the
-     * invoice stays — voiding it is a separate decision.
+     * invoice stays — voiding it is a separate decision. They are told,
+     * with the invoice as it stands when the email goes (U17).
      */
     async cancelEnrollment(
         ctx: OrganizationContext,
@@ -835,6 +845,14 @@ export class CoursesService {
                 now,
                 where: { courseEnrollmentId: enrollmentId },
             });
+            // They hear their place is cancelled, and where the money
+            // stands (U17), unless Course emails are off.
+            await queueCourseNotice(
+                tx,
+                organizationId,
+                "COURSE_CANCELLED",
+                enrollmentId,
+            );
         });
         return this.readEnrollment(ctx, enrollmentId);
     }
