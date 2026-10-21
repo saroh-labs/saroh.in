@@ -1,4 +1,6 @@
 import { toMoneyString } from "../../common/money";
+import type { VisitOrigin } from "../analytics/visit-source";
+import { visitOriginOf } from "../analytics/visit-source";
 import { contactEmailForDisplay } from "../contacts/contact-email";
 import type { OrderLineKind } from "./order-line";
 import { lineKind, lineName } from "./order-line";
@@ -69,6 +71,12 @@ export interface OrderDetailDto extends OrderSummaryDto {
         /** "15% off" or "10.00 off" — the rule that produced `discount`. */
         rule: string;
     } | null;
+    /**
+     * Where the website visit that placed it came from (U15): one of the
+     * five groups and the merchant's own link label. `null` for an order
+     * taken any other way, placed before tracking began, or past retention.
+     */
+    cameFrom: VisitOrigin | null;
 }
 
 interface RawCustomer {
@@ -116,6 +124,8 @@ interface RawDetail extends RawSummary {
         ruleAmount: DecimalLike | null;
         currency: string;
     } | null;
+    visitSource?: string | null;
+    visitRef?: string | null;
 }
 
 function ruleOf(r: NonNullable<RawDetail["discountRedemption"]>): string {
@@ -174,5 +184,6 @@ export function serializeOrderDetail(order: RawDetail): OrderDetailDto {
                   rule: ruleOf(order.discountRedemption),
               }
             : null,
+        cameFrom: visitOriginOf(order.visitSource, order.visitRef),
     };
 }

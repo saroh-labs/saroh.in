@@ -141,3 +141,97 @@ describe("event-contract — every declared type is used", () => {
         expect(code.some((text) => named.test(text))).toBe(true);
     });
 });
+
+describe("event-contract — where a visit came from (U15)", () => {
+    const STEPS = ["site.visit", "site.looked", "site.started"];
+
+    it.each(STEPS)(
+        "%s keeps only a known source and an allowed ref",
+        (type) => {
+            expect(
+                validateEventProperties(type, 1, {
+                    source: "instagram",
+                    ref: " Diwali-Post ",
+                }),
+            ).toEqual({ source: "instagram", ref: "diwali-post" });
+            expect(
+                validateEventProperties(type, 1, { source: "direct" }),
+            ).toEqual({ source: "direct" });
+        },
+    );
+
+    it.each(STEPS)("%s drops everything else it is sent", (type) => {
+        expect(
+            validateEventProperties(type, 1, {
+                source: "google",
+                path: "/pay/secret-token",
+                referrer: "https://www.google.com/search?q=me",
+                query: "utm_source=google&email=a@example.com",
+                visitId: "abc",
+            }),
+        ).toEqual({ source: "google" });
+    });
+
+    it.each(STEPS)(
+        "%s refuses an unknown source or a ref of any other shape",
+        (type) => {
+            expect(() => validateEventProperties(type, 1, {})).toThrow(
+                BadRequestException,
+            );
+            expect(() =>
+                validateEventProperties(type, 1, { source: "facebook" }),
+            ).toThrow(BadRequestException);
+            for (const ref of [
+                "someone@example.com",
+                "call-9876543210",
+                "has space",
+                "a".repeat(33),
+                "-lead",
+                "a.b",
+                42,
+            ]) {
+                expect(() =>
+                    validateEventProperties(type, 1, { source: "other", ref }),
+                ).toThrow(BadRequestException);
+            }
+        },
+    );
+
+    it("lets the public intake take the steps, never a paid order", () => {
+        for (const type of STEPS) {
+            expect(PUBLIC_INGESTABLE_TYPES.has(type)).toBe(true);
+        }
+        expect(PUBLIC_INGESTABLE_TYPES.has("order.paid")).toBe(false);
+        expect(PUBLIC_INGESTABLE_TYPES.has("order.refunded")).toBe(false);
+    });
+
+    it("lets order.paid and order.refunded say where the visit came from, optionally", () => {
+        expect(
+            validateEventProperties("order.paid", 1, {
+                orderId: "o1",
+                amountCents: 100,
+                source: "whatsapp",
+                ref: "status",
+            }),
+        ).toEqual({
+            orderId: "o1",
+            amountCents: 100,
+            source: "whatsapp",
+            ref: "status",
+        });
+        expect(
+            validateEventProperties("order.refunded", 1, {
+                orderId: "o1",
+                amountCents: 100,
+                source: null,
+            }),
+        ).toEqual({ orderId: "o1", amountCents: 100 });
+        expect(() =>
+            validateEventProperties("order.paid", 1, {
+                orderId: "o1",
+                amountCents: 100,
+                source: "tiktok",
+            }),
+        ).toThrow(BadRequestException);
+    });
+});

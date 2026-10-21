@@ -7,6 +7,7 @@ import type {
     ShopResult,
 } from "@saroh/site-blocks";
 import { isTestReleaseRefusal, TEST_RELEASE_MESSAGE } from "@saroh/site-blocks";
+import { isVisitSource, visitRefOf } from "@saroh/site-blocks/visit-source";
 
 import { qrSourceTag } from "./qr-resolve";
 
@@ -398,6 +399,13 @@ export function startBody(v: unknown): Record<string, unknown> | null {
     // The tag of the QR code whose scan opened the page, if it is one.
     const source = qrSourceTag(v.source);
     if (source) body.source = source;
+    // Where the visit came from (U15): one of five groups and a label of
+    // the allowed shape, only beside a group. Never an id.
+    if (isVisitSource(v.visitSource)) {
+        body.visitSource = v.visitSource;
+        const ref = visitRefOf(isString(v.visitRef) ? v.visitRef : null);
+        if (ref) body.visitRef = ref;
+    }
     if (isRecord(v.address)) {
         const a = v.address;
         const address: Record<string, string> = {};

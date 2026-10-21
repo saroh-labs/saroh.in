@@ -6,6 +6,9 @@ jest.mock("@saroh/database", () => ({
         // Businesses on legal hold (DEC-122): none unless a test says so.
         organization: { findMany: jest.fn() },
         job: { create: jest.fn(), count: jest.fn() },
+        // Orders whose visit's source is past retention (U15).
+        order: { findMany: jest.fn() },
+        $executeRaw: jest.fn(),
     },
 }));
 
@@ -33,6 +36,8 @@ const aggregateDelete = prisma.analyticsDailyAggregate.deleteMany as jest.Mock;
 const jobCreate = prisma.job.create as jest.Mock;
 const jobCount = prisma.job.count as jest.Mock;
 const held = prisma.organization.findMany as jest.Mock;
+const orderFindMany = prisma.order.findMany as jest.Mock;
+const executeRaw = prisma.$executeRaw as unknown as jest.Mock;
 
 const NOW = new Date("2026-10-09T03:00:00.000Z");
 
@@ -62,6 +67,7 @@ describe("AnalyticsRetentionHandler", () => {
         jest.useFakeTimers({ now: NOW, advanceTimers: true });
         jobCreate.mockResolvedValue({});
         held.mockResolvedValue([]);
+        orderFindMany.mockResolvedValue([]);
         log = jest.spyOn(Logger.prototype, "log").mockImplementation();
         error = jest.spyOn(Logger.prototype, "error").mockImplementation();
     });
@@ -216,6 +222,67 @@ describe("AnalyticsRetentionHandler", () => {
         await handler.ensureScheduled(NOW);
         expect(jobCreate).toHaveBeenCalledWith({
             data: { type: ANALYTICS_RETENTION_TYPE, payload: {}, runAt: NOW },
+        });
+    });
+
+    describe("orders' visit sources (U15)", () => {
+        it("clears the source of orders older than the retention, skipping a held business", async () => {
+            findMany.mockResolvedValue([]);
+            held.mockResolvedValue([{ id: "org_held" }]);
+            orderFindMany.mockResolvedValueOnce([{ id: "o1" }, { id: "o2" }]);
+            executeRaw.mockResolvedValueOnce(2);
+
+            await new AnalyticsRetentionHandler().handle(run());
+
+            const cutoff = new Date(NOW.getTime() - 400 * 86_400_000);
+            expect(orderFindMany).toHaveBeenCalledWith({
+                where: {
+                    visitSource: { not: null },
+                    createdAt: { lt: cutoff },
+                    organizationId: { notIn: ["org_held"] },
+                },
+                select: { id: true },
+                orderBy: { createdAt: "asc" },
+                take: ANALYTICS_RETENTION_BATCH,
+            });
+            expect(executeRaw).toHaveBeenCalledTimes(1);
+            expect(log).toHaveBeenCalledWith(
+                "analytics.retention: cleared the visit source of 2 orders past retention",
+            );
+            expect(nextRun()).toEqual(
+                new Date(NOW.getTime() + ANALYTICS_RETENTION_EVERY_MS),
+            );
+        });
+
+        it("comes back in a minute when orders are still due at the cap", async () => {
+            findMany.mockResolvedValue([]);
+            orderFindMany.mockResolvedValue(ids(ANALYTICS_RETENTION_BATCH));
+            executeRaw.mockResolvedValue(ANALYTICS_RETENTION_BATCH);
+
+            await new AnalyticsRetentionHandler().handle(run());
+
+            expect(orderFindMany).toHaveBeenCalledTimes(
+                ANALYTICS_RETENTION_MAX_BATCHES,
+            );
+            expect(nextRun()).toEqual(
+                new Date(NOW.getTime() + ANALYTICS_RETENTION_BACKLOG_MS),
+            );
+        });
+
+        it("a failed order sweep never stops the events' sweep or the chain", async () => {
+            findMany.mockResolvedValueOnce(ids(2));
+            deleteMany.mockResolvedValueOnce({ count: 2 });
+            orderFindMany.mockRejectedValue(new Error("connection reset"));
+
+            await new AnalyticsRetentionHandler().handle(run());
+
+            expect(deleteMany).toHaveBeenCalledTimes(1);
+            expect(error).toHaveBeenCalledWith(
+                "analytics.retention: order source sweep failed before it finished: Error",
+            );
+            expect(nextRun()).toEqual(
+                new Date(NOW.getTime() + ANALYTICS_RETENTION_EVERY_MS),
+            );
         });
     });
 });

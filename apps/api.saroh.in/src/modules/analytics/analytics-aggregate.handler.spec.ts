@@ -238,3 +238,141 @@ describe("AnalyticsAggregateHandler — org-isolated daily rollups", () => {
         expect(registry.get("analytics.aggregate")).toBe(handler.handle);
     });
 });
+
+describe("AnalyticsAggregateHandler — where visits came from (U15)", () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        jest.useFakeTimers({
+            now: new Date("2026-07-20T06:00:00Z"),
+            advanceTimers: true,
+        });
+        aggregateUpsert.mockResolvedValue({});
+    });
+    afterEach(() => jest.useRealTimers());
+
+    function step(
+        type: string,
+        properties: Record<string, unknown>,
+        siteId: string | null = "site_1",
+    ) {
+        return {
+            id: `${type}_${Math.random()}`,
+            organizationId: "org_1",
+            siteId,
+            type,
+            visitorHash: null,
+            occurredAt: at("09:30"),
+            properties,
+        };
+    }
+
+    function rowOf(
+        type: string,
+        siteId: string,
+        dimension: string,
+        dimensionValue: string,
+    ) {
+        return aggregateUpsert.mock.calls
+            .map((c) => c[0].create)
+            .find(
+                (r) =>
+                    r.type === type &&
+                    r.siteId === siteId &&
+                    r.dimension === dimension &&
+                    r.dimensionValue === dimensionValue,
+            );
+    }
+
+    it("breaks the visit steps and paid orders down by source and by ref", async () => {
+        eventFindMany.mockResolvedValue([
+            step("site.visit", { source: "instagram", ref: "diwali-post" }),
+            step("site.visit", { source: "instagram" }),
+            step("site.visit", { source: "direct" }),
+            step("site.looked", { source: "instagram", ref: "diwali-post" }),
+            step("site.started", { source: "instagram", ref: "diwali-post" }),
+            step(
+                "order.paid",
+                {
+                    orderId: "o1",
+                    amountCents: 100,
+                    source: "instagram",
+                    ref: "diwali-post",
+                },
+                null,
+            ),
+            // Paid before tracking began: no source, totals only.
+            step("order.paid", { orderId: "o2", amountCents: 100 }, null),
+        ]);
+
+        await new AnalyticsAggregateHandler().handle(jobFor("org_1"));
+
+        expect(rowOf("site.visit", "", "source", "instagram")).toMatchObject({
+            count: 2,
+            uniqueCount: 0,
+        });
+        expect(
+            rowOf("site.visit", "site_1", "source", "instagram"),
+        ).toMatchObject({ count: 2 });
+        expect(rowOf("site.visit", "", "source", "direct")).toMatchObject({
+            count: 1,
+        });
+        expect(rowOf("site.visit", "", "ref", "diwali-post")).toMatchObject({
+            count: 1,
+        });
+        expect(rowOf("site.looked", "", "source", "instagram")).toMatchObject({
+            count: 1,
+        });
+        expect(rowOf("site.started", "", "ref", "diwali-post")).toMatchObject({
+            count: 1,
+        });
+        // Paid names no site: the business's row only.
+        expect(rowOf("order.paid", "", "source", "instagram")).toMatchObject({
+            count: 1,
+        });
+        expect(rowOf("order.paid", "", "ref", "diwali-post")).toMatchObject({
+            count: 1,
+        });
+        expect(rowOf("order.paid", "", "", "")).toMatchObject({ count: 2 });
+        // Nothing is broken down by anything else.
+        const dimensions = new Set(
+            aggregateUpsert.mock.calls.map((c) => c[0].create.dimension),
+        );
+        expect([...dimensions].sort()).toEqual(["", "ref", "source"]);
+    });
+
+    it("drops a source or ref that isn't well formed, never trusting the row", async () => {
+        eventFindMany.mockResolvedValue([
+            step("site.visit", { source: "facebook", ref: "x" }),
+            step("site.visit", { source: "other", ref: "call 9876543210" }),
+        ]);
+
+        await new AnalyticsAggregateHandler().handle(jobFor("org_1"));
+
+        expect(rowOf("site.visit", "", "source", "facebook")).toBeUndefined();
+        expect(rowOf("site.visit", "", "source", "other")).toMatchObject({
+            count: 1,
+        });
+        const refs = aggregateUpsert.mock.calls
+            .map((c) => c[0].create)
+            .filter((r) => r.dimension === "ref");
+        expect(refs).toEqual([]);
+        expect(rowOf("site.visit", "", "", "")).toMatchObject({ count: 2 });
+    });
+
+    it("leaves site.view's own rollups as they were: no source dimension", async () => {
+        eventFindMany.mockResolvedValue([
+            step("site.view", {
+                path: "/a",
+                referrer: "https://www.instagram.com",
+                source: "instagram",
+            }),
+        ]);
+
+        await new AnalyticsAggregateHandler().handle(jobFor("org_1"));
+
+        const dims = aggregateUpsert.mock.calls.map(
+            (c) => c[0].create.dimension,
+        );
+        expect(new Set(dims)).toEqual(new Set(["", "path"]));
+    });
+});

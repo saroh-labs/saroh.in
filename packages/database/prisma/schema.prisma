@@ -1904,6 +1904,15 @@ model Order {
   // Null for every other order.
   sourceCode String?
 
+  // Where the website visit that placed this order came from (U15, #1099):
+  // one of five groups (instagram, google, whatsapp, direct, other) and the
+  // merchant's own link label (`?ref=`), both checked by
+  // `analytics/visit-source.ts`. No visit id and nothing about the visitor.
+  // Copied onto `order.paid`; cleared by `analytics.retention` once the
+  // order is older than the analytics retention (400 days).
+  visitSource String?
+  visitRef    String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1985,6 +1994,9 @@ model Order {
   @@index([customerAccountId, createdAt])
   // The QR list's Orders count: the few orders that name a code.
   @@index([sourceCode], map: "Order_sourceCode_idx", where: raw("\"sourceCode\" IS NOT NULL"))
+  // The retention sweep's read (U15): orders past retention still holding
+  // a visit's source.
+  @@index([createdAt], map: "Order_visitSource_retention_idx", where: raw("\"visitSource\" IS NOT NULL"))
 }
 
 model OrderItem {

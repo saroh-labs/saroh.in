@@ -47,6 +47,8 @@ describe("Analytics retention sweep (DB)", () => {
         await prisma.job.deleteMany({
             where: { type: ANALYTICS_RETENTION_TYPE },
         });
+        await prisma.order.deleteMany({ where: { organizationId: org } });
+        await prisma.store.deleteMany({ where: { organizationId: org } });
         await prisma.organization.delete({ where: { id: org } });
     });
 
@@ -84,6 +86,98 @@ describe("Analytics retention sweep (DB)", () => {
                 where: { id: aggregate.id },
             }),
         ).resolves.toMatchObject({ count: 3 });
+    });
+
+    it("clears a visit's source off orders past retention, keeping the order (U15)", async () => {
+        const store = await prisma.store.create({
+            data: { organizationId: org, name: `Retention ${tag}` },
+        });
+        const order = (n: string, createdAt: Date, source: string | null) =>
+            prisma.order.create({
+                data: {
+                    storeId: store.id,
+                    organizationId: org,
+                    orderId: `RET-${n}`,
+                    subtotal: "10.00",
+                    total: "10.00",
+                    createdAt,
+                    visitSource: source,
+                    visitRef: source ? "diwali-post" : null,
+                },
+            });
+        const old = await order(
+            "1",
+            new Date(now.getTime() - 401 * DAY),
+            "instagram",
+        );
+        const recent = await order(
+            "2",
+            new Date(now.getTime() - 30 * DAY),
+            "google",
+        );
+        const none = await order(
+            "3",
+            new Date(now.getTime() - 500 * DAY),
+            null,
+        );
+        const before = await prisma.order.findUniqueOrThrow({
+            where: { id: old.id },
+            select: { updatedAt: true },
+        });
+
+        const swept = await retention.sweepOrderSources(now);
+
+        expect(swept).toEqual({ cleared: 1, more: false });
+        const after = await prisma.order.findMany({
+            where: { id: { in: [old.id, recent.id, none.id] } },
+            select: {
+                id: true,
+                visitSource: true,
+                visitRef: true,
+                total: true,
+                updatedAt: true,
+            },
+        });
+        const byId = new Map(after.map((o) => [o.id, o]));
+        // The order stays; only where its visit came from goes.
+        expect(byId.get(old.id)).toMatchObject({
+            visitSource: null,
+            visitRef: null,
+        });
+        expect(byId.get(old.id)?.total.toString()).toBe("10");
+        // Clearing it is no change anyone made to the order.
+        expect(byId.get(old.id)?.updatedAt.getTime()).toBe(
+            before.updatedAt.getTime(),
+        );
+        expect(byId.get(recent.id)).toMatchObject({
+            visitSource: "google",
+            visitRef: "diwali-post",
+        });
+        expect(byId.get(none.id)?.visitSource).toBeNull();
+        // A second run finds nothing left to clear.
+        expect(await retention.sweepOrderSources(now)).toEqual({
+            cleared: 0,
+            more: false,
+        });
+    });
+
+    it("drops a visit's step events past retention like any other event (U15)", async () => {
+        const step = await prisma.analyticsEvent.create({
+            data: {
+                organizationId: org,
+                type: "site.visit",
+                properties: { source: "instagram", ref: "diwali-post" },
+                occurredAt: new Date(now.getTime() - 401 * DAY),
+                receivedAt: new Date(now.getTime() - 401 * DAY),
+                expiresAt: new Date(now.getTime() - DAY),
+            },
+        });
+
+        await retention.sweep(now);
+
+        await expect(
+            prisma.analyticsEvent.findUnique({ where: { id: step.id } }),
+        ).resolves.toBeNull();
     });
 
     it("keeps one waiting run of the chain", async () => {

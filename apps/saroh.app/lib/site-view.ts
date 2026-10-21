@@ -12,9 +12,21 @@
  *   Privacy Control) sends nothing at all;
  * - only the path is sent, never the query (a pay link or a test-release
  *   token travels there), and the referrer only as its origin;
- * - the signed-in account area sends nothing: its paths name orders and
- *   bookings, and a customer reading their own account isn't a site visit.
+ * - the private pages send nothing (`lib/private-paths.ts`): the signed-in
+ *   account area, whose paths name orders and bookings, and the pages that
+ *   are about one customer (a checkout, a pay link, an order's status, a
+ *   waitlist claim) — their paths carry an order id or a token, and a
+ *   customer reading their own page isn't a site visit.
+ *
+ * Where a visit came from (U15) rides the same beacon: the visit's steps
+ * carry one of five groups and the merchant's own link label, never the
+ * path, the address or anything about the visitor
+ * (`@saroh/site-blocks/visit-source`, {@link visitStepBody}).
  */
+
+import type { VisitOrigin, VisitStep } from "@saroh/site-blocks/visit-source";
+
+import { isPrivateSitePath } from "./private-paths";
 
 /** The event the public intake accepts (`PUBLIC_INGESTABLE_TYPES`). */
 export const SITE_VIEW_TYPE = "site.view";
@@ -33,9 +45,9 @@ export function asksNotToTrack(signals: TrackingSignals): boolean {
     return signals.doNotTrack === "1" || signals.globalPrivacyControl === true;
 }
 
-/** True for a path the beacon never reports. */
+/** True for a path the beacon never reports, nor starts a visit on. */
 export function isPrivatePath(path: string): boolean {
-    return path === "/account" || path.startsWith("/account/");
+    return isPrivateSitePath(path);
 }
 
 /** A referrer reduced to its origin, or undefined (none, or this site). */
@@ -82,5 +94,30 @@ export function siteViewBody(input: {
         schemaVersion: 1,
         consent: "anonymous",
         properties,
+    };
+}
+
+/** The event each step of a visit is (`VISIT_STEP_TYPES` in the API). */
+const STEP_TYPES: Record<VisitStep, string> = {
+    visit: "site.visit",
+    looked: "site.looked",
+    started: "site.started",
+};
+
+/**
+ * The body for one step of a visit: where it came from and nothing else.
+ * No path, no referrer, no id.
+ */
+export function visitStepBody(
+    step: VisitStep,
+    origin: VisitOrigin,
+): Record<string, unknown> {
+    return {
+        type: STEP_TYPES[step],
+        schemaVersion: 1,
+        consent: "anonymous",
+        properties: origin.ref
+            ? { source: origin.source, ref: origin.ref }
+            : { source: origin.source },
     };
 }

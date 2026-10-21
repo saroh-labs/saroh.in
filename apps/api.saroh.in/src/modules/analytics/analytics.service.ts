@@ -15,6 +15,7 @@ import {
     ANALYTICS_RETENTION_DAYS,
     PUBLIC_INGESTABLE_TYPES,
     validateEventProperties,
+    VISIT_STEP_TYPES,
 } from "./event-contract";
 
 /** The env var holding the IP-hashing salt (a platform secret, not per-org). */
@@ -78,8 +79,8 @@ export interface DashboardFilter {
  * already-salted `visitorHash`.
  *
  * `ingestPublic` is the unauthenticated boundary: the owning org is derived from
- * the target Site row (NEVER the client), only `site.view` is accepted, the
- * source IP is salted into both a `visitorHash` (for unique counts) and an
+ * the target Site row (NEVER the client), only `site.view` and a visit's
+ * steps (U15) are accepted, the source IP is salted into both a `visitorHash` (for unique counts) and an
  * `ipHash` (for rate-limiting) and then discarded.
  *
  * `getDashboard` reads the pre-computed `AnalyticsDailyAggregate` rows for
@@ -104,7 +105,8 @@ export class AnalyticsService {
 
     /**
      * Ingest a PUBLIC event against `siteId`. The org is derived from the Site
-     * (404 if missing) — the client never supplies it. Only `site.view` is
+     * (404 if missing) — the client never supplies it. Only `site.view` and a
+     * visit's steps are
      * accepted (other types 400). The raw IP is salted into a `visitorHash` and
      * an `ipHash` and then dropped; rate-limiting is per `(siteId, ipHash)`.
      */
@@ -119,7 +121,8 @@ export class AnalyticsService {
             throw new NotFoundException("Site not found");
         }
 
-        // Only `site.view` is publicly ingestable — reject org-internal types.
+        // Only a page view and a visit's steps are publicly ingestable —
+        // reject org-internal types.
         if (!PUBLIC_INGESTABLE_TYPES.has(input.type)) {
             throw new HttpException(
                 `Event type "${input.type}" is not accepted here`,
@@ -142,7 +145,12 @@ export class AnalyticsService {
             }
         }
 
-        const visitorHash = ipHash ?? null;
+        // A visit's steps (U15) are counted once per visit by the site
+        // itself, so they need no visitor grouping: none is stored with them,
+        // and a source is never kept beside anything about the person.
+        const visitorHash = VISIT_STEP_TYPES.has(input.type)
+            ? null
+            : (ipHash ?? null);
 
         return this.record({
             organizationId: site.organizationId,

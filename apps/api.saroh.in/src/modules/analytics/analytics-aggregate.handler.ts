@@ -3,7 +3,12 @@ import type { AnalyticsEvent, Job, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { planMeter } from "../billing/metering.service";
-import { ANALYTICS_RETENTION_DAYS, SITE_VIEW_TYPE } from "./event-contract";
+import {
+    ANALYTICS_RETENTION_DAYS,
+    SITE_VIEW_TYPE,
+    VISIT_ORIGIN_TYPES,
+} from "./event-contract";
+import { isVisitSource, visitRefOf } from "./visit-source";
 
 /** The job `type` this handler is registered under. */
 export const ANALYTICS_AGGREGATE_TYPE = "analytics.aggregate";
@@ -63,8 +68,9 @@ function isVisitsTotal(bucket: Bucket): boolean {
  * Org-safe daily aggregate job (S7-002).
  *
  * Reads ONE org's `AnalyticsEvent`s for a UTC day, groups them by `(type,
- * siteId)` (plus a `path` dimension for `site.view`), and UPSERTS the matching
- * `AnalyticsDailyAggregate` rows.
+ * siteId)` (plus a `path` dimension for `site.view`, and `source` and `ref`
+ * dimensions for a visit's steps and paid orders, U15), and UPSERTS the
+ * matching `AnalyticsDailyAggregate` rows.
  *
  * ORG ISOLATION: every read is filtered by `payload.organizationId` and every
  * upsert is keyed + stamped with that same id, so two orgs' events can never mix
@@ -258,6 +264,22 @@ export class AnalyticsAggregateHandler {
                     }
                 }
             }
+
+            // A visit's steps and paid orders (U15) get a `source` breakdown
+            // (the five groups) and a `ref` one (the merchant's own link
+            // labels). An event from before tracking began has neither and
+            // counts in the totals alone.
+            if (VISIT_ORIGIN_TYPES.has(type)) {
+                const origin = this.readOrigin(event.properties);
+                if (origin !== null) {
+                    for (const [dimension, value] of origin) {
+                        bump(ALL_SITES, type, dimension, value, visitorHash);
+                        if (site !== null && site !== "") {
+                            bump(site, type, dimension, value, visitorHash);
+                        }
+                    }
+                }
+            }
         }
 
         return buckets;
@@ -276,6 +298,27 @@ export class AnalyticsAggregateHandler {
             }
         }
         return null;
+    }
+
+    /**
+     * The `source` and, when there is one, the `ref` an event carries, as
+     * dimension pairs; null when it carries no well-formed source. Read
+     * again here rather than trusted, as `readPath` is.
+     */
+    private readOrigin(properties: unknown): [string, string][] | null {
+        if (
+            typeof properties !== "object" ||
+            properties === null ||
+            Array.isArray(properties)
+        ) {
+            return null;
+        }
+        const props = properties as Record<string, unknown>;
+        if (!isVisitSource(props.source)) return null;
+        const pairs: [string, string][] = [["source", props.source]];
+        const ref = visitRefOf(props.ref);
+        if (ref !== null) pairs.push(["ref", ref]);
+        return pairs;
     }
 
     /** Truncate a timestamp to the start of its UTC day. */

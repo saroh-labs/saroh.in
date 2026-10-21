@@ -16,6 +16,7 @@ import {
 } from "@saroh/site-blocks";
 
 import { PublishedPage } from "@/components/published-page";
+import { VisitStep } from "@/components/visit-step";
 import { accountAreaOn, getBooking, getMyBooking } from "@/lib/account-area";
 import { publicApiUrl } from "@/lib/api-url";
 import { getBookingPage, getBookingVisit } from "@/lib/booking-page";
@@ -289,6 +290,8 @@ export default async function BookPage({
             : null;
     return (
         <>
+            {/* The visit looked at what can be booked (U15): once a visit. */}
+            <VisitStep step="looked" />
             {jsonLd ? (
                 <script
                     type="application/ld+json"

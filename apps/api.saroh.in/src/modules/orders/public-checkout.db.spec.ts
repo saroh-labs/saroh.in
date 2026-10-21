@@ -1935,6 +1935,92 @@ describe("the QR code an order came from", () => {
     });
 });
 
+describe("where the visit an order came from began (U15)", () => {
+    const visitOf = async (res: { body: Record<string, unknown> }) =>
+        prisma.order.findUniqueOrThrow({
+            where: { id: res.body.orderId as string },
+            select: { visitSource: true, visitRef: true },
+        });
+
+    it("keeps the visit's group and label on the order and on its order.paid, once paid", async () => {
+        const s = await shop();
+        const { token } = await signIn(s.host);
+
+        const res = await start(s, token, {
+            visitSource: "instagram",
+            visitRef: "Diwali-Post",
+        });
+
+        expect(res.status).toBe(201);
+        expect(await visitOf(res)).toEqual({
+            visitSource: "instagram",
+            visitRef: "diwali-post",
+        });
+        // Started, not paid: nothing counted yet.
+        const orderId = res.body.orderId as string;
+        const paidEvents = () =>
+            prisma.analyticsEvent.findMany({
+                where: {
+                    organizationId: s.organizationId,
+                    type: "order.paid",
+                    properties: { path: ["orderId"], equals: orderId },
+                },
+            });
+        expect(await paidEvents()).toHaveLength(0);
+
+        await paid(s.organizationId, payment(res.body).providerIntentId);
+
+        const [event] = await paidEvents();
+        expect(event?.properties).toMatchObject({
+            orderId,
+            source: "instagram",
+            ref: "diwali-post",
+        });
+    });
+
+    it("places the order with no source for values that aren't allowed, never refusing it", async () => {
+        const s = await shop({ onHand: 50 });
+        for (const [visitSource, visitRef] of [
+            ["facebook", "diwali"],
+            [null, "diwali"],
+            [7, null],
+            ["whatsapp", "someone@example.com"],
+            ["whatsapp", "call-9876543210"],
+            ["direct", "x".repeat(200)],
+        ] as unknown[][]) {
+            const { token } = await signIn(s.host);
+            const res = await start(s, token, { visitSource, visitRef });
+            expect([visitSource, visitRef, res.status]).toEqual([
+                visitSource,
+                visitRef,
+                201,
+            ]);
+            const stored = await visitOf(res);
+            if (visitSource === "whatsapp" || visitSource === "direct") {
+                // The group is kept; the label that isn't one is not.
+                expect(stored).toEqual({ visitSource, visitRef: null });
+            } else {
+                expect(stored).toEqual({ visitSource: null, visitRef: null });
+            }
+        }
+    });
+
+    it("takes no visit id, and no source on a quote", async () => {
+        const s = await shop();
+        const { token } = await signIn(s.host);
+        const withId = await start(s, token, {
+            visitSource: "google",
+            visitId: "v_123",
+        });
+        expect(withId.status).toBe(400);
+        const quoted = await quote(s, {
+            lines: [{ listingId: s.listingId, quantity: 1 }],
+            visitSource: "google",
+        });
+        expect(quoted.status).toBe(400);
+    });
+});
+
 describe("the last delivery's address, for the bag to offer again", () => {
     const address = (s: Shop, token: string, host = s.host) =>
         call("GET", `/public/sites/${s.siteId}/checkout/address`, {

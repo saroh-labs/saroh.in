@@ -651,12 +651,32 @@ organizations/:org/customers`: everyone who has paid (an order through a
   every hour"); a live site sends one cookieless `site.view` per page
   (`apps/saroh.app/lib/site-view.ts`: path only, the referrer's origin only,
   nothing when the browser sends Do Not Track or Global Privacy Control,
-  nothing from the account area, never on a test release or preview), and an
+  nothing from a private page — the account area, a checkout, a pay link, an
+  order's page, a waitlist claim (`lib/private-paths.ts`, U15) — never on a
+  test release or preview), and an
   enquiry writes `enquiry.submitted` in its own transaction (UX-032). Its
   Orders tile (#919) counts `order.paid` less `order.refunded` (#867) over the
   range's days; nothing before #867 is back-filled (DEC-012), so a line under
   the tiles says so while the range reaches back before
   `ORDERS_RECORDED_FROM` (`lib/analytics/website-words.ts`).
+- **Current** — where a site visit came from (U15, #1099, A13), first party,
+  for "Where customers come from". The visit lives in the visitor's tab
+  memory only (`@saroh/site-blocks/visit-source`: no cookie, no storage, no
+  id; it ends on a reload, a closed tab or 30 minutes without a page). Its
+  source is one of five groups (`instagram`, `google`, `whatsapp`, `direct`
+  = "Typed your address", `other`) from the referrer's host and an allowed
+  `ref` / `utm_source` value, plus at most one merchant link label of the
+  allowed shape (`analytics/visit-source.ts`: lower-case letters, digits,
+  hyphens, 32 at most, no run of six digits); nothing else in the address is
+  read. Each step is sent once a visit, with the source only and no visitor
+  hash: `site.visit`, `site.looked` (a product or the booking page),
+  `site.started` (a checkout). The checkout copies the source onto the order
+  (`Order.visitSource`, `visitRef`) and `order.paid` / `order.refunded`
+  carry it; `analytics.retention` clears it off orders past 400 days. The
+  rollup adds `source` and `ref` dimensions; `analytics/visit-sources.ts`
+  is the read (counted from the first day a source was recorded; paid is
+  the business's, not a site's). A paid order with no source was taken
+  another way, before tracking began, or from a visit that sent nothing.
 
 ## One word each
 

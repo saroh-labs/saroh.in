@@ -2,6 +2,7 @@ import { ConflictException, HttpException } from "@nestjs/common";
 import { nextOrderNumberInTx, Prisma, prisma } from "@saroh/database";
 
 import { isSerializationFailure } from "../../common/prisma-errors";
+import type { VisitOrigin } from "../analytics/visit-source";
 import { planMeter } from "../billing/metering.service";
 import { splitName } from "../bookings/reservation";
 import { fillContactPhoneInTx } from "../customer-workspace/contact-phone-fill";
@@ -79,6 +80,12 @@ export async function createCheckoutOrder(
          * site (`sites/qr-source.ts`).
          */
         sourceCode?: string | null;
+        /**
+         * Where the website visit it was placed from came from (U15,
+         * `Order.visitSource` / `visitRef`), already checked
+         * (`analytics/visit-source.ts`).
+         */
+        visit?: VisitOrigin | null;
     },
 ): Promise<string> {
     const { lines, type, shippingCents, dto } = input;
@@ -272,6 +279,8 @@ export async function createCheckoutOrder(
                             // The account's Orders find it by this (A7).
                             customerAccountId: account.accountId,
                             sourceCode: input.sourceCode ?? null,
+                            visitSource: input.visit?.source ?? null,
+                            visitRef: input.visit?.ref ?? null,
                             ...(address
                                 ? {
                                       deliveryName: address.name ?? null,

@@ -16,6 +16,7 @@ import { readQrSource } from "../qr-source";
 import { useTestRelease } from "../test-release/context";
 import { TestReleaseStopSheet } from "../test-release/test-release-stop";
 import { itemsText } from "../test-release/words";
+import { markVisitStep, visitFields } from "../visit-source";
 import type {
     CheckoutStarted,
     ShopCheckoutApi,
@@ -163,6 +164,12 @@ export function ShopBag({
     useEffect(() => {
         if (open) bagShown();
     }, [open]);
+    // The classic bag is its own checkout: opening it starts one (U15),
+    // once per visit. A look's bag leads to `/checkout`, which says so.
+    const atCheckout = step.kind === "bag" && !look;
+    useEffect(() => {
+        if (atCheckout) markVisitStep("started");
+    }, [atCheckout]);
 
     const close = useCallback(() => {
         setStep({ kind: "closed" });
@@ -229,7 +236,12 @@ export function ShopBag({
     async function start(request: StartCheckout, who: SignedInCustomer) {
         setBusy(true);
         setProblem(null);
-        const asked = source ? { ...request, source } : request;
+        // The QR code's tag and the visit's source (U15), when there are.
+        const asked = {
+            ...request,
+            ...(source ? { source } : {}),
+            ...visitFields(),
+        };
         const result = await api.start(asked).catch(() => ({
             ok: false as const,
             reason: "error" as const,

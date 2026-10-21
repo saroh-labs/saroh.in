@@ -15,7 +15,8 @@
         "./site-icon": "./src/site-icon.ts",
         "./tailwind-preset": "./src/tailwind-preset.ts",
         "./test-release-words": "./src/test-release-words.ts",
-        "./url-path": "./src/url-path.ts"
+        "./url-path": "./src/url-path.ts",
+        "./visit-source": "./src/visit-source.ts"
     },
     "scripts": {
         "lint": "eslint src/",

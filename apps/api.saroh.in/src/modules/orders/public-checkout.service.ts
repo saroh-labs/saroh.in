@@ -12,6 +12,7 @@ import { prisma, runInOrgContext } from "@saroh/database";
 
 import { isCustomerPhone } from "../../common/customer-phone";
 import { toMinor, toMoneyString } from "../../common/money";
+import { visitOriginOf } from "../analytics/visit-source";
 import { notTakingOrders } from "../billing/paused-errors";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { DiscountsService } from "../discounts/discounts.service";
@@ -444,6 +445,9 @@ export class PublicCheckoutService {
                 payOnHandover: payBy === "ON_HANDOVER",
                 discount: applied,
                 sourceCode,
+                // Where the visit came from (U15): a group and a label, or
+                // nothing; never a reason to refuse the order.
+                visit: visitOriginOf(dto.visitSource, dto.visitRef),
             });
             return payBy === "ON_HANDOVER"
                 ? this.placed(orderId)
