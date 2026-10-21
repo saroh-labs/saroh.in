@@ -40,6 +40,8 @@ export interface CustomerNotifyPayload {
     orderEventId?: string;
     /** The place in line a freed place is offered to (A12). */
     waitlistEntryId?: string;
+    /** The enquiry a "we got your message" answers (U15). */
+    submissionId?: string;
 }
 
 type Tx = Pick<Prisma.TransactionClient, "job">;
@@ -57,6 +59,11 @@ export function orderNoticeKey(orderEventId: string): string {
 /** A placed order's key: once per order, however it came to be placed. */
 export function orderPlacedNoticeKey(orderId: string): string {
     return `order-placed:${orderId}`;
+}
+
+/** An enquiry's auto-reply key: once per submission (U15). */
+export function enquiryReceivedNoticeKey(submissionId: string): string {
+    return `enquiry-received:${submissionId}`;
 }
 
 /** Queue one notice on the caller's transaction. */

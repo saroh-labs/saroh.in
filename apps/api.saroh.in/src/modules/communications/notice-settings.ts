@@ -66,7 +66,7 @@ export const NOTICE_SENDS: Record<NoticeKind, boolean> = {
     MEMBERSHIP: false,
     REFUND: false,
     TEAM_REPLY: false,
-    ENQUIRY_REPLY: false,
+    ENQUIRY_REPLY: true,
     ORDER_DELIVERY: false,
     COURSE: false,
     PACK_CREDITS: false,
@@ -141,7 +141,7 @@ export const NOTICE_WORDS: Record<NoticeKind, { label: string; says: string }> =
         },
         ENQUIRY_REPLY: {
             label: "Enquiry replies",
-            says: "Someone who sends an enquiry is told you got their message.",
+            says: "Someone who sends an enquiry is told you got their message, at most once a day per person. It goes even when an automation also emails them.",
         },
         ORDER_DELIVERY: {
             label: "Delivery updates",

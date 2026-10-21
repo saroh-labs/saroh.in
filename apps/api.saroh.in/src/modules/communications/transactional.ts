@@ -34,6 +34,9 @@ export const NOTICE_TEMPLATES = [
     "ORDER_READY",
     "ORDER_HANDED_OVER",
     "WAITLIST_OFFER",
+    // "We got your message" to someone who sent an enquiry (DEC-174 U15,
+    // #1146): email only, behind the ENQUIRY_REPLY switch.
+    "ENQUIRY_RECEIVED",
 ] as const;
 export type NoticeTemplate = (typeof NOTICE_TEMPLATES)[number];
 

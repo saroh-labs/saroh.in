@@ -5,6 +5,7 @@ import type {
 import { escapeHtml } from "../../communications/transactional";
 import type { CustomerNotifyPayload } from "../customer-notify-queue";
 import { bookingNotice } from "./booking";
+import { enquiryReceivedNotice } from "./enquiry-received";
 import type { NoticeDefinition, NoticeSubject, NoticeVarsBase } from "./notice";
 import { safeLink } from "./notice";
 import { orderStepNotice, placedOrderNotice } from "./order";
@@ -28,6 +29,7 @@ export const NOTICES = {
     BOOKING_CONFIRMED: bookingNotice,
     BOOKING_LAPSED: bookingNotice,
     BOOKING_MOVED: bookingNotice,
+    ENQUIRY_RECEIVED: enquiryReceivedNotice,
     ORDER_HANDED_OVER: orderStepNotice,
     ORDER_PLACED: placedOrderNotice,
     ORDER_READY: orderStepNotice,
@@ -102,9 +104,17 @@ export function renderNotice(vars: NoticeVars): RenderedMessage {
         }),
         ...(back ? [back] : []),
     ];
+    // Words they wrote, quoted back as plain text (the enquiry reply).
+    const quote = def.quote?.(vars) ?? null;
     const body = [
         `<p>${greeting}</p>`,
         `<p>${escapeHtml(def.sentence(vars))}</p>`,
+        ...(quote
+            ? [
+                  `<p>${escapeHtml(quote.lead)}</p>`,
+                  `<blockquote>${escapeHtml(quote.text).replace(/\r?\n/g, "<br>")}</blockquote>`,
+              ]
+            : []),
         ...links.map(
             (l) =>
                 `<p>${escapeHtml(l.lead)}<br><a href="${escapeHtml(l.url)}">${escapeHtml(l.url)}</a></p>`,

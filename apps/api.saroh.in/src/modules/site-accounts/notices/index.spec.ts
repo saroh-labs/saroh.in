@@ -72,6 +72,14 @@ const SAMPLES: Record<(typeof NOTICE_TEMPLATES)[number], NoticeVars> = {
             byCustomer: false,
         },
     },
+    ENQUIRY_RECEIVED: {
+        kind: "ENQUIRY_RECEIVED",
+        enquiry: {
+            business: "Rye <&> Co.",
+            firstName: "Asha",
+            message: "Do you <b>open</b> on Sundays?",
+        },
+    },
     ORDER_PLACED: {
         kind: "ORDER_PLACED",
         placed: {

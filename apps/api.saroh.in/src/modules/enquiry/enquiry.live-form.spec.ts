@@ -16,6 +16,9 @@ jest.mock("@saroh/database", () => {
         job: { create: jest.fn() },
         activity: { create: jest.fn() },
         analyticsEvent: { create: jest.fn() },
+        // The auto-reply's reads (U15): no email provider, so none is queued.
+        communicationProvider: { findUnique: jest.fn() },
+        customerNoticeSetting: { findUnique: jest.fn() },
     };
     return {
         ...actual,

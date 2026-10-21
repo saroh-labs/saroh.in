@@ -60,7 +60,8 @@ const NOTHING: NoticeOutcome = {
  *     nothing.
  *  3. The account thread gets a SYSTEM message when it is live
  *     (`notice-reach.ts`): the customer sees it in their account, or when
- *     they first sign in.
+ *     they first sign in. Never for an email-only kind (the enquiry
+ *     reply, U15), which with no provider stops before step 1.
  *  4. The contact's own email (DEC-174 D1: a desk, phone or guest
  *     customer too; a live site account's verified address wins, A2,
  *     `contactNoticeAddress`), at a business whose own email provider is
@@ -95,6 +96,9 @@ export class CustomerNotifyService {
         // Who would email it, read once: the business's own provider, or
         // nobody.
         const provider = await emailRoute(tx, organizationId);
+        // An email-only notice (the enquiry reply) with no provider reaches
+        // nobody: nothing is claimed or written.
+        if (definition.emailOnly && provider === null) return NOTHING;
         const claimed = await tx.customerNotice.createMany({
             data: [
                 {
@@ -119,7 +123,9 @@ export class CustomerNotifyService {
         if (!contact || contact.removed) return NOTHING;
 
         const [thread, address] = await Promise.all([
-            threadLive(organizationId),
+            definition.emailOnly
+                ? Promise.resolve(false)
+                : threadLive(organizationId),
             provider === null
                 ? Promise.resolve(null)
                 : contactNoticeAddress(tx, organizationId, contact.id),

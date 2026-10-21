@@ -506,6 +506,20 @@ the Privacy Policy states both.
   module imports one of Saroh's own senders. The `Message` statuses it
   wrote (`ALLOWANCE_USED`, `NO_ALLOWANCE`, `BOOKING_LIMIT`, `STOPPED`,
   `UNKNOWN`) stay readable for any old row.
+- **The enquiry auto-reply** (DEC-174 U15, #1146, `ENQUIRY_RECEIVED`,
+  `enquiry-received:<submissionId>`). The public submit queues it on its own
+  transaction beside the team's `enquiry.notify`, never inside it
+  (`enquiry/enquiry-reply.ts`), and only when the submission isn't obvious
+  spam (`enquiry/enquiry-words.ts`: markup, three links, a link in a name,
+  a wall of text), the business's own email is connected and
+  `ENQUIRY_REPLY` is on. A notice marked `emailOnly` never writes to the
+  account thread, and with no provider claims nothing. The job sends at
+  most one per address per business in 24 hours, counted from the
+  `ENQUIRY_RECEIVED` messages to that address (any case) under a
+  transaction lock on the address, so runs at once wait for each other;
+  none to an address with a `BOUNCED` delivery. Their message is quoted
+  back, cut to 500 characters, and never when it carries a link: the
+  business's email never carries a link a stranger chose.
 
 ## Autopay charges — **Current** (D13)
 

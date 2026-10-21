@@ -11,6 +11,7 @@ import { Prisma, prisma } from "@saroh/database";
 import { enquirySubmittedEvent } from "../analytics/enquiry-event";
 import type { FieldType, FormField } from "../forms/dto";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
+import { enqueueEnquiryReply } from "./enquiry-reply";
 import { fieldsFromSnapshot } from "./live-form-fields";
 import { FixedWindowRateLimiter } from "./rate-limiter";
 
@@ -91,7 +92,8 @@ export class EnquiryService {
      *  3. Idempotency: an existing Submission for `(formId, idempotencyKey)` is replayed, no new lead.
      *  4. Rate-limit by `${formId}:${ipHash}`; 429 on exceed.
      *  5. In ONE transaction: upsert Contact, ensure Pipeline+Stage, create Lead,
-     *     create immutable Submission, enqueue the `enquiry.notify` Job, log a CREATED Activity.
+     *     create immutable Submission, enqueue the `enquiry.notify` Job, the
+     *     auto-reply where it goes (`enquiry-reply.ts`), log a CREATED Activity.
      *
      * @param formId          the target Form's id (the only client-chosen routing input)
      * @param data            raw field name → value map as submitted
@@ -198,6 +200,16 @@ export class EnquiryService {
                             submissionId: submission.id,
                         },
                     },
+                });
+
+                // "We got your message" to the person who wrote (U15): its
+                // own job, queued only when the switch is on, the business's
+                // own email is connected and it isn't obvious spam.
+                await enqueueEnquiryReply(tx, {
+                    organizationId,
+                    submissionId: submission.id,
+                    fields,
+                    data,
                 });
 
                 // Transactional outbox: a committed NEW lead ALWAYS gets one

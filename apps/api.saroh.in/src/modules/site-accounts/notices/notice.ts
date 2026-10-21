@@ -71,6 +71,23 @@ export interface NoticeDefinition<V extends NoticeVarsBase> {
     backLink?(vars: V): NoticeLinkLine | null;
     /** The vars with the way back put in (`notice-link.ts`). */
     withLink?(vars: V, link: string): V;
+    /**
+     * Words the customer wrote, quoted back under the email's lead (the
+     * enquiry auto-reply's message). Plain text; null: no quote.
+     */
+    quote?(vars: V): NoticeQuote | null;
+    /**
+     * Email only, never the account thread: someone the notice answers is
+     * not yet a customer with an account (the enquiry auto-reply). With no
+     * provider it reaches nobody, so nothing is claimed or written.
+     */
+    emailOnly?: boolean;
+}
+
+/** A quote in the email: the words above it, and what they wrote. */
+export interface NoticeQuote {
+    lead: string;
+    text: string;
 }
 
 /** Declare a notice: only checks its shape. */
