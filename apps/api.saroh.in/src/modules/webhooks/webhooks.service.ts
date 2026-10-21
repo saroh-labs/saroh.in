@@ -64,6 +64,10 @@ import {
 } from "../payments/mandate-events";
 import { settleMismatchRefundInTx } from "../payments/mismatch-refund";
 import { PaymentsService } from "../payments/payments.service";
+import {
+    enqueueRefundAlert,
+    enqueueRefundSentNotice,
+} from "../payments/refund-notices";
 import { enqueueRefundSendInTx } from "../payments/send-refund.handler";
 import { enqueueOrderPlacedNotice } from "../site-accounts/customer-notify-queue";
 import { enqueueAutopayFailedNotice } from "../site-accounts/notices/autopay-failed";
@@ -1223,6 +1227,15 @@ export class WebhooksService {
             // A booking's refund in its history (#1137), unless the cancel
             // already wrote it so.
             await recordBookingRefundInTx(tx, existing.id, "SETTLED");
+            // The customer hears it is on its way (U12), if the refund
+            // call's answer didn't tell them already: keyed to the refund,
+            // so once. A FAILED row the provider says went back after all
+            // is told now, truthfully.
+            await enqueueRefundSentNotice(
+                tx,
+                intent.organizationId,
+                existing.id,
+            );
             return { applied: true, refundId: existing.id, settledNow: true };
         }
         // Made outside Saroh (the provider's dashboard): recorded at what the
@@ -1288,6 +1301,16 @@ export class WebhooksService {
         // A booking's refund that never went back (#1137): "Refund failed"
         // in its history, after the "Refunded" its cancel wrote.
         await recordBookingRefundInTx(tx, existing.id, "FAILED");
+        // The team hears no money went back (U12): queued only by the write
+        // that moved it to FAILED, so a redelivered webhook, which finds
+        // the row FAILED, tells nobody again. The customer may have been
+        // told it was on its way; the team chooses what to say.
+        await enqueueRefundAlert(
+            tx,
+            intent.organizationId,
+            existing.id,
+            "failed",
+        );
         return { applied: true };
     }
 

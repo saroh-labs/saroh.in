@@ -56,6 +56,9 @@ export const NOTICE_TEMPLATES = [
     "THREAD_REPLY",
     // A renewal's autopay charge failed, with a fresh link to pay (U10).
     "AUTOPAY_FAILED",
+    // "₹X is on its way back to how you paid" (DEC-174 U12, #1143): an
+    // online refund the provider took, behind the REFUND switch.
+    "REFUND_SENT",
 ] as const;
 export type NoticeTemplate = (typeof NOTICE_TEMPLATES)[number];
 

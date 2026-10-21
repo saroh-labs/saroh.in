@@ -51,6 +51,8 @@ export interface CustomerNotifyPayload {
     threadMessageId?: string;
     /** The invoice a failed autopay charge was for (U10). */
     invoiceId?: string;
+    /** The online refund the customer is told is on its way (U12). */
+    refundId?: string;
 }
 
 type Tx = Pick<Prisma.TransactionClient, "job">;
@@ -73,6 +75,11 @@ export function orderPlacedNoticeKey(orderId: string): string {
 /** An enquiry's auto-reply key: once per submission (U15). */
 export function enquiryReceivedNoticeKey(submissionId: string): string {
     return `enquiry-received:${submissionId}`;
+}
+
+/** An online refund's key: once per refund, however it was sent (U12). */
+export function refundNoticeKey(refundId: string): string {
+    return `refund:${refundId}`;
 }
 
 /** Queue one notice on the caller's transaction. */

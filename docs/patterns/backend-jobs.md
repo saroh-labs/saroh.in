@@ -687,6 +687,26 @@ the Privacy Policy states both.
   captured payment's attempt). A failed pay-link payment never says "the
   same link": a link is shown once (DEC-110), so the words say a new one is
   needed and where to share it.
+- **Refunds told** (#1143, DEC-174, `payments/refund-notices.ts`): an
+  online refund the provider took tells the customer "₹X for your order …
+  is on its way back to how you paid" (`customer.notify` `REFUND_SENT`,
+  behind the REFUND switch), keyed `refund:<PaymentRefund id>` and queued
+  by whichever write records the provider took it: the refund call
+  attaching the provider's id (`settleFromProvider`), or the refund
+  webhook settling Saroh's row. A refund by hand (cash at the counter) is no
+  `PaymentRefund` and tells nobody; one made in the provider's dashboard, or
+  the ₹1 autopay check's, isn't sent from here. No money back tells the team
+  on the Payment failed row (`team.alert` `refund`): "refused" from the
+  write that moved the row to FAILED on the provider's no (`failRefund`,
+  which skips whoever asked and saw it on screen; a booking's automatic
+  refund tells everyone), "failed" from the webhook's `failProviderRefund`.
+  Only the write that moved the row to FAILED queues it, so a redelivered
+  webhook tells nobody twice; keyed `team:refund:<change>:<id>`. The alert
+  re-reads first: a refund the provider says went back after all, or money
+  handed back since by another refund, says nothing; it says when the
+  customer had already been told it was on its way. Types
+  `refund.refused|failed` open the order, `.booking` the booking, `.invoice`
+  the invoice.
 
 ## Scheduled go-live — **Current** (DEC-071, T10)
 

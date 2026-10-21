@@ -24,6 +24,7 @@ import {
 } from "./money-alerts";
 import { noticeHeadOf, noticeOf } from "./notice-target";
 import { wordProvider } from "./provider-alerts";
+import { wordRefund } from "./refund-alerts";
 import { wordReview } from "./review-alerts";
 import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
 import { TEAM_ALERT_TYPE } from "./team-alerts";
@@ -44,6 +45,14 @@ export {
     PROVIDER_ATTENTION_NOTIFICATION_TYPE,
     PROVIDER_BACK_NOTIFICATION_TYPE,
 } from "./provider-alerts";
+export {
+    REFUND_FAILED_BOOKING_NOTIFICATION_TYPE,
+    REFUND_FAILED_INVOICE_NOTIFICATION_TYPE,
+    REFUND_FAILED_NOTIFICATION_TYPE,
+    REFUND_REFUSED_BOOKING_NOTIFICATION_TYPE,
+    REFUND_REFUSED_INVOICE_NOTIFICATION_TYPE,
+    REFUND_REFUSED_NOTIFICATION_TYPE,
+} from "./refund-alerts";
 export { TEAM_ALERT_TYPE } from "./team-alerts";
 export { ORDER_UNCOLLECTED_NOTIFICATION_TYPE } from "./uncollected-alert";
 
@@ -435,6 +444,8 @@ export async function wordAlert(
             return wordPaymentMismatch(tx, organizationId, payload);
         case "paid-by-link":
             return wordOrderPaidByLink(tx, organizationId, payload);
+        case "refund":
+            return wordRefund(tx, organizationId, payload);
         case "team":
             return wordJoined(tx, organizationId, payload);
         case "booking":
@@ -749,6 +760,11 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
                 : null;
         case "mismatch":
             return str("paymentIntentId") && str("attemptId")
+                ? (p as TeamAlertPayload)
+                : null;
+        case "refund":
+            return str("refundId") &&
+                (p.change === "failed" || p.change === "refused")
                 ? (p as TeamAlertPayload)
                 : null;
         case "request":

@@ -51,6 +51,10 @@ jest.mock("@saroh/database", () => {
         },
         // The invoice's history (U9 #1140): a failed attempt is written.
         invoiceEvent: { createMany: jest.fn() },
+        // The business's notice switches (U12): none stored, so on.
+        customerNoticeSetting: { findUnique: jest.fn() },
+        // The customer's refund notice (U12), queued on the transaction.
+        job: { create: jest.fn() },
         // The intent's row lock, then the invoice's; [] keeps the status read.
         $queryRaw: jest.fn().mockResolvedValue([]),
     };

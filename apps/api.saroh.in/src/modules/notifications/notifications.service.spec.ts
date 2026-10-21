@@ -411,6 +411,13 @@ describe("what each person sees of the inbox (F14)", () => {
                 "order.payment_failed",
                 "payment.mismatch",
                 "payment.mismatch.invoice",
+                // A refund refused or failed (#1143).
+                "refund.refused",
+                "refund.refused.booking",
+                "refund.refused.invoice",
+                "refund.failed",
+                "refund.failed.booking",
+                "refund.failed.invoice",
                 "site.live",
                 "site.not_live",
                 "site.review.approved",

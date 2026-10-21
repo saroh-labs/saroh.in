@@ -124,6 +124,14 @@ export const ALERT_NOTIFICATION_TYPES: Record<AlertEvent, readonly string[]> = {
         "order.payment_failed",
         "payment.mismatch",
         "payment.mismatch.invoice",
+        // #1143: a refund refused by the provider, or failed after it was
+        // sent, on an order, a booking or an invoice.
+        "refund.refused",
+        "refund.refused.booking",
+        "refund.refused.invoice",
+        "refund.failed",
+        "refund.failed.booking",
+        "refund.failed.invoice",
     ],
     team: ["team.joined"],
     // UX-043: a reviewer's verdict, or their first note of a round.

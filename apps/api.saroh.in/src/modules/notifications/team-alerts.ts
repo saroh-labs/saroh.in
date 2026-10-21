@@ -32,6 +32,12 @@ export const TEAM_ALERT_TYPE = "team.alert";
  *   on the Payment failed row.
  * - `paid-by-link`: an order the team made, paid online by the customer
  *   (#1139), on the New order row. Keyed to the payment intent.
+ * - `refund`: an online refund that sent no money back (U12, #1143), on
+ *   the Payment failed row: `change` "refused" when the provider said no
+ *   to Saroh's call, "failed" when it took it and it failed later. Queued
+ *   only by the write that moved the refund to FAILED
+ *   (`payments/refund-notices.ts`); keyed to the refund and the change.
+ *   `actorUserId` asked for it and saw the refusal, so isn't told.
  * - `team`: someone accepted an invitation and joined the team. Keyed to
  *   the invitation, so someone who leaves and is invited back is told of
  *   again.
@@ -88,6 +94,12 @@ export type TeamAlertPayload =
     | { event: "order-failed"; orderId: string; paymentIntentId: string }
     | { event: "mismatch"; paymentIntentId: string; attemptId: string }
     | { event: "paid-by-link"; orderId: string; paymentIntentId: string }
+    | {
+          event: "refund";
+          refundId: string;
+          change: "failed" | "refused";
+          actorUserId?: string | null;
+      }
     | { event: "team"; userId: string; invitationId: string }
     | { event: "booking"; notificationId: string }
     | { event: "uncollected"; orderId: string }

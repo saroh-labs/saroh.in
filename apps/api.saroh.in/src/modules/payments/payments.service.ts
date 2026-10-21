@@ -80,6 +80,7 @@ import {
     RefundCallError,
 } from "./providers/provider.port";
 import { needsPublicKey, publicKeyFor } from "./public-key";
+import { enqueueRefundAlert, enqueueRefundSentNotice } from "./refund-notices";
 import type { SealedCredentials } from "./webhook-secret";
 import { webhookSecretFrom } from "./webhook-secret";
 import type { WebhookSetup } from "./webhook-setup";
@@ -1000,8 +1001,19 @@ export class PaymentsService {
         }
 
         const outcome = found
-            ? await this.settleFromProvider(row.id, found)
-            : await this.sendRefund(ctx.organizationId, row, row.paymentIntent);
+            ? await this.settleFromProvider(
+                  ctx.organizationId,
+                  row.id,
+                  found,
+                  ctx.userId,
+              )
+            : await this.sendRefund(
+                  ctx.organizationId,
+                  row,
+                  row.paymentIntent,
+                  undefined,
+                  ctx.userId,
+              );
         if (outcome.kind === "ACCEPTED") {
             await this.recordRefundTaken(ctx, order.id, row.reason, [outcome]);
         }
@@ -1115,7 +1127,7 @@ export class PaymentsService {
             return "UNKNOWN";
         }
         const outcome = found
-            ? await this.settleFromProvider(row.id, found)
+            ? await this.settleFromProvider(organizationId, row.id, found)
             : await this.sendRefund(organizationId, row, row.paymentIntent);
         if (outcome.kind === "ACCEPTED" && row.paymentIntent.orderId) {
             await this.recordRefundTaken(
@@ -1242,12 +1254,18 @@ export class PaymentsService {
             }
         }
         const outcome = found
-            ? await this.settleFromProvider(row.id, found)
+            ? await this.settleFromProvider(
+                  ctx.organizationId,
+                  row.id,
+                  found,
+                  ctx.userId,
+              )
             : await this.sendRefund(
                   ctx.organizationId,
                   row,
                   paying,
                   attempt.providerRef,
+                  ctx.userId,
               );
         if (outcome.kind === "REFUSED") throw refusal(outcome.error);
         return refundResult([outcome.row]);
@@ -1424,6 +1442,8 @@ export class PaymentsService {
                     ctx.organizationId,
                     reserved.rows[i],
                     part.payment.intent,
+                    undefined,
+                    ctx.userId,
                 ),
             );
         }
@@ -1465,6 +1485,8 @@ export class PaymentsService {
         },
         /** The payment to refund, when it isn't the intent's latest (PAY-06). */
         paymentRef?: string | null,
+        /** Who asked for it, and sees a refusal on screen; null: automatic. */
+        actorUserId: string | null = null,
     ): Promise<RefundOutcome> {
         // Setting the call up — the business's provider and its keys — sends
         // nothing: a failure there is a refusal.
@@ -1476,7 +1498,7 @@ export class PaymentsService {
         } catch (err) {
             return {
                 kind: "REFUSED",
-                row: await this.failRefund(row.id),
+                row: await this.failRefund(organizationId, row.id, actorUserId),
                 error: err instanceof Error ? err : new Error(String(err)),
             };
         }
@@ -1499,7 +1521,11 @@ export class PaymentsService {
             if (err instanceof RefundCallError && err.outcome === "REFUSED") {
                 return {
                     kind: "REFUSED",
-                    row: await this.failRefund(row.id),
+                    row: await this.failRefund(
+                        organizationId,
+                        row.id,
+                        actorUserId,
+                    ),
                     error,
                 };
             }
@@ -1508,18 +1534,29 @@ export class PaymentsService {
             );
             return { kind: "UNKNOWN", row: await this.refundRow(row.id) };
         }
-        return this.settleFromProvider(row.id, result);
+        return this.settleFromProvider(
+            organizationId,
+            row.id,
+            result,
+            actorUserId,
+        );
     }
 
     /** Record a refund the provider has answered for (sent, or looked up). */
     private async settleFromProvider(
+        organizationId: string,
         refundId: string,
         result: RefundResult,
+        actorUserId: string | null = null,
     ): Promise<RefundOutcome> {
         if (result.failed) {
             return {
                 kind: "REFUSED",
-                row: await this.failRefund(refundId),
+                row: await this.failRefund(
+                    organizationId,
+                    refundId,
+                    actorUserId,
+                ),
                 error: new RefundCallError(
                     `The provider refused refund ${refundId} (${result.status})`,
                     "REFUSED",
@@ -1529,9 +1566,21 @@ export class PaymentsService {
         // Only a row still PENDING with no provider id: the webhook may have
         // matched it by Saroh's reference and settled it first, under the
         // row's lock — then it wrote the REFUND step, and this call must not.
-        const { count } = await prisma.paymentRefund.updateMany({
-            where: { id: refundId, status: "PENDING", providerRefundId: null },
-            data: { providerRefundId: result.providerRefundId },
+        // The customer is told it is on its way (U12) by whichever write
+        // records the provider took it: here, or the webhook's settle.
+        const count = await prisma.$transaction(async (tx) => {
+            const attached = await tx.paymentRefund.updateMany({
+                where: {
+                    id: refundId,
+                    status: "PENDING",
+                    providerRefundId: null,
+                },
+                data: { providerRefundId: result.providerRefundId },
+            });
+            if (attached.count === 1) {
+                await enqueueRefundSentNotice(tx, organizationId, refundId);
+            }
+            return attached.count;
         });
         return {
             kind: "ACCEPTED",
@@ -1646,12 +1695,32 @@ export class PaymentsService {
         };
     }
 
-    /** Nothing went back: free the money and the lines again. */
-    private async failRefund(refundId: string): Promise<RefundRow> {
-        // Only a row still PENDING — a settled refund is never un-made.
-        await prisma.paymentRefund.updateMany({
-            where: { id: refundId, status: "PENDING" },
-            data: { status: "FAILED" },
+    /**
+     * Nothing went back: free the money and the lines again. The write that
+     * moves the row to FAILED tells the team (U12, `refund` "refused"),
+     * all but `actorUserId`, who asked for it and sees the refusal on
+     * screen; an automatic refund's (a booking's cancel, a refused
+     * checkout's) tells everyone on the Payment failed row.
+     */
+    private async failRefund(
+        organizationId: string,
+        refundId: string,
+        actorUserId: string | null = null,
+    ): Promise<RefundRow> {
+        await prisma.$transaction(async (tx) => {
+            // Only a row still PENDING — a settled refund is never un-made.
+            const { count } = await tx.paymentRefund.updateMany({
+                where: { id: refundId, status: "PENDING" },
+                data: { status: "FAILED" },
+            });
+            if (count === 0) return;
+            await enqueueRefundAlert(
+                tx,
+                organizationId,
+                refundId,
+                "refused",
+                actorUserId,
+            );
         });
         return this.refundRow(refundId);
     }

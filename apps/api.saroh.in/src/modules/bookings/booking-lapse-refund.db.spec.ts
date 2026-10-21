@@ -30,6 +30,8 @@ import { createHmac } from "node:crypto";
 import { giveBusinessDetails } from "../../../test/business-details";
 import { isRlsTestMode } from "../../../test/rls-mode";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { wordAlert } from "../notifications/team-alert.handler";
+import { TEAM_ALERT_TYPE } from "../notifications/team-alerts";
 import { recordBookingRefundInTx } from "../payments/booking-refund";
 import { PaymentsService } from "../payments/payments.service";
 import {
@@ -524,6 +526,29 @@ describe("a booking's refund in its history (#1137)", () => {
                 }),
             ],
         ]);
+        // The team hears it (U12, #1143): refund.refused on the booking,
+        // for everyone on the Payment failed row (an automatic refund).
+        const refund = await prisma.paymentRefund.findFirstOrThrow({
+            where: { idempotencyKey: `deposit-refund:${made.booking.id}` },
+        });
+        const alerts = await refundAlerts(refund.id);
+        expect(alerts).toEqual([
+            { event: "refund", refundId: refund.id, change: "refused" },
+        ]);
+        const worded = await runInOrgContext(owner.organizationId, () =>
+            prisma.$transaction((tx) =>
+                wordAlert(tx, owner.organizationId, alerts[0]),
+            ),
+        );
+        expect(worded).toMatchObject({
+            event: "failed",
+            type: "refund.refused.booking",
+            bookingId: made.booking.id,
+            skipUserId: null,
+            eventKey: `team:refund:refused:${refund.id}`,
+        });
+        // Never told to the customer: no money went back.
+        expect(await refundNotices(refund.id)).toBe(0);
     });
 
     it("sent, then failed by the provider's webhook: 'Refund failed' follows 'Refunded'", async () => {
@@ -559,6 +584,19 @@ describe("a booking's refund in its history (#1137)", () => {
             refundId: refund.id,
             outcome: "FAILED",
         });
+        // The customer was told it was on its way when the provider took
+        // it; its failure later tells the team, once (U12, #1143).
+        expect(await refundNotices(refund.id)).toBe(1);
+        await webhook({
+            eventType: "refund.failed",
+            outcome: "REFUND_FAILED",
+            providerIntentId: made.intent.providerIntentId,
+            providerRefundId: refund.providerRefundId,
+            refundReference: refund.id,
+        });
+        expect(await refundAlerts(refund.id)).toEqual([
+            { event: "refund", refundId: refund.id, change: "failed" },
+        ]);
     });
 
     it("a refund that isn't a booking's own (an order's) writes no booking line", async () => {
@@ -583,6 +621,39 @@ describe("a booking's refund in its history (#1137)", () => {
         expect(none).toBe(false);
     });
 });
+
+/** The team's refund alerts queued about one refund (U12). */
+async function refundAlerts(refundId: string) {
+    const jobs = await prisma.job.findMany({
+        where: { type: TEAM_ALERT_TYPE },
+        orderBy: { createdAt: "asc" },
+        select: { payload: true },
+    });
+    return jobs
+        .map(
+            (j) =>
+                j.payload as {
+                    event: "refund";
+                    refundId: string;
+                    change: "failed" | "refused";
+                },
+        )
+        .filter((p) => p.event === "refund" && p.refundId === refundId);
+}
+
+/** The customer's "on its way" notices queued for one refund (U12). */
+async function refundNotices(refundId: string): Promise<number> {
+    const jobs = await prisma.job.findMany({
+        where: { type: "customer.notify" },
+        select: { payload: true },
+    });
+    return jobs.filter(
+        (j) =>
+            (j.payload as { kind?: string; refundId?: string }).kind ===
+                "REFUND_SENT" &&
+            (j.payload as { refundId?: string }).refundId === refundId,
+    ).length;
+}
 
 const describeRls = isRlsTestMode() ? describe : describe.skip;
 

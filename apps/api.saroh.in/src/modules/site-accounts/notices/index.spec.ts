@@ -159,6 +159,17 @@ const SAMPLES: Record<(typeof NOTICE_TEMPLATES)[number], NoticeVars> = {
         },
     },
     ...membershipSamples(),
+    REFUND_SENT: {
+        kind: "REFUND_SENT",
+        refund: {
+            business: "Rye <&> Co.",
+            firstName: "Asha",
+            amountCents: 50000,
+            currency: "INR",
+            about: "your order ORD-1019",
+            method: null,
+        },
+    },
     THREAD_REPLY: {
         kind: "THREAD_REPLY",
         reply: {

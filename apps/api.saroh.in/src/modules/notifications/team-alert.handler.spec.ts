@@ -1867,3 +1867,170 @@ describe("a booking with you (#1138)", () => {
         expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 });
+
+describe("a refund that sent no money back (#1143)", () => {
+    const refused = {
+        event: "refund",
+        refundId: "ref_1",
+        change: "refused",
+    } as const;
+    const failed = { ...refused, change: "failed" } as const;
+    const ORDER = {
+        id: "ord_1",
+        orderId: "#1042",
+        paymentStatus: "PAID",
+        customerId: "cus_1",
+        walkInName: null,
+        customer: { firstName: "Asha", lastName: "Rao", email: null },
+    };
+    function refundTx(
+        intent: Partial<{
+            order: unknown;
+            invoice: unknown;
+            purpose: string | null;
+            refunds: { amountCents: number }[];
+        }>,
+        status = "FAILED",
+    ) {
+        const tx = makeTx();
+        const withRefunds = tx as FakeTx & {
+            paymentRefund: { findFirst: jest.Mock };
+            customerNotice: { findUnique: jest.Mock };
+        };
+        withRefunds.paymentRefund.findFirst = jest.fn().mockResolvedValue({
+            id: "ref_1",
+            status,
+            amountCents: 50000,
+            currency: "INR",
+            paymentIntent: {
+                amountCents: 120000,
+                purpose: null,
+                refunds: [],
+                order: null,
+                invoice: null,
+                ...intent,
+            },
+        });
+        withRefunds.customerNotice.findUnique = jest
+            .fn()
+            .mockResolvedValue(null);
+        return withRefunds;
+    }
+
+    it("refused on an order: the bell opens the order, keyed to the refund, on the Payment failed row", async () => {
+        const tx = refundTx({ order: ORDER });
+        const out = await tellTeam(asTx(tx), ORG, refused);
+        expect(
+            tx.customerNotice.createMany.mock.calls[0][0].data[0],
+        ).toMatchObject({ eventKey: "team:refund:refused:ref_1" });
+        expect(tx.notification.create.mock.calls[0][0].data).toEqual({
+            organizationId: ORG,
+            type: "refund.refused",
+            orderId: "ord_1",
+            title: "Refund on order #1042 was refused",
+            body: "Asha Rao's refund of ₹500 was refused by your payment provider. No money went back to the customer. Open the order to refund it again.",
+        });
+        expect(recipients(out)).toEqual(["u_owner", "u_admin"]);
+        // Saroh's email names no customer.
+        expect(out.emails[0].mail.body).not.toContain("Asha");
+        expect(out.emails[0].mail.body).toContain("₹500");
+    });
+
+    it("whoever asked for it and saw the refusal isn't emailed; the rest are", async () => {
+        const tx = refundTx({ order: ORDER });
+        const out = await tellTeam(asTx(tx), ORG, {
+            ...refused,
+            actorUserId: "u_owner",
+        });
+        expect(recipients(out)).toEqual(["u_admin"]);
+    });
+
+    it("a booking's automatic refund refused: opens the booking", async () => {
+        const tx = refundTx({
+            invoice: {
+                id: "inv_1",
+                number: "INV-0042",
+                billToName: null,
+                contact: null,
+                booking: {
+                    id: "bk_1",
+                    bookerName: "Meera",
+                    service: { name: "Haircut" },
+                    contact: { firstName: "Meera", lastName: "Iyer" },
+                },
+            },
+        });
+        const out = await tellTeam(asTx(tx), ORG, refused);
+        expect(tx.notification.create.mock.calls[0][0].data).toMatchObject({
+            type: "refund.refused.booking",
+            bookingId: "bk_1",
+            title: "Refund for Meera Iyer's Haircut was refused",
+        });
+        expect(out.emails[0].mail).toMatchObject({
+            heading: "Refund on a booking was refused",
+            body: expect.stringContaining(
+                "A refund of ₹500 on a Haircut booking was refused",
+            ),
+        });
+        expect(out.emails[0].mail.body).not.toContain("Meera");
+    });
+
+    it("failed later on an invoice, after the customer was told: says so", async () => {
+        const tx = refundTx({
+            invoice: {
+                id: "inv_1",
+                number: "INV-0042",
+                billToName: "Rao Traders",
+                contact: null,
+                booking: null,
+            },
+        });
+        tx.customerNotice.findUnique.mockResolvedValue({
+            threadMessageId: null,
+            messageId: "msg_1",
+        });
+        await tellTeam(asTx(tx), ORG, failed);
+        expect(
+            tx.customerNotice.createMany.mock.calls[0][0].data[0],
+        ).toMatchObject({ eventKey: "team:refund:failed:ref_1" });
+        expect(tx.notification.create.mock.calls[0][0].data).toMatchObject({
+            type: "refund.failed.invoice",
+            invoiceId: "inv_1",
+            title: "Refund on invoice INV-0042 failed",
+            body: "Rao Traders's refund of ₹500 failed at your payment provider after it was sent. No money went back, though the customer was told it was on its way.",
+        });
+    });
+
+    it("says nothing once it went back after all, money was handed back since, or for the autopay check", async () => {
+        const settled = refundTx({ order: ORDER }, "SUCCEEDED");
+        expect((await tellTeam(asTx(settled), ORG, failed)).told).toBe(false);
+
+        const handedBack = refundTx({
+            order: ORDER,
+            refunds: [{ amountCents: 120000 }],
+        });
+        expect((await tellTeam(asTx(handedBack), ORG, refused)).told).toBe(
+            false,
+        );
+
+        const check = refundTx({ purpose: "AUTHORISATION" });
+        expect((await tellTeam(asTx(check), ORG, refused)).told).toBe(false);
+        expect(check.notification.create).not.toHaveBeenCalled();
+    });
+
+    it("a refund alert job with no refund or an unknown change is dropped", async () => {
+        const job = (payload: unknown) =>
+            ({
+                id: "job_1",
+                organizationId: ORG,
+                type: TEAM_ALERT_TYPE,
+                payload,
+            }) as unknown as Job;
+        const handler = new TeamAlertHandler();
+        await handler.handle(job({ event: "refund", change: "refused" }));
+        await handler.handle(
+            job({ event: "refund", refundId: "ref_1", change: "maybe" }),
+        );
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+});

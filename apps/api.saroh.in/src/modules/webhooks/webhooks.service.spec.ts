@@ -71,6 +71,8 @@ jest.mock("@saroh/database", () => {
         orderEvent: { create: jest.fn() },
         // The team's alerts (#1139), queued on the webhook's transaction.
         job: { create: jest.fn() },
+        // The business's notice switches (U12): none stored, so on.
+        customerNoticeSetting: { findUnique: jest.fn() },
     };
     return {
         ...actual,
