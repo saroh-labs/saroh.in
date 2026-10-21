@@ -18,6 +18,7 @@ import { accountAreaOn } from "./account-area";
 import type { CustomerContext } from "./customer-context.decorator";
 import type { AccountMessage, AccountThread } from "./customer-view";
 import { messageView } from "./customer-view";
+import { enqueueTeamReplyNotice, teamReplyEmailedTo } from "./team-reply";
 import { appendMessage, markRead, unreadCount } from "./thread-store";
 import type { WaitingThreads } from "./threads-waiting";
 import { NOBODY_WAITING, readWaitingOnTeam } from "./threads-waiting";
@@ -82,6 +83,12 @@ export interface StaffThread {
     signsIn: boolean;
     /** The viewer may answer (`message:write`). */
     canReply: boolean;
+    /**
+     * Where a reply is emailed (DEC-174 U14): the business's own provider,
+     * its TEAM_REPLY switch on, an address and their consent. Null: it
+     * isn't, and waits in Messages.
+     */
+    emailedTo: string | null;
 }
 
 function notFound(): never {
@@ -201,12 +208,13 @@ export class ThreadsService {
         authorize(ctx, "message:read");
         const organizationId = ctx.organizationId;
         await this.liveContact(organizationId, contactId);
-        const [rows, unread, accounts] = await Promise.all([
+        const [rows, unread, accounts, emailedTo] = await Promise.all([
             this.newest(organizationId, contactId),
             unreadCount(prisma, organizationId, contactId, "staff"),
             prisma.customerAccount.count({
                 where: { organizationId, contactId, status: "ACTIVE" },
             }),
+            teamReplyEmailedTo(prisma, organizationId, contactId),
         ]);
         const userIds = [
             ...new Set(
@@ -242,6 +250,7 @@ export class ThreadsService {
             unread,
             signsIn: accounts > 0,
             canReply: allows(ctx, "message:write"),
+            emailedTo,
         };
     }
 
@@ -257,7 +266,12 @@ export class ThreadsService {
         return { unread: 0 };
     }
 
-    /** The team answers (`message:write`). */
+    /**
+     * The team answers (`message:write`). The reply is also emailed to the
+     * customer through the business's own provider, a minute later and
+     * together with any reply that follows inside that minute
+     * (`team-reply.ts`, DEC-174 U14).
+     */
     async reply(
         ctx: OrganizationContext,
         contactId: string,
@@ -275,6 +289,11 @@ export class ThreadsService {
                 author: "STAFF",
                 body: text,
                 authorUserId: ctx.userId,
+                now,
+            });
+            await enqueueTeamReplyNotice(tx, {
+                organizationId,
+                threadMessageId: message.id,
                 now,
             });
             const me = await tx.user.findUnique({

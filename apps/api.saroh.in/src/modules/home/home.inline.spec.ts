@@ -233,6 +233,21 @@ describe("the words", () => {
         );
         expect(replyWords("Farah", true).sends).toBe(true);
     });
+
+    it("Reply names the address where the business's own email sends it (U14)", () => {
+        expect(replyWords("Farah", true, "f@example.com").confirm).toBe(
+            "Emailed to f@example.com a minute after you send. Farah also sees it in Messages on your site.",
+        );
+        expect(replyWords("Farah", false, "f@example.com").confirm).toBe(
+            "Emailed to f@example.com a minute after you send. Farah can also read it when they sign in on your site.",
+        );
+        expect(replyWords(null, false, "f@example.com").confirm).toContain(
+            "They can also read it",
+        );
+        expect(replyWords("Farah", true, null).confirm).toContain(
+            "Nothing is emailed or texted.",
+        );
+    });
 });
 
 describe("refundMismatchWords (PAY-06)", () => {

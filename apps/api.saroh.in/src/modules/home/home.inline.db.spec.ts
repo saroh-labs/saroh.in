@@ -207,11 +207,31 @@ describe("Home's inline actions (real database)", () => {
         expect(await offered("PAYMENTS_OVERDUE_INVOICES", id)).toBeUndefined();
     });
 
-    it("says a reply waits for someone who doesn't sign in on the site", async () => {
+    it("says a reply is emailed through the business's own email, and read on the site once they sign in (U14)", async () => {
         const reply = await offered("CRM_UNANSWERED_MESSAGES", contactId);
         expect(reply).toMatchObject({ kind: "REPLY", target: contactId });
-        expect(reply?.confirm).toContain(
-            "They'll see your reply when they sign in there.",
+        expect(reply?.confirm).toBe(
+            `Emailed to asha-${tag}@example.com a minute after you send. Asha can also read it when they sign in on your site.`,
         );
+    });
+
+    it("with Your replies in Messages turned off, says a reply waits for someone who doesn't sign in", async () => {
+        await prisma.customerNoticeSetting.create({
+            data: {
+                organizationId: owner.organizationId,
+                kind: "TEAM_REPLY",
+                enabled: false,
+            },
+        });
+        try {
+            const reply = await offered("CRM_UNANSWERED_MESSAGES", contactId);
+            expect(reply?.confirm).toContain(
+                "They'll see your reply when they sign in there. Nothing is emailed or texted.",
+            );
+        } finally {
+            await prisma.customerNoticeSetting.deleteMany({
+                where: { organizationId: owner.organizationId },
+            });
+        }
     });
 });

@@ -8,7 +8,7 @@ import type { NoticeKind } from "./notify-templates";
  * The way back from a notice's email to what it is about, on the
  * business's own site: the order's page for an order just placed, the
  * booking's page for a booking made or moved, the booking page for a hold
- * that lapsed (#1137).
+ * that lapsed (#1137), their Messages for a team reply (U14).
  *
  * - **The customer's own site.** The one they last signed in on (a business
  *   may have more than one), at its primary address: its verified custom
@@ -100,6 +100,11 @@ export function pathOf(subject: {
     ) {
         // The booking's own page (DEC-142), so the email opens the thing.
         return `/account/bookings/${encodeURIComponent(subject.bookingId)}`;
+    }
+    if (subject.kind === "THREAD_REPLY" && accountAreaOn()) {
+        // A team reply (U14): their Messages, where they read and answer
+        // it. Only while the account area is on, as the thread is.
+        return "/account/messages";
     }
     if (subject.kind === "BOOKING_LAPSED" && subject.serviceId) {
         // A lapsed hold (#1137): the booking page, on the service, to book

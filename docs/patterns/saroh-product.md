@@ -608,6 +608,15 @@ organizations/:org/customers`: everyone who has paid (an order through a
   most. No row at all while the business is offered none. A change is told
   in Settings › Activity ("turned Membership emails off for customers").
 
+- **Current** (DEC-174, U14 #1145) — **A team reply in a customer's
+  Messages is emailed to them** through the business's own email, a minute
+  after it is sent; replies inside that minute go as one email, quoting
+  each. The line under the reply box (and Home's Reply) names the address
+  ("Emailed to ‹email› a minute after you send"), and says "Nothing is
+  emailed or texted" only when nothing is: no email connected, "Your
+  replies in Messages" turned off, no address, or email turned off by the
+  customer.
+
 ## Analytics
 
 - **Current** — Saroh owns a versioned, append-only event model (DEC-012).

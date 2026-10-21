@@ -159,6 +159,15 @@ const SAMPLES: Record<(typeof NOTICE_TEMPLATES)[number], NoticeVars> = {
         },
     },
     ...membershipSamples(),
+    THREAD_REPLY: {
+        kind: "THREAD_REPLY",
+        reply: {
+            business: "Rye <&> Co.",
+            firstName: "Asha",
+            replies: ["Yes, we <b>open</b> at 9."],
+            link: null,
+        },
+    },
     WAITLIST_OFFER: {
         kind: "WAITLIST_OFFER",
         waitlist: {

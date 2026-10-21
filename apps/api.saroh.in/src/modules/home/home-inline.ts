@@ -18,6 +18,7 @@ import type { NoticeReach } from "../site-accounts/notice-reach";
 import { contactReach, hasLiveAccount } from "../site-accounts/notice-reach";
 import { orderNoticeSetting } from "../site-accounts/notices/order";
 import { orderNoticeKind } from "../site-accounts/notify-templates";
+import { teamReplyEmailedTo } from "../site-accounts/team-reply";
 import {
     firstNameOf,
     markSentWords,
@@ -80,6 +81,14 @@ export interface InlinePorts {
     noticeOn?: (organizationId: string, kind: NoticeKind) => Promise<boolean>;
     /** Whether a contact has a live site account (A13's "signs in"). */
     signsIn: (organizationId: string, contactId: string) => Promise<boolean>;
+    /**
+     * Where a reply to a contact is emailed (DEC-174 U14), or null: it
+     * isn't. Absent (a spec's ports): never said to be emailed.
+     */
+    replyEmailedTo?: (
+        organizationId: string,
+        contactId: string,
+    ) => Promise<string | null>;
     /**
      * Each failed renewal's autopay (D13), by subscription: `CHARGING`, a
      * charge under way (no Retry); `MANDATE`, it can be charged again.
@@ -472,14 +481,15 @@ export class HomeInlineService {
         if (!holds(input, "message:write")) return;
         await Promise.all(
             evidence.map(async (ev) => {
-                const signsIn = await this.ports.signsIn(
-                    input.organizationId,
-                    ev.id,
-                );
+                const [signsIn, emailedTo] = await Promise.all([
+                    this.ports.signsIn(input.organizationId, ev.id),
+                    this.ports.replyEmailedTo?.(input.organizationId, ev.id) ??
+                        null,
+                ]);
                 const person = firstNameOf(ev.subtitle);
                 ev.inline = {
                     kind: "REPLY",
-                    ...replyWords(person, signsIn),
+                    ...replyWords(person, signsIn, emailedTo),
                     undoable: true,
                     target: ev.id,
                     person,
@@ -560,6 +570,8 @@ function defaultPorts(db: Db): InlinePorts {
         signsIn: (organizationId, contactId) =>
             hasLiveAccount(db, organizationId, contactId),
         noticeOn: (organizationId, kind) => noticeOn(db, organizationId, kind),
+        replyEmailedTo: (organizationId, contactId) =>
+            teamReplyEmailedTo(db, organizationId, contactId),
     };
 }
 

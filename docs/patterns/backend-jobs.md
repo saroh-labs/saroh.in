@@ -557,6 +557,22 @@ the Privacy Policy states both.
   back, cut to 500 characters, and never when it carries a link: the
   business's email never carries a link a stranger chose.
 
+- **A team reply in Messages** (DEC-174 U14, #1145, `THREAD_REPLY`,
+  `thread-reply:<message id>`, `notices/thread-reply.ts`). The team's reply
+  (`ThreadsService.reply`) queues it on its own transaction, held 60 s,
+  only while the business's own email is connected and `TEAM_REPLY` is on
+  (`site-accounts/team-reply.ts`). Coalesced: every reply queues its own
+  job, and only the run for the thread's newest reply sends; its one email
+  quotes every reply not yet emailed (back to the last reply whose notice
+  has a message, at most 20 and a day before the newest), so replies a few
+  seconds apart are one email a minute after the last. Email only, with
+  the way back to `/account/messages` while the account area is on. A
+  message the customer wrote in between doesn't stop it. Messages has no
+  Undo on a reply; Home's Reply holds it before it is sent, so an undone
+  one is never written. The Messages tab and Home's Reply say where it is
+  emailed (`teamReplyEmailedTo`, the same reads as the send), or that
+  nothing is.
+
 ## Autopay charges — **Current** (D13)
 
 - **`subscription.charge`** runs a renewal's autopay charge in steps, each

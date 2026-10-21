@@ -36,8 +36,9 @@ import { Empty } from "./parts";
  * whoever may answer (`message:write`).
  *
  * Opening the tab marks the customer's messages read, so its count clears.
- * A reply shows in their account on the site; nothing is emailed or texted
- * (ADR-011), and the line under the box says so.
+ * A reply shows in their account on the site, and is emailed to them a
+ * minute later where the business's own email sends it (DEC-174 U14); the
+ * line under the box says which, naming the address.
  */
 export function MessagesTab({
     contactId,
@@ -174,6 +175,7 @@ export function MessagesTab({
                     <div className="mt-2 flex items-center gap-2">
                         <span
                             id={`${id}-note`}
+                            data-ph-mask={thread.emailedTo ? "" : undefined}
                             className={cn(
                                 "flex-1 text-pretty text-[11.5px]",
                                 over
@@ -183,7 +185,11 @@ export function MessagesTab({
                         >
                             {over
                                 ? `Over ${formatNumber(REPLY_MAX)} characters`
-                                : replyNote(thread.signsIn, firstName)}
+                                : replyNote(
+                                      thread.signsIn,
+                                      firstName,
+                                      thread.emailedTo,
+                                  )}
                         </span>
                         <Button
                             size="sm"

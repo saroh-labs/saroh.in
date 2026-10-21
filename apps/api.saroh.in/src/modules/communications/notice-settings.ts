@@ -65,7 +65,7 @@ export const NOTICE_SENDS: Record<NoticeKind, boolean> = {
     AUTOPAY_FAILED: true,
     MEMBERSHIP: true,
     REFUND: false,
-    TEAM_REPLY: false,
+    TEAM_REPLY: true,
     ENQUIRY_REPLY: true,
     ORDER_DELIVERY: true,
     COURSE: false,

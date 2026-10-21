@@ -156,16 +156,27 @@ export function reminderWords(
 
 /**
  * Reply (REPLY): A13's thread. A reply shows in the customer's account on
- * the business's site and nothing else is sent — no email, no text — which
- * is what Customer Detail's Messages tab says under its reply box too.
+ * the business's site, and is emailed a minute later where the business's
+ * own email sends it (DEC-174 U14, `emailedTo`); nothing is texted. The
+ * same as Customer Detail's Messages tab says under its reply box. Home's
+ * Undo holds the reply before it is sent, so an undone one is never
+ * written, nor emailed.
  */
-export function replyWords(first: string | null, signsIn: boolean): Words {
+export function replyWords(
+    first: string | null,
+    signsIn: boolean,
+    emailedTo: string | null = null,
+): Words {
     const who = first ?? "They";
     return {
         label: "Reply",
-        confirm: signsIn
-            ? `${who} sees your reply in Messages when they're signed in on your site. Nothing is emailed or texted.`
-            : `${who} doesn't sign in on your site now. They'll see your reply when they sign in there. Nothing is emailed or texted.`,
+        confirm: emailedTo
+            ? signsIn
+                ? `Emailed to ${emailedTo} a minute after you send. ${who} also sees it in Messages on your site.`
+                : `Emailed to ${emailedTo} a minute after you send. ${first ? `${first} can` : "They can"} also read it when they sign in on your site.`
+            : signsIn
+              ? `${who} sees your reply in Messages when they're signed in on your site. Nothing is emailed or texted.`
+              : `${who} doesn't sign in on your site now. They'll see your reply when they sign in there. Nothing is emailed or texted.`,
         yes: "Send reply",
         done: first ? `Replied · it's in ${first}'s account` : "Replied",
         sends: true,

@@ -47,6 +47,8 @@ export interface CustomerNotifyPayload {
     subscriptionId?: string;
     /** The SubscriptionEvent it is about: joined, paused, cancelled… */
     subscriptionEventId?: string;
+    /** The team's reply in the Messages thread a THREAD_REPLY is for (U14). */
+    threadMessageId?: string;
     /** The invoice a failed autopay charge was for (U10). */
     invoiceId?: string;
 }

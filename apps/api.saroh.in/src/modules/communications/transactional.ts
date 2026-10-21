@@ -51,6 +51,9 @@ export const NOTICE_TEMPLATES = [
     "MEMBERSHIP_PLAN_CHANGED",
     "MEMBERSHIP_CANCELLED",
     "MEMBERSHIP_KEPT",
+    // A team reply in the customer's Messages thread (DEC-174 U14, #1145):
+    // email only, held a minute and coalesced, under the TEAM_REPLY switch.
+    "THREAD_REPLY",
     // A renewal's autopay charge failed, with a fresh link to pay (U10).
     "AUTOPAY_FAILED",
 ] as const;
