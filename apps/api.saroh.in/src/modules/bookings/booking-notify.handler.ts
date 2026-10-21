@@ -193,13 +193,16 @@ export async function tellAboutBooking(
         );
     }
 
-    // The person it is with, in their own alerts (#1138).
-    await queueStaffAlertsInTx(tx, organizationId, {
-        bookingId: booking.id,
-        bookingStaffId: booking.staffId,
-        event: event ?? null,
-        kind,
-    });
+    // The person it is with, in their own alerts (#1138). Not for a lapse
+    // (#1137): a hold that ran out was never booked with them.
+    if (kind !== "BOOKING_LAPSED") {
+        await queueStaffAlertsInTx(tx, organizationId, {
+            bookingId: booking.id,
+            bookingStaffId: booking.staffId,
+            event: event ?? null,
+            kind,
+        });
+    }
 
     // The customer did it themselves: no team member behind the event. A
     // booking they made is the team's "New booking" (F14), as a move or a
