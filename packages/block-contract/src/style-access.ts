@@ -19,6 +19,8 @@ import { samePalette } from "./palette";
  *   told apart, so never paid.
  * - Classic (no look), and whatever the site already has (the draft's look,
  *   pair or colourway, and the live site's look), are always allowed.
+ *   Classic is the only free look as the catalogue starts (owner, 21 Oct):
+ *   Quiet, Folio and Live need `themes` unless the owner ticks one.
  */
 
 export type StyleKind = "look" | "fontPair" | "colourway";
@@ -245,8 +247,10 @@ export const STYLE_ACCESS_FIXTURE = {
     colourwayIds: ["first", "freed", "paid"],
     /** The template's own pair, on every colourway. */
     ownPair: "fraunces-inter-tight",
+    // As the catalogue starts (DEC-177, owner 21 Oct): no look beyond
+    // Classic is free.
     lists: {
-        looks: ["quiet"],
+        looks: [],
         fontPairs: [],
         colourways: ["studio:freed"],
     },
@@ -269,11 +273,11 @@ export const STYLE_ACCESS_CASES: readonly {
     refused: boolean;
 }[] = [
     {
-        name: "a free look",
+        name: "Quiet, paid as every look but Classic",
         kind: "look",
         id: "quiet",
-        paid: false,
-        refused: false,
+        paid: true,
+        refused: true,
     },
     {
         name: "a paid look",

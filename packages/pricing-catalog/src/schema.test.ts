@@ -19,6 +19,7 @@ import {
     trialFirstPaise,
     validateCatalog,
 } from "./schema";
+import { SEED_CATALOG } from "./seed";
 
 const errorsOf = (input: unknown) => {
     const r = validateCatalog(input);
@@ -260,6 +261,12 @@ describe("the catalogue schema", () => {
                 colourways: [],
             });
             expect(freeStylesOf(null)).toEqual(freeStylesOf({}));
+        });
+
+        it("frees no look beyond Classic in the sample catalogue (owner, 21 Oct)", () => {
+            // Classic is always free by rule and needs no entry; Quiet,
+            // Folio and Live come with the `themes` row.
+            expect(freeStylesOf(SEED_CATALOG).looks).toEqual([]);
         });
 
         it("keeps the lists, filling a missing one as empty", () => {

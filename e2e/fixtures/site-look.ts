@@ -20,6 +20,12 @@ import { useSession } from "./sessions";
  *    if the spec published), and puts the override back as it was, or
  *    clears it if there was none.
  *
+ * Quiet, Folio and Live are paid since 21 Oct (DEC-177: Classic is the
+ * only free look), and Northwind's plan has no `themes` row. The save
+ * still goes because the e2e seed leaves `PLAN_ENFORCEMENT` off for
+ * Northwind, so no plan row is asked. A spec that turns it on and wants a
+ * look saved grants the row with `grantNorthwindThemes`.
+ *
  * A spec that uses it changes Northwind's site style, so it is tagged
  * `@serial` (the saroh-browser-tests skill), and calls `restore()` in a
  * `finally` or an `afterEach`.
@@ -179,6 +185,56 @@ export async function overrideNorthwindFlag(
                           data: { reason, idempotencyKey: key("clear") },
                       });
             expect(back.ok(), await back.text()).toBe(true);
+            await context.close();
+        },
+    };
+}
+
+/**
+ * Give Northwind the plan's "Themes, fonts and templates" row (`themes`)
+ * alone, as staff do on its admin page (a module override, kind `grant`),
+ * and give back how to end it. Since 21 Oct Classic is the only free look
+ * (DEC-177), so a spec that checks a paid look saving on a plan with the
+ * row, under `PLAN_ENFORCEMENT`, grants it here rather than making looks
+ * free in the seed. The seed's Northwind has no `themes` override of its
+ * own; a grant replaces one if it had (one per row), and `restore()` ends
+ * this grant only.
+ *
+ * Without `PLAN_ENFORCEMENT` (the e2e seed leaves it off for Northwind)
+ * no plan row is asked, so `setNorthwindLook` saves any look without this.
+ */
+export async function grantNorthwindThemes(
+    browser: Browser,
+    testInfo: TestInfo,
+): Promise<{ restore: () => Promise<void> }> {
+    const key = (what: string) => `themes-${what}-${stamp(testInfo)}`;
+    const reason = "Browser test: a paid look on a plan with themes";
+    const context = await browser.newContext({
+        baseURL: urls.APP_URL,
+        ignoreHTTPSErrors,
+    });
+    const page = await context.newPage();
+    await useSession(page, "staff");
+    const headers = { origin: urls.APP_URL };
+    const overrides = `${urls.API_URL}/admin/organizations/${NORTHWIND_ORG}/overrides`;
+    const granted = await page.request.post(`${overrides}/modules`, {
+        headers,
+        data: {
+            kind: "grant",
+            moduleKey: "themes",
+            reason,
+            idempotencyKey: key("grant"),
+        },
+    });
+    expect(granted.ok(), await granted.text()).toBe(true);
+    const { id } = (await granted.json()) as { id: string };
+    return {
+        restore: async () => {
+            const ended = await page.request.delete(`${overrides}/${id}`, {
+                headers,
+                data: { reason, idempotencyKey: key("end") },
+            });
+            expect(ended.ok(), await ended.text()).toBe(true);
             await context.close();
         },
     };

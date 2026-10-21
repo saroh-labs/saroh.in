@@ -2268,14 +2268,14 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 
 ## DEC-177 Looks, fonts and colours: free ones for everyone, the rest on paid plans, chosen in admin
 
-**Status: Accepted — 2026-10-20** · owner, issue #1163 · part of the looks release (epic #1076, DEC-172) · amends plans catalogue U13 (the "themes" row guarded every style save)
+**Status: Accepted — 2026-10-20, amended 2026-10-21 (owner: Classic is the only free look)** · owner, issue #1163 · part of the looks release (epic #1076, DEC-172) · amends plans catalogue U13 (the "themes" row guarded every style save)
 
 - Context:
     - Every save in Website › Style checked the "Themes, fonts and templates" plan row (`themes`). That row is on no plan, so no business could pick a look or change its typeface or colours. The owner: looks, fonts and themes belong to the plans; some are free and the rest come with paid plans, and both lists keep growing.
 - Decision:
     - **Each look, font pair and colourway is either free or paid.** Free ones work for every business. Paid ones need the "Themes, fonts and templates" row on the business's plan.
     - **Which are free is kept in the plan catalogue and chosen in admin › Plans and modules,** never written in code, so adding or moving one needs no release: it is published with the next catalogue version, like any other change.
-    - **To start:** all four looks are free (Classic, Quiet, Folio, Live). For typefaces and colours, a few are free and the rest are paid; the owner picks which in admin.
+    - **To start:** Classic is the only free look; Quiet, Folio and Live come with paid plans (the themes row). Owner, 21 Oct, superseding the 20 Oct choice that all four looks start free. For typefaces and colours, a few are free and the rest are paid; the owner picks which in admin.
     - **Until the owner picks:**
         - The visitor's system font is free.
         - A site's own template fonts and colourway are free, so nobody loses what they started with.
@@ -2293,8 +2293,8 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - A colourway is named in the catalogue as `template:colourway` (`salon:kesar`); a colourway's id is unique only within its template.
     - A paid choice is marked on every plan, including one with the row.
 - Consequences:
-    - `PricingCatalogVersion.catalog` gains `freeStyles: { looks, fontPairs, colourways }` (optional, ids only, no prices). The sample catalogue makes the three looks free and leaves typefaces and colourways to the always-free ones.
+    - `PricingCatalogVersion.catalog` gains `freeStyles: { looks, fontPairs, colourways }` (optional, ids only, no prices). The sample catalogue frees no look beyond Classic (owner, 21 Oct) and leaves typefaces and colourways to the always-free ones.
     - Publishing refuses a free id this build has no look, typeface or colourway for.
-    - Before the looks reach production, the owner ticks the free typefaces and colourways in admin and publishes (`SITE_LOOKS_ROLLOUT.md`).
+    - Before the looks reach production, the owner turns the themes row on for the paid plans, ticks the free typefaces and colourways in admin, and publishes (`SITE_LOOKS_ROLLOUT.md`).
 - Rules: `docs/patterns/backend-auth-and-access.md` → "A look, typeface or colourway is free or paid, and the catalogue says which"; `docs/patterns/frontend-design-system.md` → "A paid style is refused in the Style panel, and every look can be previewed".
 - Rules: `docs/patterns/backend-data-and-money.md` → Money (the ledger in integer paise, U1 #1113); the rest added as each unit is built.
