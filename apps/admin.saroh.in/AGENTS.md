@@ -85,7 +85,7 @@ recorded grant (the API refuses it otherwise).
   counts it), sorted by the API across all businesses (Most / Least) and
   paged by number. It reads with `organization:read`, the directory's
   permission, so it adds none (DEC-039).
-- **Billing (`/billing/invoices`, `/billing/subscriptions`, DEC-163)** shows
+- **Billing (`/billing/invoices`, `/billing/subscriptions`, DEC-179)** shows
   every invoice Saroh issued (with the filtered set's totals, each PDF and a
   month's CSV for GST) and every business's Saroh subscription (a row opens
   its side sheet, admin plan U15: one problem banner, then Summary, History

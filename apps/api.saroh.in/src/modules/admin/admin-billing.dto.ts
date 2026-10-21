@@ -29,7 +29,7 @@ const trim = ({ value }: { value: unknown }) =>
 /** "2026-10": a calendar month. */
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 
-/** Saroh's invoices across businesses (DEC-163): filters and page. */
+/** Saroh's invoices across businesses (DEC-179): filters and page. */
 export class ListSarohInvoicesDto {
     @IsOptional()
     @Matches(MONTH, { message: "month must look like 2026-10" })
@@ -79,7 +79,7 @@ export class ExportSarohInvoicesDto {
     status?: InvoiceStatus;
 }
 
-/** Every business's Saroh subscription (DEC-163): filters and page. */
+/** Every business's Saroh subscription (DEC-179): filters and page. */
 export class ListSarohSubscriptionsDto {
     /** A business's name or slug, or a provider id (DEC-166). */
     @IsOptional()

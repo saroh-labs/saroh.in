@@ -15,7 +15,7 @@ import { AdminPermission } from "./admin-permissions";
 import { AdminRoutes } from "./admin-routes.decorator";
 
 /**
- * Admin › Billing (DEC-163): every invoice Saroh issued and every business's
+ * Admin › Billing (DEC-179): every invoice Saroh issued and every business's
  * Saroh subscription. Read-only. Every route needs `saroh-billing:read`
  * (Platform Owners and Billing), which the service checks again, and every
  * read is recorded on the admin ledger: invoices carry a business's billing

@@ -1,6 +1,6 @@
 /**
  * How Admin › Billing reads its query string and says money, dates and
- * states (DEC-163). Client-safe: no server imports, so a client component
+ * states (DEC-179). Client-safe: no server imports, so a client component
  * may take values from here. Every amount comes from the API in paise; no
  * price is ever written here (the repo is public).
  */

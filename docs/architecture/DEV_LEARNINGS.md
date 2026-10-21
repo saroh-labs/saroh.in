@@ -117,8 +117,8 @@ checked that a decision number appears once.
 Rules line (U17's "as built"), plus U15's and U16's own; DEC-176 is
 marked reserved for the GST branch (PR #1164). `pnpm run
 check:decision-ids` fails on a DEC heading written twice, in prepush and CI.
-DEC-163 is allowed twice: two decisions took it on 17 Oct and both are cited
-in code.
+DEC-163 was allowed twice until 21 Oct, when the owner had Admin Billing
+renumbered DEC-179 (its citations moved with it); no number is exempt now.
 **Rule**: a unit that adds rules to a decision rewrites the one Rules line,
 never appends another; resolve a DECISIONS.md conflict by hand, never by
 keeping both sides. `scripts/check-decision-ids.mjs`.

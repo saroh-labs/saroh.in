@@ -644,7 +644,7 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   D2). The admin services (`admin-organizations`, `admin-people`,
   `admin-machinery`, `admin-waitlist`, `admin-metrics`, `admin-usage`
   (storage per business, #798), `admin-billing` (Saroh's invoices and
-  subscriptions, DEC-163), and the pricing
+  subscriptions, DEC-179), and the pricing
   catalogue's `ImpactService`) read across every
   business with no organization context, so the `org_isolation` policies take
   their permissive branch. Each says **CROSS-TENANT READ** in its doc comment,
@@ -662,7 +662,7 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   `organization:pii:read`. It is read-only and adds no permission. The
   public write (`POST /public/contact-messages`) is guardless, rate-limited
   per visitor and answers nothing back; rows go after 12 months.
-- **Current** (DEC-163) — **Saroh's own billing across businesses**
+- **Current** (DEC-179) — **Saroh's own billing across businesses**
   (`/admin/billing/*`: every Saroh invoice, its PDF, the month's GST CSV,
   every business's Saroh subscription, its checkouts and the provider's
   events) needs `saroh-billing:read`, which only Platform Owners and Billing

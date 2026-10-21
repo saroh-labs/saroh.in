@@ -80,7 +80,7 @@ export const AdminPermission = {
     // (owner, 10 Oct): no other role carries it. Placing one needs the
     // lifecycle write that suspends.
     OrganizationLegalHoldLift: "organization:legal-hold:lift",
-    // Saroh's own billing across every business (DEC-163): every invoice
+    // Saroh's own billing across every business (DEC-179): every invoice
     // Saroh issued (buyer name, GSTIN and address), its PDF and the month's
     // GST export, and every business's Saroh subscription with its
     // checkouts and provider events. Platform Owners and Billing only
@@ -179,7 +179,7 @@ const ROLE_PERMISSIONS = {
         AdminPermission.PricingOverride,
         // Coupons are the Billing team's to run (owner, 2026-10-03).
         AdminPermission.CouponsManage,
-        // Saroh's invoices and subscriptions (DEC-163).
+        // Saroh's invoices and subscriptions (DEC-179).
         AdminPermission.SarohBillingRead,
         // Acting on them: Needs action, autopay, refunds (DEC-166).
         AdminPermission.SarohBillingAct,

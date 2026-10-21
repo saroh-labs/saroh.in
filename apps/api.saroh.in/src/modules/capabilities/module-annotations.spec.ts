@@ -350,7 +350,7 @@ const NEVER: Record<string, string> = {
         "saroh.in's contact form, not a tenant surface",
     "admin/admin-contact-messages.controller.ts":
         "staff control plane (messages from saroh.in/contact), not a tenant surface",
-    // DEC-163, DEC-166: Saroh's own invoices, subscriptions and the billing
+    // DEC-179, DEC-166: Saroh's own invoices, subscriptions and the billing
     // queue and controls, across businesses.
     "admin/admin-billing.controller.ts":
         "staff control plane (Saroh's own billing), not a tenant surface",

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { fetchInvoicePdf } from "@/lib/billing";
 
 /**
- * "PDF" on Admin › Billing › Invoices (DEC-163): one of Saroh's invoices,
+ * "PDF" on Admin › Billing › Invoices (DEC-179): one of Saroh's invoices,
  * drawn by the API on request with the renderer the business gets. A proxy:
  * the operator's session is attached server-side and the API decides, with
  * `saroh-billing:read`. Nothing is cached.
