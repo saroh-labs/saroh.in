@@ -1,12 +1,17 @@
 // @covers app:/analytics api:analytics
-import type { APIRequestContext, Page } from "@playwright/test";
+import type {
+    APIRequestContext,
+    Browser,
+    Page,
+    TestInfo,
+} from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
 import type { OwnBusiness } from "../fixtures/own-business";
 import { makeBusiness, ownAddress } from "../fixtures/own-business";
 import { useSession } from "../fixtures/sessions";
-import { NORTHWIND_ORG, urls } from "../playwright.config";
+import { ignoreHTTPSErrors, NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
  * Insights' "Where customers come from", now (DEC-171, plan U14, #1097;
@@ -148,6 +153,38 @@ test("a business with one website reads every figure for the period, with how it
     await expectNoSidewaysScroll(page);
 });
 
+/**
+ * A module rolled out to the business by Sam: a business set up here has
+ * none rolled out, so its owner can't turn one on until Saroh has
+ * (DEC-057), as `providers-customer-emails.spec.ts` does for Payments.
+ */
+async function rollOut(
+    browser: Browser,
+    org: string,
+    key: string,
+    testInfo: TestInfo,
+) {
+    const context = await browser.newContext({ ignoreHTTPSErrors });
+    try {
+        const staff = await context.newPage();
+        await useSession(staff, "staff");
+        const res = await staff.request.put(
+            `${urls.API_URL}/admin/flags/MODULE_${key}/organizations/${org}`,
+            {
+                headers: { origin: urls.APP_URL },
+                data: {
+                    enabled: true,
+                    reason: "Insights browser test (U14)",
+                    idempotencyKey: `insf-${key}-${testInfo.project.name}-${testInfo.retry}-${org}`,
+                },
+            },
+        );
+        expect(res.ok(), `roll out ${key}: ${await res.text()}`).toBe(true);
+    } finally {
+        await context.close();
+    }
+}
+
 /** The business's own module switched on, as its owner. */
 async function turnOn(request: APIRequestContext, org: string, key: string) {
     const res = await request.put(
@@ -187,8 +224,10 @@ async function addSite(
 
 test("a business nobody has visited draws every day as a baseline, never an empty chart", async ({
     page,
+    browser,
 }, testInfo) => {
     const business = await makeBusiness(page, testInfo, "insf");
+    await rollOut(browser, business.id, "INSIGHTS", testInfo);
     await turnOn(page.request, business.id, "INSIGHTS");
     await openFrom(page, business.id, "&period=7d");
 
@@ -212,8 +251,11 @@ test("a business nobody has visited draws every day as a baseline, never an empt
 
 test("with more than one website the picker chooses one and keeps it in the address", async ({
     page,
+    browser,
 }, testInfo) => {
     const business = await makeBusiness(page, testInfo, "insp");
+    await rollOut(browser, business.id, "INSIGHTS", testInfo);
+    await rollOut(browser, business.id, "WEBSITE", testInfo);
     await turnOn(page.request, business.id, "INSIGHTS");
     await turnOn(page.request, business.id, "WEBSITE");
     // Two websites of its own; a stack that allows one per business
