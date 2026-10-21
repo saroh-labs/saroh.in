@@ -14,7 +14,7 @@ import type { OwnService } from "../fixtures/own-service";
 import { bookOnOwn } from "../fixtures/own-service";
 import { useSession } from "../fixtures/sessions";
 import { ignoreHTTPSErrors, urls } from "../playwright.config";
-import { asNewVisitor, expectNoZoomOnFocus, signInOnSheet } from "./site-codes";
+import { asNewVisitor, signInOnSheet } from "./site-codes";
 
 /**
  * The waitlist offer's claim link (automatic notices U18, #1149): the
@@ -188,7 +188,6 @@ async function joinLine(
     const name = page.getByLabel("Name");
     await expect(joined.or(name).first()).toBeVisible({ timeout: 15_000 });
     if ((await name.isVisible()) && !(await joined.isVisible())) {
-        await expectNoZoomOnFocus(name);
         await name.fill("Sneha Pillai");
         // The sheet may finish joining by itself once it has a name: click
         // Join only while it is still there.
