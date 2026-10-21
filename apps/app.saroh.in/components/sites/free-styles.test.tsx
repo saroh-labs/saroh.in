@@ -119,8 +119,9 @@ const style: SiteStyle = {
     palette: KESAR,
 };
 
+// Classic is the only free look (DEC-177, owner 21 Oct).
 const FREE: SiteStyleAccess["free"] = {
-    looks: ["quiet", "live"],
+    looks: [],
     fontPairs: ["system", "own"],
     colourways: ["kesar"],
 };
@@ -229,7 +230,8 @@ describe("the Paid plans mark", () => {
     it("marks a paid look, typeface and colourway, and nothing free", () => {
         render();
         expect(radio("Folio").textContent).toContain("Paid plans");
-        expect(radio("Quiet").textContent).not.toContain("Paid plans");
+        expect(radio("Quiet").textContent).toContain("Paid plans");
+        expect(radio("Live").textContent).toContain("Paid plans");
         expect(radio("Classic").textContent).not.toContain("Paid plans");
         expect(radio("Archivo").textContent).toContain("Paid plans");
         expect(radio("Own pair").textContent).not.toContain("Paid plans");
@@ -270,15 +272,31 @@ describe("a paid choice on a plan without themes", () => {
         expect(refusals()[0]?.textContent).toContain("Folio comes with");
     });
 
+    it("refuses Quiet in place: Classic stays, one line says why", () => {
+        const { onChoose } = render();
+        press(radio("Quiet"));
+        expect(onChoose).not.toHaveBeenCalled();
+        expect(radio("Classic").getAttribute("aria-checked")).toBe("true");
+        const [line, ...more] = refusals();
+        expect(more).toHaveLength(0);
+        expect(line.textContent).toContain("Quiet comes with a paid plan");
+        expect(actions.updateSiteStyle).not.toHaveBeenCalled();
+    });
+
+    it("lets a site in a look go back to Classic", () => {
+        const { onChoose } = render({ at: inLook(style, "quiet") });
+        press(radio("Classic"));
+        expect(onChoose).toHaveBeenCalledWith(null);
+        expect(refusals()).toHaveLength(0);
+    });
+
     it("takes a free one at once and clears the line", () => {
-        const { onChange, onChoose } = render();
+        const { onChange } = render();
         press(radio("Archivo"));
         press(radio("Your visitor's system font"));
         expect(onChange).toHaveBeenCalledTimes(1);
         expect(onChange.mock.calls[0]?.[0]).not.toHaveProperty("fontPair");
         expect(refusals()).toHaveLength(0);
-        press(radio("Quiet"));
-        expect(onChoose).toHaveBeenCalledWith("quiet");
     });
 
     it("lets colours change: they're never paid", () => {
@@ -294,6 +312,8 @@ describe("a paid choice on a plan without themes", () => {
 describe("a plan with themes", () => {
     it("takes a paid typeface, colourway and look", () => {
         const { onChange, onChoose } = render({ paidIncluded: true });
+        press(radio("Quiet"));
+        expect(onChoose).toHaveBeenCalledWith("quiet");
         press(radio("Archivo"));
         expect(onChange.mock.calls[0]?.[0]).toMatchObject({
             fontPair: "archivo",
@@ -354,11 +374,11 @@ describe("Preview", () => {
         expect(line.querySelector("a")).not.toBeNull();
     });
 
-    it("chooses a free look from Use this look, and closes", () => {
-        const { onChoose } = render();
-        press(button(host, "Preview Quiet"));
+    it("chooses Classic from Use this look on any plan, and closes", () => {
+        const { onChoose } = render({ at: inLook(style, "quiet") });
+        press(button(host, "Preview Classic"));
         press(button(shown(), "Use this look"));
-        expect(onChoose).toHaveBeenCalledWith("quiet");
+        expect(onChoose).toHaveBeenCalledWith(null);
         expect(dialog()).toBeNull();
     });
 

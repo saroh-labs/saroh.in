@@ -119,6 +119,21 @@ describe("Free looks, typefaces and colourways (DEC-177)", () => {
         expect(p.getByRole("group", { name: "Gym" })).toBeTruthy();
     });
 
+    it("leaves Quiet, Folio and Live tickable when only Classic is free", () => {
+        // As the sample catalogue starts (owner, 21 Oct): the owner can
+        // still make one free later.
+        open(liveWith({ looks: [], fontPairs: [], colourways: [] }));
+        const p = panel();
+        for (const name of [/Quiet/, /Folio/, /Live/]) {
+            const look = p.getByRole("checkbox", { name });
+            expect(checked(look)).toBe(false);
+            expect(disabled(look)).toBe(false);
+        }
+        expect(checked(p.getByRole("checkbox", { name: /Classic/ }))).toBe(
+            true,
+        );
+    });
+
     it("saves a tick into the draft, in Saroh's order, to publish like any change", async () => {
         open(liveWith({ looks: ["live"], fontPairs: [], colourways: [] }));
         fireEvent.click(panel().getByRole("checkbox", { name: /Folio/ }));

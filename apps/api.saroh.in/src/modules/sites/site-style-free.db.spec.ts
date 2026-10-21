@@ -1,8 +1,9 @@
 /**
  * Free and paid looks, typefaces and colourways (DEC-177), against a real
- * Postgres: a business on a plan without `themes` picks any free look,
- * keeps its own template's typeface and colourway, and is refused a paid
- * one with the plan's `MODULE_LOCKED`; a plan with `themes` picks anything;
+ * Postgres: a business on a plan without `themes` keeps Classic (the only
+ * free look, owner 21 Oct) and its own template's typeface and colourway,
+ * and is refused Quiet, Folio, Live or another paid style with the plan's
+ * `MODULE_LOCKED`; a plan with `themes` picks anything;
  * and a free list the operator publishes in admin › Plans and modules
  * applies at once, through the same draft and publish the console uses.
  *
@@ -65,11 +66,9 @@ const OWN_PAIR = "fraunces-inter-tight";
 function catalogue(edit?: (c: Catalog) => void): Catalog {
     return fakeMeteredCatalog((c) => {
         for (const p of c.plans) p.pricePaise = 0;
-        c.freeStyles = {
-            looks: ["quiet", "folio", "live"],
-            fontPairs: [],
-            colourways: [],
-        };
+        // As the sample catalogue starts (DEC-177, owner 21 Oct): Classic
+        // is the only free look, and needs no entry.
+        c.freeStyles = { looks: [], fontPairs: [], colourways: [] };
         edit?.(c);
     });
 }
@@ -170,15 +169,53 @@ afterAll(async () => {
 });
 
 describe("free looks, typefaces and colourways (DEC-177)", () => {
-    it("lets a free business pick Quiet, Folio and Live, and go back to Classic", async () => {
+    it("refuses Quiet, Folio and Live on a plan without themes, and keeps Classic", async () => {
         const { owner, siteId } = await business("free");
+        const before = await stored(siteId);
         for (const look of ["quiet", "folio", "live"] as const) {
-            await sites.updateStyle(owner, siteId, {
-                ...(await stored(siteId)),
-                look,
-            });
-            expect((await stored(siteId)).look).toBe(look);
+            expect(
+                await lockedRow(
+                    sites.updateStyle(owner, siteId, { ...before, look }),
+                ),
+            ).toMatchObject({ code: "MODULE_LOCKED", moduleId: "themes" });
+            expect((await stored(siteId)).look).toBeUndefined();
         }
+        // Classic is always free: saving it (and anything else free) goes.
+        await sites.updateStyle(owner, siteId, {
+            ...before,
+            colours: { ...before.colours, accent: "teal" },
+        });
+        expect((await stored(siteId)).look).toBeUndefined();
+        expect((await stored(siteId)).colours.accent).toBe("teal");
+    });
+
+    it("lets a plan with themes pick Quiet, and go back to Classic", async () => {
+        const { owner, siteId } = await business("pro");
+        await sites.updateStyle(owner, siteId, {
+            ...(await stored(siteId)),
+            look: "quiet",
+        });
+        expect((await stored(siteId)).look).toBe("quiet");
+        const { look: _look, ...classic } = await stored(siteId);
+        await sites.updateStyle(owner, siteId, classic);
+        expect((await stored(siteId)).look).toBeUndefined();
+    });
+
+    it("keeps a look the site already has, and lets it go back to Classic, on a plan without themes", async () => {
+        const { owner, siteId } = await business("free");
+        // A look set while the plan had it (or by staff): written straight.
+        await prisma.site.update({
+            where: { id: siteId },
+            data: {
+                style: { ...(await stored(siteId)), look: "folio" } as object,
+            },
+        });
+        const held = await stored(siteId);
+        await sites.updateStyle(owner, siteId, {
+            ...held,
+            colours: { ...held.colours, accent: "teal" },
+        });
+        expect((await stored(siteId)).look).toBe("folio");
         const { look: _look, ...classic } = await stored(siteId);
         await sites.updateStyle(owner, siteId, classic);
         expect((await stored(siteId)).look).toBeUndefined();
@@ -249,6 +286,9 @@ describe("free looks, typefaces and colourways (DEC-177)", () => {
         const before = await stored(siteId);
         const paid = { ...before, ...mauve.style, fontPair: "archivo" };
         await lockedRow(sites.updateStyle(owner, siteId, paid));
+        await lockedRow(
+            sites.updateStyle(owner, siteId, { ...before, look: "quiet" }),
+        );
 
         const operator = await prisma.user.create({
             data: { email: `${uniq("operator")}@example.com`, name: "Ana" },
@@ -262,8 +302,9 @@ describe("free looks, typefaces and colourways (DEC-177)", () => {
         } as never;
         const draft = await admin.saveDraft(staff, {
             catalog: catalogue((c) => {
+                // The owner may still make a look free later.
                 c.freeStyles = {
-                    looks: ["quiet", "folio", "live"],
+                    looks: ["quiet"],
                     fontPairs: ["archivo"],
                     colourways: ["salon:mauve"],
                 };
@@ -282,16 +323,21 @@ describe("free looks, typefaces and colourways (DEC-177)", () => {
             data: { status: "SYNCED", syncedAt: new Date() },
         });
 
-        await sites.updateStyle(owner, siteId, paid);
+        await sites.updateStyle(owner, siteId, { ...paid, look: "quiet" });
         const after = await stored(siteId);
         expect(after.fontPair).toBe("archivo");
         expect(after.palette).toEqual(mauve.style.palette);
+        expect(after.look).toBe("quiet");
+        // A look still paid stays refused.
+        await lockedRow(
+            sites.updateStyle(owner, siteId, { ...after, look: "folio" }),
+        );
 
         // And the editor's read says so.
         const read = await sites.getSite(owner, siteId);
         expect(read.styleAccess).toEqual({
             free: {
-                looks: ["folio", "quiet", "live"],
+                looks: ["quiet"],
                 fontPairs: ["system", OWN_PAIR, "archivo"],
                 colourways: ["kesar", "mauve"],
             },
