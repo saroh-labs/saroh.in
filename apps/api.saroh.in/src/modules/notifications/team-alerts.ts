@@ -87,6 +87,12 @@ export const TEAM_ALERT_TYPE = "team.alert";
  *   the one who did it. `change` "moved-away" and a "new" from a
  *   reassignment (#1157) are email only: the reassigning write put the
  *   bell's notice in their alerts already. Keyed to the event and person.
+ * - `member`: a member cancelled or paused their own membership from their
+ *   account (`eventId`, the SubscriptionEvent), or their bank cancelled its
+ *   autopay (`mandateId`, once per mandate), DEC-174 U19 (#1150), on the
+ *   Members row. Queued only for the member's own doing
+ *   (`subscription-events.ts`) and the bank's (`mandate-events.ts`), never
+ *   for a change the team made.
  */
 export type TeamAlertPayload =
     | { event: "order"; orderId: string; actorUserId?: string | null }
@@ -104,6 +110,18 @@ export type TeamAlertPayload =
     | { event: "booking"; notificationId: string }
     | { event: "uncollected"; orderId: string }
     | { event: "request"; requestId: string }
+    | {
+          event: "member";
+          change: "cancelled" | "paused";
+          subscriptionId: string;
+          eventId: string;
+      }
+    | {
+          event: "member";
+          change: "autopay_off";
+          subscriptionId: string;
+          mandateId: string;
+      }
     | {
           event: "booking-mine";
           bookingId: string;

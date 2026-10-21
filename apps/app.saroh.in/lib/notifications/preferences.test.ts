@@ -104,6 +104,30 @@ describe("alertGrid", () => {
         );
     });
 
+    it("names Members when the API offers it, email off by default (#1150)", () => {
+        const grid = alertGrid({
+            status: "ok",
+            prefs: prefs({
+                alerts: [
+                    {
+                        key: "member",
+                        channels: { bell: true, email: false, whatsapp: false },
+                    },
+                ],
+            }),
+        });
+        expect(grid.rows.map((r) => [r.label, r.note])).toEqual([
+            [
+                "Members",
+                "When a member cancels or pauses, or turns off autopay at their bank",
+            ],
+        ]);
+        expect(grid.rows[0]?.cells.map((c) => c.label)).toEqual([
+            "Members by Bell, on",
+            "Members by Email, off",
+        ]);
+    });
+
     it("names Bookings with you when the API offers it (#1138)", () => {
         const grid = alertGrid({
             status: "ok",

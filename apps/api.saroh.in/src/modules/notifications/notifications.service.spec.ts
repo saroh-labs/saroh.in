@@ -432,6 +432,10 @@ describe("what each person sees of the inbox (F14)", () => {
                 "booking.mine.moved",
                 "booking.mine.cancelled",
                 "booking.reassigned",
+                // A member's own changes, to who reads memberships (#1150).
+                "member.cancelled",
+                "member.paused",
+                "member.autopay_off",
                 // A rules request, only to who may approve it (#1138).
                 "hours.rule-request",
             ],

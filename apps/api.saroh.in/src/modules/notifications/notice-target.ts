@@ -69,6 +69,11 @@ export const NOTICE_KINDS = {
     // The answer, to the Member who asked alone (`userId`): approved, or
     // turned down with the reason. Their own Hours and time off.
     "hours.rule-answer": "hours",
+    // A member's own cancel or pause, or autopay cancelled at their bank
+    // (#1150): their Memberships on the person page.
+    "member.cancelled": "member",
+    "member.paused": "member",
+    "member.autopay_off": "member",
     "plan.limit": "plan",
     "plan.changed": "plan",
     "plan.ending": "plan",
@@ -96,6 +101,7 @@ interface TargetColumns {
     plan: Record<never, never>;
     products: Record<never, never>;
     "customer-request": { contactId: string | null };
+    member: { contactId: string };
 }
 
 /** What a notice of type `T` must point at. */
@@ -145,6 +151,7 @@ const COLUMN_OF: Partial<Record<NoticeKind, keyof NoticeColumns>> = {
     invoice: "invoiceId",
     site: "siteId",
     hours: "staffId",
+    member: "contactId",
 };
 
 /**
@@ -227,6 +234,7 @@ const ID_OF: Record<NoticeKind, (n: StoredNotice) => string | null> = {
     plan: () => null,
     products: () => null,
     "customer-request": (n) => n.contactId ?? null,
+    member: (n) => n.contactId ?? null,
 };
 
 /**

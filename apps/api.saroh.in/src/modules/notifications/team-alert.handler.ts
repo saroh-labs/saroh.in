@@ -16,6 +16,7 @@ import { wordAsk } from "./ask-alerts";
 import { wordBookingMine } from "./booking-mine-alerts";
 import { wordDataRequest } from "./data-request-alerts";
 import { wordDomain } from "./domain-alerts";
+import { wordMember } from "./member-alerts";
 import {
     hasMismatch,
     wordOrderPaidByLink,
@@ -35,6 +36,11 @@ export {
     DOMAIN_BACK_NOTIFICATION_TYPE,
     DOMAIN_DOWN_NOTIFICATION_TYPE,
 } from "./domain-alerts";
+export {
+    MEMBER_AUTOPAY_OFF_NOTIFICATION_TYPE,
+    MEMBER_CANCELLED_NOTIFICATION_TYPE,
+    MEMBER_PAUSED_NOTIFICATION_TYPE,
+} from "./member-alerts";
 export {
     INVOICE_PAYMENT_MISMATCH_NOTIFICATION_TYPE,
     ORDER_PAID_BY_LINK_NOTIFICATION_TYPE,
@@ -76,6 +82,7 @@ const ROW_LABEL: Record<AlertEvent, string> = {
     site: "Your website",
     request: "Data removal requests",
     mine: "Bookings with you",
+    member: "Members",
 };
 
 const BUILT_IN_LABEL: Partial<Record<string, string>> = {
@@ -466,6 +473,8 @@ export async function wordAlert(
             return wordDataRequest(tx, organizationId, payload);
         case "booking-mine":
             return wordBookingMine(tx, organizationId, payload);
+        case "member":
+            return wordMember(tx, organizationId, payload);
     }
 }
 
@@ -769,6 +778,13 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
                 : null;
         case "request":
             return str("requestId") ? (p as TeamAlertPayload) : null;
+        case "member":
+            return str("subscriptionId") &&
+                (((p.change === "cancelled" || p.change === "paused") &&
+                    str("eventId")) ||
+                    (p.change === "autopay_off" && str("mandateId")))
+                ? (p as TeamAlertPayload)
+                : null;
         case "booking-mine":
             return str("bookingId") &&
                 str("eventId") &&

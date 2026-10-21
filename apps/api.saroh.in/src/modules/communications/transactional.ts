@@ -51,6 +51,8 @@ export const NOTICE_TEMPLATES = [
     "MEMBERSHIP_PLAN_CHANGED",
     "MEMBERSHIP_CANCELLED",
     "MEMBERSHIP_KEPT",
+    // A membership set to end is a week away (DEC-174 U19, #1150).
+    "MEMBERSHIP_ENDING",
     // A team reply in the customer's Messages thread (DEC-174 U14, #1145):
     // email only, held a minute and coalesced, under the TEAM_REPLY switch.
     "THREAD_REPLY",

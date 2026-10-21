@@ -167,6 +167,17 @@ const SAMPLES: Record<(typeof NOTICE_TEMPLATES)[number], NoticeVars> = {
         },
     },
     ...membershipSamples(),
+    MEMBERSHIP_ENDING: {
+        kind: "MEMBERSHIP_ENDING",
+        ending: {
+            business: "Rye <&> Co.",
+            firstName: "Asha",
+            plan: "Monthly",
+            endsAt: AT,
+            timeZone: "Asia/Kolkata",
+            link: null,
+        },
+    },
     REFUND_SENT: {
         kind: "REFUND_SENT",
         refund: {

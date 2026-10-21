@@ -13,6 +13,7 @@ import { bookingNotice } from "./booking";
 import { courseNotice } from "./course";
 import { enquiryReceivedNotice } from "./enquiry-received";
 import { membershipNotice } from "./membership";
+import { membershipEndingNotice } from "./membership-ending";
 import type { NoticeDefinition, NoticeSubject, NoticeVarsBase } from "./notice";
 import { safeLink } from "./notice";
 import { orderStepNotice, placedOrderNotice } from "./order";
@@ -47,6 +48,8 @@ export const NOTICES = {
     WAITLIST_CLASS_CANCELLED: waitlistNotice,
     ENQUIRY_RECEIVED: enquiryReceivedNotice,
     MEMBERSHIP_CANCELLED: membershipNotice,
+    // A week before a membership ends (U19, #1150).
+    MEMBERSHIP_ENDING: membershipEndingNotice,
     MEMBERSHIP_JOINED: membershipNotice,
     MEMBERSHIP_KEPT: membershipNotice,
     MEMBERSHIP_PAUSED: membershipNotice,

@@ -4,6 +4,7 @@
 import type { OrgAction } from "../organizations/organization-actions";
 import {
     ALERT_EVENTS,
+    ALERT_MODULE,
     alertEventOfType,
     alertOn,
     channelState,
@@ -29,6 +30,8 @@ describe("alerts", () => {
             "request",
             // Bookings with you (#1138).
             "mine",
+            // Members (#1150).
+            "member",
         ]);
     });
 
@@ -213,6 +216,28 @@ describe("alerts", () => {
                 "booking.mine.cancelled",
                 "booking.reassigned",
             ]);
+        });
+    });
+
+    describe("Members (#1150)", () => {
+        it("is offered to who reads memberships, under Payments, bell on and email off", () => {
+            expect(mayHearAbout("member", holds("subscription:read"))).toBe(
+                true,
+            );
+            expect(mayHearAbout("member", holds("booking:read"))).toBe(false);
+            expect(ALERT_MODULE.member).toBe("PAYMENTS");
+            expect(alertOn([], "member", "bell")).toBe(true);
+            expect(alertOn([], "member", "email")).toBe(false);
+        });
+
+        it("covers a member's own cancel and pause, and autopay off at the bank", () => {
+            for (const type of [
+                "member.cancelled",
+                "member.paused",
+                "member.autopay_off",
+            ]) {
+                expect(alertEventOfType(type)).toBe("member");
+            }
         });
     });
 

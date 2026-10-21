@@ -179,6 +179,20 @@ const WRITTEN: {
         id: null,
         href: "/commerce/customers?tab=requests",
     },
+    // #1150: a member's own cancel or pause, or autopay off at their bank,
+    // opens the person's Memberships.
+    {
+        type: "member.cancelled",
+        kind: "member",
+        id: "con_1",
+        href: "/contacts/con_1?tab=sub",
+    },
+    {
+        type: "member.autopay_off",
+        kind: "member",
+        id: null,
+        href: "/billing/subscriptions",
+    },
 ];
 
 describe("where a notification opens", () => {

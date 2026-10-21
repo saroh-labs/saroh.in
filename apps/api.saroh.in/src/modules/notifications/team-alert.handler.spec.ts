@@ -112,6 +112,10 @@ function makeTx() {
         staffMember: { findFirst: jest.fn() },
         merchantPaymentProvider: { findFirst: jest.fn() },
         communicationProvider: { findFirst: jest.fn() },
+        // Members (#1150).
+        customerSubscription: { findFirst: jest.fn() },
+        subscriptionEvent: { findFirst: jest.fn() },
+        paymentMandate: { findFirst: jest.fn() },
         $executeRaw: jest.fn().mockResolvedValue(0),
     };
 }
@@ -1865,6 +1869,222 @@ describe("a booking with you (#1138)", () => {
             } as unknown as Job);
         }
         expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+});
+
+describe("members (#1150)", () => {
+    const END = new Date("2026-10-28T18:30:00.000Z");
+    const sub = (over: Record<string, unknown> = {}) => ({
+        id: "sub_1",
+        status: "ACTIVE",
+        cancelAtPeriodEnd: true,
+        currentPeriodEnd: END,
+        pausedUntil: null,
+        timezone: "Asia/Kolkata",
+        contactId: "con_1",
+        plan: { name: "Monthly yoga" },
+        contact: { firstName: "Asha", lastName: "Rao" },
+        ...over,
+    });
+    const cancelled = {
+        event: "member" as const,
+        change: "cancelled" as const,
+        subscriptionId: "sub_1",
+        eventId: "sev_1",
+    };
+
+    it("a member's own cancel rings the bell on the person, email off by default", async () => {
+        const tx = makeTx();
+        tx.customerSubscription.findFirst.mockResolvedValue(sub());
+        tx.subscriptionEvent.findFirst.mockResolvedValue({
+            id: "sev_1",
+            kind: "CANCEL_SCHEDULED",
+        });
+        const out = await tellTeam(asTx(tx), ORG, cancelled);
+        // Only the member's own doing is ever worded.
+        expect(tx.subscriptionEvent.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ actorKind: "CUSTOMER" }),
+            }),
+        );
+        expect(tx.customerNotice.createMany).toHaveBeenCalledWith({
+            data: [
+                expect.objectContaining({
+                    eventKey: "team:member:sev_1",
+                    kind: "TEAM_TOLD",
+                }),
+            ],
+            skipDuplicates: true,
+        });
+        expect(tx.notification.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "member.cancelled",
+                contactId: "con_1",
+                title: "Asha Rao cancelled their Monthly yoga membership",
+                body: "It ends on 29 Oct 2026. Nothing more will be charged.",
+            }),
+            select: { id: true },
+        });
+        expect(out.emails).toEqual([]);
+    });
+
+    it("emails who turned email on, naming nobody", async () => {
+        const tx = makeTx();
+        tx.customerSubscription.findFirst.mockResolvedValue(sub());
+        tx.subscriptionEvent.findFirst.mockResolvedValue({
+            id: "sev_1",
+            kind: "CANCELLED",
+        });
+        tx.notificationPreference.findMany.mockResolvedValue([
+            {
+                userId: "u_owner",
+                event: "member",
+                channel: "email",
+                enabled: true,
+            },
+        ]);
+        const out = await tellTeam(asTx(tx), ORG, cancelled);
+        expect(recipients(out)).toEqual(["u_owner"]);
+        const mail = out.emails[0].mail;
+        expect(mail.subject).toBe(
+            "Rye & Co: A member cancelled their membership",
+        );
+        expect(mail.body).not.toContain("Asha");
+        expect(mail.body).toContain("It has ended.");
+        expect(mail.url).toBe(
+            "https://app.saroh.localhost/billing/subscriptions/sub_1",
+        );
+        expect(mail.footer).toContain("“Members”");
+    });
+
+    it("a cancel kept since says nothing", async () => {
+        const tx = makeTx();
+        tx.customerSubscription.findFirst.mockResolvedValue(
+            sub({ cancelAtPeriodEnd: false }),
+        );
+        tx.subscriptionEvent.findFirst.mockResolvedValue({
+            id: "sev_1",
+            kind: "CANCEL_SCHEDULED",
+        });
+        expect(await tellTeam(asTx(tx), ORG, cancelled)).toEqual({
+            told: false,
+            emails: [],
+        });
+    });
+
+    it("a change the team made (no CUSTOMER event) says nothing", async () => {
+        const tx = makeTx();
+        tx.customerSubscription.findFirst.mockResolvedValue(sub());
+        tx.subscriptionEvent.findFirst.mockResolvedValue(null);
+        expect((await tellTeam(asTx(tx), ORG, cancelled)).told).toBe(false);
+    });
+
+    it("a pause says until when, and says nothing once started again", async () => {
+        const tx = makeTx();
+        tx.customerSubscription.findFirst.mockResolvedValue(
+            sub({
+                status: "PAUSED",
+                cancelAtPeriodEnd: false,
+                pausedUntil: new Date("2026-11-11T18:30:00.000Z"),
+            }),
+        );
+        tx.subscriptionEvent.findFirst.mockResolvedValue({
+            id: "sev_2",
+            kind: "PAUSED",
+        });
+        const paused = { ...cancelled, change: "paused" as const };
+        await tellTeam(asTx(tx), ORG, paused);
+        expect(tx.notification.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "member.paused",
+                title: "Asha Rao paused their Monthly yoga membership",
+                body: "Until 12 Nov 2026. No charges until then, and their classes are on hold.",
+            }),
+            select: { id: true },
+        });
+
+        const again = makeTx();
+        again.customerSubscription.findFirst.mockResolvedValue(
+            sub({ status: "ACTIVE", cancelAtPeriodEnd: false }),
+        );
+        again.subscriptionEvent.findFirst.mockResolvedValue({
+            id: "sev_2",
+            kind: "PAUSED",
+        });
+        expect((await tellTeam(asTx(again), ORG, paused)).told).toBe(false);
+    });
+
+    describe("autopay turned off at the bank", () => {
+        const off = {
+            event: "member" as const,
+            change: "autopay_off" as const,
+            subscriptionId: "sub_1",
+            mandateId: "man_1",
+        };
+
+        it("tells the team once per mandate", async () => {
+            const tx = makeTx();
+            tx.customerSubscription.findFirst.mockResolvedValue(
+                sub({ cancelAtPeriodEnd: false }),
+            );
+            tx.paymentMandate.findFirst
+                .mockResolvedValueOnce({
+                    status: "CANCELLED",
+                    cancelReason: "PROVIDER",
+                })
+                .mockResolvedValueOnce(null);
+            await tellTeam(asTx(tx), ORG, off);
+            expect(tx.customerNotice.createMany).toHaveBeenCalledWith({
+                data: [
+                    expect.objectContaining({
+                        eventKey: "team:member:autopay_off:man_1",
+                    }),
+                ],
+                skipDuplicates: true,
+            });
+            expect(tx.notification.create).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    type: "member.autopay_off",
+                    contactId: "con_1",
+                    title: "Asha Rao turned off autopay for Monthly yoga at their bank",
+                }),
+                select: { id: true },
+            });
+        });
+
+        it("says nothing once autopay is set up again, or the membership ended", async () => {
+            const again = makeTx();
+            again.customerSubscription.findFirst.mockResolvedValue(
+                sub({ cancelAtPeriodEnd: false }),
+            );
+            again.paymentMandate.findFirst
+                .mockResolvedValueOnce({
+                    status: "CANCELLED",
+                    cancelReason: "PROVIDER",
+                })
+                .mockResolvedValueOnce({ id: "man_2" });
+            expect((await tellTeam(asTx(again), ORG, off)).told).toBe(false);
+
+            const ended = makeTx();
+            ended.customerSubscription.findFirst.mockResolvedValue(
+                sub({ status: "CANCELLED" }),
+            );
+            ended.paymentMandate.findFirst.mockResolvedValueOnce({
+                status: "CANCELLED",
+                cancelReason: "PROVIDER",
+            });
+            expect((await tellTeam(asTx(ended), ORG, off)).told).toBe(false);
+        });
+
+        it("a mandate the team or Saroh ended says nothing", async () => {
+            const tx = makeTx();
+            tx.customerSubscription.findFirst.mockResolvedValue(sub());
+            tx.paymentMandate.findFirst.mockResolvedValueOnce({
+                status: "CANCELLED",
+                cancelReason: "STAFF",
+            });
+            expect((await tellTeam(asTx(tx), ORG, off)).told).toBe(false);
+        });
     });
 });
 

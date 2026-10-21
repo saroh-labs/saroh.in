@@ -106,6 +106,11 @@ export function pathOf(subject: {
         // it. Only while the account area is on, as the thread is.
         return "/account/messages";
     }
+    if (subject.kind === "MEMBERSHIP_ENDING" && accountAreaOn()) {
+        // A membership ending in a week (U19): a member can't keep it from
+        // their account, so their Messages, to ask the business to.
+        return "/account/messages";
+    }
     if (subject.kind === "BOOKING_LAPSED" && subject.serviceId) {
         // A lapsed hold (#1137): the booking page, on the service, to book
         // again. It served the hold minutes ago, so it is there.

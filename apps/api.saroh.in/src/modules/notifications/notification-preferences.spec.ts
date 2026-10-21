@@ -96,6 +96,8 @@ describe("reading your alerts", () => {
             "team",
             // The owner can remove a customer's details (DEC-172).
             "request",
+            // Members (#1150), with Payments on.
+            "member",
         ]);
         expect(view.alerts.find((a) => a.key === "request")?.channels).toEqual({
             bell: true,
@@ -177,7 +179,12 @@ describe("reading your alerts", () => {
             "failed",
             "team",
             "request",
+            "member",
         ]);
+        // Payments off: no Payment failed row and no Members row.
+        modules(["PAYMENTS"]);
+        const off = await service().read(ctx());
+        expect(off.alerts.map((a) => a.key)).not.toContain("member");
     });
 
     it("offers the Website row only with test releases on, to who can publish (DEC-071, T10)", async () => {
@@ -191,6 +198,7 @@ describe("reading your alerts", () => {
             "team",
             "site",
             "request",
+            "member",
         ]);
         // Email on by default: the site changed, or didn't, unwatched.
         expect(view.alerts.find((a) => a.key === "site")?.channels).toEqual({

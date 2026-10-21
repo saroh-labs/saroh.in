@@ -662,6 +662,42 @@ describe("what is never charged", () => {
         expect((await intentOf(prepared.intentId)).status).toBe("CANCELLED");
     });
 
+    it("autopay cancelled at the bank alerts the team once per mandate (#1150)", async () => {
+        const who = await autopayMember();
+        const mandate = await prisma.paymentMandate.findUniqueOrThrow({
+            where: { id: who.mandateId },
+        });
+        const report = () =>
+            prisma.$transaction((tx) =>
+                applyMandateChangeInTx(tx, owner.organizationId, "RAZORPAY", {
+                    status: "CANCELLED",
+                    providerMandateId: mandate.providerMandateId ?? undefined,
+                }),
+            );
+        await report();
+        // The webhook delivered again: the mandate is cancelled already.
+        await report();
+
+        const alerts = await prisma.job.findMany({
+            where: {
+                organizationId: owner.organizationId,
+                type: "team.alert",
+                payload: {
+                    path: ["subscriptionId"],
+                    equals: who.subscriptionId,
+                },
+            },
+        });
+        expect(alerts.map((j) => j.payload)).toEqual([
+            {
+                event: "member",
+                change: "autopay_off",
+                subscriptionId: who.subscriptionId,
+                mandateId: who.mandateId,
+            },
+        ]);
+    });
+
     it("a new mandate made active closes the old one's prepared charges (code review)", async () => {
         const who = await autopayMember();
         const invoice = await invoiceFor(who);

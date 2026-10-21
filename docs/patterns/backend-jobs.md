@@ -113,6 +113,7 @@ waits while holding one.
 | `job-chain:account-managers.link-sweep`   | Leaving one waiting run of the manager link sweep: "is one waiting? if not, add one" under the lock, in place of a `Job_one_pending_…` index                                                                                                                                                                                             | `admin/manager-link-sweep.job.ts` (`schedule`)                                      |
 | `commission-invoice:<sarohInvoiceId>`     | Writing and moving one payment's commission lines (DEC-169, admin console U21): the line job, the refund job, the sweep and a rate set all settle through it                                                                                                                                                                             | `commission/commission-settle.ts` (`settleInvoiceInTx`)                             |
 | `commission-payout:<platformAdminId>`     | Putting a line in a teammate's statement month against Mark paid locking that month, so a line never lands in a month already paid; taken after the invoice's key                                                                                                                                                                        | `commission/commission-settle.ts`; `admin/admin-commission.service.ts` (`markPaid`) |
+| `job-chain:membership.ending-notice`      | Leaving one waiting run of the membership-ending sweep (DEC-174 U19), as the manager link sweep does                                                                                                                                                                                                                                     | `subscriptions/membership-ending.handler.ts` (`schedule`)                           |
 | `job-chain:commission.sweep`              | Leaving one waiting run of the commission sweep, as the manager link sweep does                                                                                                                                                                                                                                                          | `commission/commission-sweep.job.ts` (`schedule`)                                   |
 | `job-chain:invoice.overdue-remind`        | Leaving one waiting run of the overdue reminder sweep (automatic notices U20), as the manager link sweep does                                                                                                                                                                                                                            | `invoices/overdue-remind.handler.ts` (`schedule`)                                   |
 | `plan-meter:<organizationId>:<limitKey>`  | Writes that add to one plan limit (a product, a booking…)                                                                                                                                                                                                                                                                                | `billing/metering.service.ts` (`lockMeter`, U13)                                    |
@@ -466,6 +467,18 @@ the Privacy Policy states both.
   action (resume, Keep, cancel the plan change), which withdraws the
   untold notice and queues none of its own. The run re-reads the
   membership: a change undone since tells nobody.
+- **Membership ending in 7 days** (DEC-174 U19, #1150,
+  `notices/membership-ending.ts`): **`membership.ending-notice`** is a daily
+  self-rescheduling sweep (`subscriptions/membership-ending.handler.ts`,
+  one waiting run under `job-chain:membership.ending-notice`) over
+  memberships set to end with their period. Due when the end is 1 to 7
+  days away by the membership's own calendar and it was set to end before
+  that week began (a later cancel was just emailed the day). Queues
+  `MEMBERSHIP_ENDING` keyed `membership-ending:<subscriptionId>:<periodEnd>`
+  under `noticeOn(MEMBERSHIP)`, skipping one told or waiting; the
+  `customer.notify` claim makes it once whatever runs twice. The run
+  re-reads: kept since, ended, or a different end tells nobody. The email
+  links to the member's Messages (a member can't keep it themselves).
 - **Back in stock** (DEC-174 U23, #1154, `notices/back-in-stock.ts`): a
   "Tell me" on a sold-out product (`stock/stock-watch.service.ts`, public,
   rate-limited per visitor and per address) makes a `StockWatch`, never a
@@ -722,6 +735,16 @@ the Privacy Policy states both.
   captured payment's attempt). A failed pay-link payment never says "the
   same link": a link is shown once (DEC-110), so the words say a new one is
   needed and where to share it.
+- **Members alerts** (DEC-174 U19, #1150, `notifications/member-alerts.ts`),
+  on the Members row (bell on, email off; `subscription:read`, Payments
+  on): a member's own cancel or pause from their account (`member`,
+  `cancelled` / `paused`, queued by `recordSubscriptionEvent` only for a
+  `CUSTOMER` actor, keyed `team:member:<SubscriptionEvent id>`) and autopay
+  cancelled at their bank (`autopay_off`, queued by `applyMandateChangeInTx`
+  on the `PROVIDER` cancel, keyed `team:member:autopay_off:<mandateId>`).
+  Nothing the team did is told. Each re-reads: a pause started again, a
+  cancel kept, autopay set up again or a membership ended says nothing.
+  The bell opens the person's Memberships (`member.*`, `contactId`).
 - **Refunds told** (#1143, DEC-174, `payments/refund-notices.ts`): an
   online refund the provider took tells the customer "₹X for your order …
   is on its way back to how you paid" (`customer.notify` `REFUND_SENT`,

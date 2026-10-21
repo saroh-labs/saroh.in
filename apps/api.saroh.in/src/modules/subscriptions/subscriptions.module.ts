@@ -26,6 +26,10 @@ import { SiteAccountsModule } from "../site-accounts/site-accounts.module";
 import { AccountAutopayController } from "./account-autopay.controller";
 import { AccountAutopayService } from "./account-autopay.service";
 import { AccountPlanJoinController } from "./account-plan-join.controller";
+import {
+    MEMBERSHIP_ENDING_TYPE,
+    MembershipEndingHandler,
+} from "./membership-ending.handler";
 import { PublicPlanJoinService } from "./public-plan-join.service";
 import { PublicPlansController } from "./public-plans.controller";
 import { PublicPlansService } from "./public-plans.service";
@@ -84,6 +88,8 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         SubscriptionsService,
         PublicPlansService,
         SubscriptionRenewHandler,
+        // "Your membership ends on ‹date›", a week before (U19, #1150).
+        MembershipEndingHandler,
         OrganizationGuard,
         AccountPlanService,
         AccountInvoicesService,
@@ -111,18 +117,22 @@ export class SubscriptionsModule implements OnModuleInit, OnModuleDestroy {
         private readonly registry: JobHandlerRegistry,
         private readonly renew: SubscriptionRenewHandler,
         private readonly charge: SubscriptionChargeHandler,
+        private readonly ending: MembershipEndingHandler,
     ) {}
 
     async onModuleInit(): Promise<void> {
         this.registry.register(SUBSCRIPTION_RENEW_TYPE, this.renew.handle);
         this.registry.register(SUBSCRIPTION_CHARGE_TYPE, this.charge.handle);
+        this.registry.register(MEMBERSHIP_ENDING_TYPE, this.ending.handle);
         // No worker runs under test, so nothing would ever claim the run.
         if (env.NODE_ENV === "test") return;
         // Never throws: a database that is not up yet must not stop the API
         // booting. The next start, or the next run, schedules it.
         await this.renew.schedule(new Date());
+        await this.ending.ensureScheduled();
         this.chainCheck = setInterval(() => {
             void this.renew.ensureScheduled();
+            void this.ending.ensureScheduled();
         }, CHAIN_CHECK_MS);
         this.chainCheck.unref();
     }

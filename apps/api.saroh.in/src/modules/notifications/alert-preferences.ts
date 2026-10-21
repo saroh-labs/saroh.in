@@ -29,6 +29,9 @@ export const ALERT_EVENTS = [
     // A booking with you was made, moved or cancelled (DEC-174 D7, #1138):
     // personal, to the person on the diary with a login.
     "mine",
+    // A member cancelled or paused their own membership, or stopped its
+    // autopay at their bank (DEC-174 U19, #1150).
+    "member",
 ] as const;
 export type AlertEvent = (typeof ALERT_EVENTS)[number];
 
@@ -89,6 +92,8 @@ export const ALERT_READS: Record<AlertEvent, readonly OrgAction[]> = {
     // Anyone who reads bookings, Calendar only included: it is their own
     // diary (DEC-074 scopes). Offered only to someone on the diary.
     mine: ["booking:read"],
+    // Whoever reads memberships.
+    member: ["subscription:read"],
 };
 
 /**
@@ -105,6 +110,8 @@ export const ALERT_MODULE: Record<AlertEvent, string | null> = {
     // A customer can ask from any site's account, whichever modules are on.
     request: null,
     mine: "APPOINTMENTS",
+    // Memberships are part of Payments: their routes ask for it.
+    member: "PAYMENTS",
 };
 
 /** The inbox notice types each row covers. */
@@ -154,6 +161,9 @@ export const ALERT_NOTIFICATION_TYPES: Record<AlertEvent, readonly string[]> = {
         "booking.mine.cancelled",
         "booking.reassigned",
     ],
+    // U19 (#1150): a member's own cancel or pause, and autopay cancelled at
+    // their bank. Nothing the team did themselves.
+    member: ["member.cancelled", "member.paused", "member.autopay_off"],
 };
 
 /**

@@ -3,6 +3,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { MEMBERSHIP_NOTICE_OF } from "../site-accounts/notices/membership";
 import { PLAN_EVENTS_PAGE_MAX } from "./dto";
 import type {
@@ -136,9 +137,23 @@ export interface SubscriptionEventInput {
 }
 
 /**
+ * What the team is told of when the member does it themselves from their
+ * account (DEC-174 U19, #1150), on the Members row. Never the team's own
+ * changes.
+ */
+const MEMBER_ALERT_OF: Partial<
+    Record<SubscriptionEventKind, "cancelled" | "paused">
+> = {
+    CANCELLED: "cancelled",
+    CANCEL_SCHEDULED: "cancelled",
+    PAUSED: "paused",
+};
+
+/**
  * Write one event. Called inside the action's own transaction. A change
  * the member is told about (joined, paused, resumed, cancelled, kept, a
- * plan change) queues their notice with it (`membership-notices.ts`, U11).
+ * plan change) queues their notice with it (`membership-notices.ts`, U11);
+ * a cancel or pause the member made themselves also alerts the team (U19).
  */
 export async function recordSubscriptionEvent(
     tx: Prisma.TransactionClient,
@@ -167,6 +182,15 @@ export async function recordSubscriptionEvent(
             subscriptionId,
             kind,
             actorKind: actor.actorKind,
+        });
+    }
+    const memberAlert = MEMBER_ALERT_OF[kind];
+    if (memberAlert && actor.actorKind === "CUSTOMER") {
+        await enqueueTeamAlert(tx, organizationId, {
+            event: "member",
+            change: memberAlert,
+            subscriptionId,
+            eventId: event.id,
         });
     }
 }
