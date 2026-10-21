@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { SESSIONS_SHOWN, sessionsOnShow } from "./use-times";
+import { sessionsOnShow } from "./model";
+import { SESSIONS_SHOWN } from "./use-times";
 
 const at = (n: number) => ({
     startAt: `2026-10-${String(n).padStart(2, "0")}T05:30:00.000Z`,

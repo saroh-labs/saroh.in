@@ -13,11 +13,11 @@ import { LookPay, LookWhat, LookWho } from "./look-steps";
 import type { LookStep } from "./look-words";
 import { momentText } from "./look-words";
 import type { BookingPageData, BookingStart } from "./model";
-import { laterSkip } from "./model";
+import { laterSkip, sessionsOnShow } from "./model";
 import { FlowMessageLine } from "./steps/flow-message";
 import { WhenBody } from "./steps/when-step";
 import type { BookingFlowEngine } from "./use-booking-flow";
-import { SESSIONS_SHOWN, sessionsOnShow } from "./use-times";
+import { SESSIONS_SHOWN } from "./use-times";
 
 /**
  * A look's step, under its heading (DEC-172, U10): the same contents in

@@ -8,7 +8,7 @@ import type {
     BookingWhere,
     BookPay,
 } from "./model";
-import { laterSkip } from "./model";
+import { laterSkip, sessionsOnShow } from "./model";
 import { DetailsStep } from "./steps/details-step";
 import type { FlowMessage } from "./steps/flow-message";
 import { FlowMessageLine } from "./steps/flow-message";
@@ -16,7 +16,7 @@ import { PayStep } from "./steps/pay-step";
 import { ServiceStep } from "./steps/service-step";
 import { WhenStep } from "./steps/when-step";
 import type { Times } from "./use-times";
-import { SESSIONS_SHOWN, sessionsOnShow } from "./use-times";
+import { SESSIONS_SHOWN } from "./use-times";
 import type { WaitlistPlace } from "./waitlist";
 
 /**
