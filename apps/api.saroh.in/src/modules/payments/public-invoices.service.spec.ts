@@ -303,6 +303,7 @@ describe("PublicInvoicesService.read", () => {
                     number: "004512",
                     bank: "HDFC Bank",
                     status: "WAITING",
+                    returnedAfterBanking: false,
                 },
             },
         ]);

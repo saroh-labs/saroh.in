@@ -421,6 +421,65 @@ describe("Record payment", () => {
         expect(toast.showUndo).not.toHaveBeenCalled();
     });
 
+    it("sends one key per opening: a retry keeps it, a new opening makes a new one (#6)", async () => {
+        drawSheet();
+        await settle();
+        actions.recordPayment.mockResolvedValue({
+            ok: false,
+            error: "Couldn't record that payment.",
+        });
+        await press(button("Record ₹8,400"));
+        await settle();
+        await press(button("Record ₹8,400"));
+        await settle();
+        const keyOf = (n: number) =>
+            (
+                actions.recordPayment.mock.calls[n]?.[1] as {
+                    idempotencyKey?: string;
+                }
+            ).idempotencyKey;
+        expect(keyOf(0)).toMatch(/^[A-Za-z0-9_-]{8,80}$/);
+        expect(keyOf(1)).toBe(keyOf(0));
+
+        // Closed and opened again: a second payment of its own.
+        act(() =>
+            root.render(
+                <RecordPaymentSheet
+                    open={false}
+                    onOpenChange={vi.fn()}
+                    invoice={VIVEK}
+                />,
+            ),
+        );
+        drawSheet();
+        await settle();
+        await press(button("Record ₹8,400"));
+        await settle();
+        expect(keyOf(2)).toMatch(/^[A-Za-z0-9_-]{8,80}$/);
+        expect(keyOf(2)).not.toBe(keyOf(0));
+    });
+
+    it("a retry the API already recorded says so, with no Undo (#6)", async () => {
+        const onOpenChange = drawSheet();
+        await settle();
+        actions.recordPayment.mockResolvedValue({
+            ok: true,
+            data: {
+                ...answer().data,
+                recorded: { paymentId: "pay_first", replayed: true },
+            },
+        });
+        await press(button("Record ₹8,400"));
+        await settle();
+        expect(onOpenChange).toHaveBeenCalledWith(false);
+        expect(toast.showSuccess).toHaveBeenCalledWith(
+            "Already recorded",
+            "This payment was recorded a moment ago, so nothing new was added.",
+        );
+        expect(toast.showUndo).not.toHaveBeenCalled();
+        expect(wa.offerWhatsAppReceipt).not.toHaveBeenCalled();
+    });
+
     it("refuses nothing typed", async () => {
         drawSheet();
         await settle();
@@ -457,6 +516,59 @@ describe("Record payment", () => {
             await u.undo();
         });
         expect(takeBack).toHaveBeenCalled();
+    });
+
+    // Review #14: the offer's toast comes ten seconds later, when the
+    // details may have closed or moved to another invoice.
+    it("the offer opens the share sheet only while its screen is still on that invoice", async () => {
+        const flush = () =>
+            act(async () => {
+                for (let i = 0; i < 10; i++) await Promise.resolve();
+            });
+        const onShareReceipt = vi.fn();
+        const draw = (invoice: RecordPaymentInvoice) =>
+            act(() =>
+                root.render(
+                    <RecordPaymentSheet
+                        open
+                        onOpenChange={vi.fn()}
+                        invoice={invoice}
+                        onShareReceipt={onShareReceipt}
+                    />,
+                ),
+            );
+        draw({ ...VIVEK, emailTo: null });
+        await flush();
+        actions.recordPayment.mockResolvedValue(answer({ leftToPay: "0.00" }));
+        act(() => button("Record ₹8,400").click());
+        await flush();
+        const share = (
+            wa.offerWhatsAppReceipt.mock.calls.at(-1) as unknown as [
+                string,
+                string,
+                number,
+                (() => boolean) | undefined,
+            ]
+        )[3];
+        expect(share).toBeTypeOf("function");
+
+        // Still here, on Vivek's invoice: the share sheet opens.
+        expect(share?.()).toBe(true);
+        expect(onShareReceipt).toHaveBeenCalledTimes(1);
+
+        // Moved on to the next invoice: not this one's sheet.
+        draw({ ...VIVEK, id: "inv_107", emailTo: null });
+        await flush();
+        expect(share?.()).toBe(false);
+        expect(onShareReceipt).toHaveBeenCalledTimes(1);
+
+        // Back on Vivek's, then closed for good: the toast opens WhatsApp itself.
+        draw({ ...VIVEK, emailTo: null });
+        await flush();
+        expect(share?.()).toBe(true);
+        act(() => root.render(<></>));
+        expect(share?.()).toBe(false);
+        expect(onShareReceipt).toHaveBeenCalledTimes(2);
     });
 
     it("records on another day picked", async () => {

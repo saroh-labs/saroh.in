@@ -17,6 +17,7 @@ import {
     moneyPlaces,
     moneyToday,
     usualOrder,
+    withDaySoFar,
 } from "./money";
 import { readOwedByAge } from "./owed-by-age";
 import type { InsightsPeriod } from "./period";
@@ -89,6 +90,7 @@ export class TakingsService {
         const [
             rows,
             lastWeekToday,
+            beforeLastDay,
             usual,
             first,
             org,
@@ -105,6 +107,16 @@ export class TakingsService {
                     zone,
                     day.lastStart,
                     day.lastSoFar,
+                ),
+            ),
+            // The period before's last day so far: compared with
+            // today so far, never as a whole day.
+            prisma.$queryRaw<TakingsDayRow[]>(
+                takingsByDaySql(
+                    organizationId,
+                    zone,
+                    w.beforeLastStart,
+                    w.beforeSoFar,
                 ),
             ),
             prisma.$queryRaw<UsualOrderRow[]>(
@@ -136,7 +148,12 @@ export class TakingsService {
         // Younger than both periods together: the one before is not whole.
         const thin = startedOn > w.beforeFromDate;
 
-        const fold = foldPeriod(rows, currency, w);
+        // Compared so far: the period before's last day, and last week's
+        // same weekday, are read only to the same time of day as now, so
+        // part of today is never set against a whole day. The bars draw
+        // whole days: a bar is the money of the days it names.
+        const compared = withDaySoFar(rows, w.beforeToDate, beforeLastDay);
+        const fold = foldPeriod(compared, currency, w);
         const weeks = foldBuckets(buckets, rows, currency, zone);
         return {
             period,
@@ -161,7 +178,7 @@ export class TakingsService {
             weeks,
             days: moneyDays(rows, currency, w),
             thisWeek: foldSoFar(
-                rows,
+                withDaySoFar(rows, todayIn(day.lastStart, zone), lastWeekToday),
                 currency,
                 weekInProgress(now, zone),
                 today,

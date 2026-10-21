@@ -42,7 +42,7 @@ import { moveStage, undoStage } from "@/lib/orders/actions";
 import type { KitchenStage } from "@/lib/orders/read";
 import { refundMismatch } from "@/lib/payments/actions";
 import { replyToReview } from "@/lib/product-reviews/actions";
-import { cancelBooking } from "@/lib/services/actions";
+import { turnDownBooking } from "@/lib/services/actions";
 import { cancelledMessage } from "@/lib/services/booking-money";
 import { retrySubscription } from "@/lib/subscriptions/actions";
 
@@ -58,6 +58,9 @@ export interface DoneRow {
     /** Remind all on the bills group (U8): waiting, or sent. */
     remind?: RemindAllState;
 }
+
+/** The row once Turn down found the customer had paid (review #11). */
+export const JUST_PAID_ROW = "They just paid";
 
 /** Which of a row's actions: its own, or the quiet one beside it (A7). */
 export type InlineWhich = "inline" | "second";
@@ -288,18 +291,27 @@ export function useInlineActions() {
 
     /**
      * Turn down a booking awaiting payment (A7): held ten seconds with Undo,
-     * then the booking's own cancel (`DELETE bookings/:id`), which tells the
-     * customer where the API says it does. Undo in the ten seconds leaves
-     * the booking exactly as it was.
+     * then the booking's own cancel (`DELETE bookings/:id?ifUnpaid=true`),
+     * which tells the customer where the API says it does. Undo in the ten
+     * seconds leaves the booking exactly as it was. When the customer paid
+     * in those ten seconds the API refuses (review #11), the booking
+     * stands, and the row says "They just paid".
      */
     function turnDown(need: HomeNeed, inline: HomeInline) {
         let refused: string | null = null;
         let said = false;
+        let paid = false;
         let result = inline.done;
         hold(need, inline, {
             text: heldText(inline),
             commit: async () => {
-                const res = await cancelBooking(inline.target, {});
+                const res = await turnDownBooking(inline.target);
+                if (!res.ok && "paid" in res) {
+                    // Not a failure: they paid, and the booking stands.
+                    result = JUST_PAID_ROW;
+                    paid = true;
+                    return;
+                }
                 if (!res.ok) {
                     refused = res.error;
                     throw new Error(res.error);
@@ -322,7 +334,8 @@ export function useInlineActions() {
                     showError(failedText(inline), refused ?? undefined);
                 } else {
                     setDone(need.id, { text: result });
-                    if (!said) showSuccess(result);
+                    if (paid) showSuccess(result, "The booking stands.");
+                    else if (!said) showSuccess(result);
                 }
             },
         });

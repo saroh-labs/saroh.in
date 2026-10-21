@@ -9,7 +9,7 @@ import { compareTakings, readMoney, WEEK_PATHS } from "./home-week";
  * Home A's "Money in today" tile (DEC-171): what came in today in the
  * business's zone, net of refunds, per currency, against the same weekday
  * last week to the same time of day. The same rupees This week counts
- * (`readMoney`: paid invoices, an order's money being its invoice, less
+ * (`readMoney`: money in by the one rule, `invoices/money-in.ts`, less
  * credit notes that gave money back), so the two never disagree.
  *
  * `payment:read`'s alone (DEC-098); `HomeService` asks for it only then.
@@ -63,7 +63,7 @@ export async function readMoneyToday(
     return {
         totals,
         payments,
-        // The invoices paid today, or the Calendar's money for someone who
+        // The invoices money came in on today, or the Calendar's money for someone who
         // may not open invoices (F11), as This week's takings link.
         href: view.calendar
             ? MONEY_ON_THE_CALENDAR

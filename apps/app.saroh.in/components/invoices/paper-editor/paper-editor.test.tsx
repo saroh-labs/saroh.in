@@ -36,16 +36,25 @@ vi.mock("@/lib/invoices/link-actions", () => ({ newPayLink: vi.fn() }));
 const products = vi.hoisted(() => ({ findInvoiceProducts: vi.fn() }));
 vi.mock("@/lib/invoices/product-actions", () => products);
 vi.mock("@/lib/contacts/create", () => ({ createContact: vi.fn() }));
+const step = vi.hoisted(() => ({
+    options: [] as unknown[],
+    ensure: vi.fn(() => Promise.resolve(true)),
+}));
 vi.mock("@/components/organizations/use-business-details-step", () => ({
-    useBusinessDetailsStep: () => ({
-        run: (fn: () => unknown) => fn(),
-        ensure: () => Promise.resolve(true),
-        step: null,
-    }),
+    useBusinessDetailsStep: (options: unknown) => {
+        step.options.push(options);
+        return {
+            run: (fn: () => unknown) => fn(),
+            ensure: step.ensure,
+            step: null,
+        };
+    },
 }));
 const settings = vi.hoisted(() => ({
     saveOrganizationSettings: vi.fn(),
+    saveOrganizationSettingsInPlace: vi.fn(),
     saveBusinessLogo: vi.fn(),
+    saveBusinessLogoInPlace: vi.fn(),
 }));
 vi.mock("@/lib/organizations/settings-actions", () => settings);
 vi.mock("@/components/shared/logo-upload", () => ({ LogoUpload: () => null }));
@@ -558,7 +567,7 @@ describe("the style rail", () => {
     });
 
     it("Make this my default sets the business's look, and the draft then follows it", async () => {
-        settings.saveOrganizationSettings.mockResolvedValue({
+        settings.saveOrganizationSettingsInPlace.mockResolvedValue({
             ok: true,
             data: {
                 name: "Rye & Co.",
@@ -572,12 +581,93 @@ describe("the style rail", () => {
         choose("Colour #6B3F1D");
         act(() => button("Make this my default").click());
         await settle();
-        expect(settings.saveOrganizationSettings).toHaveBeenCalledWith({
+        expect(settings.saveOrganizationSettingsInPlace).toHaveBeenCalledWith({
             invoicePaper: { style: "BAND", colour: "#6B3F1D" },
         });
         expect(text()).toContain("Your default look: Band · #6B3F1D.");
         expect(paper().dataset.style).toBe("BAND");
         expect(toast.showSuccess).toHaveBeenCalled();
+    });
+
+    // Review #15: a revalidating save from here threw the editor away, with
+    // the Style sheet and the last 800 ms of typing.
+    it("Make this my default saves what was just typed first, and never redraws the page", async () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+        settings.saveOrganizationSettingsInPlace.mockResolvedValue({
+            ok: true,
+            data: {
+                name: "Rye & Co.",
+                tax: { registered: true, state: "29", stateName: "Karnataka" },
+                profile: { timezone: "Asia/Kolkata", taxId: "29AAGCR4375J1ZU" },
+                invoicePaper: { style: "BAND", colour: "#6B3F1D" },
+            },
+        });
+        render();
+        act(() => part("Change line 2: Butter croissant (trade)").click());
+        setValue(byLabel("Qty"), "24");
+        act(() => part("Change line 2: Butter croissant (trade)").click());
+        choose("Band");
+        // Pressed inside the 800 ms: the quantity isn't on the server yet.
+        expect(actions.updateInvoice).not.toHaveBeenCalled();
+        act(() => button("Make this my default").click());
+        await settle();
+        expect(actions.updateInvoice).toHaveBeenCalled();
+        expect(lastSave().lines).toEqual([
+            expect.objectContaining({ quantity: 12 }),
+            expect.objectContaining({ quantity: 24 }),
+        ]);
+        expect(actions.updateInvoice.mock.invocationCallOrder[0]).toBeLessThan(
+            settings.saveOrganizationSettingsInPlace.mock
+                .invocationCallOrder[0],
+        );
+        expect(settings.saveOrganizationSettings).not.toHaveBeenCalled();
+    });
+
+    it("How to pay us, changed from the paper, saves without redrawing the page", async () => {
+        settings.saveOrganizationSettingsInPlace.mockResolvedValue({
+            ok: true,
+            data: {
+                name: "Rye & Co.",
+                tax: { registered: true, state: "29", stateName: "Karnataka" },
+                profile: { timezone: "Asia/Kolkata", taxId: "29AAGCR4375J1ZU" },
+                payInstructions: { upiId: "rye@okicici" },
+            },
+        });
+        render();
+        act(() => part("How to pay you").click());
+        act(() => button("Change how to pay us").click());
+        await settle();
+        setValue(byLabel("UPI ID"), "rye@okicici");
+        act(() => button("Save").click());
+        await settle();
+        const sent = settings.saveOrganizationSettingsInPlace.mock
+            .calls[0]?.[0] as { payInstructions?: { upiId?: string } };
+        expect(sent.payInstructions?.upiId).toBe("rye@okicici");
+        expect(settings.saveOrganizationSettings).not.toHaveBeenCalled();
+    });
+
+    it("Issue saves what was just typed before the business-details step, which saves in place", async () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+        actions.issueInvoice.mockResolvedValue({ ok: true, data: draft() });
+        step.options.length = 0;
+        step.ensure.mockClear();
+        // No payment link to make: Issue it, and the page moves on.
+        render({ providerConnected: false });
+        expect(step.options.at(-1)).toMatchObject({ inPlace: true });
+        act(() => part("Change line 2: Butter croissant (trade)").click());
+        setValue(byLabel("Qty"), "24");
+        act(() => part("Change line 2: Butter croissant (trade)").click());
+        expect(actions.updateInvoice).not.toHaveBeenCalled();
+        const issue = Array.from(all().querySelectorAll("button")).find((b) =>
+            b.textContent.trim().startsWith("Issue"),
+        );
+        act(() => issue?.click());
+        await settle();
+        expect(step.ensure).toHaveBeenCalled();
+        expect(actions.updateInvoice).toHaveBeenCalled();
+        expect(actions.updateInvoice.mock.invocationCallOrder[0]).toBeLessThan(
+            step.ensure.mock.invocationCallOrder[0],
+        );
     });
 
     it("a role without org:update chooses the draft's look but never the default", () => {

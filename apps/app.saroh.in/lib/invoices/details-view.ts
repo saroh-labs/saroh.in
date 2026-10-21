@@ -1,4 +1,4 @@
-import { formatMoneyMajor } from "@/lib/format/money";
+import { formatMoneyMajor, minorOf } from "@/lib/format/money";
 
 import { sentLine } from "./send";
 import type { Invoice, InvoicePayment } from "./service";
@@ -26,6 +26,11 @@ export interface HistoryLine {
     struck?: boolean;
     /** The live payment this line records, which may be removed. */
     removable?: InvoicePayment;
+    /**
+     * A cheque already in the bank, which the bank may still return (#7):
+     * "Bounced" is offered beside it.
+     */
+    bounceable?: InvoicePayment;
 }
 
 /**
@@ -59,7 +64,7 @@ export function historyLines(
     }
 
     const payments = i.payments ?? [];
-    const totalCents = Math.round(Number(i.total) * 100);
+    const totalCents = minorOf(i.total) ?? 0;
     for (const p of payments) {
         paymentEvents(p, totalCents).forEach((e, n) => {
             const first = n === 0;
@@ -76,6 +81,10 @@ export function historyLines(
                         : "ok",
                 struck: e.struck,
                 removable: first && p.canRemove ? p : undefined,
+                bounceable:
+                    first && p.canRemove && p.bankStatus === "CLEARED"
+                        ? p
+                        : undefined,
             });
         });
     }

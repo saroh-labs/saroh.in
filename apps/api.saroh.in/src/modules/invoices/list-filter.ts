@@ -1,7 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
 import type { InvoiceSource } from "./invoice-state";
-import { LIVE_PAYMENT_WHERE } from "./invoice-state";
+import { moneyInSinceWhere } from "./money-in";
 import { fromCents } from "./totals";
 
 /**
@@ -111,21 +111,11 @@ export function searchWhere(
 
 /**
  * Money received from `from` on (DEC-173, U4): the money strip's "Paid this
- * month". An invoice with a payment that counts (`LIVE_PAYMENT_WHERE`)
- * received since, part payments included; or an order's paper paid since,
- * since the order is its ledger (ADR-008) and it has no payment rows. A
- * credit note never.
+ * month", and Home's money figures' "since" link. The invoices money came
+ * in on by the one money-in rule (`money-in.ts` `moneyInSinceWhere`): a
+ * payment that counts received since, part payments included, or an
+ * order's paper paid since. A credit note never.
  */
 export function paidFromWhere(from: Date): Prisma.InvoiceWhereInput {
-    return {
-        kind: { not: "CREDIT_NOTE" },
-        OR: [
-            {
-                payments: {
-                    some: { ...LIVE_PAYMENT_WHERE, receivedAt: { gte: from } },
-                },
-            },
-            { orderId: { not: null }, paidAt: { gte: from } },
-        ],
-    };
+    return moneyInSinceWhere(from);
 }

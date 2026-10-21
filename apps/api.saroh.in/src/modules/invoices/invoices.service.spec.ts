@@ -41,6 +41,8 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn().mockResolvedValue([]),
         },
         invoiceSequence: { upsert: jest.fn() },
+        // No cheque waits unless a test says so (#5).
+        invoicePayment: { count: jest.fn().mockResolvedValue(0) },
         contact: { findFirst: jest.fn() },
         businessProfile: { findUnique: jest.fn() },
         // The seller's name, frozen on issue (DEC-082).
@@ -721,8 +723,32 @@ describe("lists and what is owed", () => {
                 source: { in: ["BOOKING", "PACK", "SUBSCRIPTION"] },
                 number: null,
             },
-            paidAt: { gte: new Date(since) },
-            kind: { not: "CREDIT_NOTE" },
+            // Money in by the one rule (`money-in.ts`, DEC-173): a payment
+            // that counts received since, or an order's paper paid since.
+            AND: [
+                {
+                    kind: { not: "CREDIT_NOTE" },
+                    OR: [
+                        {
+                            orderId: null,
+                            payments: {
+                                some: {
+                                    removedAt: null,
+                                    OR: [
+                                        { bankStatus: null },
+                                        { bankStatus: { not: "BOUNCED" } },
+                                    ],
+                                    receivedAt: { gte: new Date(since) },
+                                },
+                            },
+                        },
+                        {
+                            orderId: { not: null },
+                            paidAt: { gte: new Date(since) },
+                        },
+                    ],
+                },
+            ],
         });
     });
 
@@ -1352,6 +1378,18 @@ describe("GST (ADR-008)", () => {
             row({ status: "ISSUED", number: "RC/26-27/0004" }),
         );
         registered();
+        // The ledger's lock and read, as the merchant saw it (#2).
+        tx.$queryRaw!.mockResolvedValueOnce([{ id: "inv_1" }]);
+        tx.invoice!.findFirst!.mockResolvedValueOnce({
+            id: "inv_1",
+            organizationId: "org_1",
+            status: "ISSUED",
+            kind: "INVOICE",
+            currency: "INR",
+            total: decimal("2360"),
+            paidCents: 0,
+            order: null,
+        });
         // The original's read; the number the credit note takes is free.
         tx.invoice!.findUnique!.mockResolvedValue(null).mockResolvedValueOnce({
             id: "inv_1",

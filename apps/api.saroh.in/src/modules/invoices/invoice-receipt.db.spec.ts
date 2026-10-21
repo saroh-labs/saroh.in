@@ -330,6 +330,33 @@ describe("a cheque's receipt waits for the bank", () => {
         expect(receipt!.body).toContain("is now paid in full");
     });
 
+    it("a stray job for a cheque still waiting, or on an invoice since credited, sends nothing (#5, #9)", async () => {
+        const { id } = await issued(rye, "600.00");
+        const waiting = await payments.record(rye, id, {
+            method: "CHEQUE",
+            chequeNumber: "004560",
+        });
+        const stray = await prisma.job.create({
+            data: {
+                organizationId: rye.organizationId,
+                type: INVOICE_RECEIPT_TYPE,
+                payload: { paymentId: waiting.recorded.paymentId },
+            },
+        });
+        await handler.handle(stray);
+        expect(await receiptsFor(id)).toHaveLength(0);
+
+        const other = await issued(rye, "450.00");
+        const cash = await payments.record(rye, other.id, { method: "CASH" });
+        const job = await jobOf(rye.organizationId, cash.recorded.paymentId);
+        await prisma.invoice.update({
+            where: { id: other.id },
+            data: { status: "CREDITED" },
+        });
+        await handler.handle(job);
+        expect(await receiptsFor(other.id)).toHaveLength(0);
+    });
+
     it("sends nothing for a cheque that bounced", async () => {
         const { id } = await issued(rye, "500.00");
         const recorded = await payments.record(rye, id, {

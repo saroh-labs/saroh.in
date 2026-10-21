@@ -8,6 +8,7 @@
  */
 import { prisma } from "@saroh/database";
 
+import { onTheLedger } from "../../../test/ledger-paid";
 import { isFresh, readSince } from "./home-last-day";
 
 const tag = `${process.pid}-${Date.now()}`;
@@ -61,17 +62,19 @@ describe("Home F6 Last 24 hours (DB)", () => {
         organizationId: string,
         data: Record<string, unknown>,
     ) {
-        return prisma.invoice.create({
-            data: {
-                organizationId,
-                status: "PAID",
-                currency: "INR",
-                subtotal: "1000",
-                total: "1000",
-                issuedAt: ago(48),
-                ...data,
-            },
-        });
+        return onTheLedger(
+            await prisma.invoice.create({
+                data: {
+                    organizationId,
+                    status: "PAID",
+                    currency: "INR",
+                    subtotal: "1000",
+                    total: "1000",
+                    issuedAt: ago(48),
+                    ...data,
+                },
+            }),
+        );
     }
 
     beforeAll(async () => {

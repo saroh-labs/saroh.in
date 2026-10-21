@@ -177,6 +177,7 @@ export function InvoiceDetailsView({
                 canWrite={can.write}
                 timeZone={zone}
                 onRemove={run.removePayment}
+                onBounce={run.bouncePayment}
             />
             <ConnectedPanel invoice={i} others={details.others} />
             {i.online ? (

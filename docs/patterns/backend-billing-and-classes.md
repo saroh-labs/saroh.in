@@ -100,10 +100,28 @@ requireProvider: false })`), the email says "view it and download a copy",
   answers `recorded.paymentId` for Undo), `DELETE
 :invoiceId/payments/:paymentId` (soft: `removedAt`, who, a reason,
   "Recorded by mistake" by default; an ONLINE payment is refunded, never
-  removed), `POST …/cleared` and `POST …/bounced` (a WAITING cheque only;
-  a bounce reopens what it paid, with no charge). A repeat of the same
-  record (method, reference, cheque number, amount) within ten minutes
-  answers with the first payment (`recorded.replayed`), the desk-take rule.
+  removed), `POST …/cleared` (a WAITING cheque) and `POST …/bounced` (a
+  WAITING cheque, or one already CLEARED: banks return cheques days later,
+  and it keeps its `clearedAt` so the history and the pay page say it was
+  returned after it was banked; a bounce reopens what it paid, with no
+  charge). Neither moves money on a CREDITED or VOID invoice. **Retries are
+  keyed, never matched on fields** (review #6, 20 Oct): Record payment
+  sends an `idempotencyKey`, one per opening of the sheet, stored on the
+  row under a unique `(invoiceId, idempotencyKey)`; a retry with it answers
+  with the first payment (`recorded.replayed`), and the app says "Already
+  recorded" with no Undo. Two real payments of the same amount carry two
+  keys and both count; a record with no key is always a payment of its
+  own. Record payment is refused while an autopay charge is under way on
+  the invoice (`chargeUnderWayOn`, 409 "Autopay charge in progress"), as
+  Pay, Remind and the desk are. A bounced cheque is never removable
+  (`canRemove` false); it already doesn't count.
+- **A receipt is never for a cheque not in the bank** (review #9): Email
+  receipt and the WhatsApp RECEIPT text thank the last live payment that
+  isn't a WAITING cheque, and answer 409 "This cheque isn't in the bank
+  yet." when that is all there is. The `invoice.receipt` handler also
+  sends nothing for a waiting cheque or on an invoice no longer ISSUED or
+  PAID. "Cheques not in the bank" (`WAITING_CHEQUE_WHERE`) leaves out a
+  credited or void invoice's cheque.
 - **Every write is an event** on the invoice's history: an audit row in
   the same transaction (`invoice.payment.recorded`, `.removed`,
   `.cheque_cleared`, `.cheque_bounced`; `invoice-payment-events.ts`),
@@ -128,7 +146,15 @@ requireProvider: false })`), the email says "view it and download a copy",
   unchanged: they count paid invoices.
 - **A partly paid invoice isn't voided or credited** until its payments
   are removed (409); the void is fenced on `paidCents = 0` and the credit
-  checks again under the ledger lock.
+  checks again under the ledger lock. **A credit checks what the merchant
+  saw** (review #2): Cancel and Refund send `expectStatus` and
+  `expectPaidSoFar` from the screen (the API's own read before stands in
+  when they don't), and `creditInTx` compares them with the invoice under
+  `lockInvoiceForLedger`: paid meanwhile is 409 "This invoice was just
+  paid. Reload it.", any other payment change 409 "A payment on this
+  invoice just changed. Reload it." Nothing is credited and no draft is
+  written. **Nor while a cheque waits** (review #5): 409 "Wait for the
+  cheque to clear or bounce.", from the preview too.
 - **The read** serves `paidSoFar`, `leftToPay`, `partlyPaid` and
   `chequeWaiting` on every invoice, and `payments[]` (each with
   `bankStatus`, `removed` and `canRemove`) on the detail. A PAID invoice
@@ -176,14 +202,63 @@ requireProvider: false })`), the email says "view it and download a copy",
   so the 500 cap never hides an older invoice. New views: `owed`
   (`OWED_VIEW_WHERE`: issued, overdue included, not an order's paper or a
   credit note) and `cheques` (`WAITING_CHEQUE_WHERE`); `paidFrom`
-  (`YYYY-MM-DD` in the business's zone) is money received since that day,
-  part payments included (`LIVE_PAYMENT_WHERE`), or an order's paper paid
-  since. New parts are ANDed on, so no part's `OR` overwrites another's.
+  (`YYYY-MM-DD` in the business's zone) and Home's `paidSince` (an
+  instant) are the invoices money came in on since then, by the one
+  money-in rule (`invoices/money-in.ts` `moneyInSinceWhere`; below). New
+  parts are ANDed on, so no part's `OR` overwrites another's.
+- **Money in is one rule** (DEC-173, `invoices/money-in.ts`). The Invoices
+  strip's Paid this month, Home's Money in today, This week, How it's
+  going and the last 24 hours, and Insights' takings (money in, the bars,
+  today, this week so far, where it came from, the first sale) all read
+  it, and nothing else works out when money came in:
+    - paper that isn't an order's counts its **ledger**: each payment that
+      counts (`LIVE_PAYMENT_WHERE`: not removed, not a bounced cheque; a
+      waiting cheque counts) on its `receivedAt`, never the invoice's
+      total on its `paidAt`. A part payment counts the day it came in; a
+      bounced or removed one stops counting where it fell; a back-dated
+      one counts on the day it was received;
+    - an order's paper counts its total on its `paidAt` (the order is its
+      ledger, ADR-008); Insights reads the order itself, as Spent does;
+    - never a credit note, nor a hold's, an online pack's or a plan's
+      unnumbered draft (`NOT_A_BOOKING_HOLD`);
+    - Prisma reads `readMoneyIn` (`moneyInPaymentWhere`,
+      `orderPaperPaidWhere`); SQL reads `moneyInPaymentSql()`;
+    - money handed back stays each surface's own: the strip is money
+      received; Home takes a refund's credit note off on the day it was
+      issued; Insights takes an invoice's credit notes off its latest
+      payments first, so a payment never reads below zero;
+    - `money-in.db.spec.ts` pins the strip, Home and Insights to one
+      figure for a part-paid invoice, a bounced cheque on a paid invoice
+      and a back-dated payment. A new surface that says how much came in
+      reads `money-in.ts` and joins that spec. A spec that writes a PAID
+      invoice straight to the database gives it its ledger row
+      (`test/ledger-paid.ts` `onTheLedger`), as the app and the backfill
+      always do;
+    - a customer's **Spent** (the Customers list, Customer Detail, and
+      Insights' best customers and "came back") is the same rule per
+      contact: `spent.sql.ts` `spentLedgerRowsSql` reads
+      `moneyInPaymentSql()`, net of credit notes latest payment first, as
+      takings does; an order counts its total net of refunds. Who counts as
+      a customer is "has a payment that counts", never `status = 'PAID'`.
+      `customer-spent.money-in.db.spec.ts` pins the list, Detail and
+      Insights to `readMoneyIn`.
+- **"So far" compares with the same time of day** (DEC-171). Money in
+  today, How it's going's sales and orders, and Insights' money in, this
+  week so far and today all end the earlier window at the same moment
+  as now on the day it stands for (`lastSoFar`, `goingWindows`
+  `beforeSoFar`, `periodWindows` `beforeSoFar`; Insights swaps that day's
+  rows for its so-far read with `withDaySoFar`), never part of today
+  against a whole day. Bookings, counted by when they start, and the
+  bars, a picture of whole days, stay whole.
+- **One zone reader.** A business's zone is `businessTimezone`
+  (`bookings/staff-availability.ts`: its setting, else its first active
+  service's, else `FALLBACK_TIMEZONE`) on every money surface: the strip,
+  the list's `paidFrom`, Home and Insights. No other reader or fallback
+  constant is written.
 - **`GET invoices/summary`** (`InvoiceSummaryService`, `invoice:read`):
-  Owed and Overdue (left to pay, `isPastDue`), Paid this month (ledger
-  payments that count from the 1st in the business's zone, plus an order's
-  paper paid this month, each rupee once), Drafts, and `chequesWaiting`
-  (null while none waits). Each figure is `{ count, totals?, filter }`,
+  Owed and Overdue (left to pay, `isPastDue`), Paid this month (money in
+  from the 1st in the business's zone, by the one rule above), Drafts, and
+  `chequesWaiting` (null while none waits). Each figure is `{ count, totals?, filter }`,
   totals per currency in minor units (`amountMinor`, as Home's), and
   `filter` is the list query it stands for. Without `payment:read` there
   are no `totals` (DEC-098). Home's `week.chequesWaiting`
@@ -1472,12 +1547,18 @@ options, items, more }` and a sentence with the count, the first
   set). Nothing is charged, so nothing is refundable online: the booking's
   `paidAtDeskCents` and `deskMethod` read PAID booking paper whose method
   is one of `PAYMENT_METHODS` — so "Mark it paid" on the invoice counts
-  too — and `dueCents` subtracts it. What "Take ₹X" may take, and why not
+  too — for the words only. **What was paid is the paper's ledger**
+  (DEC-173, `paidOnPaperCents`: each invoice's paid so far,
+  `paidSoFarCents`, however the money came in: online, at the desk, or
+  recorded by hand on Invoices, in one payment or several), never the
+  last payment's method or the intents: `dueCents` and the take are the
+  price less it, a pay link out takes `leftToPayCents` of its invoice, and
+  paid in full is refused as paid. What "Take ₹X" may take, and why not
   (cancelled, a hold, a treatment's visit, a course's session, a pack or
   membership, a payment PROCESSING, a voided invoice, no price, paid), is
   one pure rule, `bookings/desk-take.ts`, shared by the booking read, the
-  diary and the write. The write takes the cancel's lock order, refuses an
-  `amountCents` that differs from what it works out, and answers a repeat
+  diary, the calendar's Due and the write. The write takes the cancel's
+  lock order, refuses an `amountCents` that differs from what it works out, and answers a repeat
   of the last take (same method and amount, within ten minutes) as it did.
   A `PAID_AT_DESK` BookingEvent names who took it. No Undo: the invoice
   is issued paper.

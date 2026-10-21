@@ -29,6 +29,7 @@ import { prisma } from "@saroh/database";
 import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
+import { InvoicePaymentsService } from "../invoices/invoice-payments.service";
 import { InvoicesService } from "../invoices/invoices.service";
 import type { CustomerContext } from "../site-accounts/customer-context.decorator";
 import { AccountAutopayService } from "../subscriptions/account-autopay.service";
@@ -56,6 +57,7 @@ const factory = new FakeProviderFactory(fake);
 const payments = new PaymentsService(factory);
 const setups = new MandateSetupService(factory);
 const autopay = new AutopayService(setups);
+const ledger = new InvoicePaymentsService();
 const invoices = new InvoicesService();
 const subscriptions = new SubscriptionsService(invoices, autopay);
 const lots = () => new FixedWindowRateLimiter(1_000);
@@ -158,7 +160,7 @@ beforeEach(() => {
 });
 
 /** A customer with a site account, on the plan, with its first invoice. */
-async function member(): Promise<{
+async function member(plan: string = planId): Promise<{
     contactId: string;
     subscriptionId: string;
     invoiceId: string;
@@ -184,7 +186,10 @@ async function member(): Promise<{
             emailVerifiedAt: new Date(),
         },
     });
-    const sub = await subscriptions.subscribe(owner, { contactId, planId });
+    const sub = await subscriptions.subscribe(owner, {
+        contactId,
+        planId: plan,
+    });
     const invoice = await prisma.invoice.findFirstOrThrow({
         where: { subscriptionId: sub.id, status: "ISSUED" },
         select: { id: true },
@@ -410,6 +415,42 @@ describe("from the pay link", () => {
                 data: { method: "UPI", source: "PAY_LINK" },
             },
         ]);
+    });
+
+    it("on a part-paid invoice, the first payment is what is left: ₹1,360 of ₹2,360 (#28)", async () => {
+        const plan = await subscriptions.createPlan(owner, {
+            name: "Monthly 2360",
+            price: "2360",
+            currency: "INR",
+            interval: "MONTH",
+        });
+        const { invoiceId } = await member(plan.id);
+        await ledger.record(owner, invoiceId, {
+            method: "CASH",
+            amount: "1000",
+        });
+        const { token } = await invoices.createPayLink(owner, invoiceId);
+        const start = await publicInvoices.startAutopay(token, {
+            method: "UPI",
+            idempotencyKey: "tab-part-paid",
+        });
+        expect(start.mode).toBe("PAY_AND_AUTHORISE");
+        expect(start.handoff.amountCents).toBe(136000);
+        const call = fake.mandateCalls.find((c) => c.op === "createSetup");
+        expect(call?.input).toMatchObject({ firstAmountCents: 136000 });
+
+        await captured(start.handoff.providerIntentId as string);
+        const intent = await prisma.paymentIntent.findFirstOrThrow({
+            where: { invoiceId, status: "SUCCEEDED" },
+            select: { amountCents: true },
+        });
+        expect(intent.amountCents).toBe(136000);
+        expect(
+            await prisma.invoice.findUniqueOrThrow({
+                where: { id: invoiceId },
+                select: { status: true, paidCents: true },
+            }),
+        ).toEqual({ status: "PAID", paidCents: 236000 });
     });
 
     it("eMandate authorises alone: nothing taken, the invoice paid as usual", async () => {
@@ -754,5 +795,38 @@ describe("while joining from the Prices page", () => {
         expect((await joins.standing(who, started.ref)).subscriptionRef).toBe(
             paid.subscriptionId,
         );
+    });
+});
+
+describe("while autopay is charging the invoice", () => {
+    it("Record payment is refused, and nothing is written (#8)", async () => {
+        const { invoiceId, subscriptionId, contactId } = await member();
+        const mandate = await prisma.paymentMandate.create({
+            data: {
+                organizationId: owner.organizationId,
+                contactId,
+                subscriptionId,
+                provider: "RAZORPAY",
+                status: "ACTIVE",
+                providerMandateId: `mandate_${next()}`,
+            },
+        });
+        await prisma.paymentIntent.create({
+            data: {
+                organizationId: owner.organizationId,
+                invoiceId,
+                provider: "RAZORPAY",
+                amountCents: 250000,
+                currency: "INR",
+                status: "PROCESSING",
+                viaMandateId: mandate.id,
+            },
+        });
+        await expect(
+            ledger.record(owner, invoiceId, { method: "CASH" }),
+        ).rejects.toThrow("Autopay charge in progress");
+        expect(
+            await prisma.invoicePayment.count({ where: { invoiceId } }),
+        ).toBe(0);
     });
 });

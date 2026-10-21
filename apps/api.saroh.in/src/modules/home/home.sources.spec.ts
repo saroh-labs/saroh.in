@@ -52,6 +52,8 @@ function moneyDb(opts: {
         unpaid.map((u) => ({ id: u.id, subscriptionId: u.subscriptionId }));
     const findMany = jest.fn((args: { where: Record<string, unknown> }) => {
         const where = args.where;
+        // Money in's order paper paid in a window (`money-in.ts`): none.
+        if ("paidAt" in where) return Promise.resolve([]);
         if ("dueAt" in where) return Promise.resolve(opts.overdue ?? []);
         if (where.status === "ISSUED") return Promise.resolve(unpaid);
         return Promise.resolve(latest);
@@ -693,8 +695,16 @@ describe("HomeService with the F1 sources", () => {
         const { service, db } = home([PAYMENTS], {
             overdue: [handOverdue()],
         });
-        // The renewal read is the first findMany on invoices.
-        db.invoice.findMany.mockRejectedValueOnce(new Error("timeout"));
+        // The renewal read: the one invoice read that selects the
+        // subscription's plan (picked by shape, not by call order, since
+        // a build now starts the overdue where first, review #16).
+        const answer = db.invoice.findMany.getMockImplementation();
+        db.invoice.findMany.mockImplementation(
+            (args: { select?: { subscription?: unknown } }) =>
+                args?.select?.subscription
+                    ? Promise.reject(new Error("timeout"))
+                    : answer?.(args),
+        );
         const model = await service.build(OWNER);
 
         expect(model.unavailable).toEqual([

@@ -3,9 +3,9 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { businessTimezone } from "../bookings/staff-availability";
+import { OWED_VIEW_WHERE } from "../invoices/invoice-state";
 import { allows, authorize } from "../organizations/organization-policy";
 import { businessCurrency } from "../stores/currency";
-import { UNPAID_BILLS_WHERE } from "./owed-by-age";
 import type { InsightsPeriod } from "./period";
 import { periodWindows } from "./period";
 import type { BookedRow, SoldRow } from "./sells";
@@ -90,7 +90,7 @@ export class SuggestionsService {
                 ? prisma.invoice.findMany({
                       where: {
                           organizationId,
-                          ...UNPAID_BILLS_WHERE,
+                          ...OWED_VIEW_WHERE,
                           dueAt: { lt: now },
                       },
                       select: {

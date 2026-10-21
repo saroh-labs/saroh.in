@@ -9,7 +9,7 @@ import type { HistoryTone } from "@/lib/invoices/details-view";
 import { historyLines, nextStep } from "@/lib/invoices/details-view";
 import type { Invoice, InvoicePayment } from "@/lib/invoices/service";
 import { billedTo } from "@/lib/invoices/status";
-import { REMOVE_THIS_PAYMENT } from "@/lib/invoices/words";
+import { BOUNCED, REMOVE_THIS_PAYMENT } from "@/lib/invoices/words";
 
 const DOT: Record<HistoryTone | "next", string> = {
     ok: "bg-success",
@@ -24,18 +24,22 @@ const DOT: Record<HistoryTone | "next", string> = {
  * ledger's lines in it — each payment, a cheque cleared or bounced, a
  * payment removed (struck through, with why), each share by hand — newest
  * first. A payment that still counts and was recorded by hand has "Remove
- * this payment" beside it, for whoever may write.
+ * this payment" beside it, for whoever may write, and a cheque already in
+ * the bank has "Bounced": banks return cheques days later (#7).
  */
 export function DetailsHistory({
     invoice,
     canWrite,
     timeZone,
     onRemove,
+    onBounce,
 }: {
     invoice: Invoice;
     canWrite: boolean;
     timeZone?: string;
     onRemove: (payment: InvoicePayment) => void;
+    /** A cheque in the bank came back: the Bounced dialog opens on it. */
+    onBounce?: (payment: InvoicePayment) => void;
 }) {
     const lines = historyLines(invoice);
     const next = nextStep(invoice, billedTo(invoice).name, canWrite);
@@ -77,6 +81,19 @@ export function DetailsHistory({
                                 }
                             >
                                 {REMOVE_THIS_PAYMENT}
+                            </Button>
+                        ) : null}
+                        {l.bounceable && canWrite && onBounce ? (
+                            <Button
+                                type="button"
+                                variant="link"
+                                size="xs"
+                                className="ml-3 h-auto px-0 text-[12px] text-destructive-subtle-foreground"
+                                onClick={() =>
+                                    l.bounceable && onBounce(l.bounceable)
+                                }
+                            >
+                                {BOUNCED}
                             </Button>
                         ) : null}
                     </Item>

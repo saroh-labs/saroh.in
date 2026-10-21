@@ -11,6 +11,7 @@
 import { ForbiddenException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { onTheLedger } from "../../../test/ledger-paid";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { INVOICES_PLACE, locationPlace, ONLINE_PLACE } from "./takings";
 import { TakingsService } from "./takings.service";
@@ -86,18 +87,20 @@ async function order(
 
 async function invoice(organizationId: string, data: Record<string, unknown>) {
     n += 1;
-    return prisma.invoice.create({
-        data: {
-            organizationId,
-            number: `MN-INV-${n}-${tag}`,
-            status: "PAID",
-            currency: "INR",
-            subtotal: "0",
-            total: "0",
-            issuedAt: new Date("2026-08-01T06:00:00.000Z"),
-            ...data,
-        },
-    });
+    return onTheLedger(
+        await prisma.invoice.create({
+            data: {
+                organizationId,
+                number: `MN-INV-${n}-${tag}`,
+                status: "PAID",
+                currency: "INR",
+                subtotal: "0",
+                total: "0",
+                issuedAt: new Date("2026-08-01T06:00:00.000Z"),
+                ...data,
+            },
+        }),
+    );
 }
 
 async function refund(organizationId: string, orderId: string, cents: number) {
@@ -253,15 +256,18 @@ describe("Insights money (DB)", () => {
             startedOn: "2026-01-05",
         });
         // (500 − 200) + 2000 + 400 + 999 + 1000 + 3000 by bill.
-        // Before: 1500 + 500 + 1000 + 1000 by bill.
+        // Before: 500 + 1000 + 1000 by bill. The 4 before end at 09:00 on
+        // 21 Sep, the same time of day as now: the ₹1,500 at 23:30 that
+        // evening is after it, so part of today is never set against a
+        // whole day.
         expect(read.moneyIn).toEqual({
             amountMinor: 769_900,
-            beforeMinor: 400_000,
-            change: { kind: "UP", percent: 92 },
+            beforeMinor: 250_000,
+            change: { kind: "UP", percent: 208 },
             payments: 6,
-            paymentsBefore: 4,
+            paymentsBefore: 3,
             orders: 5,
-            ordersBefore: 3,
+            ordersBefore: 2,
             bills: 1,
             billsBefore: 1,
         });
@@ -276,9 +282,11 @@ describe("Insights money (DB)", () => {
             beforeFrom: "2026-10-06",
             beforeTo: "2026-10-12",
         });
+        // The 7 before end at 09:00 last Monday, the same time as now: the
+        // ₹400 that morning, not the ₹999 that evening.
         expect(read.moneyIn).toMatchObject({
             amountMinor: 400_000,
-            beforeMinor: 139_900,
+            beforeMinor: 40_000,
             // Two payments the 7 days before: too few to say a percent.
             change: { kind: "THIN" },
         });
@@ -314,7 +322,8 @@ describe("Insights money (DB)", () => {
                 kind: "LOCATION",
                 name: "Hill Road",
                 amountMinor: 269_900,
-                beforeMinor: 250_000,
+                // To 09:00 on 21 Sep: the ₹1,500 at 23:30 is after it.
+                beforeMinor: 100_000,
                 change: { kind: "THIN" },
             },
             {
@@ -375,7 +384,13 @@ describe("Insights money (DB)", () => {
                     .filter((w) => w.in === window)
                     .reduce((total, w) => total + w.takingsMinor, 0);
             expect(sum("PERIOD")).toBe(read.moneyIn.amountMinor);
-            expect(sum("BEFORE")).toBe(read.moneyIn.beforeMinor);
+            // The bars draw whole days; money in before is compared to the
+            // same time of day as now, so the before's last day's money
+            // after 09:00 is in its bar and not in the figure.
+            const lateOnTheLastDay = { "7d": 99_900, "4w": 150_000, "3m": 0 };
+            expect(sum("BEFORE")).toBe(
+                read.moneyIn.beforeMinor + lateOnTheLastDay[period],
+            );
             const now = read.weeks.filter((w) => w.in === "PERIOD");
             expect(now[0].start).toBe(read.window.from);
             expect(now.at(-1)?.end).toBe(read.window.to);

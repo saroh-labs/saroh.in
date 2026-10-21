@@ -57,8 +57,9 @@ describe("viewWhere", () => {
         });
     });
 
-    it("reads Cheques as an invoice with a cheque waiting, not removed (DEC-173)", () => {
+    it("reads Cheques as an invoice with a cheque waiting, not removed, whose money still moves (DEC-173, #5)", () => {
         expect(viewWhere("cheques", now)).toEqual({
+            status: { in: ["ISSUED", "PAID"] },
             payments: { some: { removedAt: null, bankStatus: "WAITING" } },
         });
     });

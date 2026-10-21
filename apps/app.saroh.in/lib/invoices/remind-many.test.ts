@@ -79,7 +79,7 @@ describe("step 2", () => {
         expect(ways.email.map((r) => r.invoiceId)).toEqual(["a"]);
         expect(ways.email[0]?.note).toBe("nikhil@example.com");
         expect(ways.whatsapp.map((r) => r.invoiceId)).toEqual(["b"]);
-        expect(ways.whatsapp[0]?.note).toBe("No email");
+        expect(ways.whatsapp[0]?.note).toBe("No email address");
         expect(ways.cantReach.map((r) => r.invoiceId)).toEqual(["c"]);
         expect(ways.cantReach[0]?.waits).toBe(true);
         expect(ways.cantReach[0]?.note).toBe(
@@ -111,7 +111,7 @@ describe("step 2", () => {
         expect(ways.email).toEqual([]);
         expect(ways.noProvider).toBe(true);
         expect(sendLabel(ways)).toBe("WhatsApp 2");
-        expect(ways.whatsapp[0]?.note).toBe("Email not connected");
+        expect(ways.whatsapp[0]?.note).toBe("No email provider connected");
     });
 
     it("names why one can't be reached", () => {
@@ -119,7 +119,7 @@ describe("step 2", () => {
             cantReachWhy(
                 row({ invoiceId: "z", way: "NONE", reason: "UNREACHABLE" }),
             ),
-        ).toBe("No email or phone");
+        ).toBe("No email or phone to reach them");
         expect(
             cantReachWhy(
                 row({
@@ -129,7 +129,7 @@ describe("step 2", () => {
                     emailBlocked: "NO_EMAIL_PROVIDER",
                 }),
             ),
-        ).toBe("No phone, and email isn't connected");
+        ).toBe("No phone, and no email provider connected");
         expect(
             cantReachWhy(
                 row({ invoiceId: "z", way: "NONE", reason: "AUTOPAY_PENDING" }),

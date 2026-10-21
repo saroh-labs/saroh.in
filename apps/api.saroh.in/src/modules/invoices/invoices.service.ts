@@ -13,6 +13,7 @@ import {
     isRenewalInvoice,
     planTakesOnlinePayment,
 } from "../billing/online-payments-plan";
+import { businessTimezone } from "../bookings/staff-availability";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { businessPayInstructionsOf } from "../organizations/business-pay-instructions";
 import { authorize } from "../organizations/organization-policy";
@@ -45,10 +46,10 @@ import {
     leftToPayCents,
     NOT_A_BOOKING_HOLD,
     OWED_WHERE,
-    paidSinceFilter,
     viewWhere,
+    WAITING_CHEQUE_WHERE,
 } from "./invoice-state";
-import { invoiceZoneOf, startOfDayIn } from "./invoice-summary.service";
+import { startOfDayIn } from "./invoice-summary.service";
 import { listFilterWhere, paidFromWhere, searchWhere } from "./list-filter";
 import { moneyQueryCents } from "./money-query";
 import type { BuiltDocument, TaxProfile } from "./order-invoice";
@@ -113,6 +114,37 @@ const LIST_LIMIT = 500;
 /** Why a partly paid invoice isn't voided or credited (DEC-173). */
 const PAID_IN_PART =
     "Part of this invoice is paid. Remove its payments before cancelling it.";
+
+/** The invoice was paid between opening Cancel and confirming it (#2). */
+export const JUST_PAID = "This invoice was just paid. Reload it.";
+
+/** Its payments changed between opening Cancel and confirming it (#2). */
+export const PAYMENTS_JUST_CHANGED =
+    "A payment on this invoice just changed. Reload it.";
+
+/** A cheque not in the bank yet holds a cancel back (#5). */
+export const CHEQUE_STILL_WAITING = "Wait for the cheque to clear or bounce.";
+
+/** What the merchant saw when they opened Cancel, checked under the lock. */
+interface CreditSeen {
+    status: string;
+    paidSoFarCents: number;
+}
+
+/** What was seen: the screen's, when it said, else the API's read before. */
+function creditSeenOf(
+    dto: CreditInvoiceDto,
+    current: InvoiceViewModel,
+): CreditSeen {
+    const status =
+        dto.expectStatus === undefined
+            ? current.status
+            : dto.expectStatus === "OVERDUE"
+              ? "ISSUED"
+              : dto.expectStatus;
+    const paidSoFar = dto.expectPaidSoFar ?? current.paidSoFar;
+    return { status, paidSoFarCents: toCents(paidSoFar) };
+}
 
 /** A refusal the form can put on the field it is about. */
 function fieldError(message: string, field: string): never {
@@ -235,7 +267,7 @@ export class InvoicesService {
         const [search, paidFrom] = await Promise.all([
             q ? this.searchFor(organizationId, q) : null,
             paidFromDay
-                ? invoiceZoneOf(prisma, organizationId).then((zone) =>
+                ? businessTimezone(prisma, organizationId).then((zone) =>
                       startOfDayIn(paidFromDay, zone),
                   )
                 : null,
@@ -249,6 +281,11 @@ export class InvoicesService {
             ...((narrowed.AND as Prisma.InvoiceWhereInput[] | undefined) ?? []),
             ...(search ? [search] : []),
             ...(paidFrom ? [paidFromWhere(paidFrom)] : []),
+            // Home's money figures' link: the same money-in rule from an
+            // instant (`money-in.ts`).
+            ...(query.paidSince
+                ? [paidFromWhere(new Date(query.paidSince))]
+                : []),
         ];
         const rows = await prisma.invoice.findMany({
             where: {
@@ -258,9 +295,6 @@ export class InvoicesService {
                 ...(query.contactId ? { contactId: query.contactId } : {}),
                 ...(query.subscriptionId
                     ? { subscriptionId: query.subscriptionId }
-                    : {}),
-                ...(query.paidSince
-                    ? paidSinceFilter(new Date(query.paidSince))
                     : {}),
                 ...(and.length > 0 ? { AND: and } : {}),
             },
@@ -851,9 +885,10 @@ export class InvoicesService {
         dto: CreditInvoiceDto,
     ): Promise<InvoiceViewModel> {
         authorize(ctx, "invoice:write");
-        await this.assertCreditable(ctx, id);
+        const current = await this.assertCreditable(ctx, id);
+        const seen = creditSeenOf(dto, current);
         const noteId = await prisma.$transaction(async (tx) => {
-            const note = await this.creditInTx(tx, ctx, id, dto.reason);
+            const note = await this.creditInTx(tx, ctx, id, dto.reason, seen);
             return note.id;
         });
         return this.read(ctx.organizationId, noteId);
@@ -875,13 +910,17 @@ export class InvoicesService {
     ): Promise<CreditAndRewriteView> {
         authorize(ctx, "invoice:write");
         const current = await this.assertCreditable(ctx, id);
+        const seen = creditSeenOf(dto, current);
+        if (seen.status === "ISSUED" && current.status === "PAID") {
+            throw new ConflictException(JUST_PAID);
+        }
         if (current.status === "PAID") {
             throw new ConflictException(
                 "A paid invoice is refunded with a credit note, not written again.",
             );
         }
         const made = await prisma.$transaction(async (tx) => {
-            const note = await this.creditInTx(tx, ctx, id, dto.reason);
+            const note = await this.creditInTx(tx, ctx, id, dto.reason, seen);
             const draftId = await this.draftFromInTx(tx, ctx, id);
             return { note, draftId };
         });
@@ -1024,22 +1063,50 @@ export class InvoicesService {
             );
         }
         this.assertNothingPaid(current);
+        if (current.chequeWaiting) {
+            throw new ConflictException(CHEQUE_STILL_WAITING);
+        }
         return current;
     }
 
-    /** The credit note for all of it, on the caller's transaction. */
+    /**
+     * The credit note for all of it, on the caller's transaction. Checked
+     * again under the ledger's lock against what the merchant saw: an
+     * invoice paid meanwhile (a pay-link webhook, a payment recorded on
+     * another phone) is refused with words that say so, never credited on
+     * a stale screen (#2). A cheque not in the bank yet holds it back too:
+     * it may still bounce (#5).
+     */
     private async creditInTx(
         tx: Tx,
         ctx: OrganizationContext,
         id: string,
         reason: string,
+        seen: CreditSeen,
     ): Promise<{ id: string; number: string | null }> {
-        // Again under the ledger's lock: a payment recorded since the
-        // read before holds the cancel back.
         const locked = await lockInvoiceForLedger(tx, ctx.organizationId, id);
-        if (locked?.status === "ISSUED" && locked.paidCents > 0) {
+        if (!locked) notFound();
+        const paidSoFarNow =
+            locked.status === "PAID" ? locked.totalCents : locked.paidCents;
+        if (locked.status !== seen.status) {
+            throw new ConflictException(
+                locked.status === "PAID" ? JUST_PAID : PAYMENTS_JUST_CHANGED,
+            );
+        }
+        if (paidSoFarNow !== seen.paidSoFarCents) {
+            throw new ConflictException(PAYMENTS_JUST_CHANGED);
+        }
+        if (locked.status === "ISSUED" && locked.paidCents > 0) {
             throw new ConflictException(PAID_IN_PART);
         }
+        const waiting = await tx.invoicePayment.count({
+            where: {
+                invoiceId: id,
+                organizationId: ctx.organizationId,
+                ...WAITING_CHEQUE_WHERE,
+            },
+        });
+        if (waiting > 0) throw new ConflictException(CHEQUE_STILL_WAITING);
         const note = await issueCreditNote(tx, {
             invoiceId: id,
             amountCents: MAX_CENTS,

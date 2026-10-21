@@ -299,9 +299,11 @@ organizations/:org/customers`: everyone who has paid (an order through a
   brings a spreadsheet in at one storefront.
 - **Current** (round 2, C14, default 20) — **Spent is what they paid and kept
   paid**: paid orders (delivery included) less every refund that has not
-  failed, and paid invoices that aren't an order's own less their issued
-  credit notes; an edit's money back is not taken off twice, since the
-  order's total already fell. The list and Customer Detail read one rule
+  failed, and what came in on invoices that aren't an order's own (their
+  ledger, by the money-in rule, DEC-173: part of a bill counts, a bounced
+  cheque doesn't) less their issued credit notes; an edit's money back is
+  not taken off twice, since the order's total already fell. The list,
+  Customer Detail and Insights' best customers read one rule
   (`customer-workspace/spent.sql.ts`).
 - **Adopted** — Never silently merge uncertain identities: normalise email and
   phone, and keep links reversible and auditable (§14).

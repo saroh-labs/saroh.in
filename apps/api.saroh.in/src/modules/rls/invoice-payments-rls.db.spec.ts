@@ -186,6 +186,15 @@ describeRls("the ledger's CHECKs", () => {
             /InvoicePayment_cheque_check/,
         ],
         [
+            "a banked date on a waiting cheque",
+            {
+                method: "CHEQUE",
+                bankStatus: "WAITING",
+                clearedAt: new Date(),
+            },
+            /InvoicePayment_cheque_check/,
+        ],
+        [
             "a bounce reason on a waiting cheque",
             { method: "CHEQUE", bankStatus: "WAITING", bounceReason: "Funds" },
             /InvoicePayment_cheque_check/,
@@ -202,6 +211,18 @@ describeRls("the ledger's CHECKs", () => {
         ],
     ])("refuses %s", async (_what, data, constraint) => {
         await expect(payment(data)).rejects.toThrow(constraint);
+    });
+
+    it("takes a cheque returned after it was banked: bounced, keeping its banked date (#7)", async () => {
+        await expect(
+            payment({
+                method: "CHEQUE",
+                chequeNumber: "004540",
+                bankStatus: "BOUNCED",
+                clearedAt: new Date(),
+                bouncedAt: new Date(),
+            }),
+        ).resolves.toMatchObject({ bankStatus: "BOUNCED" });
     });
 
     it("takes a bounced cheque with its date and reason", async () => {

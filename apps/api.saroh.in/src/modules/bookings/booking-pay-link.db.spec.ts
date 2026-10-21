@@ -159,6 +159,85 @@ describe("a booking's pay link (E4, real database)", () => {
         );
     });
 
+    describe("Home's Turn down cancels only what still awaits payment (review #11)", () => {
+        it("turns down a booking whose link nobody has paid", async () => {
+            const booking = await book(serviceId, "2026-10-02T05:30:00Z");
+            await bookings.payLink(owner, booking.id, NOW);
+            const cancelled = await bookings.cancelBooking(
+                owner,
+                booking.id,
+                NOW,
+                { ifUnpaid: true },
+            );
+            expect(cancelled.status).toBe("CANCELLED");
+        });
+
+        it('refuses 409 "They just paid" when the link was paid during the hold, and the booking stands', async () => {
+            const booking = await book(serviceId, "2026-10-03T05:30:00Z");
+            await bookings.payLink(owner, booking.id, NOW);
+            // The webhook, inside Undo's ten seconds.
+            await prisma.$transaction(async (tx) => {
+                await tx.invoice.updateMany({
+                    where: { bookingId: booking.id },
+                    data: { status: "PAID", paidAt: NOW, paidCents: 80_000 },
+                });
+                await markBookingPaidInTx(tx, booking.id);
+            });
+            const refused = bookings.cancelBooking(owner, booking.id, NOW, {
+                ifUnpaid: true,
+            });
+            await expect(refused).rejects.toBeInstanceOf(ConflictException);
+            await expect(refused).rejects.toMatchObject({
+                response: {
+                    message: "They just paid. The booking stands.",
+                    details: { reason: "paid" },
+                },
+            });
+            await expect(
+                prisma.booking.findUnique({ where: { id: booking.id } }),
+            ).resolves.toMatchObject({ status: "CONFIRMED", paidWith: "PAID" });
+        });
+
+        it("refuses a pay-now hold the webhook confirmed meanwhile", async () => {
+            const booking = await book(serviceId, "2026-10-04T05:30:00Z");
+            // Confirmed and paid by the booking page's own checkout.
+            await prisma.booking.update({
+                where: { id: booking.id },
+                data: { paidWith: "PAID" },
+            });
+            await expect(
+                bookings.cancelBooking(owner, booking.id, NOW, {
+                    ifUnpaid: true,
+                }),
+            ).rejects.toBeInstanceOf(ConflictException);
+        });
+
+        it("still lets a hold nobody paid go", async () => {
+            const start = new Date("2026-10-05T05:30:00Z");
+            const hold = await prisma.booking.create({
+                data: {
+                    organizationId: owner.organizationId,
+                    serviceId,
+                    contactId,
+                    startAt: start,
+                    endAt: new Date(start.getTime() + 30 * 60_000),
+                    timezone: "Asia/Kolkata",
+                    status: "PENDING",
+                    holdExpiresAt: new Date(NOW.getTime() + 15 * 60_000),
+                    bookerName: "Priya Raman",
+                    bookerEmail: "priya@example.com",
+                    snapshot: {
+                        service: { priceCents: 80_000, currency: "INR" },
+                    },
+                },
+            });
+            const letGo = await bookings.cancelBooking(owner, hold.id, NOW, {
+                ifUnpaid: true,
+            });
+            expect(letGo.status).not.toBe("PENDING");
+        });
+    });
+
     it("refuses an unpriced booking, and another business's", async () => {
         const free = await book(freeServiceId, "2026-10-02T05:30:00Z");
         await expect(bookings.payLink(owner, free.id, NOW)).rejects.toThrow(

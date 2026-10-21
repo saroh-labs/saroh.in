@@ -3,6 +3,7 @@
  * business's zone, the fold of day rows into them, and the one currency the
  * figures are in. The read itself is `takings.db.spec.ts`.
  */
+import { withDaySoFar } from "./money";
 import type { TakingsDayRow } from "./takings";
 import {
     foldSoFar,
@@ -185,6 +186,25 @@ describe("foldSoFar", () => {
             sameDaysLastWeekMinor: 10_000,
             sameDaysLastWeekPayments: 2,
         });
+    });
+
+    it("reads last week's same weekday only to the same time of day, swapped in by withDaySoFar", () => {
+        const rows = [
+            row("2026-09-21", ONLINE_PLACE, "80"),
+            // All of last Wednesday: ₹20.
+            row("2026-09-23", ONLINE_PLACE, "20"),
+        ];
+        const soFar = foldSoFar(
+            withDaySoFar(rows, "2026-09-23", [
+                // By this time last Wednesday only ₹5 had come in.
+                row("2026-09-23", ONLINE_PLACE, "5"),
+            ]),
+            "INR",
+            "2026-09-28",
+            "2026-09-30",
+        );
+        expect(soFar.sameDaysLastWeekMinor).toBe(8_500);
+        expect(soFar.sameDaysLastWeekPayments).toBe(2);
     });
 
     it("counts only the figures' currency", () => {

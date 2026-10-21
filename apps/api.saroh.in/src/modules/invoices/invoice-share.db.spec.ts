@@ -414,6 +414,70 @@ describe("receipts", () => {
         ).resolves.toMatchObject({ kind: "RECEIPT" });
     });
 
+    it("a cheque not in the bank yet gets no receipt, by email or WhatsApp, and its own still goes when it clears (#9)", async () => {
+        const id = await issued(rye, "8400.00");
+        const { recorded } = await ledger.record(rye, id, {
+            method: "CHEQUE",
+            chequeNumber: "004550",
+        });
+
+        for (const channel of ["EMAIL", "WHATSAPP"] as const) {
+            const err = await caught(
+                shares.share(rye, id, { channel, kind: "RECEIPT" }),
+            );
+            expect(err.getStatus()).toBe(409);
+            expect(err.message).toBe("This cheque isn't in the bank yet.");
+        }
+        expect(
+            await prisma.message.count({
+                where: { invoiceId: id, template: "INVOICE_PAYMENT_RECEIVED" },
+            }),
+        ).toBe(0);
+        const cheque = await prisma.invoicePayment.findUniqueOrThrow({
+            where: { id: recorded.paymentId },
+        });
+        expect(cheque.receiptMessageId).toBeNull();
+        expect(await sharesOf(id)).toHaveLength(0);
+    });
+
+    it("thanks them for the last payment that is in hand, not a cheque still waiting (#9)", async () => {
+        const id = await issued(rye, "8400.00");
+        const cash = await ledger.record(rye, id, {
+            method: "CASH",
+            amount: "1000",
+            receivedAt: new Date(Date.now() - DAY).toISOString(),
+        });
+        const cheque = await ledger.record(rye, id, {
+            method: "CHEQUE",
+            chequeNumber: "004551",
+            amount: "2000",
+        });
+
+        const shared = await shares.share(rye, id, {
+            channel: "WHATSAPP",
+            kind: "RECEIPT",
+        });
+        expect(shared.text).toContain(
+            "Thank you for your payment of ₹1,000 in cash",
+        );
+        const emailed = await shares.share(rye, id, {
+            channel: "EMAIL",
+            kind: "RECEIPT",
+        });
+        expect(emailed.email).toMatchObject({ status: "QUEUED" });
+        const rows = await prisma.invoicePayment.findMany({
+            where: {
+                id: {
+                    in: [cash.recorded.paymentId, cheque.recorded.paymentId],
+                },
+            },
+            select: { id: true, receiptMessageId: true },
+        });
+        const of = (pid: string) => rows.find((r) => r.id === pid);
+        expect(of(cash.recorded.paymentId)?.receiptMessageId).not.toBeNull();
+        expect(of(cheque.recorded.paymentId)?.receiptMessageId).toBeNull();
+    });
+
     it("email takes only a receipt: a new invoice or reminder goes by Send", async () => {
         const id = await issued(rye, "400.00");
         const err = await caught(

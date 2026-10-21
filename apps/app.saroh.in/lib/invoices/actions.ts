@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 
 import { linesWithRates } from "./line-rates";
 import type { ReminderAsk } from "./remind-all";
-import type { InvoiceInput, PaymentInput, ShareAsk } from "./service";
+import type {
+    CreditExpect,
+    InvoiceInput,
+    PaymentInput,
+    ShareAsk,
+} from "./service";
 import * as api from "./service";
 
 /** Thin: the API decides who may and what an invoice may become. */
@@ -96,8 +101,12 @@ export async function voidInvoice(id: string, reason: string) {
     return res;
 }
 
-export async function creditInvoice(id: string, reason: string) {
-    const res = await api.creditInvoice(id, reason);
+export async function creditInvoice(
+    id: string,
+    reason: string,
+    expect?: CreditExpect,
+) {
+    const res = await api.creditInvoice(id, reason, expect);
     if (res.ok) refresh(id);
     return res;
 }
@@ -114,8 +123,12 @@ export async function readCreditPreview(id: string) {
 }
 
 /** Cancel and write a correct one: the invoice, its credit note and the draft. */
-export async function creditAndRewriteInvoice(id: string, reason: string) {
-    const res = await api.creditAndRewriteInvoice(id, reason);
+export async function creditAndRewriteInvoice(
+    id: string,
+    reason: string,
+    expect?: CreditExpect,
+) {
+    const res = await api.creditAndRewriteInvoice(id, reason, expect);
     if (res.ok) refresh(id);
     return res;
 }

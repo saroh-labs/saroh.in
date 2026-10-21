@@ -10,17 +10,20 @@ import {
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { mapLimit } from "../../common/map-limit";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import {
     dayWords,
     moneyWordsMinor,
     whenWords,
 } from "../../common/words-format";
+import { isRenewalInvoice } from "../billing/online-payments-plan";
 import type { AccountThreadPoster } from "../communications/account-thread";
 import {
     ACCOUNT_THREAD_POSTER,
     accountThreadOn,
 } from "../communications/account-thread";
+import type { TransactionalAddress } from "../communications/communications.service";
 import { CommunicationsService } from "../communications/communications.service";
 import type { InvoiceTemplate } from "../communications/transactional";
 import {
@@ -31,6 +34,7 @@ import { authorize } from "../organizations/organization-policy";
 import {
     AUTOPAY_CHARGE_IN_PROGRESS,
     autopayChargeInProgress,
+    chargesUnderWay,
     chargeUnderWayOn,
 } from "../payments/charge-under-way";
 import { assertBusinessDetails } from "./business-details";
@@ -107,6 +111,89 @@ export interface InvoiceReach {
 }
 
 export type SendRow = Prisma.InvoiceGetPayload<{ select: typeof SEND_SELECT }>;
+
+/**
+ * What Remind many reads once for the whole business rather than once per
+ * invoice (review #17): whether its email provider is connected, whether
+ * its links take payment online (a renewal's may when others don't), and
+ * whether the account thread is live. `dispatch` takes it too, so a
+ * hundred reminders don't each ask again; each still re-reads its own
+ * invoice under its lock.
+ */
+export interface ReachShared {
+    emailOn: boolean;
+    payOnline: (row: SendRow) => Promise<boolean>;
+    threadOn: boolean;
+}
+
+/** At most this many invoices are read or reminded at once (review #17). */
+export const REMIND_MANY_CONCURRENCY = 5;
+
+/** What one invoice's send flag is worked out from. */
+interface SendInputs {
+    nextReminderAt: string | null;
+    payOnline: boolean;
+    charging: boolean;
+    emailOn: boolean;
+    to: TransactionalAddress | null;
+    threadOn: boolean;
+}
+
+/** The channel rule over its inputs: {@link InvoiceSendService.sendChannels}. */
+function sendViewOf(row: SendRow, i: SendInputs): InvoiceSendView {
+    // Share's WhatsApp tab says who it opens a chat with (U11).
+    const phone = row.contact?.phone ? { phone: row.contact.phone } : {};
+    const none = (reason: SendBlocker): InvoiceSendView => ({
+        channels: [],
+        reason,
+        payOnline: i.payOnline,
+        nextReminderAt: i.nextReminderAt,
+        ...phone,
+    });
+    if (!sendable(row)) return none("NOT_OWED");
+    if (i.charging) return none("AUTOPAY_PENDING");
+    const channels: SendChannel[] = [];
+    if (i.emailOn && i.to) channels.push("email");
+    if (i.threadOn) channels.push("thread");
+    if (channels.length === 0) {
+        return none(i.emailOn ? "NO_EMAIL_ADDRESS" : "NO_EMAIL_PROVIDER");
+    }
+    return {
+        channels,
+        ...(channels.includes("email") && i.to
+            ? { emailTo: i.to.address }
+            : {}),
+        payOnline: i.payOnline,
+        nextReminderAt: i.nextReminderAt,
+        ...phone,
+    };
+}
+
+/** How it reaches its customer, from its send flag and inputs. */
+function reachOf(
+    row: SendRow,
+    send: InvoiceSendView,
+    emailOn: boolean,
+    to: TransactionalAddress | null,
+    consent: string | null,
+): InvoiceReach {
+    const phone = row.contact?.phone ?? null;
+    if (!emailOn) {
+        return {
+            emailTo: null,
+            emailBlocked: "NO_EMAIL_PROVIDER",
+            phone,
+            send,
+        };
+    }
+    if (!to) {
+        return { emailTo: null, emailBlocked: "NO_EMAIL_ADDRESS", phone, send };
+    }
+    if (consent === "REVOKED") {
+        return { emailTo: null, emailBlocked: "EMAIL_OFF", phone, send };
+    }
+    return { emailTo: to.address, emailBlocked: null, phone, send };
+}
 
 function notFound(): never {
     throw new NotFoundException("Invoice not found");
@@ -236,38 +323,133 @@ export class InvoiceSendService {
                 invoiceId: row.id,
             }),
         ]);
-        const phone = row.contact?.phone ?? null;
-        if (!emailOn) {
-            return {
-                emailTo: null,
-                emailBlocked: "NO_EMAIL_PROVIDER",
-                phone,
-                send,
-            };
-        }
-        if (!to) {
-            return {
-                emailTo: null,
-                emailBlocked: "NO_EMAIL_ADDRESS",
-                phone,
-                send,
-            };
-        }
-        const consent = to.contactId
-            ? await db.consent.findUnique({
-                  where: {
-                      contactId_channel: {
-                          contactId: to.contactId,
+        const consent =
+            emailOn && to?.contactId
+                ? await db.consent.findUnique({
+                      where: {
+                          contactId_channel: {
+                              contactId: to.contactId,
+                              channel: "EMAIL",
+                          },
+                      },
+                      select: { status: true },
+                  })
+                : null;
+        return reachOf(row, send, emailOn, to, consent?.status ?? null);
+    }
+
+    /** The business-wide part of {@link channelsFor}, read once (review #17). */
+    async readShared(db: Db, organizationId: string): Promise<ReachShared> {
+        const [emailOn, threadOn] = await Promise.all([
+            this.comms.emailConnected(db, organizationId),
+            this.thread
+                ? accountThreadOn(organizationId)
+                : Promise.resolve(false),
+        ]);
+        // A renewal's link may take payment online on a plan whose others
+        // don't (`invoicePayOnline`): one answer for each kind, asked once.
+        const byKind = new Map<boolean, Promise<boolean>>();
+        const payOnline = (row: SendRow) => {
+            const renewal = isRenewalInvoice(row);
+            let read = byKind.get(renewal);
+            if (!read) {
+                read = invoicePayOnline(db, organizationId, row);
+                byKind.set(renewal, read);
+            }
+            return read;
+        };
+        return { emailOn, payOnline, threadOn };
+    }
+
+    /**
+     * {@link channelsFor} for many invoices at once (Remind many, review
+     * #17): the business-wide reads once, the per-invoice ones batched with
+     * IN (when each was last sent, autopay charges, consents, site
+     * accounts), and each invoice's address read with at most
+     * {@link REMIND_MANY_CONCURRENCY} in flight. The same rules, row for
+     * row, as `channelsFor`.
+     */
+    async channelsForMany(
+        db: Db,
+        organizationId: string,
+        rows: readonly SendRow[],
+        now: Date,
+        shared?: ReachShared,
+    ): Promise<Map<string, InvoiceReach>> {
+        const out = new Map<string, InvoiceReach>();
+        if (rows.length === 0) return out;
+        const ids = rows.map((r) => r.id);
+        const [common, next, charges, addresses] = await Promise.all([
+            shared ?? this.readShared(db, organizationId),
+            this.nextReminderAtMany(db, ids, now),
+            chargesUnderWay(db, organizationId, ids),
+            mapLimit(rows, REMIND_MANY_CONCURRENCY, (row) =>
+                this.comms.transactionalAddress(db, organizationId, {
+                    kind: "INVOICE_BILL_TO",
+                    invoiceId: row.id,
+                }),
+            ),
+        ]);
+        const contactIds = (list: (string | null | undefined)[]) => [
+            ...new Set(list.filter((id): id is string => !!id)),
+        ];
+        const consentIds = common.emailOn
+            ? contactIds(addresses.map((a) => a?.contactId))
+            : [];
+        const threadIds = common.threadOn
+            ? contactIds(rows.map((r) => r.contactId))
+            : [];
+        const [consents, accounts, payOnline] = await Promise.all([
+            consentIds.length > 0
+                ? db.consent.findMany({
+                      where: {
+                          contactId: { in: consentIds },
                           channel: "EMAIL",
                       },
-                  },
-                  select: { status: true },
-              })
-            : null;
-        if (consent?.status === "REVOKED") {
-            return { emailTo: null, emailBlocked: "EMAIL_OFF", phone, send };
-        }
-        return { emailTo: to.address, emailBlocked: null, phone, send };
+                      select: { contactId: true, status: true },
+                  })
+                : [],
+            threadIds.length > 0
+                ? db.customerAccount.findMany({
+                      where: {
+                          organizationId,
+                          contactId: { in: threadIds },
+                          status: "ACTIVE",
+                      },
+                      select: { contactId: true },
+                  })
+                : [],
+            Promise.all(rows.map((row) => common.payOnline(row))),
+        ]);
+        const consentOf = new Map(consents.map((c) => [c.contactId, c.status]));
+        const withAccount = new Set(accounts.map((a) => a.contactId));
+        rows.forEach((row, index) => {
+            const to = addresses[index] ?? null;
+            const send = sendViewOf(row, {
+                nextReminderAt: next.get(row.id) ?? null,
+                payOnline: payOnline[index] ?? false,
+                charging: charges.has(row.id),
+                emailOn: common.emailOn,
+                to,
+                threadOn:
+                    common.threadOn &&
+                    !!row.contactId &&
+                    withAccount.has(row.contactId),
+            });
+            out.set(
+                row.id,
+                reachOf(
+                    row,
+                    send,
+                    common.emailOn,
+                    to,
+                    to?.contactId
+                        ? (consentOf.get(to.contactId) ?? null)
+                        : null,
+                ),
+            );
+        });
+        return out;
     }
 
     /**
@@ -288,49 +470,41 @@ export class InvoiceSendService {
         organizationId: string,
         row: SendRow,
         now: Date,
+        // The business-wide reads, when a batch already made them (#17).
+        shared?: ReachShared,
     ): Promise<InvoiceSendView> {
         const [nextReminderAt, payOnline] = await Promise.all([
             this.nextReminderAt(db, row.id, now),
-            invoicePayOnline(db, organizationId, row),
+            shared
+                ? shared.payOnline(row)
+                : invoicePayOnline(db, organizationId, row),
         ]);
-        // Share's WhatsApp tab says who it opens a chat with (U11).
-        const phone = row.contact?.phone ? { phone: row.contact.phone } : {};
-        const none = (reason: SendBlocker): InvoiceSendView => ({
-            channels: [],
-            reason,
-            payOnline,
+        const inputs: SendInputs = {
             nextReminderAt,
-            ...phone,
-        });
-        if (!sendable(row)) return none("NOT_OWED");
+            payOnline,
+            charging: false,
+            emailOn: false,
+            to: null,
+            threadOn: false,
+        };
+        if (!sendable(row)) return sendViewOf(row, inputs);
         if (await chargeUnderWayOn(db, organizationId, row.id)) {
-            return none("AUTOPAY_PENDING");
+            return sendViewOf(row, { ...inputs, charging: true });
         }
 
         const [emailOn, to, threadOn] = await Promise.all([
-            this.comms.emailConnected(db, organizationId),
+            shared
+                ? shared.emailOn
+                : this.comms.emailConnected(db, organizationId),
             this.comms.transactionalAddress(db, organizationId, {
                 kind: "INVOICE_BILL_TO",
                 invoiceId: row.id,
             }),
-            this.threadOpen(db, organizationId, row.contactId),
+            shared && !shared.threadOn
+                ? false
+                : this.threadOpen(db, organizationId, row.contactId),
         ]);
-
-        const channels: SendChannel[] = [];
-        if (emailOn && to) channels.push("email");
-        if (threadOn) channels.push("thread");
-        if (channels.length === 0) {
-            return none(emailOn ? "NO_EMAIL_ADDRESS" : "NO_EMAIL_PROVIDER");
-        }
-        return {
-            channels,
-            ...(channels.includes("email") && to
-                ? { emailTo: to.address }
-                : {}),
-            payOnline,
-            nextReminderAt,
-            ...phone,
-        };
+        return sendViewOf(row, { ...inputs, emailOn, to, threadOn });
     }
 
     /** `POST :id/send`: the first send, with its pay link. */
@@ -338,21 +512,33 @@ export class InvoiceSendService {
         return this.dispatch(ctx, id, false);
     }
 
-    /** `POST :id/remind`: the same send in reminder words, once a day at most. */
-    remind(ctx: OrganizationContext, id: string): Promise<InvoiceSendResult> {
-        return this.dispatch(ctx, id, true);
+    /**
+     * `POST :id/remind`: the same send in reminder words, once a day at
+     * most. Remind many passes what it already read for the business
+     * (`batch`, review #17): its details checked, and the business-wide
+     * reads; the invoice itself is read again under its lock either way.
+     */
+    remind(
+        ctx: OrganizationContext,
+        id: string,
+        batch?: { shared: ReachShared; detailsChecked: true },
+    ): Promise<InvoiceSendResult> {
+        return this.dispatch(ctx, id, true, batch);
     }
 
     private async dispatch(
         ctx: OrganizationContext,
         id: string,
         reminder: boolean,
+        batch?: { shared: ReachShared; detailsChecked: true },
     ): Promise<InvoiceSendResult> {
         authorize(ctx, "invoice:write");
         const organizationId = ctx.organizationId;
         const now = new Date();
         // It asks to be paid: the business details first (DEC-068).
-        await assertBusinessDetails(prisma, organizationId);
+        if (!batch?.detailsChecked) {
+            await assertBusinessDetails(prisma, organizationId);
+        }
 
         return prisma.$transaction(async (tx) => {
             // The invoice's lock serializes sends, reminders and pay links.
@@ -364,7 +550,13 @@ export class InvoiceSendService {
             if (!row) notFound();
             this.assertSendable(row);
 
-            const view = await this.sendChannels(tx, organizationId, row, now);
+            const view = await this.sendChannels(
+                tx,
+                organizationId,
+                row,
+                now,
+                batch?.shared,
+            );
             if (view.reason === "AUTOPAY_PENDING") {
                 throw autopayChargeInProgress();
             }
@@ -519,46 +711,72 @@ export class InvoiceSendService {
         invoiceId: string,
         now: Date,
     ): Promise<string | null> {
+        const next = await this.nextReminderAtMany(db, [invoiceId], now);
+        return next.get(invoiceId) ?? null;
+    }
+
+    /**
+     * {@link nextReminderAt} for many invoices in three reads (review #17):
+     * each invoice's latest send of each kind in the last day. Invoices
+     * free to be reminded now are absent.
+     */
+    async nextReminderAtMany(
+        db: Db,
+        invoiceIds: readonly string[],
+        now: Date,
+    ): Promise<Map<string, string>> {
+        const out = new Map<string, string>();
+        if (invoiceIds.length === 0) return out;
+        const ids = [...new Set(invoiceIds)];
         const since = new Date(now.getTime() - DAY_MS);
         // An email that went, or a post into the account thread (A13): a
         // thread-only send counts the same.
-        const [email, post, whatsapp] = await Promise.all([
-            db.message.findFirst({
+        const [emails, posts, whatsapps] = await Promise.all([
+            db.message.findMany({
                 where: {
-                    invoiceId,
+                    invoiceId: { in: ids },
                     template: { in: INVOICE_TEMPLATES },
                     status: { in: WENT },
                     createdAt: { gt: since },
                 },
                 orderBy: { createdAt: "desc" },
-                select: { createdAt: true },
+                distinct: ["invoiceId"],
+                select: { invoiceId: true, createdAt: true },
             }),
-            db.customerThreadMessage.findFirst({
+            db.customerThreadMessage.findMany({
                 where: {
-                    invoiceId,
+                    invoiceId: { in: ids },
                     event: { in: INVOICE_TEMPLATES },
                     createdAt: { gt: since },
                 },
                 orderBy: { createdAt: "desc" },
-                select: { createdAt: true },
+                distinct: ["invoiceId"],
+                select: { invoiceId: true, createdAt: true },
             }),
-            db.invoiceShare.findFirst({
+            db.invoiceShare.findMany({
                 where: {
-                    invoiceId,
+                    invoiceId: { in: ids },
                     channel: "WHATSAPP",
                     kind: { in: WHATSAPP_ASKS },
                     createdAt: { gt: since },
                 },
                 orderBy: { createdAt: "desc" },
-                select: { createdAt: true },
+                distinct: ["invoiceId"],
+                select: { invoiceId: true, createdAt: true },
             }),
         ]);
-        const times = [email?.createdAt, post?.createdAt, whatsapp?.createdAt]
-            .filter((at): at is Date => at !== undefined)
-            .map((at) => at.getTime());
-        return times.length > 0
-            ? new Date(Math.max(...times) + DAY_MS).toISOString()
-            : null;
+        const latest = new Map<string, number>();
+        for (const sent of [...emails, ...posts, ...whatsapps]) {
+            if (!sent.invoiceId) continue;
+            const at = sent.createdAt.getTime();
+            if (at > (latest.get(sent.invoiceId) ?? -Infinity)) {
+                latest.set(sent.invoiceId, at);
+            }
+        }
+        for (const [id, at] of latest) {
+            out.set(id, new Date(at + DAY_MS).toISOString());
+        }
+        return out;
     }
 
     private async alreadySent(db: Db, invoiceId: string): Promise<boolean> {

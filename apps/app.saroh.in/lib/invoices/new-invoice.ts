@@ -3,6 +3,7 @@ import { PAPER_STYLES } from "@saroh/block-contract";
 import { z } from "zod";
 
 import { isTimeZone, zoneParts } from "@/lib/format/datetime";
+import { minorOf } from "@/lib/format/money";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import type { PayInstructionsSettings } from "@/lib/organizations/pay-instructions";
 import type {
@@ -99,9 +100,10 @@ export const EMPTY_LINE: InvoiceFormLine = {
 /** A typed price in minor units; 0 for anything that isn't one yet. */
 export function centsOf(typed: string | undefined): number {
     const t = (typed ?? "").trim();
+    // A box takes up to nine digits and no sign; what it holds is read as
+    // every amount is (`minorOf`).
     if (!MONEY.test(t)) return 0;
-    const [whole, frac = ""] = t.split(".");
-    return Number(whole) * 100 + Number((frac + "00").slice(0, 2));
+    return minorOf(t) ?? 0;
 }
 
 /** Minor units as a price box holds them: "400", "220.5" → "220.50". */

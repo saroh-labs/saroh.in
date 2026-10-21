@@ -34,7 +34,11 @@ export function InvoicePaidSoFar({
                     className="rounded-xl border border-site-border bg-site-surface p-5"
                 >
                     <p className="font-semibold text-site-fg">
-                        {`${chequeWords(bouncedCheque.cheque ?? { number: null, bank: null })} was returned by the bank`}
+                        {`${chequeWords(bouncedCheque.cheque ?? { number: null, bank: null })} was returned by the bank${
+                            bouncedCheque.cheque?.returnedAfterBanking
+                                ? " after it was banked"
+                                : ""
+                        }`}
                     </p>
                     <p className="mt-1 text-sm text-site-muted">
                         {`The ${money(bouncedCheque.amount)} it paid is due again.`}

@@ -2,6 +2,7 @@ import type { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
 import { readOwedByAge } from "../analytics/owed-by-age";
+import type { UnpaidBillsRead } from "../analytics/unpaid-bills";
 import { realOrderWhere } from "../orders/open-orders";
 import { MONEY_ON_THE_CALENDAR, sinceHref } from "./home-last-day";
 import type { HomeGoing, HomeGoingSales } from "./home-model";
@@ -18,6 +19,12 @@ import { compareTakings, readMoney, WEEK_PATHS } from "./home-week";
  * before" the seven days before those. A Monday therefore compares Tuesday
  * to Monday with the Tuesday to Monday before, never a week that just
  * started with a whole one ("0 · 19 fewer than last week").
+ *
+ * Sales and orders so far: today is only part of a day, so the 7 before
+ * end at the same time of day seven days ago (`beforeSoFar`), as Money in
+ * today compares with the same weekday last week so far. Bookings are
+ * counted by when they start, today's later ones included, so both
+ * windows are whole days.
  *
  * Each figure for whoever holds its read, as This week's (`weekScope`):
  * sales with `payment:read`, bookings with `booking:read`, orders with
@@ -39,6 +46,12 @@ export interface GoingWindows {
     to: Date;
     /** 00:00 seven days before `from`. */
     beforeFrom: Date;
+    /**
+     * The same time of day seven days before now: what came in or was
+     * placed in the 7 before is counted up to here, never a whole last day
+     * against part of today.
+     */
+    beforeSoFar: Date;
     fromDate: string;
     toDate: string;
     beforeFromDate: string;
@@ -47,13 +60,17 @@ export interface GoingWindows {
 
 /** The two windows around `now`, in `zone`'s calendar. */
 export function goingWindows(now: Date, zone: string): GoingWindows {
-    const today = DateTime.fromJSDate(now, { zone }).startOf("day");
+    const at = DateTime.fromJSDate(now, { zone });
+    const today = at.startOf("day");
     const from = today.minus({ days: GOING_DAYS - 1 });
     const beforeFrom = from.minus({ days: GOING_DAYS });
     return {
         from: from.toJSDate(),
         to: today.plus({ days: 1 }).toJSDate(),
         beforeFrom: beforeFrom.toJSDate(),
+        // By the zone's calendar, so a clock change between the two still
+        // compares 10:00 with 10:00.
+        beforeSoFar: at.minus({ days: GOING_DAYS }).toJSDate(),
         fromDate: from.toISODate() ?? "",
         toDate: today.toISODate() ?? "",
         beforeFromDate: beforeFrom.toISODate() ?? "",
@@ -95,7 +112,12 @@ export async function readGoing(
     organizationId: string,
     scope: WeekScope,
     clock: { now: Date; zone: string },
-    view: { money: boolean; storeIds?: readonly string[] | null },
+    view: {
+        money: boolean;
+        storeIds?: readonly string[] | null;
+        /** The build's one read of the unpaid bills (review #16). */
+        unpaid?: UnpaidBillsRead;
+    },
 ): Promise<HomeGoing> {
     const w = goingWindows(clock.now, clock.zone);
     const storeIds = view.storeIds ?? null;
@@ -121,13 +143,21 @@ export async function readGoing(
     const [last, before, bookings, bookingsBefore, orders, ordersBefore, owed] =
         await Promise.all([
             sales ? readMoney(db, organizationId, w.from, clock.now) : null,
-            sales ? readMoney(db, organizationId, w.beforeFrom, w.from) : null,
+            sales
+                ? readMoney(db, organizationId, w.beforeFrom, w.beforeSoFar)
+                : null,
             scope.bookings ? booked(w.from, w.to) : null,
             scope.bookings ? booked(w.beforeFrom, w.from) : null,
             scope.orders ? placed(w.from, w.to) : null,
-            scope.orders ? placed(w.beforeFrom, w.from) : null,
+            scope.orders ? placed(w.beforeFrom, w.beforeSoFar) : null,
             scope.owed
-                ? readOwedByAge(db, organizationId, clock, view.money)
+                ? readOwedByAge(
+                      db,
+                      organizationId,
+                      clock,
+                      view.money,
+                      view.unpaid,
+                  )
                 : null,
         ]);
 

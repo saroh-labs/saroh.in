@@ -18,7 +18,7 @@ import { todayIn } from "./takings";
  *   (`bookedSql`): a session is a class time anyone booked, and a place is
  *   a confirmed booking. "Add a class time".
  * - **A bill more than 3 weeks late** (`LATE_BILL`): an unpaid bill (owed
- *   by age's bills, `UNPAID_BILLS_WHERE`) with something left to pay
+ *   by age's bills, `OWED_VIEW_WHERE`) with something left to pay
  *   (`leftToPayCents`, DEC-173) whose due date is more than 21 days ago by
  *   the business's calendar. "Send reminder", or open the bill.
  * - **Something selling less** (`SELLING_LESS`): a product whose units in

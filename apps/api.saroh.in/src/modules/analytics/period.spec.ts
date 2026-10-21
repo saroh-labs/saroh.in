@@ -26,6 +26,23 @@ const MONDAY = new Date("2026-10-19T03:30:00.000Z");
 const SUNDAY = new Date("2026-10-18T18:20:00.000Z");
 
 describe("Insights period", () => {
+    it("ends the period before at the same time of day as now, on the day today stands for", () => {
+        // Monday 09:00 in Mumbai: the 7 before end at 09:00 on Monday 12
+        // Oct, never at midnight after it.
+        const w = periodWindows("7d", MONDAY, ZONE);
+        expect(w.beforeLastStart.toISOString()).toBe(
+            "2026-10-11T18:30:00.000Z",
+        );
+        expect(w.beforeSoFar.toISOString()).toBe("2026-10-12T03:30:00.000Z");
+        // 4 weeks: 28 days back, the same time of day.
+        const four = periodWindows("4w", MONDAY, ZONE);
+        expect(four.beforeToDate).toBe("2026-09-21");
+        expect(four.beforeSoFar.toISOString()).toBe("2026-09-21T03:30:00.000Z");
+        expect(goingWindows(MONDAY, ZONE).beforeSoFar.toISOString()).toBe(
+            "2026-10-12T03:30:00.000Z",
+        );
+    });
+
     it("opens on 4 weeks and knows only its three periods", () => {
         expect(DEFAULT_PERIOD).toBe("4w");
         expect(isInsightsPeriod("7d")).toBe(true);
@@ -57,6 +74,8 @@ describe("Insights period", () => {
             expect(w.to).toEqual(going.to);
             expect(w.beforeFrom).toEqual(going.beforeFrom);
             expect(w.beforeToDate).toBe(going.beforeToDate);
+            // Both compare so far: the 7 before end at the same time of day.
+            expect(w.beforeSoFar).toEqual(going.beforeSoFar);
         }
     });
 

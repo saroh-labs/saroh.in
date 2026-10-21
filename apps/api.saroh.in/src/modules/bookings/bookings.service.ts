@@ -894,7 +894,11 @@ export class BookingsService {
         ctx: OrganizationContext,
         bookingId: string,
         now: Date = new Date(),
-        options: { returnCredit?: boolean; closesClass?: boolean } = {},
+        options: {
+            returnCredit?: boolean;
+            closesClass?: boolean;
+            ifUnpaid?: boolean;
+        } = {},
     ): Promise<CancelledBooking> {
         requireBookingPower(ctx, "booking:write");
         const found = await this.requireOwnedBooking(ctx, bookingId);

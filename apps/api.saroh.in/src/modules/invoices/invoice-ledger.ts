@@ -254,6 +254,8 @@ export interface LedgerPaymentInput {
     chequeBank?: string | null;
     /** The online payment it came from (ONLINE only): one row per intent. */
     paymentIntentId?: string | null;
+    /** Record payment's key, one per opening of the sheet: a retry answers with this row. */
+    idempotencyKey?: string | null;
     actor: LedgerActor;
 }
 
@@ -312,6 +314,7 @@ export async function recordLedgerPaymentInTx(
             chequeBank: cheque ? (input.chequeBank ?? null) : null,
             bankStatus: cheque ? waiting : null,
             recordedById: input.actor.userId,
+            idempotencyKey: input.idempotencyKey ?? null,
             paymentIntentId:
                 input.method === ONLINE_PAYMENT_METHOD
                     ? (input.paymentIntentId ?? null)

@@ -22,18 +22,36 @@ describe("spent.sql", () => {
         expect(sql).toContain("GREATEST(o.total - ");
     });
 
-    it("takes an invoice's issued credit notes off it, never a draft or void one", () => {
+    it("counts an invoice's ledger by the money-in rule, net of its issued credit notes, never its status", () => {
         const sql = spentInvoiceRowsSql("org").sql;
+        // The money-in rule (DEC-173): payments that count, on paper that
+        // isn't an order's, a credit note or a hold.
+        expect(sql).toContain(`FROM "InvoicePayment" p`);
+        expect(sql).toContain(`p."removedAt" IS NULL`);
+        expect(sql).toContain(`p."bankStatus" <> 'BOUNCED'`);
+        expect(sql).toContain(`i."orderId" IS NULL`);
+        expect(sql).toContain(`i.kind <> 'CREDIT_NOTE'`);
         expect(sql).toContain(`cn."relatedInvoiceId" = i.id`);
         expect(sql).toContain(`cn.kind = 'CREDIT_NOTE'`);
         expect(sql).toContain(`cn.status NOT IN ('DRAFT', 'VOID')`);
-        expect(sql).toContain("GREATEST(i.total - ");
+        // PAID is "the ledger covers the total": a part payment counts, and
+        // a bounced cheque on a paid bill takes out only the cheque.
+        expect(sql).not.toMatch(/i\.status\s*=/);
+    });
+
+    it("never reads an invoice's status for who paid or what they spent", () => {
+        for (const sql of [
+            spentRowsSql("org").sql,
+            peopleCte({ organizationId: "org", sensitiveToo: true }).sql,
+        ]) {
+            expect(sql).not.toMatch(/i\.status\s*=\s*'PAID'/);
+        }
     });
 
     it("scopes every part, the refunds and credit notes included, to the business", () => {
         const both = spentRowsSql("org", ["c1"]);
         expect(both.sql).toContain("UNION ALL");
-        expect(both.values.filter((v) => v === "org")).toHaveLength(5);
+        expect(both.values.filter((v) => v === "org")).toHaveLength(6);
         expect(both.values).toContainEqual(["c1"]);
     });
 

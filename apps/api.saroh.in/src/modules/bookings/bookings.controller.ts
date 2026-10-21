@@ -374,6 +374,9 @@ export class BookingsController {
      * `?closesClass=true` when the whole class is cancelled: its waitlist is
      * closed rather than offered the place (A12).
      *
+     * `?ifUnpaid=true` is Home's Turn down (review #11): cancel only while
+     * the booking still awaits payment, else 409 "They just paid".
+     *
      * Not gated on Appointments (#117, owner 9 Oct): a business that
      * switched Appointments off can still cancel a booking already made,
      * and the refund its policy gives (DEC-058). `booking:*` still applies.
@@ -385,11 +388,13 @@ export class BookingsController {
         @Param("bookingId") bookingId: string,
         @Query("returnCredit") returnCredit?: string,
         @Query("closesClass") closesClass?: string,
+        @Query("ifUnpaid") ifUnpaid?: string,
     ): Promise<WithoutIntakeNote<CancelledBooking>> {
         return this.bookings
             .cancelBooking(ctx, bookingId, undefined, {
                 returnCredit: returnCredit === "true",
                 closesClass: closesClass === "true",
+                ifUnpaid: ifUnpaid === "true",
             })
             .then(withoutIntakeNote);
     }

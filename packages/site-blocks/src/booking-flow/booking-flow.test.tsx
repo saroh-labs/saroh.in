@@ -577,6 +577,88 @@ describe("the booking page (U19)", () => {
         expect(retry.idempotencyKey).toBe(first.idempotencyKey);
     });
 
+    it("books the held time at the desk even when the times read again no longer offer it (#508)", async () => {
+        // Their own hold takes the time off the public list, so a read of
+        // the days after it (the site's server drawing the page again once
+        // they signed in) no longer offers it.
+        let held = false;
+        const OTHERS_ONLY = {
+            ...ONE_DAYS,
+            days: ONE_DAYS.days.map((d) => ({ ...d, starts: [] })),
+        };
+        serve((url, init) => {
+            if (url.endsWith("/days"))
+                return json(held ? OTHERS_ONLY : ONE_DAYS);
+            if (url.endsWith("/payment-intent")) return json({}, 500);
+            if (url.endsWith("/release")) {
+                return json({ state: "RELEASED", holdExpiresAt: null });
+            }
+            if (url.endsWith("/book")) {
+                const body = JSON.parse(init?.body as string) as {
+                    pay: string;
+                };
+                if (body.pay === "NOW") {
+                    held = true;
+                    return json(
+                        booked({
+                            state: "HELD",
+                            holdExpiresAt: "2026-09-18T04:15:00.000Z",
+                            payToken: "tok_1",
+                        }),
+                        201,
+                    );
+                }
+                return json(booked(), 201);
+            }
+            return json({ state: "HELD", holdExpiresAt: null });
+        });
+        const { rerender } = render(
+            <BookingFlow page={PAGE} apiUrl={API} account={account()} />,
+        );
+        await chooseOneToOne();
+        fireEvent.click(
+            screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
+        );
+        const desk = await screen.findByRole("button", {
+            name: "Book it to pay at the desk",
+        });
+        // Drawn again by the server with the service the address now names.
+        const daysRead = () => calls.filter((c) => c.url.endsWith("/days"));
+        const before = daysRead().length;
+        rerender(
+            <BookingFlow
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+                initialServiceId="svc_pt"
+            />,
+        );
+        await waitFor(() => expect(daysRead().length).toBe(before + 1));
+        fireEvent.click(desk);
+
+        expect(
+            await screen.findByRole("heading", {
+                name: "You're booked, Asha.",
+            }),
+        ).toBeInTheDocument();
+        const desks = calls
+            .filter((c) => c.url.endsWith("/book"))
+            .map(
+                (c) =>
+                    JSON.parse(c.init?.body as string) as {
+                        pay: string;
+                        startAt: string;
+                        staffId?: string;
+                    },
+            )
+            .filter((b) => b.pay === "DESK");
+        expect(desks).toHaveLength(1);
+        expect(desks[0]).toMatchObject({
+            startAt: "2026-09-20T01:30:00.000Z",
+            staffId: "staff_karan",
+        });
+    });
+
     /** Pay now, the payment can't start, and the booker asks for the desk. */
     function heldThenDesk(release: () => Response) {
         serve((url, init) => {

@@ -176,6 +176,22 @@ export interface PeriodFold {
     places: Map<string, { period: Sums; before: Sums }>;
 }
 
+/**
+ * The day rows with one day's rows swapped for that day read only so far
+ * (to the same time of day as now), so a comparison never sets part of
+ * today against a whole day. The day's rows in `soFar` alone are taken.
+ */
+export function withDaySoFar(
+    rows: readonly TakingsDayRow[],
+    day: string,
+    soFar: readonly TakingsDayRow[],
+): TakingsDayRow[] {
+    return [
+        ...rows.filter((row) => row.day !== day),
+        ...soFar.filter((row) => row.day === day),
+    ];
+}
+
 /** Fold day rows into the period and the one before, in `currency` only. */
 export function foldPeriod(
     rows: readonly TakingsDayRow[],

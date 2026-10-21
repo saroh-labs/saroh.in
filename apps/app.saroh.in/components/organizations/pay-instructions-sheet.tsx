@@ -35,7 +35,10 @@ import {
     payValuesOf,
     UPI_EXAMPLE,
 } from "@/lib/organizations/pay-instructions";
-import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
+import {
+    saveOrganizationSettings,
+    saveOrganizationSettingsInPlace,
+} from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 
 /** The fields, in the order the customer's card reads them. */
@@ -106,6 +109,7 @@ export function PayInstructionsSheet({
     returnTo,
     onClose,
     onSaved,
+    inPlace = false,
 }: {
     /** The settings read's `payInstructions`; absent from an older API. */
     saved: PayInstructionsSettings | undefined;
@@ -115,6 +119,11 @@ export function PayInstructionsSheet({
     onClose: () => void;
     /** The settings as the save answered. */
     onSaved: (next: OrganizationSettings) => void;
+    /**
+     * Saved from a screen that must stay drawn (the invoice editor): the
+     * save revalidates nothing (review #15).
+     */
+    inPlace?: boolean;
 }) {
     const values = payValuesOf(saved);
     const form = useForm<PayValues>({
@@ -130,7 +139,10 @@ export function PayInstructionsSheet({
             onClose();
             return;
         }
-        const res = await saveOrganizationSettings({ payInstructions: input });
+        const save = inPlace
+            ? saveOrganizationSettingsInPlace
+            : saveOrganizationSettings;
+        const res = await save({ payInstructions: input });
         if (!res.ok) {
             if (
                 res.field &&

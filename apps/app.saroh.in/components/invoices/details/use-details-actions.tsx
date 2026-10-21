@@ -5,7 +5,7 @@ import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Copy, Link2 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useReducer, useState } from "react";
+import { useReducer, useRef, useState } from "react";
 
 import { refusedResult } from "@/components/billing/plan-refusal";
 import { cancelTargetOf } from "@/components/invoices/cancel-or-correct-sheet";
@@ -90,6 +90,8 @@ export function useDetailsActions({
     charging: { at: string } | null;
     /** "Remove this payment", from the payment's own line in the history. */
     removePayment: (payment: InvoicePayment) => void;
+    /** A cheque in the bank that came back (#7): opens Bounced on it. */
+    bouncePayment: (payment: InvoicePayment) => void;
     overlays: ReactNode;
 } {
     const { invoice: i, can, registered } = details;
@@ -108,6 +110,9 @@ export function useDetailsActions({
     } | null>(null);
     const [busy, setBusy] = useState(false);
     const [downloading, setDownloading] = useState(false);
+    // A receipt being emailed: a second tap sends nothing (review #13).
+    const [receiptBusy, setReceiptBusy] = useState(false);
+    const receiptGoing = useRef(false);
     // A view link just made (#833): shown until something replaces it.
     const [viewUrl, setViewUrl] = useState<string | null>(null);
     // A payment link is kept outside React (UX-048); this redraws once it is.
@@ -160,6 +165,7 @@ export function useDetailsActions({
         emailConnected: i.send?.reason !== "NO_EMAIL_PROVIDER",
         linkBusy: busy,
         pdfBusy: downloading,
+        receiptBusy,
         linkUnseen,
     });
 
@@ -218,10 +224,19 @@ export function useDetailsActions({
     }
 
     async function emailReceipt() {
-        const res = await shareWithLink(i.id, {
-            channel: "EMAIL",
-            kind: "RECEIPT",
-        });
+        // The ref, not the state: two taps in one frame both see busy false.
+        if (receiptGoing.current) return;
+        receiptGoing.current = true;
+        const res = await runAction(
+            () => shareWithLink(i.id, { channel: "EMAIL", kind: "RECEIPT" }),
+            {
+                setBusy: (on) => {
+                    receiptGoing.current = on;
+                    setReceiptBusy(on);
+                },
+            },
+        );
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         onChanged();
         showSuccess(
@@ -392,6 +407,7 @@ export function useDetailsActions({
         sendable,
         charging,
         removePayment: (p) => setPayment({ dialog: "remove", payment: p }),
+        bouncePayment: (p) => setPayment({ dialog: "bounced", payment: p }),
         overlays,
     };
 }

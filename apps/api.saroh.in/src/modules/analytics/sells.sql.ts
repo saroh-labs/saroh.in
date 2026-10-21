@@ -2,9 +2,9 @@ import { Prisma } from "@saroh/database";
 
 import { notRetired } from "../customer-workspace/customers-list.sql";
 import {
-    invoiceCreditedSql,
     orderRefundedSql,
-    PAID_NON_ORDER_INVOICE,
+    paidOnInvoiceSql,
+    spentLedgerRowsSql,
 } from "../customer-workspace/spent.sql";
 import { ts } from "../orders/order-list-filters";
 
@@ -23,10 +23,11 @@ import { ts } from "../orders/order-list-filters";
  * `Order(organizationId)` and `Order(organizationId, createdAt)`, their
  * lines by `OrderItem(orderId)`, refund lines by
  * `PaymentRefundLine(orderItemId)`; bookings by
- * `Booking(organizationId, startAt)`; bills by `Invoice(organizationId,
- * paidAt)`; a customer's earlier visits by `CustomerIdentityLink(contactId,
- * customerId)`, `Order(customerId)`, `Invoice(contactId)` and
- * `Booking(contactId)`. No new index was needed: when paid
+ * `Booking(organizationId, startAt)`; bills (since the money-in rule, by
+ * their ledger) by `InvoicePayment(organizationId, receivedAt)` and
+ * `InvoicePayment(invoiceId)`; a customer's earlier visits by
+ * `CustomerIdentityLink(contactId, customerId)`, `Order(customerId)`,
+ * `Invoice(contactId)` and `Booking(contactId)`. No new index was needed: when paid
  * (`COALESCE(paidAt, createdAt)`) is not indexable, as in takings, and
  * the business's own rows are what the organization index narrows to.
  */
@@ -154,8 +155,10 @@ export function busiestSql(
 
 /**
  * What each person did in `[from, to)`: paid orders (through the storefront
- * customers linked to them, net of refunds), paid bills that are not an
- * order's own (net of credit notes), and bookings they came to. `kind`,
+ * customers linked to them, net of refunds), bills that are not an order's
+ * own with money in during the window (their ledger payments received in
+ * it, net of credit notes, by the money-in rule as Spent reads it), and
+ * bookings they came to. `kind`,
  * `amount` (0 for a visit), `currency`, `delivery`, `online`.
  */
 function didSql(organizationId: string, from: Date, to: Date): Prisma.Sql {
@@ -172,15 +175,14 @@ function didSql(organizationId: string, from: Date, to: Date): Prisma.Sql {
           AND ${ORDER_PAID_AT} >= ${ts(from)}
           AND ${ORDER_PAID_AT} < ${ts(to)}
         UNION ALL
-        SELECT i."contactId", 'BILL', i.currency,
-            GREATEST(i.total - ${invoiceCreditedSql(organizationId)}, 0),
+        SELECT x."contactId", 'BILL', x.currency, SUM(x.amount),
             FALSE, NULL
-        FROM "Invoice" i
-        WHERE i."organizationId" = ${organizationId}
-          AND i."contactId" IS NOT NULL
-          AND ${PAID_NON_ORDER_INVOICE}
-          AND i."paidAt" >= ${ts(from)}
-          AND i."paidAt" < ${ts(to)}
+        FROM (${spentLedgerRowsSql(organizationId, {
+            paidIn: { from: ts(from), to: ts(to) },
+        })}) x
+        WHERE x.at >= ${ts(from)}
+          AND x.at < ${ts(to)}
+        GROUP BY x."invoiceId", x."contactId", x.currency
         UNION ALL
         SELECT b."contactId",
             CASE WHEN s.capacity > 1 THEN 'CLASS' ELSE 'BOOKING' END,
@@ -207,13 +209,7 @@ function cameBeforeSql(organizationId: string, from: Date): Prisma.Sql {
               AND eo."paymentStatus" IN ('PAID', 'REFUNDED')
               AND COALESCE(eo."paidAt", eo."createdAt") < ${ts(from)}
         )
-        OR EXISTS (
-            SELECT 1 FROM "Invoice" i
-            WHERE i."contactId" = a."contactId"
-              AND i."organizationId" = ${organizationId}
-              AND ${PAID_NON_ORDER_INVOICE}
-              AND i."paidAt" < ${ts(from)}
-        )
+        OR ${paidOnInvoiceSql(organizationId, Prisma.sql`a."contactId"`, ts(from))}
         OR EXISTS (
             SELECT 1 FROM "Booking" eb
             WHERE eb."contactId" = a."contactId"

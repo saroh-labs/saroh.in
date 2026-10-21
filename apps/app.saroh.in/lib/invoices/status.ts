@@ -1,5 +1,5 @@
 import { formatDate } from "@/lib/format/datetime";
-import { formatMoneyMajor } from "@/lib/format/money";
+import { formatMoneyMajor, minorOf } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
 import { METHOD_WORD } from "@/lib/payments/method-words";
 import { isSince } from "@/lib/views/since";
@@ -261,8 +261,6 @@ export function isOwed(
     );
 }
 
-const cents = (amount: string) => Math.round(Number(amount) * 100);
-
 /**
  * What is owed and what of it is overdue, per currency, in minor units — the
  * API priced each invoice; this only adds them, in whole paise.
@@ -289,7 +287,7 @@ export function owedSummary(
     for (const i of invoices) {
         if (!isOwed(i)) continue;
         // What is left to pay on it (DEC-173), not its whole total.
-        const left = cents(i.leftToPay ?? i.total);
+        const left = minorOf(i.leftToPay ?? i.total) ?? 0;
         owed.set(i.currency, (owed.get(i.currency) ?? 0) + left);
         if (i.standing === "OVERDUE") {
             overdueCount += 1;
@@ -472,17 +470,20 @@ export function withCorrectionsUnder<
 }
 
 /**
- * The invoices Home's "Last 24 hours" link opens: those paid from `since`
- * on, credit notes never. `fromApi` is the API's own `?paidSince=` read
- * (H-7), which finds an old invoice paid today; without it (an API from
- * before it) the capped list on hand is filtered instead. No `since`: every
- * invoice on hand.
+ * The invoices a Home money figure's link opens: those money came in on
+ * from `since`, credit notes never. `fromApi` is the API's own
+ * `?paidSince=` read (H-7), which finds an old invoice paid today and
+ * applies the one money-in rule (DEC-173): a part payment received since
+ * counts, though the invoice isn't paid yet, so its rows are taken as they
+ * come. Without it the capped list on hand is filtered by paid date
+ * instead. No `since`: every invoice on hand.
  */
 export function paidSinceRows<
     T extends { kind?: InvoiceKind; paidAt?: string | null },
 >(onHand: T[], fromApi: T[] | null, since: Date | null): T[] {
     if (!since) return onHand;
-    return (fromApi ?? onHand).filter(
+    if (fromApi) return fromApi.filter((i) => i.kind !== "CREDIT_NOTE");
+    return onHand.filter(
         (i) => i.kind !== "CREDIT_NOTE" && isSince(i.paidAt, since),
     );
 }
@@ -546,9 +547,6 @@ export function lateBy(
     return i.dueAt ? Math.max(1, daysLate(i.dueAt, now)) : 1;
 }
 
-const centsOf = (amount: string | undefined) =>
-    amount === undefined ? null : Math.round(Number(amount) * 100);
-
 /**
  * What is left to pay, in paise: the API's `leftToPay`, or, from an API
  * before the ledger, the whole total while it is owed. Nothing on paper
@@ -560,7 +558,7 @@ export function leftCents(
 ): number {
     if (i.kind === "CREDIT_NOTE") return 0;
     if (i.standing !== "ISSUED" && i.standing !== "OVERDUE") return 0;
-    return centsOf(i.leftToPay) ?? centsOf(i.total) ?? 0;
+    return minorOf(i.leftToPay) ?? minorOf(i.total) ?? 0;
 }
 
 /**
@@ -571,9 +569,9 @@ export function paidCents(
     i: Pick<Invoice, "standing" | "total"> &
         Partial<Pick<Invoice, "paidSoFar">>,
 ): number {
-    const paid = centsOf(i.paidSoFar);
+    const paid = minorOf(i.paidSoFar);
     if (paid !== null) return paid;
-    return i.standing === "PAID" ? (centsOf(i.total) ?? 0) : 0;
+    return i.standing === "PAID" ? (minorOf(i.total) ?? 0) : 0;
 }
 
 /**
@@ -679,7 +677,7 @@ export function moneyMessage(
 ): MoneyMessage {
     const money = (cents: number) => formatMoneyMajor(cents / 100, i.currency);
     const day = (iso: string) => formatDate(iso, timeZone, { now });
-    const total = money(centsOf(i.total) ?? 0);
+    const total = money(minorOf(i.total) ?? 0);
     const last = lastLivePayment(i.payments);
     // "cash on 12 Oct": how and when the last money that counts came in.
     const how = (p: InvoicePayment | null) =>

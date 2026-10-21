@@ -9,7 +9,10 @@ import { LogoUpload } from "@/components/shared/logo-upload";
 import { runAction } from "@/lib/api/run-action";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { sheetWords } from "@/lib/organizations/business-sheet-words";
-import { saveBusinessLogo } from "@/lib/organizations/settings-actions";
+import {
+    saveBusinessLogo,
+    saveBusinessLogoInPlace,
+} from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 
 /**
@@ -29,6 +32,7 @@ export function BusinessLogoSheet({
     returnTo,
     onClose,
     onSaved,
+    inPlace = false,
 }: {
     settings: Pick<OrganizationSettings, "name" | "logo">;
     open: boolean;
@@ -36,6 +40,11 @@ export function BusinessLogoSheet({
     onClose: () => void;
     /** Saved: the settings now, and what to say (the page offers Undo). */
     onSaved: (next: OrganizationSettings, said: string) => void;
+    /**
+     * Saved from a screen that must stay drawn (the invoice editor): the
+     * save revalidates nothing (review #15).
+     */
+    inPlace?: boolean;
 }) {
     const saved: LogoValue | null = settings.logo ?? null;
     const [logo, setLogo] = useState(saved);
@@ -52,7 +61,10 @@ export function BusinessLogoSheet({
         }
         setRefusal(null);
         const result = await runAction(
-            () => saveBusinessLogo(logo?.mediaId ?? null),
+            () =>
+                (inPlace ? saveBusinessLogoInPlace : saveBusinessLogo)(
+                    logo?.mediaId ?? null,
+                ),
             { setBusy: setSaving },
         );
         if (!result) return;

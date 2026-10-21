@@ -79,6 +79,18 @@ export class RecordPaymentDto {
     @IsString()
     @MaxLength(120)
     chequeBank?: string;
+
+    /**
+     * One key per opening of the Record payment sheet (#6 review): a retry
+     * with it answers with the payment already written (`replayed`), never
+     * a second. Left out, every record is a payment of its own.
+     */
+    @IsOptional()
+    @IsString()
+    @Matches(/^[A-Za-z0-9_-]{8,80}$/, {
+        message: "That request key isn't one Saroh made.",
+    })
+    idempotencyKey?: string;
 }
 
 /** Remove a payment recorded by mistake (soft; it stays in the history). */

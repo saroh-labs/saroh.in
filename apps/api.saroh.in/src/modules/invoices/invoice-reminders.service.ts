@@ -1,12 +1,22 @@
-import { HttpException, Injectable } from "@nestjs/common";
+import { HttpException, Injectable, Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { mapLimit } from "../../common/map-limit";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { allows, authorize } from "../organizations/organization-policy";
 import { assertBusinessDetails } from "./business-details";
 import { reminderSample } from "./invoice-reminder-sample";
-import type { EmailBlocker, SendRow } from "./invoice-send.service";
-import { InvoiceSendService, SEND_SELECT } from "./invoice-send.service";
+import type {
+    EmailBlocker,
+    InvoiceReach,
+    ReachShared,
+    SendRow,
+} from "./invoice-send.service";
+import {
+    InvoiceSendService,
+    REMIND_MANY_CONCURRENCY,
+    SEND_SELECT,
+} from "./invoice-send.service";
 import type { BulkRemindersDto } from "./invoice-share.dto";
 import { BULK_REMINDER_MAX } from "./invoice-share.dto";
 import { leftToPayCents } from "./invoice-state";
@@ -15,6 +25,12 @@ import { daysAgo, heardWords, lastHeardFrom } from "./overdue-bills";
 import { fromCents } from "./totals";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * What one invoice's row says when its reminder failed for a reason
+ * nobody expected (review #34): the rest still go.
+ */
+export const COULD_NOT_SEND_ONE = "Couldn't send this one just now.";
 
 /** How one invoice's reminder goes in Remind many. */
 export type ReminderWay = "EMAIL" | "WHATSAPP" | "WAIT" | "NONE";
@@ -123,6 +139,8 @@ export interface ReminderSendRow extends ReminderPreviewRow {
  */
 @Injectable()
 export class InvoiceRemindersService {
+    private readonly logger = new Logger(InvoiceRemindersService.name);
+
     constructor(private readonly sending: InvoiceSendService) {}
 
     async preview(
@@ -157,49 +175,81 @@ export class InvoiceRemindersService {
         // the business's details are the business's, so one refusal.
         await assertBusinessDetails(prisma, ctx.organizationId);
         const money = allows(ctx, "payment:read");
-        const { rows } = await this.read(ctx, dto, new Date());
-        const results: ReminderSendRow[] = [];
-        for (const row of rows) {
-            if (row.way !== "EMAIL") {
-                results.push({ ...shown(row, money), outcome: "NOT_SENT" });
-                continue;
-            }
-            try {
-                const sent = await this.sending.remind(ctx, row.invoiceId);
-                results.push({
-                    ...shown(row, money),
-                    outcome:
-                        sent.email?.status === "SUPPRESSED"
-                            ? "SUPPRESSED"
-                            : "EMAILED",
-                });
-            } catch (error) {
-                if (!(error instanceof HttpException)) throw error;
-                const body = error.getResponse() as
-                    | { message?: unknown; details?: { retryAt?: unknown } }
-                    | string;
-                const message =
-                    typeof body === "string"
-                        ? body
-                        : typeof body.message === "string"
-                          ? body.message
-                          : error.message;
-                const retryAt =
-                    typeof body === "object" &&
-                    typeof body.details?.retryAt === "string"
-                        ? body.details.retryAt
-                        : undefined;
-                results.push({
-                    ...shown(row, money),
-                    ...(retryAt
-                        ? { way: "WAIT", reason: "REMINDED_TODAY", retryAt }
-                        : {}),
-                    outcome: "FAILED",
-                    message,
-                });
-            }
-        }
+        const { rows, shared } = await this.read(ctx, dto, new Date());
+        // Each EMAIL row is reminded exactly as `remind` does (its own
+        // transaction, lock and one-a-day check), a few at a time rather
+        // than one after another (review #17), with the business-wide reads
+        // made once. Each answers for itself: one that fails, however it
+        // fails, never stops the rest (review #34).
+        const results = await mapLimit(
+            rows,
+            REMIND_MANY_CONCURRENCY,
+            (row): Promise<ReminderSendRow> =>
+                row.way === "EMAIL"
+                    ? this.remindOne(ctx, row, money, shared)
+                    : Promise.resolve({
+                          ...shown(row, money),
+                          outcome: "NOT_SENT",
+                      }),
+        );
         return { invoices: results };
+    }
+
+    /** One EMAIL row of Send: its outcome, never a throw. */
+    private async remindOne(
+        ctx: OrganizationContext,
+        row: ReminderPreviewRow,
+        money: boolean,
+        shared: ReachShared,
+    ): Promise<ReminderSendRow> {
+        try {
+            const sent = await this.sending.remind(ctx, row.invoiceId, {
+                shared,
+                detailsChecked: true,
+            });
+            return {
+                ...shown(row, money),
+                outcome:
+                    sent.email?.status === "SUPPRESSED"
+                        ? "SUPPRESSED"
+                        : "EMAILED",
+            };
+        } catch (error) {
+            if (!(error instanceof HttpException)) {
+                // Logged for the operator; the row says it couldn't go.
+                this.logger.error(
+                    `Remind many: invoice ${row.invoiceId} failed: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+                return {
+                    ...shown(row, money),
+                    outcome: "FAILED",
+                    message: COULD_NOT_SEND_ONE,
+                };
+            }
+            const body = error.getResponse() as
+                { message?: unknown; details?: { retryAt?: unknown } } | string;
+            const message =
+                typeof body === "string"
+                    ? body
+                    : typeof body.message === "string"
+                      ? body.message
+                      : error.message;
+            const retryAt =
+                typeof body === "object" &&
+                typeof body.details?.retryAt === "string"
+                    ? body.details.retryAt
+                    : undefined;
+            return {
+                ...shown(row, money),
+                ...(retryAt
+                    ? { way: "WAIT", reason: "REMINDED_TODAY", retryAt }
+                    : {}),
+                outcome: "FAILED",
+                message,
+            };
+        }
     }
 
     /**
@@ -215,16 +265,27 @@ export class InvoiceRemindersService {
         rows: ReminderPreviewRow[];
         found: Map<string, { row: SendRow; payOnline: boolean }>;
         zone: string;
+        shared: ReachShared;
     }> {
         const ids = [...new Set(dto.invoiceIds)].slice(0, BULK_REMINDER_MAX);
-        const [found, zone] = await Promise.all([
+        // The business-wide reads once, not once per invoice (review #17).
+        const [found, zone, shared] = await Promise.all([
             prisma.invoice.findMany({
                 where: { id: { in: ids }, organizationId: ctx.organizationId },
                 select: SEND_SELECT,
             }),
             this.sending.zone(prisma, ctx.organizationId),
+            this.sending.readShared(prisma, ctx.organizationId),
         ]);
         const byId = new Map(found.map((row) => [row.id, row]));
+        // How each owed one reaches its customer, read for them all at once.
+        const reaches = await this.sending.channelsForMany(
+            prisma,
+            ctx.organizationId,
+            found.filter((row) => owedReason(row) === null),
+            now,
+            shared,
+        );
         // Sent or reminded inside the quiet days the call asked for, read
         // for them all at once: the same three things one a day counts.
         const quiet = dto.quietDays ?? 0;
@@ -245,9 +306,9 @@ export class InvoiceRemindersService {
                 rows.push({ invoiceId: id, way: "NONE", reason: "NOT_FOUND" });
                 continue;
             }
-            const { out, payOnline } = await this.way(
-                ctx.organizationId,
+            const { out, payOnline } = this.way(
                 row,
+                reaches.get(id),
                 now,
                 zone,
                 quiet > 0 ? { days: quiet, last: heard.get(id) } : null,
@@ -255,16 +316,16 @@ export class InvoiceRemindersService {
             rows.push(out);
             kept.set(id, { row, payOnline });
         }
-        return { rows, found: kept, zone };
+        return { rows, found: kept, zone, shared };
     }
 
-    private async way(
-        organizationId: string,
+    private way(
         row: SendRow,
+        reach: InvoiceReach | undefined,
         now: Date,
         zone: string,
         quiet: { days: number; last: LastHeard | undefined } | null,
-    ): Promise<{ out: ReminderPreviewRow; payOnline: boolean }> {
+    ): { out: ReminderPreviewRow; payOnline: boolean } {
         const base = {
             invoiceId: row.id,
             number: row.number,
@@ -281,18 +342,10 @@ export class InvoiceRemindersService {
             out: { ...base, way: "NONE", reason } satisfies ReminderPreviewRow,
             payOnline: false,
         });
-        if (row.orderId) return none("ORDER");
-        if (row.kind === "CREDIT_NOTE") return none("NOT_OWED");
-        if (row.status === "DRAFT") return none("DRAFT");
-        if (row.status === "PAID") return none("PAID");
-        if (row.status !== "ISSUED") return none("NOT_OWED");
-
-        const reach = await this.sending.channelsFor(
-            prisma,
-            organizationId,
-            row,
-            now,
-        );
+        const refused = owedReason(row);
+        if (refused) return none(refused);
+        // Read with the rest; absent only if that read skipped it.
+        if (!reach) return none("NOT_OWED");
         if (reach.send.reason === "AUTOPAY_PENDING") {
             return none("AUTOPAY_PENDING");
         }
@@ -351,6 +404,16 @@ export class InvoiceRemindersService {
             ...(reach.emailBlocked ? { emailBlocked: reach.emailBlocked } : {}),
         });
     }
+}
+
+/** Why a picked invoice isn't one to remind, or null when it is owed. */
+function owedReason(row: SendRow): ReminderReason | null {
+    if (row.orderId) return "ORDER";
+    if (row.kind === "CREDIT_NOTE") return "NOT_OWED";
+    if (row.status === "DRAFT") return "DRAFT";
+    if (row.status === "PAID") return "PAID";
+    if (row.status !== "ISSUED") return "NOT_OWED";
+    return null;
 }
 
 /** A row as this viewer may see it: no amount without `payment:read`. */

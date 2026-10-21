@@ -159,6 +159,7 @@ export function useCancelFlow({
                     open={open === "refund"}
                     onOpenChange={to("refund")}
                     invoice={invoice}
+                    expect={target.expect}
                     onDone={onDone}
                 />
             </>

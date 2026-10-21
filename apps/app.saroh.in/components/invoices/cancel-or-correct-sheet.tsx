@@ -20,7 +20,12 @@ import {
     reissueInvoice,
     voidInvoice,
 } from "@/lib/invoices/actions";
-import type { CreditPreview, Invoice } from "@/lib/invoices/service";
+import type {
+    CreditExpect,
+    CreditPreview,
+    Invoice,
+    InvoiceStanding,
+} from "@/lib/invoices/service";
 import { billedTo } from "@/lib/invoices/status";
 import {
     CANCEL_OR_CORRECT,
@@ -48,6 +53,24 @@ export interface CancelOrCorrectInvoice extends InvoiceRef {
     partlyPaid?: boolean;
     /** What has come in so far, as shown: "₹1,000". */
     paidSoFar?: string | null;
+    /**
+     * What the screen showed, sent with the credit (#2 review): the API
+     * refuses "This invoice was just paid. Reload it." when it changed.
+     */
+    expect?: CreditExpect;
+}
+
+/** What the screen shows of an invoice, for the API to check (#2 review). */
+export function creditExpectOf(i: {
+    standing: InvoiceStanding;
+    paidSoFar?: string;
+}): CreditExpect | undefined {
+    const s = i.standing;
+    if (s !== "ISSUED" && s !== "OVERDUE" && s !== "PAID") return undefined;
+    return {
+        expectStatus: s,
+        ...(i.paidSoFar ? { expectPaidSoFar: i.paidSoFar } : {}),
+    };
 }
 
 /** The sheet's invoice from the API's read: for the details view (U9). */
@@ -67,6 +90,7 @@ export function cancelTargetOf(
             i.paidSoFar !== undefined
                 ? formatMoneyMajor(i.paidSoFar, i.currency)
                 : null,
+        expect: creditExpectOf(i),
     };
 }
 
@@ -229,7 +253,7 @@ export function CancelOrCorrectSheet({
         switch (choice) {
             case "credit": {
                 const res = await runAction(
-                    () => creditInvoice(invoice.id, why),
+                    () => creditInvoice(invoice.id, why, invoice.expect),
                     { setBusy },
                 );
                 if (!res) return;
@@ -241,7 +265,12 @@ export function CancelOrCorrectSheet({
             }
             case "rewrite": {
                 const res = await runAction(
-                    () => creditAndRewriteInvoice(invoice.id, why),
+                    () =>
+                        creditAndRewriteInvoice(
+                            invoice.id,
+                            why,
+                            invoice.expect,
+                        ),
                     { setBusy },
                 );
                 if (!res) return;

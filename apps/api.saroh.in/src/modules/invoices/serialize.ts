@@ -304,7 +304,8 @@ export interface InvoicePaymentView {
     removed: { at: string; reason: string | null } | null;
     /**
      * Whether Remove is offered: not already removed, not an online
-     * payment (refunded instead), and the invoice ISSUED or PAID.
+     * payment (refunded instead), not a bounced cheque (it already doesn't
+     * count, #10), and the invoice ISSUED or PAID.
      */
     canRemove: boolean;
 }
@@ -558,6 +559,7 @@ function paymentView(p: PaymentRow, status: string): InvoicePaymentView {
         canRemove:
             !removed &&
             p.method !== ONLINE_PAYMENT_METHOD &&
+            p.bankStatus !== "BOUNCED" &&
             (status === "ISSUED" || status === "PAID"),
     };
 }

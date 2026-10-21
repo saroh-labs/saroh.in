@@ -810,6 +810,16 @@ describe("actionsFor: the details", () => {
         });
     });
 
+    it("the receipt by email is off while one is going", () => {
+        const got = actionsFor(STATES.paidChequeWaiting, owner, {
+            receiptBusy: true,
+        });
+        expect(find(got, "emailReceipt")).toMatchObject({
+            label: "Sending…",
+            disabled: true,
+        });
+    });
+
     it("paid: Share receipt opens the sheet on the receipt", () => {
         expect(actionsFor(STATES.paid, owner).main).toMatchObject({
             id: "shareReceipt",
