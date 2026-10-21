@@ -78,11 +78,11 @@ async function expectEveryDay(page: Page, days: { min: number; max: number }) {
     );
     expect(labels.length).toBeGreaterThanOrEqual(days.min);
     expect(labels.length).toBeLessThanOrEqual(days.max);
-    const weekdays = labels.map((l) => WEEKDAYS.indexOf(l.split(" ")[0]!));
+    const weekdays = labels.map((l) => WEEKDAYS.indexOf(l.split(" ")[0] ?? ""));
     expect(weekdays.every((d) => d >= 0)).toBe(true);
     for (let i = 1; i < weekdays.length; i++) {
         expect(weekdays[i], `${labels[i - 1]} then ${labels[i]}`).toBe(
-            (weekdays[i - 1]! + 1) % 7,
+            ((weekdays[i - 1] ?? -1) + 1) % 7,
         );
     }
     return labels;
@@ -299,7 +299,8 @@ test("with more than one website the picker chooses one and keeps it in the addr
     await expect(sheet).toBeVisible();
     // On a phone it rises from the foot of the screen; at a desk it comes
     // in from the right.
-    const viewport = page.viewportSize()!;
+    const viewport = page.viewportSize();
+    if (!viewport) throw new Error("the project sets a viewport");
     await expect
         .poll(async () => {
             const box = await sheet.boundingBox();
