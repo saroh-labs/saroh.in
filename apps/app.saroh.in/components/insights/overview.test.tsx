@@ -5,7 +5,12 @@ import type { AnalyticsSummary } from "@/lib/analytics/summary";
 import type { SourceRead } from "@/lib/analytics/takings";
 import type { InsightsAddress } from "@/lib/insights/period";
 import { periodWindow } from "@/lib/insights/period";
-import type { MoneyRead, MoneyWeekRead, SellsRead } from "@/lib/insights/reads";
+import type {
+    MoneyRead,
+    MoneyWeekRead,
+    SellsRead,
+    SourcesRead,
+} from "@/lib/insights/reads";
 
 import { InsightsTabs } from "./insights-tabs";
 import { Overview } from "./overview";
@@ -140,9 +145,9 @@ describe("the Overview, for an owner", () => {
         expect(said).toContain(
             "1,689 visits from 1,109 people, 23 enquiries and 159 online orders.",
         );
-        expect(said).toContain(
-            "comes next, once your site's links are tracked",
-        );
+        // Sources weren't read: the website's figures answer alone, and
+        // nothing says it comes next (U16).
+        expect(said).not.toContain("comes next");
         // Each answer opens its tab, keeping the period.
         expect(html).toContain('href="/analytics?tab=money"');
         expect(html).toContain('href="/analytics?tab=sells"');
@@ -306,7 +311,7 @@ describe("the Overview's other states", () => {
 });
 
 describe("the tabs", () => {
-    it("are four addresses that keep the period and the website, the last marked Next", () => {
+    it("are four addresses that keep the period and the website, none marked Next", () => {
         const html = renderToStaticMarkup(
             <InsightsTabs
                 address={{ period: "3m", tab: "money", siteId: "site_1" }}
@@ -318,6 +323,79 @@ describe("the tabs", () => {
             'href="/analytics?tab=sells&amp;period=3m&amp;siteId=site_1"',
         );
         expect(html).toMatch(/aria-current="page"[^>]*>Money</);
-        expect(text(html)).toContain("Where customers come from Next");
+        expect(text(html)).toContain("Where customers come from");
+        // Sources and the path are built (U16): nothing is still to come.
+        expect(text(html)).not.toMatch(/\bNext\b/);
+    });
+});
+
+describe("the Overview's sources answer (U16)", () => {
+    const SOURCES: SourcesRead = {
+        period: "4w",
+        window: { days: 28, from: "2026-09-22", to: "2026-10-19" },
+        siteId: null,
+        countedFrom: "2026-09-01",
+        countedPart: false,
+        path: { visits: 1109, looked: 612, started: 214, paid: 159 },
+        sources: [
+            { source: "instagram", visits: 455, paid: 52 },
+            { source: "google", visits: 288, paid: 61 },
+            { source: "whatsapp", visits: 166, paid: 31 },
+            { source: "direct", visits: 133, paid: 12 },
+            { source: "other", visits: 67, paid: 3 },
+        ],
+        folded: [],
+        refs: [],
+        moreRefs: 0,
+    };
+
+    it("names where visits come from and how many paid, the website's figures kept under it", () => {
+        const html = draw({ sources: ok(SOURCES) });
+        const said = text(html);
+        expect(said).toContain(
+            "Instagram brings the most visits. 1 in 7 visits ended in a payment.",
+        );
+        expect(said).toContain("Instagram 455 visits");
+        expect(said).toContain("Google search 288 visits");
+        expect(said).toContain("WhatsApp links 166 visits");
+        expect(said).not.toContain("Typed your address");
+        // Every figure the card had stays.
+        expect(said).toContain(
+            "1,689 visits from 1,109 people, 23 enquiries and 159 online orders.",
+        );
+        expect(html).toContain('href="/analytics?tab=from"');
+        // Counts, never a percentage, in this card.
+        const card = said.slice(
+            said.indexOf("Where do customers come from?"),
+            said.indexOf("How these are counted"),
+        );
+        expect(card).not.toMatch(/%/);
+    });
+
+    it("says counting starts with the next visit when nothing is counted yet", () => {
+        const said = text(
+            draw({
+                sources: ok({
+                    ...SOURCES,
+                    countedFrom: null,
+                    path: { visits: 0, looked: 0, started: 0, paid: 0 },
+                    sources: [],
+                }),
+            }),
+        );
+        expect(said).toContain(
+            "1,689 visits from 1,109 people, 23 enquiries and 159 online orders.",
+        );
+        expect(said).toContain(
+            "Where visits come from is counted from the next visit to your site.",
+        );
+    });
+
+    it("keeps the website's answer when the sources couldn't be read", () => {
+        const said = text(draw({ sources: { status: "failed" } }));
+        expect(said).toContain(
+            "1,689 visits from 1,109 people, 23 enquiries and 159 online orders.",
+        );
+        expect(said).not.toContain("brings the most visits");
     });
 });

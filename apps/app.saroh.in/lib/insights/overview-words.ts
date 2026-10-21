@@ -446,6 +446,7 @@ export const HOW_INSIGHTS_ARE_COUNTED: readonly string[] = [
     "The weekly bars are seven days at a time, back from today, so a period's bars add up to its money in.",
     "What sells counts what was paid for, and bookings that weren't cancelled.",
     "Your website's visits, enquiries and online orders are updated every hour.",
+    "Where visits come from counts each visit once, by the site or app it came from. Nothing about the visitor is kept.",
 ];
 
 /** A part of the Overview that couldn't be read. */

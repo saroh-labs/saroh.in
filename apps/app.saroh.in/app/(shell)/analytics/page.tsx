@@ -18,6 +18,7 @@ import {
     readMoney,
     readSells,
     readSiteChoices,
+    readSources,
     readSuggestions,
     readTraffic,
     summarizeAnalytics,
@@ -71,8 +72,9 @@ export const metadata = { title: "Insights" };
  *
  * Money reads the period (U12, #1093, `money-tab.tsx`), and so does What
  * sells (U13, #1095, `sells-tab.tsx`). Where customers come from holds
- * today's website figures for the period, with a site picker and Coming
- * next (U14, #1097, `from-tab.tsx`); sources and the path follow (U16).
+ * the website figures for the period, with a site picker (U14, #1097,
+ * `from-tab.tsx`), and the path from visit to paid and where visitors come
+ * from (U16, #1101), which the Overview's third answer reads too.
  */
 export default async function AnalyticsPage({
     searchParams,
@@ -104,7 +106,7 @@ export default async function AnalyticsPage({
         line: periodChoiceLine(period, periodWindow(period, today)),
     }));
 
-    const body = tabBody(address, window, {
+    const body = tabBody(address, window, today, {
         canRemind: permits(organization, "invoice:write"),
         canTakeOrder: permits(organization, "order:create"),
         canAddService: permits(organization, "service:write"),
@@ -153,6 +155,7 @@ export default async function AnalyticsPage({
 function tabBody(
     address: InsightsAddress,
     window: PeriodWindow,
+    today: string,
     can: { canRemind: boolean; canTakeOrder: boolean; canAddService: boolean },
 ) {
     switch (address.tab) {
@@ -169,7 +172,7 @@ function tabBody(
                 />
             );
         case "from":
-            return <FromPart address={address} window={window} />;
+            return <FromPart address={address} window={window} today={today} />;
         default:
             return <OverviewTab address={address} window={window} />;
     }
@@ -191,11 +194,12 @@ async function OverviewTab({
     address: InsightsAddress;
     window: PeriodWindow;
 }) {
-    const [money, sells, traffic, suggestions] = await Promise.all([
+    const [money, sells, traffic, suggestions, sources] = await Promise.all([
         readMoney(address.period),
         readSells(address.period),
         trafficFor(window.from, window.to),
         readSuggestions(address.period),
+        readSources(address.period, address.siteId),
     ]);
     // Without Insights' own reads the page is not theirs (#274). Outside
     // any try, so the interrupt lands.
@@ -235,6 +239,7 @@ async function OverviewTab({
             money={money}
             sells={sells}
             website={website}
+            sources={sources}
             suggestion={<SuggestionCard read={suggestions} share={share} />}
         />
     );
@@ -297,23 +302,26 @@ async function SellsPart({
 }
 
 /**
- * Where customers come from: today's website figures for the page's period
- * and the period before, for the website chosen (U14, #1097; sources and
- * the path come with U15, U16). The three reads go together; each that
- * fails is named on the tab.
+ * Where customers come from: the website's figures for the period and
+ * the period before, for the website chosen (U14, #1097), and where the
+ * visits came from (U16, #1101). The reads go together; each that fails
+ * is named on the tab.
  */
 async function FromPart({
     address,
     window,
+    today,
 }: {
     address: InsightsAddress;
     window: PeriodWindow;
+    today: string;
 }) {
-    const [traffic, earlier, sites, links] = await Promise.all([
+    const [traffic, earlier, sites, links, sourcesRead] = await Promise.all([
         trafficFor(window.from, window.to),
         trafficFor(window.beforeFrom, window.beforeTo),
         readSiteChoices(),
         readWebAddressLinks(),
+        readSources(address.period, address.siteId),
     ]);
     if (traffic.status === "denied") forbidden();
     const list = sites.status === "ok" ? sites.data : null;
@@ -323,6 +331,11 @@ async function FromPart({
             ? address.siteId
             : null;
     const fold = { siteId, from: window.from, to: window.to };
+    // A website no longer the business's reads as all of them, sources too.
+    const sources =
+        siteId === address.siteId
+            ? sourcesRead
+            : await readSources(address.period, siteId);
     const options: SiteOption[] | null = list
         ? [
               {
@@ -366,6 +379,8 @@ async function FromPart({
             sitesFailed={sites.status === "failed"}
             siteId={siteId}
             retryHref={insightsHref({ ...address, siteId })}
+            sources={sources}
+            today={today}
         />
     );
 }

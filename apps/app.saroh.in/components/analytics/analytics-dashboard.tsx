@@ -2,6 +2,7 @@ import { formatNumber } from "@/lib/format/money";
 import { cn } from "@saroh/ui/lib/utils";
 import { ChevronRight, ChevronUp } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import type {
     AnalyticsSummary,
@@ -36,9 +37,11 @@ import { ReadoutBars } from "./readout-bars";
  * 1. four figures, each with how it moved on the period before: Visits,
  *    People, Enquiries (opening Leads) and Paid orders and bookings
  *    (opening those days' paid orders), with the orders' counted-from note;
- * 2. visits every day of the period, a day nobody came drawn as a
+ * 2. what the tab puts between (`between`): the path from visit to paid
+ *    and where visitors come from (U16, #1101);
+ * 3. visits every day of the period, a day nobody came drawn as a
  *    baseline mark, every day readable by tap, focus or pointer;
- * 3. which pages people open, by the name they read as, the address kept
+ * 4. which pages people open, by the name they read as, the address kept
  *    under it.
  */
 
@@ -292,6 +295,7 @@ export function AnalyticsDashboard({
     before,
     range,
     oneSite = false,
+    between = null,
 }: {
     view: AnalyticsView;
     /** The period before's figures; null when they couldn't be read. */
@@ -299,6 +303,11 @@ export function AnalyticsDashboard({
     range: WebsiteRange;
     /** One website is chosen, not all of them. */
     oneSite?: boolean;
+    /**
+     * Drawn between the figures and the visits each day: the path from
+     * visit to paid and where visitors come from (U16, #1101).
+     */
+    between?: ReactNode;
 }) {
     const { summary, daily, topPages } = view;
     const ordersNote = ordersLine({
@@ -362,6 +371,7 @@ export function AnalyticsDashboard({
                     {ordersNote}
                 </p>
             ) : null}
+            {between}
             <DailyVisits daily={daily} period={range.period} />
             <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-2">
                 <TopPages pages={topPages} />

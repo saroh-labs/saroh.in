@@ -75,3 +75,18 @@ export class InsightsPeriodQueryDto {
     })
     period?: InsightsPeriod;
 }
+
+/**
+ * Insights' sources (plan U16, #1101): the period, and the website chosen
+ * on Where customers come from, absent for every website together. A
+ * website not the business's reads as no visits; the read names the
+ * business on every query.
+ */
+export class InsightsSourcesQueryDto extends InsightsPeriodQueryDto {
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MinLength(1)
+    @MaxLength(64)
+    siteId?: string;
+}

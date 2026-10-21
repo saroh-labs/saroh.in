@@ -14,12 +14,21 @@ import { useSession } from "../fixtures/sessions";
 import { ignoreHTTPSErrors, NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
- * Insights' "Where customers come from", now (DEC-171, plan U14, #1097;
- * boards `IBFromD`, `IBSiteD`, `IBFromP`, `IBSiteP`): today's website
- * figures for the page's one period, with Coming next (A9), a change on
- * each figure, every day of the period drawn (a day nobody came as a
- * baseline), the pages with their paths, and a site picker only when the
- * business has more than one website (a sheet on a phone).
+ * Insights' "Where customers come from" (DEC-171, plan U14, #1097, and
+ * U16, #1101; boards `IBFromD`, `IBSiteD`, `IBFromP`, `IBSiteP`): the
+ * website figures for the page's one period, a change on each figure, the
+ * path from visit to paid and where visitors come from (no longer marked
+ * Next), every day of the period drawn (a day nobody came as a baseline),
+ * the pages with their paths, and a site picker only when the business has
+ * more than one website (a sheet on a phone).
+ *
+ * Sources are counted by the hourly rollup from what U15's beacon sends,
+ * and the seed records none, so Northwind shows either its counted path
+ * or the one message that counting starts with the next visit; a business
+ * of the spec's own is always the second. The path's rules (never going
+ * up, small sources in Other sites, from when it counted) are pinned by
+ * `sources.db.spec.ts`, `sources-words.test.ts`, `visit-path.test.tsx` and
+ * `sources-table.test.tsx`.
  *
  * Northwind is read only (one website, ninety days of seeded visits). The
  * empty days and the picker are on a business of the spec's own
@@ -88,6 +97,74 @@ async function expectEveryDay(page: Page, days: { min: number; max: number }) {
     return labels;
 }
 
+/**
+ * From visit to paid and Where do visitors come from? (U16): the four
+ * steps never going up, the table's columns and sources by name, said as
+ * counts; or, before a source is counted, the one message that says when
+ * counting begins.
+ */
+async function expectSources(page: Page) {
+    const path = page.getByTestId("visit-path");
+    const notYet = page.getByTestId("sources-not-yet");
+    await expect(path.or(notYet)).toBeVisible();
+    if (await notYet.isVisible()) {
+        await expect(notYet).toContainText(
+            "Where visits come from is counted from the next visit to your site",
+        );
+        await expect(page.getByTestId("sources-table")).toHaveCount(0);
+        return;
+    }
+    await expect(
+        page.getByRole("region", { name: "From visit to paid" }),
+    ).toBeVisible();
+    const steps = path.locator("li[data-step]");
+    await expect(steps).toHaveCount(4);
+    await expect(steps.nth(0)).toContainText("Visited your site");
+    await expect(steps.nth(1)).toContainText("Looked at a product or class");
+    await expect(steps.nth(2)).toContainText("Started an order or booking");
+    await expect(steps.nth(3)).toContainText("Paid");
+    // Each step's count, never above the one before.
+    const counts = (
+        await path
+            .locator("li[data-step] > span:nth-child(2)")
+            .allTextContents()
+    ).map((t) => Number(t.replace(/[^\d]/g, "")));
+    expect(counts).toHaveLength(4);
+    for (let i = 1; i < counts.length; i++) {
+        expect(counts[i]).toBeLessThanOrEqual(counts[i - 1] ?? 0);
+    }
+    const sources = page.getByRole("region", {
+        name: "Where do visitors come from?",
+    });
+    await expect(sources).toBeVisible();
+    await expect(sources).toContainText(
+        /brings? the most visits|No visits counted in/,
+    );
+    const table = sources.getByRole("table");
+    if ((await table.count()) > 0) {
+        await expect(table.getByRole("columnheader")).toHaveText([
+            "From",
+            "Visits",
+            "Paid",
+            "How many paid",
+        ]);
+        for (const name of await table
+            .getByRole("rowheader")
+            .allTextContents()) {
+            expect([
+                "Instagram",
+                "Google search",
+                "WhatsApp links",
+                "Typed your address",
+                "Other sites",
+            ]).toContain(name.trim());
+        }
+    }
+    // Shares are counts ("1 in 7"), never a percentage.
+    await expect(path).not.toContainText("%");
+    await expect(sources).not.toContainText("%");
+}
+
 test("a business with one website reads every figure for the period, with how it moved", async ({
     page,
 }) => {
@@ -95,10 +172,13 @@ test("a business with one website reads every figure for the period, with how it
     await openFrom(page, NORTHWIND_ORG, "&period=3m");
     const main = page.locator("main");
 
-    // Coming next, and what works today (A9).
-    await expect(page.getByTestId("from-next")).toContainText(
-        "Coming next. Sources and the path from visit to paid need your site's links to be tracked.",
-    );
+    // Nothing is still to come (A9 done, U16): no banner, no Next mark.
+    await expect(page.getByTestId("from-next")).toHaveCount(0);
+    await expect(
+        page
+            .getByRole("navigation", { name: "Insights" })
+            .getByRole("link", { name: /^Where customers come from/ }),
+    ).toHaveText(/^Where customers come from$/);
     // One website: no picker.
     await expect(page.getByTestId("site-picker")).toHaveCount(0);
 
@@ -131,6 +211,8 @@ test("a business with one website reads every figure for the period, with how it
         "href",
         /^\/commerce\/orders\?date=custom&from=\d{4}-\d{2}-\d{2}&to=\d{4}-\d{2}-\d{2}&payment=paid$/,
     );
+
+    await expectSources(page);
 
     // Every day of the three months, in order, each read by a tap.
     await expectEveryDay(page, { min: 89, max: 92 });
@@ -246,7 +328,29 @@ test("a business nobody has visited draws every day as a baseline, never an empt
     await expect(page.getByTestId("website-pages")).toContainText(
         "No page visits yet.",
     );
+    // No source counted yet: one message says counting starts with the
+    // next visit, and the path and the table wait for it (U16).
+    await expect(page.getByTestId("sources-not-yet")).toContainText(
+        "Where visits come from is counted from the next visit to your site",
+    );
+    await expect(page.getByTestId("visit-path")).toHaveCount(0);
+    await expect(page.getByTestId("sources-table")).toHaveCount(0);
     await expectNoSidewaysScroll(page);
+
+    // The Overview's third answer: before the first sale it says the
+    // website's figures alone (`IBNoSalesD`), and never that sources come
+    // next.
+    await page.goto(`${urls.APP_URL}/analytics?period=7d`);
+    const card = page.getByRole("region", {
+        name: "Where do customers come from?",
+    });
+    await expect(card).toContainText(
+        "No visits to your website in the last 7 days.",
+    );
+    await expect(card).not.toContainText("comes next");
+    await expect(
+        card.getByRole("link", { name: "See your website" }),
+    ).toHaveAttribute("href", "/analytics?tab=from&period=7d");
 });
 
 test("with more than one website the picker chooses one and keeps it in the address", async ({

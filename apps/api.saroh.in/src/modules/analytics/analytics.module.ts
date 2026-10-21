@@ -25,6 +25,7 @@ import {
     AnalyticsPublicController,
 } from "./analytics.controller";
 import { SellsService } from "./sells.service";
+import { SourcesService } from "./sources.service";
 import { SuggestionsService } from "./suggestions.service";
 import { TakingsService } from "./takings.service";
 
@@ -70,6 +71,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         OrganizationGuard,
         TakingsService,
         SellsService,
+        SourcesService,
         SuggestionsService,
     ],
     // Re-exported so existing consumers of AnalyticsModule are unaffected by

@@ -24,11 +24,17 @@ import {
 } from "../capabilities/require-module.decorator";
 import type { IngestResult } from "./analytics.service";
 import { AnalyticsService } from "./analytics.service";
-import { IngestAnalyticsEventDto, InsightsPeriodQueryDto } from "./dto";
+import {
+    IngestAnalyticsEventDto,
+    InsightsPeriodQueryDto,
+    InsightsSourcesQueryDto,
+} from "./dto";
 import type { MoneyRead } from "./money";
 import { DEFAULT_PERIOD } from "./period";
 import type { SellsRead } from "./sells";
 import { SellsService } from "./sells.service";
+import type { SourcesRead } from "./sources";
+import { SourcesService } from "./sources.service";
 import type { SuggestionsRead } from "./suggestions";
 import type { NotNowResult } from "./suggestions.service";
 import { SuggestionsService } from "./suggestions.service";
@@ -95,6 +101,7 @@ export class AnalyticsController {
         private readonly analytics: AnalyticsService,
         private readonly takings: TakingsService,
         private readonly sells: SellsService,
+        private readonly sources: SourcesService,
         private readonly suggestions: SuggestionsService,
     ) {}
 
@@ -126,6 +133,27 @@ export class AnalyticsController {
         @Query() query: InsightsPeriodQueryDto,
     ): Promise<SellsRead> {
         return this.sells.read(ctx, query.period ?? DEFAULT_PERIOD);
+    }
+
+    /**
+     * Insights' sources and the path from visit to paid for one period
+     * (DEC-171, plan U16, #1101, `sources.ts`): visited, looked, started
+     * and paid, each at most the one before; visits and paid by source,
+     * small sources folded into Other sites; the merchant's own links; and
+     * the day counting began. `?period=7d|4w|3m`, 4 weeks when absent;
+     * `?siteId=` narrows the visits to one website (paid stays the
+     * business's). Needs `analytics:read`; counts only, no money.
+     */
+    @Get("sources")
+    getSources(
+        @OrgContext() ctx: OrganizationContext,
+        @Query() query: InsightsSourcesQueryDto,
+    ): Promise<SourcesRead> {
+        return this.sources.read(
+            ctx,
+            query.period ?? DEFAULT_PERIOD,
+            query.siteId ?? null,
+        );
     }
 
     /**

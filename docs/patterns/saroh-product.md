@@ -704,6 +704,22 @@ organizations/:org/customers`: everyone who has paid (an order through a
     `packages/database/src/backfill/private-path-views.cli.ts` (dry run
     first).
 
+- **Current** — "From visit to paid" and "Where do visitors come from?"
+  (U16, #1101) on Where customers come from, between the figures and the
+  visits each day, and the Overview's third answer, read from
+  `GET analytics/sources?period=&siteId=` (`analytics/sources.ts`,
+  `analytics:read`, counts only). The path's four steps (visited, looked,
+  started, paid) are each held to at most the one before, so it never goes
+  up. A share is said as a count reads ("1 in 7", "3 in 4", "about half",
+  `lib/insights/sources-words.ts` `oneIn`), never a percentage, and what
+  is counted is called visits, never people (no visitor is kept). A source
+  with fewer than 5 visits is counted in Other sites and the line under the
+  table names it; the merchant's own `?ref=` links are listed under the
+  table when any were visited. Counting that began inside the period says
+  from when; before anything is counted one message says it starts with
+  the next visit. With a website chosen, paid stays the business's and the
+  table says so. Where customers come from is no longer marked Next.
+
 ## One word each
 
 **Current** (UX-078, owner 9 Oct) — one word for one thing, in the workspace,

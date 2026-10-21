@@ -24,7 +24,12 @@ import {
 } from "@/lib/insights/overview-words";
 import type { InsightsAddress } from "@/lib/insights/period";
 import { insightsHref } from "@/lib/insights/period";
-import type { MoneyRead, SellsRead } from "@/lib/insights/reads";
+import type { MoneyRead, SellsRead, SourcesRead } from "@/lib/insights/reads";
+import {
+    countedFromLine,
+    overviewSourceRows,
+    overviewSourcesAnswer,
+} from "@/lib/insights/sources-words";
 import { newOrderHref } from "@/lib/orders/links";
 
 import { AnswerCard, AnswerLink, AnswerText } from "./answer-card";
@@ -49,6 +54,8 @@ export interface OverviewProps {
     money: SourceRead<MoneyRead> | null;
     sells: SourceRead<SellsRead> | null;
     website: SourceRead<AnalyticsSummary>;
+    /** Where visits came from (U16); null or failed: the website's figures alone. */
+    sources?: SourceRead<SourcesRead> | null;
     suggestion?: ReactNode;
 }
 
@@ -57,6 +64,7 @@ export function Overview({
     money,
     sells,
     website,
+    sources = null,
     suggestion = null,
 }: OverviewProps) {
     const href = (tab: InsightsAddress["tab"]) =>
@@ -81,6 +89,7 @@ export function Overview({
     const fromCard = (
         <FromCard
             website={website}
+            sources={sources?.status === "ok" ? sources.data : null}
             period={address.period}
             noSales={noSales}
             href={href("from")}
@@ -426,13 +435,23 @@ export function SellsCard({
     );
 }
 
+/**
+ * "Where do customers come from?" (`IBOverviewD`, U16 #1101): the source
+ * that brings the most and how many visits ended in a payment, the first
+ * three sources, and the website's figures under them as before. Before
+ * any source is counted, or in a period with no visit, the website's
+ * figures answer alone, with when counting begins. A sources read that
+ * failed leaves the website's answer as it was; the tab names the failure.
+ */
 function FromCard({
     website,
+    sources,
     period,
     noSales,
     href,
 }: {
     website: SourceRead<AnalyticsSummary>;
+    sources: SourcesRead | null;
     period: InsightsAddress["period"];
     noSales: boolean;
     href: string;
@@ -448,19 +467,54 @@ function FromCard({
             </AnswerCard>
         );
     }
+    const figures = fromAnswer(website.data, period, noSales);
+    const answer = sources ? overviewSourcesAnswer(sources) : null;
+    const rows = answer && sources ? overviewSourceRows(sources) : [];
+    const notYet =
+        sources && !answer && !noSales ? countedFromLine(sources) : null;
     return (
         <AnswerCard question={QUESTION.from} data-testid="answer-from">
-            <AnswerText answer={fromAnswer(website.data, period, noSales)} />
-            {noSales ? null : (
+            <AnswerText answer={answer ?? figures} />
+            {rows.length > 0 ? (
+                <ol className="w-full" data-ph-mask="">
+                    {rows.map((row, i) => (
+                        <li
+                            key={row.key}
+                            className="flex items-center gap-2.5 border-t border-border/70 py-2 text-[13.5px]"
+                        >
+                            <span
+                                aria-hidden
+                                className="flex size-5 shrink-0 items-center justify-center rounded-md bg-neutral-100 text-[11px] font-bold dark:bg-neutral-800"
+                            >
+                                {i + 1}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate font-semibold">
+                                {row.name}
+                            </span>
+                            <span className="shrink-0 text-[12.5px] tabular-nums text-muted-foreground">
+                                {row.visits}
+                            </span>
+                        </li>
+                    ))}
+                </ol>
+            ) : null}
+            {answer ? (
+                <p
+                    data-ph-mask=""
+                    data-testid="answer-from-figures"
+                    className="text-[12.5px] leading-[1.45] text-muted-foreground"
+                >
+                    {figures}
+                </p>
+            ) : notYet ? (
                 <p
                     data-ph-unmask=""
                     className="flex items-start gap-1.5 text-[12.5px] leading-[1.45] text-muted-foreground"
                 >
                     <Info aria-hidden className="mt-px size-[15px] shrink-0" />
-                    Which sites and apps they came from comes next, once your
-                    site's links are tracked.
+                    {notYet}
                 </p>
-            )}
+            ) : null}
             <AnswerLink href={href}>See your website</AnswerLink>
         </AnswerCard>
     );

@@ -294,3 +294,52 @@ export interface SuggestionsRead {
     hasSales: boolean;
     suggestions: Suggestion[];
 }
+
+/** Where a visit came from: one of five groups (U15, #1099). */
+export type VisitSource =
+    "instagram" | "google" | "whatsapp" | "direct" | "other";
+
+/** Visited, looked, started and paid: each at most the one before. */
+export interface VisitPathRead {
+    visits: number;
+    looked: number;
+    started: number;
+    paid: number;
+}
+
+/** One source's visits and how many of them paid. */
+export interface SourceRowRead {
+    source: VisitSource;
+    visits: number;
+    paid: number;
+}
+
+/** One of the merchant's own links (`?ref=`). */
+export interface RefRowRead {
+    ref: string;
+    visits: number;
+    paid: number;
+}
+
+/**
+ * `GET organizations/:id/analytics/sources?period=&siteId=` (#1101,
+ * `apps/api.saroh.in/src/modules/analytics/sources.ts`), `analytics:read`:
+ * the path from visit to paid and where visits came from. Counts only.
+ * Paid is the business's even when a website is chosen.
+ */
+export interface SourcesRead {
+    period: InsightsPeriod;
+    window: { days: number; from: string; to: string };
+    siteId: string | null;
+    /** The first day a source was counted; null: nothing counted yet. */
+    countedFrom: string | null;
+    /** Counting began after the period's first day. */
+    countedPart: boolean;
+    path: VisitPathRead;
+    /** Most visits first, Other sites last; small sources folded in it. */
+    sources: SourceRowRead[];
+    /** Sources with too few visits, counted in Other sites. */
+    folded: VisitSource[];
+    refs: RefRowRead[];
+    moreRefs: number;
+}

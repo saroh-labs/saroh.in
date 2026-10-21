@@ -4,6 +4,7 @@ import type { InsightsPeriod } from "@/lib/insights/period";
 import type {
     MoneyRead,
     SellsRead,
+    SourcesRead,
     SuggestionsRead,
 } from "@/lib/insights/reads";
 
@@ -88,6 +89,25 @@ export async function readSells(
     if (!orgId) return null;
     return readSource<SellsRead>(
         `/organizations/${orgId}/analytics/sells?period=${period}`,
+    );
+}
+
+/**
+ * Insights' sources and the path from visit to paid for one period
+ * (DEC-171, #1101), for the website chosen or all of them. Counts only,
+ * so anyone with Insights reads it. A failure is `failed`, said where the
+ * two answers would be; the website's figures still show.
+ */
+export async function readSources(
+    period: InsightsPeriod,
+    siteId: string | null = null,
+): Promise<SourceRead<SourcesRead> | null> {
+    const orgId = await getActiveOrgId();
+    if (!orgId) return null;
+    const qs = new URLSearchParams({ period });
+    if (siteId) qs.set("siteId", siteId);
+    return readSource<SourcesRead>(
+        `/organizations/${orgId}/analytics/sources?${qs.toString()}`,
     );
 }
 
