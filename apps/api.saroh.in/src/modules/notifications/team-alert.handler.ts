@@ -16,6 +16,12 @@ import { wordAsk } from "./ask-alerts";
 import { wordBookingMine } from "./booking-mine-alerts";
 import { wordDataRequest } from "./data-request-alerts";
 import { wordDomain } from "./domain-alerts";
+import {
+    hasMismatch,
+    wordOrderPaidByLink,
+    wordOrderPaymentFailed,
+    wordPaymentMismatch,
+} from "./money-alerts";
 import { noticeHeadOf, noticeOf } from "./notice-target";
 import { wordProvider } from "./provider-alerts";
 import { wordReview } from "./review-alerts";
@@ -28,6 +34,12 @@ export {
     DOMAIN_BACK_NOTIFICATION_TYPE,
     DOMAIN_DOWN_NOTIFICATION_TYPE,
 } from "./domain-alerts";
+export {
+    INVOICE_PAYMENT_MISMATCH_NOTIFICATION_TYPE,
+    ORDER_PAID_BY_LINK_NOTIFICATION_TYPE,
+    ORDER_PAYMENT_FAILED_NOTIFICATION_TYPE,
+    PAYMENT_MISMATCH_NOTIFICATION_TYPE,
+} from "./money-alerts";
 export {
     PROVIDER_ATTENTION_NOTIFICATION_TYPE,
     PROVIDER_BACK_NOTIFICATION_TYPE,
@@ -84,7 +96,8 @@ export interface AlertEmail {
 /**
  * Consumer for `team.alert` (round-2 F14): tells the business's team about
  * a new order, a booking the customer made, moved or cancelled, a failed
- * payment, someone joining, a scheduled go-live of the website that ran
+ * payment (an invoice's or, #1139, an order's), money captured at the wrong
+ * amount, a team-made order paid by its link, someone joining, a scheduled go-live of the website that ran
  * (DEC-071, T10), a website order to pay on handover nobody came for in
  * three days (R34, on the New order row), or a live custom domain that
  * stopped reaching the site and came back (#917, on the Your website
@@ -416,6 +429,12 @@ export async function wordAlert(
             return wordOrder(tx, organizationId, payload);
         case "failed":
             return wordFailed(tx, organizationId, payload);
+        case "order-failed":
+            return wordOrderPaymentFailed(tx, organizationId, payload);
+        case "mismatch":
+            return wordPaymentMismatch(tx, organizationId, payload);
+        case "paid-by-link":
+            return wordOrderPaidByLink(tx, organizationId, payload);
         case "team":
             return wordJoined(tx, organizationId, payload);
         case "booking":
@@ -521,9 +540,19 @@ async function wordFailed(
             },
         }),
     ]);
-    // Paid since, or gone: nothing failed that still matters.
+    // Paid since (online, or in cash before this ran), voided, credited in
+    // full, or gone: nothing failed that still matters.
     if (intent?.status !== "FAILED" || !invoice) return null;
-    if (invoice.status === "PAID" || invoice.status === "VOID") return null;
+    if (
+        invoice.status === "PAID" ||
+        invoice.status === "VOID" ||
+        invoice.status === "CREDITED"
+    ) {
+        return null;
+    }
+    // Taken at the wrong amount (PAY-06): the mismatch alert says so, with
+    // both figures, rather than "didn't go through".
+    if (await hasMismatch(tx, p.paymentIntentId)) return null;
     const contact = [invoice.contact?.firstName, invoice.contact?.lastName]
         .filter(Boolean)
         .join(" ")
@@ -543,12 +572,12 @@ async function wordFailed(
         // An autopay charge (D13) has no link they tried: the merchant retries.
         body: intent.viaMandateId
             ? `${who}'s autopay charge of ${amount} didn't go through. Try it again, or send them a pay link.`
-            : `${who}'s payment of ${amount} didn't go through. They can try again from the same link.`,
+            : `${who}'s payment of ${amount} didn't go through. They'll need a new link: open the invoice to share one.`,
         mail: {
             heading: `Payment failed on invoice ${invoice.number ?? "(draft)"}`,
             body: intent.viaMandateId
                 ? `An autopay charge of ${amount} didn't go through. Try it again, or send the customer a pay link.`
-                : `A payment of ${amount} didn't go through. The customer can try again from the same link.`,
+                : `A payment of ${amount} didn't go through. The customer will need a new link: open the invoice to share one.`,
         },
         path: `/billing/invoices/${invoice.id}`,
         skipUserId: null,
@@ -713,6 +742,15 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
             return str("notificationId") ? (p as TeamAlertPayload) : null;
         case "uncollected":
             return str("orderId") ? (p as TeamAlertPayload) : null;
+        case "order-failed":
+        case "paid-by-link":
+            return str("orderId") && str("paymentIntentId")
+                ? (p as TeamAlertPayload)
+                : null;
+        case "mismatch":
+            return str("paymentIntentId") && str("attemptId")
+                ? (p as TeamAlertPayload)
+                : null;
         case "request":
             return str("requestId") ? (p as TeamAlertPayload) : null;
         case "booking-mine":

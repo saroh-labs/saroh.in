@@ -57,7 +57,10 @@ jest.mock("@saroh/database", () => {
             update: jest.fn(),
             updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         },
-        paymentAttempt: { create: jest.fn(), findFirst: jest.fn() },
+        paymentAttempt: {
+            create: jest.fn().mockResolvedValue({ id: "att_1" }),
+            findFirst: jest.fn(),
+        },
         paymentRefund: {
             findFirst: jest.fn(),
             findUniqueOrThrow: jest.fn(),
@@ -66,6 +69,8 @@ jest.mock("@saroh/database", () => {
         },
         order: { findUnique: jest.fn(), update: jest.fn() },
         orderEvent: { create: jest.fn() },
+        // The team's alerts (#1139), queued on the webhook's transaction.
+        job: { create: jest.fn() },
     };
     return {
         ...actual,
@@ -129,6 +134,17 @@ const queryRaw = prisma.$queryRaw as unknown as jest.Mock;
 const refundUpdate = prisma.paymentRefund.update as jest.Mock;
 const orderFindUnique = prisma.order.findUnique as jest.Mock;
 const orderUpdate = prisma.order.update as jest.Mock;
+const jobCreate = (prisma as unknown as { job: { create: jest.Mock } }).job
+    .create;
+/** The `team.alert` payloads queued, in order. */
+const alertsQueued = () =>
+    jobCreate.mock.calls
+        .map(
+            ([args]: [{ data: { type: string; payload: unknown } }]) =>
+                args.data,
+        )
+        .filter((d) => d.type === "team.alert")
+        .map((d) => d.payload);
 
 const SECRET = "whsec_test_secret";
 
@@ -244,6 +260,14 @@ describe("WebhooksService signature verification", () => {
             where: { id: "wh_1" },
             data: expect.objectContaining({ status: "PROCESSED" }),
         });
+        // An order the team made, paid by the customer online (#1139).
+        expect(alertsQueued()).toEqual([
+            {
+                event: "paid-by-link",
+                orderId: "order_1",
+                paymentIntentId: "pi_1",
+            },
+        ]);
     });
 
     it("keeps the fee the provider reported, once, and none when it reported none (E19)", async () => {
@@ -1061,7 +1085,19 @@ describe("the captured amount is compared with the intent (PAY-06)", () => {
                     capturedAmountCents: 4000,
                 }),
             }),
+            select: { id: true },
         });
+        // The team hears of the mismatch with both figures (#1139), queued
+        // with its record; the payment it failed is queued too, and says
+        // nothing when it runs, since the mismatch tells it.
+        expect(alertsQueued()).toEqual([
+            { event: "mismatch", paymentIntentId: "pi_1", attemptId: "att_1" },
+            {
+                event: "order-failed",
+                orderId: "order_1",
+                paymentIntentId: "pi_1",
+            },
+        ]);
         // No fee is kept on money that wasn't applied.
         expect(intentUpdateMany).not.toHaveBeenCalledWith(
             expect.objectContaining({ data: { feeCents: 100 } }),
@@ -1083,11 +1119,13 @@ describe("the captured amount is compared with the intent (PAY-06)", () => {
             );
             await deliver(service, over);
             expect(paidMoves()).toHaveLength(0);
-            expect(attemptCreate).toHaveBeenCalledWith({
-                data: expect.objectContaining({
-                    status: "CAPTURED_NEEDS_REFUND",
+            expect(attemptCreate).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        status: "CAPTURED_NEEDS_REFUND",
+                    }),
                 }),
-            });
+            );
         }
     });
 
@@ -1107,5 +1145,81 @@ describe("the captured amount is compared with the intent (PAY-06)", () => {
         const service = arrange();
         await deliver(service, {});
         expect(paidMoves()).toHaveLength(1);
+    });
+});
+
+describe("the team's money alerts (#1139)", () => {
+    function arrange(order: Record<string, unknown>) {
+        const { service } = makeService();
+        providerFindUnique.mockResolvedValue(providerRow());
+        whCreate.mockResolvedValue({ id: "wh_1" });
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        orderFindUnique.mockResolvedValue(order);
+        return service;
+    }
+    const deliver = (
+        service: WebhooksService,
+        over: Record<string, unknown>,
+    ) => {
+        const raw = bodyOf(over);
+        return service.handle("razorpay", "org_1", raw, {
+            "x-fake-signature": sign(raw),
+        });
+    };
+
+    it("a team order's payment that didn't go through queues 'didn't go through' with the failure", async () => {
+        const service = arrange({
+            paymentStatus: "UNPAID",
+            placedOnline: false,
+            payOnHandover: false,
+        });
+        await deliver(service, {
+            eventType: "payment.failed",
+            outcome: "FAILED",
+        });
+        expect(alertsQueued()).toEqual([
+            {
+                event: "order-failed",
+                orderId: "order_1",
+                paymentIntentId: "pi_1",
+            },
+        ]);
+    });
+
+    it("a failure already applied (the webhook redelivered) queues nothing more", async () => {
+        const service = arrange({
+            paymentStatus: "FAILED",
+            placedOnline: false,
+            payOnHandover: false,
+        });
+        intentUpdateMany.mockResolvedValueOnce({ count: 0 });
+        await deliver(service, {
+            eventType: "payment.failed",
+            outcome: "FAILED",
+        });
+        expect(alertsQueued()).toEqual([]);
+    });
+
+    it("a site checkout's failed attempt is no order yet: nothing is queued", async () => {
+        const service = arrange({
+            paymentStatus: "UNPAID",
+            placedOnline: true,
+            payOnHandover: false,
+        });
+        await deliver(service, {
+            eventType: "payment.failed",
+            outcome: "FAILED",
+        });
+        expect(alertsQueued()).toEqual([]);
+    });
+
+    it("a website order to pay on handover, paid by its link, has no 'paid by link' alert", async () => {
+        const service = arrange({
+            paymentStatus: "UNPAID",
+            placedOnline: true,
+            payOnHandover: true,
+        });
+        await deliver(service, { providerPaymentRef: "pay_1" });
+        expect(alertsQueued()).toEqual([]);
     });
 });

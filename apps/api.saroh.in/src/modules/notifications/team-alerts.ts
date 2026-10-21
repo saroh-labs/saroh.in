@@ -23,6 +23,15 @@ export const TEAM_ALERT_TYPE = "team.alert";
  * - `order`: an order placed — paid online, or taken by the team.
  *   `actorUserId` is who took it, who isn't emailed about their own order.
  * - `failed`: a payment on an invoice's pay link that didn't go through.
+ * - `order-failed`: an order's online payment that didn't go through
+ *   (#1139), on the Payment failed row. Keyed to the payment intent.
+ * - `mismatch`: money captured at an amount or currency Saroh didn't ask
+ *   for (PAY-06, #1139), on an order or an invoice, with both figures.
+ *   Queued where the capture is recorded as owed back
+ *   (`recordCaptureMismatchInTx`), once per captured payment (`attemptId`);
+ *   on the Payment failed row.
+ * - `paid-by-link`: an order the team made, paid online by the customer
+ *   (#1139), on the New order row. Keyed to the payment intent.
  * - `team`: someone accepted an invitation and joined the team. Keyed to
  *   the invitation, so someone who leaves and is invited back is told of
  *   again.
@@ -76,6 +85,9 @@ export const TEAM_ALERT_TYPE = "team.alert";
 export type TeamAlertPayload =
     | { event: "order"; orderId: string; actorUserId?: string | null }
     | { event: "failed"; invoiceId: string; paymentIntentId: string }
+    | { event: "order-failed"; orderId: string; paymentIntentId: string }
+    | { event: "mismatch"; paymentIntentId: string; attemptId: string }
+    | { event: "paid-by-link"; orderId: string; paymentIntentId: string }
     | { event: "team"; userId: string; invitationId: string }
     | { event: "booking"; notificationId: string }
     | { event: "uncollected"; orderId: string }

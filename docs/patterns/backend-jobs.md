@@ -618,6 +618,23 @@ the Privacy Policy states both.
   read live (`home/home-uncollected.ts`), not from the alert. Known gap: a
   pay-on-handover order placed before this shipped has no alert queued;
   Home still shows it.
+- **Money alerts** (#1139, DEC-174, `notifications/money-alerts.ts`):
+  an order's online payment that didn't go through (`order-failed`, queued
+  by the webhook's `applyFailure` once per attempt that failed, never for a
+  site checkout not yet paid; `order.payment_failed`), and money captured at
+  an amount Saroh didn't ask for (`mismatch`, queued by
+  `recordCaptureMismatchInTx` with the owed-back record, so the webhook, a
+  look-up and an autopay charge all tell it once; both figures;
+  `payment.mismatch` on an order, `payment.mismatch.invoice` on an invoice)
+  are on the Payment failed row. A team-made order paid online by the
+  customer (`paid-by-link`, queued by `applySuccess` when it moves to PAID;
+  `order.paid_by_link`) is on the New order row. Each re-reads first: paid,
+  cancelled, credited or refunded since says nothing, and a payment taken at
+  the wrong amount says only the mismatch, never "didn't go through" as
+  well. Keyed `team:<event>:<paymentIntentId>` (a mismatch adds the
+  captured payment's attempt). A failed pay-link payment never says "the
+  same link": a link is shown once (DEC-110), so the words say a new one is
+  needed and where to share it.
 
 ## Scheduled go-live — **Current** (DEC-071, T10)
 

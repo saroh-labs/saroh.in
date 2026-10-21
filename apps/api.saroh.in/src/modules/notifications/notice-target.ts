@@ -33,6 +33,13 @@ export const NOTICE_KINDS = {
     "booking.mine.moved": "booking",
     "booking.mine.cancelled": "booking",
     "payment.failed": "invoice",
+    // Money alerts (#1139): an order's payment that didn't go through, a
+    // capture at the wrong amount (on an order, or on an invoice), and a
+    // team-made order paid by its link.
+    "order.payment_failed": "order",
+    "payment.mismatch": "order",
+    "payment.mismatch.invoice": "invoice",
+    "order.paid_by_link": "order",
     "site.live": "site",
     "site.not_live": "site",
     "site.review.approved": "site",

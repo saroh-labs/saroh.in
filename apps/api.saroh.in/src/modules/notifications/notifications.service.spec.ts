@@ -363,7 +363,9 @@ describe("what each person sees of the inbox (F14)", () => {
         await new NotificationsService().unreadCount(ctx());
 
         const hidden = {
-            type: { notIn: ["order.new", "order.uncollected"] },
+            type: {
+                notIn: ["order.new", "order.uncollected", "order.paid_by_link"],
+            },
         };
         expect(findMany.mock.calls[0][0].where).toEqual(seenByAdmin(hidden));
         expect(count.mock.calls[0][0].where).toEqual({
@@ -396,12 +398,19 @@ describe("what each person sees of the inbox (F14)", () => {
             notIn: [
                 "order.new",
                 "order.uncollected",
+                // A team order paid by its link (#1139).
+                "order.paid_by_link",
                 "booking.new",
                 "booking.moved",
                 "booking.cancelled",
                 "payment.failed",
                 "provider.attention",
                 "provider.back",
+                // An order's payment failed, and money taken at the wrong
+                // amount (#1139).
+                "order.payment_failed",
+                "payment.mismatch",
+                "payment.mismatch.invoice",
                 "site.live",
                 "site.not_live",
                 "site.review.approved",

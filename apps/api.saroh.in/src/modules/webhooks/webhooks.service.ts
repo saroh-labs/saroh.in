@@ -732,6 +732,15 @@ export class WebhooksService {
                 reference:
                     event.providerPaymentRef ?? intent.providerIntentId ?? null,
             });
+            // An order the team made, paid by the customer online (#1139):
+            // the New order row's bell. A site order has its own alert.
+            if (placed && !placed.placedOnline) {
+                await enqueueTeamAlert(tx, intent.organizationId, {
+                    event: "paid-by-link",
+                    orderId,
+                    paymentIntentId: intent.id,
+                });
+            }
         } else if (intent.status !== "SUCCEEDED") {
             // A second payment on a paid order — an edit's difference —
             // settles the supplementary invoice that edit wrote, and its pay
@@ -839,7 +848,8 @@ export class WebhooksService {
         intent: IntentRow,
         orderId: string,
     ): Promise<{ applied: boolean }> {
-        let { applied } = await this.applyIntentFailure(tx, intent);
+        const failedNow = (await this.applyIntentFailure(tx, intent)).applied;
+        let applied = failedNow;
         // Move Order UNPAID→FAILED only. A stray failure after a capture (PAID)
         // is IGNORED rather than forced through an illegal transition.
         const order = await tx.order.findUnique({
@@ -856,6 +866,16 @@ export class WebhooksService {
         if (order?.paymentStatus === "UNPAID" && !holdsOnPayment(order)) {
             const changed = await this.moveOrderPayment(tx, orderId, "FAILED");
             applied = applied || changed;
+        }
+        // The team hears an order's payment failed (#1139), once per
+        // attempt that actually failed. Not a site checkout's: until it is
+        // paid it is no order (G13). The alert re-reads it when it runs.
+        if (failedNow && order && !holdsOnPayment(order)) {
+            await enqueueTeamAlert(tx, intent.organizationId, {
+                event: "order-failed",
+                orderId,
+                paymentIntentId: intent.id,
+            });
         }
         return { applied };
     }
@@ -904,7 +924,7 @@ export class WebhooksService {
 
     /**
      * A failed attempt moves the intent only. An invoice stays as it was —
-     * the customer can try again from the same link.
+     * the customer pays again from a new link (DEC-110: a link is shown once).
      */
     private async applyIntentFailure(
         tx: Tx,

@@ -110,11 +110,21 @@ export const ALERT_MODULE: Record<AlertEvent, string | null> = {
 /** The inbox notice types each row covers. */
 export const ALERT_NOTIFICATION_TYPES: Record<AlertEvent, readonly string[]> = {
     // R34: an order to pay on handover nobody came for in three days.
-    order: ["order.new", "order.uncollected"],
+    // #1139: a team-made order paid online by the customer (good news).
+    order: ["order.new", "order.uncollected", "order.paid_by_link"],
     booking: ["booking.new", "booking.moved", "booking.cancelled"],
     // UX-012: a provider that refused the business's keys, and (#555) one
     // that works again.
-    failed: ["payment.failed", "provider.attention", "provider.back"],
+    // #1139: an order's payment that didn't go through, and money captured
+    // at the wrong amount on an order or an invoice.
+    failed: [
+        "payment.failed",
+        "provider.attention",
+        "provider.back",
+        "order.payment_failed",
+        "payment.mismatch",
+        "payment.mismatch.invoice",
+    ],
     team: ["team.joined"],
     // UX-043: a reviewer's verdict, or their first note of a round.
     // #917: a live custom domain that stopped working, and came back.
