@@ -432,6 +432,7 @@ model Organization {
   // Which automatic customer notices it has turned off or on, where that
   // differs from the default in code (DEC-174, U1 #1132).
   customerNoticeSettings   CustomerNoticeSetting[]
+  overdueReminderTiming    OverdueReminderTiming?
   // "Tell me when it's back" (DEC-174 U23).
   stockWatches             StockWatch[]
   // Places in line for full classes (round-2 A12).
@@ -7891,6 +7892,32 @@ model CustomerNoticeSetting {
   updatedAt DateTime @updatedAt
 
   @@unique([organizationId, kind])
+}
+
+// When the business's overdue reminders go (DEC-178, #1169): the days after
+// the due date for the first and the second, and the hours of the day they
+// may go in, in the business's time zone. One row per business, kept only
+// while it differs from the defaults in code
+// (`communications/overdue-timing.ts`: days 3 and 10, 9:00 to 20:00), so a
+// business that never chose has none. Kept apart from the switch's row, so
+// turning reminders off and on again keeps the timing.
+model OverdueReminderTiming {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Whole days after the due date: 1..30, and the second after the first.
+  firstDay  Int
+  secondDay Int
+  // Hours of the day: from 0..23, until 1..24 and after from.
+  fromHour  Int
+  untilHour Int
+
+  // Who made the choice. Informational, no FK: the choice outlives them.
+  updatedByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ============================================================================

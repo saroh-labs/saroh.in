@@ -1,4 +1,7 @@
-import { customerEmailLabel } from "@/lib/communications/customer-emails";
+import {
+    customerEmailLabel,
+    overdueTimingChange,
+} from "@/lib/communications/customer-emails";
 import { formatNumber } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
 import { ALERT_CHANNELS, ALERTS } from "@/lib/notifications/preferences";
@@ -242,6 +245,13 @@ function alertWhat(meta: Record<string, unknown>): string {
  */
 function customerEmailWhat(meta: Record<string, unknown>): string {
     const label = customerEmailLabel(meta.kind);
+    if (
+        label &&
+        recordedChanges(meta)?.some((c) => overdueTimingChange(c) !== null)
+    ) {
+        // When overdue reminders go (DEC-178, #1169).
+        return `changed when ${label} go`;
+    }
     const after = recordedChanges(meta)?.find(
         (c) => c.field === "noticeOn",
     )?.after;

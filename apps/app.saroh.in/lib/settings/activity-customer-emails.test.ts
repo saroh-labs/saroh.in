@@ -79,3 +79,35 @@ describe("a customer email turned on or off", () => {
         ]);
     });
 });
+
+describe("when overdue reminders go, changed (DEC-178, #1169)", () => {
+    const retimed = event({
+        kind: "OVERDUE_REMINDERS",
+        changes: [
+            { field: "firstReminderDay", before: 3, after: 5 },
+            { field: "remindUntilHour", before: 20, after: 18 },
+        ],
+    });
+
+    it("says what was changed, and opens Providers", () => {
+        expect(activityLine(retimed)).toMatchObject({
+            what: "changed when Overdue reminders go",
+            where: { label: "Providers", href: "/settings/providers" },
+        });
+    });
+
+    it("its sheet says each change in words", () => {
+        expect(activityDetail(retimed, "Asia/Kolkata").changes).toEqual([
+            {
+                label: "Overdue reminders, first reminder",
+                before: "3 days after it's due",
+                after: "5 days after it's due",
+            },
+            {
+                label: "Overdue reminders, until",
+                before: "8 pm",
+                after: "6 pm",
+            },
+        ]);
+    });
+});

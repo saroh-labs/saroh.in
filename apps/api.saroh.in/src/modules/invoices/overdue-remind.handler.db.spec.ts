@@ -8,7 +8,9 @@
  * a WhatsApp share in the last day moves the automatic one to a later run,
  * and it isn't counted. Paid, voided or credited (even between the read
  * and the send), an order's invoice, no provider, or outside 9 am to 8 pm:
- * nothing.
+ * nothing. With the business's own days and hours (DEC-178, #1169), the
+ * same, on its days and in its hours, each reminder still catching up
+ * inside its own window.
  *
  * Runs in the integration project, plain and under `TEST_RLS=on`. Only the
  * app env is stubbed (for the credential key and the renderer).
@@ -51,6 +53,12 @@ async function business(
         on?: boolean | null;
         email?: boolean;
         zone?: string;
+        timing?: {
+            firstDay: number;
+            secondDay: number;
+            fromHour: number;
+            untilHour: number;
+        };
     } = {},
 ): Promise<OrganizationContext> {
     const org = await prisma.organization.create({
@@ -68,6 +76,11 @@ async function business(
             provider: "RESEND",
             fromAddress: "hello@rye.example",
             credentials: { apiKey: "re_test_key" },
+        });
+    }
+    if (opts.timing) {
+        await prisma.overdueReminderTiming.create({
+            data: { organizationId: org.id, ...opts.timing },
         });
     }
     const on = opts.on === undefined ? true : opts.on;
@@ -421,6 +434,112 @@ describe("nothing is sent", () => {
             ).toBe(0);
         }
         expect(await reminders(id)).toHaveLength(0);
+    });
+});
+
+describe("the business's own days and hours (DEC-178, #1169)", () => {
+    // Reminders on days 5 and 8, from 10 am to 6 pm.
+    const timing = { firstDay: 5, secondDay: 8, fromHour: 10, untilHour: 18 };
+
+    it("reminds on its own days and never on the default ones", async () => {
+        const rye = await business({ timing });
+        const id = await owed(rye, dueDaysBefore(3));
+        const org = rye.organizationId;
+
+        // Days 3 and 4: the default day, but not this business's.
+        expect((await sweep.runBusiness(org, NOW)).size).toBe(0);
+        expect((await sweep.runBusiness(org, later(1))).size).toBe(0);
+        // Day 5: the first.
+        expect((await sweep.runBusiness(org, later(2))).get(id)).toBe("SENT");
+        await aDayPasses(id);
+        // Days 6 and 7: nothing more.
+        expect((await sweep.runBusiness(org, later(4))).size).toBe(0);
+        // Day 8: the second, not day 10.
+        expect((await sweep.runBusiness(org, later(5))).get(id)).toBe("SENT");
+        await aDayPasses(id);
+        for (const day of [7, 9, 30]) {
+            expect((await sweep.runBusiness(org, later(day))).size).toBe(0);
+        }
+        expect(await reminders(id)).toHaveLength(2);
+        expect(await autoReminded(id)).toHaveLength(2);
+    });
+
+    it("a first reminder held up by the one-a-day rule still goes before the second's day", async () => {
+        const rye = await business({ timing });
+        const id = await owed(rye, dueDaysBefore(5));
+        const org = rye.organizationId;
+        await sending.remind(rye, id);
+        expect((await sweep.runBusiness(org, NOW)).get(id)).toBe("WAIT");
+        await aDayPasses(id);
+        // Day 6: the held first goes.
+        expect((await sweep.runBusiness(org, later(1))).get(id)).toBe("SENT");
+        expect(
+            await prisma.customerNotice.count({
+                where: { eventKey: `invoice-overdue:${id}:1` },
+            }),
+        ).toBe(1);
+    });
+
+    it("turned on late: the reminder whose window it is goes, and the first's window ends where the second's starts", async () => {
+        const rye = await business({ timing });
+        const seven = await owed(rye, dueDaysBefore(7));
+        const eight = await owed(rye, dueDaysBefore(8));
+        const fourteen = await owed(rye, dueDaysBefore(14));
+        const fifteen = await owed(rye, dueDaysBefore(15));
+        const out = await sweep.runBusiness(rye.organizationId, NOW);
+        expect(out.get(seven)).toBe("SENT");
+        expect(out.get(eight)).toBe("SENT");
+        expect(out.get(fourteen)).toBe("SENT");
+        expect(out.has(fifteen)).toBe(false);
+        expect(
+            await prisma.customerNotice.findMany({
+                where: { organizationId: rye.organizationId },
+                select: { eventKey: true },
+                orderBy: { eventKey: "asc" },
+            }),
+        ).toEqual(
+            [
+                `invoice-overdue:${eight}:2`,
+                `invoice-overdue:${fourteen}:2`,
+                `invoice-overdue:${seven}:1`,
+            ]
+                .sort()
+                .map((eventKey) => ({ eventKey })),
+        );
+    });
+
+    it("only inside its own hours, in its time zone", async () => {
+        const rye = await business({
+            timing: { ...timing, fromHour: 13, untilHour: 15 },
+        });
+        const id = await owed(rye, dueDaysBefore(5));
+        const org = rye.organizationId;
+        // 12:00 in India: the default hours, not this business's.
+        expect((await sweep.runBusiness(org, NOW)).size).toBe(0);
+        // 15:00 in India: just after.
+        expect(
+            (await sweep.runBusiness(org, new Date("2026-10-21T09:30:00.000Z")))
+                .size,
+        ).toBe(0);
+        // 13:30 in India.
+        expect(
+            (
+                await sweep.runBusiness(
+                    org,
+                    new Date("2026-10-21T08:00:00.000Z"),
+                )
+            ).get(id),
+        ).toBe("SENT");
+    });
+
+    it("the whole sweep reads each business's own timing", async () => {
+        const mine = await business({ timing });
+        const plain = await business();
+        const a = await owed(mine, dueDaysBefore(3));
+        const b = await owed(plain, dueDaysBefore(3));
+        await sweep.sweep(NOW);
+        expect(await reminders(a)).toHaveLength(0);
+        expect(await reminders(b)).toHaveLength(1);
     });
 });
 

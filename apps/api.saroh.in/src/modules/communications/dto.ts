@@ -2,14 +2,21 @@ import { Transform } from "class-transformer";
 import {
     IsBoolean,
     IsIn,
+    IsInt,
     IsObject,
     IsOptional,
     IsString,
+    Max,
     MaxLength,
+    Min,
     MinLength,
 } from "class-validator";
 
 import { NOTICE_KINDS } from "./notice-settings";
+import {
+    OVERDUE_FIRST_DAY_MAX,
+    OVERDUE_SECOND_DAY_MAX,
+} from "./overdue-timing";
 import { COMMS_CHANNELS } from "./providers/provider.port";
 
 const trim = ({ value }: { value: unknown }) =>
@@ -154,4 +161,37 @@ export class SetNoticeSettingDto {
 
     @IsBoolean({ message: "Choose on or off" })
     on!: boolean;
+}
+
+/**
+ * When overdue reminders go (DEC-178, #1169): all four numbers, whole.
+ * Each is checked alone here; together (the second after the first, the
+ * end after the start) in `overdueTimingProblem`, in words.
+ */
+export class SetOverdueTimingDto {
+    @IsInt({ message: "Choose a day for the first reminder" })
+    @Min(1, {
+        message: "The first reminder goes at least 1 day after the due date",
+    })
+    @Max(OVERDUE_FIRST_DAY_MAX, {
+        message: `The first reminder goes at most ${OVERDUE_FIRST_DAY_MAX} days after the due date`,
+    })
+    firstDay!: number;
+
+    @IsInt({ message: "Choose a day for the second reminder" })
+    @Min(2, { message: "The second reminder goes after the first" })
+    @Max(OVERDUE_SECOND_DAY_MAX, {
+        message: `The second reminder goes at most ${OVERDUE_SECOND_DAY_MAX} days after the due date`,
+    })
+    secondDay!: number;
+
+    @IsInt({ message: "Choose when reminders start" })
+    @Min(0, { message: "Choose when reminders start" })
+    @Max(23, { message: "Choose when reminders start" })
+    fromHour!: number;
+
+    @IsInt({ message: "Choose when reminders stop" })
+    @Min(1, { message: "Choose when reminders stop" })
+    @Max(24, { message: "Choose when reminders stop" })
+    untilHour!: number;
 }
