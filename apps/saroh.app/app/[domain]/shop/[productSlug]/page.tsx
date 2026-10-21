@@ -5,6 +5,7 @@ import type { SignInOptions } from "@saroh/site-blocks";
 import {
     AddToBag,
     AskAboutOrdering,
+    BackInStock,
     LookAddToBag,
     lookOf,
     NotTakingOrders,
@@ -35,6 +36,7 @@ import { shareable } from "@/lib/test-metadata";
 import PostPage, {
     generateMetadata as postMetadata,
 } from "../../[slug]/[postSlug]/page";
+import { backInStockOffer, stopWaiting, watchBackInStock } from "../actions";
 
 /**
  * One product on a merchant's site (round-2 G11): `/shop/<product>`, drawn
@@ -145,36 +147,65 @@ export default async function ShopProductPage({
     // Folio, Quiet or Live (DEC-172, U11): the look's Add to bag and its
     // − 1 + stepper; absent, Classic's.
     const look = lookOf(resolved.snapshot.site.look);
+    // "Tell me when it's back" (DEC-174, U24, #1155): drawn only for a
+    // sold-out option the API says it may be offered for, asked in the
+    // browser, so the cached page holds nothing of it.
+    const tellMe = product.productId ? (
+        <BackInStock
+            api={{
+                offer: backInStockOffer,
+                watch: watchBackInStock,
+                stop: stopWaiting,
+            }}
+            productId={product.productId}
+            business={business}
+            look={look}
+        />
+    ) : null;
     const action =
         checkout?.canOrder && product.listingId ? (
             look ? (
-                <LookAddToBag
-                    look={look}
-                    site={resolved.siteId}
-                    listingId={product.listingId}
-                    askHref={enquiryPagePath(resolved.snapshot)}
-                />
+                <>
+                    {/* The form leads; "Ask about it" and the way back
+                        follow it. */}
+                    {tellMe}
+                    <LookAddToBag
+                        look={look}
+                        site={resolved.siteId}
+                        listingId={product.listingId}
+                        askHref={enquiryPagePath(resolved.snapshot)}
+                    />
+                </>
             ) : (
-                <AddToBag
-                    site={resolved.siteId}
-                    listingId={product.listingId}
-                />
+                <>
+                    {/* "Sold out" on the button, then the form under it. */}
+                    <AddToBag
+                        site={resolved.siteId}
+                        listingId={product.listingId}
+                    />
+                    {tellMe}
+                </>
             )
         ) : checkout?.notTakingOrders ? (
             // Stopped taking orders for now (#800): nothing to ask about.
             <NotTakingOrders />
         ) : (
-            <AskAboutOrdering
-                enquiryHref={enquiryPagePath(resolved.snapshot)}
-                phone={
-                    (
-                        await getSignInOptions().catch(
-                            (): SignInOptions | null => null,
-                        )
-                    )?.phone ?? null
-                }
-                businessName={business}
-            />
+            <>
+                <AskAboutOrdering
+                    enquiryHref={enquiryPagePath(resolved.snapshot)}
+                    phone={
+                        (
+                            await getSignInOptions().catch(
+                                (): SignInOptions | null => null,
+                            )
+                        )?.phone ?? null
+                    }
+                    businessName={business}
+                />
+                {/* Sold out where orders are taken by asking: still worth
+                    an email when it's back. */}
+                {tellMe}
+            </>
         );
     // The page's own width, as the header's and every block's: at a desk
     // the product sits under the menu rather than across the whole screen.

@@ -69,6 +69,7 @@ const READS = new Set([
     "packPayment",
     "planJoinStanding",
     "readAutopay",
+    "backInStockOffer",
 ]);
 
 const LINE = { listingId: "lst_1", variantId: null, quantity: 1 };
@@ -79,6 +80,13 @@ const KEY = "key_1";
 const WRITES: Record<string, () => Promise<unknown>> = {
     startCheckout: () =>
         shop.startCheckout({ lines: [LINE], fulfilment: "PICKUP", key: KEY }),
+    watchBackInStock: () =>
+        shop.watchBackInStock({
+            productId: "prd_1",
+            variantId: null,
+            email: "asha@example.com",
+        }),
+    stopWaiting: () => shop.stopWaiting("v1.watch1abc.sig"),
     bookSignedIn: () =>
         book.bookSignedIn({
             serviceId: "svc_1",

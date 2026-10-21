@@ -175,9 +175,12 @@ export class StockWatchService {
                 variantId,
             });
             if (why !== null) {
+                // `details` is what the exception filter sends on: a bare
+                // `reason` beside the message never reached the site (U24).
                 throw new ConflictException({
                     message: WATCH_REFUSAL_WORDS[why],
                     reason: why,
+                    details: { reason: why },
                 });
             }
             const open = {

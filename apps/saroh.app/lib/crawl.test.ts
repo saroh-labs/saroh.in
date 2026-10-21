@@ -100,6 +100,7 @@ describe("robotsTxt", () => {
             "/shop/order",
             "/pay",
             "/book/claim",
+            "/shop/stop-waiting",
         ]) {
             expect(text).toContain(`Disallow: ${path}\n`);
         }
@@ -145,5 +146,11 @@ describe("isPrivateSitePath", () => {
         expect(isPrivateSitePath("/book/claim/v1.cl1.1.sig")).toBe(true);
         expect(isPrivateSitePath("/book")).toBe(false);
         expect(isPrivateSitePath("/book/classes")).toBe(false);
+        // "Stop waiting" for a product (#1155), never the shop itself.
+        expect(isPrivateSitePath("/shop/stop-waiting/v1.watch1abc.sig")).toBe(
+            true,
+        );
+        expect(isPrivateSitePath("/shop")).toBe(false);
+        expect(isPrivateSitePath("/shop/linen-shirt")).toBe(false);
     });
 });

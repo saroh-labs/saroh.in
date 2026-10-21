@@ -8,6 +8,10 @@
  * customer's held place, and its token is the link: never kept, never
  * crawled, while `/book` itself stays public.
  *
+ * "Stop waiting" for a product to be back (`/shop/stop-waiting/<token>`,
+ * #1155) is one visitor's watch, and its token is the way to stop it:
+ * never kept, never crawled, while `/shop` stays public.
+ *
  * `/q` is here too: a QR code's short link (`/q/<code>`) is not a page at
  * all. It counts a scan and forwards, so a crawler following it would add
  * scans nobody made, and it must never be kept by the page cache.
@@ -22,6 +26,7 @@ export const PRIVATE_PATH_PREFIXES = [
     "/shop/order",
     "/pay",
     "/book/claim",
+    "/shop/stop-waiting",
     "/q",
 ] as const;
 

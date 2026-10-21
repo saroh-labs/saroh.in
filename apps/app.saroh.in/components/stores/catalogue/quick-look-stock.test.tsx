@@ -17,7 +17,13 @@ import { StockBlock, waitingOrdersHref } from "./quick-look-stock";
  * each can be told — and only for someone who can open them.
  */
 
-vi.mock("@/lib/products/list-actions", () => ({ addQuickStock: vi.fn() }));
+const waitingRead = vi.hoisted((): { answer: unknown } => ({
+    answer: null,
+}));
+vi.mock("@/lib/products/list-actions", () => ({
+    addQuickStock: vi.fn(),
+    loadWaitingCount: vi.fn(() => Promise.resolve(waitingRead.answer)),
+}));
 vi.mock("@saroh/ui/toast", () => ({
     showError: vi.fn(),
     showSuccess: vi.fn(),
@@ -62,6 +68,7 @@ let root: Root;
 let host: HTMLDivElement;
 
 beforeEach(() => {
+    waitingRead.answer = null;
     (
         globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -129,5 +136,62 @@ describe("waitingOrdersHref", () => {
         expect(waitingOrdersHref("loaf", null)).toBe(
             "/commerce/orders?tab=open&product=loaf",
         );
+    });
+});
+
+/**
+ * "3 people waiting for it" (DEC-174, U24, #1155): customers who asked the
+ * site to tell them when it's back. Shown only when someone waits; a count
+ * that couldn't be read is left out, never shown as none.
+ */
+describe("who waits for it to be back (U24)", () => {
+    async function settle() {
+        await act(async () => {
+            await Promise.resolve();
+        });
+    }
+
+    it("says how many wait", async () => {
+        waitingRead.answer = {
+            productId: "loaf",
+            waiting: 3,
+            byOption: [{ variantId: null, waiting: 3 }],
+        };
+        render(true, true);
+        await settle();
+        expect(host.textContent).toMatch(/3 people waiting for it/);
+    });
+
+    it("says one person in the singular", async () => {
+        waitingRead.answer = {
+            productId: "loaf",
+            waiting: 1,
+            byOption: [{ variantId: null, waiting: 1 }],
+        };
+        render(true, true);
+        await settle();
+        expect(host.textContent).toMatch(/1 person waiting for it/);
+    });
+
+    it("says nothing when nobody waits, or the count can't be read", async () => {
+        waitingRead.answer = { productId: "loaf", waiting: 0, byOption: [] };
+        render(true, true);
+        await settle();
+        expect(host.querySelector("[data-waiting-line]")).toBeNull();
+        waitingRead.answer = null;
+        render(true, true);
+        await settle();
+        expect(host.querySelector("[data-waiting-line]")).toBeNull();
+    });
+
+    it("never shows another product's count", async () => {
+        waitingRead.answer = {
+            productId: "other",
+            waiting: 4,
+            byOption: [{ variantId: null, waiting: 4 }],
+        };
+        render(true, true);
+        await settle();
+        expect(host.querySelector("[data-waiting-line]")).toBeNull();
     });
 });

@@ -246,12 +246,38 @@ export type {
 export { AskAboutOrdering, askAboutHref } from "./shop/ask-about-ordering";
 export { ShopBag } from "./shop/bag";
 export { LookAddToBag } from "./shop/look-add-to-bag";
+// "Tell me when it's back" and its stop page (DEC-174, U24, #1155).
+export { BackInStock } from "./shop/back-in-stock";
+export {
+    REFUSAL_WORDS,
+    WATCH_WORDS,
+    cleanWatchEmail,
+    consentLine,
+    isWatchOffer,
+    isWatchTaken,
+    isWatchView,
+    stopWaitingWords,
+    waitingLine,
+    watchProblemOf,
+    watchResultOf,
+} from "./shop/back-in-stock-shape";
+export type {
+    BackInStockApi,
+    WatchOffer,
+    WatchProblem,
+    WatchRefusal,
+    WatchResult,
+    WatchState,
+    WatchTaken,
+    WatchView,
+} from "./shop/back-in-stock-shape";
 export { LookCheckout } from "./shop/look-checkout";
 export { LookOrderPlaced } from "./shop/look-placed";
 export {
     NOT_TAKING_ORDERS_TEXT,
     NotTakingOrders,
 } from "./shop/not-taking-orders";
+export { StopWaitingPage } from "./shop/stop-waiting-page";
 // The order confirmation page after a shop payment (P4).
 export type { ShopBagProps } from "./shop/bag";
 export type { BagItem } from "./shop/bag-store";

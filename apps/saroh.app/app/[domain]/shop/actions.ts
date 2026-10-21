@@ -8,8 +8,21 @@ import type {
     CheckoutStarted,
     DeliveryAddress,
     ShopResult,
+    WatchOffer,
+    WatchResult,
+    WatchTaken,
+    WatchView,
 } from "@saroh/site-blocks";
-import { TEST_RELEASE_MESSAGE, TEST_RELEASE_REASON } from "@saroh/site-blocks";
+import {
+    cleanWatchEmail,
+    isWatchOffer,
+    isWatchTaken,
+    isWatchView,
+    TEST_RELEASE_MESSAGE,
+    TEST_RELEASE_REASON,
+    WATCH_WORDS,
+    watchResultOf,
+} from "@saroh/site-blocks";
 
 import { accountSitesFetch, sitesFetch } from "@/lib/customer-session";
 import { servedHost, siteOrigin } from "@/lib/origin";
@@ -159,4 +172,132 @@ export async function savedDeliveryAddress(): Promise<
     if (!call.res.ok) return TROUBLE;
     const answer = savedAddressOf(await call.res.json().catch(() => null));
     return answer ? { ok: true, data: answer.address } : TROUBLE;
+}
+
+// ── "Tell me when it's back" (DEC-174, U24, #1155) ─────────────────────────
+
+const WATCH_TROUBLE = {
+    ok: false as const,
+    reason: "error" as const,
+    message: WATCH_WORDS.error,
+};
+const WATCH_OFFLINE = {
+    ok: false as const,
+    reason: "error" as const,
+    message: WATCH_WORDS.offline,
+};
+const WATCH_TEST = {
+    ok: false as const,
+    reason: TEST_RELEASE_REASON as typeof TEST_RELEASE_REASON,
+    message: TEST_RELEASE_MESSAGE,
+};
+/** A product or option id as the API makes them: never a path. */
+const WATCH_ID = /^[A-Za-z0-9_-]{1,40}$/;
+/** A stop token (`v1.<id>.<sig>`), checked by shape only: the API verifies it. */
+const WATCH_TOKEN = /^[A-Za-z0-9._-]{1,120}$/;
+
+function watchIds(
+    productId: unknown,
+    variantId: unknown,
+): { productId: string; variantId: string | null } | null {
+    if (typeof productId !== "string" || !WATCH_ID.test(productId)) {
+        return null;
+    }
+    if (variantId === null || variantId === undefined) {
+        return { productId, variantId: null };
+    }
+    return typeof variantId === "string" && WATCH_ID.test(variantId)
+        ? { productId, variantId }
+        : null;
+}
+
+/**
+ * Whether the product page offers "Tell me" for the option on screen: read
+ * in the browser, never cached, so a switch turned off or a count put
+ * right shows at the next read. Any failure reads as not offered.
+ */
+export async function backInStockOffer(
+    productId: unknown,
+    variantId: unknown,
+): Promise<WatchResult<WatchOffer>> {
+    if (!(await siteOrigin())) return WATCH_TROUBLE;
+    const ids = watchIds(productId, variantId);
+    if (!ids) return WATCH_TROUBLE;
+    const siteId = await hostSiteId();
+    if (!siteId) return WATCH_TROUBLE;
+    const q = ids.variantId
+        ? `?variantId=${encodeURIComponent(ids.variantId)}`
+        : "";
+    const call = await sitesFetch(
+        `${encodeURIComponent(siteId)}/products/${encodeURIComponent(ids.productId)}/watch${q}`,
+    );
+    if (!call.ok) return WATCH_OFFLINE;
+    return watchResultOf(
+        call.res.status,
+        await call.res.json().catch(() => null),
+        isWatchOffer,
+    );
+}
+
+/**
+ * "Tell me when it's back": the address, for the option chosen. The press
+ * is the opt-in, with the consent line beside the button, so it is sent
+ * as `consent: true`. Refused on a test release before anything is sent.
+ */
+export async function watchBackInStock(
+    request: unknown,
+): Promise<WatchResult<WatchTaken>> {
+    if (!(await siteOrigin())) return WATCH_TROUBLE;
+    if (await testMode()) return WATCH_TEST;
+    const r =
+        typeof request === "object" && request !== null
+            ? (request as Record<string, unknown>)
+            : {};
+    const ids = watchIds(r.productId, r.variantId);
+    if (!ids) return WATCH_TROUBLE;
+    const email = cleanWatchEmail(r.email);
+    if (!email) {
+        return { ok: false, reason: "invalid", message: WATCH_WORDS.invalid };
+    }
+    const siteId = await hostSiteId();
+    if (!siteId) return WATCH_TROUBLE;
+    const body: Record<string, unknown> = { email, consent: true };
+    if (ids.variantId) body.variantId = ids.variantId;
+    const call = await sitesFetch(
+        `${encodeURIComponent(siteId)}/products/${encodeURIComponent(ids.productId)}/watch`,
+        { method: "POST", body },
+    );
+    if (!call.ok) return WATCH_OFFLINE;
+    return watchResultOf(
+        call.res.status,
+        await call.res.json().catch(() => null),
+        isWatchTaken,
+    );
+}
+
+/**
+ * "Stop waiting", from the product page right after "Tell me" or from the
+ * stop page (`/shop/stop-waiting/<token>`). A press, never a link that
+ * stops on opening. Refused on a test release before anything is sent.
+ */
+export async function stopWaiting(
+    token: unknown,
+): Promise<WatchResult<WatchView>> {
+    if (!(await siteOrigin())) return WATCH_TROUBLE;
+    if (await testMode()) return WATCH_TEST;
+    if (typeof token !== "string" || !WATCH_TOKEN.test(token)) {
+        return WATCH_TROUBLE;
+    }
+    const siteId = await hostSiteId();
+    if (!siteId) return WATCH_TROUBLE;
+    const call = await sitesFetch(
+        `${encodeURIComponent(siteId)}/stock-watch/${encodeURIComponent(token)}/stop`,
+        { method: "POST" },
+    );
+    if (!call.ok) return WATCH_OFFLINE;
+    return watchResultOf(
+        call.res.status,
+        await call.res.json().catch(() => null),
+        isWatchView,
+    );
 }

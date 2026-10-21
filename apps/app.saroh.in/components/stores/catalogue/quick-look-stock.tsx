@@ -6,11 +6,11 @@ import { cn } from "@saroh/ui/lib/utils";
 import { OptionSelect } from "@saroh/ui/option-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
-import { useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import type { CatalogueRow } from "@/lib/products/catalogue";
 import { stockWords } from "@/lib/products/catalogue";
-import { addQuickStock } from "@/lib/products/list-actions";
+import { addQuickStock, loadWaitingCount } from "@/lib/products/list-actions";
 import type { NeedDetail } from "@/lib/products/needs-you";
 import { optionWord } from "@/lib/products/needs-you";
 import type { QuickShelf } from "@/lib/products/quick-look";
@@ -27,6 +27,9 @@ import {
     storefrontsLine,
 } from "@/lib/products/quick-look";
 import { addedWords } from "@/lib/stock/levels";
+import type { WaitingCount } from "@/lib/stock/waiting";
+
+import { WaitingLine } from "@/components/commerce/stock/waiting-line";
 
 import { runAction } from "@/lib/api/run-action";
 import { Label } from "@saroh/ui/label";
@@ -89,6 +92,7 @@ export function StockBlock({
         (needed ?? where.at(0))?.storeId ?? null,
     );
     const across = storeId ? null : storefrontsLine(row);
+    const waiting = useWaitingCount(row.id);
     const words = stockWords(row, need);
     const lineTone = stock.tracked
         ? shelfTone({
@@ -130,6 +134,15 @@ export function StockBlock({
                     {across}
                 </p>
             ) : null}
+            {/* "3 people waiting for it" (U24): customers who asked the
+                site to tell them when it's back. */}
+            <WaitingLine
+                count={waiting}
+                titleOf={(id) =>
+                    row.variants.find((v) => v.id === id)?.title ?? null
+                }
+                className="pl-[98px]"
+            />
             {stock.total.short > 0 ? (
                 <Notice tone="error">
                     <strong>{shortTitle(stock.total.short)}</strong>{" "}
@@ -221,6 +234,26 @@ export function StockBlock({
             ) : null}
         </div>
     );
+}
+
+/**
+ * Who waits for it to be back, read when the quick look opens on it. Null
+ * until it is read, and when it can't be: the line is left out.
+ */
+function useWaitingCount(productId: string): WaitingCount | null {
+    const [count, setCount] = useState<WaitingCount | null>(null);
+    useEffect(() => {
+        let live = true;
+        loadWaitingCount(productId)
+            .then((c) => {
+                if (live) setCount(c);
+            })
+            .catch(() => undefined);
+        return () => {
+            live = false;
+        };
+    }, [productId]);
+    return count?.productId === productId ? count : null;
 }
 
 function ShelfRow({

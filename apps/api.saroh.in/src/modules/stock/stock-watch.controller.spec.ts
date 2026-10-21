@@ -112,8 +112,9 @@ describe("when Tell me is offered (U23)", () => {
                 "v",
             );
             await expect(refused).rejects.toBeInstanceOf(ConflictException);
+            // `details` is what reaches the site through the filter (U24).
             await expect(refused).rejects.toMatchObject({
-                response: { reason: why },
+                response: { reason: why, details: { reason: why } },
             });
             expect(stockWatch.createManyAndReturn).not.toHaveBeenCalled();
         },

@@ -492,6 +492,15 @@ the Privacy Policy states both.
   BACK_IN_STOCK per watch (`back-in-stock:<watchId>`), re-queuing for the
   rest. Email only, to the watch's own address (`STOCK_WATCH` recipient),
   through the business's own provider, behind the BACK_IN_STOCK switch.
+  The site side (U24, #1155): the product page asks whether "Tell me" is
+  offered for the option on screen in the browser, through a server
+  action (`backInStockOffer`), never on the server, so the cached page
+  holds nothing of it and a switch or count change needs no purge. A
+  refusal's reason travels as `details.reason`. Stopping is the private
+  page `/shop/stop-waiting/<token>` with a button (never a GET that
+  stops), or "Stop waiting" right after "Tell me". The workspace shows
+  the count only ("3 people waiting for it") on the product's Stock tab
+  and the quick look.
 - **Every cancel says what happened to the money** (DEC-174 U13, #1144,
   `notices/cancel-money.ts`): one `CancelMoney` and one set of words for a
   booking's BOOKING_CANCELLED (either side), a class the business

@@ -36,7 +36,8 @@ import { SHOP_LABEL, shopLink, shopOutline, shopPrimary } from "./look-shop";
  *   page's own button is off screen, and hides whenever a sheet is open
  *   (the bag): one fixed bar at a time.
  * - Sold out: "Sold out", "Ask about it" where the site has a way to ask,
- *   and the way back to the shop. No bar, no date, no notify list.
+ *   and the way back to the shop. No bar and no date. "Tell me when it's
+ *   back" (U24, #1155) is its own block above these, `BackInStock`.
  */
 export function LookAddToBag({
     look,
