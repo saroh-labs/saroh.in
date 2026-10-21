@@ -429,6 +429,9 @@ jest.mock("@saroh/database", () => {
                 Promise.resolve({ _sum: { putBackQuantity: 0 } }),
             ),
         },
+        // Back in stock (U23): stock put back looks for anyone waiting;
+        // nobody is here (`back-in-stock.handler.db.spec.ts` has the rest).
+        stockWatch: { findFirst: jest.fn(() => Promise.resolve(null)) },
         // The stock log (#513): what the order flows wrote to it.
         stockEntry: {
             aggregate: jest.fn(() =>
