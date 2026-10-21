@@ -513,8 +513,10 @@ organizations/:org/customers`: everyone who has paid (an order through a
   billing, the waitlist, alerts to a business's own team (enquiries, and
   the team alerts — new order, booking, failed payment, someone joining, a
   go-live, a custom domain that stopped working (#917) — for every business, provider or not, in fixed words with the
-  business's names cleaned; built, #849), a site's customer sign-in codes and the email-changed notice
-  with Saroh's built-in customer accounts (ADR-011), and a template test
+  business's names cleaned; built, #849), a site's customer sign-in codes, the email-changed notice
+  and the "Ask to remove my data" acknowledgement and its done or closed email
+  with Saroh's built-in customer accounts (ADR-011; DEC-172, #1106), all under one footer that names
+  them (`siteAccountEmailFooter`, #1156), and a template test
   sent to the signed-in user's own verified address. A business that brings
   its own login system sends its own codes (not built). With no email
   provider, owners and admins who can act are asked to connect one — "Your
@@ -529,7 +531,9 @@ organizations/:org/customers`: everyone who has paid (an order through a
   customer's own order, booking or invoice goes into their account on the
   business's site, unless the business has turned those updates off (below).
   It goes out by email, SMS or WhatsApp only through the business's connected
-  provider. Saroh's own email sends a site's sign-in codes and nothing else.
+  provider. Saroh's own email sends a site's sign-in codes and notices about
+  the customer's own account there (a changed email, a request to remove
+  their data), and nothing else.
   Until those messages ship, the honest copy ("Saroh doesn't send this") stays.
   Invoices went first (D17): see Money above.
 - **Current** (round-2 A14) — A booking confirmed, moved or cancelled, and

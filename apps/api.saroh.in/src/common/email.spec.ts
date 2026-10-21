@@ -1,7 +1,11 @@
+import { dataRequestEmail } from "../modules/site-accounts/data-request-emails";
+import { siteAccountEmailFooter } from "../modules/site-accounts/sender-name";
 import {
     SIGN_IN_CODE_SUBJECT,
+    siteCodeEmail,
     siteCodesSmtpSecure,
     siteCodesTransportOptions,
+    siteEmailChangedEmail,
     verificationOtpEmail,
 } from "./email";
 
@@ -104,5 +108,49 @@ describe("siteCodesTransportOptions", () => {
             auth: { user: "codes-user", pass: "codes-pass" },
             pool: true,
         });
+    });
+});
+
+/**
+ * The footer of every email from a site's sign-in code sender (#1156,
+ * DEC-011 as amended by DEC-172). It names everything that address sends,
+ * so it stays true now the data-removal emails go from it too.
+ */
+describe("the site sign-in sender's footer", () => {
+    it("names sign-in codes, a changed email and a request to remove data", () => {
+        expect(siteAccountEmailFooter("Northwind")).toBe(
+            "Northwind's website runs on Saroh. This address sends only sign-in codes and notices about your account there: a changed email, or a request to remove your data.",
+        );
+    });
+
+    it("is the one footer on the code, email-changed and data-removal emails", () => {
+        const footer = siteAccountEmailFooter("Northwind");
+        const mails = [
+            siteCodeEmail("Northwind", "123456", 10),
+            siteEmailChangedEmail("Northwind"),
+            dataRequestEmail("received", "Northwind").html,
+            dataRequestEmail("done", "Northwind").html,
+            dataRequestEmail("closed", "Northwind").html,
+        ];
+        for (const html of mails) {
+            expect(html).toContain(footer);
+            // The old footers, which left out the removal emails, are gone.
+            expect(html).not.toContain(
+                "a notice if your sign-in email changes",
+            );
+            expect(html).not.toContain("a notice like this one");
+        }
+    });
+
+    it("carries the business name escaped, as the email body does", () => {
+        const html = siteCodeEmail('Kavi <b>"Dental"</b>', "123456", 10);
+        expect(html).toContain(
+            siteAccountEmailFooter(
+                "Kavi &lt;b&gt;&quot;Dental&quot;&lt;/b&gt;",
+            ),
+        );
+        expect(siteEmailChangedEmail('Kavi <b>"Dental"</b>')).not.toContain(
+            "<b>",
+        );
     });
 });

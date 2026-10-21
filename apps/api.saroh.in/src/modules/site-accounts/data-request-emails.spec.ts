@@ -1,8 +1,5 @@
-import {
-    dataRequestEmail,
-    dataRequestFooter,
-    KEPT_BY_LAW,
-} from "./data-request-emails";
+import { dataRequestEmail, KEPT_BY_LAW } from "./data-request-emails";
+import { siteAccountEmailFooter } from "./sender-name";
 
 /**
  * The words of Saroh's two emails about "Ask to remove my data" (DEC-172,
@@ -84,11 +81,8 @@ describe("every email", () => {
     it("says it comes from Saroh, for the business's site", () => {
         for (const step of ["received", "done", "closed"] as const) {
             expect(dataRequestEmail(step, "Northwind").html).toContain(
-                dataRequestFooter("Northwind"),
+                siteAccountEmailFooter("Northwind"),
             );
         }
-        expect(dataRequestFooter("Northwind")).toBe(
-            "Northwind's website runs on Saroh. This address sends only sign-in codes and notices about your account there.",
-        );
     });
 });
