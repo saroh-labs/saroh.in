@@ -157,6 +157,18 @@ interface Slot {
     taken: number;
 }
 
+/**
+ * How an upcoming booking's first roll decides its status in
+ * {@link bookingRows}: below the first line it was cancelled, below the
+ * second it is still pending, and from there on it is confirmed.
+ */
+const CANCELLED_BELOW = 0.06;
+const PENDING_BELOW = 0.2;
+
+/** Whether a booking still ahead of `now` is written as confirmed. */
+export const confirmsAhead = (b: PlannedBooking, now: Date): boolean =>
+    b.startAt.getTime() > now.getTime() && b.roll[0] >= PENDING_BELOW;
+
 export interface PlannedBooking {
     service: number;
     contact: number;
@@ -194,6 +206,12 @@ export function planBookings(
         reserved?: ReadonlyMap<string, number>;
         /** Times people are already booked for elsewhere (their courses). */
         busy?: readonly { contact: number; start: number; end: number }[];
+        /**
+         * Services the demo must show booked ahead: each ends the plan with
+         * at least one confirmed booking after `now`, whatever the draws were.
+         * See {@link guaranteeAhead}.
+         */
+        showAhead?: readonly number[];
     },
 ): PlannedBooking[] {
     const slots: Slot[] = [];
@@ -310,7 +328,75 @@ export function planBookings(
             });
         }
     }
+
+    for (const service of options.showAhead ?? []) {
+        if (
+            planned.some(
+                (b) => b.service === service && confirmsAhead(b, options.now),
+            )
+        )
+            continue;
+        const extra = guaranteeAhead(service, slots, planned, {
+            ...options,
+            pool: options.prospectServices.includes(service)
+                ? options.prospects
+                : everyone,
+            isFree,
+        });
+        busy.set(extra.contact, [
+            ...(busy.get(extra.contact) ?? []),
+            { start: extra.startAt.getTime(), end: extra.endAt.getTime() },
+        ]);
+        planned.push(extra);
+    }
     return planned.sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+}
+
+/**
+ * The one booking a "must show" service is given when the draws left it with
+ * nothing confirmed ahead — on 21 Oct 2026 Aarohan Academy's diary held no
+ * upcoming demo class, and the seed stopped. Chosen without chance, so it is
+ * there on every day the seed runs: the service's first slot from tomorrow
+ * (in the business's zone, inside its weekly hours) that still has room after
+ * the courses' places, for the first person in `pool` who is free then —
+ * preferring someone with nothing else in the diary. Fails loudly when the
+ * diary's window holds no such slot, rather than letting the check catch it.
+ */
+function guaranteeAhead(
+    service: number,
+    slots: readonly Slot[],
+    planned: readonly PlannedBooking[],
+    o: {
+        services: readonly ShowcaseService[];
+        pool: readonly number[];
+        isFree: (contact: number, slot: Slot) => boolean;
+    },
+): PlannedBooking {
+    const s = o.services[service];
+    const booked = new Set(planned.map((b) => b.contact));
+    const open = slots
+        .filter(
+            (slot) =>
+                slot.service === service &&
+                slot.dayOffset >= 1 &&
+                slot.taken < s.capacity,
+        )
+        .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+    for (const slot of open) {
+        const free = o.pool.filter((c) => o.isFree(c, slot));
+        if (free.length === 0) continue;
+        const contact = free.find((c) => !booked.has(c)) ?? free[0];
+        slot.taken++;
+        return {
+            service,
+            contact,
+            startAt: slot.startAt,
+            endAt: slot.endAt,
+            // Confirmed, booked about five days before, by the first team member.
+            roll: [0.5, 0.5, 0.5, 0],
+        };
+    }
+    throw new Error(`No free slot ahead for ${s.name} in the diary's window`);
 }
 
 /** A booking as it was placed, for what is built on it (a pack spent on it). */
@@ -393,9 +479,9 @@ export function bookingRows(
             } else {
                 outcome = r2 < 0.88 ? "ATTENDED" : "NO_SHOW";
             }
-        } else if (r1 < 0.06) {
+        } else if (r1 < CANCELLED_BELOW) {
             status = "CANCELLED";
-        } else if (r1 < 0.2) {
+        } else if (r1 < PENDING_BELOW) {
             status = "PENDING";
         }
         if (status === "CANCELLED") {

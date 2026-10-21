@@ -72,6 +72,25 @@ export { SA_NAME } from "./shiksha-data";
 const LEADS = 40;
 const FORM_LEADS = 27;
 const STUDENTS = 175;
+/** Contacts in the CRM, by index: the leads, then the students. */
+export const SA_PEOPLE = { leads: LEADS, students: STUDENTS } as const;
+/** Who books a demo class or a counselling call: the leads and 40 students. */
+const SA_PROSPECTS = Array.from({ length: LEADS + 40 }, (_, i) => i);
+
+/**
+ * The diary's shape. `showAhead` is what the demo shows booked ahead, so it is
+ * there on every day the seed runs rather than when the draws allow it.
+ */
+export const SA_DIARY = {
+    target: 105,
+    fromDay: -90,
+    toDay: 14,
+    prospects: SA_PROSPECTS,
+    prospectServices: [SA_SERVICE.demo, SA_SERVICE.counselling],
+    weekdayWeights: [1.4, 0.8, 0.9, 0.9, 0.9, 1, 1.5],
+    showAhead: [SA_SERVICE.demo],
+};
+
 /** Students on the yearly programme, paying in four instalments. */
 const ON_INSTALMENTS = 42;
 
@@ -279,20 +298,11 @@ export async function seedShiksha(
     seen.push(...courses.seen);
 
     // --- the diary: demo classes and counselling calls, by new families
-    const prospects = [
-        ...Array.from({ length: LEADS }, (_, i) => i),
-        ...students.slice(0, 40),
-    ];
     const planned = planBookings(rngFor(sid(""), "bookings"), {
+        ...SA_DIARY,
         now,
         services: SA_SERVICES,
-        target: 105,
-        fromDay: -90,
-        toDay: 14,
         contacts: people.length,
-        prospects,
-        prospectServices: [SA_SERVICE.demo, SA_SERVICE.counselling],
-        weekdayWeights: [1.4, 0.8, 0.9, 0.9, 0.9, 1, 1.5],
         reserved: courses.reserved,
         busy: courses.busy,
     });

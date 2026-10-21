@@ -12,6 +12,33 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Seed — a seed's must-show item left to chance broke on 21 Oct
+
+**Symptom**: 21 Oct 2026, the gate's `db:seed:showcase` stopped with
+`[seed] Aarohan Academy is missing what its demo shows: an upcoming demo
+class` and exit 1. Nothing in the seed had changed since it last passed.
+**Cause**: the diary is drawn at random (`planBookings`, a fixed rng,
+`fromDay: -90` to `toDay: 14` relative to `now`), and the demo class runs
+only Saturday 16:00 and Sunday 11:00 — four slots in the fortnight ahead.
+Whether one of them drew a booking that `bookingRows` then wrote as
+confirmed depended on the date: with the rng fixed and `now` moving, 18 of
+120 runs over 60 days had none. Desk 42's "day passes / the room / the booth
+booked ahead" were drawn the same way, just with better odds.
+**Fix**: `planBookings` takes `showAhead`, the services the demo must show
+booked ahead. After the draws, a service with nothing confirmed after `now`
+gets one booking chosen without chance (`guaranteeAhead`): its first slot
+from tomorrow, in the business's zone and hours, with room left after the
+courses' places, for a free prospect (or regular), rolled to be confirmed.
+The status thresholds `bookingRows` uses are named once (`confirmsAhead`).
+Aarohan (`SA_DIARY`) and Desk 42 (`DK_DIARY`) pass theirs.
+`showcase/show-ahead.test.ts` plans both diaries at two hours of every day
+for 60 days and proves each must-show booking is there, confirmed, on a
+real slot, within its room, with nobody double-booked.
+**Rule**: anything a seed's check requires (`requireStates`, a minimum) is
+placed on purpose, never left to the draws; a seed planned relative to
+`now` gets a test that plans it for many `now`s (`bakery-any-day.test.ts`,
+`clinic.test.ts`, `show-ahead.test.ts`).
+
 ## Sites — closing a look's booking left the hold standing, and the panel and the save disagreed on paid styles
 
 **Symptom**: 20 Oct 2026, review of the looks release (#20, #22). On a
