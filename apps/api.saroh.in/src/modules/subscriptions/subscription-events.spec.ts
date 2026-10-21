@@ -1,6 +1,11 @@
 // A subscription's log (D9): what an action records, who it names, and how
 // the log is read a page at a time. The database is mocked;
 // subscription-events.db.spec.ts writes and reads real rows.
+// The member's notice (U11) is queued with each event; it has its own
+// specs (`membership-notices.db.spec.ts`), so it is stubbed here.
+jest.mock("./membership-notices", () => ({
+    queueMembershipNotice: jest.fn().mockResolvedValue("none"),
+}));
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     return {

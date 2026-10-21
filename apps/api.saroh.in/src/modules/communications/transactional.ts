@@ -37,6 +37,14 @@ export const NOTICE_TEMPLATES = [
     // "We got your message" to someone who sent an enquiry (DEC-174 U15,
     // #1146): email only, behind the ENQUIRY_REPLY switch.
     "ENQUIRY_RECEIVED",
+    // A member's membership changed (DEC-174 U11, #1142), each keyed to its
+    // SubscriptionEvent, under the MEMBERSHIP switch.
+    "MEMBERSHIP_JOINED",
+    "MEMBERSHIP_PAUSED",
+    "MEMBERSHIP_RESUMED",
+    "MEMBERSHIP_PLAN_CHANGED",
+    "MEMBERSHIP_CANCELLED",
+    "MEMBERSHIP_KEPT",
 ] as const;
 export type NoticeTemplate = (typeof NOTICE_TEMPLATES)[number];
 

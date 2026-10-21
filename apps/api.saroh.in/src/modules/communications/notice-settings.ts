@@ -63,7 +63,7 @@ export function defaultOn(kind: NoticeKind): boolean {
 export const NOTICE_SENDS: Record<NoticeKind, boolean> = {
     RENEWAL_INVOICE: false,
     AUTOPAY_FAILED: false,
-    MEMBERSHIP: false,
+    MEMBERSHIP: true,
     REFUND: false,
     TEAM_REPLY: false,
     ENQUIRY_REPLY: true,

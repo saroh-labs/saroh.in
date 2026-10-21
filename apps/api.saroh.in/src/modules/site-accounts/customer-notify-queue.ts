@@ -42,6 +42,10 @@ export interface CustomerNotifyPayload {
     waitlistEntryId?: string;
     /** The enquiry a "we got your message" answers (U15). */
     submissionId?: string;
+    /** The membership a MEMBERSHIP_* notice is about (U11). */
+    subscriptionId?: string;
+    /** The SubscriptionEvent it is about: joined, paused, cancelled… */
+    subscriptionEventId?: string;
 }
 
 type Tx = Pick<Prisma.TransactionClient, "job">;

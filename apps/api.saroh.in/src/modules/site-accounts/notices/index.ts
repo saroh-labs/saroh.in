@@ -6,6 +6,7 @@ import { escapeHtml } from "../../communications/transactional";
 import type { CustomerNotifyPayload } from "../customer-notify-queue";
 import { bookingNotice } from "./booking";
 import { enquiryReceivedNotice } from "./enquiry-received";
+import { membershipNotice } from "./membership";
 import type { NoticeDefinition, NoticeSubject, NoticeVarsBase } from "./notice";
 import { safeLink } from "./notice";
 import { orderStepNotice, placedOrderNotice } from "./order";
@@ -30,6 +31,12 @@ export const NOTICES = {
     BOOKING_LAPSED: bookingNotice,
     BOOKING_MOVED: bookingNotice,
     ENQUIRY_RECEIVED: enquiryReceivedNotice,
+    MEMBERSHIP_CANCELLED: membershipNotice,
+    MEMBERSHIP_JOINED: membershipNotice,
+    MEMBERSHIP_KEPT: membershipNotice,
+    MEMBERSHIP_PAUSED: membershipNotice,
+    MEMBERSHIP_PLAN_CHANGED: membershipNotice,
+    MEMBERSHIP_RESUMED: membershipNotice,
     ORDER_HANDED_OVER: orderStepNotice,
     ORDER_PLACED: placedOrderNotice,
     ORDER_READY: orderStepNotice,

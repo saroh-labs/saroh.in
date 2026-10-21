@@ -15,6 +15,12 @@ import {
     NOTICE_SENDS,
 } from "../../communications/notice-settings";
 import { NOTICE_TEMPLATES } from "../../communications/transactional";
+import type {
+    MembershipNoticeKind,
+    MembershipNoticeVars,
+    MembershipVariant,
+} from "./membership";
+import { MEMBERSHIP_NOTICE_KINDS } from "./membership";
 
 const AT = new Date("2026-10-06T05:30:00.000Z");
 
@@ -116,6 +122,7 @@ const SAMPLES: Record<(typeof NOTICE_TEMPLATES)[number], NoticeVars> = {
             trackingUrl: "https://track.example.com/BD123",
         },
     },
+    ...membershipSamples(),
     WAITLIST_OFFER: {
         kind: "WAITLIST_OFFER",
         waitlist: {
@@ -128,6 +135,37 @@ const SAMPLES: Record<(typeof NOTICE_TEMPLATES)[number], NoticeVars> = {
         },
     },
 };
+
+/** One membership notice of each kind (U11). */
+function membershipSamples(): Record<MembershipNoticeKind, NoticeVars> {
+    const membership: MembershipNoticeVars = {
+        business: "Rye <&> Co.",
+        firstName: "Asha",
+        variant: "JOINED",
+        plan: "Monthly",
+        toPlan: null,
+        priceMinor: 120000,
+        currency: "INR",
+        interval: "MONTH",
+        classes: 8,
+        on: AT,
+        timeZone: "Asia/Kolkata",
+    };
+    const variant: Record<MembershipNoticeKind, MembershipVariant> = {
+        MEMBERSHIP_JOINED: "JOINED",
+        MEMBERSHIP_PAUSED: "PAUSED",
+        MEMBERSHIP_RESUMED: "RESUMED",
+        MEMBERSHIP_PLAN_CHANGED: "PLAN_CHANGED",
+        MEMBERSHIP_CANCELLED: "CANCELS_AT_END",
+        MEMBERSHIP_KEPT: "KEPT",
+    };
+    return Object.fromEntries(
+        MEMBERSHIP_NOTICE_KINDS.map((kind) => [
+            kind,
+            { kind, membership: { ...membership, variant: variant[kind] } },
+        ]),
+    ) as Record<MembershipNoticeKind, NoticeVars>;
+}
 
 describe("the notice registry", () => {
     it("every NOTICE_TEMPLATES kind has an entry, and nothing else does", () => {

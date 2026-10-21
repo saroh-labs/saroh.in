@@ -25,6 +25,11 @@ jest.mock("../invoices/business-details", () => ({
     assertBusinessDetails: jest.fn().mockResolvedValue(undefined),
 }));
 
+// The member's notice (U11) is queued with each event; it has its own
+// specs (`membership-notices.db.spec.ts`), so it is stubbed here.
+jest.mock("./membership-notices", () => ({
+    queueMembershipNotice: jest.fn().mockResolvedValue("none"),
+}));
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const tx = {

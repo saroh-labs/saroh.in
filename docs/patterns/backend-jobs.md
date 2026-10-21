@@ -442,6 +442,18 @@ the Privacy Policy states both.
   payment's hold when it is paid online (`enqueueOrderPlacedNotice`). It
   goes through the same `emailRoute` as every notice: the thread, and the
   business's own provider.
+- **Membership emails** (DEC-174 U11, #1142, `notices/membership.ts`):
+  joined, paused, resumed, plan change booked / called off / taken effect,
+  cancelled (today or at the period end) and kept. Queued by
+  `recordSubscriptionEvent` itself (`subscriptions/membership-notices.ts`),
+  keyed `membership:<SubscriptionEvent id>`, so every path that writes the
+  event (desk, member's account, online join, a pause's end date, the
+  renewal applying a booked change) tells the member, and no caller adds
+  its own. Gated by `noticeOn(MEMBERSHIP)` when queued and when run. A
+  team member's change with an Undo is held 10 s; the Undo is the inverse
+  action (resume, Keep, cancel the plan change), which withdraws the
+  untold notice and queues none of its own. The run re-reads the
+  membership: a change undone since tells nobody.
 - **`customer-message.notify`** (UX-014) tells the team a customer wrote
   from their site account: one inbox notice (`message.new`, opening the
   customer's thread, unique on `(messageId, type)`) and an email to the

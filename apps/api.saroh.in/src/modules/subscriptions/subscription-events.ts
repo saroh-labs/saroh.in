@@ -3,6 +3,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { MEMBERSHIP_NOTICE_OF } from "../site-accounts/notices/membership";
 import { PLAN_EVENTS_PAGE_MAX } from "./dto";
 import type {
     EventActor,
@@ -15,6 +16,7 @@ import {
     JOB_ACTOR,
     teamNames,
 } from "./event-actors";
+import { queueMembershipNotice } from "./membership-notices";
 
 /**
  * A subscription's log (plan 2026-09-26-004, D9): one event for everything
@@ -127,7 +129,11 @@ export interface SubscriptionEventInput {
     data?: SubscriptionEventData;
 }
 
-/** Write one event. Called inside the action's own transaction. */
+/**
+ * Write one event. Called inside the action's own transaction. A change
+ * the member is told about (joined, paused, resumed, cancelled, kept, a
+ * plan change) queues their notice with it (`membership-notices.ts`, U11).
+ */
 export async function recordSubscriptionEvent(
     tx: Prisma.TransactionClient,
     organizationId: string,
@@ -136,7 +142,7 @@ export async function recordSubscriptionEvent(
     actor: SubscriptionActor,
     input: SubscriptionEventInput = {},
 ): Promise<void> {
-    await tx.subscriptionEvent.create({
+    const event = await tx.subscriptionEvent.create({
         data: {
             organizationId,
             subscriptionId,
@@ -149,6 +155,14 @@ export async function recordSubscriptionEvent(
             data: input.data ?? {},
         },
     });
+    if (MEMBERSHIP_NOTICE_OF[kind]) {
+        await queueMembershipNotice(tx, organizationId, {
+            event,
+            subscriptionId,
+            kind,
+            actorKind: actor.actorKind,
+        });
+    }
 }
 
 /**
