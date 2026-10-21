@@ -111,6 +111,99 @@ export function readyUndoneText(
 }
 
 /**
+ * The toast once an order is Delivered or a digital order Sent (U16,
+ * #1147): told like Ready, ten seconds on, while the business sends
+ * delivery updates; with them off, they aren't told. Unknown claims
+ * nothing either way.
+ */
+export function deliveryDoneText(
+    reach: NoticeReach | null | undefined,
+    first: string,
+    deliveryUpdates: boolean | null | undefined,
+): string {
+    if (deliveryUpdates === false) {
+        return `${first} isn't told: delivery updates are off. It shows on the order.`;
+    }
+    if (deliveryUpdates !== true) return "It shows on the order.";
+    return readyDoneText(reach, first);
+}
+
+/**
+ * The courier sheet's line on what the customer gets (U16, #1147):
+ *
+ * - `handover`: the "on its way" notice carries what is typed here (A14),
+ *   whatever the delivery updates switch says;
+ * - `change`: tracking added or changed after the handover is told once,
+ *   only while the business sends delivery updates.
+ *
+ * Never "Nothing is sent" where something is, and never a promise where
+ * nothing goes. Unknown says only that it stays on the order.
+ */
+export function courierNoticeText(
+    reach: NoticeReach | null | undefined,
+    first: string,
+    opts: {
+        mode: "handover" | "change";
+        to?: string | null;
+        deliveryUpdates?: boolean | null;
+    },
+): string {
+    const kept = "It stays on the order.";
+    if (opts.mode === "change") {
+        if (opts.deliveryUpdates === false) {
+            return `${kept} Nothing is sent to ${first}: delivery updates are off.`;
+        }
+        if (opts.deliveryUpdates !== true) return kept;
+    }
+    const what =
+        opts.mode === "handover"
+            ? "the tracking with the handover"
+            : "new tracking";
+    switch (reach) {
+        case "EMAIL_AND_ACCOUNT":
+        case "EMAIL":
+            return opts.to
+                ? `${kept} ${first} gets ${what} by email, at ${opts.to}.`
+                : `${kept} ${first} gets ${what} by email.`;
+        case "ACCOUNT":
+            return `${kept} ${first} sees ${what} in their account on your site.`;
+        case "ON_SIGN_IN":
+            return `${kept} ${first} sees ${what} when they sign in on your site.`;
+        case "NONE":
+            return `${kept} Nothing is sent to ${first}.`;
+        default:
+            return kept;
+    }
+}
+
+/**
+ * The toast once tracking is saved after the handover (U16). `told` is the
+ * API's answer: a notice carries it (its own, or the handover's still
+ * held). Where it reaches nobody, nothing is claimed.
+ */
+export function trackingSavedText(
+    reach: NoticeReach | null | undefined,
+    first: string,
+    told: boolean | undefined,
+): string {
+    const kept = "It stays on the order.";
+    if (!told) return `${kept} Nothing is sent to ${first}.`;
+    switch (reach) {
+        case "EMAIL_AND_ACCOUNT":
+        case "EMAIL":
+            return `${kept} ${first} is emailed the tracking.`;
+        case "ACCOUNT":
+            return `${kept} ${first} sees it in their account on your site.`;
+        case "ON_SIGN_IN":
+            return `${kept} ${first} sees it when they sign in on your site.`;
+        case "NONE":
+            return `${kept} Nothing is sent to ${first}.`;
+        default:
+            return kept;
+    }
+}
+
+/**
  * The booking peek's line on moving or cancelling (the design's "‹First› is
  * told"), naming the address when the read gives it ("emailed to ‹email›").
  * Unknown keeps the old advice, which asks the merchant to tell them.

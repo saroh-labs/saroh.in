@@ -37,6 +37,12 @@ export const NOTICE_TEMPLATES = [
     // "We got your message" to someone who sent an enquiry (DEC-174 U15,
     // #1146): email only, behind the ENQUIRY_REPLY switch.
     "ENQUIRY_RECEIVED",
+    // Delivery updates (DEC-174 U16, #1147), behind the ORDER_DELIVERY
+    // switch: a delivered order, a digital order sent, and tracking added
+    // or changed after the handover.
+    "ORDER_DELIVERED",
+    "ORDER_SENT",
+    "ORDER_TRACKING",
     // A member's membership changed (DEC-174 U11, #1142), each keyed to its
     // SubscriptionEvent, under the MEMBERSHIP switch.
     "MEMBERSHIP_JOINED",

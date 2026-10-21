@@ -3,10 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
     bookingChangeText,
     classCancelText,
+    courierNoticeText,
+    deliveryDoneText,
     isNoticeReach,
     readyDoneText,
     readyNoticeText,
     readyUndoneText,
+    trackingSavedText,
 } from "./notice-reach";
 
 describe("what the workspace says a customer is told (A14)", () => {
@@ -142,6 +145,91 @@ describe("naming the address it is emailed to (DEC-174 D1)", () => {
         );
         expect(bookingChangeText("NONE", "Asha", "asha@example.com")).toBe(
             "Saroh doesn't message Asha. Tell them yourself if you move or cancel.",
+        );
+    });
+});
+
+describe("delivery updates on Order Detail (U16)", () => {
+    it("Delivered and Sent are told like Ready while delivery updates go; off says they aren't", () => {
+        expect(deliveryDoneText("EMAIL", "Asha", true)).toBe(
+            "Asha will be told in 10 seconds.",
+        );
+        expect(deliveryDoneText("NONE", "Asha", true)).toBe(
+            "Asha isn't told. It shows on the order.",
+        );
+        expect(deliveryDoneText("EMAIL", "Asha", false)).toBe(
+            "Asha isn't told: delivery updates are off. It shows on the order.",
+        );
+        expect(deliveryDoneText("EMAIL", "Asha", null)).toBe(
+            "It shows on the order.",
+        );
+    });
+
+    it("the handover sheet says the tracking goes with the handover's email, naming the address", () => {
+        expect(
+            courierNoticeText("EMAIL", "Asha", {
+                mode: "handover",
+                to: "asha@example.com",
+            }),
+        ).toBe(
+            "It stays on the order. Asha gets the tracking with the handover by email, at asha@example.com.",
+        );
+        // The handover's notice has no switch: off doesn't silence it.
+        expect(
+            courierNoticeText("EMAIL", "Asha", {
+                mode: "handover",
+                deliveryUpdates: false,
+            }),
+        ).toBe(
+            "It stays on the order. Asha gets the tracking with the handover by email.",
+        );
+        expect(courierNoticeText("ACCOUNT", "Asha", { mode: "handover" })).toBe(
+            "It stays on the order. Asha sees the tracking with the handover in their account on your site.",
+        );
+    });
+
+    it("the Tracking sheet promises the new tracking only while delivery updates go, and never with no email", () => {
+        expect(
+            courierNoticeText("EMAIL", "Asha", {
+                mode: "change",
+                deliveryUpdates: true,
+            }),
+        ).toBe("It stays on the order. Asha gets new tracking by email.");
+        expect(
+            courierNoticeText("EMAIL", "Asha", {
+                mode: "change",
+                deliveryUpdates: false,
+            }),
+        ).toBe(
+            "It stays on the order. Nothing is sent to Asha: delivery updates are off.",
+        );
+        // No provider: nothing reaches them, so nothing is promised.
+        expect(
+            courierNoticeText("NONE", "Asha", {
+                mode: "change",
+                deliveryUpdates: true,
+            }),
+        ).toBe("It stays on the order. Nothing is sent to Asha.");
+        expect(
+            courierNoticeText(null, "Asha", {
+                mode: "change",
+                deliveryUpdates: null,
+            }),
+        ).toBe("It stays on the order.");
+    });
+
+    it("the saved toast says they're emailed only when a notice carries it", () => {
+        expect(trackingSavedText("EMAIL", "Asha", true)).toBe(
+            "It stays on the order. Asha is emailed the tracking.",
+        );
+        expect(trackingSavedText("EMAIL", "Asha", false)).toBe(
+            "It stays on the order. Nothing is sent to Asha.",
+        );
+        expect(trackingSavedText("NONE", "Asha", true)).toBe(
+            "It stays on the order. Nothing is sent to Asha.",
+        );
+        expect(trackingSavedText("EMAIL", "Asha", undefined)).not.toMatch(
+            /emailed/,
         );
     });
 });

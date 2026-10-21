@@ -94,6 +94,8 @@ function makeTx() {
         customerNoticeSetting: {
             findUnique: jest.fn().mockResolvedValue(null),
         },
+        // Nobody revoked email (U16's promise reads it).
+        consent: { findUnique: jest.fn().mockResolvedValue(null) },
         customerIdentityLink: {
             findFirst: jest.fn().mockResolvedValue(null),
         },
@@ -627,7 +629,7 @@ describe("customer.notify — a website order placed (UX-042)", () => {
         expect(append.mock.calls[0][1]).toMatchObject({
             contactId: "ct_1",
             author: "SYSTEM",
-            body: "We have your order ORD-1019. You pay at pick-up. We'll tell you when it's ready for pick-up.",
+            body: "We have your order ORD-1019. You pay at pick-up. We'll email you when it's ready for pick-up.",
             event: "ORDER_PLACED",
         });
         expect(queueTransactional.mock.calls[0][2]).toMatchObject({
@@ -653,7 +655,23 @@ describe("customer.notify — a website order placed (UX-042)", () => {
         });
         await service.notify(asTx(tx), ORG, PLACED, NOW);
         expect(append.mock.calls[0][1].body).toBe(
-            "We have your order ORD-1019, and it's paid. We'll tell you when it's on its way.",
+            "We have your order ORD-1019, and it's paid. We'll email you when it's on its way, and when it's delivered.",
+        );
+    });
+
+    it("delivery updates off: promises only the handover (U16)", async () => {
+        const tx = makeTx();
+        placed(tx, {
+            payOnHandover: false,
+            paymentStatus: "PAID",
+            fulfilment: "SHIPPING",
+        });
+        tx.customerNoticeSetting.findUnique.mockResolvedValue({
+            enabled: false,
+        });
+        await service.notify(asTx(tx), ORG, PLACED, NOW);
+        expect(append.mock.calls[0][1].body).toBe(
+            "We have your order ORD-1019, and it's paid. We'll email you when it's on its way.",
         );
     });
 
@@ -664,6 +682,10 @@ describe("customer.notify — a website order placed (UX-042)", () => {
         const out = await service.notify(asTx(tx), ORG, PLACED, NOW);
         expect(out.threadMessageId).toBe("ctm_1");
         expect(out.messageId).toBeNull();
+        // No email goes, so none is promised (U16).
+        expect(append.mock.calls[0][1].body).toBe(
+            "We have your order ORD-1019. You pay at pick-up. We'll tell you when it's ready for pick-up.",
+        );
         expect(queueTransactional).not.toHaveBeenCalled();
         expect(tx.$executeRaw).not.toHaveBeenCalled();
     });

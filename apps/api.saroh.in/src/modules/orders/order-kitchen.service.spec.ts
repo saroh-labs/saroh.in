@@ -41,6 +41,8 @@ const mockDb = {
         string,
         { threadMessageId: string | null; messageId: string | null }
     >(),
+    // The business turned its delivery updates off (U16).
+    deliveryOff: false,
 };
 
 // The order's invoice (ADR-008, U5) has its own specs; here the business
@@ -139,6 +141,30 @@ jest.mock("@saroh/database", () => {
             }),
         },
         job: {
+            // A held notice still waiting: by kind and order (U16).
+            count: jest.fn(
+                ({
+                    where,
+                }: {
+                    where: {
+                        type: string;
+                        status: string;
+                        AND: { payload: { path: string[]; equals: string } }[];
+                    };
+                }) =>
+                    Promise.resolve(
+                        mockDb.jobs.filter(
+                            (j) =>
+                                j.type === where.type &&
+                                j.status === where.status &&
+                                where.AND.every(
+                                    (c) =>
+                                        j.payload[c.payload.path[0]] ===
+                                        c.payload.equals,
+                                ),
+                        ).length,
+                    ),
+            ),
             create: jest.fn(
                 ({ data }: { data: (typeof mockDb.jobs)[number] }) => {
                     mockDb.jobs.push({ status: "PENDING", ...data });
@@ -168,6 +194,11 @@ jest.mock("@saroh/database", () => {
                         count: before - mockDb.jobs.length,
                     });
                 },
+            ),
+        },
+        customerNoticeSetting: {
+            findUnique: jest.fn(() =>
+                Promise.resolve(mockDb.deliveryOff ? { enabled: false } : null),
             ),
         },
         customerNotice: {
@@ -514,6 +545,7 @@ function reset(over: Record<string, unknown> = {}) {
     mockDb.events = [];
     mockDb.jobs = [];
     mockDb.told = new Map();
+    mockDb.deliveryOff = false;
     mockDb.inventory = { quantity: 10, reserved: 3 };
     mockDb.entries = [];
     mockDb.order = {
@@ -690,6 +722,124 @@ describe("telling the customer (A14)", () => {
             "ORDER_HANDED_OVER",
         ]);
         expect(mockDb.jobs[1].payload.eventKey).toBe(`order:${out.eventId}`);
+    });
+
+    it("Delivered queues its own held notice, a digital order's Sent too; Collected none (U16)", async () => {
+        reset({
+            fulfilment: "SHIPPING",
+            stage: "HANDED_TO_COURIER",
+            status: "SHIPPED",
+        });
+        const before = Date.now();
+        const done = await kitchen.moveStage(MEMBER, "order_1", {
+            to: "DELIVERED",
+        });
+        expect(mockDb.jobs).toHaveLength(1);
+        expect(mockDb.jobs[0].payload).toEqual({
+            kind: "ORDER_DELIVERED",
+            eventKey: `order:${done.eventId}`,
+            orderId: "order_1",
+            orderEventId: done.eventId,
+        });
+        const wait = (mockDb.jobs[0].runAt as Date).getTime() - before;
+        expect(wait).toBeGreaterThanOrEqual(10_000);
+        // Undo inside the hold takes it back unsent.
+        const back = await kitchen.undoStage(MEMBER, "order_1", done.eventId);
+        expect(back.told).toBe(false);
+        expect(mockDb.jobs).toHaveLength(0);
+
+        reset({ fulfilment: "DIGITAL" });
+        await kitchen.moveStage(MEMBER, "order_1", { to: "SENT" });
+        expect(mockDb.jobs.map((j) => j.payload.kind)).toEqual(["ORDER_SENT"]);
+    });
+
+    it("with delivery updates off, Delivered and Sent queue nothing; Ready still does (U16)", async () => {
+        reset({
+            fulfilment: "SHIPPING",
+            stage: "HANDED_TO_COURIER",
+            status: "SHIPPED",
+        });
+        mockDb.deliveryOff = true;
+        await kitchen.moveStage(MEMBER, "order_1", { to: "DELIVERED" });
+        expect(mockDb.jobs).toHaveLength(0);
+        reset({ fulfilment: "DIGITAL" });
+        mockDb.deliveryOff = true;
+        await kitchen.moveStage(MEMBER, "order_1", { to: "SENT" });
+        expect(mockDb.jobs).toHaveLength(0);
+        reset();
+        mockDb.deliveryOff = true;
+        await kitchen.moveStage(MEMBER, "order_1", { to: "PREPARING" });
+        await kitchen.moveStage(MEMBER, "order_1", { to: "READY" });
+        expect(mockDb.jobs.map((j) => j.payload.kind)).toEqual(["ORDER_READY"]);
+    });
+
+    it("tracking added after the handover is told once; the same again, or only the courier's name, tells nobody (U16)", async () => {
+        reset({
+            fulfilment: "SHIPPING",
+            stage: "HANDED_TO_COURIER",
+            status: "SHIPPED",
+        });
+        const first = await kitchen.edit(MEMBER, "order_1", {
+            trackingNumber: "AWB4411",
+        });
+        expect(first.trackingNotice).toBe(true);
+        expect(mockDb.jobs).toHaveLength(1);
+        expect(mockDb.jobs[0]).toMatchObject({
+            type: "customer.notify",
+            payload: {
+                kind: "ORDER_TRACKING",
+                eventKey: `order-tracking:${first.eventId}`,
+                orderId: "order_1",
+                orderEventId: first.eventId,
+            },
+        });
+        // Not held: there is no Undo for a courier save.
+        expect(mockDb.jobs[0].runAt).toBeUndefined();
+
+        const same = await kitchen.edit(MEMBER, "order_1", {
+            trackingNumber: "AWB4411",
+        });
+        expect(same.trackingNotice).toBe(false);
+        const name = await kitchen.edit(MEMBER, "order_1", {
+            courierName: "Delhivery",
+        });
+        expect(name.trackingNotice).toBe(false);
+        expect(mockDb.jobs).toHaveLength(1);
+
+        // Changed: told again.
+        const changed = await kitchen.edit(MEMBER, "order_1", {
+            trackingUrl: "https://track.example.com/AWB4411",
+        });
+        expect(changed.trackingNotice).toBe(true);
+        expect(mockDb.jobs).toHaveLength(2);
+    });
+
+    it("tracking saved while the handover's notice is still held rides on it; with delivery updates off, nothing is queued (U16)", async () => {
+        reset({ fulfilment: "SHIPPING", stage: "READY", status: "PROCESSING" });
+        await kitchen.moveStage(MEMBER, "order_1", {
+            to: "HANDED_TO_COURIER",
+            courierName: "Delhivery",
+        });
+        // The handover's email reads the order when it goes: it has it.
+        const edit = await kitchen.edit(MEMBER, "order_1", {
+            trackingNumber: "AWB4411",
+        });
+        expect(edit.trackingNotice).toBe(true);
+        expect(mockDb.jobs.map((j) => j.payload.kind)).toEqual([
+            "ORDER_HANDED_OVER",
+        ]);
+
+        reset({
+            fulfilment: "SHIPPING",
+            stage: "HANDED_TO_COURIER",
+            status: "SHIPPED",
+        });
+        mockDb.deliveryOff = true;
+        const off = await kitchen.edit(MEMBER, "order_1", {
+            trackingNumber: "AWB4411",
+        });
+        expect(off.trackingNotice).toBe(false);
+        expect(mockDb.jobs).toHaveLength(0);
     });
 
     it("Undo inside the wait takes the notice back unsent: nobody was told", async () => {

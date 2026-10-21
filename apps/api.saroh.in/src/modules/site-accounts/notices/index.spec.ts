@@ -125,6 +125,39 @@ const SAMPLES: Record<(typeof NOTICE_TEMPLATES)[number], NoticeVars> = {
             trackingUrl: "https://track.example.com/BD123",
         },
     },
+    ORDER_DELIVERED: {
+        kind: "ORDER_DELIVERED",
+        delivery: {
+            business: "Rye <&> Co.",
+            firstName: "Asha",
+            number: "ORD-1019",
+            courier: null,
+            trackingNumber: null,
+            trackingUrl: null,
+        },
+    },
+    ORDER_SENT: {
+        kind: "ORDER_SENT",
+        delivery: {
+            business: "Rye <&> Co.",
+            firstName: "Asha",
+            number: "ORD-1019",
+            courier: null,
+            trackingNumber: null,
+            trackingUrl: null,
+        },
+    },
+    ORDER_TRACKING: {
+        kind: "ORDER_TRACKING",
+        delivery: {
+            business: "Rye <&> Co.",
+            firstName: "Asha",
+            number: "ORD-1019",
+            courier: "Bluedart",
+            trackingNumber: "BD<123>",
+            trackingUrl: "https://track.example.com/BD123",
+        },
+    },
     ...membershipSamples(),
     WAITLIST_OFFER: {
         kind: "WAITLIST_OFFER",

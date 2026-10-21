@@ -14,7 +14,12 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
 import { formatMoney } from "@/lib/format/money";
-import { readyDoneText, readyUndoneText } from "@/lib/messages/notice-reach";
+import {
+    deliveryDoneText,
+    readyDoneText,
+    readyUndoneText,
+    trackingSavedText,
+} from "@/lib/messages/notice-reach";
 import {
     editBeforePreparing,
     moveStage,
@@ -187,6 +192,24 @@ export function useKitchen({
                             duration: HOLD_MS,
                         },
                     );
+                } else if (to === "DELIVERED" || to === "SENT") {
+                    // Told like Ready while the business sends delivery
+                    // updates, held ten seconds so Undo takes it back (U16).
+                    showUndo(
+                        message,
+                        () =>
+                            order.deliveryUpdates === true
+                                ? undoReady(res.data.eventId, from)
+                                : undo(res.data.eventId, from),
+                        {
+                            description: deliveryDoneText(
+                                order.customerNotice,
+                                first,
+                                order.deliveryUpdates,
+                            ),
+                            duration: HOLD_MS,
+                        },
+                    );
                 } else {
                     showUndo(message, () => undo(res.data.eventId, from), {
                         duration: HOLD_MS,
@@ -322,7 +345,7 @@ export function useKitchen({
 
     /**
      * Hand it to the courier with whatever of their details are known now
-     * (all optional, B10). Nothing is sent to the customer.
+     * (all optional, B10). The handover's own notice (A14) carries them.
      */
     const handOver = (fields: CourierFields) => {
         const courier = fields.courierName ?? null;
@@ -359,7 +382,11 @@ export function useKitchen({
                 fields.trackingNumber
                     ? "Tracking number saved."
                     : "Tracking details saved.",
-                `It stays on the order. Nothing is sent to ${first}.`,
+                trackingSavedText(
+                    order.customerNotice,
+                    first,
+                    res.data.trackingNotice,
+                ),
             );
             refresh();
         });

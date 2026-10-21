@@ -26,13 +26,15 @@ export function firstNameOf(name: string | null | undefined): string | null {
 /**
  * Mark sent (MARK_SENT): the order's move to its handover step. `notifies`
  * is whether that step has a customer notice at all (A14 tells the
- * customer about a courier handover or a delivery going out; a digital
- * order's "sent" has none), and `reach` how it would reach them.
+ * customer about a courier handover or a delivery going out, and a digital
+ * order's "sent" while the business sends delivery updates, U16), and
+ * `reach` how it would reach them.
  */
 export function markSentWords(
     first: string | null,
     notifies: boolean,
     reach: NoticeReach,
+    stage?: string,
 ): Words {
     const who = first ?? "the customer";
     const done = "Marked sent";
@@ -44,7 +46,11 @@ export function markSentWords(
         sends: false,
     };
     if (!notifies || reach === "NONE") return quiet;
-    const onItsWay = "that the order is on its way";
+    // A digital order isn't on its way: it is sent (U16).
+    const onItsWay =
+        stage === "SENT"
+            ? "that the order has been sent"
+            : "that the order is on its way";
     switch (reach) {
         case "EMAIL_AND_ACCOUNT":
             return {

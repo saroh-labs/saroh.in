@@ -90,6 +90,8 @@ export function OrderSheets({
                 mode="handover"
                 to={to}
                 first={first}
+                reach={order.customerNotice}
+                noticeTo={order.customerNoticeTo}
                 busy={kitchen.busy}
                 onPrint={onPrint}
                 onCancel={onClose}
@@ -103,6 +105,9 @@ export function OrderSheets({
                     mode="change"
                     to={to}
                     first={first}
+                    reach={order.customerNotice}
+                    noticeTo={order.customerNoticeTo}
+                    deliveryUpdates={order.deliveryUpdates}
                     busy={kitchen.busy}
                     before={shipment}
                     onCancel={onClose}

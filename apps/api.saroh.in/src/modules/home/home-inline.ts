@@ -2,6 +2,8 @@ import { Injectable, Logger, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { moneyWordsMinor } from "../../common/words-format";
+import type { NoticeKind } from "../communications/notice-settings";
+import { defaultOn, noticeOn } from "../communications/notice-settings";
 import { InvoiceSendService } from "../invoices/invoice-send.service";
 import type { OrderStage } from "../orders/dto";
 import { nextStages } from "../orders/order-stage";
@@ -14,6 +16,7 @@ import { accountAreaOn } from "../site-accounts/account-area";
 import { orderContactId } from "../site-accounts/customer-notify.handler";
 import type { NoticeReach } from "../site-accounts/notice-reach";
 import { contactReach, hasLiveAccount } from "../site-accounts/notice-reach";
+import { orderNoticeSetting } from "../site-accounts/notices/order";
 import { orderNoticeKind } from "../site-accounts/notify-templates";
 import {
     firstNameOf,
@@ -70,6 +73,11 @@ export interface InlinePorts {
         organizationId: string,
         order: { customerId: string | null; customerAccountId: string | null },
     ) => Promise<NoticeReach | null>;
+    /**
+     * Whether the business sends a switched notice kind (U1's switches).
+     * Absent (a spec's ports): the default, on.
+     */
+    noticeOn?: (organizationId: string, kind: NoticeKind) => Promise<boolean>;
     /** Whether a contact has a live site account (A13's "signs in"). */
     signsIn: (organizationId: string, contactId: string) => Promise<boolean>;
     /**
@@ -187,7 +195,17 @@ export class HomeInlineService {
                 if (!order) return;
                 const stage = handoverOf(order);
                 if (!stage) return;
-                const notifies = orderNoticeKind(stage) !== null;
+                // A step's notice behind a switch the business turned off
+                // (a digital order's Sent, U16) tells nobody.
+                const kind = orderNoticeKind(stage);
+                const setting = kind ? orderNoticeSetting(kind) : null;
+                const notifies =
+                    kind !== null &&
+                    (setting === null ||
+                        (await (this.ports.noticeOn ?? switchedOn)(
+                            input.organizationId,
+                            setting,
+                        )));
                 const reach = notifies
                     ? await this.ports
                           .orderReach(input.organizationId, order)
@@ -197,7 +215,7 @@ export class HomeInlineService {
                 // row opens the order, which says it for itself.
                 if (reach === null) return;
                 const person = firstNameOf(ev.subtitle);
-                const words = markSentWords(person, notifies, reach);
+                const words = markSentWords(person, notifies, reach, stage);
                 ev.inline = {
                     kind: "MARK_SENT",
                     ...words,
@@ -541,5 +559,10 @@ function defaultPorts(db: Db): InlinePorts {
         },
         signsIn: (organizationId, contactId) =>
             hasLiveAccount(db, organizationId, contactId),
+        noticeOn: (organizationId, kind) => noticeOn(db, organizationId, kind),
     };
 }
+
+/** A switch read with no port: its default. */
+const switchedOn = (_organizationId: string, kind: NoticeKind) =>
+    Promise.resolve(defaultOn(kind));

@@ -1,6 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
-import { orderNoticeKind } from "./notices/order";
+import { noticeOn } from "../communications/notice-settings";
+import { orderNoticeKind, orderNoticeSetting } from "./notices/order";
 import type { NoticeKind } from "./notify-templates";
 
 /**
@@ -140,12 +141,13 @@ export async function cancelHeldCustomerNotice(
 
 /**
  * An order moved to a step the customer is told about (Ready, handed to
- * the courier, out for delivery): queue its notice, held for
+ * the courier, out for delivery; Delivered and a digital order's Sent while
+ * the business sends delivery updates, U16): queue its notice, held for
  * {@link ORDER_NOTICE_DELAY_MS} so an Undo can take it back. Any other
  * step queues nothing. Returns whether one was queued.
  */
 export async function enqueueOrderStepNotice(
-    tx: Tx,
+    tx: Pick<Prisma.TransactionClient, "job" | "customerNoticeSetting">,
     input: {
         organizationId: string;
         orderId: string;
@@ -156,6 +158,11 @@ export async function enqueueOrderStepNotice(
 ): Promise<boolean> {
     const kind = orderNoticeKind(input.stage);
     if (!kind) return false;
+    // A switched-off kind isn't queued; the handler asks again when it runs.
+    const setting = orderNoticeSetting(kind);
+    if (setting && !(await noticeOn(tx, input.organizationId, setting))) {
+        return false;
+    }
     await enqueueHeldCustomerNotice(
         tx,
         input.organizationId,
@@ -167,6 +174,49 @@ export async function enqueueOrderStepNotice(
         },
         { now: input.now, ms: ORDER_NOTICE_DELAY_MS },
     );
+    return true;
+}
+
+/** Tracking added after the handover: keyed to the edit's OrderEvent (U16). */
+export function orderTrackingNoticeKey(orderEventId: string): string {
+    return `order-tracking:${orderEventId}`;
+}
+
+/**
+ * The courier's tracking added or changed after the handover (DEC-174 U16,
+ * #1147): tell the customer once, keyed to the edit's OrderEvent. No Undo,
+ * so not held.
+ *
+ * While the handover's own notice is still held nothing more is queued:
+ * that one is read when it goes, so it carries the new tracking already.
+ * Otherwise nothing is queued while the business has delivery updates off.
+ * Returns whether a notice will carry it (queued now, or the held one).
+ */
+export async function enqueueOrderTrackingNotice(
+    tx: Pick<Prisma.TransactionClient, "job" | "customerNoticeSetting">,
+    input: { organizationId: string; orderId: string; orderEventId: string },
+): Promise<boolean> {
+    const handoverWaiting = await tx.job.count({
+        where: {
+            organizationId: input.organizationId,
+            type: CUSTOMER_NOTIFY_TYPE,
+            status: "PENDING",
+            AND: [
+                { payload: { path: ["kind"], equals: "ORDER_HANDED_OVER" } },
+                { payload: { path: ["orderId"], equals: input.orderId } },
+            ],
+        },
+    });
+    if (handoverWaiting > 0) return true;
+    if (!(await noticeOn(tx, input.organizationId, "ORDER_DELIVERY"))) {
+        return false;
+    }
+    await enqueueCustomerNotice(tx, input.organizationId, {
+        kind: "ORDER_TRACKING",
+        eventKey: orderTrackingNoticeKey(input.orderEventId),
+        orderId: input.orderId,
+        orderEventId: input.orderEventId,
+    });
     return true;
 }
 

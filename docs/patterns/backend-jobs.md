@@ -442,6 +442,17 @@ the Privacy Policy states both.
   payment's hold when it is paid online (`enqueueOrderPlacedNotice`). It
   goes through the same `emailRoute` as every notice: the thread, and the
   business's own provider.
+- **Delivery updates** (DEC-174 U16, #1147) share the `ORDER_DELIVERY`
+  switch (`notices/order-delivery.ts`): Delivered (a local delivery or a
+  shipment) and a digital order's Sent go through `enqueueOrderStepNotice`,
+  held 10 seconds like Ready so the step's Undo takes them back; Collected
+  and a treatment's Delivered (its visits, a STATUS event) tell nobody.
+  Tracking added or changed after the handover (`saveCourier`) queues
+  `ORDER_TRACKING` once per change (`order-tracking:<EDIT OrderEvent id>`),
+  not held, and not at all while the handover's own notice is still held
+  (that one reads the order when it goes). A switched kind is checked when
+  it is queued and again when it runs. "Order placed" promises only what
+  will reach them (`placedNext`: "We'll email you" only when an email goes).
 - **Membership emails** (DEC-174 U11, #1142, `notices/membership.ts`):
   joined, paused, resumed, plan change booked / called off / taken effect,
   cancelled (today or at the period end) and kept. Queued by

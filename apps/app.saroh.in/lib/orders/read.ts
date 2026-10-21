@@ -334,6 +334,18 @@ export interface OrderRead extends FulfilmentFields {
      */
     customerNotice?: NoticeReach | null;
     /**
+     * The address its notices are emailed to ("Emailed to ‹email›"), when
+     * they are. Null when they aren't, or it couldn't be read; absent from
+     * an API before U16.
+     */
+    customerNoticeTo?: string | null;
+    /**
+     * Whether the business sends delivery updates (DEC-174 U16): Delivered,
+     * Sent, and tracking added after the handover. Null when it couldn't be
+     * read; absent from an API before U16. Unknown claims nothing.
+     */
+    deliveryUpdates?: boolean | null;
+    /**
      * A treatment's visits (B14). Absent on an order that isn't one (and
      * from an API before B14); null when the API couldn't read them.
      */

@@ -100,6 +100,8 @@ function setup(opts: {
     attempts?: unknown[];
     /** The providers connected now, by name. */
     connected?: string[];
+    /** The business's delivery updates switch (U16). */
+    deliveryOn?: boolean;
 }) {
     const db = {
         order: { findMany: jest.fn().mockResolvedValue(opts.orders ?? []) },
@@ -131,6 +133,9 @@ function setup(opts: {
     const ports: InlinePorts = {
         orderReach: opts.reach ?? jest.fn().mockResolvedValue("EMAIL"),
         signsIn: jest.fn().mockResolvedValue(opts.signsIn ?? true),
+        ...(opts.deliveryOn === undefined
+            ? {}
+            : { noticeOn: jest.fn().mockResolvedValue(opts.deliveryOn) }),
         ...(opts.charges
             ? {
                   renewalCharges: jest
@@ -354,6 +359,39 @@ describe("HomeInlineService.decorate", () => {
         const { needs } = flattenNeeds(actions, "Asia/Kolkata");
         expect(needs[0].inline?.kind).toBe("MARK_SENT");
         expect(needs[1].inline).toBeUndefined();
+    });
+
+    it("a digital order's Mark sent tells them it was sent while delivery updates are on, and nothing when off (U16)", async () => {
+        const digital = order("o_1", {
+            fulfilment: "DIGITAL",
+            stage: "NEW",
+            status: "PENDING",
+        });
+        for (const deliveryOn of [true, false]) {
+            const { service } = setup({ orders: [digital], deliveryOn });
+            const actions = [
+                action("COMMERCE_OPEN_ORDERS", [
+                    ev("o_1", { subtitle: "Anika Rao" }),
+                ]),
+            ];
+            await service.decorate(actions, OWNER, NOW);
+            const [row] = actions[0].evidence ?? [];
+            expect(row.inline).toMatchObject(
+                deliveryOn
+                    ? {
+                          stage: "SENT",
+                          sends: true,
+                          confirm:
+                              "This tells Anika by email that the order has been sent.",
+                      }
+                    : {
+                          stage: "SENT",
+                          sends: false,
+                          confirm:
+                              "Nothing is sent to Anika. The order shows as sent.",
+                      },
+            );
+        }
     });
 
     it("offers Refund on a capture taken at the wrong amount, at what it took (PAY-06)", async () => {

@@ -1,6 +1,9 @@
 import type { Prisma } from "@saroh/database";
 
+import { noticeOn } from "../../communications/notice-settings";
 import { holdsOnPayment } from "../../orders/online-checkout";
+import type { NoticeReach } from "../notice-reach";
+import { contactReach } from "../notice-reach";
 import { businessName, defineNotice, firstWord, safeLink } from "./notice";
 
 /**
@@ -14,6 +17,14 @@ type Tx = Prisma.TransactionClient;
 export type NoticeStage = "READY" | "HANDED_TO_COURIER" | "OUT_FOR_DELIVERY";
 
 export type OrderStepKind = "ORDER_READY" | "ORDER_HANDED_OVER";
+
+/**
+ * The delivery updates (DEC-174 U16, #1147): a delivered order, a digital
+ * order sent, tracking added after the handover. Behind the business's
+ * ORDER_DELIVERY switch; their words are `order-delivery.ts`.
+ */
+export type OrderDeliveryKind =
+    "ORDER_DELIVERED" | "ORDER_SENT" | "ORDER_TRACKING";
 
 export interface OrderNoticeVars {
     business: string;
@@ -42,6 +53,16 @@ export interface PlacedOrderVars {
      * or absent: the email has no link.
      */
     link?: string | null;
+    /**
+     * How its next updates reach them (U16, #1147), as `contactNotice`
+     * reads it when the notice goes: `EMAIL`, emailed (and maybe in their
+     * account too); `ACCOUNT`, only in their account on the site; `NONE`,
+     * nothing reaches them, so nothing is promised and the business will be
+     * in touch. Absent (a notice queued before U16): "We'll tell you".
+     */
+    updates?: "EMAIL" | "ACCOUNT" | "NONE";
+    /** The business sends delivery updates (ORDER_DELIVERY on). */
+    deliveryUpdates?: boolean;
 }
 
 export interface OrderStepNotice {
@@ -54,13 +75,35 @@ export interface PlacedOrderNotice {
     placed: PlacedOrderVars;
 }
 
-/** Which notice an order step is, or null for a step nobody is told. */
-export function orderNoticeKind(stage: string): OrderStepKind | null {
+/**
+ * Which notice an order step is, or null for a step nobody is told:
+ * Ready, the handover, Delivered and a digital order's Sent. Collected
+ * tells nobody: they were there. A treatment reaches Delivered through its
+ * visits, never as a step here (`treatment-fulfil.ts`), so is never told.
+ */
+export function orderNoticeKind(
+    stage: string,
+): OrderStepKind | Exclude<OrderDeliveryKind, "ORDER_TRACKING"> | null {
     if (stage === "READY") return "ORDER_READY";
     if (stage === "HANDED_TO_COURIER" || stage === "OUT_FOR_DELIVERY") {
         return "ORDER_HANDED_OVER";
     }
+    if (stage === "DELIVERED") return "ORDER_DELIVERED";
+    if (stage === "SENT") return "ORDER_SENT";
     return null;
+}
+
+/**
+ * The business's switch a step's notice sits behind, or null: Ready and
+ * the handover have none of their own (A1); the delivery updates share
+ * ORDER_DELIVERY (A17).
+ */
+export function orderNoticeSetting(
+    kind: OrderStepKind | OrderDeliveryKind,
+): "ORDER_DELIVERY" | null {
+    return kind === "ORDER_READY" || kind === "ORDER_HANDED_OVER"
+        ? null
+        : "ORDER_DELIVERY";
 }
 
 export const orderStepNotice = defineNotice<OrderStepNotice>({
@@ -186,6 +229,11 @@ export const placedOrderNotice = defineNotice<PlacedOrderNotice>({
         }
         const contactId = await orderContactId(tx, organizationId, order);
         if (!contactId) return null;
+        // What the email promises is only what will reach them (U16).
+        const [reach, deliveryUpdates] = await Promise.all([
+            contactReach(tx, organizationId, contactId),
+            noticeOn(tx, organizationId, "ORDER_DELIVERY"),
+        ]);
         return {
             contactId,
             orderId: order.id,
@@ -197,6 +245,8 @@ export const placedOrderNotice = defineNotice<PlacedOrderNotice>({
                     number: order.orderId,
                     fulfilment: order.fulfilment,
                     payOnHandover: order.payOnHandover,
+                    updates: updatesOf(reach),
+                    deliveryUpdates,
                 },
             },
         };
@@ -205,12 +255,7 @@ export const placedOrderNotice = defineNotice<PlacedOrderNotice>({
         const pickup = p.fulfilment === "PICKUP";
         const delivered =
             p.fulfilment === "LOCAL_DELIVERY" || p.fulfilment === "SHIPPING";
-        // Only the steps they are told about are promised (`orderNoticeKind`).
-        const next = pickup
-            ? " We'll tell you when it's ready for pick-up."
-            : delivered
-              ? " We'll tell you when it's on its way."
-              : "";
+        const next = placedNext(p);
         if (p.payOnHandover) {
             const pay = pickup
                 ? "You pay at pick-up."
@@ -233,6 +278,44 @@ export const placedOrderNotice = defineNotice<PlacedOrderNotice>({
     }),
     withLink: (vars, link) => ({ ...vars, placed: { ...vars.placed, link } }),
 });
+
+/** A contact's reach, as the placed notice's promise reads it. */
+function updatesOf(reach: NoticeReach): PlacedOrderVars["updates"] {
+    if (reach === "EMAIL" || reach === "EMAIL_AND_ACCOUNT") return "EMAIL";
+    if (reach === "ACCOUNT" || reach === "ON_SIGN_IN") return "ACCOUNT";
+    return "NONE";
+}
+
+/**
+ * What "Order placed" promises next, with its leading space: only the
+ * steps they are told about (`orderNoticeKind`), by the way that reaches
+ * them (U16, #1147). Emailed: "We'll email you when it's on its way";
+ * shown in their account only: "We'll tell you"; nothing reaches them:
+ * no promise, "‹Business› will be in touch". Delivered and Sent are
+ * promised only while the business sends delivery updates.
+ */
+export function placedNext(p: PlacedOrderVars): string {
+    if (p.updates === "NONE") return ` ${p.business} will be in touch.`;
+    const tell = p.updates === "EMAIL" ? "We'll email you" : "We'll tell you";
+    const deliveryOn = p.deliveryUpdates === true;
+    switch (p.fulfilment) {
+        case "PICKUP":
+            return ` ${tell} when it's ready for pick-up.`;
+        case "LOCAL_DELIVERY":
+        case "SHIPPING":
+            return deliveryOn
+                ? ` ${tell} when it's on its way, and when it's delivered.`
+                : ` ${tell} when it's on its way.`;
+        case "DIGITAL":
+            if (deliveryOn) return ` ${tell} when it's sent.`;
+            // Queued before U16: it promised nothing for a digital order.
+            return p.updates === undefined
+                ? ""
+                : ` ${p.business} will be in touch.`;
+        default:
+            return "";
+    }
+}
 
 /**
  * The contact an order is told to: the site account that placed it, or

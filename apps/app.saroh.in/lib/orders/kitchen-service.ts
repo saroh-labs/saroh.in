@@ -117,7 +117,16 @@ export function moveOrderStage(
 export function saveOrderCourier(
     orderId: string,
     input: CourierFields,
-): Promise<CrmResult<{ eventId: string | null }>> {
+): Promise<
+    CrmResult<{
+        eventId: string | null;
+        /**
+         * A notice carries the new tracking to the customer (U16); absent
+         * from an API before it.
+         */
+        trackingNotice?: boolean;
+    }>
+> {
     return mutate(
         path(orderId),
         "PATCH",

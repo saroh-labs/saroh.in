@@ -14,6 +14,7 @@ import { membershipNotice } from "./membership";
 import type { NoticeDefinition, NoticeSubject, NoticeVarsBase } from "./notice";
 import { safeLink } from "./notice";
 import { orderStepNotice, placedOrderNotice } from "./order";
+import { orderDeliveryNotice } from "./order-delivery";
 import { waitlistNotice } from "./waitlist";
 
 /**
@@ -45,6 +46,10 @@ export const NOTICES = {
     ORDER_HANDED_OVER: orderStepNotice,
     ORDER_PLACED: placedOrderNotice,
     ORDER_READY: orderStepNotice,
+    // Delivery updates (U16, #1147).
+    ORDER_DELIVERED: orderDeliveryNotice,
+    ORDER_SENT: orderDeliveryNotice,
+    ORDER_TRACKING: orderDeliveryNotice,
     WAITLIST_OFFER: waitlistNotice,
 } as const satisfies Record<NoticeTemplate, NoticeDefinition<NoticeVarsBase>>;
 

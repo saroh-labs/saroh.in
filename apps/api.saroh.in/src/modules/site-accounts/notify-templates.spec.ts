@@ -1,3 +1,4 @@
+import { orderNoticeSetting } from "./notices/order";
 import type {
     BookingNoticeVars,
     NoticeVars,
@@ -189,15 +190,20 @@ describe("notice words (A14)", () => {
         expect(orderNoticeKind("READY")).toBe("ORDER_READY");
         expect(orderNoticeKind("HANDED_TO_COURIER")).toBe("ORDER_HANDED_OVER");
         expect(orderNoticeKind("OUT_FOR_DELIVERY")).toBe("ORDER_HANDED_OVER");
-        for (const stage of [
-            "NEW",
-            "PREPARING",
-            "COLLECTED",
-            "DELIVERED",
-            "SENT",
-        ]) {
+        // U16: Delivered and a digital order's Sent are told; Collected never.
+        expect(orderNoticeKind("DELIVERED")).toBe("ORDER_DELIVERED");
+        expect(orderNoticeKind("SENT")).toBe("ORDER_SENT");
+        for (const stage of ["NEW", "PREPARING", "COLLECTED"]) {
             expect(orderNoticeKind(stage)).toBeNull();
         }
+    });
+
+    it("puts Delivered, Sent and tracking behind the delivery updates switch, Ready and the handover behind none", () => {
+        expect(orderNoticeSetting("ORDER_READY")).toBeNull();
+        expect(orderNoticeSetting("ORDER_HANDED_OVER")).toBeNull();
+        expect(orderNoticeSetting("ORDER_DELIVERED")).toBe("ORDER_DELIVERY");
+        expect(orderNoticeSetting("ORDER_SENT")).toBe("ORDER_DELIVERY");
+        expect(orderNoticeSetting("ORDER_TRACKING")).toBe("ORDER_DELIVERY");
     });
 });
 
@@ -372,6 +378,103 @@ describe("a website order placed (UX-042)", () => {
                 placed({ payOnHandover: false, fulfilment: "DIGITAL" }),
             ),
         ).toBe("We have your order ORD-1019, and it's paid.");
+    });
+
+    it("promises email only when an email will go, and delivery steps only while delivery updates are on (U16)", () => {
+        const say = (over: Record<string, unknown>) =>
+            noticeSentence(placed({ payOnHandover: false, ...over }));
+        expect(say({ updates: "EMAIL", deliveryUpdates: true })).toBe(
+            "We have your order ORD-1019, and it's paid. We'll email you when it's ready for pick-up.",
+        );
+        expect(
+            say({
+                fulfilment: "SHIPPING",
+                updates: "EMAIL",
+                deliveryUpdates: true,
+            }),
+        ).toBe(
+            "We have your order ORD-1019, and it's paid. We'll email you when it's on its way, and when it's delivered.",
+        );
+        expect(
+            say({
+                fulfilment: "LOCAL_DELIVERY",
+                updates: "EMAIL",
+                deliveryUpdates: false,
+            }),
+        ).toBe(
+            "We have your order ORD-1019, and it's paid. We'll email you when it's on its way.",
+        );
+        expect(
+            say({
+                fulfilment: "DIGITAL",
+                updates: "EMAIL",
+                deliveryUpdates: true,
+            }),
+        ).toBe(
+            "We have your order ORD-1019, and it's paid. We'll email you when it's sent.",
+        );
+        expect(
+            say({
+                fulfilment: "DIGITAL",
+                updates: "EMAIL",
+                deliveryUpdates: false,
+            }),
+        ).toBe(
+            "We have your order ORD-1019, and it's paid. Rye & Co. will be in touch.",
+        );
+        // Only in their account: told, never "emailed".
+        expect(
+            say({
+                fulfilment: "SHIPPING",
+                updates: "ACCOUNT",
+                deliveryUpdates: true,
+            }),
+        ).toBe(
+            "We have your order ORD-1019, and it's paid. We'll tell you when it's on its way, and when it's delivered.",
+        );
+        // Nothing reaches them: no promise at all.
+        for (const fulfilment of ["PICKUP", "SHIPPING", "DIGITAL"]) {
+            const words = say({
+                fulfilment,
+                updates: "NONE",
+                deliveryUpdates: true,
+            });
+            expect(words).toMatch(/Rye & Co\. will be in touch\.$/);
+            expect(words).not.toMatch(/We'll/);
+        }
+    });
+
+    it("words Delivered, Sent and tracking added later (U16)", () => {
+        const delivery = {
+            business: "Rye & Co.",
+            firstName: "Asha",
+            number: "ORD-1019",
+            courier: "Bluedart",
+            trackingNumber: "BD123",
+            trackingUrl: "https://track.example.com/BD123",
+        };
+        expect(noticeSentence({ kind: "ORDER_DELIVERED", delivery })).toBe(
+            "Your order ORD-1019 has been delivered.",
+        );
+        expect(noticeSentence({ kind: "ORDER_SENT", delivery })).toBe(
+            "Your order ORD-1019 has been sent. If you can't find the download or access details, Rye & Co. can help.",
+        );
+        expect(noticeSentence({ kind: "ORDER_TRACKING", delivery })).toBe(
+            "You can track your order ORD-1019 with Bluedart now. Tracking number: BD123.",
+        );
+        const email = renderNotice({ kind: "ORDER_TRACKING", delivery });
+        expect(email.subject).toBe("Track your order ORD-1019 from Rye & Co.");
+        expect(email.body).toContain("Track your parcel:");
+        expect(email.body).toContain("https://track.example.com/BD123");
+        // A link that isn't a web address is never one.
+        const bad = renderNotice({
+            kind: "ORDER_TRACKING",
+            delivery: { ...delivery, trackingUrl: "javascript:alert(1)" },
+        });
+        expect(bad.body).not.toContain("javascript:");
+        expect(
+            renderNotice({ kind: "ORDER_DELIVERED", delivery }).body,
+        ).not.toContain("Track your parcel");
     });
 
     it("emails in the business's voice, everything escaped", () => {
