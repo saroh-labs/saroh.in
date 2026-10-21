@@ -187,14 +187,17 @@ async function joinLine(
     // A new account may be asked its name first, as booking does.
     const name = page.getByLabel("Name");
     await expect(joined.or(name).first()).toBeVisible({ timeout: 15_000 });
-    if (await name.isVisible()) {
+    if ((await name.isVisible()) && !(await joined.isVisible())) {
         await expectNoZoomOnFocus(name);
         await name.fill("Sneha Pillai");
-        await page
+        // The sheet may finish joining by itself once it has a name: click
+        // Join only while it is still there.
+        const join = page
             .getByRole("button", { name: /^Join (the )?waitlist$/ })
             .filter({ visible: true })
-            .first()
-            .click();
+            .first();
+        await expect(joined.or(join).first()).toBeVisible({ timeout: 15_000 });
+        if (!(await joined.isVisible())) await join.click();
     }
     await expect(joined).toBeVisible({ timeout: 15_000 });
 }
