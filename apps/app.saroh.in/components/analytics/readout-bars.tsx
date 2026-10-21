@@ -37,6 +37,7 @@ export function ReadoutBars({
     label,
     initial,
     tall = false,
+    dense = false,
 }: {
     bars: readonly ReadoutBar[];
     /** What the chart shows, for the group. */
@@ -45,6 +46,11 @@ export function ReadoutBars({
     initial: string;
     /** 160px rather than 96px from the md breakpoint. */
     tall?: boolean;
+    /**
+     * Many bars (three months of days): the gaps narrow to a pixel, so
+     * ninety-odd bars still fit across a 320px phone.
+     */
+    dense?: boolean;
 }) {
     const [selected, setSelected] = useState(initial);
     const shown = bars.find((b) => b.key === selected) ?? bars.at(-1);
@@ -73,7 +79,8 @@ export function ReadoutBars({
                 role="group"
                 aria-label={label}
                 className={cn(
-                    "flex items-end gap-[3px] sm:gap-[5px]",
+                    "flex items-end",
+                    dense ? "gap-px sm:gap-[2px]" : "gap-[3px] sm:gap-[5px]",
                     tall ? "h-24 md:h-40" : "h-24",
                 )}
             >
@@ -114,7 +121,10 @@ export function ReadoutBars({
             </div>
             <div
                 aria-hidden
-                className="mt-[7px] flex gap-[3px] text-xs text-muted-foreground sm:gap-[5px]"
+                className={cn(
+                    "mt-[7px] flex text-xs text-muted-foreground",
+                    dense ? "gap-px sm:gap-[2px]" : "gap-[3px] sm:gap-[5px]",
+                )}
             >
                 {bars.map((bar, i) => (
                     <span

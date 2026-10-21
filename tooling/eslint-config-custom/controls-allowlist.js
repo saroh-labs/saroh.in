@@ -157,6 +157,9 @@ export const RAW_ALLOWED = {
     // button: an age of "Who owes me?", a row that is one button (U12)
     "components/insights/owed-by-age.tsx": ["button"],
     "components/insights/period-control.tsx": ["button"],
+    // button: the board's website chip on Where customers come from, naming
+    // the site shown and opening its picker (DEC-171, U14, IBSiteD)
+    "components/insights/site-picker.tsx": ["button"],
     // button: a part of the invoice's paper, pressed to change it (U15)
     "components/invoices/paper-editor/part-popover.tsx": ["button"],
     // button: "Add a line" under the paper's lines, a row that is one button (U15)

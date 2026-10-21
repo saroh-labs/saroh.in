@@ -126,3 +126,33 @@ export async function readTraffic(
         `/organizations/${orgId}/analytics${query ? `?${query}` : ""}`,
     );
 }
+
+/** A website the Where customers come from tab can be narrowed to. */
+export interface SiteChoiceRead {
+    id: string;
+    name: string;
+    subdomain?: string | null;
+}
+
+/**
+ * The business's websites, for the tab's site picker (DEC-171, plan U14):
+ * the sites list (`site:read`). `denied` for a role without it (the tab
+ * then shows every website together, with no picker), `failed` said once
+ * on the tab, never as "one website".
+ */
+export async function readSiteChoices(): Promise<SourceRead<SiteChoiceRead[]>> {
+    const orgId = await getActiveOrgId();
+    if (!orgId) return { status: "ok", data: [] };
+    const read = await readSource<SiteChoiceRead[] | null>(
+        `/organizations/${orgId}/sites`,
+    );
+    if (read.status !== "ok") return read;
+    return {
+        status: "ok",
+        data: (read.data ?? []).map(({ id, name, subdomain }) => ({
+            id,
+            name,
+            subdomain: subdomain ?? null,
+        })),
+    };
+}
