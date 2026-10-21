@@ -1,13 +1,19 @@
 // @covers site:/book/claim/[token] site:/book api:site-accounts api:bookings pkg:site-blocks
 import { createHmac } from "node:crypto";
 
-import type { APIRequestContext, Page, TestInfo } from "@playwright/test";
+import type {
+    APIRequestContext,
+    Browser,
+    Page,
+    TestInfo,
+} from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { northwind, phone, stamp } from "../fixtures/own-data";
 import type { OwnService } from "../fixtures/own-service";
 import { bookOnOwn } from "../fixtures/own-service";
-import { urls } from "../playwright.config";
+import { useSession } from "../fixtures/sessions";
+import { ignoreHTTPSErrors, urls } from "../playwright.config";
 import { asNewVisitor, expectNoZoomOnFocus, signInOnSheet } from "./site-codes";
 
 /**
@@ -193,14 +199,31 @@ async function joinLine(
     await expect(joined).toBeVisible({ timeout: 15_000 });
 }
 
+/** The owner's side: their own context, so the visitor's page stays theirs. */
+async function ownerRequest(
+    browser: Browser,
+): Promise<{ request: APIRequestContext; close: () => Promise<void> }> {
+    const context = await browser.newContext({
+        baseURL: urls.APP_URL,
+        ignoreHTTPSErrors,
+    });
+    const page = await context.newPage();
+    await useSession(page, "owner");
+    return { request: page.request, close: () => context.close() };
+}
+
 test.describe("the waitlist offer's claim link (#1149)", () => {
     test.beforeEach(({ page }) => asNewVisitor(page));
 
     test("opens the class with Book my spot, books the place, and is then spent; an ended hold and another business's site say so", async ({
         page,
-        request,
+        browser,
     }, testInfo) => {
         test.setTimeout(150_000);
+        // The owner's calls go in their own signed-in context, so the page
+        // stays a new visitor to the site.
+        const owner = await ownerRequest(browser);
+        const request = owner.request;
         const { service, startAt, handBookings } = await fullClass(
             request,
             testInfo,
@@ -292,6 +315,7 @@ test.describe("the waitlist offer's claim link (#1149)", () => {
             ).toHaveCount(0);
         } finally {
             await service.remove();
+            await owner.close();
         }
     });
 

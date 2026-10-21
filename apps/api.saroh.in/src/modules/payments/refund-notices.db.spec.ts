@@ -69,7 +69,7 @@ import {
     FakeProviderFactory,
 } from "./providers/fake.provider";
 
-const WEBHOOK_SECRET = "whsec_u12_refunds";
+const WEBHOOK_SECRET = "whsec_u12_refunds"; // gitleaks:allow (made-up test secret)
 const tag = `${process.pid}-${Date.now()}`;
 
 const flags = {

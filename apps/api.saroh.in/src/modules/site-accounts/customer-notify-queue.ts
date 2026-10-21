@@ -1,8 +1,8 @@
 import type { Prisma } from "@saroh/database";
 
 import { noticeOn } from "../communications/notice-settings";
-import { orderNoticeKind, orderNoticeSetting } from "./notices/order";
-import type { NoticeKind } from "./notify-templates";
+import type { NoticeTemplate as NoticeKind } from "../communications/transactional";
+import { orderNoticeKind, orderNoticeSetting } from "./notices/order-steps";
 
 /**
  * Enqueueing and cancelling `customer.notify` (round-2 A14, R15): the one

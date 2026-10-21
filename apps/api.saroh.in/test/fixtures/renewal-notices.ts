@@ -47,7 +47,7 @@ import { giveBusinessDetails } from "../business-details";
  * `RENDERER_URL`) with `jest.mock("../../env")` first.
  */
 
-const WEBHOOK_SECRET = "whsec_u10_renewals";
+const WEBHOOK_SECRET = "whsec_u10_renewals"; // gitleaks:allow (made-up test secret)
 export const HOUR = 60 * 60 * 1000;
 export const DAY = 24 * HOUR;
 

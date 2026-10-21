@@ -1,8 +1,8 @@
 import type { Prisma } from "@saroh/database";
 
+import type { NoticeTemplate as NoticeKind } from "../communications/transactional";
 import { siteOriginOf } from "../sites/site-origin";
 import { accountAreaOn } from "./account-area";
-import type { NoticeKind } from "./notify-templates";
 
 /**
  * The way back from a notice's email to what it is about, on the

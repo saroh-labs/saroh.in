@@ -1,9 +1,9 @@
 import type { Prisma } from "@saroh/database";
 
 import { dayWords, isTimeZone, timeWords } from "../../../common/words-format";
-import type { TransactionalRecipient } from "../../communications/communications.service";
 import type { NoticeKind as NoticeSettingKind } from "../../communications/notice-settings";
 import type { NoticeTemplate } from "../../communications/transactional";
+import type { TransactionalRecipient } from "../../communications/transactional-recipient";
 import type { CustomerNotifyPayload } from "../customer-notify-queue";
 
 /**

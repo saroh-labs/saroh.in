@@ -1,6 +1,6 @@
 import type { Prisma } from "@saroh/database";
 
-import type { ModuleKey } from "../capabilities/module-registry";
+import type { ModuleKey } from "../capabilities/module-keys";
 
 /**
  * The business's switches for its automatic customer notices (DEC-174,
