@@ -16,7 +16,7 @@ import { PayStep } from "./steps/pay-step";
 import { ServiceStep } from "./steps/service-step";
 import { WhenStep } from "./steps/when-step";
 import type { Times } from "./use-times";
-import { SESSIONS_SHOWN } from "./use-times";
+import { SESSIONS_SHOWN, sessionsOnShow } from "./use-times";
 import type { WaitlistPlace } from "./waitlist";
 
 /**
@@ -88,8 +88,22 @@ export function ChooseSteps({
                     days={times.days}
                     isClass={times.isClass}
                     day={times.day}
-                    sessions={times.sessions.slice(0, times.sessionsShown)}
-                    more={times.sessions.length > times.sessionsShown}
+                    sessions={times.sessions.slice(
+                        0,
+                        sessionsOnShow(
+                            times.sessions,
+                            times.sessionsShown,
+                            chosen?.startAt,
+                        ),
+                    )}
+                    more={
+                        times.sessions.length >
+                        sessionsOnShow(
+                            times.sessions,
+                            times.sessionsShown,
+                            chosen?.startAt,
+                        )
+                    }
                     zone={times.zone}
                     service={service}
                     chosen={chosen}

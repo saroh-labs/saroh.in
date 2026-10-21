@@ -17,7 +17,7 @@ import { laterSkip } from "./model";
 import { FlowMessageLine } from "./steps/flow-message";
 import { WhenBody } from "./steps/when-step";
 import type { BookingFlowEngine } from "./use-booking-flow";
-import { SESSIONS_SHOWN } from "./use-times";
+import { SESSIONS_SHOWN, sessionsOnShow } from "./use-times";
 
 /**
  * A look's step, under its heading (DEC-172, U10): the same contents in
@@ -95,8 +95,22 @@ export function LookStepBody({
                         days={times.days}
                         isClass={times.isClass}
                         day={times.day}
-                        sessions={times.sessions.slice(0, times.sessionsShown)}
-                        more={times.sessions.length > times.sessionsShown}
+                        sessions={times.sessions.slice(
+                            0,
+                            sessionsOnShow(
+                                times.sessions,
+                                times.sessionsShown,
+                                chosen?.startAt,
+                            ),
+                        )}
+                        more={
+                            times.sessions.length >
+                            sessionsOnShow(
+                                times.sessions,
+                                times.sessionsShown,
+                                chosen?.startAt,
+                            )
+                        }
                         zone={zone}
                         service={service}
                         chosen={chosen}

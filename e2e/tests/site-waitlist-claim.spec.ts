@@ -297,6 +297,18 @@ test.describe("the waitlist offer's claim link (#1149)", () => {
                 timeout: 15_000,
             });
             await expect(page.getByText(/That time has gone/)).toHaveCount(0);
+            // An account that joined the line without a name is asked for
+            // one before booking, as any booking does.
+            const bookName = page
+                .getByLabel("Name")
+                .filter({ visible: true })
+                .first();
+            if (
+                (await bookName.count()) > 0 &&
+                !(await bookName.inputValue())
+            ) {
+                await bookName.fill("Sneha Pillai");
+            }
             await page
                 .getByRole("button", { name: /^Book/ })
                 .filter({ visible: true })

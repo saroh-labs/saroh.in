@@ -23,6 +23,22 @@ export interface PendingStart {
 export const SESSIONS_SHOWN = 10;
 
 /**
+ * How many sessions are on show: what "Show more" has opened, and never
+ * fewer than reach the chosen one, so a session chosen by the address (a
+ * waitlist claim link, #1149) is always in the list it is chosen from.
+ */
+export function sessionsOnShow(
+    sessions: readonly { startAt: string }[],
+    shown: number,
+    chosenStartAt: string | null | undefined,
+): number {
+    const at = chosenStartAt
+        ? sessions.findIndex((s) => s.startAt === chosenStartAt)
+        : -1;
+    return Math.max(shown, at + 1);
+}
+
+/**
  * What is being chosen on the booking page and the times it is chosen
  * from: the service, the two weeks on show and who with, the day and the
  * start, and the API's read of the free times. A late answer for another
