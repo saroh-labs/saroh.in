@@ -100,6 +100,10 @@ export const AuditAction = {
     // channel, and on or off as it was and became. Their own choice, about
     // no one else, so it carries the value.
     MemberAlertsUpdate: "member.alerts.update",
+    // The business turned one of its automatic customer notices on or off
+    // (DEC-174, U1 #1132): which kind, and on or off as it was and became.
+    // The business's own setting, about no person, so it carries the value.
+    CustomerNoticesSetting: "customer-notices.setting",
     // The owner changed the business's web address (DEC-069, plan L2),
     // written in the change's own transaction. Metadata: `from` and `to`,
     // the addresses — public by nature, never a person's detail.

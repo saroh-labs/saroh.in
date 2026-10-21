@@ -428,6 +428,9 @@ model Organization {
   packExtensions           PackExtension[]
   // The notices told about a customer's bookings and orders (round-2 A14).
   customerNotices          CustomerNotice[]
+  // Which automatic customer notices it has turned off or on, where that
+  // differs from the default in code (DEC-174, U1 #1132).
+  customerNoticeSettings   CustomerNoticeSetting[]
   // Places in line for full classes (round-2 A12).
   classWaitlistEntries     ClassWaitlistEntry[]
   // Customers' "Ask to remove my data" requests (DEC-172, #1106).
@@ -7766,6 +7769,29 @@ model CustomerNotice {
   @@index([messageId])
   // One booking's notices: Saroh's cap of emails per booking a day (DEC-086).
   @@index([organizationId, bookingId, createdAt])
+}
+
+// A business's choice about one kind of automatic customer notice (DEC-174,
+// U1 #1132): renewal invoices, membership emails, refunds and so on. The
+// kinds and their defaults are code (`communications/notice-settings.ts`);
+// a row is kept only while the business's choice differs from the default,
+// as NotificationPreference does, so a switch put back removes it.
+model CustomerNoticeSetting {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // A NoticeKind: RENEWAL_INVOICE | AUTOPAY_FAILED | MEMBERSHIP | ... .
+  kind    String
+  enabled Boolean
+
+  // Who made the choice. Informational, no FK: the choice outlives them.
+  updatedByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, kind])
 }
 
 // ============================================================================

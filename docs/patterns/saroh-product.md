@@ -565,6 +565,26 @@ organizations/:org/customers`: everyone who has paid (an order through a
   while the first two hold (`offered`), so nobody is offered a switch that
   does nothing, and it says what a business with no email provider is left
   with: no other way to tell a customer their order is ready.
+- **Current** (DEC-174, U1 #1132) — **Every automatic customer notice
+  added by DEC-174 has a switch the business can turn off.** The kinds,
+  their defaults, the module each belongs to and their words are one pure
+  module, `communications/notice-settings.ts`: renewal invoices, failed
+  autopay charges, membership emails, refunds, team replies, enquiry
+  replies, delivery updates, course emails, pack credits and back in stock
+  start on; overdue reminders start off (D3 is opt-in). A business's choice
+  is a `CustomerNoticeSetting` row only while it differs from the default,
+  as `NotificationPreference` is; a write equal to the default deletes it.
+  **Every sender asks `noticeOn(tx, organizationId, kind)` inside its own
+  transaction, and only that**: never a gate of its own. `noticeOn` says
+  only whether the business sends the kind; the provider, consent and the
+  account thread stay the send path's. `GET` and
+  `PATCH …/customer-notices/settings`: anyone in the business reads them
+  (`canChange` says whether they may change them), a change needs
+  `comms:manage` and writes `customer-notices.setting` to the audit stream.
+  A kind whose module is off is not listed (DEC-057); the enquiry reply is
+  listed but not offered without a connected email provider ("Connect your
+  email first"), and a change to a kind not offered is refused (409).
+  Booking and order notices, and the fixes, have no switch here.
 
 ## Analytics
 

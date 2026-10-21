@@ -23,7 +23,9 @@ import {
     SendMessageDto,
     SetAccountUpdatesDto,
     SetConsentDto,
+    SetNoticeSettingDto,
 } from "./dto";
+import { NoticeSettingsService } from "./notice-settings.service";
 
 /**
  * Org communications endpoints (S6-001), scoped to
@@ -38,7 +40,10 @@ import {
 @Controller("organizations/:organizationId")
 @UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
 export class CommunicationsController {
-    constructor(private readonly comms: CommunicationsService) {}
+    constructor(
+        private readonly comms: CommunicationsService,
+        private readonly noticeSettings: NoticeSettingsService,
+    ) {}
 
     // ---- Providers ----
     /*
@@ -177,5 +182,26 @@ export class CommunicationsController {
         @Body() dto: SetAccountUpdatesDto,
     ) {
         return this.comms.setAccountUpdates(ctx, dto.on);
+    }
+
+    /**
+     * The business's switches for its automatic customer notices (DEC-174,
+     * U1 #1132): each kind whose module is on, with whether it is on, its
+     * default, and whether it can be changed now (and why not). Anyone in
+     * the business reads it; changing one needs `comms:manage`. Not
+     * module-gated, as "Updates in Messages": turning a notice off must
+     * work with Communications off.
+     */
+    @Get("customer-notices/settings")
+    noticeSettingsRead(@OrgContext() ctx: OrganizationContext) {
+        return this.noticeSettings.read(ctx);
+    }
+
+    @Patch("customer-notices/settings")
+    noticeSettingsUpdate(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: SetNoticeSettingDto,
+    ) {
+        return this.noticeSettings.update(ctx, { kind: dto.kind, on: dto.on });
     }
 }
