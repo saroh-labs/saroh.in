@@ -73,16 +73,23 @@ export function leftWords(left: number | null | undefined): string | null {
     return left === 1 ? "Last one" : `${left} left`;
 }
 
+/** The owner's line without its closing full stops and spaces, in one pass. */
+function withoutEndStops(line: string): string {
+    let end = line.length;
+    while (end > 0 && (line[end - 1] === "." || /\s/.test(line[end - 1] ?? "")))
+        end -= 1;
+    return line.slice(0, end);
+}
+
 /** What the one line about when reads: the owner's line, then the facts. */
 export function shopWhenLine(
     cutOff: string | null | undefined,
     facts: string | null | undefined,
 ): string | null {
-    const own = cutOff?.trim();
-    const parts = [
-        own ? own.replace(/[.\s]+$/, "") : null,
-        facts?.trim() ? facts.trim() : null,
-    ].filter((p): p is string => Boolean(p));
+    const own = withoutEndStops(cutOff?.trim() ?? "");
+    const parts = [own || null, facts?.trim() ? facts.trim() : null].filter(
+        (p): p is string => Boolean(p),
+    );
     if (parts.length === 0) return null;
     return `${parts.join(". ")}.`;
 }

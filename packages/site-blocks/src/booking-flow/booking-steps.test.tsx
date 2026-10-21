@@ -322,7 +322,9 @@ describe("the step in the address (U9)", () => {
         ]);
         // Every request was the API's own: the page itself was never asked
         // for again.
-        expect(calls.every((c) => c.url.startsWith(API))).toBe(true);
+        expect(
+            calls.every((c) => new URL(c.url).origin === new URL(API).origin),
+        ).toBe(true);
     });
 
     it("Back returns to the person step with the service kept, and Forward chooses the time again", async () => {
