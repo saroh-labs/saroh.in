@@ -13,6 +13,7 @@ import { cleanBusinessName } from "../site-accounts/sender-name";
 import type { AlertEvent } from "./alert-preferences";
 import { alertOn, mayHearAbout } from "./alert-preferences";
 import { wordAsk } from "./ask-alerts";
+import { wordDataRequest } from "./data-request-alerts";
 import { wordDomain } from "./domain-alerts";
 import { noticeHeadOf, noticeOf } from "./notice-target";
 import { wordProvider } from "./provider-alerts";
@@ -21,6 +22,7 @@ import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
 import { TEAM_ALERT_TYPE } from "./team-alerts";
 import { putOffUntilDue, wordUncollected } from "./uncollected-alert";
 
+export { DATA_REQUEST_NOTIFICATION_TYPE } from "./data-request-alerts";
 export {
     DOMAIN_BACK_NOTIFICATION_TYPE,
     DOMAIN_DOWN_NOTIFICATION_TYPE,
@@ -50,6 +52,7 @@ const ROW_LABEL: Record<AlertEvent, string> = {
     failed: "Payment failed",
     team: "Someone joins the team",
     site: "Your website",
+    request: "Data removal requests",
 };
 
 const BUILT_IN_LABEL: Partial<Record<string, string>> = {
@@ -423,6 +426,8 @@ export async function wordAlert(
             return wordDomain(tx, organizationId, payload);
         case "ask":
             return wordAsk(tx, organizationId, payload);
+        case "request":
+            return wordDataRequest(tx, organizationId, payload);
     }
 }
 
@@ -700,6 +705,8 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
             return str("notificationId") ? (p as TeamAlertPayload) : null;
         case "uncollected":
             return str("orderId") ? (p as TeamAlertPayload) : null;
+        case "request":
+            return str("requestId") ? (p as TeamAlertPayload) : null;
         case "provider":
             return str("providerId") &&
                 str("since") &&

@@ -36,3 +36,28 @@ describe("SiteError", () => {
         expect(html).not.toMatch(SAROH_BRAND);
     });
 });
+
+describe("SiteError in a look (DEC-172, U15)", () => {
+    it.each(["folio", "quiet", "live"] as const)(
+        "%s: what happened, Try again filled, home as a link",
+        (look) => {
+            const html = renderToStaticMarkup(
+                <SiteError
+                    onRetry={() => undefined}
+                    digest="abc"
+                    look={look}
+                />,
+            );
+            expect(html).toContain(`data-site-state-look="${look}"`);
+            expect(html).toContain("This page didn’t load");
+            expect(html).toContain("on our side, not yours");
+            expect(html).toMatch(/<button [^>]*>Try again<\/button>/);
+            expect(html).toMatch(/<a [^>]*href="\/"[^>]*>Back to home<\/a>/);
+            expect(html.match(/bg-site-accent/g)).toHaveLength(1);
+            expect(html).toContain("Reference: abc");
+            // Says only what is true: no promise about a charge.
+            expect(html).not.toMatch(/charged/);
+            expect(html).not.toMatch(SAROH_BRAND);
+        },
+    );
+});

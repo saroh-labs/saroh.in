@@ -25,9 +25,13 @@ async function signIn(page: import("@playwright/test").Page) {
     await page.getByLabel("Email").fill(demoUser.email);
     await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
     await page.getByRole("button", { name: "Sign in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    // Polled: `waitForURL` fails on a navigation cut short on the way
+    // (net::ERR_ABORTED), though the page lands where it should.
+    await expect
+        .poll(() => new URL(page.url()).pathname.startsWith("/login"), {
+            timeout: 30_000,
+        })
+        .toBe(false);
     // The landing page has finished loading: a `goto` made while sign-in
     // is still moving the page on is aborted (net::ERR_ABORTED).
     await page.waitForLoadState("load");
@@ -84,7 +88,10 @@ test.describe("cross-origin session", () => {
             .fill(demoUser.password);
         await page.getByRole("button", { name: "Sign in" }).click();
 
-        await page.waitForURL(/\/bookings/, { timeout: 30_000 });
+        // Polled, not `waitForURL`: on the way to /bookings one navigation
+        // replaces another, and `waitForURL` fails on the one cut short
+        // (net::ERR_ABORTED) though the visitor lands where they asked.
+        await expect(page).toHaveURL(/\/bookings/, { timeout: 30_000 });
 
         /*
          * The claim is about the DESTINATION, so that is what is asserted.

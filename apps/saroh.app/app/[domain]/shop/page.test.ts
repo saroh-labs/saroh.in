@@ -40,6 +40,9 @@ vi.mock("@/lib/test-metadata", () => ({
     shareable: vi.fn((_resolved: unknown, metadata: unknown) => metadata),
 }));
 vi.mock("@/lib/shop-checkout", () => ({ getCheckoutOptions: vi.fn() }));
+vi.mock("@/lib/shop-checkout-shape", () => ({
+    enquiryPagePath: vi.fn(() => null),
+}));
 vi.mock("@/lib/page-cache/site-rules", () => ({
     dontCachePage: vi.fn(),
     listsProducts: vi.fn(),

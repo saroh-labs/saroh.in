@@ -321,7 +321,18 @@ test.describe("invoice details: Northwind, own invoices", () => {
     test("a read that fails is said inside the sheet, with Try again", async ({
         page,
     }) => {
-        await openList(page, NORTHWIND_ORG, "?invoice=no-such-invoice");
+        // Not `openList`: the sheet can open before the heading is read,
+        // and a modal sheet hides the page behind it from the tree.
+        await useSession(page);
+        await page.goto(`/open/${NORTHWIND_ORG}`);
+        await page.goto("/billing/invoices?invoice=no-such-invoice");
+        await expect(
+            page.getByRole("heading", {
+                level: 1,
+                name: "Invoices",
+                includeHidden: true,
+            }),
+        ).toBeVisible();
         const open = page.getByRole("dialog");
         await expect(open).toContainText("Couldn't load this invoice");
         // The house words for a failed read (`NOTHING_CHANGED`, @saroh/ui/lib/state-copy).

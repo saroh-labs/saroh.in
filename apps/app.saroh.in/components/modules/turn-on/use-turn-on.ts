@@ -272,10 +272,16 @@ export function useTurnOn({
               )
             : [];
 
+    // Bookings' booking page, when the API said one is coming (DEC-175).
+    const bookingPage =
+        (loaded ?? []).find((d) => d.key === "APPOINTMENTS")?.bookingPage ??
+        null;
+
     return {
         ready: draft !== null,
         draft,
         plan,
+        bookingPage,
         websiteTemplate,
         websiteChoices,
         websiteAddressFixed,

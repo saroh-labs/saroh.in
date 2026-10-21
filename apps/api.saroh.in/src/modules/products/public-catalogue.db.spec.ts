@@ -21,7 +21,10 @@ import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { automaticStorefront, sellsFromView } from "../sites/sells-from";
 import { SitesService } from "../sites/sites.service";
 import { StorefrontsService } from "../stores/storefronts.service";
-import { PublicCatalogueService } from "./public-catalogue.service";
+import {
+    PublicCatalogueService,
+    SHOP_STOCK_KEPT_MS,
+} from "./public-catalogue.service";
 
 const tag = `${process.pid}-${Date.now()}`;
 let seq = 0;
@@ -286,6 +289,100 @@ describe("public catalogue (G11)", () => {
         expect(
             shop.products.find((p) => p.slug === "focaccia")?.bagVariantId,
         ).toBeNull();
+    });
+
+    it("serves the Live look's counts: the shop's cards, with only what \"N left\" needs (review #21)", async () => {
+        const shop = await catalogue.list(ryeSite, "visitor");
+        const stock = await new PublicCatalogueService(
+            new FixedWindowRateLimiter(1_000),
+        ).stock(ryeSite, "visitor");
+        expect(stock.items).toEqual(
+            shop.products.map((card) => ({
+                slug: card.slug,
+                listingId: card.listingId,
+                variantId: card.bagVariantId,
+                left: card.bagLeft,
+                soldOut: card.soldOut,
+            })),
+        );
+        // Sourdough's Large: 4 on the shelf, 2 promised.
+        expect(stock.items.find((i) => i.slug === "sourdough")?.left).toBe(2);
+        // Nothing else rides along: no prices, names or photos.
+        for (const item of stock.items) {
+            expect(Object.keys(item).sort()).toEqual([
+                "left",
+                "listingId",
+                "slug",
+                "soldOut",
+                "variantId",
+            ]);
+        }
+    });
+
+    it("keeps one shop's counts 30 seconds for every visitor, then reads them again (review #21)", async () => {
+        const fresh = new PublicCatalogueService(
+            new FixedWindowRateLimiter(1_000),
+        );
+        const now = Date.now();
+        try {
+            const first = await Promise.all(
+                Array.from({ length: 10 }, (_, i) =>
+                    fresh.stock(ryeSite, `visitor-${i}`, now),
+                ),
+            );
+            // One answer, shared.
+            expect(new Set(first).size).toBe(1);
+            const before = first[0]?.items.find((i) => i.slug === "sourdough");
+            expect(before?.left).toBe(2);
+            // One more of Large is promised to an order.
+            await prisma.stockLevel.updateMany({
+                where: {
+                    storeId: online,
+                    productId: sourdough.id,
+                    variantId: sourdough.variants[1]!,
+                },
+                data: { promised: 3 },
+            });
+            // Inside the window a visitor may still see 2 (checkout
+            // refuses what is gone); after it, 1.
+            const kept = await fresh.stock(
+                ryeSite,
+                "late",
+                now + SHOP_STOCK_KEPT_MS - 1,
+            );
+            expect(kept.items.find((i) => i.slug === "sourdough")?.left).toBe(
+                2,
+            );
+            const after = await fresh.stock(
+                ryeSite,
+                "later",
+                now + SHOP_STOCK_KEPT_MS,
+            );
+            expect(after.items.find((i) => i.slug === "sourdough")?.left).toBe(
+                1,
+            );
+        } finally {
+            await prisma.stockLevel.updateMany({
+                where: {
+                    storeId: online,
+                    productId: sourdough.id,
+                    variantId: sourdough.variants[1]!,
+                },
+                data: { promised: 2 },
+            });
+        }
+    });
+
+    it("404s the counts like the shop, and limits each visitor (review #21)", async () => {
+        const closed = await business("Closed Counts Bakery", false);
+        const closedStore = await storefront(closed, "Online");
+        const closedSite = await site(closed, closedStore);
+        await expectNotFound(catalogue.stock(closedSite, "visitor"));
+        const tight = new PublicCatalogueService(new FixedWindowRateLimiter(1));
+        await tight.stock(ryeSite, "busy");
+        await expect(tight.stock(ryeSite, "busy")).rejects.toMatchObject({
+            status: 429,
+        });
     });
 
     it("names the category a product is filed under, for the shop's chips", async () => {

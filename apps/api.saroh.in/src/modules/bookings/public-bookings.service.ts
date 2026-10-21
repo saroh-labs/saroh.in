@@ -622,7 +622,17 @@ export class PublicBookingsService {
             onRace: credit
                 ? "That changed while you were booking. Try again."
                 : "That time is fully booked.",
-            retryOnce: credit !== null || treatmentStore !== null,
+            // Up to three tries, 20 to 80 ms apart (review #33): Postgres
+            // aborts the loser of any overlap in the serializable
+            // reservation, a booking of another time too, so a visitor was
+            // told a free time was fully booked when several bookings
+            // landed at once. Tried again, the capacity check gives the
+            // true answer; if every try still loses, the page says it is
+            // busy, never that the time is full.
+            tries: 3,
+            busy: credit
+                ? "That changed while you were booking. Try again."
+                : "Lots of people are booking right now. Try again.",
             inTx: async (tx: Prisma.TransactionClient, booking: Booking) => {
                 made.bookingId = booking.id;
                 // A note on a booking confirmed now waits on the customer's

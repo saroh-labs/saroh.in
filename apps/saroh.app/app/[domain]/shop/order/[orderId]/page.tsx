@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { AccountEntry, OrderConfirmation } from "@saroh/site-blocks";
+import {
+    AccountEntry,
+    lookOf,
+    LookOrderPlaced,
+    OrderConfirmation,
+} from "@saroh/site-blocks";
 
 import {
     loadSignInOptions,
@@ -57,29 +62,34 @@ export default async function ShopOrderPage({
             : null;
 
     const businessName = resolved.snapshot.site.name;
+    // Folio, Quiet or Live (DEC-172, U11) draw the look's Order placed;
+    // absent, Classic's page, exactly as before.
+    const look = lookOf(resolved.snapshot.site.look);
+    const props = {
+        lookup,
+        businessName,
+        soldBy: soldByFor(facts, businessName, true),
+        ordersHref,
+        // Where a read that failed is asked for again.
+        retryHref: `/shop/order/${encodeURIComponent(orderId)}`,
+        signIn:
+            !lookup.ok && lookup.reason === "signed-out" ? (
+                <AccountEntry
+                    variant="page"
+                    customer={null}
+                    businessName={businessName}
+                    api={{
+                        requestCode: requestSignInCode,
+                        verifyCode: verifySignInCode,
+                    }}
+                    loadOptions={loadSignInOptions}
+                />
+            ) : null,
+    };
 
-    return (
-        <OrderConfirmation
-            lookup={lookup}
-            businessName={businessName}
-            soldBy={soldByFor(facts, businessName, true)}
-            ordersHref={ordersHref}
-            // Where a read that failed is asked for again.
-            retryHref={`/shop/order/${encodeURIComponent(orderId)}`}
-            signIn={
-                !lookup.ok && lookup.reason === "signed-out" ? (
-                    <AccountEntry
-                        variant="page"
-                        customer={null}
-                        businessName={businessName}
-                        api={{
-                            requestCode: requestSignInCode,
-                            verifyCode: verifySignInCode,
-                        }}
-                        loadOptions={loadSignInOptions}
-                    />
-                ) : null
-            }
-        />
+    return look ? (
+        <LookOrderPlaced look={look} {...props} />
+    ) : (
+        <OrderConfirmation {...props} />
     );
 }

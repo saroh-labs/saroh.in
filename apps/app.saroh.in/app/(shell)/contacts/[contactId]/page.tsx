@@ -29,6 +29,8 @@ import { getContact } from "@/lib/contacts/service";
 import { contactSourceLabel } from "@/lib/contacts/source";
 import { isRemovedContact, shownEmail } from "@/lib/crm/format";
 import { rolesThatSeeSensitive } from "@/lib/customer-workspace/attention";
+import { listDataRequests } from "@/lib/customer-workspace/data-requests";
+import { openRequestFor } from "@/lib/customer-workspace/data-requests-view";
 import { getCustomerDetail } from "@/lib/customer-workspace/detail";
 import {
     isMergedRedirect,
@@ -144,45 +146,57 @@ export default async function PersonPage({
     };
     const packsShown = detail.packs !== undefined;
 
-    const [suggestions, thread, reviews, packSale, crm, holdings, products] =
-        await Promise.all([
-            // Only whoever may link or merge reads what they'd be offered.
-            canWrite || canMerge
-                ? getSuggestions(contactId, { includeContacts: true }).catch(
-                      (): Suggestion[] => [],
-                  )
-                : Promise.resolve<Suggestion[]>([]),
-            // Their message thread (A13). A failed read shows the tab with
-            // the failure said, never an empty thread.
-            may("message:read")
-                ? getThread(contactId).catch((): ThreadRead => "failed")
-                : Promise.resolve<ThreadRead>(null),
-            // Their product reviews (C6), where the business sells.
-            detail.linkedCustomers !== undefined && may("product-review:read")
-                ? contactReviews(contactId).catch((): ReviewsRead => "failed")
-                : Promise.resolve<ReviewsRead>(null),
-            // Selling a pack needs the packs on sale (C7).
-            packsShown && canSellPacks(organization)
-                ? loadContactHoldings(contactId, sellPacksOnly()).then(
-                      ({ choices }): PackSale | null =>
-                          choices.packs
-                              ? {
-                                    packs: choices.packs,
-                                    invoicesOnSale: choices.invoicesOnSale,
-                                    gst: choices.gst,
-                                }
-                              : null,
-                  )
-                : Promise.resolve(null),
-            // Their leads and enquiries, only where CRM is on and the viewer
-            // reads leads; null when the read failed.
-            gates.leads
-                ? getContact(contactId).catch((): ContactDetail | null => null)
-                : Promise.resolve(null),
-            loadContactHoldings(contactId, holdingsPlan),
-            // New order is for a business that sells products (B13).
-            opens.newOrder ? sellsProducts() : Promise.resolve(false),
-        ]);
+    const [
+        suggestions,
+        thread,
+        reviews,
+        packSale,
+        crm,
+        holdings,
+        products,
+        openRequests,
+    ] = await Promise.all([
+        // Only whoever may link or merge reads what they'd be offered.
+        canWrite || canMerge
+            ? getSuggestions(contactId, { includeContacts: true }).catch(
+                  (): Suggestion[] => [],
+              )
+            : Promise.resolve<Suggestion[]>([]),
+        // Their message thread (A13). A failed read shows the tab with
+        // the failure said, never an empty thread.
+        may("message:read")
+            ? getThread(contactId).catch((): ThreadRead => "failed")
+            : Promise.resolve<ThreadRead>(null),
+        // Their product reviews (C6), where the business sells.
+        detail.linkedCustomers !== undefined && may("product-review:read")
+            ? contactReviews(contactId).catch((): ReviewsRead => "failed")
+            : Promise.resolve<ReviewsRead>(null),
+        // Selling a pack needs the packs on sale (C7).
+        packsShown && canSellPacks(organization)
+            ? loadContactHoldings(contactId, sellPacksOnly()).then(
+                  ({ choices }): PackSale | null =>
+                      choices.packs
+                          ? {
+                                packs: choices.packs,
+                                invoicesOnSale: choices.invoicesOnSale,
+                                gst: choices.gst,
+                            }
+                          : null,
+              )
+            : Promise.resolve(null),
+        // Their leads and enquiries, only where CRM is on and the viewer
+        // reads leads; null when the read failed.
+        gates.leads
+            ? getContact(contactId).catch((): ContactDetail | null => null)
+            : Promise.resolve(null),
+        loadContactHoldings(contactId, holdingsPlan),
+        // New order is for a business that sells products (B13).
+        opens.newOrder ? sellsProducts() : Promise.resolve(false),
+        // Their open "Ask to remove my data" (DEC-172), for whoever can
+        // act on it. Unread, there is no banner; the Requests tab
+        // still has it.
+        canRemove ? listDataRequests("open") : Promise.resolve(null),
+    ]);
 
     const name = detail.contact.name;
     const first = detail.contact.firstName?.trim()
@@ -338,6 +352,7 @@ export default async function PersonPage({
                 actions={actions}
                 deleteWords={deleteWords}
                 canRecordPayment={acts.recordPayment}
+                dataRequest={openRequestFor(openRequests, contactId)}
                 starts={personStarts(contactId, opens, {
                     removed,
                     sellsProducts: products,

@@ -37,7 +37,8 @@ import { nobodyTaking, pausedDiaryIds, splitPaused } from "./diary-paused";
 import type { BookingLocationType, LocationType } from "./dto";
 import { openingFor } from "./opening-hours";
 import { bookableStarts, furthestAhead, loadDiaryRules } from "./person-rules";
-import { loadBookableService } from "./reservation";
+import type { OnceRead } from "./reservation";
+import { loadBookableService, readNow } from "./reservation";
 import { depositCents } from "./service-fields";
 import { serviceCharge } from "./service-price";
 import {
@@ -91,6 +92,12 @@ export interface PublicDaysAsk {
      * own, is the same as none: whoever is free.
      */
     staffId?: string | null;
+    /**
+     * Several services read together (On today, the Timetable) share the
+     * business's own reads through this: whether it is online and taking
+     * bookings, its zone, rules, closures and opening hours (review #4).
+     */
+    once?: OnceRead;
 }
 
 /** A start on the booking page (U19). `placesLeft` is a class's only. */
@@ -216,20 +223,25 @@ export async function publicDays(
     span: number = PUBLIC_DAYS,
     ask: PublicDaysAsk = {},
 ): Promise<PublicDays> {
+    const once = ask.once ?? readNow;
     const { service, rules } = await loadBookableService(serviceId, {
         bookingPage: true,
+        once,
     });
+    const org = service.organizationId;
     const [zone, staffing] = await Promise.all([
-        businessTimezone(prisma, service.organizationId),
+        once(`${org}:zone`, () => businessTimezone(prisma, org)),
         loadStaffing(service),
     ]);
     // The business's rules, and each person's own for a one-to-one
     // (DEC-170, #1038).
-    const diary = await loadDiaryRules(
-        prisma,
-        service.organizationId,
-        staffing.perPerson ? staffing.people.map((p) => p.id) : [],
-    );
+    const diary = staffing.perPerson
+        ? await loadDiaryRules(
+              prisma,
+              org,
+              staffing.people.map((p) => p.id),
+          )
+        : await once(`${org}:rules`, () => loadDiaryRules(prisma, org, []));
     const bookingRules = diary.business;
     const skip = Math.min(
         MAX_DAYS_SKIP,
@@ -251,7 +263,10 @@ export async function publicDays(
     // What the hours alone offer (open days), and what is free now.
     // A day the business is closed is closed on the page, not Full (E3):
     // closures are public, unlike a person's time off.
-    const closed = await loadClosures(prisma, service.organizationId, from, to);
+    const closed = await once(
+        `${org}:closures:${from.toISOString()}:${to.toISOString()}`,
+        () => loadClosures(prisma, org, from, to),
+    );
     // Each has their own times: the booker may ask for one of them.
     const ownTimes = staffing.perPerson && staffing.zone !== null;
     const asked =
@@ -352,7 +367,9 @@ export async function publicDays(
 
     // In person keeps to opening hours (DEC-087). A service offered either
     // way lists both, and a start only one way can have says which.
-    const opening = await openingFor(service, "IN_PERSON");
+    const opening = await once(`${org}:opening:${service.locationType}`, () =>
+        openingFor(service, "IN_PERSON"),
+    );
     const { hours, starts } =
         service.locationType === "EITHER" && opening
             ? eitherWay(offer(opening), offer(null))

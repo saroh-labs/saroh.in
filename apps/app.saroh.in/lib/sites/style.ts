@@ -8,11 +8,12 @@
  * use it.
  */
 
-import type { SitePalette, SiteTypeScale } from "@saroh/block-contract";
+import type { LookId, SitePalette, SiteTypeScale } from "@saroh/block-contract";
 import {
     fontPairVariables,
     paletteVariables,
     typeScaleVariables,
+    withLookColours,
 } from "@saroh/block-contract";
 
 /** One selectable colour, as the API serves it. */
@@ -76,6 +77,21 @@ export interface SiteStyle {
     palette?: SitePalette;
     /** A template's type scale (DEC-090). */
     type?: SiteTypeScale;
+    /**
+     * The site's look (DEC-172): Folio, Quiet or Live. Absent is Classic,
+     * and Classic is saved by leaving it out, as the API keeps it.
+     */
+    look?: LookId;
+}
+
+/**
+ * The style in another look, or in Classic for `null`, everything else
+ * kept: colours, spacing and typeface stay the merchant's, so going back
+ * to Classic brings back what they had (U16).
+ */
+export function inLook(style: SiteStyle, look: LookId | null): SiteStyle {
+    const { look: _previous, ...rest } = style;
+    return look ? { ...rest, look } : rest;
 }
 
 /**
@@ -250,5 +266,7 @@ export function resolveStyleVariables(
     // one rule, as the API's resolver applies them.
     if (style.palette) Object.assign(vars, paletteVariables(style.palette));
     Object.assign(vars, typeScaleVariables(style.type));
-    return vars;
+    // A look draws in safe colours, by the contract's one rule, as
+    // publishing does (DEC-172, KD4). Classic's variables are unchanged.
+    return withLookColours(style, vars);
 }

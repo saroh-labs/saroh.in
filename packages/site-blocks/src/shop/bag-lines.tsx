@@ -96,7 +96,10 @@ export function BagLines({
                                 alt=""
                                 width={56}
                                 height={56}
-                                {...siteImage()}
+                                {...siteImage("below", {
+                                    src: line.image.url,
+                                    sizes: "56px",
+                                })}
                                 className="border-site-border size-14 shrink-0 rounded-[calc(var(--site-radius)+4px)] border object-cover"
                             />
                         ) : anyPhoto ? (

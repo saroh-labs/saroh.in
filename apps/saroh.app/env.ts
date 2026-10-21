@@ -56,6 +56,16 @@ export const env = createEnv({
     client: {
         NEXT_PUBLIC_API_URL: z.string().url().optional(),
         NEXT_PUBLIC_ROOT_DOMAIN: z.string().optional(),
+        /**
+         * The business media's public address (`https://media.saroh.in`;
+         * dev `https://media.saroh.io`), set only in `wrangler.jsonc`, where
+         * the `IMAGES` binding is. With it, `siteImage()` gives a site's
+         * photos a `srcset` through the Worker's image route (#1043,
+         * `lib/images/resize.ts`), which fetches from this address and
+         * nowhere else. Unset (`next dev`, `next start`, e2e): plain `src`.
+         * Compiled into the bundle; `siteImage` reads it as written.
+         */
+        NEXT_PUBLIC_SITE_MEDIA_URL: z.string().url().optional(),
         NEXT_PUBLIC_VERCEL_ENV: z
             .enum(["development", "preview", "production"])
             .optional(),
@@ -74,6 +84,7 @@ export const env = createEnv({
         POSTHOG_HOST: process.env.POSTHOG_HOST,
         NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
         NEXT_PUBLIC_ROOT_DOMAIN: process.env.NEXT_PUBLIC_ROOT_DOMAIN,
+        NEXT_PUBLIC_SITE_MEDIA_URL: process.env.NEXT_PUBLIC_SITE_MEDIA_URL,
         NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
     },
     emptyStringAsUndefined: true,

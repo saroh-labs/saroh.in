@@ -3,7 +3,13 @@ import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { cardAction, menuItem } from "../fixtures/invoice-actions";
-import { makeContact, northwind, phone, stamp } from "../fixtures/own-data";
+import {
+    chequeNumber,
+    makeContact,
+    northwind,
+    phone,
+    stamp,
+} from "../fixtures/own-data";
 import { pressUntil } from "../fixtures/press";
 import { onPhone } from "../fixtures/roles";
 import { useSession } from "../fixtures/sessions";
@@ -307,7 +313,7 @@ test.describe("the invoice journey", { tag: "@serial" }, () => {
             await customer.close();
 
             // 4. The rest by cheque: the cheques line appears.
-            const no = `00${String(Date.now()).slice(-4)}`;
+            const no = chequeNumber();
             await openInvoice(page, id);
             const cheque = await recordSheet(page, "Record the rest");
             await expect(cheque.getByLabel("Amount received")).toHaveValue(

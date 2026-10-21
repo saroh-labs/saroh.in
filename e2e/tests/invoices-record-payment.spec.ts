@@ -2,7 +2,12 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { makeContact, northwind, stamp } from "../fixtures/own-data";
+import {
+    chequeNumber,
+    makeContact,
+    northwind,
+    stamp,
+} from "../fixtures/own-data";
 import { onPhone } from "../fixtures/roles";
 import { useSession } from "../fixtures/sessions";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
@@ -187,7 +192,7 @@ test.describe("record payment: cheques", { tag: "@serial" }, () => {
     }) => {
         test.setTimeout(120_000);
         const inv = await issued(page, "cheque");
-        const no = `00${String(Date.now()).slice(-4)}`;
+        const no = chequeNumber();
         try {
             await open(page, inv.id);
             const sheet = await openSheet(page);
@@ -256,7 +261,7 @@ test.describe("record payment: cheques", { tag: "@serial" }, () => {
         // again but not yet overdue; the overdue wording is the
         // component test's.
         const inv = await issued(page, "bounce");
-        const no = `00${String(Date.now()).slice(-4)}`;
+        const no = chequeNumber();
         try {
             await northwind(page.request).post(`/invoices/${inv.id}/payments`, {
                 method: "CHEQUE",

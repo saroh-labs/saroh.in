@@ -1,9 +1,11 @@
+import type { LookId } from "@saroh/block-contract";
 import Link from "next/link";
 
 import { ORDERS_HREF } from "./hrefs";
 import type { TrackLookup } from "./order-track";
 import { orderLead, OrderTrack, trackProblem } from "./order-track";
 import { AccountCard, BackLink, buttonClasses, Tag } from "./parts";
+import { orderStatusWords } from "./status-words";
 
 /**
  * One order on a page of its own (DEC-142), at `/account/orders/‹ref›`, so
@@ -20,6 +22,7 @@ export function AccountOrderPage({
     businessName,
     messagesHref,
     ordersTab,
+    look,
 }: {
     lookup: TrackLookup;
     businessName: string;
@@ -27,6 +30,8 @@ export function AccountOrderPage({
     messagesHref: string | null;
     /** This business shows the Orders tab, so there is a list to go back to. */
     ordersTab: boolean;
+    /** The site's look (DEC-172): the stage in the customer's words. */
+    look?: LookId;
 }) {
     const back = ordersTab ? (
         <BackLink href={ORDERS_HREF}>Orders</BackLink>
@@ -60,7 +65,7 @@ export function AccountOrderPage({
                 lead={
                     <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
                         <Tag tone={order.state === "open" ? "accent" : "quiet"}>
-                            {order.status}
+                            {look ? orderStatusWords(order) : order.status}
                         </Tag>
                         <span>{orderLead(order)}</span>
                     </span>

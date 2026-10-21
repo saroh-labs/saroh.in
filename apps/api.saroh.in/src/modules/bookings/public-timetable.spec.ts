@@ -13,7 +13,14 @@ import {
  * booking page's own for the week, Full included, in the business's zone.
  */
 
-const STRENGTH = { id: "svc_strength", name: "Strength", durationMinutes: 45 };
+const STRENGTH = {
+    id: "svc_strength",
+    name: "Strength",
+    durationMinutes: 45,
+    priceCents: 70_000,
+    currency: "INR",
+    gst: null,
+};
 
 function week(
     days: { date: string; starts: { startAt: string; placesLeft: number }[] }[],
@@ -67,6 +74,10 @@ describe("timetableRows", () => {
                 staffName: "Meera",
                 placesLeft: 4,
                 capacity: 12,
+                // The class's own price, as the services list serves it.
+                priceCents: 70_000,
+                currency: "INR",
+                gst: null,
             },
             expect.objectContaining({
                 date: "2026-10-07",

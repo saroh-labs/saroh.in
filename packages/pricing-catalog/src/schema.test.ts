@@ -13,6 +13,7 @@ import {
     autopayCharges,
     catalogSchema,
     cellOf,
+    freeStylesOf,
     MAX_ADDON_QUANTITY,
     parseCatalog,
     trialFirstPaise,
@@ -194,6 +195,47 @@ describe("the catalogue schema", () => {
         it("reads a draft or snapshot without it as 12", () => {
             expect(autopayCharges({})).toBe(12);
             expect(autopayCharges(null)).toBe(12);
+        });
+    });
+
+    describe("which looks, typefaces and colourways are free (DEC-177)", () => {
+        it("reads a version published before it as none free", () => {
+            const c = parseCatalog(fixtureInput());
+            expect(c.freeStyles).toBeUndefined();
+            expect(freeStylesOf(c)).toEqual({
+                looks: [],
+                fontPairs: [],
+                colourways: [],
+            });
+            expect(freeStylesOf(null)).toEqual(freeStylesOf({}));
+        });
+
+        it("keeps the lists, filling a missing one as empty", () => {
+            const input = fixtureInput() as Record<string, unknown>;
+            input.freeStyles = { looks: ["quiet", "folio"] };
+            const c = parseCatalog(input);
+            expect(freeStylesOf(c)).toEqual({
+                looks: ["quiet", "folio"],
+                fontPairs: [],
+                colourways: [],
+            });
+        });
+
+        it("names a colourway with its template, and nothing twice", () => {
+            const input = fixtureInput() as Record<string, unknown>;
+            input.freeStyles = { colourways: ["kesar"] };
+            expect(errorsOf(input)).toEqual([
+                "freeStyles.colourways.0: Name a colourway as template:colourway",
+            ]);
+            input.freeStyles = {
+                looks: ["Quiet"],
+                fontPairs: ["archivo", "archivo"],
+                colourways: ["salon:kesar"],
+            };
+            expect(errorsOf(input)).toEqual([
+                "freeStyles.looks.0: Use lower-case letters, digits and dashes",
+                'freeStyles.fontPairs: "archivo" is listed as free twice',
+            ]);
         });
     });
 

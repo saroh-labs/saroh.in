@@ -51,7 +51,9 @@ export type MergeRuleKind =
     /** Never moved: the merged contact's autopay is cancelled (D20). */
     | "cancel-mandates"
     /** Moves; one place per class's line, the better one kept (A12). */
-    | "waitlist";
+    | "waitlist"
+    /** Moves; the request follows the person it is about (DEC-172). */
+    | "data-request";
 
 export interface MergeRule {
     kind: MergeRuleKind;
@@ -129,6 +131,10 @@ export const MERGE_RULES: Readonly<Record<string, MergeRule>> = {
     "ClassWaitlistEntry.contactId": {
         kind: "waitlist",
         note: "Places in line follow them; in one class the better place stays, and a second held place goes to the next in line (A12).",
+    },
+    "CustomerDataRequest.contactId": {
+        kind: "data-request",
+        note: "“Ask to remove my data” requests follow them, open or closed, so a removal of the survivor marks them done (DEC-172).",
     },
 };
 

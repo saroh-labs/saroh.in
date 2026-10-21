@@ -3,6 +3,7 @@ import { apiFetch, getActiveOrgId, getJson, getList } from "@/lib/api/http";
 import type { PlanRefusal } from "@/lib/billing/refusal";
 import { planRefusalOf } from "@/lib/billing/refusal";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
+import type { SiteStyleAccess } from "@/lib/sites/style-access";
 
 // Re-exported so callers keep one import site for "everything about a site",
 // while the pure half stays in a module a client component can reach.
@@ -43,7 +44,7 @@ export type {
  * knows about, and the exhaustive `Record<SectionType, …>` maps in the editor
  * start demanding their entries instead of silently accepting six.
  */
-import type { SectionType } from "@saroh/block-contract";
+import type { LookId, SectionType } from "@saroh/block-contract";
 import type { SiteChangeKind } from "./pending";
 
 export type { SectionType };
@@ -310,6 +311,8 @@ export interface ProductGridContent {
     showAvailability?: boolean;
     /** A line under the products. */
     note?: string;
+    /** The owner's own cut-off line, "Order by 9 pm" (DEC-172, U11). */
+    cutOff?: string;
     /** `bare`: the even grid without a card. Absent: the card. */
     cardStyle?: "card" | "bare";
 }
@@ -762,6 +765,23 @@ export interface SiteDetail extends SiteSummary {
      * recorded; absent from an older API.
      */
     template?: SiteTemplate | null;
+    /**
+     * Whether this business may choose a look (`SITE_LOOKS`, DEC-172).
+     * Off, Website › Style offers no look to a Classic site. Absent from an
+     * older API, which reads as off.
+     */
+    looksAvailable?: boolean;
+    /**
+     * The look the live site is in (U16); null for Classic or a site never
+     * published. Absent from an older API.
+     */
+    liveLook?: LookId | null;
+    /**
+     * Which looks, typefaces and colourways this site may choose for
+     * nothing, and whether its plan opens the rest (DEC-177). Absent from
+     * an older API, which reads as all free.
+     */
+    styleAccess?: SiteStyleAccess;
 }
 
 /** Which template a site came from: its id, version and style, if any. */
@@ -1294,7 +1314,12 @@ export interface PublishedPage {
 
 /** The parts of a publication snapshot the version preview reads (#283). */
 export interface PublishedSnapshot {
-    site?: { name?: string; styleVariables?: Record<string, string> | null };
+    site?: {
+        name?: string;
+        styleVariables?: Record<string, string> | null;
+        /** The look it was published in (DEC-172); absent is Classic. */
+        look?: string;
+    };
     pages?: PublishedPage[];
 }
 

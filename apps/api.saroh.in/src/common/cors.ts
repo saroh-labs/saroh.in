@@ -20,6 +20,13 @@ export function corsOptionsFor(
     trustedOrigins: string[],
 ): CorsOptions {
     const bare = path.split("?")[0] ?? "";
+    // A live read the edge may keep (review #4, #21) answers "*", never the
+    // caller's own origin: one kept answer serves every site's address
+    // (its saroh.app one, its own domain, the editor's preview), and an
+    // answer naming the first caller's origin would be refused by the rest.
+    if (EDGE_KEPT_READ.test(bare)) {
+        return { origin: "*", credentials: false };
+    }
     if (bare.startsWith("/public/") && !bare.startsWith(`/${WEBHOOK_ROUTE}/`)) {
         return { origin: true, credentials: false };
     }
@@ -29,6 +36,14 @@ export function corsOptionsFor(
         exposedHeaders: EXPOSED_HEADERS,
     };
 }
+
+/**
+ * The public live reads whose answer is the same for every visitor and may
+ * be kept at the edge for a few seconds (`LIVE_READ_EDGE_CACHE`): On today,
+ * the Timetable, and the shop's stock counts.
+ */
+export const EDGE_KEPT_READ =
+    /^\/public\/sites\/[^/]+\/(today|timetable|shop\/stock)\/?$/;
 
 /**
  * What a first-party page may read off a response besides its body. The

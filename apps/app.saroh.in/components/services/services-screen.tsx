@@ -18,6 +18,7 @@ import { useState } from "react";
 
 import { MissingRatesNotice } from "@/components/gst-rates/missing-rates-notice";
 import { AlsoSell } from "@/components/services/also-sell";
+import { BookingLinkRow } from "@/components/services/booking-link-row";
 import type { ServiceRowView } from "@/components/services/services-rows";
 import {
     ServicesPhoneList,
@@ -29,6 +30,7 @@ import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import type { MissingRates } from "@/lib/gst-rates/missing";
 import type { ModuleView } from "@/lib/modules/schema";
 import type { AlsoSellFeature } from "@/lib/services/also-sell";
+import type { BookingLinkView } from "@/lib/services/booking-link";
 import { callName } from "@/lib/services/call-name";
 import { onlineBookingProblem } from "@/lib/services/online-booking";
 import type { Service } from "@/lib/services/service";
@@ -81,7 +83,13 @@ export function ServicesScreen({
     modules = [],
     missingRates = null,
     canNewCourse = false,
+    bookingLink = null,
 }: {
+    /**
+     * "Your booking page" (DEC-175): where it is and whether customers can
+     * open it; null leaves the row out (it couldn't be read).
+     */
+    bookingLink?: BookingLinkView | null;
     /**
      * What is on sale with a price and no GST rate, for a GST-registered
      * business; null when it couldn't be told, which draws nothing.
@@ -245,6 +253,10 @@ export function ServicesScreen({
             {/* Priced things on sale with no GST rate, for a registered
                 business: one line, and the sheet to choose them in. */}
             <MissingRatesNotice missing={missingRates} className="mb-3" />
+            {/* The page customers book on, read first (DEC-175). */}
+            {bookingLink ? (
+                <BookingLinkRow view={bookingLink} className="mb-3" />
+            ) : null}
             {!hasRows ? (
                 <EmptyState
                     icon={<CalendarClock />}

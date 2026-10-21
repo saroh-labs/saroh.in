@@ -41,6 +41,7 @@ export {
     DEFAULT_FONT_PAIR,
     FONT_PAIRS,
     FONT_PAIR_KEYS,
+    PICKABLE_FONT_PAIRS,
     findFontPair,
     fontPairVariables,
     isFontPairKey,
@@ -95,6 +96,20 @@ export type {
     StyleScalar,
     Swatch,
 } from "@saroh/block-contract";
+
+// Looks (DEC-172) and the safe colours they draw in, for the same reason:
+// the API validates a saved look and picks a new site's from its template
+// with the mapping the editor's "Suggested for" reads.
+export {
+    LOOKS,
+    LOOK_IDS,
+    defaultLookForTemplate,
+    deriveSafeColours,
+    isLookId,
+    parseLook,
+    siteStyleSafeColours,
+} from "@saroh/block-contract";
+export type { LookId, SafeColours, SiteLook } from "@saroh/block-contract";
 
 // Registry
 export { getTemplate, listTemplates } from "./registry";

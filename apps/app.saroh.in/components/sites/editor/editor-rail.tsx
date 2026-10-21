@@ -16,10 +16,12 @@ import type {
     EditorRailTab,
     FixedPart,
 } from "@/components/sites/editor/use-editor-selection";
+import type { LookChoices } from "@/components/sites/look-picker";
 import type { HeldBackSection } from "@/components/sites/saveable-sections";
 import { StylePanel } from "@/components/sites/style-panel";
 import type { Flag, Section, SectionType } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
+import type { StyleChoiceRules } from "@/lib/sites/style-access";
 import { Tip } from "@saroh/ui/tooltip";
 
 export type RailTab = "page" | "add" | "brand";
@@ -63,7 +65,13 @@ export function EditorRail({
     notedKeys,
     shopOpen = false,
     packsOpen = false,
+    looks,
+    styleRules,
 }: {
+    /** The Brand tab's Look row (DEC-172, U16); absent draws none. */
+    looks?: LookChoices;
+    /** Which looks, typefaces and colourways are paid (DEC-177). */
+    styleRules?: StyleChoiceRules;
     rail: EditorRailTab;
     setRail: (next: EditorRailTab) => void;
     style: SiteStyle;
@@ -123,6 +131,8 @@ export function EditorRail({
                     onChange={setStyle}
                     onReset={resetStyle}
                     saving={styleSaving}
+                    looks={looks}
+                    rules={styleRules}
                 />
             ) : (
                 <>

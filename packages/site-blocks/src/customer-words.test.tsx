@@ -272,3 +272,31 @@ describe("the added-to-your-bag message", () => {
         expect(screen.queryByRole("status")).toBeNull();
     });
 });
+
+describe("booking in a look (DEC-172, U10)", () => {
+    const looks = lines.filter(({ at }) =>
+        /^booking-flow\/(look-|inline-code|sentence-picker|frames\/|book-return)/.test(
+            at,
+        ),
+    );
+
+    it("never tells a returning email from a new one", () => {
+        const found = looks.filter(({ text }) =>
+            /welcome back|booked (with us )?before|new here|returning/i.test(
+                text,
+            ),
+        );
+        expect(found.map((l) => `${l.at}  ${l.text}`)).toEqual([]);
+    });
+
+    it("promises no WhatsApp, no reminder and no enrolment it can't keep", () => {
+        // In what a customer reads: a string, or a JSX text line. The
+        // business's own chat link (`reach.whatsapp`) is not a promise.
+        const said = (text: string) =>
+            /["'`][^"'`]*(whatsapp|remind|\benrol)/i.test(text) ||
+            (/^[A-Z][^=:;(){}]*$/.test(text) &&
+                /whatsapp|remind|\benrol/i.test(text));
+        const found = looks.filter(({ text }) => said(text));
+        expect(found.map((l) => `${l.at}  ${l.text}`)).toEqual([]);
+    });
+});

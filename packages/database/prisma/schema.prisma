@@ -430,6 +430,8 @@ model Organization {
   customerNotices          CustomerNotice[]
   // Places in line for full classes (round-2 A12).
   classWaitlistEntries     ClassWaitlistEntry[]
+  // Customers' "Ask to remove my data" requests (DEC-172, #1106).
+  customerDataRequests     CustomerDataRequest[]
   // Bulk kitchen moves held on the server, then committed (round-2 B6).
   orderStageBatches        OrderStageBatch[]
   // Each person's alert choices here (round-2 F14).
@@ -4521,6 +4523,8 @@ model Contact {
   // Accounts staff said "This isn't them" about this contact (A4), so the
   // pair is never suggested again.
   unlinkedCustomerAccounts CustomerAccount[] @relation("CustomerAccountUnlinkedFrom")
+  // Their "Ask to remove my data" requests (DEC-172): kept after a removal.
+  dataRequests             CustomerDataRequest[]
 
   // Needs attention: one shared list of what the team must know (DEC-040, C1).
   attention ContactAttention[]
@@ -7430,6 +7434,9 @@ model CustomerAccount {
   // Messages the customer wrote to the business from this account (A13).
   threadMessages CustomerThreadMessage[]
 
+  // "Ask to remove my data" requests made from this account (DEC-172).
+  dataRequests CustomerDataRequest[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -7445,6 +7452,65 @@ model CustomerAccount {
   @@index([contactId])
   @@index([mergedIntoId])
   @@index([unlinkedFromContactId])
+}
+
+/// A customer's request to the business, made from their site account
+/// (DEC-172, #1106): today only "Ask to remove my data". Nothing is deleted
+/// when they ask. The business acts through the existing privacy removal
+/// (`customer-workspace/privacy-removal.service.ts`), which marks the open
+/// request DONE in its own transaction, or closes it without removal, with
+/// a reason.
+///
+/// The row is the record of the request and outlives what it is about: the
+/// removal deletes the account and anonymises the contact, so both links are
+/// nullable single-column keys that clear (SET NULL) rather than cascade,
+/// and the requester's name and email are kept as they were when asked, for
+/// the merchant's list and the "done" email. Single-column keys as
+/// `Booking.customerAccountId`: a composite SET NULL would null the required
+/// organization; row-level security keeps the row in its business.
+model CustomerDataRequest {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  customerAccountId String?
+  customerAccount   CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
+  contactId         String?
+  contact           Contact?         @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  // Who asked, as they were when they asked. Once their details are removed
+  // (DONE) the name is cleared, and the email too once the "done" email has
+  // gone (review #19); a CHECK keeps the email until then.
+  requesterName  String?
+  requesterEmail String?
+
+  kind   CustomerDataRequestKind   @default(REMOVAL)
+  status CustomerDataRequestStatus @default(OPEN)
+  // Why it was closed without removal. Never in Saroh's email to the customer.
+  reason String?
+
+  // Who marked it DONE (the removal) or closed it, and when.
+  handledByUserId String?
+  handledAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // At most one OPEN request per account: asking again returns it.
+  @@unique([customerAccountId], map: "CustomerDataRequest_one_open_per_account", where: raw("status = 'OPEN'"))
+  @@index([organizationId, status, createdAt])
+  @@index([contactId])
+  @@index([customerAccountId, createdAt])
+}
+
+enum CustomerDataRequestKind {
+  REMOVAL
+}
+
+enum CustomerDataRequestStatus {
+  OPEN
+  DONE
+  CLOSED_WITHOUT_REMOVAL
 }
 
 /// A six-digit code sent to a destination to sign in on a business's site.

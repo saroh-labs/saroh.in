@@ -231,6 +231,8 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
             "Product settings' sub-pages: Categories, Options, Fields and the rest",
         "components/commerce/stock/stock-screen.tsx":
             "Levels, Log and Checks: three views of stock with different columns",
+        "components/customers/data-requests/customers-tabs.tsx":
+            "Customers, and their requests to remove their data (DEC-172)",
         "components/customers/detail/header.tsx":
             "a person's sections: Overview, Orders, Bookings and the rest",
         "components/invoices/share-sheet.tsx":

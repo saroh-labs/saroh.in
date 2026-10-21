@@ -19,13 +19,16 @@
  *     template — all before the transaction.
  *  6. ONE transaction: the switch, its audit event and the minimum. Any
  *     failure writes nothing — neither the rows nor the switch.
+ *  7. After the commit, what follows a module being on
+ *     (`afterTurnedOn`): Bookings makes its booking page where there is no
+ *     website (DEC-175, `booking-site.ts`).
  *
  * `GET …/modules/:key/setup-defaults` is what the sheet shows before
  * anything is saved: the payload prefilled, what else turns on with it,
  * and whether the business may see the module at all. The prefill follows
  * the business's kind (DEC-070); nothing else here reads it.
  */
-import { Injectable, Optional } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../../common/types/organization-context";
@@ -41,6 +44,8 @@ import { templateCatalogue } from "../../sites/template-catalogue";
 import { ModuleLifecycleService } from "../module-lifecycle.service";
 import type { ModuleKey } from "../module-registry";
 import { MODULE_BY_KEY, moduleRolledOut } from "../module-registry";
+import type { BookingSiteOutcome, BookingSiteWhy } from "./booking-site";
+import { bookingPageToCome, makeBookingSite } from "./booking-site";
 import { parseModuleSetup } from "./module-setup.parse";
 import type { SetupCreated } from "./module-setup.writers";
 import {
@@ -82,6 +87,13 @@ export interface ModuleSetupDefaults {
     setup: Record<string, unknown>;
     /** The minimum already there, which saving reuses. Null: made new. */
     existing: ExistingMinimum | null;
+    /**
+     * Bookings only (DEC-175): the business has no website, so turning
+     * Bookings on makes its booking page, a starter site at this address
+     * with its Book page, not published. Absent when nothing would be made
+     * (a website already, Website not offered, or this person may not).
+     */
+    alsoBookingPage?: { address: string };
     /**
      * Sell only (DEC-069): the business has no website yet, so selling
      * online would make the starter site too (the app turns Website on
@@ -147,6 +159,8 @@ const BOOKINGS_DEFAULTS: Record<
 
 @Injectable()
 export class ModuleSetupService {
+    private readonly logger = new Logger(ModuleSetupService.name);
+
     constructor(
         private readonly lifecycle: ModuleLifecycleService,
         private readonly entitlements: EntitlementService,
@@ -183,9 +197,44 @@ export class ModuleSetupService {
         );
         // Switched on by someone else between the read and the write: the
         // setup never ran.
-        return switched
-            ? { alreadyEnabled: false, created }
-            : { alreadyEnabled: true, created: {} };
+        if (!switched) return { alreadyEnabled: true, created: {} };
+        await this.afterTurnedOn(ctx, moduleKey);
+        return { alreadyEnabled: false, created };
+    }
+
+    /**
+     * What follows a module being switched on, after its commit: Bookings
+     * makes the booking page where there is no website (DEC-175). The
+     * plain switch (no setup) calls it too, so every way Bookings is
+     * turned on reaches it. Never refuses: the switch has committed.
+     */
+    async afterTurnedOn(
+        ctx: OrganizationContext,
+        moduleKey: ModuleKey,
+    ): Promise<void> {
+        if (moduleKey === "APPOINTMENTS") {
+            await this.makeBookingSite(ctx, "turned-on");
+        }
+    }
+
+    /**
+     * Make the booking page (DEC-175, `booking-site.ts`): the starter site
+     * on the business's address, Website switched on with it, not
+     * published. Made by itself (`turned-on`, `service`) it never refuses;
+     * asked for (`asked`), the refusal is the caller's to say.
+     */
+    makeBookingSite(
+        ctx: OrganizationContext,
+        why: BookingSiteWhy,
+    ): Promise<BookingSiteOutcome> {
+        return makeBookingSite(ctx, why, {
+            websiteRolledOut: (orgId) =>
+                moduleRolledOut(this.flags, "WEBSITE", orgId),
+            websiteOn: () => this.isOn(ctx, "WEBSITE"),
+            enableWebsite: (setup) => this.enable(ctx, "WEBSITE", setup),
+            entitlements: this.entitlements,
+            logger: this.logger,
+        });
     }
 
     /** What the Turn on sheet prefills (see {@link ModuleSetupDefaults}). */
@@ -232,13 +281,16 @@ export class ModuleSetupService {
                 };
             }
             case "APPOINTMENTS": {
-                const [service, kind] = await Promise.all([
+                const [service, kind, bookingPage] = await Promise.all([
                     prisma.service.findFirst({
                         where: { organizationId, deletedAt: null },
                         orderBy: { createdAt: "asc" },
                         select: { id: true },
                     }),
                     organizationKind(prisma, organizationId),
+                    bookingPageToCome(ctx, (orgId) =>
+                        moduleRolledOut(this.flags, "WEBSITE", orgId),
+                    ),
                 ]);
                 const suggestion = BOOKINGS_DEFAULTS[kind];
                 return {
@@ -248,6 +300,7 @@ export class ModuleSetupService {
                         service: { ...suggestion.service },
                     },
                     existing: service ? { serviceId: service.id } : null,
+                    ...(bookingPage ? { alsoBookingPage: bookingPage } : {}),
                 };
             }
             case "CRM": {

@@ -1,6 +1,7 @@
+import type { LookId } from "@saroh/block-contract";
+import type { SiteHeaderAction } from "@saroh/site-blocks";
+import { ctaClasses, frontButton, SitePageMessage } from "@saroh/site-blocks";
 import Link from "next/link";
-
-import { ctaClasses, SitePageMessage } from "@saroh/site-blocks";
 
 import type { NotFoundWay } from "@/lib/not-found-ways";
 
@@ -21,12 +22,28 @@ import type { NotFoundWay } from "@/lib/not-found-ways";
 export function SiteNotFound({
     siteName,
     secondary,
+    look,
+    action = null,
 }: {
     /** The published site's name; null if the read found nothing. */
     siteName: string | null;
     /** The shop or contact page, only when the site has one. */
     secondary: NotFoundWay | null;
+    /** Folio, Quiet or Live (DEC-172); absent is Classic, unchanged. */
+    look?: LookId;
+    /** The site's main action (Book, Order, Contact us), for a look. */
+    action?: SiteHeaderAction | null;
 }) {
+    if (look) {
+        return (
+            <LookNotFound
+                look={look}
+                siteName={siteName}
+                secondary={secondary}
+                action={action}
+            />
+        );
+    }
     return (
         <SitePageMessage
             eyebrow="Page not found"
@@ -50,6 +67,66 @@ export function SiteNotFound({
             {siteName
                 ? `There’s no page at this address on ${siteName}. It may have moved, or the link may have a typo.`
                 : "There’s no page at this address. It may have moved, or the link may have a typo."}
+        </SitePageMessage>
+    );
+}
+
+/**
+ * The 404 under a look (DEC-172, plan U15, #1108; VA26, VD26, VB26): in
+ * the look's type with the large "404" beside the words, ONE way back
+ * (home, the page's one filled button) and the site's main action (Book)
+ * as a link. The shop or contact page stays offered as a link when it is
+ * a different place (nothing Classic's 404 offers is taken away). Still a
+ * real 404 for search engines: the status is the route's, not the look's.
+ */
+function LookNotFound({
+    look,
+    siteName,
+    secondary,
+    action,
+}: {
+    look: LookId;
+    siteName: string | null;
+    secondary: NotFoundWay | null;
+    action: SiteHeaderAction | null;
+}) {
+    const ways: NotFoundWay[] = [];
+    if (action && action.href !== "/") {
+        ways.push({ href: action.href, label: action.label });
+    }
+    if (secondary && !ways.some((w) => w.href === secondary.href)) {
+        ways.push(secondary);
+    }
+    return (
+        <SitePageMessage
+            look={look}
+            mark="404"
+            eyebrow="Page not found"
+            title={<>This page isn&rsquo;t here</>}
+            actions={
+                <>
+                    <Link
+                        href="/"
+                        data-site-primary=""
+                        className={frontButton(look, "fill")}
+                    >
+                        Go to the home page
+                    </Link>
+                    {ways.map((way) => (
+                        <Link
+                            key={way.href}
+                            href={way.href}
+                            className={frontButton(look, "link")}
+                        >
+                            {way.label}
+                        </Link>
+                    ))}
+                </>
+            }
+        >
+            {siteName
+                ? `It may have moved, or the link has a small typo. Everything ${siteName} offers starts from the home page.`
+                : "It may have moved, or the link has a small typo. Everything starts from the home page."}
         </SitePageMessage>
     );
 }

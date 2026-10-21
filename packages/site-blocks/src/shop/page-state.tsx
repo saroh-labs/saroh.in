@@ -1,9 +1,12 @@
+import type { LookId } from "@saroh/block-contract";
 import type { ReactNode } from "react";
 
+import { frontButton } from "../blocks/look-front";
 import { focusRing } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
 import type { BusinessReach } from "../reach-links";
 import { ReachLinks } from "../reach-links";
+import { LOOK_PAGE } from "../site-page-message";
 
 /**
  * A whole page that has nothing to show: the shop or the booking page when
@@ -34,6 +37,7 @@ export function SitePageState({
     retryHref = null,
     reach = null,
     action = null,
+    look,
 }: {
     title: string;
     /** The one sentence under the heading. */
@@ -46,7 +50,44 @@ export function SitePageState({
     reach?: BusinessReach | null;
     /** Another way on, drawn after "Try again". */
     action?: ReactNode;
+    /**
+     * Folio, Quiet or Live (DEC-172, U15; the boards' 27 and 28): the
+     * same words and ways in the look's type, "Try again" its one filled
+     * button. Absent is Classic, drawn exactly as before.
+     */
+    look?: LookId;
 }) {
+    if (look) {
+        const type = LOOK_PAGE[look];
+        return (
+            <div className="bg-site-bg max-w-site-content mx-auto w-full px-[var(--site-page-margin,20px)] pb-16 pt-14 min-[700px]:pb-32 min-[700px]:pt-24">
+                <div
+                    data-page-state={failed ? "failed" : "empty"}
+                    data-site-state-look={look}
+                    role={failed ? "alert" : undefined}
+                    className="grid max-w-[36rem] gap-4"
+                >
+                    <h1 className={type.title}>{title}</h1>
+                    <p className={cn("max-w-[52ch]", type.lead)}>{children}</p>
+                    {retryHref || action ? (
+                        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-2">
+                            {retryHref ? (
+                                <a
+                                    href={retryHref}
+                                    data-site-primary=""
+                                    className={frontButton(look, "fill")}
+                                >
+                                    Try again
+                                </a>
+                            ) : null}
+                            {action}
+                        </div>
+                    ) : null}
+                    <ReachLinks reach={reach} />
+                </div>
+            </div>
+        );
+    }
     return (
         <div className="bg-site-bg max-w-site-content mx-auto w-full px-5 py-16 sm:px-[var(--site-page-margin)] sm:py-24">
             <div

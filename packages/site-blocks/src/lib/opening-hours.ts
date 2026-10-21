@@ -282,3 +282,28 @@ export function weekSummary(
         )
         .join(" · ");
 }
+
+/**
+ * The next time the place opens, as a date on the business's clock
+ * (`YYYY-MM-DD`) and its "HH:MM" opening, or null when it is open now or
+ * nothing true can be said. A look's checkout says "Ready from 7 am Tue 20
+ * Oct" from it (DEC-172, U11): pick-up has no slots, so the hours are all
+ * there is to go on.
+ */
+export function nextOpening(
+    week: readonly OpeningHoursDay[] | null | undefined,
+    now: Date,
+    timeZone: string,
+    closedDates: readonly string[] = [],
+): { date: string; opensAt: string } | null {
+    const state = openState(week, now, timeZone, closedDates);
+    if (!state || state.open) return null;
+    const { day, date } = wallClock(now, timeZone);
+    if (state.today) return { date, opensAt: state.opensAt };
+    for (let ahead = 1; ahead <= 7; ahead++) {
+        if (shift(day, ahead) === state.opensOn) {
+            return { date: addDays(date, ahead), opensAt: state.opensAt };
+        }
+    }
+    return null;
+}

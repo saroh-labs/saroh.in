@@ -130,6 +130,24 @@ and fail when `innerWidth` has grown, as `phone-reflow.spec.ts` does. Test
 with the values merchants have: a 60-character email with no hyphen (a
 hyphen is a line break the layout didn't earn), and long names.
 
+**What the looks' first run caught (DEV_LEARNINGS, 20 Oct 2026).**
+
+- A colour read once right after a click lands mid-transition: poll it.
+  Two `boundingBox` calls on something animating land at two heights: read
+  both rects in one `evaluate`.
+- `getByLabel("Code")` matches "Country code" too: `{ exact: true }`.
+- A block drawn twice (desk columns and phone tabs, CSS shows one) needs
+  `.filter({ visible: true })` before a strict assertion.
+- A live fact swaps its link when the read lands: wait for
+  `data-live-state` to leave `loading` before reading its `href`, and never
+  `.first()` a link inside one when you mean the hero's own button
+  (`[data-site-primary]`).
+- `if ((await x.count()) > 0)` before something has drawn skips the step:
+  click it and let it wait.
+- The seed is not the demo: Northwind has no public phone or place, no
+  storefront chosen for its site, online storefronts only and a short home.
+  Give it what the test needs and put it back.
+
 **A flaky harness gets ignored, which is worse than none.** Poll for readiness
 rather than sleeping a fixed number of seconds; a cold Next server on a runner
 is not reliably up in any particular time.

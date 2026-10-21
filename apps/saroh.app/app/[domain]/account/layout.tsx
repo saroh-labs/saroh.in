@@ -1,20 +1,30 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import type { LookId } from "@saroh/block-contract";
+import type { SignInOptions } from "@saroh/site-blocks";
 import {
     AccountCard,
     AccountEntry,
     AccountHeader,
+    AccountLookFrame,
+    AccountsOffNote,
     AccountTabBar,
+    greetingWords,
+    lookOf,
+    LookSignIn,
 } from "@saroh/site-blocks";
 
 import { accountAreaOn, getAccount } from "@/lib/account-area";
 import { getAccountSite } from "@/lib/account-site";
 import { accountMetadata } from "@/lib/account-title";
+import { getBookingPage } from "@/lib/booking-page";
+import { getSignInOptions } from "@/lib/sign-in";
 
 import {
     loadSignInOptions,
     requestSignInCode,
+    signOut,
     verifySignInCode,
 } from "./actions";
 
@@ -66,14 +76,50 @@ export default async function AccountLayout({
     params: Promise<{ domain: string }>;
     children: React.ReactNode;
 }) {
-    if (!accountAreaOn()) notFound();
     const { domain } = await params;
+    if (!accountAreaOn()) {
+        // The middleware answers `/account` with a 404 first while the
+        // area is off, so this is reached only without it (a preview).
+        // Classic: a 404 here too. A look says what the site does instead
+        // (DEC-172, plan U12), so the page never reads as broken.
+        const off = await getAccountSite(domain);
+        const offLook = off ? lookOf(off.snapshot.site.look) : undefined;
+        if (!off || !offLook) notFound();
+        return (
+            <AccountLookFrame
+                look={offLook}
+                businessName={off.snapshot.site.name}
+                tabs={[]}
+                greeting=""
+                title="Your account"
+            >
+                <AccountsOffNote />
+            </AccountLookFrame>
+        );
+    }
     const [site, lookup] = await Promise.all([
         getAccountSite(domain),
         getAccount(),
     ]);
     if (!site) notFound();
     const businessName = site.snapshot.site.name;
+
+    // Folio, Quiet or Live (DEC-172, plan U12): the account inside the
+    // site's own header and footer, in the look. Absent: Classic, below,
+    // exactly as before.
+    const look = lookOf(site.snapshot.site.look);
+    if (look) {
+        return (
+            <LookAccount
+                look={look}
+                siteId={site.siteId}
+                businessName={businessName}
+                lookup={lookup}
+            >
+                {children}
+            </LookAccount>
+        );
+    }
 
     if (!lookup.ok) {
         return (
@@ -147,5 +193,98 @@ export default async function AccountLayout({
                 {children}
             </main>
         </>
+    );
+}
+
+/**
+ * The account under a look: signed out, its sign-in page (the code asked
+ * on the page, as the booking asks it); unreadable, said so; signed in,
+ * the tabs, the page's title and the page, in the site's own chrome
+ * (`SiteChromeFrame` keeps the header and footer under a look).
+ */
+async function LookAccount({
+    look,
+    siteId,
+    businessName,
+    lookup,
+    children,
+}: {
+    look: LookId;
+    siteId: string | null | undefined;
+    businessName: string;
+    lookup: Awaited<ReturnType<typeof getAccount>>;
+    children: React.ReactNode;
+}) {
+    if (!lookup.ok) {
+        if (lookup.reason === "signed-out") {
+            const options: SignInOptions = (await getSignInOptions().catch(
+                () => null,
+            )) ?? {
+                businessName,
+                phone: null,
+                challenge: { required: false, siteKey: null },
+            };
+            return (
+                <AccountLookFrame
+                    look={look}
+                    businessName={businessName}
+                    tabs={[]}
+                    greeting=""
+                    title="Sign in"
+                >
+                    <LookSignIn
+                        look={look}
+                        options={options}
+                        api={{
+                            requestCode: requestSignInCode,
+                            verifyCode: verifySignInCode,
+                        }}
+                        lead={`Sign in to see your bookings, orders, messages and receipts with ${businessName}.`}
+                    />
+                </AccountLookFrame>
+            );
+        }
+        return (
+            <AccountLookFrame
+                look={look}
+                businessName={businessName}
+                tabs={[]}
+                greeting=""
+                title="Your account"
+            >
+                <AccountCard
+                    labelledBy="account-unavailable"
+                    title="Couldn't load your account"
+                    lead={
+                        <span role="status">
+                            Refresh the page to try again. You're still signed
+                            in.
+                        </span>
+                    }
+                />
+            </AccountLookFrame>
+        );
+    }
+    // Home's greeting on the business's own clock (the booking page's
+    // zone, read once per request with the site's layout); India without.
+    const booking = siteId
+        ? await getBookingPage(siteId).catch(() => null)
+        : null;
+    const greeting = greetingWords(
+        new Date(),
+        booking?.ok ? booking.page.timezone : null,
+    );
+    return (
+        <AccountLookFrame
+            look={look}
+            businessName={businessName}
+            tabs={lookup.account.tabs}
+            name={lookup.account.name}
+            unreadMessages={lookup.account.unreadMessages ?? 0}
+            greeting={greeting}
+            signOut={signOut}
+        >
+            {children}
+        </AccountLookFrame>
     );
 }

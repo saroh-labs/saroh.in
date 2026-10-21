@@ -72,7 +72,8 @@ export interface PublicToday {
     closedDates: string[];
 }
 
-function isTodayItem(value: unknown): value is PublicTodayItem {
+/** One row, narrowed (also `nextFree`, U8). */
+export function isTodayItem(value: unknown): value is PublicTodayItem {
     if (typeof value !== "object" || value === null) return false;
     const v = value as Record<string, unknown>;
     return (
@@ -364,7 +365,11 @@ function SplitHero({
                         alt={content.image.alt ?? ""}
                         width={content.image.width}
                         height={content.image.height}
-                        {...siteImage()}
+                        {...siteImage("below", {
+                            src: content.image.src,
+                            width: content.image.width,
+                            sizes: "(min-width: 1280px) 1280px, 100vw",
+                        })}
                         className="absolute inset-0 size-full rounded-[calc(var(--site-radius)*1.6)] object-cover"
                     />
                 </div>

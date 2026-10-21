@@ -6,6 +6,8 @@
  *   GET ${apiUrl}/public/sites/:siteId/timetable[?services=a,b]
  */
 
+import type { GstOnPrice } from "./gst-price";
+
 /** One class session, as the public read returns it. */
 export interface TimetableSession {
     serviceId: string;
@@ -19,6 +21,15 @@ export interface TimetableSession {
     staffName: string | null;
     placesLeft: number;
     capacity: number;
+    /**
+     * The class's price as the services list serves it (DEC-172 U7): the
+     * amount typed x 100 and its currency, null for none. Absent from an
+     * older API, where a row shows no price rather than a wrong one.
+     */
+    priceCents?: number | null;
+    currency?: string | null;
+    /** The GST in or on the price; null for none. Absent from an older API. */
+    gst?: GstOnPrice | null;
 }
 
 /** What the public timetable read returns. */
@@ -133,12 +144,17 @@ export function dayLabel(date: string, long = false): string {
     return `${names[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 }
 
-/** The booking page on this class, that day, that time chosen. */
+/**
+ * The booking page on this class, that day, that time chosen, opened on
+ * the details step (U9): the class is chosen, so what is left is who is
+ * booking and how they'll pay.
+ */
 export function sessionHref(bookHref: string, s: TimetableSession): string {
     const q = new URLSearchParams({
         service: s.serviceId,
         date: s.date,
         start: s.time,
+        step: "details",
     });
     return `${bookHref}?${q.toString()}`;
 }

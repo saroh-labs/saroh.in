@@ -2,12 +2,20 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
-import type { SignInOptions } from "@saroh/site-blocks";
+import type {
+    SignInOptions,
+    SiteContact,
+    SiteSession,
+} from "@saroh/site-blocks";
 import {
     AccountEntry,
+    lookOf,
+    lookScope,
     ShopBag,
+    SignInOpener,
     SiteChromeFrame,
     SiteTheme,
+    StickyActions,
     TestReleaseProvider,
 } from "@saroh/site-blocks";
 
@@ -49,6 +57,8 @@ import { getTestRelease, rootDomain } from "@/lib/test-release";
 import { HEADER_BELOW_BAR } from "@/lib/test-release-chrome";
 import { needsConsent } from "@/lib/trackers";
 import { reportBusinessHref, SiteFooter, SiteHeader } from "@saroh/site-blocks";
+
+import { lookDock } from "@/lib/header-action";
 
 import { SITE_FACES } from "@/lib/site-fonts";
 import {
@@ -311,6 +321,9 @@ export default async function SiteLayout({
                     savedAddress: savedDeliveryAddress,
                 }}
                 apiUrl={publicApiUrl()}
+                // A look's bag holds the lines only and leads to the
+                // checkout page (DEC-172, U11); absent, Classic's bag.
+                look={lookOf(snapshot.site.look)}
                 account={{
                     customer,
                     options: signInOptions ?? {
@@ -345,6 +358,37 @@ export default async function SiteLayout({
     ) : undefined;
 
     /*
+     * Who is signed in, for a look's phone menu and its footer's "Your
+     * account" (DEC-172, U5). Read on the server, beside the header's own
+     * account entry (the same read), and drawn only in the browser, so a
+     * page kept for everyone names no one. None while the site has no
+     * customer accounts.
+     */
+    const look = lookOf(snapshot.site.look);
+    const session: SiteSession | null =
+        look && accountAreaOn()
+            ? {
+                  signedIn: (await readCustomer()) !== null,
+                  bookings: action?.kind === "book",
+                  orders: takesOrders,
+              }
+            : null;
+    // The footer's contact group: the business's public phone and contact
+    // email, where customers come and its social links (UX-038, DEC-101,
+    // DEC-128), read live. A look's phone menu says the same facts.
+    const siteContact: SiteContact = {
+        phone: contact?.phone ?? null,
+        email: contact?.email ?? null,
+        address: null,
+        places: contact?.places ?? [],
+        social: contact?.social ?? [],
+        // Today is marked on the business's own clock (DEC-033). The
+        // contact read names no zone; the booking page's does, and
+        // without one the footer reads India.
+        timeZone: booking?.ok ? booking.page.timezone : null,
+    };
+
+    /*
      * On a test host every flow stops short of a real order, booking,
      * payment, enquiry or sign-in (DEC-071, T6): the blocks read the
      * provider and show their stop, and the server actions refuse on their
@@ -361,6 +405,8 @@ export default async function SiteLayout({
             <div
                 className="min-h-screen bg-site-bg text-site-body"
                 data-test-release={resolved.release ? "" : undefined}
+                // The look's mark (DEC-172); nothing for Classic.
+                {...lookScope(snapshot.site.look)}
             >
                 {resolved.release ? (
                     <>
@@ -376,6 +422,9 @@ export default async function SiteLayout({
                 <SiteTheme
                     variables={snapshot.site.styleVariables}
                     faces={SITE_FACES}
+                    // Folio, Quiet or Live (DEC-172); absent is Classic,
+                    // drawn exactly as before.
+                    look={snapshot.site.look}
                 />
                 {/* Page views for Insights (UX-032): live hosts only, never a
                 test release, whose visits are not the business's. */}
@@ -391,12 +440,20 @@ export default async function SiteLayout({
                     <SiteTrackers
                         trackers={head.trackers}
                         noticeHref={head.privacyUrl ?? "/cookie-notice"}
+                        // The banner in the look (DEC-172, U15); and it
+                        // says visits are counted without cookies, true
+                        // here: the beacon above runs on these same hosts.
+                        look={look}
+                        countsVisits
                     />
                 ) : null}
                 {/* The account area draws its own compact header and no
                 footer (DEC-073 #10): the frame leaves these out there. */}
                 <SiteChromeFrame
                     account={accountAreaOn()}
+                    // Under a look the account is a page of the site, in
+                    // its header and footer (DEC-172, U12).
+                    look={look}
                     header={
                         <SiteHeader
                             name={snapshot.site.name}
@@ -414,54 +471,86 @@ export default async function SiteLayout({
                             shopServes={shopServes}
                             account={account}
                             bag={bag}
+                            // Folio, Quiet or Live draw their own header
+                            // and phone menu (DEC-172, U5); absent is
+                            // Classic, unchanged.
+                            look={look}
+                            contact={siteContact}
+                            session={session}
                         />
                     }
                     footer={
-                        <SiteFooter
-                            footer={snapshot.site.footer}
-                            name={snapshot.site.name}
-                            // The header's own menu, listed again at the
-                            // foot with every page in it.
-                            navigation={navigation}
-                            modules={resolved.modules}
-                            shopServes={shopServes}
-                            contact={{
-                                phone: contact?.phone ?? null,
-                                email: contact?.email ?? null,
-                                address: null,
-                                places: contact?.places ?? [],
-                                social: contact?.social ?? [],
-                                // Today is marked on the business's own
-                                // clock (DEC-033). The contact read names
-                                // no zone; the booking page's does, and
-                                // without one the footer reads India.
-                                timeZone: booking?.ok
-                                    ? booking.page.timezone
-                                    : null,
-                            }}
-                            // "Made with Saroh" on Free only (DEC-102).
-                            // "Report" rides with it: no Saroh link on a
-                            // paid site (DEC-121).
-                            credit={
-                                footerFacts?.credit
-                                    ? {
-                                          ...footerFacts.credit,
-                                          reportHref: reportBusinessHref(
-                                              test.host,
-                                          ),
-                                      }
-                                    : null
-                            }
-                            // "Cookie choices" while a tracker asks (DEC-108).
-                            cookieChoices={asksConsent}
-                            // "Sold by ‹legal name›" in the business's own
-                            // details, on every plan (DEC-121).
-                            seller={siteSeller(
-                                footerFacts,
-                                snapshot.site.name,
-                                shopServes,
-                            )}
-                        />
+                        <>
+                            <SiteFooter
+                                look={look}
+                                // A look's footer offers the main action
+                                // again, as an outline.
+                                action={action}
+                                session={session}
+                                footer={snapshot.site.footer}
+                                name={snapshot.site.name}
+                                // The header's own menu, listed again at the
+                                // foot with every page in it.
+                                navigation={navigation}
+                                modules={resolved.modules}
+                                shopServes={shopServes}
+                                contact={siteContact}
+                                // "Made with Saroh" on Free only (DEC-102).
+                                // "Report" rides with it: no Saroh link on a
+                                // paid site (DEC-121).
+                                credit={
+                                    footerFacts?.credit
+                                        ? {
+                                              ...footerFacts.credit,
+                                              reportHref: reportBusinessHref(
+                                                  test.host,
+                                              ),
+                                          }
+                                        : null
+                                }
+                                // "Cookie choices" while a tracker asks (DEC-108).
+                                cookieChoices={asksConsent}
+                                // "Sold by ‹legal name›" in the business's own
+                                // details, on every plan (DEC-121).
+                                seller={siteSeller(
+                                    footerFacts,
+                                    snapshot.site.name,
+                                    shopServes,
+                                )}
+                            />
+                            {/* One fixed bar on a phone, and the header's Book
+                            filled only while the page's own is off screen
+                            (DEC-172, U5). Classic has none. */}
+                            {/* Under a look, "Sign in" in the menu or the
+                            footer comes back to the page it was pressed on
+                            (U12). */}
+                            {look && accountAreaOn() ? <SignInOpener /> : null}
+                            {look ? (
+                                <StickyActions
+                                    look={look}
+                                    action={action}
+                                    // Next free beside Book, read in the
+                                    // browser (U8, #1042): the cached
+                                    // page carries no time.
+                                    live={
+                                        siteId
+                                            ? {
+                                                  siteId,
+                                                  apiUrl: publicApiUrl(),
+                                              }
+                                            : null
+                                    }
+                                    dock={lookDock({
+                                        look,
+                                        navigation,
+                                        modules: resolved.modules,
+                                        shopServes,
+                                        action,
+                                        accountArea: accountAreaOn(),
+                                    })}
+                                />
+                            ) : null}
+                        </>
                     }
                 >
                     {children}

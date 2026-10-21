@@ -118,6 +118,18 @@ export const FlagKey = {
      * Deleted once the route is on for every business for a release.
      */
     SAROH_BUSINESS_EMAIL: "SAROH_BUSINESS_EMAIL",
+
+    /**
+     * Looks on merchant sites (DEC-172, KD12): Folio, Quiet and Live.
+     * Off, a style save can't set or change a look and a new site starts
+     * Classic; keeping a look a site already has, and going back to
+     * Classic, always work. On only in the development environment
+     * (saroh.io) until the owner says otherwise; production stays off,
+     * globally and per business. Three readers, all in
+     * `sites/site-looks.ts`: style saves, site creation and the editor's
+     * `looksAvailable`. The renderer never reads it.
+     */
+    SITE_LOOKS: "SITE_LOOKS",
 } as const;
 
 export type FlagKey = (typeof FlagKey)[keyof typeof FlagKey];
@@ -263,6 +275,16 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         reviewBy: "2027-03-31",
         removeWhen:
             "Saroh's booking emails have been on for every business on every instance for a release with no need to switch them off, and the four readers in saroh-may-send.ts no longer ask it.",
+    },
+    SITE_LOOKS: {
+        shownAs: "Website looks",
+        group: "feature",
+        purpose:
+            "Lets a business choose a look for its website (Folio, Quiet or Live) in Website › Style, and starts its new sites in its industry's look. On only in the development environment until the owner says so; off, no look can be set or changed and new sites start Classic, while a site that has a look keeps it and can always go back to Classic.",
+        owner: "Release manager",
+        reviewBy: "2027-03-31",
+        removeWhen:
+            "Every site has chosen a look or Classic is retired, the looks have been on for every business on every instance for a release, and the three readers in site-looks.ts no longer ask it.",
     },
     WEB_ADDRESS_CHANGE: {
         shownAs: "Change web address",

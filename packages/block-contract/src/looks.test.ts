@@ -7,7 +7,9 @@ import {
     isLookId,
     LOOK_IDS,
     LOOKS,
+    lookSuggestion,
     parseLook,
+    TEMPLATE_INDUSTRIES,
     TEMPLATE_LOOKS,
 } from "./looks";
 import type { SectionType } from "./section-contract";
@@ -128,6 +130,33 @@ describe("the industry default (R10)", () => {
     it("maps only to looks this build has", () => {
         for (const look of Object.values(TEMPLATE_LOOKS)) {
             expect(isLookId(look)).toBe(true);
+        }
+    });
+});
+
+describe("the editor's suggestion (U16)", () => {
+    it.each([
+        ["salon", "quiet", "salons"],
+        ["bakery", "quiet", "bakeries"],
+        ["gym", "live", "gyms"],
+        ["yoga", "folio", "yoga"],
+    ])("%s suggests %s for %s", (template, look, industry) => {
+        expect(lookSuggestion(template)).toEqual({ look, industry });
+    });
+
+    it("suggests Quiet, for no trade, from an unknown or absent template", () => {
+        for (const id of ["starter", "not-a-template", null, undefined]) {
+            expect(lookSuggestion(id)).toEqual({
+                look: "quiet",
+                industry: null,
+            });
+        }
+        expect(lookSuggestion("__proto__").industry).toBeNull();
+    });
+
+    it("names a trade only for a template that has an industry default", () => {
+        for (const id of Object.keys(TEMPLATE_INDUSTRIES)) {
+            expect(TEMPLATE_LOOKS[id], id).toBeDefined();
         }
     });
 });

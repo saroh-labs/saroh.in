@@ -1106,7 +1106,15 @@ export async function sendSiteSignInCodeEmail(
     }
 }
 
-/** The code email's body; every value in it is escaped. */
+/**
+ * The code email's body; every value in it is escaped.
+ *
+ * TODO(#1156): its footer says this address sends only sign-in codes and
+ * the email-changed notice. Since DEC-172 it also sends a customer's
+ * data-removal acknowledgement and its done notice
+ * (`site-accounts/data-request-emails.ts`); #1156 rewords this footer and
+ * the email-changed one.
+ */
 export function siteCodeEmail(
     businessName: string,
     code: string,
@@ -1157,6 +1165,48 @@ export async function sendSiteEmailChangedEmail(
             to,
             subject: emailChangedSubject(businessName),
             html: siteEmailChangedEmail(businessName),
+        });
+        return "sent";
+    } catch {
+        return "failed";
+    }
+}
+
+/**
+ * A notice to a customer about their own account on a business's site, from
+ * the code stream's sender in the business's name, as the code is: today
+ * the "Ask to remove my data" acknowledgement and its done or closed notice
+ * (DEC-172, which widens DEC-011's identity mail to them). The words are the
+ * caller's (`site-accounts/data-request-emails.ts`), already escaped;
+ * `businessName` must already be cleaned (`site-accounts/sender-name.ts`).
+ * With no SMTP, development logs that it went (the code's fake transport);
+ * `SITE_CODES_EMAIL_FAKE=fail` fails it. Nothing logged names the address
+ * outside development.
+ */
+export async function sendSiteAccountNoticeEmail(
+    to: string,
+    details: { businessName: string; subject: string; html: string },
+): Promise<EmailOutcome> {
+    const { businessName, subject, html } = details;
+    if (!siteCodesTransporter) {
+        if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
+            if (env.SITE_CODES_EMAIL_FAKE === "fail") return "failed";
+            console.info(
+                `[Site account notice] (no SMTP) "${subject}" to ${to} for ${businessName}`,
+            );
+            return "sent";
+        }
+        return "not-configured";
+    }
+    try {
+        await siteCodesTransporter.sendMail({
+            from: {
+                name: codeSenderName(businessName),
+                address: SITE_CODES_FROM_ADDRESS,
+            },
+            to,
+            subject,
+            html,
         });
         return "sent";
     } catch {

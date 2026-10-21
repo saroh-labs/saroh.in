@@ -1,4 +1,5 @@
 // @covers site:/ site:/account site:/account/me site:/account/bookings site:/book api:site-accounts api:bookings api:sites pkg:site-blocks
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { urls } from "../playwright.config";
@@ -27,6 +28,10 @@ import {
 const renderer = new URL(urls.RENDERER_URL);
 const SITE = `${renderer.protocol}//northwind.${renderer.host}`;
 const areaOn = process.env.SITE_ACCOUNT_AREA === "on";
+
+/** Your details' Name and contact card. */
+const contact = (page: Page) =>
+    page.getByRole("region", { name: "Name and contact" });
 
 test.describe("the account area while it is switched off", () => {
     test.skip(areaOn, "the stack has the account area switched on");
@@ -73,7 +78,11 @@ test.describe("the account area (A5)", () => {
         // The tab is "Your details" (DEC-142); its address is unchanged.
         await tabs.getByRole("link", { name: "Your details" }).click();
         await expect(page).toHaveURL(/\/account\/me$/);
-        await expect(page.getByText(email)).toBeVisible();
+        // The contact line of Name and contact; the emails card under it
+        // says the same address in a sentence.
+        await expect(
+            contact(page).getByText(email, { exact: true }),
+        ).toBeVisible();
         await expect(page.getByText("No receipts yet.")).toBeVisible();
 
         await page.getByRole("button", { name: "Edit" }).click();
@@ -96,9 +105,11 @@ test.describe("the account area (A5)", () => {
             .click();
         await expect(page).toHaveURL(new RegExp(`^${SITE}/?$`));
         await expect(page.getByRole("contentinfo")).toBeVisible();
+        // Their initials, and "My account" beside them (a screen reader's
+        // only, on a phone).
         await expect(
             page.getByRole("banner").getByRole("link", { name: "My account" }),
-        ).toHaveText("AR");
+        ).toHaveText(/^AR\s*My account$/);
     });
 
     test("changes the sign-in email with a code to the new address", async ({
@@ -122,7 +133,9 @@ test.describe("the account area (A5)", () => {
             page.getByText(/Use that email to sign in from now on/),
         ).toBeVisible();
         await page.reload();
-        await expect(page.getByText(next)).toBeVisible();
+        await expect(
+            contact(page).getByText(next, { exact: true }),
+        ).toBeVisible();
     });
 
     test("Bookings: a booking made signed in is moved and cancelled by the customer (A6)", async ({
@@ -167,8 +180,13 @@ test.describe("the account area (A5)", () => {
         await comingUp
             .getByRole("button", { name: /^Move Warehouse walkthrough/ })
             .click();
+        // The sheet is the booking page's day strip and the chosen day's
+        // times (UX-055): it opens on the first day with a free time, and
+        // a day with none is a disabled radio before it. Pick a time.
         const sheet = page.getByRole("dialog");
-        const firstTime = sheet.getByRole("radio").first();
+        const firstTime = sheet
+            .getByRole("radio", { name: /^\d{1,2}:\d{2} [ap]m\b/ })
+            .first();
         await expect(firstTime).toBeVisible({ timeout: 15_000 });
         await firstTime.click();
         await sheet.getByRole("button", { name: /^Move to / }).click();

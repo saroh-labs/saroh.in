@@ -7,6 +7,7 @@ import {
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import type {
+    LookId,
     TemplateContext,
     TemplateManifest,
     TemplateModulePageKind,
@@ -41,10 +42,11 @@ import {
 } from "./site-address";
 import type { SiteFooter } from "./site-footer";
 import { parseSiteFooter } from "./site-footer";
+import { newSiteLook } from "./site-looks";
 import type { SiteNavigation } from "./site-navigation";
 import { NAVIGATION_MAX_ITEMS } from "./site-navigation";
 import type { SiteStyle } from "./site-style";
-import { parseSiteStyle } from "./site-style";
+import { defaultSiteStyle, parseSiteStyle } from "./site-style";
 import {
     buildTemplateContext,
     KIND_TEMPLATE,
@@ -89,6 +91,11 @@ export interface SitePlan {
      * default look, as every site did before templates carried styles.
      */
     style?: { id: string; value: SiteStyle };
+    /**
+     * The look the site starts in (DEC-172): its template's industry look
+     * while `SITE_LOOKS` is on for the business. Absent: Classic.
+     */
+    look?: LookId;
     /**
      * The footer the site starts with: the template's line and layout
      * (`TemplateManifest.footer`), as plain text. Absent when the template
@@ -266,6 +273,9 @@ export async function planSiteFromTemplate(
 
     // Before any read: a colourway the template lacks is the caller's error.
     const style = planTemplateStyle(template, dto.styleId);
+    // Its industry's look (DEC-172, R10) while `SITE_LOOKS` is on: the
+    // template is the industry signal. Off, the site starts Classic.
+    const look = await newSiteLook(ctx.organizationId, template.id);
 
     const slug = slugify(dto.slug ?? dto.name);
     if (!slug) {
@@ -292,6 +302,7 @@ export async function planSiteFromTemplate(
                 styleId: style?.id ?? null,
             },
             ...(style ? { style } : {}),
+            ...(look ? { look } : {}),
             ...(footer ? { footer } : {}),
             ...(modulePages.length > 0 ? { modulePages } : {}),
         };
@@ -453,11 +464,14 @@ export async function writeSiteFromTemplate(
                 // Where it sells from (G11): set only when there is
                 // exactly one candidate, and the settings say so.
                 storefrontId: await automaticStorefront(tx, ctx.organizationId),
-                // The template's colourway (KTD-1), if it has one.
-                ...(plan.style
+                // The template's colourway (KTD-1), if it has one, in the
+                // look the site starts in, if any (DEC-172).
+                ...(plan.style || plan.look
                     ? {
-                          style: plan.style
-                              .value as unknown as Prisma.InputJsonValue,
+                          style: {
+                              ...(plan.style?.value ?? defaultSiteStyle()),
+                              ...(plan.look ? { look: plan.look } : {}),
+                          } as unknown as Prisma.InputJsonValue,
                       }
                     : {}),
                 // Its footer line and layout, if it sets them: the

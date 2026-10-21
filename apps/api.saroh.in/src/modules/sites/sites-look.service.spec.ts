@@ -13,10 +13,20 @@ jest.mock("@saroh/database", () => {
     };
 });
 
-import { BadRequestException } from "@nestjs/common";
+// The plan's answer, stood in: whether the save asks for `themes` is what
+// is proven here (DEC-177); the real refusal is in plan-limits.db.spec.ts.
+jest.mock("../billing/metering.service", () => ({
+    planMeter: {
+        assertIncluded: jest.fn(),
+        isIncluded: jest.fn().mockResolvedValue(true),
+    },
+}));
+
+import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { Prisma, prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { planMeter } from "../billing/metering.service";
 import { roleDenial } from "../organizations/organization-policy";
 import { defaultSiteStyle } from "./site-style";
 import { SitesService } from "./sites.service";
@@ -136,6 +146,39 @@ describe("SitesService.updateStyle", () => {
         });
         expect(siteFindFirst).not.toHaveBeenCalled();
         expect(siteUpdate).not.toHaveBeenCalled();
+    });
+});
+
+describe("SitesService.updateStyle: free and paid choices (DEC-177)", () => {
+    const assertIncluded = planMeter.assertIncluded as jest.Mock;
+
+    it("asks no plan for colours and spacing", async () => {
+        await service.updateStyle(ctx(), "site_1", {
+            colours: { accent: "teal" },
+            scalars: { cornerRadius: 10 },
+        });
+        expect(assertIncluded).not.toHaveBeenCalled();
+        expect(siteUpdate).toHaveBeenCalled();
+    });
+
+    it("asks for themes for a paid typeface, and writes nothing when refused", async () => {
+        assertIncluded.mockRejectedValueOnce(
+            new ForbiddenException({ details: { code: "MODULE_LOCKED" } }),
+        );
+        await expect(
+            service.updateStyle(ctx(), "site_1", { fontPair: "archivo" }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(assertIncluded).toHaveBeenCalledWith(
+            "org_1",
+            "themes",
+            expect.any(Date),
+        );
+        expect(siteUpdate).not.toHaveBeenCalled();
+    });
+
+    it("never asks for the system font", async () => {
+        await service.updateStyle(ctx(), "site_1", { fontPair: "system" });
+        expect(assertIncluded).not.toHaveBeenCalled();
     });
 });
 

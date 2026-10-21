@@ -87,6 +87,15 @@ export const AuditAction = {
     // A privacy removal refused because the business is on legal hold
     // (DEC-122): the contact as the target, DENIED, the reason as a code.
     CustomerRemovalRefused: "customer.removal.refused",
+    // A customer's "Ask to remove my data" request (DEC-172, #1106): made
+    // from their site account (the actor is `system:site-account`; the
+    // account and contact in metadata), closed without removal by someone
+    // on the team (the reason stays on the request, never here), or marked
+    // done by a privacy removal, in its transaction. The request as the
+    // target; ids only, never a name or an email.
+    CustomerDataRequestCreated: "customer.data_request.created",
+    CustomerDataRequestClosed: "customer.data_request.closed",
+    CustomerDataRequestDone: "customer.data_request.done",
     // Someone changed one of their own alerts (F14): which alert, which
     // channel, and on or off as it was and became. Their own choice, about
     // no one else, so it carries the value.

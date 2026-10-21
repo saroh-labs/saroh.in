@@ -18,21 +18,22 @@ const holds =
         actions.includes(a);
 
 describe("alerts", () => {
-    it("offers the design's four rows and the Website row (DEC-071), and no Monday summary (default 127)", () => {
+    it("offers the design's four rows, the Website row (DEC-071) and data removal requests (DEC-172), and no Monday summary (default 127)", () => {
         expect(ALERT_EVENTS).toEqual([
             "order",
             "booking",
             "failed",
             "team",
             "site",
+            "request",
         ]);
     });
 
-    it("starts with the bell on for everything, email for a failed payment and a scheduled go-live, and WhatsApp off (default 126)", () => {
+    it("starts with the bell on for everything, email for a failed payment, a scheduled go-live and a data removal request, and WhatsApp off (default 126)", () => {
         for (const event of ALERT_EVENTS) {
             expect(defaultOn(event, "bell")).toBe(true);
             expect(defaultOn(event, "email")).toBe(
-                event === "failed" || event === "site",
+                event === "failed" || event === "site" || event === "request",
             );
             expect(defaultOn(event, "whatsapp")).toBe(false);
         }
@@ -69,6 +70,13 @@ describe("alerts", () => {
         );
         expect(alertEventOfType("site.live")).toBe("site");
         expect(alertEventOfType("site.not_live")).toBe("site");
+        // A data removal request: whoever can run a customer removal
+        // (DEC-172), not whoever only reads or edits customers.
+        expect(mayHearAbout("request", holds("customer:remove"))).toBe(true);
+        expect(
+            mayHearAbout("request", holds("contact:read", "contact:write")),
+        ).toBe(false);
+        expect(alertEventOfType("customer.data-request")).toBe("request");
     });
 
     it("never offers Calendar only the business's booking alerts (#868)", () => {

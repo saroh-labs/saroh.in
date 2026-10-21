@@ -190,6 +190,28 @@ describe("openState", () => {
     });
 });
 
+describe("Open now at the minute it closes (U8, #1042)", () => {
+    // Tue 20 Oct 2026 in Bengaluru, closing at 21:00.
+    it("reads open at 20:59 and closed at 21:00", () => {
+        expect(openState(PULSE, ist("2026-10-20T20:59:00"), KOLKATA)).toEqual({
+            open: true,
+            closesAt: "21:00",
+        });
+        expect(
+            openState(PULSE, ist("2026-10-20T21:00:00"), KOLKATA)?.open,
+        ).toBe(false);
+    });
+
+    it("reads the business's clock, not the phone's", () => {
+        // 20:59 in Bengaluru is 15:29 UTC; a phone in London says nothing.
+        const at = new Date("2026-10-20T15:29:00Z");
+        expect(openState(PULSE, at, KOLKATA)?.open).toBe(true);
+        expect(
+            openState(PULSE, new Date("2026-10-20T15:30:00Z"), KOLKATA)?.open,
+        ).toBe(false);
+    });
+});
+
 describe("clockText", () => {
     it("says a time the way a shop door does", () => {
         expect(clockText("21:00")).toBe("9pm");

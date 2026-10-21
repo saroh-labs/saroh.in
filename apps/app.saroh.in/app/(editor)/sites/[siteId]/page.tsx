@@ -151,6 +151,13 @@ export default async function SiteEditorPage({
             canUpdateSite={site.can.manageSettings}
             initialStyle={site.style}
             styleOptions={site.styleOptions}
+            // The Look row (DEC-172, U16): offered while `SITE_LOOKS` is on,
+            // or kept with Classic for a site that has a look already.
+            looksAvailable={site.looksAvailable === true}
+            liveLook={site.liveLook ?? null}
+            // Which looks, typefaces and colourways are free (DEC-177).
+            styleAccess={site.styleAccess ?? null}
+            templateId={site.template?.id ?? null}
             address={
                 siteAddressOf(site, webAddress, RENDERER_APEX)?.host ?? null
             }

@@ -1,5 +1,6 @@
 "use client";
 
+import type { LookId } from "@saroh/block-contract";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -25,6 +26,7 @@ import {
     buttonClasses,
     smallButton,
     Tag,
+    textLink,
     Unavailable,
 } from "./parts";
 import { PauseSheet } from "./pause-sheet";
@@ -70,6 +72,12 @@ export interface PlanTabProps {
      * pack or turning autopay on moves on without waiting for the webhook.
      */
     apiUrl?: string;
+    /**
+     * The site's look (DEC-172, U12): her plan first. Someone with packs
+     * and no membership sees the packs, then one line about plans, in
+     * place of a "No plan yet" card above them. Classic is as before.
+     */
+    look?: LookId;
 }
 
 /** What is being done, to which plan: one thing at a time. */
@@ -89,6 +97,7 @@ export function PlanTab({
     packs: shop = null,
     plansHref = null,
     apiUrl,
+    look,
 }: PlanTabProps) {
     const router = useRouter();
     const [tab, setTab] = useState(initial);
@@ -152,20 +161,8 @@ export function PlanTab({
     const autopayMethods = api.startAutopay ? (tab.autopayMethods ?? []) : [];
     const canBuy = shop !== null && shop.onSale.packs.length > 0;
     const showPacks = !packs.ok || packs.value.length > 0 || canBuy;
-
-    return (
-        <div className="grid gap-3.5">
-            {said ? (
-                <p role="status" className="text-site-body text-sm">
-                    {said}
-                </p>
-            ) : null}
-            {problem ? (
-                <p role="alert" className={destructiveAlertClasses}>
-                    {problem}
-                </p>
-            ) : null}
-
+    const membershipCard = (
+        <>
             {!plans.ok ? (
                 <AccountCard labelledBy="plan-membership" title="Membership">
                     <Unavailable what="Your plan" />
@@ -213,7 +210,10 @@ export function PlanTab({
                     />
                 ))
             )}
-
+        </>
+    );
+    const packsCard = (
+        <>
             {showPacks ? (
                 <AccountCard
                     labelledBy="plan-packs"
@@ -260,6 +260,54 @@ export function PlanTab({
                     )}
                 </AccountCard>
             ) : null}
+        </>
+    );
+    // Under a look her plan comes first: packs and no membership put the
+    // packs at the top and plans in one line under them.
+    const packsFirst =
+        look !== undefined &&
+        plans.ok &&
+        plans.value.length === 0 &&
+        packs.ok &&
+        packs.value.length > 0;
+
+    return (
+        <div className="grid gap-3.5">
+            {said ? (
+                <p role="status" className="text-site-body text-sm">
+                    {said}
+                </p>
+            ) : null}
+            {problem ? (
+                <p role="alert" className={destructiveAlertClasses}>
+                    {problem}
+                </p>
+            ) : null}
+
+            {packsFirst ? (
+                <>
+                    {packsCard}
+                    <p
+                        data-account-plan-line=""
+                        className="text-site-body text-[15px] leading-normal"
+                    >
+                        {`You're not on a membership with ${account.businessName}.`}
+                        {plansHref ? (
+                            <>
+                                {" "}
+                                <a href={plansHref} className={textLink}>
+                                    See plans
+                                </a>
+                            </>
+                        ) : null}
+                    </p>
+                </>
+            ) : (
+                <>
+                    {membershipCard}
+                    {packsCard}
+                </>
+            )}
 
             {shop && canBuy ? (
                 <BuyPackSheet

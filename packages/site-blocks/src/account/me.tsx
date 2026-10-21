@@ -8,6 +8,8 @@ import { destructiveAlertClasses } from "../alert";
 import { focusRing } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
 import type { SignInOptions } from "./api";
+import type { AccountDataRequest } from "./data-request";
+import { DataRequestCard } from "./data-request";
 import type { AccountInvoiceDue, AccountNotices } from "./details-model";
 import { TO_PAY_ID } from "./details-model";
 import { EmailChoice } from "./email-choice";
@@ -45,8 +47,9 @@ import { SignInSheet } from "./sign-in-sheet";
  *   that already exists (DEC-142).
  * - **Signing out:** "Sign out" is the button. "Sign out everywhere" is
  *   rare, so it waits behind "More" (DEC-142).
- * - There is no "Remove my details" (user, 2026-09-27): a customer asks the
- *   business by message or in person.
+ * - **Your data:** "Ask to remove my data" (DEC-172, #1107): a request the
+ *   business acts on, with a confirmation and a sent state
+ *   (`data-request.tsx`). It replaced 2026-09-27's "ask by message".
  *
  * Everything it changes goes through the site's server actions (`api`).
  */
@@ -94,6 +97,12 @@ export interface MeProps {
     invoices?: Block<AccountInvoiceDue[]>;
     /** Whether the business may email them (DEC-142); null draws no card. */
     notices?: Block<AccountNotices> | null;
+    /**
+     * Their latest "Ask to remove my data" request (DEC-172), null when
+     * they never asked. Left out, with `api.askDataRemoval`, by an older
+     * caller: no Your data card.
+     */
+    dataRequest?: Block<AccountDataRequest | null>;
     /** For the email change's sheet: the phone line and the challenge. */
     options: SignInOptions;
     api: MeApi;
@@ -107,6 +116,7 @@ export function Me({
     notes,
     invoices,
     notices = null,
+    dataRequest,
     options,
     api,
 }: MeProps) {
@@ -267,6 +277,14 @@ export function Me({
                     notices={notices}
                     account={account}
                     save={api.saveNotices}
+                />
+            ) : null}
+
+            {dataRequest && api.askDataRemoval ? (
+                <DataRequestCard
+                    request={dataRequest}
+                    businessName={account.businessName}
+                    ask={api.askDataRemoval}
                 />
             ) : null}
 

@@ -175,7 +175,9 @@ function lookDefault(
  *     this is exactly what it always was.
  *
  * A v1 gallery's `layout` is the merchant's choice too, so no look sets a
- * gallery default until U7 says how the two meet.
+ * gallery default: under a look the gallery draws its grid or masonry as
+ * the look's own arrangement, and keeps a carousel the merchant chose as
+ * a strip (U7, `gallery-look.tsx`).
  */
 export function resolveVariant(
     type: SectionType,

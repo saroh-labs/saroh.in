@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { AccountCard, AccountHome } from "@saroh/site-blocks";
+import { AccountCard, AccountHome, lookOf } from "@saroh/site-blocks";
 
 import { getAccount, getAccountHome } from "@/lib/account-area";
 import { accountDoors, getAccountSite } from "@/lib/account-site";
@@ -69,6 +69,7 @@ export default async function AccountHomePage({
             doors={await accountDoors(site?.siteId)}
             api={{ payInvoice: payInvoiceNow, leaveLine }}
             now={new Date().toISOString()}
+            look={lookOf(site?.snapshot.site.look)}
         />
     );
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { AccountCard, PlanTab } from "@saroh/site-blocks";
+import { AccountCard, lookOf, PlanTab } from "@saroh/site-blocks";
 
 import { getAccount, getPacksOnSale, getPlanTab } from "@/lib/account-area";
 import { accountTitle, getAccountSite } from "@/lib/account-site";
@@ -63,6 +63,8 @@ export default async function AccountPlanPage({
             account={lookup.account}
             tab={tab}
             apiUrl={publicApiUrl()}
+            // Her plan first, in the look (DEC-172, U12).
+            look={lookOf(site?.snapshot.site.look)}
             plansHref={
                 site ? pricesPageHref(site.snapshot.pages, site.modules) : null
             }

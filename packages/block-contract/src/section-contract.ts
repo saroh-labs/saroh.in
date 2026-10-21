@@ -980,6 +980,13 @@ const productGridV1 = z.object({
     /** A short line under the grid, the merchant's own. Plain text. */
     note: z.string().trim().max(400).optional(),
     /**
+     * The owner's own cut-off line, "Order by 9 pm" (DEC-172, U11): plain
+     * text they write, shown on the shop beside how an order reaches the
+     * customer, and nowhere when empty. Saroh never computes or enforces
+     * it; a real cut-off is Phase 2 (U23). ABSENT, none.
+     */
+    cutOff: z.string().trim().max(80).optional(),
+    /**
      * `bare` (template polish): the even grid's products without a card —
      * a tall 4:5 photo, the name and price beside each other in the
      * heading face, sold out as a label on the photo's corner. ABSENT is

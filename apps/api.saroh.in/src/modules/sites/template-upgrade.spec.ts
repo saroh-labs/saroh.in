@@ -87,6 +87,28 @@ describe("planLook — the look", () => {
         expect(parseSiteStyle(style)).not.toEqual(defaultSiteStyle());
     });
 
+    it("carries a look to the new colourway: a look is not a colour choice", () => {
+        for (const style of [
+            { ...defaultSiteStyle(), look: "quiet" },
+            { look: "quiet" },
+        ]) {
+            const look = planLook(
+                { ...untouched, style },
+                starterTemplateV3,
+                starterTemplate,
+                salon,
+            );
+            expect(look.style).toBe("applied");
+            expect(look.nextStyle?.id).toBe("stone");
+            expect(look.nextStyle?.value.look).toBe("quiet");
+        }
+        // No look stays no look.
+        expect(
+            planLook(untouched, starterTemplateV3, starterTemplate, salon)
+                .nextStyle?.value,
+        ).not.toHaveProperty("look");
+    });
+
     it("is kept when what is stored cannot be read: never guessed untouched", () => {
         const look = planLook(
             { ...untouched, style: { colours: { accent: "not-a-swatch" } } },

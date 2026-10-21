@@ -51,6 +51,8 @@ const NOT_FORMS: Record<string, string> = {
         "the one leave guard: Stay, Leave, and Save and leave",
     // Read-only quick looks, with their own header as their design draws.
     "components/shared/quick-look.tsx": "a read-only quick look",
+    "components/sites/look-preview.tsx":
+        "a look's preview: the site drawn read-only, with Use this look and Close",
     "components/stores/catalogue/quick-look.tsx": "a read-only quick look",
     "components/bookings/calendar/booking-quick-look.tsx":
         "a read-only quick look with its own actions",

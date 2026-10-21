@@ -1,4 +1,6 @@
 import type { RenderedTestimonials } from "@saroh/block-contract";
+import type { LookProps } from "../look-context";
+import LookTestimonials from "./testimonials-look";
 
 /**
  * `testimonials` v1 — what customers said, under their names (#255).
@@ -7,13 +9,18 @@ import type { RenderedTestimonials } from "@saroh/block-contract";
  * said it stay tied together for a screen reader. One column on a phone; at
  * most three side by side, the same cap `features` uses.
  *
+ * Under a look (DEC-172, U6) it is the look's own (`testimonials-look.tsx`);
+ * Classic is unchanged.
+ *
  * Drawn from `--site-*` only; gate G2 fails the build otherwise.
  */
 export default function TestimonialsSection({
     content,
-}: {
+    look,
+}: LookProps & {
     content: RenderedTestimonials;
 }) {
+    if (look) return <LookTestimonials content={content} look={look} />;
     return (
         <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             {content.heading ? (

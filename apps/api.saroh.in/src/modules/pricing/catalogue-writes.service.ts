@@ -13,6 +13,7 @@ import {
 } from "@saroh/database";
 import type { Catalog } from "@saroh/pricing-catalog";
 import { diff, planRows, validateCatalog } from "@saroh/pricing-catalog";
+import { unknownFreeStyles } from "./free-style-choices";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
 import { dayWords } from "../../common/words-format";
@@ -328,6 +329,20 @@ export class CatalogueWritesService {
                 throw new BadRequestException({
                     message: "Fix the draft before publishing it.",
                     details: { errors: check.errors },
+                });
+            }
+            // A free look, typeface or colourway this build doesn't have
+            // (DEC-177) would read as nothing free: refused, by name.
+            const unknown = unknownFreeStyles(check.catalog);
+            if (unknown.length > 0) {
+                throw new BadRequestException({
+                    message: "Fix the draft before publishing it.",
+                    details: {
+                        errors: unknown.map(
+                            (id) =>
+                                `freeStyles: "${id}" isn't a look, typeface or colourway Saroh has`,
+                        ),
+                    },
                 });
             }
             const result = await this.writeVersion(tx, {

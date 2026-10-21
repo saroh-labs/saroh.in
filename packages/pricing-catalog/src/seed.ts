@@ -375,6 +375,16 @@ const input: CatalogInput = {
     ],
     yearly: { on: true, paid: 10 },
     gst: { show: "excl" },
+    // Which looks every business may choose (DEC-177): all of them, as the
+    // owner starts. Classic is always free and needs no entry. Typefaces
+    // and colourways are left to what a site always has (the visitor's
+    // system font, its own template's fonts and colourway), so the rest
+    // need the `themes` row until the owner ticks some in admin.
+    freeStyles: {
+        looks: ["quiet", "folio", "live"],
+        fontPairs: [],
+        colourways: [],
+    },
     // One thing sold at a price and a maximum of its own on each plan
     // (DEC-157). Made up, like every number here.
     addons: [

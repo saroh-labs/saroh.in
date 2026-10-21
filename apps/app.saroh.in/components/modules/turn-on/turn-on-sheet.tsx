@@ -14,6 +14,7 @@ import { BLOCKER_COPY } from "@/lib/modules/blocker-copy";
 import type { ModuleView } from "@/lib/modules/schema";
 import { listWords } from "@/lib/modules/switch-plan";
 import {
+    bookingPageLine,
     comesWithLines,
     CONNECT_KEYS,
     GIVES,
@@ -151,6 +152,9 @@ function TurnOnBody({
                   "Selling online needs a website for your online shop, so Website comes with it.",
               ]
             : []),
+        ...[bookingPageLine(plan, t.bookingPage)].flatMap((line) =>
+            line ? [line] : [],
+        ),
     ];
 
     const shopNote = !draft

@@ -30,6 +30,17 @@ export interface CapturedThumbnail {
     height: number;
 }
 
+/** The Look row's phone picture for one template in one look (U16). */
+export interface CapturedLookThumbnail {
+    /** The template's id. */
+    id: string;
+    /** `classic`, `quiet`, `folio` or `live`. */
+    look: string;
+    src: string;
+    width: number;
+    height: number;
+}
+
 const byPath = (a: string, b: string) =>
     a === b ? 0 : a === "/" ? -1 : b === "/" ? 1 : a < b ? -1 : 1;
 
@@ -155,6 +166,73 @@ export function templateThumbnail(
     id: string,
 ): TemplateThumbnailImage | undefined {
     return TEMPLATE_THUMBNAILS[id];
+}
+`;
+}
+
+/** The looks' order in the Look row: Classic first. */
+const LOOK_ORDER = ["classic", "quiet", "folio", "live"];
+
+/** `apps/app.saroh.in/lib/sites/look-thumbnails.ts`, from disk (U16). */
+export function lookThumbnailsSource(
+    thumbnails: readonly CapturedLookThumbnail[],
+): string {
+    const sorted = [...thumbnails].sort((a, b) =>
+        a.id !== b.id
+            ? a.id < b.id
+                ? -1
+                : 1
+            : LOOK_ORDER.indexOf(a.look) - LOOK_ORDER.indexOf(b.look),
+    );
+    const entries = sorted.map(
+        (t) =>
+            `    ${key(`${t.id}:${t.look}`)}: {\n` +
+            `        src: ${json(t.src)},\n` +
+            `        width: ${t.width},\n` +
+            `        height: ${t.height},\n` +
+            `    },`,
+    );
+    const body = entries.length > 0 ? `{\n${entries.join("\n")}\n}` : "{}";
+    return `/**
+ * The Look row's phone pictures (DEC-172, U16): each gallery template's
+ * home page on a phone in each look, as the renderer draws it for the
+ * template's sample business, captured by
+ * \`e2e/marketing-shots/template-shots.ts\` (\`--looks\`) into
+ * \`public/looks/<template>-<look>.webp\`. Generated: re-run the capture
+ * instead of editing the entries.
+ *
+ * Keyed \`<template>:<look>\`, Classic as \`classic\`. A pair with no entry
+ * keeps the drawn phone (\`LookThumbnail\`), in the business's own colours.
+ * \`width\`/\`height\` are the picture's CSS size (the file is twice that).
+ */
+export interface LookThumbnailImage {
+    /** Under \`public/\`, e.g. \`/looks/salon-quiet.webp\`. */
+    src: string;
+    width: number;
+    height: number;
+}
+
+export const LOOK_THUMBNAILS: Readonly<
+    Partial<Record<string, LookThumbnailImage>>
+> = ${body};
+
+/** The template whose pictures stand in for a site made from none. */
+export const LOOK_THUMBNAIL_FALLBACK_TEMPLATE = "salon";
+
+/**
+ * The picture for \`look\` ("classic" for Classic) on a site made from
+ * \`templateId\`: its own template's, else the stand-in template's, else
+ * none (the drawn phone).
+ */
+export function lookThumbnail(
+    templateId: string | null | undefined,
+    look: string,
+    images: Readonly<
+        Partial<Record<string, LookThumbnailImage>>
+    > = LOOK_THUMBNAILS,
+): LookThumbnailImage | undefined {
+    const own = templateId ? images[\`\${templateId}:\${look}\`] : undefined;
+    return own ?? images[\`\${LOOK_THUMBNAIL_FALLBACK_TEMPLATE}:\${look}\`];
 }
 `;
 }

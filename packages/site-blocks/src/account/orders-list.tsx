@@ -1,5 +1,6 @@
 "use client";
 
+import type { LookId } from "@saroh/block-contract";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -15,6 +16,7 @@ import {
     Tag,
     Unavailable,
 } from "./parts";
+import { orderStatusWords } from "./status-words";
 import type { TrackLookup } from "./track-sheet";
 import { TrackSheet } from "./track-sheet";
 
@@ -39,6 +41,7 @@ export function AccountOrders({
     businessName,
     shopHref,
     messagesHref,
+    look,
 }: {
     orders: Block<AccountOrder[]>;
     /** The order whose Track is open, or null. */
@@ -47,6 +50,8 @@ export function AccountOrders({
     /** The shop, while it takes orders (G13); null hides the button. */
     shopHref: string | null;
     messagesHref: string | null;
+    /** The site's look (DEC-172): its words for each order's stage. */
+    look?: LookId;
 }) {
     const router = useRouter();
     const shop = shopHref ? (
@@ -68,7 +73,7 @@ export function AccountOrders({
                     actions={shop}
                 >
                     {orders.value.map((order) => (
-                        <OrderRow key={order.ref} order={order} />
+                        <OrderRow key={order.ref} order={order} look={look} />
                     ))}
                 </AccountCard>
             ) : (
@@ -94,9 +99,16 @@ export function AccountOrders({
 export function OrderRow({
     order,
     details = true,
+    look,
 }: {
     order: AccountOrder;
     details?: boolean;
+    /**
+     * Under a look the tag says the stage in the customer's words, one
+     * mapping for every look (`status-words.ts`): a pick-up is never "on
+     * its way". Classic keeps the API's word.
+     */
+    look?: LookId;
 }) {
     const button = order.open || details;
     return (
@@ -106,7 +118,9 @@ export function OrderRow({
             href={orderHref(order.ref)}
             sub={orderLine(order)}
             tag={
-                <Tag tone={order.open ? "accent" : "quiet"}>{order.status}</Tag>
+                <Tag tone={order.open ? "accent" : "quiet"}>
+                    {look ? orderStatusWords(order) : order.status}
+                </Tag>
             }
             actions={button ? <OrderButton order={order} /> : undefined}
         />

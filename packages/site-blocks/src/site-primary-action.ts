@@ -153,3 +153,47 @@ export function withoutPrimaryAction<T extends KindedEntry>(
     if (kept.length < menu.length && kept.every(isHome)) return [];
     return kept;
 }
+
+/**
+ * What kind of page a path is, as the chrome under a look needs to know it
+ * (DEC-172, U5): the page that books, the shop's pages (its grid, a
+ * product, checkout), or any other page. `basePath` is the draft
+ * preview's prefix, "" on a live site.
+ */
+export type ChromePageKind = "book" | "shop" | "page";
+
+export function chromePageKind(
+    path: string | null,
+    basePath = "",
+): ChromePageKind | null {
+    if (path === null) return null;
+    let own = path;
+    if (basePath && own.startsWith(basePath)) own = own.slice(basePath.length);
+    const page = pagePath(own === "" ? "/" : own);
+    const under = (root: string) =>
+        page === root || page.startsWith(`${root}/`);
+    if (under("/book")) return "book";
+    if (under("/shop") || under("/checkout")) return "shop";
+    return "page";
+}
+
+/**
+ * Whether the header's main button shows on a page, under a look (U5:
+ * one filled button per page type). Never on the page it opens (on
+ * `/book` the step's own action is the one button), and never on the
+ * shop's pages, where the header holds the bag only and the filled button
+ * is Add to bag or Check out. While the path is not known yet (the
+ * server's render), it shows: the browser settles it.
+ */
+export function chromeActionShows(
+    path: string | null,
+    action: { href: string } | null,
+    basePath = "",
+): boolean {
+    if (!action) return false;
+    const kind = chromePageKind(path, basePath);
+    if (kind === null) return true;
+    if (kind === "shop") return false;
+    if (kind === "book") return false;
+    return path === null || pagePath(path) !== pagePath(action.href);
+}

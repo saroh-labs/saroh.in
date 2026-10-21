@@ -409,6 +409,8 @@ describe("what each person sees of the inbox (F14)", () => {
                 "site.review.note",
                 "domain.down",
                 "domain.back",
+                // Only who can run a customer removal sees a request (DEC-172).
+                "customer.data-request",
             ],
         });
     });

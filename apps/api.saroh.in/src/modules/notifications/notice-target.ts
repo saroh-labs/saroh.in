@@ -40,6 +40,9 @@ export const NOTICE_KINDS = {
     "provider.attention": "providers",
     "provider.back": "providers",
     "team.joined": "team",
+    // A customer asked to remove their data (DEC-172): the customer, when
+    // the request names one; else the Customers requests list.
+    "customer.data-request": "customer-request",
     // A Member asked to change their own booking rules (#1038): Hours and
     // time off on that person, where the request is reviewed.
     "hours.rule-request": "hours",
@@ -72,6 +75,7 @@ interface TargetColumns {
     hours: { staffId: string };
     plan: Record<never, never>;
     products: Record<never, never>;
+    "customer-request": { contactId: string | null };
 }
 
 /** What a notice of type `T` must point at. */
@@ -202,6 +206,7 @@ const ID_OF: Record<NoticeKind, (n: StoredNotice) => string | null> = {
     hours: (n) => n.staffId ?? null,
     plan: () => null,
     products: () => null,
+    "customer-request": (n) => n.contactId ?? null,
 };
 
 /**

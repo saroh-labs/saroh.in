@@ -55,7 +55,9 @@ describe("the retention erase plan (DEC-122)", () => {
         expect(erased.filter((key) => key.startsWith("Invoice."))).toEqual([]);
         expect(erased).not.toContain("Order.deliveryState");
         // What it does erase of what a removal keeps: a walk-in's name and
-        // phone, and the CRM a removal leaves to the business.
+        // phone, and the CRM a removal leaves to the business. A data
+        // removal request's name and email are a removal's own to clear
+        // now (review #19), and the eraser deletes the requests whole.
         expect(erased.sort()).toEqual(
             [
                 "Activity.body",
