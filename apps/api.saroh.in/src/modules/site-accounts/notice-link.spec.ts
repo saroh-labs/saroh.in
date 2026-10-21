@@ -77,6 +77,25 @@ describe("the page a notice leads back to", () => {
         );
     });
 
+    it("a lapsed hold leads to the booking page, on its service, area on or off (#1137)", () => {
+        expect(
+            pathOf({
+                kind: "BOOKING_LAPSED",
+                bookingId: "b_1",
+                serviceId: "s 1",
+            }),
+        ).toBe("/book?service=s%201");
+        areaOn.mockReturnValue(false);
+        expect(
+            pathOf({
+                kind: "BOOKING_LAPSED",
+                bookingId: "b_1",
+                serviceId: "s_1",
+            }),
+        ).toBe("/book?service=s_1");
+        expect(pathOf({ kind: "BOOKING_LAPSED", bookingId: "b_1" })).toBeNull();
+    });
+
     it("is nothing for a notice with nowhere to go", () => {
         for (const kind of [
             "BOOKING_CANCELLED",

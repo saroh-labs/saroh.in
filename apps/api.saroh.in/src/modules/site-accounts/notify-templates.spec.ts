@@ -381,3 +381,38 @@ describe("a website order placed (UX-042)", () => {
         expect(mail.body).toContain("<p>Rye &lt;&amp;&gt; Co.</p>");
     });
 });
+
+describe("a lapsed hold (#1137)", () => {
+    const lapsed = (over: Partial<BookingNoticeVars> = {}): NoticeVars => ({
+        kind: "BOOKING_LAPSED",
+        booking: booking(over),
+    });
+
+    it("says the hold lapsed because it wasn't paid, in the business's zone", () => {
+        expect(noticeSentence(lapsed())).toBe(
+            "Your hold on Check-up, Tue 6 Oct at 11:00 am has lapsed because it wasn't paid.",
+        );
+    });
+
+    it("emails it with 'Book again' and the booking page", () => {
+        const mail = renderNotice(
+            lapsed({ link: "https://rye.saroh.app/book?service=s_1" }),
+        );
+        expect(mail.subject).toBe("Your hold with Kavi Dental has lapsed");
+        expect(mail.body).toContain("Hi Asha,");
+        expect(mail.body).toContain("Book again:");
+        expect(mail.body).toContain(
+            'href="https://rye.saroh.app/book?service=s_1"',
+        );
+    });
+
+    it("has no link line when there is no site to book on", () => {
+        const mail = renderNotice(lapsed());
+        expect(mail.body).not.toContain("Book again");
+    });
+
+    it("escapes what the business typed", () => {
+        const mail = renderNotice(lapsed({ service: "<b>Cut</b>" }));
+        expect(mail.body).toContain("&lt;b&gt;Cut&lt;/b&gt;");
+    });
+});

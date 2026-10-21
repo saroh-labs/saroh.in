@@ -39,7 +39,8 @@ export interface BookingNoticeVars {
     reassigned?: boolean;
     /**
      * Their bookings on the business's own site, where they can move or
-     * cancel it (`notice-link.ts`); null or absent: the email has no link.
+     * cancel it, or for a lapsed hold the booking page to book again
+     * (`notice-link.ts`); null or absent: the email has no link.
      */
     link?: string | null;
 }
@@ -88,7 +89,11 @@ export interface WaitlistNoticeVars {
 
 export type NoticeVars =
     | {
-          kind: "BOOKING_CONFIRMED" | "BOOKING_MOVED" | "BOOKING_CANCELLED";
+          kind:
+              | "BOOKING_CONFIRMED"
+              | "BOOKING_MOVED"
+              | "BOOKING_CANCELLED"
+              | "BOOKING_LAPSED";
           booking: BookingNoticeVars;
       }
     | { kind: "ORDER_PLACED"; placed: PlacedOrderVars }
@@ -121,6 +126,8 @@ export function noticeSentence(vars: NoticeVars): string {
         case "BOOKING_MOVED":
         case "BOOKING_CANCELLED":
             return bookingSentence(vars.kind, vars.booking);
+        case "BOOKING_LAPSED":
+            return lapsedSentence(vars.booking);
         case "ORDER_PLACED":
             return placedSentence(vars.placed);
         case "ORDER_READY":
@@ -155,6 +162,15 @@ function bookingSentence(
                 ? `You cancelled your ${b.service} on ${when}.`
                 : `Your ${b.service} on ${when} has been cancelled.`;
     }
+}
+
+/**
+ * An unpaid hold whose time ran out (#1137): "Your hold on Haircut, Tue 6
+ * Oct at 11:00 am has lapsed because it wasn't paid." The email adds
+ * "Book again:" and the booking page ({@link backLink}).
+ */
+function lapsedSentence(b: BookingNoticeVars): string {
+    return `Your hold on ${b.service}, ${noticeWhen(b.startAt, b.timeZone)} has lapsed because it wasn't paid.`;
 }
 
 /**
@@ -224,6 +240,8 @@ function noticeSubject(vars: NoticeVars): string {
                 : `Your booking with ${vars.booking.business} has moved`;
         case "BOOKING_CANCELLED":
             return `Your booking with ${vars.booking.business} is cancelled`;
+        case "BOOKING_LAPSED":
+            return `Your hold with ${vars.booking.business} has lapsed`;
         case "ORDER_PLACED":
             return `Your order ${vars.placed.number} from ${vars.placed.business}`;
         case "ORDER_READY":
@@ -292,6 +310,10 @@ export function backLink(
     if (vars.kind === "BOOKING_CONFIRMED" || vars.kind === "BOOKING_MOVED") {
         const url = safeLink(vars.booking.link ?? null);
         return url ? { lead: "See, move or cancel your booking:", url } : null;
+    }
+    if (vars.kind === "BOOKING_LAPSED") {
+        const url = safeLink(vars.booking.link ?? null);
+        return url ? { lead: "Book again:", url } : null;
     }
     return null;
 }

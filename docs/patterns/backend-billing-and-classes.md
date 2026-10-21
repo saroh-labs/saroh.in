@@ -1492,6 +1492,21 @@ options, items, more }` and a sentence with the count, the first
 - **A hold is only ever let go through `releaseHoldInTx`** — the sweep, the
   booker, and the team cancelling it (`cancelBooking`) — so its draft is
   always voided and its pay token cleared with it.
+- **A hold whose time ran out is a lapse, not a cancel** (#1137, DEC-174).
+  `releaseHoldInTx`'s `why` says which: `let-go` (the booker or the team:
+  CANCELLED, with the team member as actor), `lapsed` (the sweep: a
+  `LAPSED` BookingEvent with no actor, and one `booking.notify` with reason
+  `lapsed` when there is a contact and it is not a course's session — the
+  booker hears "Your hold on ‹service›, ‹time› has lapsed because it wasn't
+  paid", `BOOKING_LAPSED`, with "Book again:" and `/book?service=…`), or
+  `paid-late` (money came after the place was taken: `LAPSED`, owed back,
+  no notice). Nothing that reads "cancelled by the customer" (a null actor
+  on CANCELLED) counts a lapse: the team gets no bell for it.
+- **A hold that moves is not told "has moved"** (#1137): the move's
+  `booking.notify` carries `held: true` while the booking is PENDING, and
+  the handler sends no BOOKING_MOVED for it (the team still hears a move
+  the customer made). The payment's confirmation reads the booking's time
+  then, so it gives the new one.
 - **Lock a booking that may be a hold invoice first, then booking**
   (`lockBookingInTx`), the webhook's order. The other way round, a release
   and a payment arriving together deadlock (#508).
@@ -1535,6 +1550,15 @@ options, items, more }` and a sentence with the count, the first
   settles it and makes the credit note on the booking's invoice
   (`creditNoteForRefund`, DEC-023). A late cancel keeps the money; the
   business's `returnCredit` override refunds it only with `payment:manage`.
+  **The refund is in the booking's history** (#1137): once sent, a
+  `REFUNDED` BookingEvent ("Refunded ₹500 to how they paid"), or
+  `REFUND_FAILED` ("Refund failed") when the provider refused it, with
+  `data: { amountCents, currency, refundId, outcome }`
+  (`recordBookingRefundInTx`). The refund row's status decides which, under
+  its lock, and a line already the newest for that refund is not written
+  again; the refund webhook's settle and fail (and a refund made in the
+  provider's dashboard) call the same helper, so a refund that fails later
+  appends "Refund failed". Only a booking's own invoice (no order).
   A visit of a treatment has no booking invoice, so it never refunds here
   (DEC-050): its money goes back through the order.
 - **Money taken at the desk is the booking's paper, paid by hand** (round-2

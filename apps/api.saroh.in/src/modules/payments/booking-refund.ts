@@ -164,3 +164,97 @@ export async function reserveBookingRefundInTx(
         reservedNow: true,
     };
 }
+
+/**
+ * Where a booking's refund stood when its history line was written
+ * (#1137): the cancel's answer from the provider (SENT, CONFIRMING,
+ * REFUSED), or the refund webhook's final word (SETTLED, FAILED).
+ */
+export type BookingRefundOutcome =
+    "SENT" | "CONFIRMING" | "REFUSED" | "SETTLED" | "FAILED";
+
+/** What a REFUNDED or REFUND_FAILED line carries in `BookingEvent.data`. */
+export interface BookingRefundData {
+    amountCents: number;
+    currency: string;
+    refundId: string;
+    outcome: BookingRefundOutcome;
+}
+
+/**
+ * Put a booking's refund in its history (#1137): "Refunded ₹500 to how
+ * they paid" while the refund stands (sent, or awaiting the provider's
+ * answer with the money held), "Refund failed" once the provider refused
+ * it. The refund row's own status decides which, so a line written late
+ * never contradicts one the webhook wrote first; and a line already the
+ * newest for this refund is not written twice. A FAILED refund the
+ * provider later says went back gets a REFUNDED line after it.
+ *
+ * Only a booking's own invoice (source BOOKING, no order): a treatment's
+ * money is its order's, and the order's history tells it. Returns whether
+ * a line was written. Call it under the refund row's lock.
+ */
+export async function recordBookingRefundInTx(
+    tx: Tx,
+    refundId: string,
+    outcome: BookingRefundOutcome,
+): Promise<boolean> {
+    const refund = await tx.paymentRefund.findUnique({
+        where: { id: refundId },
+        select: {
+            id: true,
+            organizationId: true,
+            amountCents: true,
+            currency: true,
+            status: true,
+            paymentIntent: {
+                select: {
+                    invoice: {
+                        select: {
+                            bookingId: true,
+                            source: true,
+                            orderId: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+    const invoice = refund?.paymentIntent.invoice;
+    if (!refund || invoice?.source !== "BOOKING" || invoice.orderId) {
+        return false;
+    }
+    const bookingId = invoice.bookingId;
+    if (!bookingId) return false;
+    const type = refund.status === "FAILED" ? "REFUND_FAILED" : "REFUNDED";
+    const last = await tx.bookingEvent.findFirst({
+        where: {
+            bookingId,
+            organizationId: refund.organizationId,
+            type: { in: ["REFUNDED", "REFUND_FAILED"] },
+            data: { path: ["refundId"], equals: refund.id },
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: { type: true },
+    });
+    if (last?.type === type) return false;
+    const data: BookingRefundData = {
+        amountCents: refund.amountCents,
+        currency: refund.currency,
+        refundId: refund.id,
+        outcome,
+    };
+    await tx.bookingEvent.create({
+        data: {
+            bookingId,
+            organizationId: refund.organizationId,
+            type,
+            // Nobody's hand: the refund follows the cancel, or the
+            // provider's answer.
+            actorUserId: null,
+            data: { ...data },
+        },
+        select: { id: true },
+    });
+    return true;
+}

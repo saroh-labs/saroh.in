@@ -26,6 +26,8 @@ export const NOTICE_TEMPLATES = [
     "BOOKING_CONFIRMED",
     "BOOKING_MOVED",
     "BOOKING_CANCELLED",
+    // An unpaid hold whose time ran out (#1137), with a way to book again.
+    "BOOKING_LAPSED",
     // A website order the customer placed (UX-042): paid, or to pay on
     // handover.
     "ORDER_PLACED",

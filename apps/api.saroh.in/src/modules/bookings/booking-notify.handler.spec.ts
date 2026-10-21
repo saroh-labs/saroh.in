@@ -22,6 +22,7 @@ import type { BookingNotifyPayload } from "./booking-notify.handler";
 import {
     BOOKING_NOTIFY_TYPE,
     BookingNotifyHandler,
+    noticeKind,
     tellAboutBooking,
 } from "./booking-notify.handler";
 
@@ -266,6 +267,123 @@ describe("booking.notify", () => {
             organizationId: ORG,
         });
         expect(notify).not.toHaveBeenCalled();
+    });
+});
+
+describe("booking.notify: holds (#1137)", () => {
+    it("a hold still awaiting payment that moved is not told 'has moved'", async () => {
+        const tx = makeTx();
+        tx.booking.findFirst.mockResolvedValue({
+            ...(await makeTx().booking.findFirst()),
+            status: "PENDING",
+        });
+        tx.bookingEvent.findFirst.mockResolvedValue({
+            id: "ev_move",
+            type: "RESCHEDULED",
+            actorUserId: "user_1",
+            fromStartAt: WAS,
+            toStartAt: NOW,
+        });
+        await run(tx, {
+            bookingId: "bk_1",
+            reason: "rescheduled",
+            eventId: "ev_move",
+            held: true,
+        });
+        expect(notify).not.toHaveBeenCalled();
+        expect(tx.notification.create).not.toHaveBeenCalled();
+    });
+
+    it("moved while a hold and paid since: still no 'has moved' — the confirmation gives the new time", async () => {
+        const tx = makeTx();
+        tx.bookingEvent.findFirst.mockResolvedValue({
+            id: "ev_move",
+            type: "RESCHEDULED",
+            actorUserId: "user_1",
+            fromStartAt: WAS,
+            toStartAt: NOW,
+        });
+        await run(tx, {
+            bookingId: "bk_1",
+            reason: "rescheduled",
+            eventId: "ev_move",
+            held: true,
+        });
+        expect(notify).not.toHaveBeenCalled();
+    });
+
+    it("a customer moving their own hold: the team is still told, the customer isn't", async () => {
+        const tx = makeTx();
+        tx.booking.findFirst.mockResolvedValue({
+            ...(await makeTx().booking.findFirst()),
+            status: "PENDING",
+        });
+        tx.bookingEvent.findFirst.mockResolvedValue({
+            id: "ev_move",
+            type: "RESCHEDULED",
+            actorUserId: null,
+            fromStartAt: WAS,
+            toStartAt: NOW,
+        });
+        await run(tx, { bookingId: "bk_1", eventId: "ev_move", held: true });
+        expect(notify).not.toHaveBeenCalled();
+        expect(tx.notification.create).toHaveBeenCalledTimes(1);
+    });
+
+    it("a confirmed booking moved is told as before", async () => {
+        const tx = makeTx();
+        tx.bookingEvent.findFirst.mockResolvedValue({
+            id: "ev_move",
+            type: "RESCHEDULED",
+            actorUserId: "user_1",
+            fromStartAt: WAS,
+            toStartAt: NOW,
+        });
+        await run(tx, { bookingId: "bk_1", eventId: "ev_move" });
+        expect(notify.mock.calls[0][2]).toMatchObject({
+            kind: "BOOKING_MOVED",
+        });
+    });
+
+    it("a lapsed hold: the customer hears it lapsed, and the team gets no 'customer cancelled'", async () => {
+        const tx = makeTx();
+        tx.booking.findFirst.mockResolvedValue({
+            ...(await makeTx().booking.findFirst()),
+            status: "CANCELLED",
+        });
+        tx.bookingEvent.findFirst.mockResolvedValue({
+            id: "ev_lapse",
+            type: "LAPSED",
+            actorUserId: null,
+            fromStartAt: NOW,
+            toStartAt: null,
+        });
+        await run(tx, {
+            bookingId: "bk_1",
+            reason: "lapsed",
+            eventId: "ev_lapse",
+        });
+        expect(notify).toHaveBeenCalledWith(
+            tx,
+            ORG,
+            {
+                kind: "BOOKING_LAPSED",
+                eventKey: "booking:ev_lapse",
+                bookingId: "bk_1",
+                bookingEventId: "ev_lapse",
+            },
+            NOW,
+        );
+        expect(tx.notification.create).not.toHaveBeenCalled();
+        expect(enqueueTeamAlert).not.toHaveBeenCalled();
+    });
+});
+
+describe("noticeKind", () => {
+    it("reads a lapse as BOOKING_LAPSED, by its event or its reason", () => {
+        expect(noticeKind("LAPSED", undefined)).toBe("BOOKING_LAPSED");
+        expect(noticeKind(null, "lapsed")).toBe("BOOKING_LAPSED");
+        expect(noticeKind("CANCELLED", "cancelled")).toBe("BOOKING_CANCELLED");
     });
 });
 

@@ -7,7 +7,8 @@ import type { NoticeKind } from "./notify-templates";
 /**
  * The way back from a notice's email to what it is about, on the
  * business's own site: the order's page for an order just placed, the
- * booking's page for a booking made or moved.
+ * booking's page for a booking made or moved, the booking page for a hold
+ * that lapsed (#1137).
  *
  * - **The customer's own site.** The one they last signed in on (a business
  *   may have more than one), at its primary address: its verified custom
@@ -36,6 +37,7 @@ export async function noticeLink(
         contactId: string;
         orderId?: string;
         bookingId?: string;
+        serviceId?: string;
     },
 ): Promise<string | null> {
     const path = pathOf(subject);
@@ -68,6 +70,7 @@ export function pathOf(subject: {
     kind: NoticeKind;
     orderId?: string;
     bookingId?: string;
+    serviceId?: string;
 }): string | null {
     if (subject.kind === "ORDER_PLACED" && subject.orderId) {
         const order = encodeURIComponent(subject.orderId);
@@ -85,6 +88,11 @@ export function pathOf(subject: {
     ) {
         // The booking's own page (DEC-142), so the email opens the thing.
         return `/account/bookings/${encodeURIComponent(subject.bookingId)}`;
+    }
+    if (subject.kind === "BOOKING_LAPSED" && subject.serviceId) {
+        // A lapsed hold (#1137): the booking page, on the service, to book
+        // again. It served the hold minutes ago, so it is there.
+        return `/book?service=${encodeURIComponent(subject.serviceId)}`;
     }
     return null;
 }

@@ -39,6 +39,7 @@ import {
     captureCheckInTx,
     failCheckInTx,
 } from "../payments/authorisation-check";
+import { recordBookingRefundInTx } from "../payments/booking-refund";
 import type { CapturedAmount } from "../payments/capture-mismatch";
 import {
     AMOUNT_MISMATCH,
@@ -1178,6 +1179,9 @@ export class WebhooksService {
                     },
                 });
             }
+            // A booking's refund in its history (#1137), unless the cancel
+            // already wrote it so.
+            await recordBookingRefundInTx(tx, existing.id, "SETTLED");
             return { applied: true, refundId: existing.id, settledNow: true };
         }
         // Made outside Saroh (the provider's dashboard): recorded at what the
@@ -1203,6 +1207,9 @@ export class WebhooksService {
                 providerRefundId: event.providerRefundId,
             },
         });
+        // A refund of a booking's payment made in the provider's own
+        // dashboard is in the booking's history too (#1137).
+        await recordBookingRefundInTx(tx, created.id, "SETTLED");
         return { applied: true, refundId: created.id, settledNow: true };
     }
 
@@ -1237,6 +1244,9 @@ export class WebhooksService {
                     existing.providerRefundId ?? event.providerRefundId ?? null,
             },
         });
+        // A booking's refund that never went back (#1137): "Refund failed"
+        // in its history, after the "Refunded" its cancel wrote.
+        await recordBookingRefundInTx(tx, existing.id, "FAILED");
         return { applied: true };
     }
 

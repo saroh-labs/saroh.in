@@ -5432,7 +5432,10 @@ model BookingEvent {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  type String // BOOKED | RESCHEDULED | CANCELLED | ATTENDED | NO_SHOW
+  // BOOKED | RESCHEDULED | CANCELLED | ATTENDED | NO_SHOW | PAID_AT_DESK |
+  // REASSIGNED | LAPSED (an unpaid hold whose time ran out: nobody's
+  // choice) | REFUNDED | REFUND_FAILED (#1137)
+  type String
 
   // Who did it. Null when the booker did it themselves through the public
   // form, which is exactly the difference between "they booked it" and "we
@@ -5455,6 +5458,11 @@ model BookingEvent {
   fromStaff   StaffMember? @relation("BookingEventFromStaff", fields: [fromStaffId], references: [id], onDelete: SetNull)
   toStaffId   String?
   toStaff     StaffMember? @relation("BookingEventToStaff", fields: [toStaffId], references: [id], onDelete: SetNull)
+
+  // What a money line says (#1137): on REFUNDED and REFUND_FAILED,
+  // `{ amountCents, currency, refundId, outcome }` — the refund it is about
+  // and where it stood when written. Null on every other kind.
+  data Json?
 
   createdAt DateTime @default(now())
 

@@ -30,8 +30,19 @@ export interface BookingNotifyPayload {
     serviceId?: string;
     contactId?: string | null;
     reason?:
-        "booked" | "rescheduled" | "reassigned" | "cancelled" | "confirmed";
+        | "booked"
+        | "rescheduled"
+        | "reassigned"
+        | "cancelled"
+        | "confirmed"
+        | "lapsed";
     eventId?: string;
+    /**
+     * A move made while the booking was a hold awaiting payment (#1137):
+     * the customer isn't told it moved, even if it is paid by the time
+     * this runs — the payment's confirmation gives the new time.
+     */
+    held?: boolean;
 }
 
 type Tx = Prisma.TransactionClient;
@@ -80,14 +91,23 @@ export class BookingNotifyHandler {
     };
 }
 
+/** The booking notices this handler sends. */
+type BookingNoticeKind = Extract<
+    NoticeKind,
+    | "BOOKING_CONFIRMED"
+    | "BOOKING_MOVED"
+    | "BOOKING_CANCELLED"
+    | "BOOKING_LAPSED"
+>;
+
 /** What a booking event is, as a customer notice. */
-function noticeKind(
+export function noticeKind(
     eventType: string | null,
     reason: BookingNotifyPayload["reason"],
-): Extract<
-    NoticeKind,
-    "BOOKING_CONFIRMED" | "BOOKING_MOVED" | "BOOKING_CANCELLED"
-> {
+): BookingNoticeKind {
+    // An unpaid hold whose time ran out (#1137): "has lapsed", not
+    // "cancelled".
+    if (eventType === BookingEventType.Lapsed) return "BOOKING_LAPSED";
     if (eventType === BookingEventType.Rescheduled) return "BOOKING_MOVED";
     // Given to someone else (#1157): the customer hears it as a change to
     // their booking, "now with Meera", through the same notice.
@@ -98,6 +118,7 @@ function noticeKind(
         return "BOOKING_MOVED";
     }
     if (reason === "cancelled") return "BOOKING_CANCELLED";
+    if (reason === "lapsed") return "BOOKING_LAPSED";
     return "BOOKING_CONFIRMED";
 }
 
@@ -146,22 +167,30 @@ export async function tellAboutBooking(
     // The customer's notice first: it takes the plan-meter lock when Saroh
     // emails it (DEC-086), and that lock comes before any row this
     // transaction writes, the team's notice included (`backend-jobs.md`).
-    await notices.notify(
-        tx,
-        organizationId,
-        {
-            kind,
-            eventKey: bookingNoticeKey(key),
-            bookingId: booking.id,
-            bookingEventId: event?.id ?? null,
-        },
-        input.now,
-    );
+    // A booking still waiting for its payment (a hold) is not told it has
+    // moved (#1137): it isn't booked yet, and the confirmation its payment
+    // sends gives the time it has then.
+    const awaitingPayment =
+        payload.held === true || booking.status === "PENDING";
+    if (!(kind === "BOOKING_MOVED" && awaitingPayment)) {
+        await notices.notify(
+            tx,
+            organizationId,
+            {
+                kind,
+                eventKey: bookingNoticeKey(key),
+                bookingId: booking.id,
+                bookingEventId: event?.id ?? null,
+            },
+            input.now,
+        );
+    }
 
     // The customer did it themselves: no team member behind the event. A
     // booking they made is the team's "New booking" (F14), as a move or a
-    // cancel always was.
-    if (event?.actorUserId === null) {
+    // cancel always was. A lapse (#1137) carries no actor either, but
+    // nobody chose it: the team is not told "‹customer› cancelled".
+    if (event?.actorUserId === null && kind !== "BOOKING_LAPSED") {
         await tellTeam(tx, organizationId, {
             key,
             kind,

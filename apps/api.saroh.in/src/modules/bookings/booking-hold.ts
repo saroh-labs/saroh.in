@@ -46,6 +46,13 @@ type Tx = Prisma.TransactionClient;
 /** How long a pay-now booking holds its place. */
 export const HOLD_MINUTES = 15;
 
+/**
+ * Why a hold is let go (#1137): the booker or the team let it go
+ * (`let-go`, a cancel), its time ran out unpaid (`lapsed`), or its money
+ * came after its place was taken (`paid-late`, lapsed and owed back).
+ */
+export type HoldRelease = "let-go" | "lapsed" | "paid-late";
+
 /** The self-rescheduling job that releases holds whose time ran out. */
 export const RELEASE_HOLDS_TYPE = "booking.release-holds";
 
@@ -240,13 +247,20 @@ export async function lockBookingInTx(
  * The place it held is free again, so the class's waitlist is offered it
  * (A12) — unless the same person is booking the same session again this
  * moment (`freesPlace: false`, K-2), when nothing frees.
+ *
+ * `why` (#1137) is what the history says: `let-go` (the default) is a
+ * cancel — by the team member named, else by the booker; `lapsed` is a
+ * hold whose time ran out unpaid, recorded as LAPSED, nobody's choice, and
+ * the booker is told ({@link HoldRelease}); `paid-late` lapsed too, but the
+ * money came after someone else took the place, so it is owed back and the
+ * booker is not told it "wasn't paid".
  */
 export async function releaseHoldInTx(
     tx: Tx,
     bookingId: string,
     now: Date,
     actorUserId: string | null = null,
-    options: { freesPlace?: boolean } = {},
+    options: { freesPlace?: boolean; why?: HoldRelease } = {},
 ): Promise<boolean> {
     await lockBookingInTx(tx, bookingId);
     const booking = await tx.booking.findUnique({
@@ -259,9 +273,13 @@ export async function releaseHoldInTx(
             startAt: true,
             holdExpiresAt: true,
             orderId: true,
+            contactId: true,
+            courseEnrollmentId: true,
         },
     });
     if (booking?.status !== "PENDING") return false;
+    const why = options.why ?? "let-go";
+    const lapsed = why !== "let-go";
     await tx.booking.update({
         where: { id: booking.id },
         data: {
@@ -270,18 +288,39 @@ export async function releaseHoldInTx(
             holdExpiresAt: booking.holdExpiresAt ?? now,
         },
     });
-    // The history reads "cancelled", and the booking's kept expiry says it
-    // was a hold that was let go — by the team when it names who.
-    await tx.bookingEvent.create({
+    // Let go, the history reads "cancelled", and the booking's kept expiry
+    // says it was a hold — by the team when it names who. Run out, it reads
+    // "Lapsed" (#1137): not a customer's cancel, so no count or bell takes
+    // it for one.
+    const event = await tx.bookingEvent.create({
         data: {
             bookingId: booking.id,
             organizationId: booking.organizationId,
-            type: "CANCELLED",
-            actorUserId,
+            type: lapsed ? BookingEventType.Lapsed : BookingEventType.Cancelled,
+            actorUserId: lapsed ? null : actorUserId,
             fromStartAt: booking.startAt,
         },
         select: { id: true },
     });
+    // The booker hears their hold lapsed, with a way to book again — only
+    // when there is someone to tell: a contact, and not a course's session
+    // (told as the course). A late payment is not "wasn't paid".
+    if (why === "lapsed" && booking.contactId && !booking.courseEnrollmentId) {
+        await tx.job.create({
+            data: {
+                organizationId: booking.organizationId,
+                type: "booking.notify",
+                payload: {
+                    bookingId: booking.id,
+                    serviceId: booking.serviceId,
+                    contactId: booking.contactId,
+                    reason: "lapsed",
+                    eventId: event.id,
+                },
+            },
+            select: { id: true },
+        });
+    }
     await tx.invoice.updateMany({
         where: {
             bookingId: booking.id,
@@ -426,7 +465,7 @@ export async function confirmHoldInTx(
         !isExpiredHold(booking, now) ||
         (await placeStillFree(tx, booking, booking.service, now));
     if (!free) {
-        await releaseHoldInTx(tx, booking.id, now);
+        await releaseHoldInTx(tx, booking.id, now, null, { why: "paid-late" });
         return "released";
     }
 

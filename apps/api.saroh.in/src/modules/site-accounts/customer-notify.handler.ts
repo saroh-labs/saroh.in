@@ -27,6 +27,8 @@ export interface NoticeSubject {
     vars: NoticeVars;
     bookingId?: string;
     orderId?: string;
+    /** The service a lapsed hold was for: "Book again" opens it (#1137). */
+    serviceId?: string;
 }
 
 /** What one notice became. */
@@ -136,6 +138,7 @@ export class CustomerNotifyService {
                 contactId: contact.id,
                 orderId: subject.orderId,
                 bookingId: subject.bookingId,
+                serviceId: subject.serviceId,
             });
             const queued = await this.comms.queueTransactional(
                 tx,
@@ -200,7 +203,11 @@ export function withLink(vars: NoticeVars, link: string | null): NoticeVars {
     if (vars.kind === "ORDER_PLACED") {
         return { ...vars, placed: { ...vars.placed, link } };
     }
-    if (vars.kind === "BOOKING_CONFIRMED" || vars.kind === "BOOKING_MOVED") {
+    if (
+        vars.kind === "BOOKING_CONFIRMED" ||
+        vars.kind === "BOOKING_MOVED" ||
+        vars.kind === "BOOKING_LAPSED"
+    ) {
         return { ...vars, booking: { ...vars.booking, link } };
     }
     return vars;
@@ -229,6 +236,7 @@ export async function loadSubject(
         case "BOOKING_CONFIRMED":
         case "BOOKING_MOVED":
         case "BOOKING_CANCELLED":
+        case "BOOKING_LAPSED":
             return loadBooking(tx, organizationId, payload.kind, payload);
         case "ORDER_PLACED":
             return loadPlacedOrder(tx, organizationId, payload);
@@ -257,7 +265,11 @@ function firstWord(name: string | null | undefined): string | null {
 async function loadBooking(
     tx: Tx,
     organizationId: string,
-    kind: "BOOKING_CONFIRMED" | "BOOKING_MOVED" | "BOOKING_CANCELLED",
+    kind:
+        | "BOOKING_CONFIRMED"
+        | "BOOKING_MOVED"
+        | "BOOKING_CANCELLED"
+        | "BOOKING_LAPSED",
     payload: CustomerNotifyPayload,
 ): Promise<NoticeSubject | null> {
     if (!payload.bookingId) return null;
@@ -271,6 +283,7 @@ async function loadBooking(
             contactId: true,
             bookerName: true,
             courseEnrollmentId: true,
+            serviceId: true,
             service: { select: { name: true } },
             staff: { select: { name: true } },
             contact: { select: { firstName: true } },
@@ -287,7 +300,11 @@ async function loadBooking(
     if (kind === "BOOKING_MOVED" && booking.status === "CANCELLED") {
         return null;
     }
-    if (kind === "BOOKING_CANCELLED" && booking.status !== "CANCELLED") {
+    // A lapse (#1137) is a released hold: cancelled, never confirmed.
+    if (
+        (kind === "BOOKING_CANCELLED" || kind === "BOOKING_LAPSED") &&
+        booking.status !== "CANCELLED"
+    ) {
         return null;
     }
     const event = payload.bookingEventId
@@ -308,7 +325,7 @@ async function loadBooking(
     const reassigned =
         kind === "BOOKING_MOVED" && event?.type === BookingEventType.Reassigned;
     const startAt =
-        kind === "BOOKING_CANCELLED"
+        kind === "BOOKING_CANCELLED" || kind === "BOOKING_LAPSED"
             ? (event?.fromStartAt ?? booking.startAt)
             : kind === "BOOKING_MOVED"
               ? (event?.toStartAt ?? booking.startAt)
@@ -316,6 +333,7 @@ async function loadBooking(
     return {
         contactId: booking.contactId,
         bookingId: booking.id,
+        ...(kind === "BOOKING_LAPSED" ? { serviceId: booking.serviceId } : {}),
         vars: {
             kind,
             booking: {

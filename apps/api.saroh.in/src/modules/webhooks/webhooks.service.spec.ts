@@ -36,6 +36,14 @@ jest.mock("../analytics/order-events", () => ({
     recordOrderRefundedInTx: jest.fn().mockResolvedValue(true),
 }));
 
+// A booking's refund in its history (#1137) is specced against a real
+// database (bookings/booking-refund-history.db.spec.ts); here each call is
+// recorded.
+jest.mock("../payments/booking-refund", () => ({
+    ...jest.requireActual("../payments/booking-refund"),
+    recordBookingRefundInTx: jest.fn().mockResolvedValue(false),
+}));
+
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const client = {
@@ -89,6 +97,7 @@ import {
     invoiceSupersededPayment,
     settleSupplementaryInvoices,
 } from "../invoices/order-invoicing";
+import { recordBookingRefundInTx } from "../payments/booking-refund";
 import { encryptSecret } from "../payments/crypto";
 import { PaymentsService } from "../payments/payments.service";
 import {
@@ -485,6 +494,13 @@ describe("WebhooksService refund settlement", () => {
             expect.anything(),
             "order_1",
         );
+        // Asked to put it in a booking's history (#1137); an order's
+        // refund writes nothing there (the helper's own spec).
+        expect(recordBookingRefundInTx).toHaveBeenCalledWith(
+            expect.anything(),
+            "rf_1",
+            "SETTLED",
+        );
     });
 
     it("a partial refund settles but leaves the order PAID (ADR-008)", async () => {
@@ -687,6 +703,12 @@ describe("WebhooksService refund settlement", () => {
         expect(creditNoteForRefund).not.toHaveBeenCalled();
         expect(orderUpdate).not.toHaveBeenCalled();
         expect(orderEventCreate).not.toHaveBeenCalled();
+        // "Refund failed" in a booking's history, when it is one (#1137).
+        expect(recordBookingRefundInTx).toHaveBeenCalledWith(
+            expect.anything(),
+            "rf_1",
+            "FAILED",
+        );
     });
 
     it("a failed refund matched by Saroh's reference alone is failed too", async () => {
