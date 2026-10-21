@@ -12,6 +12,8 @@ import { OrganizationsModule } from "../organizations/organizations.module";
 import { AccountThreadPosterService } from "../site-accounts/thread-poster";
 import { GstRatesController } from "./gst-rates.controller";
 import { GstRatesService } from "./gst-rates.service";
+import { INVOICE_AUTO_SEND_TYPE } from "./invoice-auto-send";
+import { InvoiceAutoSendHandler } from "./invoice-auto-send.handler";
 import { InvoicePaymentsService } from "./invoice-payments.service";
 import { InvoicePdfService } from "./invoice-pdf.service";
 import { INVOICE_RECEIPT_TYPE } from "./invoice-receipt";
@@ -53,6 +55,8 @@ import { InvoicesService } from "./invoices.service";
         InvoiceShareService,
         InvoiceRemindersService,
         InvoiceReceiptHandler,
+        // A renewal's invoice, sent by Saroh (automatic notices U10).
+        InvoiceAutoSendHandler,
         OrganizationGuard,
         // The account thread's poster (A13). Still offered only while the
         // ACCOUNT_THREAD flag is on, which it is not by default.
@@ -68,10 +72,13 @@ export class InvoicesModule implements OnModuleInit {
     constructor(
         private readonly registry: JobHandlerRegistry,
         private readonly receipts: InvoiceReceiptHandler,
+        private readonly autoSend: InvoiceAutoSendHandler,
     ) {}
 
     onModuleInit(): void {
         // Every recorded payment's receipt, after the Undo window (DEC-173).
         this.registry.register(INVOICE_RECEIPT_TYPE, this.receipts.handle);
+        // A membership's renewal invoice, sent as it is made (DEC-174 R3).
+        this.registry.register(INVOICE_AUTO_SEND_TYPE, this.autoSend.handle);
     }
 }

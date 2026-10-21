@@ -19,6 +19,7 @@ import {
     earliestDebitAt,
     MandateChargesService,
 } from "../payments/mandate-charges.service";
+import { enqueueAutopayFailedNotice } from "../site-accounts/notices/autopay-failed";
 import type { ChargeJobPayload } from "./charge-job";
 import {
     chargeKey,
@@ -493,6 +494,12 @@ export class SubscriptionChargeHandler {
                 event: "failed",
                 invoiceId,
                 paymentIntentId: intentId,
+            });
+            // And the customer, with a link to pay (U10).
+            await enqueueAutopayFailedNotice(tx, organizationId, {
+                invoiceId,
+                paymentIntentId: intentId,
+                reason,
             });
         });
     }

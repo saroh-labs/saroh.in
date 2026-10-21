@@ -66,6 +66,7 @@ import { settleMismatchRefundInTx } from "../payments/mismatch-refund";
 import { PaymentsService } from "../payments/payments.service";
 import { enqueueRefundSendInTx } from "../payments/send-refund.handler";
 import { enqueueOrderPlacedNotice } from "../site-accounts/customer-notify-queue";
+import { enqueueAutopayFailedNotice } from "../site-accounts/notices/autopay-failed";
 import { lockOrderShelves, settleRefundStock } from "../stock/reserve";
 import { completePlanJoinInTx } from "../subscriptions/plan-join";
 import { linkMandateInTx } from "./mandate-link";
@@ -912,6 +913,12 @@ export class WebhooksService {
                     "RENEWAL_FAILED",
                     { reason },
                 );
+                // The customer is told too, with a link to pay (U10).
+                await enqueueAutopayFailedNotice(tx, intent.organizationId, {
+                    invoiceId,
+                    paymentIntentId: intent.id,
+                    reason,
+                });
             }
             await enqueueTeamAlert(tx, intent.organizationId, {
                 event: "failed",

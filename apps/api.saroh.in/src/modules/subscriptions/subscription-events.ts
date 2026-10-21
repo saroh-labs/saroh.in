@@ -57,6 +57,12 @@ export const SUBSCRIPTION_EVENT_KINDS = [
     /** "Retry now": a new pay link for `invoiceId`. */
     "RETRIED",
     /**
+     * Saroh emailed the customer a fresh link to pay `invoiceId` (automatic
+     * notices U10): `data.reason` AUTOPAY_FAILED, after a failed charge.
+     * Never the link itself.
+     */
+    "PAY_LINK_EMAILED",
+    /**
      * A pause's end date came, but the resume would restart billing with
      * Payments off (D8): `data.until`, `data.reason` PAYMENTS_OFF. Once a pause.
      */

@@ -99,6 +99,7 @@ import { createPlanRow, setPlanStatusRow, updatePlanRow } from "./plan-writes";
 import type { PlanView } from "./plans";
 import { planViews, readPlan } from "./plans";
 import { SUBSCRIPTION_RENEW_TYPE } from "./renew-job";
+import { sendRenewalUnlessCharged } from "./renewal-send";
 import type {
     AutopayBadge,
     AutopayCardView,
@@ -1114,6 +1115,15 @@ export class SubscriptionsService {
             createdByUserId: opts.createdByUserId,
         });
         await log("RESUMED", { invoiceId, data: { restarted: true } });
+        // A pause whose end date came restarts on the renewal job, which
+        // sends the new period's invoice as it sends a renewal's (U10). A
+        // resume by hand or by the member leaves Send to the team.
+        if (ended) {
+            await sendRenewalUnlessCharged(tx, sub.organizationId, invoiceId, {
+                charge: undefined,
+                now,
+            });
+        }
     }
 
     async cancel(
@@ -1978,7 +1988,7 @@ export class SubscriptionsService {
             // (D13): its intent and first step, or MANDATE_LIMIT_LOW. With
             // none, or its provider's charging off, the pay link as before.
             // Its debit follows the merchant's timing (D13B).
-            await this.charges?.queueInTx(tx, {
+            const charge = await this.charges?.queueInTx(tx, {
                 organizationId: sub.organizationId,
                 subscriptionId: id,
                 invoiceId,
@@ -1992,6 +2002,11 @@ export class SubscriptionsService {
                     periodStart: period.start,
                     timezone: sub.timezone,
                 },
+            });
+            // Nobody has to press Send (DEC-174 R3, U10).
+            await sendRenewalUnlessCharged(tx, sub.organizationId, invoiceId, {
+                charge,
+                now,
             });
             return "renewed";
         });
@@ -2084,7 +2099,7 @@ export class SubscriptionsService {
                     early: true,
                 },
             });
-            await this.charges.queueInTx(tx, {
+            const charge = await this.charges.queueInTx(tx, {
                 organizationId: sub.organizationId,
                 subscriptionId: id,
                 invoiceId,
@@ -2094,6 +2109,11 @@ export class SubscriptionsService {
                     periodStart: period.start,
                     timezone: sub.timezone,
                 },
+            });
+            // Sent on its early day when autopay won't take it (U10).
+            await sendRenewalUnlessCharged(tx, sub.organizationId, invoiceId, {
+                charge,
+                now,
             });
             return "issued";
         });

@@ -404,6 +404,27 @@ invoices/reminders` (`InvoiceRemindersService`, `invoice:write`, at most
 - **Automatic sends** pass `{ automatic: true }` to `send` / `remind`
   (renewals U10, overdue reminders U20): AUTO_SENT / AUTO_REMINDED, actor
   JOB. Every rule of a send still applies.
+- **A renewal's invoice is sent by Saroh** (U10 #1141, DEC-174 R3).
+  `renewOne`, `renewEarlyOne` and a restart when a pause's end date comes
+  queue `invoice.auto-send` (`invoice-auto-send.ts`) on the renewal's
+  transaction through `sendRenewalUnlessCharged`
+  (`subscriptions/renewal-send.ts`): not when live autopay will charge it
+  (`queueInTx` QUEUED) or the customer has a checkout open, and only while
+  `noticeOn(RENEWAL_INVOICE)`. The handler re-reads the invoice and calls
+  `InvoiceSendService.sendAutomatic` (no person: the job's pay link is
+  `payLinkForJobInTx`); paid, voided, under a charge, already sent or
+  switched off sends nothing, and a refusal is SEND_FAILED with
+  `data.reason` (NO_EMAIL_PROVIDER, NO_EMAIL_ADDRESS,
+  BUSINESS_DETAILS_MISSING, REFUSED), never thrown. Hand-made invoices are
+  never auto-sent. The autopay-cancelled note's words follow the switch.
+- **A failed autopay charge tells the customer** (U10): every place that
+  writes RENEWAL_FAILED for a decline (`failMandateChargeInTx`, the charge
+  job's give-up, the webhook's `applyInvoiceFailure`) calls
+  `enqueueAutopayFailedNotice` (`site-accounts/notices/autopay-failed.ts`);
+  CHECKOUT_OPEN and AMOUNT_MISMATCH are not told. Its email carries a pay
+  link minted only as it goes (the notice's `secretLink`, sealed into the
+  send, DEC-110), recorded as LINK_MADE (JOB) and PAY_LINK_EMAILED on the
+  subscription.
 - **A failed send is told once**: the `message.send` handler calls
   `recordInvoiceSendFailed` only on the last attempt (or a failure it
   won't retry), for an invoice's own emails; a partial unique index on

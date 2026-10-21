@@ -69,6 +69,14 @@ export interface SendOptions {
     automatic?: boolean;
 }
 
+/**
+ * Who sends: a person in the workspace (their context, authorized), or
+ * Saroh on the business's behalf with nobody behind it (a renewal's
+ * invoice, automatic notices U10), which is always automatic.
+ */
+type Sender =
+    { ctx: OrganizationContext } | { job: true; organizationId: string };
+
 export interface InvoiceSendResult {
     channels: SendChannel[];
     email: { status: "QUEUED" | "SUPPRESSED"; to: string } | null;
@@ -539,7 +547,22 @@ export class InvoiceSendService {
         id: string,
         options: SendOptions = {},
     ): Promise<InvoiceSendResult> {
-        return this.dispatch(ctx, id, false, undefined, options);
+        return this.dispatch({ ctx }, id, false, undefined, options);
+    }
+
+    /**
+     * The first send, made by Saroh for the business (a membership's
+     * renewal invoice, automatic notices U10, DEC-174): every rule of a
+     * send by hand (the business details, the provider, the address,
+     * consent, the autopay charge, "already sent"), its refusals thrown as
+     * they are to a person, and the history's AUTO_SENT with actor JOB.
+     * Nobody is authorized: only a job calls it.
+     */
+    sendAutomatic(
+        organizationId: string,
+        id: string,
+    ): Promise<InvoiceSendResult> {
+        return this.dispatch({ job: true, organizationId }, id, false);
     }
 
     /**
@@ -554,18 +577,22 @@ export class InvoiceSendService {
         batch?: { shared: ReachShared; detailsChecked: true },
         options: SendOptions = {},
     ): Promise<InvoiceSendResult> {
-        return this.dispatch(ctx, id, true, batch, options);
+        return this.dispatch({ ctx }, id, true, batch, options);
     }
 
     private async dispatch(
-        ctx: OrganizationContext,
+        sender: Sender,
         id: string,
         reminder: boolean,
         batch?: { shared: ReachShared; detailsChecked: true },
         options: SendOptions = {},
     ): Promise<InvoiceSendResult> {
-        authorize(ctx, "invoice:write");
-        const organizationId = ctx.organizationId;
+        const ctx = "ctx" in sender ? sender.ctx : null;
+        if (ctx) authorize(ctx, "invoice:write");
+        const organizationId =
+            "ctx" in sender ? sender.ctx.organizationId : sender.organizationId;
+        const automatic = !ctx || options.automatic === true;
+        const userId = ctx?.userId ?? null;
         const now = new Date();
         // It asks to be paid: the business details first (DEC-068).
         if (!batch?.detailsChecked) {
@@ -660,25 +687,33 @@ export class InvoiceSendService {
                         // link: the same page, without a Pay button. On the
                         // business's own address (DEC-069, L7), read on
                         // this transaction as the message is composed.
-                        secretLink: async () =>
-                            payLinkUrlFor(
+                        secretLink: async () => {
+                            const link = { requireProvider: view.payOnline };
+                            const made = ctx
+                                ? await this.invoices.createPayLinkInTx(
+                                      tx,
+                                      ctx,
+                                      id,
+                                      link,
+                                  )
+                                : await this.invoices.payLinkForJobInTx(
+                                      tx,
+                                      organizationId,
+                                      id,
+                                      link,
+                                  );
+                            return payLinkUrlFor(
                                 organizationId,
-                                (
-                                    await this.invoices.createPayLinkInTx(
-                                        tx,
-                                        ctx,
-                                        id,
-                                        { requireProvider: view.payOnline },
-                                    )
-                                ).token,
+                                made.token,
                                 tx,
-                            ),
+                            );
+                        },
                         invoiceId: id,
                         // Its PDF goes with it (DEC-083): drawn by the send
                         // job, where the business's provider takes
                         // attachments; otherwise the link alone, as before.
                         attachInvoicePdf: true,
-                        createdByUserId: ctx.userId,
+                        createdByUserId: userId,
                     },
                 );
                 email = { status: queued.status, to: queued.toAddress };
@@ -696,7 +731,7 @@ export class InvoiceSendService {
                     contactId: row.contactId,
                     invoiceId: id,
                     kind: template,
-                    actorUserId: ctx.userId,
+                    actorUserId: userId,
                 });
                 thread = true;
             }
@@ -705,8 +740,8 @@ export class InvoiceSendService {
             await recordInvoiceEvent(tx, {
                 organizationId,
                 invoiceId: id,
-                kind: sendKind(reminder, options.automatic === true),
-                actor: options.automatic ? JOB_ACTOR : personActor(ctx),
+                kind: sendKind(reminder, automatic),
+                actor: ctx && !automatic ? personActor(ctx) : JOB_ACTOR,
                 channel: email ? "EMAIL" : "THREAD",
                 messageId,
                 data: email
@@ -826,7 +861,8 @@ export class InvoiceSendService {
         return out;
     }
 
-    private async alreadySent(db: Db, invoiceId: string): Promise<boolean> {
+    /** Sent before, by email or into the account thread: Send is refused. */
+    async alreadySent(db: Db, invoiceId: string): Promise<boolean> {
         const [emails, posts] = await Promise.all([
             db.message.count({
                 where: {

@@ -2,8 +2,12 @@ import type {
     NoticeTemplate,
     RenderedMessage,
 } from "../../communications/transactional";
-import { escapeHtml } from "../../communications/transactional";
+import {
+    escapeHtml,
+    SECRET_LINK_SLOT,
+} from "../../communications/transactional";
 import type { CustomerNotifyPayload } from "../customer-notify-queue";
+import { autopayFailedNotice } from "./autopay-failed";
 import { bookingNotice } from "./booking";
 import { enquiryReceivedNotice } from "./enquiry-received";
 import { membershipNotice } from "./membership";
@@ -26,6 +30,7 @@ import { waitlistNotice } from "./waitlist";
  * (`notice-settings.ts`) isn't flipped to true in the same commit.
  */
 export const NOTICES = {
+    AUTOPAY_FAILED: autopayFailedNotice,
     BOOKING_CANCELLED: bookingNotice,
     BOOKING_CONFIRMED: bookingNotice,
     BOOKING_LAPSED: bookingNotice,
@@ -111,11 +116,17 @@ export function renderNotice(vars: NoticeVars): RenderedMessage {
         }),
         ...(back ? [back] : []),
     ];
+    // A secret link (a fresh pay link) is a slot here, filled in only when
+    // the send job hands the email to the provider.
+    const secret = def.secretLink
+        ? `<p>${escapeHtml(def.secretLink.lead(vars))}<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a></p>`
+        : null;
     // Words they wrote, quoted back as plain text (the enquiry reply).
     const quote = def.quote?.(vars) ?? null;
     const body = [
         `<p>${greeting}</p>`,
         `<p>${escapeHtml(def.sentence(vars))}</p>`,
+        ...(secret ? [secret] : []),
         ...(quote
             ? [
                   `<p>${escapeHtml(quote.lead)}</p>`,

@@ -136,6 +136,13 @@ describe("changeWhat", () => {
             "Resumed. A new period started",
         );
         expect(what({ kind: "RETRIED" })).toBe("Made a new payment link");
+        // U10: Saroh told the customer their autopay charge failed.
+        expect(
+            what({
+                kind: "PAY_LINK_EMAILED",
+                data: { reason: "AUTOPAY_FAILED" },
+            }),
+        ).toBe("Emailed them a new link to pay after autopay failed");
     });
 
     it("has words for the kinds later units write, and for one it doesn't know", () => {

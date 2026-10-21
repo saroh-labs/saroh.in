@@ -61,8 +61,8 @@ export function defaultOn(kind: NoticeKind): boolean {
  * own line here, in the same commit as the sender, and nothing else.
  */
 export const NOTICE_SENDS: Record<NoticeKind, boolean> = {
-    RENEWAL_INVOICE: false,
-    AUTOPAY_FAILED: false,
+    RENEWAL_INVOICE: true,
+    AUTOPAY_FAILED: true,
     MEMBERSHIP: true,
     REFUND: false,
     TEAM_REPLY: false,

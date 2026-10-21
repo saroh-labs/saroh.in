@@ -34,6 +34,8 @@ export interface NoticeSubject<V extends NoticeVarsBase = NoticeVarsBase> {
     orderId?: string;
     /** The service a lapsed hold was for: "Book again" opens it (#1137). */
     serviceId?: string;
+    /** The invoice it asks to be paid, recorded on the email (U10). */
+    invoiceId?: string;
 }
 
 /** A link in the email, with the words above it. */
@@ -82,6 +84,21 @@ export interface NoticeDefinition<V extends NoticeVarsBase> {
      * provider it reaches nobody, so nothing is claimed or written.
      */
     emailOnly?: boolean;
+    /**
+     * A secret link the email carries (a fresh pay link, DEC-110), with the
+     * words above it. `make` runs on the job's transaction only when the
+     * email really goes (not for a customer who turned email off), and the
+     * link is put in at send time: the stored body holds the slot, never
+     * the token (`SECRET_LINK_SLOT`). The thread's sentence has none.
+     */
+    secretLink?: {
+        lead(vars: V): string;
+        make(
+            tx: Tx,
+            organizationId: string,
+            subject: NoticeSubject<V>,
+        ): Promise<string>;
+    };
 }
 
 /** A quote in the email: the words above it, and what they wrote. */

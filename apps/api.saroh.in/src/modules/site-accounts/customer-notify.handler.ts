@@ -156,6 +156,9 @@ export class CustomerNotifyService {
                 bookingId: subject.bookingId,
                 serviceId: subject.serviceId,
             });
+            // A notice asking to be paid carries a fresh pay link (U10),
+            // made only if the email really goes and sealed into its send.
+            const secret = definition.secretLink;
             const queued = await this.comms.queueTransactional(
                 tx,
                 organizationId,
@@ -165,6 +168,15 @@ export class CustomerNotifyService {
                     provider,
                     recipient: { kind: "CONTACT", contactId: contact.id },
                     createdByUserId: null,
+                    ...(secret
+                        ? {
+                              secretLink: () =>
+                                  secret.make(tx, organizationId, subject),
+                          }
+                        : {}),
+                    ...(subject.invoiceId
+                        ? { invoiceId: subject.invoiceId }
+                        : {}),
                 },
             );
             messageId = queued.id;

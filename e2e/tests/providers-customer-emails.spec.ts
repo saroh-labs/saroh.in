@@ -1,11 +1,13 @@
-// @covers app:/settings/providers app:/open api:communications
-import type { Page } from "@playwright/test";
+// @covers app:/settings/providers app:/open api:communications api:capabilities api:admin
+import type { Browser, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import type { OwnBusiness } from "../fixtures/own-business";
 import { makeBusiness } from "../fixtures/own-business";
+import { stamp } from "../fixtures/own-data";
 import { pressUntil } from "../fixtures/press";
-import { urls } from "../playwright.config";
+import { useSession } from "../fixtures/sessions";
+import { ignoreHTTPSErrors, urls } from "../playwright.config";
 
 /**
  * Settings › Providers' "Emails to your customers" (DEC-174, U4 #1135):
@@ -19,10 +21,12 @@ import { urls } from "../playwright.config";
  *
  * What is listed is the API's (`communications/notice-settings.ts`): only
  * the emails Saroh sends today (`NOTICE_SENDS`, flipped by each unit that
- * ships a sender) whose module is on. Until the first sender ships the
- * business is offered none, and the first test pins that no row is drawn
- * then, so no switch that does nothing is ever shown. The second runs once
- * one is offered, and is skipped, saying why, until then.
+ * ships a sender) whose module is on. The renewal invoice and the failed
+ * autopay charge (U10 #1141) are the first: they are Payments', so each
+ * test has Sam, Saroh staff, roll Payments out to its business and Asha
+ * turn it on, as an operator and an owner would (`withPayments`). The
+ * first test still pins that no row is drawn while nothing is offered,
+ * and the second is skipped, saying why, if nothing is.
  *
  * The words, the one-note rule, the read-only sheet and a refused save
  * are covered by `customer-emails*.test.ts(x)` beside the components; the
@@ -60,6 +64,42 @@ async function openProviders(page: Page, b: OwnBusiness) {
 const block = (page: Page) =>
     page.getByRole("region", { name: "Emails to your customers" });
 
+/**
+ * Payments, rolled out to the business by Sam (a business set up here has
+ * no module rolled out) and turned on by Asha, so its emails are offered.
+ */
+async function withPayments(
+    browser: Browser,
+    page: Page,
+    b: OwnBusiness,
+    testInfo: TestInfo,
+) {
+    const context = await browser.newContext({ ignoreHTTPSErrors });
+    try {
+        const staff = await context.newPage();
+        await useSession(staff, "staff");
+        const res = await staff.request.put(
+            `${urls.API_URL}/admin/flags/MODULE_PAYMENTS/organizations/${b.id}`,
+            {
+                headers: { origin: urls.APP_URL },
+                data: {
+                    enabled: true,
+                    reason: "Customer emails browser test (U10)",
+                    idempotencyKey: `ce-pay-${stamp(testInfo)}`,
+                },
+            },
+        );
+        expect(res.ok(), `roll out Payments: ${await res.text()}`).toBe(true);
+    } finally {
+        await context.close();
+    }
+    const on = await page.request.put(
+        `${urls.API_URL}/organizations/${b.id}/modules/PAYMENTS`,
+        { headers: headers(b), data: { status: "ENABLED", setup: {} } },
+    );
+    expect(on.ok(), `turn on Payments: ${await on.text()}`).toBe(true);
+}
+
 /** Never sideways, at the width the project set. */
 async function noSideways(page: Page) {
     const width = page.viewportSize()?.width ?? 0;
@@ -72,8 +112,10 @@ async function noSideways(page: Page) {
 
 test("a row only while an email is offered, with a switch for exactly those", async ({
     page,
+    browser,
 }, testInfo) => {
     const b = await makeBusiness(page, testInfo, "ce-row");
+    await withPayments(browser, page, b, testInfo);
     const read = await listed(page, b);
     expect(read.canChange).toBe(true);
 
@@ -105,9 +147,15 @@ test("a row only while an email is offered, with a switch for exactly those", as
 
 test("an owner turns one off, Undo turns it back on, and the sheet fits", async ({
     page,
+    browser,
 }, testInfo) => {
     const b = await makeBusiness(page, testInfo, "ce-flip");
+    await withPayments(browser, page, b, testInfo);
     const read = await listed(page, b);
+    // Renewal invoices and failed autopay charges (U10) are offered.
+    expect(read.notices.map((n) => n.kind)).toEqual(
+        expect.arrayContaining(["RENEWAL_INVOICE", "AUTOPAY_FAILED"]),
+    );
     const target = read.notices.find((n) => n.offered && n.on);
     test.skip(
         !target,

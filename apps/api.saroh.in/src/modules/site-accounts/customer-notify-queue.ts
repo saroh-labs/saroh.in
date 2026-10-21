@@ -46,6 +46,8 @@ export interface CustomerNotifyPayload {
     subscriptionId?: string;
     /** The SubscriptionEvent it is about: joined, paused, cancelled… */
     subscriptionEventId?: string;
+    /** The invoice a failed autopay charge was for (U10). */
+    invoiceId?: string;
 }
 
 type Tx = Pick<Prisma.TransactionClient, "job">;

@@ -72,7 +72,7 @@ import {
 import type { PaperColumns } from "./paper-styles";
 import { paperWrite, resolvePaper } from "./paper-styles";
 import { invoiceOnlineBlocker } from "./pay-online";
-import { mintPayToken } from "./pay-token";
+import { replacePayTokenInTx } from "./pay-token";
 import { assertPaymentsOn } from "./payments-on";
 import type {
     InvoiceOnlineView,
@@ -448,6 +448,21 @@ export class InvoicesService {
         return this.payLink(tx, ctx, id, options);
     }
 
+    /**
+     * {@link createPayLinkInTx} for a send Saroh makes on the business's
+     * behalf (a renewal's invoice, automatic notices U10): every check a
+     * person's link makes, with nobody to authorize. Never reached from a
+     * request.
+     */
+    async payLinkForJobInTx(
+        tx: Tx,
+        organizationId: string,
+        id: string,
+        options: LinkOptions = PAY_LINK,
+    ): Promise<MadeLink> {
+        return this.checkedLink(tx, organizationId, id, options);
+    }
+
     private async payLink(
         db: Tx,
         ctx: OrganizationContext,
@@ -455,25 +470,34 @@ export class InvoicesService {
         options: LinkOptions,
     ): Promise<MadeLink> {
         authorize(ctx, "invoice:write");
+        return this.checkedLink(db, ctx.organizationId, id, options);
+    }
+
+    private async checkedLink(
+        db: Tx,
+        organizationId: string,
+        id: string,
+        options: LinkOptions,
+    ): Promise<MadeLink> {
         // A link asks to be paid: the business details first (DEC-068). A
         // member's own "Pay now" is never refused for it.
-        await assertBusinessDetails(db, ctx.organizationId);
+        await assertBusinessDetails(db, organizationId);
         // Taking money online is Payments' (DEC-070); a view link isn't.
         if (options.requireProvider) {
-            await assertPaymentsOn(db, ctx.organizationId, "make a pay link");
+            await assertPaymentsOn(db, organizationId, "make a pay link");
             // And the plan's (403 MODULE_LOCKED), except for a renewal of a
             // subscription the business already has: that stays payable.
-            if (!(await planTakesOnlinePayment(ctx.organizationId))) {
+            if (!(await planTakesOnlinePayment(organizationId))) {
                 const paper = await db.invoice.findFirst({
-                    where: { id, organizationId: ctx.organizationId },
+                    where: { id, organizationId },
                     select: { subscriptionId: true },
                 });
                 if (!isRenewalInvoice(paper)) {
-                    await assertPlanTakesOnlinePayment(ctx.organizationId);
+                    await assertPlanTakesOnlinePayment(organizationId);
                 }
             }
         }
-        return this.mintInvoiceLink(db, ctx.organizationId, id, options);
+        return this.mintInvoiceLink(db, organizationId, id, options);
     }
 
     /**
@@ -539,22 +563,16 @@ export class InvoicesService {
         if (await chargeUnderWayOn(db, ctx.organizationId, id)) {
             throw autopayChargeInProgress();
         }
-        const { token, tokenHash } = mintPayToken();
-        const payLinkCreatedAt = new Date();
-        const { count } = await db.invoice.updateMany({
-            where: {
-                id,
-                organizationId: ctx.organizationId,
-                status: paidView ? "PAID" : "ISSUED",
-                orderId: null,
-                kind: { not: "CREDIT_NOTE" },
-            },
-            data: { payTokenHash: tokenHash, payLinkCreatedAt },
-        });
-        if (count === 0) {
+        const made = await replacePayTokenInTx(
+            db,
+            ctx.organizationId,
+            id,
+            paidView ? "PAID" : "ISSUED",
+        );
+        if (!made) {
             throw new ConflictException("This invoice changed. Reload it.");
         }
-        return { token, payLinkCreatedAt };
+        return made;
     }
 
     /**

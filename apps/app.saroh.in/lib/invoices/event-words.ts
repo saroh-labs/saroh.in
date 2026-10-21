@@ -33,6 +33,24 @@ function failedWhat(template: string | null): string {
 }
 
 /**
+ * Why Saroh couldn't send a renewal's invoice by itself (automatic notices
+ * U10): the API's code for it. A failed send with no code is an email the
+ * provider refused.
+ */
+function notSentWhy(reason: string): string {
+    switch (reason) {
+        case "NO_EMAIL_PROVIDER":
+            return "no email provider is connected";
+        case "NO_EMAIL_ADDRESS":
+            return "there's no email address for them";
+        case "BUSINESS_DETAILS_MISSING":
+            return "your business details aren't complete";
+        default:
+            return "it couldn't be sent";
+    }
+}
+
+/**
  * One event's line. `issuedAs` is how the paper says it was issued when
  * Saroh issued it (" by the subscription renewal"), so the old line keeps
  * its words.
@@ -69,6 +87,9 @@ export function eventLine(
                 : `Sent automatically${where(e)}`;
         }
         case "SEND_FAILED":
+            if (e.reason) {
+                return `${failedWhat(e.template)} not sent automatically: ${notSentWhy(e.reason)}`;
+            }
             return `${failedWhat(e.template)}${e.to ? ` to ${e.to}` : ""} didn't go: the email provider refused it`;
         case "VOIDED":
             return `Voided${by}${e.reason ? `: ${e.reason}` : ""}`;

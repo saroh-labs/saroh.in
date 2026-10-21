@@ -151,6 +151,9 @@ export function changeWhat(
                 : `Renewed${invoice}`;
         case "RETRIED":
             return `Made a new payment link${invoice}`;
+        case "PAY_LINK_EMAILED":
+            // U10: after a failed autopay charge, Saroh told the customer.
+            return `Emailed them a new link to pay after autopay failed${invoice}`;
         case "RESUME_REFUSED":
             return "Couldn't resume on its own. Payments is off";
         case "RENEWAL_FAILED":

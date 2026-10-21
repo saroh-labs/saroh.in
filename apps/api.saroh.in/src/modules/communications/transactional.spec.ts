@@ -172,6 +172,7 @@ describe("the autopay-cancelled note (D14)", () => {
         business: "Pulse & Co.",
         firstName: "Meera",
         plan: "Monthly unlimited",
+        invoiceSent: true,
     };
 
     it("says it stopped, the plan carries on, and how the next renewal is paid", () => {
@@ -181,7 +182,9 @@ describe("the autopay-cancelled note (D14)", () => {
         expect(body).toContain(
             "Pulse &amp; Co. has turned off autopay for Monthly unlimited. Nothing more will be taken automatically.",
         );
-        expect(body).toContain("an invoice with a link to pay it");
+        expect(body).toContain(
+            "From your next renewal, Pulse &amp; Co. emails you an invoice with a link to pay.",
+        );
         // Nothing secret: no link slot at all.
         expect(body).not.toContain(SECRET_LINK_SLOT);
     });
@@ -200,6 +203,18 @@ describe("the autopay-cancelled note (D14)", () => {
     it("the thread line is plain text, never HTML", () => {
         expect(autopayCancelledSentence(vars)).toBe(
             "Pulse & Co. turned off autopay for Monthly unlimited. Nothing more is taken automatically. Your next renewal comes as an invoice with a link to pay.",
+        );
+    });
+
+    it("with renewal invoices turned off (U10), it promises no invoice", () => {
+        const off = { ...vars, invoiceSent: false };
+        const { body } = renderAutopayCancelled(off);
+        expect(body).toContain(
+            "From your next renewal, Pulse &amp; Co. will tell you how to pay.",
+        );
+        expect(body).not.toContain("link to pay");
+        expect(autopayCancelledSentence(off)).toBe(
+            "Pulse & Co. turned off autopay for Monthly unlimited. Nothing more is taken automatically. Pulse & Co. will tell you how to pay your next renewal.",
         );
     });
 });

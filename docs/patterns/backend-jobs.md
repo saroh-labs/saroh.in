@@ -495,6 +495,10 @@ the Privacy Policy states both.
   claimed. A notice naming a switch flips that kind's `NOTICE_SENDS` line
   (`notice-settings.ts`) in the same commit, so the switches screen offers
   it; `notices/index.spec.ts` fails otherwise.
+- **A notice that asks to be paid** (U10's AUTOPAY_FAILED) declares a
+  `secretLink` (`lead`, `make`): the handler passes `make` to
+  `queueTransactional`, so the link is minted only when the email really
+  goes and the stored body keeps `SECRET_LINK_SLOT`, never the token.
 - **Held for an Undo.** A notice whose change has an Undo is queued with
   `enqueueHeldCustomerNotice` (ten seconds unless the Undo lasts longer)
   and taken back with `cancelHeldCustomerNotice(eventKey)`, which says

@@ -389,6 +389,49 @@ describe("historyLines with who did it (U9 #1140)", () => {
         ]);
     });
 
+    it("says why a renewal's invoice wasn't sent automatically (U10), never blaming the provider", () => {
+        const lines = historyLines(
+            invoice({
+                events: [
+                    event({
+                        kind: "SEND_FAILED",
+                        actor: SAROH,
+                        at: at(-2),
+                        template: "INVOICE_SENT",
+                        reason: "NO_EMAIL_PROVIDER",
+                    }),
+                    event({
+                        kind: "SEND_FAILED",
+                        actor: SAROH,
+                        at: at(-3),
+                        template: "INVOICE_SENT",
+                        reason: "NO_EMAIL_ADDRESS",
+                    }),
+                    event({
+                        kind: "SEND_FAILED",
+                        actor: SAROH,
+                        at: at(-4),
+                        template: "INVOICE_SENT",
+                        reason: "BUSINESS_DETAILS_MISSING",
+                    }),
+                ],
+            }),
+            new Date(NOW),
+        );
+        expect(lines.slice(0, 3)).toEqual([
+            expect.objectContaining({
+                what: "Invoice not sent automatically: no email provider is connected",
+                tone: "bad",
+            }),
+            expect.objectContaining({
+                what: "Invoice not sent automatically: there's no email address for them",
+            }),
+            expect.objectContaining({
+                what: "Invoice not sent automatically: your business details aren't complete",
+            }),
+        ]);
+    });
+
     it("dates a credit note with who made it, once", () => {
         const lines = historyLines(
             invoice({

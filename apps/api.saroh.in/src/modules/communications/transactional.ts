@@ -45,6 +45,8 @@ export const NOTICE_TEMPLATES = [
     "MEMBERSHIP_PLAN_CHANGED",
     "MEMBERSHIP_CANCELLED",
     "MEMBERSHIP_KEPT",
+    // A renewal's autopay charge failed, with a fresh link to pay (U10).
+    "AUTOPAY_FAILED",
 ] as const;
 export type NoticeTemplate = (typeof NOTICE_TEMPLATES)[number];
 
@@ -233,6 +235,12 @@ export interface AutopayCancelledVars {
     /** "Asha", or null when there's no name. */
     firstName: string | null;
     plan: string;
+    /**
+     * The business sends renewal invoices by itself ("Renewal invoices" on,
+     * automatic notices U10). Off, nobody sends one unless the team does,
+     * so the note doesn't promise it.
+     */
+    invoiceSent: boolean;
 }
 
 /**
@@ -240,7 +248,10 @@ export interface AutopayCancelledVars {
  * autopay (D14). Plain text: a thread message is never rendered as HTML.
  */
 export function autopayCancelledSentence(vars: AutopayCancelledVars): string {
-    return `${vars.business} turned off autopay for ${vars.plan}. Nothing more is taken automatically. Your next renewal comes as an invoice with a link to pay.`;
+    const next = vars.invoiceSent
+        ? "Your next renewal comes as an invoice with a link to pay."
+        : `${vars.business} will tell you how to pay your next renewal.`;
+    return `${vars.business} turned off autopay for ${vars.plan}. Nothing more is taken automatically. ${next}`;
 }
 
 /**
@@ -259,7 +270,9 @@ export function renderAutopayCancelled(
     const body = [
         `<p>${greeting}</p>`,
         `<p>${business} has turned off autopay for ${plan}. Nothing more will be taken automatically.</p>`,
-        `<p>Your plan carries on. From your next renewal, ${business} sends you an invoice with a link to pay it.</p>`,
+        vars.invoiceSent
+            ? `<p>Your plan carries on. From your next renewal, ${business} emails you an invoice with a link to pay.</p>`
+            : `<p>Your plan carries on. From your next renewal, ${business} will tell you how to pay.</p>`,
         `<p>${business}</p>`,
     ].join("\n");
     return {

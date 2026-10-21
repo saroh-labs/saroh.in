@@ -14,7 +14,10 @@ import {
     NOTICE_KINDS,
     NOTICE_SENDS,
 } from "../../communications/notice-settings";
-import { NOTICE_TEMPLATES } from "../../communications/transactional";
+import {
+    NOTICE_TEMPLATES,
+    SECRET_LINK_SLOT,
+} from "../../communications/transactional";
 import type {
     MembershipNoticeKind,
     MembershipNoticeVars,
@@ -134,6 +137,16 @@ const SAMPLES: Record<(typeof NOTICE_TEMPLATES)[number], NoticeVars> = {
             timeZone: "Asia/Kolkata",
         },
     },
+    AUTOPAY_FAILED: {
+        kind: "AUTOPAY_FAILED",
+        autopay: {
+            business: "Rye <&> Co.",
+            firstName: "Asha",
+            plan: "Monthly yoga",
+            amount: "₹1,200.00",
+            payOnline: true,
+        },
+    },
 };
 
 /** One membership notice of each kind (U11). */
@@ -242,5 +255,35 @@ describe("a notice with a switch is offered on the switches screen (U4)", () => 
             const setting = noticeDefinition(kind).setting;
             if (setting !== null) expect(NOTICE_SENDS[setting]).toBe(true);
         }
+    });
+});
+
+describe("a failed autopay charge's notice (U10)", () => {
+    it("says what couldn't be taken, and carries its pay link as a slot, never a link of its own", () => {
+        const vars = SAMPLES.AUTOPAY_FAILED;
+        expect(noticeSentence(vars)).toBe(
+            "We couldn't take ₹1,200.00 for Monthly yoga by autopay.",
+        );
+        const email = renderNotice(vars);
+        expect(email.subject).toBe(
+            "We couldn't take your payment for Monthly yoga",
+        );
+        expect(email.body).toContain(
+            `Pay it by UPI or card here:<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a>`,
+        );
+        expect(backLink(withLink(vars, "https://rye.saroh.app/x"))).toBeNull();
+    });
+
+    it("a business that doesn't take payment online sends a link to see how to pay", () => {
+        const vars = {
+            ...SAMPLES.AUTOPAY_FAILED,
+            autopay: {
+                ...(SAMPLES.AUTOPAY_FAILED as { autopay: object }).autopay,
+                payOnline: false,
+            },
+        } as NoticeVars;
+        expect(renderNotice(vars).body).toContain(
+            "See the invoice and how to pay it here:",
+        );
     });
 });
