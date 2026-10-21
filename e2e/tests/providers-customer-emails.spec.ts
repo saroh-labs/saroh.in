@@ -322,7 +322,10 @@ test("with overdue reminders on, an owner chooses when they go, and Undo puts it
     await noSideways(page);
 
     await when.getByRole("combobox", { name: "First reminder" }).click();
-    await page.getByRole("option", { name: "5 days after it's due" }).click();
+    await page
+        .getByRole("option", { name: "5 days after it's due" })
+        .filter({ visible: true })
+        .click();
     await expect(
         page.getByText("Overdue reminder timing saved."),
     ).toBeVisible();
