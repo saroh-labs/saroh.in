@@ -491,6 +491,16 @@ the Privacy Policy states both.
   BACK_IN_STOCK per watch (`back-in-stock:<watchId>`), re-queuing for the
   rest. Email only, to the watch's own address (`STOCK_WATCH` recipient),
   through the business's own provider, behind the BACK_IN_STOCK switch.
+- **Every cancel says what happened to the money** (DEC-174 U13, #1144,
+  `notices/cancel-money.ts`): one `CancelMoney` and one set of words for a
+  booking's BOOKING_CANCELLED (either side), a class the business
+  cancelled, and an order's cancel note. A booking's is read when the
+  notice runs (`bookingCancelMoney`: the cancel's refund row as the
+  provider stands now, else money kept, the pack's class back or used, or
+  no payment taken), never carried on the job. An order's comes from the
+  cancel's own outcome (`orderCancelMoney`), the one the sheet shows, and
+  names only the refunds not refused. Money nobody is handing back is
+  never said as refunded; desk money and a treatment visit's say nothing.
 - **`customer-message.notify`** (UX-014) tells the team a customer wrote
   from their site account: one inbox notice (`message.new`, opening the
   customer's thread, unique on `(messageId, type)`) and an email to the

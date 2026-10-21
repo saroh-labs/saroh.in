@@ -960,10 +960,57 @@ describe("tell the customer (B9, A13's thread)", () => {
             },
             {
                 author: "SYSTEM",
-                body: `Your order #${number} has been cancelled.`,
+                body: `Your order #${number} has been cancelled. No payment was taken.`,
                 event: "ORDER_CANCELLED",
             },
         ]);
+    });
+
+    /** The cancel note posted into the contact's thread. */
+    async function cancelNoteOf(contactId: string): Promise<string> {
+        const message = await prisma.customerThreadMessage.findFirstOrThrow({
+            where: {
+                thread: { contactId, organizationId: orgId },
+                event: "ORDER_CANCELLED",
+            },
+            select: { body: true },
+        });
+        return message.body;
+    }
+
+    it("paid online: the note says only what is being refunded (U13)", async () => {
+        const saved = customerId;
+        const contactId = await signedIn();
+        (env as { SITE_ACCOUNT_AREA?: string }).SITE_ACCOUNT_AREA = "on";
+        const id = await order();
+        customerId = saved;
+        const outcome = await cancels.cancel(owner, id, {
+            idempotencyKey: key(),
+            tell: true,
+        });
+        expect(outcome).toMatchObject({ cancelled: true, told: true });
+        expect(await cancelNoteOf(contactId)).toMatch(
+            /^Your order #\S+ has been cancelled\. ₹480 is being refunded to how you paid\.$/,
+        );
+    });
+
+    it("paid by hand: the note says the business returns it (U13)", async () => {
+        const saved = customerId;
+        const contactId = await signedIn();
+        (env as { SITE_ACCOUNT_AREA?: string }).SITE_ACCOUNT_AREA = "on";
+        const id = await order({ paid: false });
+        customerId = saved;
+        await orders.updateStatus(storeId, id, ownerId, {
+            paymentStatus: "PAID",
+        });
+        const outcome = await cancels.cancel(owner, id, {
+            idempotencyKey: key(),
+            tell: true,
+        });
+        expect(outcome).toMatchObject({ cancelled: true, told: true });
+        expect(await cancelNoteOf(contactId)).toMatch(
+            /^Your order #\S+ has been cancelled\. Rye & Co\. will return the ₹480 you paid\.$/,
+        );
     });
 
     it("with the account area off, nothing is posted and the read says so", async () => {

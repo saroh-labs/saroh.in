@@ -822,6 +822,25 @@ describe("a refund and a cancel are held on the page, with Undo", () => {
     });
 });
 
+describe('the cancel sheet\'s "Tell the customer" (U13, #1144)', () => {
+    const tick = () =>
+        dialog()?.querySelector<HTMLElement>("[role=checkbox]") ?? null;
+
+    it("starts ticked when a note would reach them", async () => {
+        render(order({ next: { ...order().next, tell: true } }));
+        await press(button("Cancel order…"));
+        expect(dialog()?.textContent).toContain("Tell Priya in their messages");
+        expect(tick()?.getAttribute("aria-checked")).toBe("true");
+    });
+
+    it("offers no tick, and says nothing is sent, when nothing would reach them", async () => {
+        render();
+        await press(button("Cancel order…"));
+        expect(tick()).toBe(null);
+        expect(dialog()?.textContent).toContain("Nothing is sent to Priya.");
+    });
+});
+
 describe("Ready says what the customer hears, and Undo takes it back (U5)", () => {
     const preparing = (customerNotice: OrderRead["customerNotice"]) =>
         order({

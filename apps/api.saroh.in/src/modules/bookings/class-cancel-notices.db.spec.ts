@@ -397,7 +397,10 @@ describe("a class the business cancels (U17)", () => {
         expect(await waitlistJobs(serviceId)).toHaveLength(0);
         const { payload, sentence } = await told(booking.id);
         expect(payload).not.toHaveProperty("classCancelled");
-        expect(sentence).toMatch(/^Your HIIT \d+ on .+ has been cancelled\.$/);
+        // U13: every cancel says what happened to the money.
+        expect(sentence).toMatch(
+            /^Your HIIT \d+ on .+ has been cancelled\. No payment was taken\.$/,
+        );
     });
 
     it("with Course emails off, class cancel notices still go", async () => {

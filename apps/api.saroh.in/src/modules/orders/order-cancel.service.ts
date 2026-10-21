@@ -16,6 +16,10 @@ import { creditRestOfOrder } from "../invoices/order-invoicing";
 import { authorize } from "../organizations/organization-policy";
 import { PaymentsService } from "../payments/payments.service";
 import { enqueueRefundSendInTx } from "../payments/send-refund.handler";
+import type { OrderCancelOutcome } from "../site-accounts/notices/cancel-money";
+import { orderCancelMoney } from "../site-accounts/notices/cancel-money";
+import { businessName } from "../site-accounts/notices/notice";
+import { handPaidCents } from "./hand-payments";
 import { readLeftToRefundInTx } from "./hand-refund";
 import {
     cancelRefundKey,
@@ -26,6 +30,7 @@ import {
 import type { CancelOrderDto } from "./order-change.dto";
 import { cancelNote, tellOrderCustomer } from "./order-customer-note";
 import { assertPaymentTransition } from "./order-state";
+import { orderMoneyIntents } from "./treatment-ledger";
 
 /** What "Cancel order…" did. */
 export interface CancelOutcome {
@@ -109,7 +114,9 @@ export class OrderCancelService {
                     field: "status",
                 });
             }
-            // Nothing to hand back online: cancelled now.
+            // Nothing to hand back online: cancelled now. Whether anything
+            // was ever paid is read first, for the customer's note (U13).
+            const nothingTaken = await nothingTakenInTx(tx, order.id);
             let byHand: CancelOutcome["byHand"] = null;
             if (order.paymentStatus === "PAID") {
                 // What the counter gives back: what was paid, less every
@@ -143,7 +150,7 @@ export class OrderCancelService {
                 reason,
                 releaseStock: true,
             });
-            return { kind: "done" as const, order, byHand };
+            return { kind: "done" as const, order, byHand, nothingTaken };
         });
 
         if (first.kind === "done") {
@@ -153,11 +160,11 @@ export class OrderCancelService {
                 refund: null,
                 byHand: first.byHand,
                 told: dto.tell
-                    ? await this.tell(
-                          ctx,
-                          first.order,
-                          cancelNote(first.order.orderId),
-                      )
+                    ? await this.tell(ctx, first.order, {
+                          refund: null,
+                          byHand: first.byHand,
+                          nothingTaken: first.nothingTaken,
+                      })
                     : false,
             };
         }
@@ -194,42 +201,56 @@ export class OrderCancelService {
             select: { status: true },
         });
         const cancelled = now?.status === "CANCELLED";
+        // What went back, and what the provider refused: the customer's
+        // note says only the part that is really on its way (U13).
+        const sent = refund.refunds
+            .filter((r) => r.status !== "FAILED")
+            .reduce((s, r) => s + r.amountCents, 0);
+        const refusedCents = refund.refunds
+            .filter((r) => r.status === "FAILED")
+            .reduce((s, r) => s + r.amountCents, 0);
         return {
             id: orderId,
             cancelled,
             refund: {
-                amountCents: refund.refunds
-                    .filter((r) => r.status !== "FAILED")
-                    .reduce((s, r) => s + r.amountCents, 0),
+                amountCents: sent,
                 currency: refund.currency,
                 beingConfirmed: unanswered.length > 0,
-                partlyRefused: refund.refunds.some(
-                    (r) => r.status === "FAILED",
-                ),
+                partlyRefused: refusedCents > 0,
             },
             byHand: null,
             // Said only once it is so: a cancel still waiting on its refund
             // tells them nothing yet.
             told:
                 dto.tell && cancelled
-                    ? await this.tell(
-                          ctx,
-                          first.order,
-                          cancelNote(first.order.orderId, {
-                              amountCents: refund.amountCents,
+                    ? await this.tell(ctx, first.order, {
+                          refund: {
+                              amountCents: sent,
                               currency: refund.currency,
-                          }),
-                      )
+                              refusedCents,
+                          },
+                          byHand: null,
+                          nothingTaken: false,
+                      })
                     : false,
         };
     }
 
-    /** The note in the customer's thread; never fails the cancel. */
-    private tell(
+    /**
+     * The note in the customer's thread, its money line from the same
+     * outcome the sheet shows (U13); never fails the cancel.
+     */
+    private async tell(
         ctx: OrganizationContext,
-        order: { customerId: string | null },
-        body: string,
+        order: { orderId: string; customerId: string | null },
+        outcome: OrderCancelOutcome,
     ): Promise<boolean> {
+        if (!order.customerId) return false;
+        const body = cancelNote(
+            order.orderId,
+            orderCancelMoney(outcome),
+            await businessName(prisma, ctx.organizationId),
+        );
         return tellOrderCustomer(
             {
                 organizationId: ctx.organizationId,
@@ -264,6 +285,34 @@ async function lockForCancel(
     });
     if (!order) throw new NotFoundException("Order not found");
     return order;
+}
+
+/**
+ * Nothing was ever taken for the order, online or by hand, so its note
+ * may say "No payment was taken" (U13). Read before the cancel marks
+ * anything refunded.
+ */
+async function nothingTakenInTx(tx: Tx, orderId: string): Promise<boolean> {
+    const [order, intents] = await Promise.all([
+        tx.order.findUniqueOrThrow({
+            where: { id: orderId },
+            select: { total: true, paymentStatus: true, paidByHand: true },
+        }),
+        tx.paymentIntent.findMany({
+            where: { ...orderMoneyIntents(orderId), status: "SUCCEEDED" },
+            select: { id: true },
+            take: 1,
+        }),
+    ]);
+    if (intents.length > 0) return false;
+    if (
+        order.paymentStatus === "PAID" ||
+        order.paymentStatus === "PARTIALLY_REFUNDED" ||
+        order.paymentStatus === "REFUNDED"
+    ) {
+        return false;
+    }
+    return handPaidCents({ ...order, paymentIntents: intents }) === 0;
 }
 
 function refuseCancel(

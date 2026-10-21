@@ -1,4 +1,4 @@
-import { fulfilmentNote, handBackOf } from "./order-customer-note";
+import { cancelNote, fulfilmentNote, handBackOf } from "./order-customer-note";
 
 /**
  * The note a customer gets when how their order is fulfilled changes (U5,
@@ -81,5 +81,48 @@ describe("what the note may say about money going back", () => {
         expect(
             handBackOf({ settleCents: 0, byHand: false }, null, null),
         ).toEqual({ kind: "NOT_PAID" });
+    });
+});
+
+describe("the cancel note says what happened to the money (U13, #1144)", () => {
+    it("refunded, partly refunded, by hand, nothing paid", () => {
+        expect(
+            cancelNote(
+                "1063",
+                { state: "REFUNDING", amountMinor: 120_000, currency: "INR" },
+                "Hill Road Bakery",
+            ),
+        ).toBe(
+            "Your order #1063 has been cancelled. ₹1,200 is being refunded to how you paid.",
+        );
+        expect(
+            cancelNote(
+                "1063",
+                {
+                    state: "PARTLY_REFUNDED",
+                    amountMinor: 70_000,
+                    restMinor: 50_000,
+                    currency: "INR",
+                },
+                "Hill Road Bakery",
+            ),
+        ).toBe(
+            "Your order #1063 has been cancelled. ₹700 is being refunded to how you paid; Hill Road Bakery will return the other ₹500.",
+        );
+        expect(
+            cancelNote(
+                "1063",
+                { state: "BY_HAND", amountMinor: 61_000, currency: "INR" },
+                "Hill Road Bakery",
+            ),
+        ).toBe(
+            "Your order #1063 has been cancelled. Hill Road Bakery will return the ₹610 you paid.",
+        );
+        expect(
+            cancelNote("1063", { state: "NOTHING_TAKEN" }, "Hill Road Bakery"),
+        ).toBe("Your order #1063 has been cancelled. No payment was taken.");
+        expect(cancelNote("1063", null, "Hill Road Bakery")).toBe(
+            "Your order #1063 has been cancelled.",
+        );
     });
 });

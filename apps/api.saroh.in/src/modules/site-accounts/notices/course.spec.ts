@@ -6,7 +6,7 @@
 import type { NoticeVars } from ".";
 import { noticeSentence, renderNotice } from ".";
 import type { BookingNoticeVars } from "./booking";
-import { classCancelMoneyWords } from "./class-cancel";
+import { cancelMoneyWords } from "./cancel-money";
 import type { CourseNoticeVars } from "./course";
 import {
     courseMoneyWords,
@@ -188,8 +188,8 @@ describe("a class the business cancelled", () => {
 
     it("every money line says what is true", () => {
         const amount = { amountMinor: 50000, currency: "INR" };
-        const words = (m: Parameters<typeof classCancelMoneyWords>[0]) =>
-            classCancelMoneyWords(m, "Pulse Fitness");
+        const words = (m: Parameters<typeof cancelMoneyWords>[0]) =>
+            cancelMoneyWords(m, "Pulse Fitness", { classCancelled: true });
         expect(words({ state: "REFUNDED", ...amount })).toBe(
             "₹500 has been refunded to how you paid.",
         );

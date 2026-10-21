@@ -2,8 +2,8 @@ import type { Prisma } from "@saroh/database";
 
 import { BookingEventType } from "../../bookings/booking-event-type";
 import type { CustomerNotifyPayload } from "../customer-notify-queue";
-import type { ClassCancelMoney } from "./class-cancel";
-import { classCancelMoney, classCancelMoneyWords } from "./class-cancel";
+import type { CancelMoney } from "./cancel-money";
+import { bookingCancelMoney, cancelMoneyWords } from "./cancel-money";
 import type { NoticeSubject } from "./notice";
 import {
     businessName,
@@ -48,8 +48,11 @@ export interface BookingNoticeVars {
      * "‹Business› cancelled this class", with what happened to the money.
      */
     classCancelled?: boolean;
-    /** The class-cancelled notice's money, read when it runs. */
-    money?: ClassCancelMoney | null;
+    /**
+     * What the cancel did with their money (U13, #1144), read when the
+     * notice runs: refunded, kept, the credit back, or nothing taken.
+     */
+    money?: CancelMoney | null;
     /**
      * Their bookings on the business's own site, where they can move or
      * cancel it, or for a lapsed hold the booking page to book again
@@ -123,13 +126,16 @@ function bookingSentence(kind: BookingNoticeKind, b: BookingNoticeVars) {
             return `Your ${b.service}${withWhom} has moved to ${when}.${was}`;
         }
         case "BOOKING_CANCELLED": {
+            const words = cancelMoneyWords(b.money, b.business, {
+                classCancelled: b.classCancelled === true,
+            });
+            const money = words ? ` ${words}` : "";
             if (b.classCancelled) {
-                const money = classCancelMoneyWords(b.money, b.business);
-                return `${b.business} cancelled this class: ${b.service} on ${when}. Your place in it is cancelled.${money ? ` ${money}` : ""}`;
+                return `${b.business} cancelled this class: ${b.service} on ${when}. Your place in it is cancelled.${money}`;
             }
             return b.byCustomer
-                ? `You cancelled your ${b.service} on ${when}.`
-                : `Your ${b.service} on ${when} has been cancelled.`;
+                ? `You cancelled your ${b.service} on ${when}.${money}`
+                : `Your ${b.service} on ${when} has been cancelled.${money}`;
         }
         case "BOOKING_LAPSED":
             // An unpaid hold whose time ran out (#1137); the email adds
@@ -184,6 +190,8 @@ async function loadBooking(
             paidWith: true,
             holdExpiresAt: true,
             cancelledLate: true,
+            freeCancelUntil: true,
+            orderId: true,
             service: { select: { name: true } },
             staff: { select: { name: true } },
             contact: { select: { firstName: true } },
@@ -256,13 +264,15 @@ async function loadBooking(
                 ...(reassigned ? { reassigned: true } : {}),
                 timeZone: booking.timezone,
                 byCustomer: event ? event.actorUserId === null : false,
-                ...(classCancelled
+                ...(classCancelled ? { classCancelled: true } : {}),
+                // Every cancel says what happened to the money (U13).
+                ...(kind === "BOOKING_CANCELLED"
                     ? {
-                          classCancelled: true,
-                          money: await classCancelMoney(
+                          money: await bookingCancelMoney(
                               tx,
                               organizationId,
                               booking,
+                              { classCancelled },
                           ),
                       }
                     : {}),

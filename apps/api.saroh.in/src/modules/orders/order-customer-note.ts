@@ -5,6 +5,8 @@ import { prisma } from "@saroh/database";
 import { moneyWordsMinor } from "../../common/words-format";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { accountAreaOn } from "../site-accounts/account-area";
+import type { CancelMoney } from "../site-accounts/notices/cancel-money";
+import { cancelMoneyWords } from "../site-accounts/notices/cancel-money";
 import { appendMessage } from "../site-accounts/thread-store";
 import type { FulfilmentType } from "./fulfilment";
 
@@ -198,14 +200,16 @@ export function handBackOf(
 
 /**
  * "Your order #1063 has been cancelled. ₹610.00 is being refunded to how
- * you paid."
+ * you paid." What the cancel did with the money (U13, #1144) in the words
+ * every cancel notice uses (`notices/cancel-money.ts`): the part refunded,
+ * the part the business returns by hand, or that no payment was taken.
  */
 export function cancelNote(
     orderNumber: string,
-    refund?: { amountCents: number; currency: string },
+    money: CancelMoney | null,
+    business: string,
 ): string {
     const first = `Your order #${orderNumber} has been cancelled.`;
-    return refund && refund.amountCents > 0
-        ? `${first} ${said(refund.amountCents, refund.currency)} is being refunded to how you paid.`
-        : first;
+    const words = cancelMoneyWords(money, business);
+    return words ? `${first} ${words}` : first;
 }
