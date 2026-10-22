@@ -1,10 +1,11 @@
-import { LOOK_IDS } from "@saroh/block-contract";
+import { LOOK_IDS, LOOKS, parsePalette } from "@saroh/block-contract";
 import { describe, expect, it } from "vitest";
 
 import { GALLERY_PATCHES, withGallerySamples } from "./gallery-patches";
 import { GALLERY_SAMPLES } from "./gallery-samples";
 import { instantiateTemplate } from "./instantiate";
 import {
+    LOOK_SHOWCASE_PALETTE,
     LOOK_SHOWCASE_TEMPLATE,
     lookShowcaseTemplate,
     starterCopyPlan,
@@ -248,5 +249,16 @@ describe("withLookShowcase (DEC-172 amendment, 22 Oct)", () => {
     it("leaves every other look's pages as they are", () => {
         expect(withLookShowcase("quiet", made)).toBe(made);
         expect(withLookShowcase(null, made)).toBe(made);
+    });
+});
+
+describe("each look's Preview colours (DEC-172, 22 Oct)", () => {
+    // A palette that fails is dropped without a word (`presetSiteStyle`),
+    // and the Preview falls back to its template's colours.
+    it.each(LOOK_IDS)("%s's board palette is kept", (look) => {
+        const parsed = parsePalette(LOOK_SHOWCASE_PALETTE[look], {
+            accentFillContrast: LOOKS[look].colour.accentFillContrast,
+        });
+        expect(parsed.ok ? [] : parsed.problems).toEqual([]);
     });
 });

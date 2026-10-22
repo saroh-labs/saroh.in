@@ -29,7 +29,7 @@ export function BookingHeader({
     return (
         <section className="bg-site-hero-bg text-site-hero-fg">
             <div className="mx-auto max-w-[1060px] px-5 pb-[38px] pt-[34px]">
-                <p className="text-site-accent text-xs font-semibold uppercase tracking-[0.14em]">
+                <p className="text-site-accent-text text-xs font-semibold uppercase tracking-[0.14em]">
                     {kicker(services)}
                 </p>
                 <h1 className="font-site-heading mt-2.5 text-balance text-[clamp(34px,6vw,56px)] font-semibold leading-[1.02] tracking-[-0.035em]">

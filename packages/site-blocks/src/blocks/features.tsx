@@ -84,7 +84,7 @@ export default function FeaturesSection({
                         {isSteps ? (
                             <span
                                 aria-hidden="true"
-                                className="font-site-heading text-site-accent text-[15px] tabular-nums"
+                                className="font-site-heading text-site-accent-text text-[15px] tabular-nums"
                             >
                                 {String(i + 1).padStart(2, "0")}
                             </span>

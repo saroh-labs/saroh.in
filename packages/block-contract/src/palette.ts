@@ -327,7 +327,13 @@ export function mixHex(from: string, to: string, ratio: number): string {
  * palette in one pass. An unknown role is refused too, rather than dropped:
  * it is a typo for a role that then silently falls back.
  */
-export function parsePalette(input: unknown): PaletteResult {
+export function parsePalette(
+    input: unknown,
+    /** What the accent as a fill must reach (a look's `accentFillContrast`). */
+    {
+        accentFillContrast = PALETTE_GRAPHIC_CONTRAST,
+    }: { accentFillContrast?: number } = {},
+): PaletteResult {
     if (input === null || typeof input !== "object" || Array.isArray(input)) {
         return {
             ok: false,
@@ -443,10 +449,10 @@ export function parsePalette(input: unknown): PaletteResult {
     if (accentIsFill) {
         for (const pair of ACCENT_FILL_PAIRS) {
             const ratio = contrastRatio(palette.accent, palette[pair.ground]);
-            if (ratio < PALETTE_GRAPHIC_CONTRAST) {
+            if (ratio < accentFillContrast) {
                 problems.push({
                     field: "palette.accent",
-                    message: `${pair.label} reads at ${ratio.toFixed(2)}:1; it needs ${PALETTE_GRAPHIC_CONTRAST}:1`,
+                    message: `${pair.label} reads at ${ratio.toFixed(2)}:1; it needs ${accentFillContrast}:1`,
                 });
             }
         }

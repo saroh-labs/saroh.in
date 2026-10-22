@@ -77,7 +77,7 @@ export default function RichTextSection({
                    text colour (#189), and `dark:prose-invert` is gone with
                    them: once a palette is chosen, a visitor's OS setting
                    must not repaint a storefront its owner picked. */
-                className={`prose prose-headings:font-site-heading prose-headings:text-site-fg prose-p:text-site-fg/80 prose-a:text-site-accent prose-strong:text-site-fg prose-li:text-site-fg/80 max-w-[var(--site-measure,none)] text-[length:var(--site-body-size,1rem)]${labels}`}
+                className={`prose prose-headings:font-site-heading prose-headings:text-site-fg prose-p:text-site-fg/80 prose-a:text-site-accent-text prose-strong:text-site-fg prose-li:text-site-fg/80 max-w-[var(--site-measure,none)] text-[length:var(--site-body-size,1rem)]${labels}`}
                 // Sanitized at publish (see the safety note above).
                 dangerouslySetInnerHTML={{ __html: content.value }}
             />
@@ -98,7 +98,7 @@ export default function RichTextSection({
         <>
             <p
                 data-site-title=""
-                className="font-site-body text-site-accent mb-4 text-[13px] font-semibold uppercase leading-snug tracking-[0.1em]"
+                className="font-site-body text-site-accent-text mb-4 text-[13px] font-semibold uppercase leading-snug tracking-[0.1em]"
             >
                 {label}
             </p>

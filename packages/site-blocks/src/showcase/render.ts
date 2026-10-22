@@ -270,7 +270,7 @@ export function templateRender(
 
     const preStyle = presetSiteStyle(
         showcase
-            ? { ...preset?.style, palette: LOOK_SHOWCASE_PALETTE[look] }
+            ? { ...preset?.style, palette: LOOK_SHOWCASE_PALETTE[look], look }
             : (preset?.style ?? {}),
     );
     const styleVariables = siteStyleVariables(

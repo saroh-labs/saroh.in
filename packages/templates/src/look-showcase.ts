@@ -75,8 +75,15 @@ export const LOOK_SHOWCASE_PALETTE: Readonly<Record<LookId, SitePalette>> = {
         body: "#121410",
         muted: "#55584F",
         border: "#DEE0D8",
+        // Lime is only ever a fill with ink on it; as text the board uses
+        // its "signature as text on light" (`--site-accent-ink`).
         accent: "#C6F432",
         accentFg: "#121410",
+        accentText: "#4C6300",
+        // The board's live green (#2BB673), darkened to a dot's 3:1 on the
+        // page; lime over the ink.
+        status: "#279961",
+        statusInverse: "#C6F432",
         heroBg: "#EDEEEA",
         heroFg: "#121410",
         // The board's ink cards and footer.

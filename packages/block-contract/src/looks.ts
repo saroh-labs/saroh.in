@@ -73,6 +73,13 @@ export interface LookColour {
      * Used only when the palette has no surface of its own.
      */
     surfaceTint: number;
+    /**
+     * What the accent as a fill must reach against the page and a card:
+     * a graphic's 3:1, or (Live, board VB) 1, because Live only fills
+     * what carries its own text (a button, a tag, a pill), which reads
+     * at 4.5:1 on it; links and the like read `accentText`.
+     */
+    accentFillContrast: number;
 }
 
 export interface SiteLook {
@@ -135,7 +142,7 @@ export const LOOKS: Readonly<Record<LookId, SiteLook>> = {
         },
         booking: "panel",
         motion: MOTION,
-        colour: { surfaceTint: 0 },
+        colour: { surfaceTint: 0, accentFillContrast: 3 },
     },
     quiet: {
         id: "quiet",
@@ -161,7 +168,7 @@ export const LOOKS: Readonly<Record<LookId, SiteLook>> = {
         },
         booking: "page",
         motion: MOTION,
-        colour: { surfaceTint: 0 },
+        colour: { surfaceTint: 0, accentFillContrast: 3 },
     },
     live: {
         id: "live",
@@ -188,7 +195,7 @@ export const LOOKS: Readonly<Record<LookId, SiteLook>> = {
         },
         booking: "sheets",
         motion: MOTION,
-        colour: { surfaceTint: 0.05 },
+        colour: { surfaceTint: 0.05, accentFillContrast: 1 },
     },
 };
 

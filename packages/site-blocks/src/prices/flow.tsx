@@ -110,7 +110,7 @@ export function PricesDone({
             <a
                 href={accountHref}
                 className={cn(
-                    "text-site-accent cursor-pointer rounded-[var(--site-radius)] font-semibold underline-offset-4 hover:underline active:opacity-70",
+                    "text-site-accent-text cursor-pointer rounded-[var(--site-radius)] font-semibold underline-offset-4 hover:underline active:opacity-70",
                     focusRing,
                 )}
             >

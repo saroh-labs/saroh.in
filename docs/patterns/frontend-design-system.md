@@ -937,7 +937,16 @@ results), mark it `data-ph-mask`; a picture inside it is left out too, and
   (buttons and inputs), `rounded-site-s` (chips, times) and
   `rounded-site-photo`; the new colour roles are `site-accent-text`,
   `site-accent-soft`, `site-rule` and `site-footer-muted`, each falling back
-  to the role it refines on a Classic site.
+  to the role it refines on a Classic site. The accent drawn as text (a
+  link, "Shop →", a price in the accent, `prose-a`) is always
+  `text-site-accent-text`, never `text-site-accent`, which is for fills
+  (22 Oct 2026): on Classic the two are the same colour; under a look the
+  fill may be a colour no text could be read in, like Live's lime. A palette
+  that names its own `accentText` keeps it (board VB's #4C6300), and under
+  Live its accent fill may then sit under a graphic's 3:1 against the page
+  (`LOOKS.live.colour.accentFillContrast`, `parsePalette`'s option),
+  because Live only fills what carries its own 4.5:1 text. A business's own
+  colours never name one, so they are made safe as before.
 - **Current** (20 Oct 2026, DEC-172 U5) — **A look's chrome keeps one filled
   button per view and one fixed bar on a phone, in one place**
   (`sticky-actions.tsx`). A block marks the page's own main action

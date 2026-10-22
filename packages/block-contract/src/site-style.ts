@@ -1,7 +1,7 @@
 import type { FontPairKey } from "./fonts";
 import { DEFAULT_FONT_PAIR, fontPairVariables, isFontPairKey } from "./fonts";
 import type { LookId } from "./looks";
-import { parseLook } from "./looks";
+import { LOOKS, parseLook } from "./looks";
 import type { PaletteRole, SitePalette } from "./palette";
 import {
     hslTripleToHex,
@@ -461,8 +461,17 @@ export function presetSiteStyle(input: {
     if (isFontPairKey(input.fontPair) && input.fontPair !== DEFAULT_FONT_PAIR) {
         style.fontPair = input.fontPair;
     }
+    const look = parseLook(input.look);
     if (input.palette !== undefined && input.palette !== null) {
-        const parsed = parsePalette(input.palette);
+        const parsed = parsePalette(
+            input.palette,
+            look.ok && look.look
+                ? {
+                      accentFillContrast:
+                          LOOKS[look.look].colour.accentFillContrast,
+                  }
+                : {},
+        );
         if (parsed.ok) style.palette = parsed.palette;
     }
     if (input.type !== undefined && input.type !== null) {
@@ -471,7 +480,6 @@ export function presetSiteStyle(input: {
             style.type = parsed.type;
         }
     }
-    const look = parseLook(input.look);
     if (look.ok && look.look) style.look = look.look;
     return style;
 }

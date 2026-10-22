@@ -61,7 +61,7 @@ export function SummaryAside({
             aria-label="Your booking"
             className="bg-site-fg text-site-bg sticky top-4 min-w-0 flex-[1_1_300px] rounded-[calc(var(--site-radius)+14px)] p-[22px] shadow-[0_4px_12px_hsl(var(--site-fg)/0.10)] max-[699px]:hidden"
         >
-            <p className="text-site-accent mb-3 text-[11px] font-semibold uppercase tracking-[0.1em]">
+            <p className="text-site-accent-text mb-3 text-[11px] font-semibold uppercase tracking-[0.1em]">
                 Your booking
             </p>
             <dl>
@@ -107,7 +107,7 @@ export function SummaryAside({
                         "mt-2.5 text-[13px]",
                         quiet && !submitError
                             ? onDarkMuted
-                            : "text-site-accent",
+                            : "text-site-accent-text",
                     )}
                 >
                     {submitError ?? block}
@@ -200,7 +200,7 @@ export function PhoneBar({
                     className={cn(
                         "mb-2 truncate text-[12.5px]",
                         submitError || (block && !quiet)
-                            ? "text-site-accent"
+                            ? "text-site-accent-text"
                             : "text-site-bg",
                     )}
                 >

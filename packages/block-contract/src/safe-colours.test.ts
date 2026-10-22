@@ -107,6 +107,41 @@ describe("deriveSafeColours", () => {
         expect(parsePalette(safe.palette).ok).toBe(true);
     });
 
+    it("keeps a designed lime fill under Live when the palette names its own accent text (board VB)", () => {
+        const board = given({
+            bg: "#EDEEEA",
+            surface: "#FFFFFF",
+            fg: "#121410",
+            body: "#121410",
+            muted: "#55584F",
+            border: "#DEE0D8",
+            accent: "#C6F432",
+            accentFg: "#121410",
+            accentText: "#4C6300",
+        });
+        const live = deriveSafeColours(board, "live").palette;
+        expect(live.accent).toBe("#C6F432");
+        expect(live.accentText).toBe("#4C6300");
+        expect(
+            contrastRatio(live.accentFg, live.accent),
+        ).toBeGreaterThanOrEqual(PALETTE_MIN_CONTRAST);
+        expect(parsePalette(live, { accentFillContrast: 1 }).ok).toBe(true);
+        // Another look still holds the fill to a graphic's 3:1.
+        const quiet = deriveSafeColours(board, "quiet").palette;
+        expect(contrastRatio(quiet.accent, quiet.bg)).toBeGreaterThanOrEqual(
+            PALETTE_GRAPHIC_CONTRAST,
+        );
+        // A business's own lime (no accent text) is still moved under Live.
+        const { accentText: _none, ...business } = board;
+        const moved = deriveSafeColours(
+            business as SitePalette,
+            "live",
+        ).palette;
+        expect(contrastRatio(moved.accent, moved.bg)).toBeGreaterThanOrEqual(
+            PALETTE_GRAPHIC_CONTRAST,
+        );
+    });
+
     it("lifts the rule to 3:1 on the page and on a card", () => {
         const safe = deriveSafeColours(
             given({

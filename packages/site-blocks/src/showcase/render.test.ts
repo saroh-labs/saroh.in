@@ -1,9 +1,11 @@
+import { hexToHslTriple, LOOK_IDS } from "@saroh/block-contract";
 import {
     CLINIC_GALLERY_SAMPLE,
     DEVELOPER_GALLERY_SAMPLE,
     DIETICIAN_GALLERY_SAMPLE,
     GALLERY_SAMPLES,
     instantiateTemplate,
+    LOOK_SHOWCASE_PALETTE,
     LOOK_SHOWCASE_TEMPLATE,
     SALON_GALLERY_SAMPLE,
     templatePlaceholderIn,
@@ -643,5 +645,22 @@ describe("the starter's renders (DEC-141)", () => {
                 }
             }
         }
+    });
+});
+
+describe("a look's Preview draws on its board's ground (DEC-172, 22 Oct)", () => {
+    // Not its template's colourway: a board palette the contrast check
+    // refused was dropped without a word, and Live drew on the gym's slate.
+    it.each(LOOK_IDS)("%s", (look) => {
+        const render = templateRender(
+            LOOK_SHOWCASE_TEMPLATE[look],
+            undefined,
+            "/",
+            look,
+        );
+        const vars = render?.styleVariables as Record<string, string>;
+        expect(vars["--site-bg"]).toBe(
+            hexToHslTriple(LOOK_SHOWCASE_PALETTE[look].bg),
+        );
     });
 });

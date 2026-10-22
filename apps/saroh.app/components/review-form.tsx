@@ -193,7 +193,7 @@ function LineCard({
                                     aria-hidden
                                     className={cn(
                                         on
-                                            ? "text-site-accent"
+                                            ? "text-site-accent-text"
                                             : "text-site-border",
                                     )}
                                 >

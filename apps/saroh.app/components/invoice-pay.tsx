@@ -496,7 +496,7 @@ export function ContactToPay({
                     <li>
                         <a
                             href={`tel:${contact.phone}`}
-                            className="text-site-accent underline underline-offset-2"
+                            className="text-site-accent-text underline underline-offset-2"
                         >
                             {phoneText(contact.phone)}
                         </a>
@@ -506,7 +506,7 @@ export function ContactToPay({
                     <li>
                         <a
                             href={`mailto:${contact.email}`}
-                            className="break-all text-site-accent underline underline-offset-2"
+                            className="break-all text-site-accent-text underline underline-offset-2"
                         >
                             {contact.email}
                         </a>

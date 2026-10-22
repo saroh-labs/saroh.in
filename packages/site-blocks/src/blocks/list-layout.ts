@@ -24,4 +24,4 @@ export const listPhoto = "h-full min-h-[120px] w-full object-cover";
  * as "Read" (G16): drawn as the link's label, never a second link.
  */
 export const cardLink =
-    "text-site-accent mt-1 px-4 text-sm font-semibold underline-offset-4 group-hover:underline";
+    "text-site-accent-text mt-1 px-4 text-sm font-semibold underline-offset-4 group-hover:underline";

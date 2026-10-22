@@ -98,7 +98,7 @@ export function AccountTabBar({
                                 aria-hidden="true"
                                 className={cn(
                                     "shrink-0 md:size-[18px]",
-                                    on ? "text-site-accent" : undefined,
+                                    on ? "text-site-accent-text" : undefined,
                                 )}
                             >
                                 <path

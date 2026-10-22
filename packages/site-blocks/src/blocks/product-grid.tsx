@@ -269,7 +269,7 @@ const focusRing =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent focus-visible:ring-offset-2 focus-visible:ring-offset-site-bg";
 
 const textButton = cn(
-    "cursor-pointer rounded-[var(--site-radius)] text-sm font-semibold text-site-accent underline-offset-4 transition-opacity hover:underline active:opacity-70",
+    "cursor-pointer rounded-[var(--site-radius)] text-sm font-semibold text-site-accent-text underline-offset-4 transition-opacity hover:underline active:opacity-70",
     focusRing,
 );
 
@@ -423,7 +423,7 @@ function ProductCards({
                         Shop <span aria-hidden="true">→</span>
                     </a>
                 ) : (
-                    <span className="text-site-accent shrink-0 text-sm font-semibold">
+                    <span className="text-site-accent-text shrink-0 text-sm font-semibold">
                         Shop <span aria-hidden="true">→</span>
                     </span>
                 )
@@ -716,7 +716,7 @@ function BareGrid({
                             </span>
                         ) : null}
                         {show.label ? (
-                            <span className="text-site-accent mt-2 block text-sm font-semibold underline-offset-4 group-hover:underline">
+                            <span className="text-site-accent-text mt-2 block text-sm font-semibold underline-offset-4 group-hover:underline">
                                 {show.label}
                             </span>
                         ) : null}

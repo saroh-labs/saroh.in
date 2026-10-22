@@ -86,7 +86,7 @@ export function OrderTrack({
                                 aria-hidden="true"
                                 className={
                                     step.state === "now"
-                                        ? "text-site-accent"
+                                        ? "text-site-accent-text"
                                         : undefined
                                 }
                             >
