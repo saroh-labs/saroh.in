@@ -3,6 +3,7 @@ import type { Auth } from "@saroh/auth";
 import { createAuth, VERIFICATION_OTP_EXPIRY_SECONDS } from "@saroh/auth";
 import { prisma } from "@saroh/database";
 
+import { env } from "../../env";
 import { signedUp } from "../../modules/analytics/product-milestones";
 import { noticeProfilesOfDeletedOwnerInTx } from "../../modules/billing/billing-profile-owner";
 import {
@@ -11,6 +12,7 @@ import {
     sendExistingAccountEmail,
     sendPasswordResetEmail,
 } from "../email";
+import { trustedProxyRanges } from "../trust-proxy";
 import { clearStaffVerification } from "./email-verification";
 import { reportAuthServerError } from "./report-auth-error";
 import { mayStartSession } from "./sign-in-holds";
@@ -57,4 +59,6 @@ export const auth: Auth = createAuth({
     // A 5xx inside Better Auth, which answers /api/auth/* itself and so
     // never reaches AllExceptionsFilter. Never a 4xx.
     onServerError: reportAuthServerError,
+    // The sign-in rate limit counts the same client the API's `req.ip` does.
+    trustedProxies: trustedProxyRanges(env.TRUST_PROXY),
 });
