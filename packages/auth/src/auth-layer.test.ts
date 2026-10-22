@@ -292,6 +292,13 @@ describe("safeDestination — where to land after sign-in (#222)", () => {
             "https://app.saroh.in,https://admin.saroh.in";
     });
 
+    it("refuses a path the browser would read as another site", () => {
+        expect(safeDestination("/\\evil.example")).toBeNull();
+        expect(safeDestination("/\t/evil.example")).toBeNull();
+        expect(safeDestination("/\n/evil.example")).toBeNull();
+        expect(safeDestination("/sites/abc")).toBe("/sites/abc");
+    });
+
     it("follows a full URL on a trusted origin, keeping its path and query", () => {
         expect(
             safeDestination("https://app.saroh.in/sites/abc?tab=pages"),

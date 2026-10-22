@@ -99,7 +99,8 @@ export function cookieValue(all: string, name: string): string | null {
  */
 export function safeArrival(to: string | null | undefined): string {
     if (!to || !to.startsWith("/") || to.startsWith("//")) return "/";
-    if (to.includes("\\") || /[\r\n]/.test(to)) return "/";
+    // The browser turns `\` into `/` and drops tabs and newlines.
+    if (/[\\\t\n\r]/.test(to)) return "/";
     return to;
 }
 
