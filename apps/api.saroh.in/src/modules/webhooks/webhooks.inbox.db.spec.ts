@@ -28,7 +28,7 @@ import {
     FakeWebhookProvider,
     FakeWebhookProviderFactory,
 } from "./providers/fake.webhook";
-import { WebhooksService } from "./webhooks.service";
+import { WEBHOOK_PROCESS_TYPE, WebhooksService } from "./webhooks.service";
 
 const payments = new PaymentsService(
     new FakeProviderFactory(new FakeMerchantProvider("RAZORPAY")),
@@ -110,5 +110,48 @@ describe("the webhook inbox is unique per business (PAY-05)", () => {
         expect(rows.map((r) => r.organizationId).sort()).toEqual(
             [a.organizationId, b.organizationId].sort(),
         );
+    });
+});
+
+describe("a delivery that errors is stored, answered and retried", () => {
+    it("answers 200 with the row RECEIVED, and its job applies it", async () => {
+        const a = await business("Charlie", "whsec_charlie");
+        const id = `evt_retry_${tag}`;
+        const reconcile = jest
+            .spyOn(
+                webhooks as unknown as { reconcile: () => Promise<unknown> },
+                "reconcile",
+            )
+            .mockRejectedValueOnce(new Error("connection lost"));
+
+        await expect(deliver(a, "whsec_charlie", id)).resolves.toEqual({
+            status: "queued",
+            changed: false,
+        });
+        const row = await prisma.webhookEvent.findFirstOrThrow({
+            where: { organizationId: a.organizationId, providerEventId: id },
+        });
+        expect(row.status).toBe("RECEIVED");
+        // A redelivery meanwhile is still the exactly-once no-op.
+        await expect(deliver(a, "whsec_charlie", id)).resolves.toEqual({
+            status: "duplicate",
+            changed: false,
+        });
+
+        reconcile.mockRestore();
+        const job = await prisma.job.findFirstOrThrow({
+            where: {
+                type: WEBHOOK_PROCESS_TYPE,
+                payload: { equals: { webhookEventId: row.id } },
+            },
+        });
+        await webhooks.processJob(job);
+        expect(
+            (
+                await prisma.webhookEvent.findUniqueOrThrow({
+                    where: { id: row.id },
+                })
+            ).status,
+        ).toBe("IGNORED");
     });
 });

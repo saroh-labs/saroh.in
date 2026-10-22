@@ -14,7 +14,7 @@ import {
 } from "./pending-payments.handler";
 import { webhookProviderFactoryProvider } from "./providers/webhook-provider.factory";
 import { WebhooksController } from "./webhooks.controller";
-import { WebhooksService } from "./webhooks.service";
+import { WEBHOOK_PROCESS_TYPE, WebhooksService } from "./webhooks.service";
 
 /** How often a stopped sweep chain is looked for and restarted. */
 const CHAIN_CHECK_MS = 15 * 60 * 1000;
@@ -55,6 +55,7 @@ export class WebhooksModule implements OnModuleInit, OnModuleDestroy {
     constructor(
         private readonly registry: JobHandlerRegistry,
         private readonly pending: PendingPaymentsHandler,
+        private readonly webhooks: WebhooksService,
     ) {}
 
     /**
@@ -68,6 +69,8 @@ export class WebhooksModule implements OnModuleInit, OnModuleDestroy {
             CONFIRM_PENDING_PAYMENTS_TYPE,
             this.pending.handle,
         );
+        // A stored delivery the request could not apply is retried here.
+        this.registry.register(WEBHOOK_PROCESS_TYPE, this.webhooks.processJob);
         if (env.NODE_ENV === "test") return;
         await this.pending.schedule(new Date());
         this.chainCheck = setInterval(() => {

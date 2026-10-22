@@ -20,9 +20,10 @@ import { WebhooksService } from "./webhooks.service";
  * the service can load THAT org's webhook secret and HMAC-verify the RAW body
  * BEFORE trusting anything. Trust comes from the signature, never the caller.
  *
- * The handler always answers 200 for a verified (or duplicate) delivery so the
- * provider stops retrying; only signature/verification failures surface as 401
- * and a genuinely unknown provider as 404.
+ * The handler answers 200 for a verified (or duplicate) delivery so the
+ * provider stops retrying; signature/verification failures surface as 401, a
+ * genuinely unknown provider as 404, and an unexpected reconcile error as a 5xx
+ * so the provider redelivers it.
  *
  * The route is written out, not imported, because the test-host route list
  * reads `@Controller` paths as plain strings (`public-write-routes.ts`).

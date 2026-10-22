@@ -50,7 +50,13 @@ jest.mock("@saroh/database", () => {
         // The intent's row lock; [] keeps the status findIntent read.
         $queryRaw: jest.fn().mockResolvedValue([]),
         merchantPaymentProvider: { findUnique: jest.fn() },
-        webhookEvent: { create: jest.fn(), update: jest.fn() },
+        webhookEvent: {
+            create: jest.fn(),
+            update: jest.fn(),
+            // Claims the stored row for the reconcile, or keeps it FAILED.
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            findUnique: jest.fn(),
+        },
         paymentIntent: {
             findFirst: jest.fn(),
             findMany: jest.fn(),
@@ -67,7 +73,11 @@ jest.mock("@saroh/database", () => {
             create: jest.fn(),
             update: jest.fn(),
         },
-        order: { findUnique: jest.fn(), update: jest.fn() },
+        order: {
+            findUnique: jest.fn(),
+            update: jest.fn(),
+            updateMany: jest.fn(),
+        },
         orderEvent: { create: jest.fn() },
         // The team's alerts (#1139), queued on the webhook's transaction.
         job: { create: jest.fn() },
@@ -123,6 +133,7 @@ const providerFindUnique = prisma.merchantPaymentProvider
     .findUnique as jest.Mock;
 const whCreate = prisma.webhookEvent.create as jest.Mock;
 const whUpdate = prisma.webhookEvent.update as jest.Mock;
+const whUpdateMany = prisma.webhookEvent.updateMany as jest.Mock;
 const intentFindFirst = prisma.paymentIntent.findFirst as jest.Mock;
 const intentUpdate = prisma.paymentIntent.update as jest.Mock;
 const intentFindMany = prisma.paymentIntent.findMany as jest.Mock;
@@ -427,11 +438,129 @@ describe("WebhooksService reconcile routes through the state machine", () => {
         expect(result.status).toBe("failed");
         expect(orderUpdate).not.toHaveBeenCalled();
         expect(refundCreate).not.toHaveBeenCalled();
-        // The event is durably recorded FAILED for inspection/replay.
-        expect(whUpdate).toHaveBeenCalledWith({
-            where: { id: "wh_1" },
+        // The event is kept FAILED at once for inspection/replay: a
+        // redelivery would be refused the same way.
+        expect(whUpdateMany).toHaveBeenLastCalledWith({
+            where: { id: "wh_1", status: "RECEIVED" },
             data: expect.objectContaining({ status: "FAILED" }),
         });
+    });
+});
+
+describe("WebhooksService stores, answers 200, then applies", () => {
+    /** The retry job the delivery queued, as the worker would claim it. */
+    function queuedJob(attempts = 0) {
+        const [[{ data }]] = jobCreate.mock.calls.filter(
+            ([args]: [{ data: { type: string } }]) =>
+                args.data.type === "webhook.process",
+        );
+        expect(data.payload).toEqual({ webhookEventId: "wh_1" });
+        return { ...data, id: "job_1", attempts } as never;
+    }
+
+    it("answers 200 on an unexpected error and its job retries, then applies it", async () => {
+        const { service } = makeService();
+        providerFindUnique.mockResolvedValue(providerRow());
+        whCreate.mockResolvedValue({ id: "wh_1" });
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        orderFindUnique.mockResolvedValue({ paymentStatus: "UNPAID" });
+        orderUpdate
+            .mockRejectedValueOnce(new Error("connection lost"))
+            .mockRejectedValueOnce(new Error("connection lost"));
+
+        const raw = bodyOf({});
+        await expect(
+            service.handle("razorpay", "org_1", raw, {
+                "x-fake-signature": sign(raw),
+            }),
+        ).resolves.toEqual({ status: "queued", changed: false });
+        // Nothing FAILED: the row stays RECEIVED for its job.
+        expect(whUpdateMany).not.toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ status: "FAILED" }),
+            }),
+        );
+
+        const stored = {
+            provider: "RAZORPAY",
+            organizationId: "org_1",
+            payload: JSON.parse(raw.toString("utf8")),
+            status: "RECEIVED",
+        };
+        (prisma.webhookEvent.findUnique as jest.Mock).mockResolvedValue(stored);
+        // Still failing: thrown, so the queue backs off and tries again.
+        await expect(service.processJob(queuedJob(1))).rejects.toThrow(
+            "connection lost",
+        );
+        await service.processJob(queuedJob(2));
+        expect(whUpdate).toHaveBeenLastCalledWith({
+            where: { id: "wh_1" },
+            data: expect.objectContaining({ status: "PROCESSED" }),
+        });
+        expect(orderUpdate).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ paymentStatus: "PAID" }),
+            }),
+        );
+    });
+
+    it("keeps the row FAILED for replay when the last try fails", async () => {
+        const { service } = makeService();
+        providerFindUnique.mockResolvedValue(providerRow());
+        whCreate.mockResolvedValue({ id: "wh_1" });
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        orderFindUnique.mockResolvedValue({ paymentStatus: "UNPAID" });
+        orderUpdate.mockRejectedValue(new Error("connection lost"));
+        const raw = bodyOf({});
+        await service.handle("razorpay", "org_1", raw, {
+            "x-fake-signature": sign(raw),
+        });
+        (prisma.webhookEvent.findUnique as jest.Mock).mockResolvedValue({
+            provider: "RAZORPAY",
+            organizationId: "org_1",
+            payload: JSON.parse(raw.toString("utf8")),
+            status: "RECEIVED",
+        });
+        const job = queuedJob(11);
+        await service.processJob(job);
+        expect(whUpdateMany).toHaveBeenLastCalledWith({
+            where: { id: "wh_1", status: "RECEIVED" },
+            data: expect.objectContaining({
+                status: "FAILED",
+                error: "connection lost",
+            }),
+        });
+        orderUpdate.mockReset();
+    });
+
+    it("is a 5xx, with nothing kept, only when the inbox row cannot be stored", async () => {
+        const { service } = makeService();
+        providerFindUnique.mockResolvedValue(providerRow());
+        whCreate.mockRejectedValueOnce(new Error("database down"));
+        const raw = bodyOf({});
+        await expect(
+            service.handle("razorpay", "org_1", raw, {
+                "x-fake-signature": sign(raw),
+            }),
+        ).rejects.toThrow("database down");
+        expect(intentFindFirst).not.toHaveBeenCalled();
+    });
+
+    it("leaves a delivery another try already settled alone", async () => {
+        const { service } = makeService();
+        (prisma.webhookEvent.findUnique as jest.Mock).mockResolvedValue({
+            provider: "RAZORPAY",
+            organizationId: "org_1",
+            payload: {},
+            status: "PROCESSED",
+        });
+        await service.processJob({
+            id: "job_1",
+            attempts: 0,
+            maxAttempts: 12,
+            payload: { webhookEventId: "wh_1" },
+        } as never);
+        expect(intentFindFirst).not.toHaveBeenCalled();
     });
 });
 
