@@ -249,11 +249,11 @@ export function EditorCanvas({
         >
             {/* Over the page, taking no room: it moves nothing it covers. */}
             {trying ? (
-                <div className="sticky top-3 z-20 flex h-0 justify-center">
-                    <p
-                        role="status"
-                        className="h-fit whitespace-nowrap rounded-full border bg-card px-3 py-1.5 text-xs font-medium shadow-md"
-                    >
+                <div
+                    role="status"
+                    className="sticky top-3 z-20 flex h-0 justify-center"
+                >
+                    <p className="h-fit whitespace-nowrap rounded-full border bg-card px-3 py-1.5 text-xs font-medium shadow-md">
                         {`Trying ${trying}. Not saved until you press Enter.`}
                     </p>
                 </div>
