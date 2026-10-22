@@ -1,18 +1,6 @@
 import type { LookId } from "@saroh/block-contract";
 import { inPageNavigation, siteStyleVariables } from "@saroh/block-contract";
 import type {
-    JournalFeed,
-    PacksFeed,
-    PlansFeed,
-    ProductGridFeed,
-    Section,
-    ShopListingCard,
-    SiteFixtures,
-    SiteFooterContent,
-    SiteHeaderAction,
-    SiteNavItem,
-} from "@saroh/site-blocks";
-import type {
     InstantiatedTemplate,
     TemplateContext,
     TemplateManifest,
@@ -27,7 +15,17 @@ import {
     templateFooterLineFor,
     templateModulePageKinds,
     templateStylePreset,
+    withGallerySample,
 } from "@saroh/templates";
+import type { JournalFeed } from "../blocks/journal";
+import type { PacksFeed } from "../blocks/packs";
+import type { PlansFeed } from "../blocks/plans";
+import type { ProductGridFeed } from "../blocks/product-grid";
+import type { ShopListingCard } from "../product/shop-listing";
+import type { Section } from "../section-renderer";
+import type { SiteFooterContent } from "../site-chrome";
+import type { SiteFixtures } from "../site-fixtures";
+import type { SiteHeaderAction, SiteNavItem } from "../site-header-menu";
 
 import type { BriefColours } from "./brief-image";
 import { briefImage, hslOf } from "./brief-image";
@@ -50,6 +48,12 @@ import {
  *
  * Pure and synchronous: the page draws it, and `render.test.ts` holds every
  * gallery template's every page and colourway to building cleanly.
+ *
+ * Shared (`@saroh/site-blocks/showcase`, DEC-182) by the gallery's
+ * `/template-renders` (`apps/saroh.app`) and a look's Preview in the
+ * editor (`apps/app.saroh.in`, `look-preview.tsx`), which draws each
+ * look's showcase template (`LOOK_SHOWCASE_TEMPLATE`) from it. No API, no
+ * clock, nothing written.
  */
 
 /** A template the gallery shows (KTD-6): the gallery's own rule. */
@@ -266,11 +270,12 @@ export function templateRender(
     };
 
     const sections: Section[] = page.sections.map((s, i) => {
-        const content = patched(
-            fixture,
+        // The design's sample words over its placeholders (KTD-6).
+        const content = withGallerySample(
+            template.id,
             page.path,
-            s.type,
-            nthOfType(page.sections, i),
+            page.sections,
+            i,
             { ...(s.content as Record<string, unknown>) },
         );
         // A real site's message form gets its Form when the site is made
@@ -395,27 +400,6 @@ function footerOf(
     const layout = footer.layout ?? "centre";
     if (line === "" && layout === "centre") return null;
     return { format: "markdown", value: line, layout };
-}
-
-function nthOfType(sections: readonly { type: string }[], index: number) {
-    const type = sections[index]?.type;
-    return sections.slice(0, index).filter((s) => s.type === type).length;
-}
-
-function patched(
-    fixture: TemplateFixture | undefined,
-    path: string,
-    type: string,
-    nth: number,
-    content: Record<string, unknown>,
-): Record<string, unknown> {
-    let out = content;
-    for (const p of fixture?.patches ?? []) {
-        if (p.page === path && p.type === type && (p.nth ?? 0) === nth) {
-            out = p.patch(out);
-        }
-    }
-    return out;
 }
 
 function productCard(

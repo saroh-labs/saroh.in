@@ -232,6 +232,11 @@ const SITE_LAYER_ALLOWED = new Set([
     // `--site-*` values by name and draws no block; the real look is shown by
     // Preview, which renders through @saroh/site-blocks.
     "apps/app.saroh.in/components/sites/look-thumbnail.tsx",
+    // A look's Preview (DEC-182): the look's showcase template drawn for its
+    // sample business, the editor's twin of the gallery's template renders
+    // above. It supplies the page ground and hands the header, every block
+    // and the footer to @saroh/site-blocks (`templateRender`, PageSections).
+    "apps/app.saroh.in/components/sites/look-showcase.tsx",
     // Version history's preview of a past version (#283). The same category as
     // the editor's frame directly above: it supplies the merchant's page ground
     // — in the palette THAT version was published with, read from its snapshot —

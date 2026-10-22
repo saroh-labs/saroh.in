@@ -2,10 +2,13 @@ import {
     HERO_PROMPT,
     instantiateTemplate,
     listTemplates,
+    lookShowcaseTemplate,
+    SALON_GALLERY_SAMPLE,
     starterTemplate,
     starterTemplateV2,
     starterTemplateV3,
     templateModulePageKinds,
+    withGallerySamples,
 } from "@saroh/templates";
 
 import {
@@ -1491,5 +1494,90 @@ describe("the first starters' stock sentences (DEC-141)", () => {
             ["/"],
         );
         expect(types(flags)).not.toContain("placeholderText");
+    });
+});
+
+describe("a showcase template's sample words (DEC-182)", () => {
+    const sampleFlags = (flags: { type: FlagType; message: string }[]) =>
+        flags.filter((f) => f.message.includes("sample words from"));
+
+    it("names each block of a copied starter that still has them, by page and section, with the words", () => {
+        const salon = lookShowcaseTemplate("quiet");
+        const copied = withGallerySamples(
+            salon.id,
+            instantiateTemplate(salon, {
+                organizationName: "Asha's Corner",
+                modules: ["WEBSITE", ...(salon.uses ?? [])],
+            }),
+        );
+        const home = copied.pages.find((p) => p.isHome);
+        const flags = checkPage(
+            page(
+                (home?.sections ?? []).map((s) => ({
+                    type: s.type,
+                    content: s.content,
+                })),
+            ),
+            ["/"],
+        );
+        const named = sampleFlags(flags);
+        expect(named.length).toBeGreaterThan(0);
+        for (const flag of named) {
+            expect(flag.type).toBe("placeholderText");
+            expect(flag.pageId).toBe("page_1");
+            expect(flag.sectionIndex).not.toBeNull();
+            expect(flag.message).toMatch(/from the Salon starter/);
+        }
+        const person = (home?.sections ?? []).findIndex(
+            (s) => s.type === "person",
+        );
+        expect(named.some((f) => f.sectionIndex === person)).toBe(true);
+    });
+
+    it("names a sample sentence the owner left in a text block", () => {
+        const flags = checkPage(
+            page([
+                {
+                    type: "richText",
+                    content: {
+                        format: "html",
+                        value: `<h2>Before you come</h2><p>${SALON_GALLERY_SAMPLE.before[0]}</p>`,
+                    },
+                },
+            ]),
+            ["/"],
+        );
+        expect(sampleFlags(flags)).toHaveLength(1);
+    });
+
+    it("says nothing about a site made from a gallery template, or the owner's own words", () => {
+        for (const t of listTemplates().filter((t) => t.sample)) {
+            const made = instantiateTemplate(t, {
+                organizationName: "Asha's Corner",
+                modules: ["WEBSITE", ...(t.uses ?? [])],
+            });
+            for (const p of made.pages) {
+                const flags = checkPage(
+                    page(
+                        p.sections.map((s) => ({
+                            type: s.type,
+                            content: s.content,
+                        })),
+                    ),
+                    made.pages.map((x) => x.path),
+                );
+                expect(sampleFlags(flags)).toEqual([]);
+            }
+        }
+        const own = checkPage(
+            page([
+                {
+                    type: "person",
+                    content: { name: "Meher", role: "Our senior stylist" },
+                },
+            ]),
+            ["/"],
+        );
+        expect(sampleFlags(own)).toEqual([]);
     });
 });

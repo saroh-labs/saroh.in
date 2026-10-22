@@ -24,12 +24,15 @@ import { STUDIO_GALLERY_SAMPLE, STUDIO_TEMPLATE_ID } from "./templates/studio";
  * (`*_GALLERY_SAMPLE`, beside the placeholders it replaces); each carries
  * at least the footer's line.
  *
- * GALLERY ONLY. `instantiateTemplate` never reads these, so a merchant's
- * site keeps the placeholders (which the pre-publish check names until
- * they are replaced). The render route (`apps/saroh.app`,
- * `lib/template-renders`) is the one reader: it lays them over the
- * instantiated pages. `gallery-samples.test.ts` holds both sides: every
- * gallery template has one, and none of its words reach a merchant's site.
+ * NEVER ON A NEW SITE. `instantiateTemplate` never reads these, so a site
+ * made from a template keeps the placeholders (which the pre-publish check
+ * names until they are replaced). They are laid over a template's pages by
+ * `gallery-patches.ts` for three readers: the gallery's renders, a look's
+ * Preview, and "Use this look with its starter content" (DEC-182), the
+ * one way they reach a merchant's draft, by the owner's choice; the
+ * pre-publish check then names each one still there (`sample-words.ts`).
+ * `gallery-samples.test.ts` holds both sides: every gallery template has
+ * one, and none of its words reach a site made from it.
  */
 export const GALLERY_SAMPLES: Readonly<
     Record<string, { readonly footer: string }>

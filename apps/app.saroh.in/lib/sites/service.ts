@@ -1401,6 +1401,255 @@ export async function restorePublication(
     return { ok: false, ...readError(data, "Couldn't restore that version.") };
 }
 
+/** What "Use this look with its starter content" did (DEC-182). */
+export interface StarterContentCopy {
+    /** What its Undo puts back. */
+    snapshotId: string;
+    /** The showcase template copied in: `gym`, `salon`, … */
+    templateId: string;
+    look: LookId | null;
+    /** The titles of the pages whose drafts were replaced. */
+    replaced: string[];
+    /** The titles of the pages made. */
+    created: string[];
+    /** What "Fill in my details" put in place of the samples. */
+    filled: FilledKind[];
+}
+
+/** What the business's details stood in for: its staff, address, town. */
+export type FilledKind = "team" | "address" | "town";
+
+/**
+ * Set a look and copy its showcase template, sample words and all, into
+ * the draft (DEC-182), the business's details in place of the samples
+ * when `fill`. Nothing goes live until Publish. A paid look on a plan
+ * without themes is refused with `plan`, as a style save is.
+ */
+export async function copyStarterContent(
+    siteId: string,
+    look: LookId | "classic",
+    fill: boolean,
+): Promise<SitesResult<StarterContentCopy>> {
+    const base = await sitesBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(`${base}/${siteId}/starter-content`, {
+        method: "POST",
+        body: JSON.stringify({ look, fill }),
+    });
+    const data = (await res.json().catch(() => null)) as
+        | (Partial<StarterContentCopy> & { message?: string; error?: string })
+        | null;
+    if (res.ok && data?.snapshotId) {
+        return {
+            ok: true,
+            data: {
+                snapshotId: data.snapshotId,
+                templateId: data.templateId ?? "",
+                look: data.look ?? null,
+                replaced: data.replaced ?? [],
+                created: data.created ?? [],
+                filled: data.filled ?? [],
+            },
+        };
+    }
+    return {
+        ok: false,
+        ...readError(data, "Couldn't copy the starter content."),
+    };
+}
+
+/** What "Bring in my details" did (DEC-182). */
+export interface DetailsFill {
+    /** What its Undo puts back; null when there was nothing to fill. */
+    snapshotId: string | null;
+    filled: FilledKind[];
+    /** The titles of the pages changed. */
+    pages: string[];
+}
+
+/**
+ * "Bring in my details" (DEC-182): sample words the business has its own
+ * for replaced with them, across the draft. Never the owner's own words.
+ */
+export async function fillDetails(
+    siteId: string,
+): Promise<SitesResult<DetailsFill>> {
+    const base = await sitesBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(`${base}/${siteId}/starter-content/fill`, {
+        method: "POST",
+    });
+    const data = (await res.json().catch(() => null)) as
+        (Partial<DetailsFill> & { message?: string; error?: string }) | null;
+    if (res.ok) {
+        return {
+            ok: true,
+            data: {
+                snapshotId: data?.snapshotId ?? null,
+                filled: data?.filled ?? [],
+                pages: data?.pages ?? [],
+            },
+        };
+    }
+    return { ok: false, ...readError(data, "Couldn't bring in your details.") };
+}
+
+/** A previous version of the draft: what it was before a change (DEC-182). */
+export interface DraftVersion {
+    id: string;
+    /** What changed it: `starter-content`, `fill-details`, `rollback`, `bring-in`. */
+    reason: string;
+    /** When it was replaced, ISO. */
+    createdAt: string;
+    /** Its look then; null is Classic. */
+    look: LookId | null;
+    pages: {
+        pageId: string;
+        /** The page's title now; null for a page removed since. */
+        title: string | null;
+        sections: { key: string; type: string; heading: string | null }[];
+    }[];
+}
+
+/** The draft's previous versions, newest first; empty when unreadable. */
+export async function listDraftVersions(
+    siteId: string,
+): Promise<SitesResult<DraftVersion[]>> {
+    const base = await sitesBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(`${base}/${siteId}/starter-content/versions`);
+    const data = (await res.json().catch(() => null)) as unknown;
+    if (res.ok && Array.isArray(data)) {
+        return { ok: true, data: data as DraftVersion[] };
+    }
+    return {
+        ok: false,
+        ...readError(data, "Couldn't read your previous versions."),
+    };
+}
+
+/**
+ * Roll the draft back to a previous version (DEC-182). The draft as it was
+ * is kept as a version of its own; `snapshotId` is the roll back's Undo.
+ */
+export async function rollbackDraft(
+    siteId: string,
+    versionId: string,
+): Promise<SitesResult<{ snapshotId: string; restored: number }>> {
+    const base = await sitesBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(
+        `${base}/${siteId}/starter-content/versions/${versionId}/rollback`,
+        { method: "POST" },
+    );
+    const data = (await res.json().catch(() => null)) as {
+        snapshotId?: string;
+        restored?: number;
+        message?: string;
+        error?: string;
+    } | null;
+    if (res.ok && data?.snapshotId) {
+        return {
+            ok: true,
+            data: { snapshotId: data.snapshotId, restored: data.restored ?? 0 },
+        };
+    }
+    return { ok: false, ...readError(data, "Couldn't roll back your draft.") };
+}
+
+/**
+ * One section of a previous version copied to the end of its page's draft,
+ * or the home page's when that page is gone (DEC-182).
+ */
+export async function bringInSection(
+    siteId: string,
+    versionId: string,
+    pageId: string,
+    sectionKey: string,
+): Promise<SitesResult<{ snapshotId: string; pageId: string; title: string }>> {
+    const base = await sitesBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(
+        `${base}/${siteId}/starter-content/versions/${versionId}/bring-in`,
+        { method: "POST", body: JSON.stringify({ pageId, sectionKey }) },
+    );
+    const data = (await res.json().catch(() => null)) as {
+        snapshotId?: string;
+        pageId?: string;
+        title?: string;
+        message?: string;
+        error?: string;
+    } | null;
+    if (res.ok && data?.snapshotId && data.pageId) {
+        return {
+            ok: true,
+            data: {
+                snapshotId: data.snapshotId,
+                pageId: data.pageId,
+                title: data.title ?? "",
+            },
+        };
+    }
+    return { ok: false, ...readError(data, "Couldn't bring that section in.") };
+}
+
+/**
+ * Put back the draft a starter copy replaced (DEC-182). Refused once it
+ * has been undone (`STARTER_UNDONE`) or once the draft has been saved
+ * over (`STARTER_CHANGED`).
+ */
+export async function undoStarterContent(
+    siteId: string,
+    snapshotId: string,
+): Promise<SitesResult<{ restored: number; removed: number }>> {
+    const base = await sitesBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(
+        `${base}/${siteId}/starter-content/${snapshotId}/undo`,
+        { method: "POST" },
+    );
+    const data = (await res.json().catch(() => null)) as {
+        restored?: number;
+        removed?: number;
+        message?: string;
+        error?: string;
+    } | null;
+    if (res.ok) {
+        return {
+            ok: true,
+            data: {
+                restored: data?.restored ?? 0,
+                removed: data?.removed ?? 0,
+            },
+        };
+    }
+    return { ok: false, ...readError(data, "Couldn't put your draft back.") };
+}
+
 /** Replace a site's look. The panel always sends a whole style (#189). */
 // ---------------------------------------------------------------------------
 // Review — notes pinned to sections, and one approval (#193)

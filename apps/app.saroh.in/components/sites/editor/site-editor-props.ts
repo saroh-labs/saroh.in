@@ -105,4 +105,11 @@ export interface SiteEditorProps {
     canOverride?: boolean;
     /** When the live version went live; null before the first publish. */
     livePublishedAt?: string | null;
+    /**
+     * Read the draft again and start the editor afresh on it, on the page
+     * named or this one (`SiteEditorHost`): after a write that changed the
+     * draft on the server, as a look's starter content does (DEC-182).
+     * Absent, nothing offers such a write.
+     */
+    reloadDraft?: (pageId?: string) => void;
 }

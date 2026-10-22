@@ -107,7 +107,10 @@
 - **Current** — **Undo or confirm, never both, never neither.** Reversible:
   do it and offer Undo, no dialog. Irreversible: the one `ConfirmDialog`,
   which waits for the action and says a refusal inside itself. No way back
-  in the API, but not final yet: hold it (`useHold`).
+  in the API, but not final yet: hold it (`useHold`). The one allowed
+  exception (DEC-182, owner 22 Oct 2026): a look's starter content and a
+  roll back to a previous version confirm first, because the confirm is
+  where they say what they replace, and still offer Undo.
 
 ### A save that got no answer — **Current** (10 Oct 2026)
 

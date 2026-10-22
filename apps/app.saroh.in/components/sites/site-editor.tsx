@@ -10,6 +10,7 @@ import { EditorRail } from "@/components/sites/editor/editor-rail";
 import { EditorTopBar } from "@/components/sites/editor/editor-top-bar";
 import { InspectorHost } from "@/components/sites/editor/inspector-host";
 import type { SiteEditorProps } from "@/components/sites/editor/site-editor-props";
+import { starterContentActions } from "@/components/sites/editor/starter-content-actions";
 import { useAddBlock } from "@/components/sites/editor/use-add-block";
 import { useEditorDraft } from "@/components/sites/editor/use-editor-draft";
 import { useEditorJumps } from "@/components/sites/editor/use-editor-jumps";
@@ -35,7 +36,6 @@ import {
     TestReleaseSheets,
 } from "@/components/sites/test-releases/test-release-sheets";
 import { TestReleasesPanel } from "@/components/sites/test-releases/test-releases-panel";
-import { getPageSections } from "@/lib/sites/actions";
 import { flagsByScreenPosition } from "@/lib/sites/editor-positions";
 import { resolveStyleVariables } from "@/lib/sites/style";
 import { styleChoiceRules } from "@/lib/sites/style-access";
@@ -84,6 +84,7 @@ export function SiteEditor({
     publishNeedsApproval = false,
     canOverride = false,
     livePublishedAt = null,
+    reloadDraft,
 }: SiteEditorProps) {
     const review = useEditorReview({
         siteId,
@@ -239,6 +240,16 @@ export function SiteEditor({
         liveLook,
     );
     const homePage = pages.find((p) => p.isHome) ?? pages.at(0);
+    // A look's starter content (DEC-182): the editor starts afresh on it.
+    const starter = reloadDraft
+        ? starterContentActions({
+              siteId,
+              homePageId: homePage?.id ?? null,
+              unsaved,
+              settleUndo: () => edits.settleUndo(),
+              reloadDraft,
+          })
+        : null;
 
     return (
         // The workspace's theme (#335); the page on the canvas is bright.
@@ -301,25 +312,14 @@ export function SiteEditor({
                             templateId,
                             error: siteStyle.lookError,
                             onChoose: siteStyle.chooseLook,
-                            // Each look's Preview draws the home page: the
-                            // editor's own sections when it is open.
+                            // Each look's Preview draws its showcase
+                            // template, and offers its starter content to
+                            // whoever may change the site (DEC-182).
                             preview: {
-                                siteId,
-                                address: address ?? null,
                                 pages,
-                                chrome: canvasChromeFor({
-                                    siteName: chrome.displayName,
-                                    navigation,
-                                    pages,
-                                    footer: chrome.footer,
-                                    homeSections:
-                                        homePage?.id === pageId
-                                            ? sections
-                                            : undefined,
-                                }),
-                                homeSections:
-                                    homePage?.id === pageId ? sections : null,
-                                readPage: (id) => getPageSections(siteId, id),
+                                ...(canUpdateSite && starter
+                                    ? { starter }
+                                    : {}),
                             },
                         }}
                         styleRules={styleRules}

@@ -265,6 +265,7 @@ model Organization {
   // A site's QR codes and their daily scan counts.
   qrCodes              QrCode[]
   siteLinks            SiteLink[]
+  siteDraftSnapshots   SiteDraftSnapshot[]
   qrScanDays           QrScanDay[]
   // What customers reported about this business at saroh.in/customers.
   businessReports      BusinessReport[]
@@ -3749,6 +3750,8 @@ model Site {
   // The site's QR codes: short links at `/q/<code>` on its Saroh address.
   qrCodes          QrCode[]
   siteLinks        SiteLink[]
+  // What Undo puts back after starter content was copied in (DEC-182).
+  draftSnapshots   SiteDraftSnapshot[]
   // "Tell me when it's back" asked on this site (DEC-174 U23).
   stockWatches     StockWatch[]
 
@@ -4404,6 +4407,37 @@ model SiteLink {
   // One live link per label on a site; an archived one frees its label.
   @@unique([siteId, label], map: "SiteLink_siteId_label_live_key", where: raw("\"archivedAt\" IS NULL"))
   @@index([organizationId, siteId])
+}
+
+/// A site's draft as it was before "Use this look with its starter content"
+/// (DEC-182) replaced some of its pages: what Undo puts back. One row per
+/// copy; `undoneAt` is set when Undo has put it back, and a second Undo of
+/// the same copy is refused. The pages' own sections are in `before` (JSON:
+/// the style, the menu, each replaced page's draft sections and the pages
+/// the copy made), and `after` holds each page's draft revision just after
+/// the copy, so Undo is refused once anyone has saved over it.
+model SiteDraftSnapshot {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Why it was taken: "starter-content" is the only reason today.
+  reason     String
+  // The template copied in (`salon@1`) and the look chosen with it.
+  templateId String
+  look       String?
+
+  before Json
+  after  Json
+
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  undoneAt        DateTime?
+
+  @@index([organizationId, siteId, createdAt])
 }
 
 /// A QR code a business made for its site. The printed code holds a short

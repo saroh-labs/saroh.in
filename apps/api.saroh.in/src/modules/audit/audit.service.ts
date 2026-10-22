@@ -183,6 +183,21 @@ export const AuditAction = {
     SiteLinkCreated: "site-link.created",
     SiteLinkArchived: "site-link.archived",
     SiteLinkRestored: "site-link.restored",
+    // "Use this look with its starter content" (DEC-182): a look's showcase
+    // template copied into a site's draft, sample words and all, and that
+    // copy undone. Each in the write's own transaction with the site as the
+    // target. Metadata: the site, the template, the look and counts of the
+    // pages replaced and made (or restored and removed); never a line of
+    // the site's text.
+    SiteStarterContentCopied: "site.starter_content.copied",
+    SiteStarterContentUndone: "site.starter_content.undone",
+    // DEC-182 amended (22 Oct 2026): "Bring in my details" filling sample
+    // words with the business's own, a roll back to a previous version of
+    // the draft, and a section brought in from one. Metadata: the site, the
+    // snapshot, counts and kinds; never a line of the site's text.
+    SiteDetailsFilled: "site.starter_content.filled",
+    SiteDraftRolledBack: "site.draft.rolled_back",
+    SiteSectionBroughtIn: "site.draft.section_brought_in",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

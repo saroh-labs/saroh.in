@@ -55,6 +55,8 @@ const CLASS_LEVEL: Record<string, string> = {
     "sites/site-icon.controller.ts": "WEBSITE",
     // A site's QR codes (Settings › Share).
     "sites/qr-codes.controller.ts": "WEBSITE",
+    // A look's starter content copied into the draft, and its Undo (DEC-182).
+    "sites/starter-content.controller.ts": "WEBSITE",
     "forms/forms.controller.ts": "WEBSITE",
     "domains/domains.controller.ts": "WEBSITE",
     "content/posts.controller.ts": "WEBSITE",

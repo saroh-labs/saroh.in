@@ -31,7 +31,12 @@
 
 import type { PageKind } from "@saroh/database";
 import { BLOCK_META, exampleTextIn, resolveVariant } from "@saroh/database";
-import { isOwnerNote, templatePlaceholderInAny } from "@saroh/templates";
+import {
+    gallerySampleIn,
+    getTemplate,
+    isOwnerNote,
+    templatePlaceholderInAny,
+} from "@saroh/templates";
 
 import { trimTrailingSlashes } from "../../common/paths";
 import {
@@ -355,6 +360,34 @@ function checkSection(
                 null,
             );
         }
+    }
+
+    /*
+     * A showcase template's sample words (DEC-182): "Use this look with its
+     * starter content" copies a template's pages with the gallery's sample
+     * stylists, coaches, story, rates and hours. They are a sample
+     * business's, so every block still holding one is named, with the
+     * words, and none goes live unnoticed. Read from all the block's text
+     * a visitor reads (`gallerySampleIn` keeps to whole pieces of it).
+     */
+    const sample = gallerySampleIn(visitorText(c));
+    if (sample !== null) {
+        const label =
+            section.type in BLOCK_META
+                ? BLOCK_META[
+                      section.type as keyof typeof BLOCK_META
+                  ].label.toLowerCase()
+                : "block";
+        const from = getTemplate(sample.templateId)?.name ?? "starter";
+        const quoted =
+            sample.words.length > 60
+                ? `${sample.words.slice(0, 57).trimEnd()}…`
+                : sample.words;
+        at(
+            "placeholderText",
+            `This ${label} block still has sample words from the ${from} starter in it ("${quoted}"). Replace them with your own before going live.`,
+            null,
+        );
     }
 
     switch (section.type) {

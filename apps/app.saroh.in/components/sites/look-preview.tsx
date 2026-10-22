@@ -4,12 +4,14 @@ import type { LookId } from "@saroh/block-contract";
 import { LOOKS } from "@saroh/block-contract";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { Checkbox } from "@saroh/ui/checkbox";
 import {
     Dialog,
     DialogContent,
     DialogDescription,
     DialogTitle,
 } from "@saroh/ui/dialog";
+import { Label } from "@saroh/ui/label";
 import { Segmented } from "@saroh/ui/segmented";
 import {
     Sheet,
@@ -18,31 +20,32 @@ import {
     SheetTitle,
 } from "@saroh/ui/sheet";
 import type { ReactNode } from "react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useId, useState } from "react";
 
 import { DEVICE_WIDTH } from "@/components/sites/editor-constants";
 import { DeviceFrame } from "@/components/sites/editor/device-frame";
-import type { CanvasChrome } from "@/components/sites/editor/editor-canvas";
+import type { StarterContentActions } from "@/components/sites/editor/starter-content-actions";
+import { LookShowcase } from "@/components/sites/look-showcase";
 import { PaidRefusal } from "@/components/sites/paid-refusal";
-import { DraftPreview } from "@/components/sites/section-preview";
 import { useNarrow } from "@/lib/hooks/use-narrow";
-import type { Section, SitePage } from "@/lib/sites/service";
-import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
-import { inLook } from "@/lib/sites/style";
+import type { SitePage } from "@/lib/sites/service";
+import {
+    STARTER_FILL_HINT,
+    STARTER_FILL_LABEL,
+    STARTER_SAMPLE_NOTE,
+    starterConfirmText,
+    starterPlanFor,
+} from "@/lib/sites/starter-content";
 
-/** What a look's preview draws the business's home page from. */
+/** What a look's Preview needs from the editor beside the look. */
 export interface LookPreviewSource {
-    siteId: string;
-    address: string | null;
+    /** The site's pages, for what the starter content would replace. */
     pages: SitePage[];
-    chrome: CanvasChrome;
     /**
-     * The home page's sections as the editor holds them, when the home page
-     * is the one open (unsaved work included); null to read its draft.
+     * "Use this look with its starter content" (DEC-182); absent, only the
+     * look is offered.
      */
-    homeSections: Section[] | null;
-    /** Read a page's draft sections (`getPageSections`); null on a failure. */
-    readPage: (pageId: string) => Promise<Section[] | null>;
+    starter?: StarterContentActions;
 }
 
 type PreviewDevice = "desktop" | "phone";
@@ -51,25 +54,29 @@ const CLASSIC_SUITS =
     "The look Saroh sites have had so far, set by your choices below.";
 
 /**
- * A look before choosing it (DEC-177): the business's own home page drawn
- * in that look, in a large dialog on a desk and a full-height sheet on a
- * phone, with a desk and phone switch, the look's name and what it suits,
- * and "Use this look" and Close.
+ * A look before choosing it (DEC-177, DEC-182): the look's showcase
+ * template (`LookShowcase`: Quiet the Salon, Live the Gym, Folio the
+ * Studio, Classic the Bakery) drawn with its sample words and pictures, in
+ * a large dialog on a desk and a full-height sheet on a phone, with a desk
+ * and phone switch, the look's name and what it suits.
  *
- * Nothing saves and the draft doesn't change until "Use this look", which
- * follows the free and paid rule as the row does: on a plan without
+ * Two ways on. "Use this look" takes the look alone into the draft, as
+ * choosing it in the row does. "Use this look with its starter content"
+ * first says which pages it replaces and adds, and that the words are a
+ * sample business's, then copies the template's pages into the draft and
+ * sets the look (`starterContentActions`, with Undo).
+ *
+ * Both follow the free and paid rule as the row does: on a plan without
  * "Themes, fonts and templates" a paid look is refused here, in one line
- * with the way to plans, and the dialog stays open. The editor's canvas
- * behind it is untouched. The page is inert: a preview, not a visit, so no
- * link opens and no form sends. Escape, the backdrop and Close close it,
- * and the keyboard goes back to the look's Preview button.
+ * with the way to plans, and the dialog stays open. Nothing goes live
+ * until Publish. The page is inert: a picture, not a visit. Escape, the
+ * backdrop and Close close it, and the keyboard goes back to the look's
+ * Preview button.
  */
 export function LookPreview({
     look,
     open,
     source,
-    style,
-    options,
     chosen,
     paid,
     refused,
@@ -81,9 +88,6 @@ export function LookPreview({
     look: LookId | null;
     open: boolean;
     source: LookPreviewSource;
-    /** The draft's style; the look is drawn over it, never written to it. */
-    style: SiteStyle;
-    options: SiteStyleOptions;
     /** It is the draft's look already. */
     chosen: boolean;
     /** Marked "Paid plans". */
@@ -98,15 +102,15 @@ export function LookPreview({
 }) {
     const narrow = useNarrow();
     // Each opening is a new mount (the row keys it), so it starts on the
-    // screen's own size with nothing said.
+    // screen's own size, on the look, with nothing said.
     const [device, setDevice] = useState<PreviewDevice>(() =>
         narrow ? "phone" : "desktop",
     );
     const [said, setSaid] = useState(false);
+    const [confirming, setConfirming] = useState(false);
     const name = look ? LOOKS[look].name : "Classic";
     const suits = look ? LOOKS[look].suits : CLASSIC_SUITS;
-
-    const home = useHomeSections(open, source);
+    const starter = source.starter;
 
     function use() {
         if (refused) {
@@ -115,6 +119,14 @@ export function LookPreview({
         }
         onUse();
         onClose();
+    }
+
+    function startStarter() {
+        if (refused) {
+            setSaid(true);
+            return;
+        }
+        setConfirming(true);
     }
 
     const header = (title: ReactNode, description: ReactNode) => (
@@ -142,81 +154,68 @@ export function LookPreview({
         </div>
     );
 
-    const page =
-        home.state === "ready" ? (
-            <DraftPreview
-                siteId={source.siteId}
-                siteAddress={source.address}
-                sections={home.sections}
-                pages={source.pages}
-                page={source.pages.find((p) => p.isHome) ?? null}
-                style={inLook(style, look)}
-                styleOptions={options}
-                chrome={source.chrome}
-            />
-        ) : null;
-
+    const page = <LookShowcase look={look} />;
     const body = (
         <div className="min-h-0 flex-1 overflow-y-auto bg-muted p-3 sm:p-4">
-            {home.state === "loading" ? (
-                <p className="py-16 text-center text-sm text-muted-foreground">
-                    Drawing your home page…
-                </p>
-            ) : home.state === "failed" ? (
-                <div className="space-y-3 py-16 text-center text-sm">
-                    <p>Couldn&rsquo;t draw your home page.</p>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={home.retry}
-                    >
-                        Try again
-                    </Button>
-                </div>
-            ) : (
-                <div
-                    // A picture of the page, not a visit: nothing in it
-                    // can be pressed, focused or sent.
-                    inert
-                    data-look-preview={look ?? "classic"}
-                    className="mx-auto overflow-hidden rounded-md border bg-background shadow-sm"
-                    style={{ maxWidth: DEVICE_WIDTH[device] }}
-                >
-                    {device === "desktop" ? (
-                        page
-                    ) : (
-                        <DeviceFrame
-                            title={`Your home page in ${name}, at phone width`}
-                        >
-                            {page}
-                        </DeviceFrame>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-
-    const footer = (
-        <div className="space-y-2 border-t px-4 py-3">
-            {said ? <PaidRefusal name={name} /> : null}
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
-                {chosen ? (
-                    <p className="text-xs text-muted-foreground sm:mr-auto">
-                        Your draft is in {name}.
-                    </p>
-                ) : null}
-                <Button type="button" variant="outline" onClick={onClose}>
-                    Close
-                </Button>
-                {chosen ? null : (
-                    <Button type="button" onClick={use}>
-                        Use this look
-                    </Button>
+            <div
+                // A picture of the page, not a visit: nothing in it can be
+                // pressed, focused or sent.
+                inert
+                data-look-preview={look ?? "classic"}
+                className="mx-auto overflow-hidden rounded-md border bg-background shadow-sm"
+                style={{ maxWidth: DEVICE_WIDTH[device] }}
+            >
+                {device === "desktop" ? (
+                    page
+                ) : (
+                    <DeviceFrame title={`${name} at phone width`}>
+                        {page}
+                    </DeviceFrame>
                 )}
             </div>
         </div>
     );
+
+    const footer =
+        confirming && starter ? (
+            <StarterConfirm
+                look={look}
+                name={name}
+                pages={source.pages}
+                starter={starter}
+                onBack={() => setConfirming(false)}
+                onDone={onClose}
+            />
+        ) : (
+            <div className="space-y-2 border-t px-4 py-3">
+                {said ? <PaidRefusal name={name} /> : null}
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+                    {chosen ? (
+                        <p className="text-xs text-muted-foreground sm:mr-auto">
+                            Your draft is in {name}.
+                        </p>
+                    ) : null}
+                    <Button type="button" variant="outline" onClick={onClose}>
+                        Close
+                    </Button>
+                    {starter ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            data-look-starter-open=""
+                            onClick={startStarter}
+                        >
+                            Use this look with its starter content
+                        </Button>
+                    ) : null}
+                    {chosen ? null : (
+                        <Button type="button" onClick={use}>
+                            Use this look
+                        </Button>
+                    )}
+                </div>
+            </div>
+        );
 
     const backToOpener = (e: Event) => {
         const back = returnFocus();
@@ -268,53 +267,117 @@ export function LookPreview({
     );
 }
 
-type HomeRead =
-    | { state: "loading"; retry: () => void }
-    | { state: "failed"; retry: () => void }
-    | { state: "ready"; sections: Section[]; retry: () => void };
-
 /**
- * The home page's sections: the editor's own when it is the open page,
- * else its draft, read when the preview opens (and again on Try again).
+ * The starter content's confirm, in place of the Preview's footer (DEC-182):
+ * which pages are replaced and added, that the words are a sample
+ * business's, then the copy. "Fill in my details", on by default, puts the
+ * business's own in place of the samples as it copies (amended 22 Oct
+ * 2026); off, the samples stay for "Bring in my details" later. A refusal
+ * is said here and the dialog stays.
  */
-function useHomeSections(open: boolean, source: LookPreviewSource): HomeRead {
-    const home = source.pages.find((p) => p.isHome) ?? source.pages.at(0);
-    const [read, setRead] = useState<Section[] | "loading" | "failed">(
-        "loading",
-    );
-    const [attempt, setAttempt] = useState(0);
-    const given = source.homeSections;
+function StarterConfirm({
+    look,
+    name,
+    pages,
+    starter,
+    onBack,
+    onDone,
+}: {
+    look: LookId | null;
+    name: string;
+    pages: SitePage[];
+    starter: StarterContentActions;
+    onBack: () => void;
+    onDone: () => void;
+}) {
+    const [busy, setBusy] = useState(false);
+    const [fill, setFill] = useState(true);
+    const fillId = useId();
+    const [failure, setFailure] = useState<
+        { paid: true } | { paid: false; error: string } | null
+    >(null);
+    const plan = starterPlanFor(look, pages);
 
-    // The editor hands a new reader each render; the latest is used, and
-    // only opening, the page or Try again reads again.
-    const reader = useRef(source.readPage);
-    useLayoutEffect(() => {
-        reader.current = source.readPage;
-    });
-    const homeId = home?.id;
-
-    useEffect(() => {
-        if (!open || given || !homeId) return;
-        let live = true;
-        void reader.current(homeId).then(
-            (sections) => {
-                if (live) setRead(sections ?? "failed");
-            },
-            () => {
-                if (live) setRead("failed");
-            },
+    async function confirm() {
+        setBusy(true);
+        setFailure(null);
+        let outcome: Awaited<ReturnType<typeof starter.copy>>;
+        try {
+            outcome = await starter.copy(look, fill);
+        } finally {
+            setBusy(false);
+        }
+        if (outcome.ok) {
+            onDone();
+            return;
+        }
+        setFailure(
+            outcome.paid
+                ? { paid: true }
+                : { paid: false, error: outcome.error },
         );
-        return () => {
-            live = false;
-        };
-    }, [open, given, homeId, attempt]);
+    }
 
-    const retry = () => {
-        setRead("loading");
-        setAttempt((n) => n + 1);
-    };
-    if (given) return { state: "ready", sections: given, retry };
-    if (!home) return { state: "failed", retry };
-    if (read === "loading" || read === "failed") return { state: read, retry };
-    return { state: "ready", sections: read, retry };
+    return (
+        <div
+            className="space-y-2 border-t px-4 py-3"
+            data-look-starter-confirm=""
+        >
+            <p className="text-sm">{starterConfirmText(plan)}</p>
+            <p className="text-xs text-muted-foreground">
+                {STARTER_SAMPLE_NOTE}
+            </p>
+            <div className="flex items-start gap-2.5 coarse:min-h-11">
+                <Checkbox
+                    id={fillId}
+                    checked={fill}
+                    disabled={busy}
+                    onCheckedChange={(on) => setFill(on === true)}
+                    aria-describedby={`${fillId}-hint`}
+                    data-look-starter-fill=""
+                    className="mt-0.5"
+                />
+                <div className="space-y-0.5">
+                    <Label htmlFor={fillId}>{STARTER_FILL_LABEL}</Label>
+                    <p
+                        id={`${fillId}-hint`}
+                        className="text-xs text-muted-foreground"
+                    >
+                        {STARTER_FILL_HINT}
+                    </p>
+                </div>
+            </div>
+            {failure?.paid ? (
+                <PaidRefusal name={name} />
+            ) : failure ? (
+                <p role="alert" className="text-xs text-destructive">
+                    {failure.error}
+                </p>
+            ) : starter.blocked ? (
+                <p role="status" className="text-xs text-muted-foreground">
+                    {starter.blocked}
+                </p>
+            ) : null}
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+                <Button
+                    type="button"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={onBack}
+                >
+                    Back
+                </Button>
+                <Button
+                    type="button"
+                    onClick={() => void confirm()}
+                    disabled={starter.blocked !== null}
+                    busy={busy}
+                    busyLabel="Adding…"
+                    data-ph-unmask=""
+                >
+                    Use {name} and its starter content
+                </Button>
+            </div>
+        </div>
+    );
 }

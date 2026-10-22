@@ -10,6 +10,7 @@ import type { KeyboardEvent } from "react";
 import { useId, useRef, useState } from "react";
 
 import { ChoiceGroup } from "@/components/shared/choice-group";
+import { DraftTools } from "@/components/sites/draft-tools";
 import type { LookPreviewSource } from "@/components/sites/look-preview";
 import { LookPreview } from "@/components/sites/look-preview";
 import { LookThumbnail } from "@/components/sites/look-thumbnail";
@@ -105,8 +106,8 @@ export interface LookChoices {
     error: string | null;
     onChoose: (look: LookId | null) => void;
     /**
-     * What each look's Preview draws the home page from (DEC-177); absent
-     * draws no Preview buttons.
+     * Each look's Preview (DEC-177): its showcase template, and its starter
+     * content when offered (DEC-182). Absent draws no Preview buttons.
      */
     preview?: LookPreviewSource;
 }
@@ -304,14 +305,15 @@ export function LookPicker({
                     {status.text}
                 </p>
             ) : null}
+            {preview?.starter ? (
+                <DraftTools starter={preview.starter} lookName={lookName} />
+            ) : null}
             {preview ? (
                 <LookPreview
                     key={opened}
                     look={shownLook}
                     open={previewing !== null}
                     source={preview}
-                    style={style}
-                    options={options}
                     chosen={shownLook === draftLook}
                     paid={paid(shownLook)}
                     refused={

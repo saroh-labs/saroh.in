@@ -597,3 +597,30 @@ export class ScheduleGoLiveDto {
     @IsBoolean({ message: "override must be true or false" })
     override?: boolean;
 }
+
+/**
+ * "Use this look with its starter content" (DEC-182): the look, or
+ * `classic` for none, whose showcase template is copied into the draft.
+ */
+export class CopyStarterContentDto {
+    @IsIn(["quiet", "live", "folio", "classic"], {
+        message: "look must be quiet, live, folio or classic",
+    })
+    look!: "quiet" | "live" | "folio" | "classic";
+
+    /** "Fill in my details": the business's own in place of samples. */
+    @IsOptional()
+    @IsBoolean({ message: "fill must be true or false" })
+    fill?: boolean;
+}
+
+/** A section of a previous version, brought into the draft (DEC-182). */
+export class BringInSectionDto {
+    @IsString()
+    @MaxLength(64)
+    pageId!: string;
+
+    @IsString()
+    @MaxLength(64)
+    sectionKey!: string;
+}

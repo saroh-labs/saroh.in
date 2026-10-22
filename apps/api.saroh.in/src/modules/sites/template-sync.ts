@@ -408,7 +408,7 @@ export async function applySitePages(
  * with no menu, or a full one, is left alone: the owner adds the page in
  * Settings › Menu.
  */
-async function addToMenu(
+export async function addToMenu(
     tx: Tx,
     siteId: string,
     pageIds: readonly string[],

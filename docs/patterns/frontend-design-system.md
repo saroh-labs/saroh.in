@@ -74,12 +74,19 @@
   "Preview {look}" button beside the radio, never inside it (`ChoiceGroup`'s
   `layout`), a 44px target on a coarse pointer. It opens `LookPreview`: the
   shared Dialog, large, on a desk; the shared Sheet from the bottom, full
-  height, on a phone (`useNarrow`). Inside, the home page in that look
-  (the editor's own sections when home is open, else its draft read by
-  `getPageSections`), inert, with a Desk and Phone switch, the look's name
-  and `suits`, Close, and "Use this look", which follows the same rule.
-  Nothing saves and the draft and canvas don't change until then; closing
-  hands the keyboard back to the Preview button.
+  height, on a phone (`useNarrow`). Inside, the look's showcase template
+  drawn for its sample business with the gallery's sample words
+  (`LookShowcase`, DEC-182: `LOOK_SHOWCASE_TEMPLATE`, the gallery's own
+  `templateRender`), inert, with a Desk and Phone switch, the look's name
+  and `suits`, Close, "Use this look", and, for someone who may change the
+  site, "Use this look with its starter content". That one first says, in
+  the dialog's foot, which pages it replaces and adds and that the words
+  are a sample business's, waits while the editor has unsaved work, then
+  copies the template's pages into the draft (`starterContentActions`):
+  the editor starts afresh on it (`SiteEditorHost`) and a toast offers
+  Undo. Both follow the same paid rule. Nothing saves and the draft and
+  canvas don't change until one is pressed; closing hands the keyboard
+  back to the Preview button.
 - **Current** — **A section's frame and the page's column** (industry
   templates, polish pass). Every section may carry `anchor`, `navLabel` and
   `band` beside its own fields (`section-frame.ts` in `@saroh/block-contract`;

@@ -14,7 +14,8 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  * panel: the canvas draws Quiet at once, the draft saves it, publishing
  * puts it on the live site, and choosing Classic brings the site back,
  * the row saying it isn't published yet. Each look's Preview (DEC-177)
- * draws the home page in it and closes back to the look as it was.
+ * draws its showcase template (DEC-182) and closes back to the look as it
+ * was.
  *
  * @serial: it changes and publishes Northwind's site style.
  */
@@ -184,7 +185,7 @@ test.describe("the Look row", { tag: "@serial" }, () => {
             await open.click();
 
             // A large dialog on a desk, a full-height sheet on a phone:
-            // the home page in Folio, its name and what it suits.
+            // Folio's showcase template, its name and what it suits.
             const preview = page.getByRole("dialog", { name: "Folio" });
             await expect(preview).toBeVisible();
             await expect(

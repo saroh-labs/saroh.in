@@ -4,8 +4,9 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { StarterContentActions } from "@/components/sites/editor/starter-content-actions";
 import type { LookPreviewSource } from "@/components/sites/look-preview";
-import type { Section, SitePage } from "@/lib/sites/service";
+import type { SitePage } from "@/lib/sites/service";
 import type { SitePalette } from "@saroh/block-contract";
 import {
     PALETTE_ROLES,
@@ -26,7 +27,8 @@ import { StylePanel } from "./style-panel";
  * (DEC-177): a paid one says "Paid plans"; on a plan without "Themes,
  * fonts and templates" choosing it is refused in the panel, the previous
  * choice stays, and one line says why. Each look has a Preview that draws
- * the home page in it without changing the draft or saving anything.
+ * its showcase template with sample words (DEC-182) without changing the
+ * draft or saving anything, and offers its starter content, said first.
  */
 
 vi.mock("next/image", () => ({
@@ -45,7 +47,6 @@ vi.mock("@/lib/saroh-billing/plans-shown", () => ({
 // Nothing here may write a style: the actions are watched, never called.
 const actions = vi.hoisted(() => ({
     updateSiteStyle: vi.fn(),
-    getPageSections: vi.fn(),
 }));
 vi.mock("@/lib/sites/actions", () => actions);
 
@@ -129,12 +130,19 @@ const FREE: SiteStyleAccess["free"] = {
 const PAGES: SitePage[] = [
     { id: "p-home", path: "/", title: "Home", isHome: true, hidden: false },
 ];
-const HERO: Section = {
-    key: "s1",
-    type: "hero",
-    contractVersion: 1,
-    content: { heading: "Welcome to Kesar" },
-};
+
+/** A starter the dialog is handed: the editor's, watched. */
+function starter(over: Partial<StarterContentActions> = {}) {
+    return {
+        blocked: null,
+        copy: vi.fn().mockResolvedValue({ ok: true }),
+        fillDetails: vi.fn().mockResolvedValue(undefined),
+        listVersions: vi.fn().mockResolvedValue({ ok: true, versions: [] }),
+        rollback: vi.fn().mockResolvedValue({ ok: true }),
+        bringIn: vi.fn().mockResolvedValue({ ok: true }),
+        ...over,
+    } satisfies StarterContentActions;
+}
 
 let host: HTMLDivElement;
 let root: Root;
@@ -168,15 +176,7 @@ function render({
         templateId: "salon",
         error: null,
         onChoose,
-        preview: {
-            siteId: "site-1",
-            address: "kesar.saroh.app",
-            pages: PAGES,
-            chrome: { name: "Kesar Salon", navigation: [], footer: null },
-            homeSections: [HERO],
-            readPage: vi.fn(),
-            ...preview,
-        },
+        preview: { pages: PAGES, ...preview },
     };
     act(() =>
         root.render(
@@ -335,7 +335,7 @@ describe("Preview", () => {
         }
     });
 
-    it("draws the home page in the look, and closing leaves the draft as it was", async () => {
+    it("draws the look's showcase template with its sample words, and closing leaves the draft as it was", async () => {
         const { onChoose, onChange } = render();
         const open = button(host, "Preview Folio");
         act(() => open.focus());
@@ -347,7 +347,12 @@ describe("Preview", () => {
         const drawn = d.querySelector<HTMLElement>("[data-look-preview]");
         expect(drawn?.dataset.lookPreview).toBe("folio");
         expect(drawn?.hasAttribute("inert")).toBe(true);
-        expect(drawn?.textContent).toContain("Welcome to Kesar");
+        // Folio's showcase is the Studio template, for its sample business.
+        expect(
+            d.querySelector<HTMLElement>("[data-look-showcase]")?.dataset
+                .lookShowcase,
+        ).toBe("studio");
+        expect(drawn?.textContent).toContain("Studio Neue");
         // A paid look is shown on any plan, marked.
         expect(d.textContent).toContain("Paid plans");
 
@@ -396,36 +401,152 @@ describe("Preview", () => {
         expect(() => button(shown(), "Use this look")).toThrow();
     });
 
-    it("reads the home page's draft when another page is open", async () => {
-        const readPage = vi.fn().mockResolvedValue([HERO]);
-        render({ preview: { homeSections: null, readPage } });
+    it("offers no starter content where the editor gives none", () => {
+        render();
         press(button(host, "Preview Live"));
-        expect(shown().textContent).toContain("Drawing your home page");
+        expect(() =>
+            button(shown(), "Use this look with its starter content"),
+        ).toThrow();
+    });
+});
+
+describe("a look's starter content (DEC-182)", () => {
+    it("says what it replaces and adds, then copies it and closes", async () => {
+        const s = starter();
+        const { onChoose } = render({
+            paidIncluded: true,
+            preview: { starter: s },
+        });
+        press(button(host, "Preview Live"));
+        press(button(shown(), "Use this look with its starter content"));
+
+        const confirm = shown().querySelector("[data-look-starter-confirm]");
+        expect(confirm?.textContent).toContain(
+            "Your draft of Home is replaced with the Gym template's.",
+        );
+        expect(confirm?.textContent).toContain(
+            "Your other pages stay as they are.",
+        );
+        expect(confirm?.textContent).toContain("a sample business's");
+        expect(s.copy).not.toHaveBeenCalled();
+
         await act(async () => {
+            press(button(shown(), "Use Live and its starter content"));
             await Promise.resolve();
         });
-        expect(readPage).toHaveBeenCalledWith("p-home");
-        expect(
-            shown().querySelector("[data-look-preview]")?.textContent,
-        ).toContain("Welcome to Kesar");
+        // "Fill in my details" is on unless it is unticked.
+        expect(s.copy).toHaveBeenCalledWith("live", true);
+        // The server sets the look with the copy: the row's choice isn't used.
+        expect(onChoose).not.toHaveBeenCalled();
+        expect(dialog()).toBeNull();
     });
 
-    it("says when the home page can't be drawn, with Try again", async () => {
-        const readPage = vi
-            .fn()
-            .mockResolvedValueOnce(null)
-            .mockResolvedValueOnce([HERO]);
-        render({ preview: { homeSections: null, readPage } });
+    it("goes back to the look without copying anything", () => {
+        const s = starter();
+        render({ paidIncluded: true, preview: { starter: s } });
+        press(button(host, "Preview Quiet"));
+        press(button(shown(), "Use this look with its starter content"));
+        press(button(shown(), "Back"));
+        expect(shown().querySelector("[data-look-starter-confirm]")).toBeNull();
+        expect(() => button(shown(), "Use this look")).not.toThrow();
+        expect(s.copy).not.toHaveBeenCalled();
+    });
+
+    it("refuses a paid look's starter on this plan before the confirm", () => {
+        const s = starter();
+        render({ preview: { starter: s } });
+        press(button(host, "Preview Folio"));
+        press(button(shown(), "Use this look with its starter content"));
+        expect(shown().querySelector("[data-look-starter-confirm]")).toBeNull();
+        expect(refusals(shown())[0].textContent).toContain(
+            "Folio comes with a paid plan",
+        );
+        expect(s.copy).not.toHaveBeenCalled();
+    });
+
+    it("offers Classic's Bakery on any plan", async () => {
+        const s = starter();
+        render({ preview: { starter: s } });
+        press(button(host, "Preview Classic"));
+        press(button(shown(), "Use this look with its starter content"));
+        expect(shown().textContent).toContain("the Bakery template's");
+        await act(async () => {
+            press(button(shown(), "Use Classic and its starter content"));
+            await Promise.resolve();
+        });
+        expect(s.copy).toHaveBeenCalledWith(null, true);
+    });
+
+    it("copies the samples alone when Fill in my details is unticked", async () => {
+        const s = starter();
+        render({ paidIncluded: true, preview: { starter: s } });
         press(button(host, "Preview Live"));
+        press(button(shown(), "Use this look with its starter content"));
+        const fill = shown().querySelector<HTMLElement>(
+            "[data-look-starter-fill]",
+        );
+        expect(fill?.getAttribute("aria-checked")).toBe("true");
+        expect(shown().textContent).toContain("Fill in my details");
+        if (fill) press(fill);
+        expect(fill?.getAttribute("aria-checked")).toBe("false");
         await act(async () => {
+            press(button(shown(), "Use Live and its starter content"));
             await Promise.resolve();
         });
-        expect(shown().textContent).toContain("Couldn’t draw your home page.");
-        press(button(shown(), "Try again"));
+        expect(s.copy).toHaveBeenCalledWith("live", false);
+    });
+
+    it("waits while the editor has changes not saved yet", () => {
+        const s = starter({ blocked: "Your last changes aren't saved yet." });
+        render({ paidIncluded: true, preview: { starter: s } });
+        press(button(host, "Preview Live"));
+        press(button(shown(), "Use this look with its starter content"));
+        expect(shown().textContent).toContain(
+            "Your last changes aren't saved yet.",
+        );
+        expect(
+            button(shown(), "Use Live and its starter content").hasAttribute(
+                "disabled",
+            ),
+        ).toBe(true);
+    });
+
+    it("says a refusal inside the confirm and stays open", async () => {
+        const s = starter({
+            copy: vi.fn().mockResolvedValue({
+                ok: false,
+                error: "Couldn't copy the starter content.",
+            }),
+        });
+        render({ paidIncluded: true, preview: { starter: s } });
+        press(button(host, "Preview Live"));
+        press(button(shown(), "Use this look with its starter content"));
         await act(async () => {
+            press(button(shown(), "Use Live and its starter content"));
             await Promise.resolve();
         });
-        expect(readPage).toHaveBeenCalledTimes(2);
-        expect(shown().querySelector("[data-look-preview]")).not.toBeNull();
+        const alert = shown().querySelector('[role="alert"]');
+        expect(alert?.textContent).toBe("Couldn't copy the starter content.");
+        expect(dialog()).not.toBeNull();
+    });
+
+    it("says the plan's refusal from the server as the row says it", async () => {
+        const s = starter({
+            copy: vi.fn().mockResolvedValue({
+                ok: false,
+                error: "Refused",
+                paid: true,
+            }),
+        });
+        render({ paidIncluded: true, preview: { starter: s } });
+        press(button(host, "Preview Quiet"));
+        press(button(shown(), "Use this look with its starter content"));
+        await act(async () => {
+            press(button(shown(), "Use Quiet and its starter content"));
+            await Promise.resolve();
+        });
+        expect(refusals(shown())[0].textContent).toContain(
+            "Quiet comes with a paid plan",
+        );
     });
 });

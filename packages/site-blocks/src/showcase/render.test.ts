@@ -1,4 +1,3 @@
-import { openState } from "@saroh/site-blocks";
 import {
     CLINIC_GALLERY_SAMPLE,
     DEVELOPER_GALLERY_SAMPLE,
@@ -9,6 +8,7 @@ import {
     templatePlaceholderIn,
 } from "@saroh/templates";
 import { describe, expect, it } from "vitest";
+import { openState } from "../lib/opening-hours";
 
 import { briefImage, wrapBrief } from "./brief-image";
 import {

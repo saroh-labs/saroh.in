@@ -580,6 +580,9 @@ importers:
       '@saroh/site-blocks':
         specifier: workspace:*
         version: link:../../packages/site-blocks
+      '@saroh/templates':
+        specifier: workspace:*
+        version: link:../../packages/templates
       '@saroh/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -1518,6 +1521,9 @@ importers:
       '@saroh/block-contract':
         specifier: workspace:*
         version: link:../block-contract
+      '@saroh/templates':
+        specifier: workspace:*
+        version: link:../templates
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -1531,9 +1537,6 @@ importers:
       '@saroh/eslint-config':
         specifier: workspace:*
         version: link:../../tooling/eslint-config-custom
-      '@saroh/templates':
-        specifier: workspace:*
-        version: link:../templates
       '@saroh/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/tsconfig

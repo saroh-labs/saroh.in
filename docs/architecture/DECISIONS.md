@@ -2355,3 +2355,22 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **Sample words may now reach a merchant's draft**, only by that explicit choice. The check before publishing lists every sample word or sample price, hour or name still on a page, so none goes live unnoticed. `instantiateTemplate` still never adds them on its own.
 - Consequences:
     - `gallery-samples.test.ts`'s "none reach a merchant's site" holds for site creation only; the copy path is tested on its own, and the pre-publish check learns the sample words.
+- Amended 2026-10-22 (owner) — **the business's own details in place of the samples, and the previous site kept:**
+    - **Confirm and Undo, both.** The copy keeps its confirm step and its Undo, an allowed exception to "Undo or confirm, never both" (`frontend-error-feedback.md`): the confirm is the only place that says the words are a sample business's, and it replaces Home. The wording as built is approved.
+    - **One step by default.** The confirm has "Fill in my details", on by default: as the starter copies, sample words are replaced with what Saroh already knows (the staff in place of sample people, the registered address, the town under a place fact; the name, services, prices, hours and contact the template already lays down or reads live). Unticked, the samples go in alone.
+    - **Two steps always possible.** "Bring in my details" under the looks does the same fill at any time. It replaces only text that is still a sample's own words, never what the owner typed; what has nothing to fill it stays, and the pre-publish check still lists it. Its toast says what it filled, with Undo.
+    - **The previous site is kept.** Every starter copy, fill, roll back and section brought in keeps the draft as it was (`SiteDraftSnapshot`, kept as long as the site). "Previous versions" under the looks lists them, newest first. Roll back (its own confirm) puts a version's pages, look and menu back, whatever was saved since, and keeps the draft as it was first so the roll back has its own Undo; pages added since stay, off the menu. "Bring in a section" copies one section of a version to the end of its page (or Home, if that page is gone). Nothing goes live until Publish.
+    - Rules: `packages/templates/src/fill-details.ts`, `apps/api.saroh.in/src/modules/sites/starter-content.ts`, `apps/app.saroh.in/components/sites/draft-tools.tsx`.
+
+## DEC-183 Components folders get feature sub-folders, and a component's UI is kept apart from its business rules
+
+**Status: Accepted — 2026-10-22** · owner · from the `components/organizations/` refactor audit; amends the "Not adopted" hook → view → index note in `frontend-app-structure.md`
+
+- Context:
+    - `apps/app.saroh.in/components/organizations/` grew to 75 flat files across a dozen unrelated features, and `team-screen.tsx` (1,486 lines) and `roles-tab.tsx` (836) mix drawing with rules, so a visual change means editing logic.
+- Decision:
+    - **Feature sub-folders** once a domain folder holds more than three unrelated files, or more than about 25: `components/<domain>/<feature>/`, named after what the merchant sees, tests beside their file, no barrels, `./` inside a folder and `@/components/<domain>/<feature>/…` across.
+    - **UI apart from business logic.** `.tsx` only draws; rules and derivations are pure `.ts` functions with unit tests; state and actions are `use-*.ts` hooks. A UI change shouldn't touch business logic, and a rule change shouldn't touch the UI. New components follow it; existing ones move when next changed.
+- Consequences:
+    - `components/organizations/` is reorganised in steps (pure moves first, then splits and fixes), each verified on its own. Other domain folders that meet the trigger are moved when next worked on, not in a sweep.
+- Rules: `docs/patterns/frontend-app-structure.md` → Rules, "A domain folder that grows mixed or big gets feature sub-folders" and "The UI layer is separate from the business layer".

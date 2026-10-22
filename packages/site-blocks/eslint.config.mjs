@@ -51,8 +51,16 @@ export default [
      * test ships nothing to a merchant's page, so G1's reason does not reach
      * it. Everything else stays shut, `@saroh/ui` included.
      */
+    /*
+     * The showcase (`src/showcase`, `@saroh/site-blocks/showcase`, DEC-182)
+     * is not a block: it builds a gallery template's sample business for
+     * the gallery's renders and a look's Preview in the editor, from
+     * `@saroh/templates` (pure data, no brand). No block imports it, and a
+     * merchant's page never draws it, so G1's reason does not reach it
+     * either. `@saroh/ui` stays shut here too.
+     */
     {
-        files: ["src/**/*.test.tsx"],
+        files: ["src/**/*.test.tsx", "src/showcase/**/*.ts"],
         rules: {
             "no-restricted-imports": [
                 "error",
