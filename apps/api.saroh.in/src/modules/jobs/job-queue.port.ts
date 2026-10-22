@@ -33,6 +33,15 @@ export interface JobQueue {
     claimDue(workerId: string, limit: number): Promise<Job[]>;
 
     /**
+     * Restart a claimed job's lease (`lockedAt` = now), fenced on the lease
+     * like {@link complete}. The worker calls it just before running each job
+     * of a batch: one claim covers the batch, so a job waiting behind a long
+     * one can pass the visibility timeout and be reclaimed. `false` (nothing
+     * written) means another worker has it, and this one must not run it.
+     */
+    renew(id: string, workerId: string): Promise<boolean>;
+
+    /**
      * Mark a job DONE — but only while `workerId` still holds its lease.
      *
      * Returns `false`, writing nothing, when it does not. A handler that runs
@@ -168,6 +177,13 @@ export class FakeJobQueue implements JobQueue {
             j.lockedBy = workerId;
         }
         return Promise.resolve(claimed);
+    }
+
+    renew(id: string, workerId: string): Promise<boolean> {
+        const job = this.held(id, workerId);
+        if (!job) return Promise.resolve(false);
+        job.lockedAt = new Date();
+        return Promise.resolve(true);
     }
 
     complete(id: string, workerId: string): Promise<boolean> {

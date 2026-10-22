@@ -38,7 +38,10 @@
   and `deadLetter` update
   `WHERE id = … AND status = 'PROCESSING' AND lockedBy = <worker>` and report
   whether they won; a new write to a claimed `Job` carries the same condition.
-  Reclaim is anchored on `lockedAt` (the claim), never `createdAt`.
+  Reclaim is anchored on `lockedAt` (the claim), never `createdAt`. One claim
+  covers a batch of up to `JOB_WORKER_BATCH`, so the worker renews each
+  job's lease (`renew`, the same fence) just before running it, and skips
+  a job another worker reclaimed while an earlier one ran (22 Oct 2026).
 - **Current** (10 Oct 2026) — **Every inbox notice names what it opens.**
   A `Notification` is written with `noticeOf(type, target)`
   (`notifications/notice-target.ts`), which makes the target required for

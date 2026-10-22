@@ -5869,3 +5869,10 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** `billing.addons.sync` moves a row QUEUED → SENT only after `POST /subscriptions/:id/addons` answers. An UNKNOWN answer is rethrown and the row stays QUEUED, and Razorpay has no idempotency key for add-ons, so the retry made a second one.
 - **Fix:** `RazorpayBillingProvider.addToNextCharge` first reads the newest add-ons (`GET /addons`, as `findPlan` reads plans) for one on the same subscription whose description is `saroh_ref:<row id>`, and returns it without posting. The lookup decides, so no SENDING state was needed. `billing-provider.spec.ts` ("never adds an item twice").
 - **Rule:** `backend-jobs.md` › `billing.addons.sync`: a provider call with no idempotency key looks for its own reference before it creates.
+
+### A job could run twice when it waited behind a long one in the same batch (money review; 22 Oct 2026)
+
+- **Symptom:** found by reading: with two API containers (or two overlapping during a deploy), a job that sat late in a batch could be run by both, so a refund send, a charge or a notice could go out twice.
+- **Cause:** `claimDue` claims up to ten jobs under one `lockedAt`, and the worker runs them one by one. While the first ran past `JOB_VISIBILITY_MS` (5 min), the rest of the batch looked abandoned, and another worker reclaimed and ran them while this one still meant to.
+- **Fix:** before running each job the worker renews its lease (`JobQueue.renew`: `lockedAt = now` where it is still PROCESSING and `lockedBy` this worker) and skips it, with a WARN, when no row changes. `job-worker.service.spec.ts` ("skips a job of the batch whose lease another worker took"), `prisma-job-queue.db.spec.ts` ("renewing a claimed job's lease").
+- **Rule:** `backend-jobs.md` › Terminal writes are fenced on the lease: a claim that covers several jobs is renewed per job before it runs.

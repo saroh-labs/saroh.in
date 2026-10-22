@@ -84,6 +84,14 @@ export class PrismaJobQueue implements JobQueue {
         );
     }
 
+    async renew(id: string, workerId: string): Promise<boolean> {
+        // UTC in a timestamp without a zone, as the claim writes it.
+        const count = await prisma.$executeRaw`
+            UPDATE "Job" SET "lockedAt" = (now() AT TIME ZONE 'UTC')
+            WHERE id = ${id} AND status = 'PROCESSING' AND "lockedBy" = ${workerId}`;
+        return count === 1;
+    }
+
     async complete(id: string, workerId: string): Promise<boolean> {
         const { count } = await prisma.job.updateMany({
             where: { id, status: "PROCESSING", lockedBy: workerId },
