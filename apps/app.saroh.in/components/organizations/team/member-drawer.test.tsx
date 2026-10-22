@@ -97,7 +97,7 @@ const seeOrders = () =>
     ).find((s) =>
         s
             .closest("label, [data-switch-row], li, div")
-            ?.textContent?.includes("See orders"),
+            ?.textContent.includes("See orders"),
     );
 
 describe("the People drawer", () => {
