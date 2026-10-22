@@ -21,7 +21,7 @@ import { buildQrTargets } from "@/lib/qr/targets";
 import type { QrCodeView } from "@/lib/qr/types";
 import { TOO_LIGHT } from "@/lib/qr/words";
 
-import type { DownloadEnv } from "./qr-download";
+import type { DownloadEnv } from "@/components/qr/link-qr/qr-download";
 import { QrMaker } from "./qr-maker";
 import type { QrStyleLock } from "./qr-style-lock";
 import { QR_KEPT_LINE, QR_LOCKED_LINE } from "./qr-style-lock";

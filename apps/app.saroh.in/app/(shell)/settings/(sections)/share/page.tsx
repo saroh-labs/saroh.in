@@ -4,7 +4,7 @@ import { QrCode } from "lucide-react";
 import Link from "next/link";
 
 import { ModuleGate } from "@/components/modules/module-gate";
-import { QrShare } from "@/components/qr/qr-share";
+import { QrShare } from "@/components/qr/share/qr-share";
 import {
     SettingsPanel,
     SettingsPanelHeader,

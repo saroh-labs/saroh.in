@@ -10,7 +10,7 @@ import {
     refusedResult,
     reportFailure,
 } from "@/components/billing/plan-refusal";
-import { QrButton } from "@/components/qr/qr-button";
+import { QrButton } from "@/components/qr/link-qr/qr-button";
 import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { BusinessDate } from "@/components/shared/dates/business-zone";

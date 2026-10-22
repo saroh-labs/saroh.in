@@ -3,7 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { Copy } from "lucide-react";
 
-import { QrButton } from "@/components/qr/qr-button";
+import { QrButton } from "@/components/qr/link-qr/qr-button";
 import {
     addedLineOf,
     isExemptPaper,

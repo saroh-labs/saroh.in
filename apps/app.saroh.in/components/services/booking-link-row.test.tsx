@@ -38,7 +38,7 @@ vi.mock("next/link", () => ({
     ),
 }));
 // The QR button has tests of its own; here only whether it is offered.
-vi.mock("@/components/qr/qr-button", () => ({
+vi.mock("@/components/qr/link-qr/qr-button", () => ({
     QrButton: ({ link }: { link: { url: string; kind?: string } }) => (
         <button type="button" data-qr={link.kind} data-url={link.url}>
             QR code

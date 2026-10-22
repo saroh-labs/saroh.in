@@ -22,7 +22,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { QrButton } from "@/components/qr/qr-button";
+import { QrButton } from "@/components/qr/link-qr/qr-button";
 import { mayAddWebsite } from "@/lib/business-limits";
 import type { PostCategory } from "@/lib/content/service";
 import type { SiteStateTone } from "@/lib/sites/site-state";

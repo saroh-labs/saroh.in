@@ -13,10 +13,10 @@ import type { QrCodeView } from "@/lib/qr/types";
 import { opensWords, placeWords } from "@/lib/qr/words";
 import { NotPublishedNotice } from "@saroh/ui/data-state";
 
+import type { DownloadEnv } from "@/components/qr/link-qr/qr-download";
+import { QrMaker } from "@/components/qr/maker/qr-maker";
+import { QrPrintSlot } from "@/components/qr/maker/qr-print-slot";
 import { QrCodesList } from "./qr-codes-list";
-import type { DownloadEnv } from "./qr-download";
-import { QrMaker } from "./qr-maker";
-import { QrPrintSlot } from "./qr-print-slot";
 import { QrViewer } from "./qr-viewer";
 
 const HEADING = "font-display text-[19px] font-semibold tracking-[-0.02em]";

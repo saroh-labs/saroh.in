@@ -170,7 +170,7 @@ describe("a list draws the one toolbar", () => {
             {
                 "components/commerce/new-order/lines-step.tsx":
                     "New order's product picker, inside the sheet: it finds a product to add as a line",
-                "components/qr/qr-target-picker.tsx":
+                "components/qr/maker/qr-target-picker.tsx":
                     "the QR maker's picker for what a code points at, inside its panel",
                 "components/commerce/collections/products-picker.tsx":
                     "a picker inside a sheet: it searches the catalogue to add products, with its own results list",

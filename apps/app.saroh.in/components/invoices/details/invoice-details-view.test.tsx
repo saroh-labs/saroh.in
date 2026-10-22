@@ -49,7 +49,7 @@ vi.mock(
         }),
     }),
 );
-vi.mock("@/components/qr/qr-button", () => ({ QrButton: () => null }));
+vi.mock("@/components/qr/link-qr/qr-button", () => ({ QrButton: () => null }));
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh, push: vi.fn(), replace: vi.fn() }),

@@ -340,7 +340,7 @@ logo standing in until it has one, DEC-123) and a field another row owns
 joins the sheet that needs it (turning GST on asks for the registered
 address there). The same goes for a prompt on another screen: the QR
 maker's "Add your logo" opens the business logo's sheet in place
-(`components/qr/qr-add-logo.tsx`), never a link to Settings. Where a preview
+(`components/qr/maker/qr-add-logo.tsx`), never a link to Settings. Where a preview
 sits beside the rows it shows what is saved; the sheet draws the same
 preview under its fields, from the draft.
 

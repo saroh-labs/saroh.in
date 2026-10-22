@@ -3,7 +3,7 @@
 import { ShareLink as ShareButton } from "@saroh/ui/copy-button";
 import { cn } from "@saroh/ui/lib/utils";
 
-import { QrButton } from "@/components/qr/qr-button";
+import { QrButton } from "@/components/qr/link-qr/qr-button";
 import type { ShareKind, ShareLink } from "@/lib/sites/share-links";
 
 /** The saved code each shared page has, and how its button names it. */

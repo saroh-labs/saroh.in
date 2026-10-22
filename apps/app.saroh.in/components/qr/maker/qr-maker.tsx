@@ -6,9 +6,9 @@ import { swatchesWith } from "@/lib/qr/colours";
 import { targetAddress } from "@/lib/qr/targets";
 import { linkWords, placeWords } from "@/lib/qr/words";
 
+import { QrCodeCard } from "@/components/qr/share/qr-code-card";
 import { Notice } from "@saroh/ui/notice";
 import { TextLink } from "@saroh/ui/text-link";
-import { QrCodeCard } from "./qr-code-card";
 import { QrLookControls } from "./qr-look-controls";
 import { QrPrintSlot } from "./qr-print-slot";
 import { QrTargetPicker } from "./qr-target-picker";

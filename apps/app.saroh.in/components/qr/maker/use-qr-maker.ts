@@ -24,9 +24,17 @@ import type {
 import type { QrRefusalWords } from "@/lib/qr/words";
 import { defaultLabel, linkWords, refusalWords } from "@/lib/qr/words";
 
+import type {
+    DownloadEnv,
+    QrFormat,
+    QrLogoChoice,
+} from "@/components/qr/link-qr/qr-download";
+import {
+    BROWSER,
+    downloadQr,
+    qrFile,
+} from "@/components/qr/link-qr/qr-download";
 import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
-import type { DownloadEnv, QrFormat, QrLogoChoice } from "./qr-download";
-import { BROWSER, downloadQr, qrFile } from "./qr-download";
 import type { QrStyleLock } from "./qr-style-lock";
 import { qrStyleLockOfRefusal } from "./qr-style-lock";
 

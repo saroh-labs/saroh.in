@@ -76,7 +76,7 @@ const NOT_FORMS: Record<string, string> = {
     // it is changed, with Undo, so there is no Save or Cancel, only Done.
     "components/bookings/availability/hours-panel.tsx":
         "Hours and time off's frame: each control saves as it changes, Done closes",
-    "components/qr/qr-button.tsx": "a code to scan, download and copy",
+    "components/qr/link-qr/qr-button.tsx": "a code to scan, download and copy",
     // Navigation and pickers.
     "components/shared/shell/tab-bar-sheet.tsx": "the phone's menu",
     "components/insights/overview/period-control.tsx":

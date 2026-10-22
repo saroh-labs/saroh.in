@@ -134,7 +134,7 @@ components/shared/             app shell, navigation, command menu
   touches a `.tsx` one. Every new component follows it; an existing one moves
   to it when it is next changed, not in a sweep.
 - **Current** — **A QR beside a link is `QrButton`** (DEC-118,
-  `components/qr/qr-button.tsx`, its panel `qr-panel.tsx`), never a second
+  `components/qr/link-qr/qr-button.tsx`, its panel `qr-panel.tsx`), never a second
   drawing. A page that stays (the website, the shop, the booking page, a
   product) takes `mode: "saved"`: the panel finds the target's code or
   offers "Make this code" as a press of its own, so opening it never

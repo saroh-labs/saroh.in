@@ -15,7 +15,7 @@ import {
     suffixOf,
 } from "@/lib/organizations/web-address";
 
-import { QrButton } from "@/components/qr/qr-button";
+import { QrButton } from "@/components/qr/link-qr/qr-button";
 import { FailedRead } from "@/components/shared/states/failed-read";
 import { WebAddressDialog } from "./web-address-dialog";
 

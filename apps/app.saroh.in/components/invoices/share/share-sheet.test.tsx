@@ -54,7 +54,7 @@ vi.mock("@/components/gst-rates/use-gst-rate-step", () => ({
         step: null,
     }),
 }));
-vi.mock("@/components/qr/qr-button", () => ({ QrButton: () => null }));
+vi.mock("@/components/qr/link-qr/qr-button", () => ({ QrButton: () => null }));
 const router = { refresh: vi.fn(), push: vi.fn(), replace: vi.fn() };
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 const toast = {

@@ -7,7 +7,7 @@ import { useMemo } from "react";
 import type { QrPrintFormatView } from "@/lib/qr/print";
 import type { QrCodeView } from "@/lib/qr/types";
 
-import { artOf } from "./qr-download";
+import { artOf } from "@/components/qr/link-qr/qr-download";
 
 /** How wide each paper is drawn, in px: the tray is 150px tall. */
 const WIDTH: Record<QrPrintFormatView["format"], number> = {

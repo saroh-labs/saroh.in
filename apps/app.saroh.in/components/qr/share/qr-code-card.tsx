@@ -6,9 +6,9 @@ import { useMemo } from "react";
 import type { QrStyle } from "@/lib/qr/types";
 import { linkWords, TOO_LIGHT } from "@/lib/qr/words";
 
+import type { QrLogoChoice } from "@/components/qr/link-qr/qr-download";
+import { artOf } from "@/components/qr/link-qr/qr-download";
 import { Notice } from "@saroh/ui/notice";
-import type { QrLogoChoice } from "./qr-download";
-import { artOf } from "./qr-download";
 
 /** The design's line that keeps this code apart from the UPI QR (R5). */
 export const UPI_LINE =

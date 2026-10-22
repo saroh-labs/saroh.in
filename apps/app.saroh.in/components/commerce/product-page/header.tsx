@@ -5,7 +5,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { Camera, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
-import { QrButton } from "@/components/qr/qr-button";
+import { QrButton } from "@/components/qr/link-qr/qr-button";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { productEditHref, productHref } from "@/lib/products/links";

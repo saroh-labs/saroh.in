@@ -8,10 +8,18 @@ import { targetAddress } from "@/lib/qr/targets";
 import type { QrCodeView } from "@/lib/qr/types";
 import { opensWords } from "@/lib/qr/words";
 
+import type {
+    DownloadEnv,
+    QrFormat,
+    QrLogoChoice,
+} from "@/components/qr/link-qr/qr-download";
+import {
+    BROWSER,
+    downloadQr,
+    qrFile,
+} from "@/components/qr/link-qr/qr-download";
 import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
 import { QrCodeCard } from "./qr-code-card";
-import type { DownloadEnv, QrFormat, QrLogoChoice } from "./qr-download";
-import { BROWSER, downloadQr, qrFile } from "./qr-download";
 
 /**
  * One saved code, for someone who may look and not change (`site:read`
