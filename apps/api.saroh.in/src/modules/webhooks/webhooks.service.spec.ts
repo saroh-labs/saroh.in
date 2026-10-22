@@ -568,6 +568,14 @@ describe("WebhooksService stores, answers 200, then applies", () => {
             skipDuplicates: true,
         });
         expect(prisma.adminOrganizationNote.create).toHaveBeenCalled();
+        // The business's team is told too.
+        expect(jobCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "team.alert",
+                organizationId: "org_1",
+                payload: { event: "webhook", webhookEventId: "wh_1" },
+            }),
+        });
         orderUpdate.mockReset();
     });
 

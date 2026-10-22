@@ -171,7 +171,9 @@ a note saying so.
   unexpected error is left to the job's retries (about 16 hours, its own
   schedule in `RETRY_SCHEDULES`, `jobs/job-queue.port.ts`), and a 4xx
   refusal or the last try keeps the row FAILED for replay and raises
-  `merchant_webhook_failed` in Admin › Billing › Needs action. Only a row
+  `merchant_webhook_failed` in Admin › Billing › Needs action, and tells
+  the business's team on the Payment failed row
+  (`payment.event_unapplied`, `notifications/webhook-alerts.ts`). Only a row
   that could not be stored is a 5xx, because a provider switches off a
   webhook that keeps failing (`webhooks/webhooks.service.ts`).
 - **Current** — **Stored provider payloads are for verification and audit,**

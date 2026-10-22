@@ -418,6 +418,8 @@ describe("what each person sees of the inbox (F14)", () => {
                 "refund.failed",
                 "refund.failed.booking",
                 "refund.failed.invoice",
+                // A provider's event Saroh couldn't apply.
+                "payment.event_unapplied",
                 "site.live",
                 "site.not_live",
                 "site.review.approved",

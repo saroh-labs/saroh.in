@@ -383,6 +383,11 @@ export class WebhooksService {
                     note: `A ${name} ${event.eventType} event for this business could not be applied after its tries (${message.slice(0, 200)}). Its payment, refund or mandate may be out of step until it is replayed in Operations › Webhooks.`,
                     dedupeKey: `merchant_webhook_failed:${id}`,
                 });
+                // The team, so nobody acts on a record that is out of step.
+                await enqueueTeamAlert(tx, organizationId, {
+                    event: "webhook",
+                    webhookEventId: id,
+                });
             });
             return { status: "failed", changed: false };
         }
