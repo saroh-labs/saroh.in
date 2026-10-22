@@ -24,10 +24,14 @@ import {
 } from "@/lib/insights/sells-words";
 import { newOrderHref } from "@/lib/orders/links";
 
-import { AnswerCard, AnswerLink, AnswerText } from "./answer-card";
+import {
+    AnswerCard,
+    AnswerLink,
+    AnswerText,
+} from "@/components/insights/overview/answer-card";
+import { HowCounted } from "@/components/insights/overview/overview";
 import { BestCustomers } from "./best-customers";
 import { BusiestGrid } from "./busiest-grid";
-import { HowCounted } from "./overview";
 
 /**
  * Insights' What sells tab (DEC-171, plan U13, #1095; boards `IBSellsD`,

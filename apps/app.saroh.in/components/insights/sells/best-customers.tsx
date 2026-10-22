@@ -5,7 +5,11 @@ import type { SellsRead } from "@/lib/insights/reads";
 import { customersView } from "@/lib/insights/sells-words";
 import { initials } from "@/lib/names";
 
-import { AnswerCard, AnswerLink, AnswerText } from "./answer-card";
+import {
+    AnswerCard,
+    AnswerLink,
+    AnswerText,
+} from "@/components/insights/overview/answer-card";
 
 /**
  * "Who are my best customers?" (DEC-171, plan U13, #1095; `IBSellsD`,

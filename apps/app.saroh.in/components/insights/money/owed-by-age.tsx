@@ -19,7 +19,11 @@ import type { OwedAge } from "@/lib/insights/reads";
 import { remindWithLink } from "@/lib/invoices/link-actions";
 import { sendOutcome } from "@/lib/invoices/send";
 
-import { AnswerCard, AnswerLink, AnswerText } from "./answer-card";
+import {
+    AnswerCard,
+    AnswerLink,
+    AnswerText,
+} from "@/components/insights/overview/answer-card";
 
 /**
  * "Who owes me?" on the Money tab (DEC-171, plan U12, #1093; `IBMoneyD`,

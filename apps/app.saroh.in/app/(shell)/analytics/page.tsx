@@ -1,18 +1,18 @@
 import { PageHeader } from "@saroh/ui/page-header";
 import { forbidden } from "next/navigation";
 
-import { FromTab } from "@/components/insights/from-tab";
-import { InsightsTabs } from "@/components/insights/insights-tabs";
-import { MoneyTab } from "@/components/insights/money-tab";
-import { Overview } from "@/components/insights/overview";
-import type { PeriodChoice } from "@/components/insights/period-control";
+import { MoneyTab } from "@/components/insights/money/money-tab";
+import { InsightsTabs } from "@/components/insights/overview/insights-tabs";
+import { Overview } from "@/components/insights/overview/overview";
+import type { PeriodChoice } from "@/components/insights/overview/period-control";
 import {
     PeriodSegments,
     PeriodSheet,
-} from "@/components/insights/period-control";
-import { SellsTab } from "@/components/insights/sells-tab";
-import type { SiteOption } from "@/components/insights/site-picker";
-import { SuggestionCard } from "@/components/insights/suggestion-card";
+} from "@/components/insights/overview/period-control";
+import { SuggestionCard } from "@/components/insights/overview/suggestion-card";
+import { SellsTab } from "@/components/insights/sells/sells-tab";
+import { FromTab } from "@/components/insights/where-from/from-tab";
+import type { SiteOption } from "@/components/insights/where-from/site-picker";
 import { PageContainer } from "@/components/shared/page/page-container";
 import {
     readLinks,

@@ -694,7 +694,7 @@ organizations/:org/customers`: everyone who has paid (an order through a
   (DEC-181, #1099): `SiteLink` (site, name, label, made by, when,
   archived), made, listed and archived with Undo on Insights › Where
   customers come from under the sources ("Links made in Saroh",
-  `components/insights/site-links.tsx`). Make a link takes a name ("Name
+  `components/insights/where-from/site-links.tsx`). Make a link takes a name ("Name
   the post, not the person." under it), proposes the label from it, shows
   it editable with the whole link, and copies
   `https://<site's real address>/?ref=<label>` once made (the address is

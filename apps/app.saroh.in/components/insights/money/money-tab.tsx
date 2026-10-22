@@ -25,9 +25,13 @@ import { sourceLine } from "@/lib/insights/overview-words";
 import type { MoneyRead } from "@/lib/insights/reads";
 import { newOrderHref } from "@/lib/orders/links";
 
-import { AnswerCard, AnswerLink, AnswerText } from "./answer-card";
+import {
+    AnswerCard,
+    AnswerLink,
+    AnswerText,
+} from "@/components/insights/overview/answer-card";
+import { HowCounted } from "@/components/insights/overview/overview";
 import { MoneyChart } from "./money-chart";
-import { HowCounted } from "./overview";
 import { OwedByAge } from "./owed-by-age";
 
 /**

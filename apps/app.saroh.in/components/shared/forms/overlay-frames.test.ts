@@ -70,7 +70,7 @@ const NOT_FORMS: Record<string, string> = {
         "a read-only look at the paper",
     "components/invoices/details/invoice-details-sheet.tsx":
         "an invoice's details: each action opens its own frame over it",
-    "components/insights/week-sheet.tsx":
+    "components/insights/money/week-sheet.tsx":
         "a read-only quick look of a week's orders, opening the list",
     // Hours and time off's sheets (U17, DEC-170): what they hold saves as
     // it is changed, with Undo, so there is no Save or Cancel, only Done.
@@ -79,7 +79,7 @@ const NOT_FORMS: Record<string, string> = {
     "components/qr/qr-button.tsx": "a code to scan, download and copy",
     // Navigation and pickers.
     "components/shared/shell/tab-bar-sheet.tsx": "the phone's menu",
-    "components/insights/period-control.tsx":
+    "components/insights/overview/period-control.tsx":
         "a picker: choosing Insights' period goes there",
     "components/home/header/new-sheet.tsx":
         "Home's New on a phone: a menu of starts, each going to its flow",

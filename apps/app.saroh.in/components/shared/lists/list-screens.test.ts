@@ -111,9 +111,9 @@ describe("a list draws the one table", () => {
                     "kitchen tickets as they print on paper: a ruled table per ticket, not a list on a screen",
                 "components/commerce/product-page/orders-tab.tsx":
                     "a real <table> for its caption and column headers, drawn with listTable's band and rows",
-                "components/insights/sources-table.tsx":
+                "components/insights/where-from/sources-table.tsx":
                     "Insights' where visits came from: a real <table> so each count is read with its source and column, drawn with listTable's band and rows",
-                "components/insights/busiest-grid.tsx":
+                "components/insights/sells/busiest-grid.tsx":
                     "Insights' busiest grid as a table (Show as a table): a real <table> so each number is read with its day and time, drawn with listTable's band and rows",
             },
         );
@@ -239,7 +239,7 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
             "a person's sections: Overview, Orders, Bookings and the rest",
         "components/invoices/share/share-sheet.tsx":
             "Share's ways: WhatsApp, Email, Link and PDF, each its own panel (INVShareA)",
-        "components/insights/insights-tabs.tsx":
+        "components/insights/overview/insights-tabs.tsx":
             "Insights' answers: Overview, Money, What sells, Where customers come from",
         "components/leads/leads-tabs.tsx":
             "Leads and Follow-ups: the leads, and the tasks set on them",

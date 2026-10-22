@@ -13,7 +13,7 @@ import { PERIOD_LABEL } from "@/lib/insights/period";
 import type { SourcesRead } from "@/lib/insights/reads";
 import { countedFromLine } from "@/lib/insights/sources-words";
 
-import { HowCounted } from "./overview";
+import { HowCounted } from "@/components/insights/overview/overview";
 import type { LinkSite } from "./site-links";
 import { SiteLinks } from "./site-links";
 import type { SiteOption } from "./site-picker";

@@ -15,7 +15,10 @@ import {
     WEEKDAYS_SHORT,
 } from "@/lib/insights/sells-words";
 
-import { AnswerCard, AnswerText } from "./answer-card";
+import {
+    AnswerCard,
+    AnswerText,
+} from "@/components/insights/overview/answer-card";
 
 /**
  * "When is it busiest?" (DEC-171, plan U13, #1095; `IBSellsD`, `IBSellsP`):
