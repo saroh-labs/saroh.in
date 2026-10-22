@@ -354,7 +354,12 @@ function MakeLinkDialog({
                     ) : null}
                 </div>
             ) : null}
-            <Field label="Name" hint={NAME_HINT} error={nameError}>
+            <Field
+                label="Name"
+                hint={NAME_HINT}
+                holdsData={false}
+                error={nameError}
+            >
                 <Input
                     id={ids.name}
                     value={name}
@@ -366,6 +371,8 @@ function MakeLinkDialog({
             </Field>
             <Field
                 label="Label"
+                // The hint shows the business's own link: masked.
+                holdsData
                 hint={
                     url
                         ? `The link: ${url}`

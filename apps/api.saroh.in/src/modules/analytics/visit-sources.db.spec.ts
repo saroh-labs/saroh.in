@@ -147,8 +147,6 @@ beforeAll(async () => {
     forgetAllSiteLinkLabels();
 });
 
-afterAll(() => forgetAllSiteLinkLabels());
-
 /** Roll up every day this business's events fell on (a run may cross midnight). */
 async function rollUp(organizationId: string) {
     const days = new Set(
