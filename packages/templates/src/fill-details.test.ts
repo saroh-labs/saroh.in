@@ -8,7 +8,7 @@ import {
     STUDIO_GALLERY_SAMPLE,
 } from "./index";
 import { instantiateTemplate } from "./instantiate";
-import { lookShowcaseTemplate } from "./look-showcase";
+import { getTemplate } from "./registry";
 import { gallerySampleIn } from "./sample-words";
 
 const facts = {
@@ -20,9 +20,16 @@ const facts = {
     town: "Bengaluru",
 };
 
-/** A showcase template's pages as the starter copies them. */
+/**
+ * The templates these cases were written for (the Salon's stylists, the
+ * Gym's coaches, the Studio's contact and facts), as a starter copy lays
+ * them down with their sample words.
+ */
+const SAMPLE_TEMPLATES = { quiet: "salon", live: "gym", folio: "studio" };
+
 function starter(look: "quiet" | "live" | "folio" | null) {
-    const template = lookShowcaseTemplate(look);
+    const template = getTemplate(SAMPLE_TEMPLATES[look ?? "quiet"]);
+    if (!template) throw new Error(`No template for ${look}`);
     const made = instantiateTemplate(template, {
         organizationName: "Sample",
         contactEmail: "hello@example.com",

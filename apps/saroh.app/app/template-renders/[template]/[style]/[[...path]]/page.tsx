@@ -110,6 +110,7 @@ export default async function TemplateRenderPage({
                     packs={render.packs}
                     productGrids={render.productGrids}
                     fixtures={render.fixtures}
+                    frontDoor={render.frontDoor}
                     look={look}
                 />
             </SiteChromeFrame>

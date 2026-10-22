@@ -132,7 +132,8 @@ export const LOOKS: Readonly<Record<LookId, SiteLook>> = {
             displaySize: 64,
             bodySize: 17,
             measure: 64,
-            labelStyle: "eyebrow",
+            // No eyebrow label style: VA01 sets a section's small label
+            // (its `eyebrow`) over a large heading, never one for the other.
         },
         defaultVariants: {
             hero: "split",

@@ -100,7 +100,7 @@ function fillPerson(
     // Staff already on the block (a fill run before) aren't placed twice.
     const people = [
         content,
-        ...(Array.isArray(content.people) ? content.people : []),
+        ...(Array.isArray(content.people) ? (content.people as unknown[]) : []),
     ];
     const placed = new Set(
         people.map((p) => (p as Record<string, unknown> | null)?.name),

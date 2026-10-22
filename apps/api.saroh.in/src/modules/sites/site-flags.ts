@@ -35,6 +35,7 @@ import {
     gallerySampleIn,
     getTemplate,
     isOwnerNote,
+    SHOWCASE_ONLY_TEMPLATES,
     templatePlaceholderInAny,
 } from "@saroh/templates";
 
@@ -378,7 +379,11 @@ function checkSection(
                       section.type as keyof typeof BLOCK_META
                   ].label.toLowerCase()
                 : "block";
-        const from = getTemplate(sample.templateId)?.name ?? "starter";
+        const from =
+            (
+                SHOWCASE_ONLY_TEMPLATES[sample.templateId] ??
+                getTemplate(sample.templateId)
+            )?.name ?? "template";
         const quoted =
             sample.words.length > 60
                 ? `${sample.words.slice(0, 57).trimEnd()}…`

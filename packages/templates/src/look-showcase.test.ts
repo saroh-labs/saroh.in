@@ -8,12 +8,14 @@ import {
     LOOK_SHOWCASE_PALETTE,
     LOOK_SHOWCASE_TEMPLATE,
     lookShowcaseTemplate,
+    SHOWCASE_ONLY_TEMPLATES,
     starterCopyPlan,
     withLookShowcase,
 } from "./look-showcase";
 import type { TemplateContext, TemplateManifest } from "./manifest";
 import { listTemplates } from "./registry";
 import { gallerySampleIn } from "./sample-words";
+import { PRANA_GALLERY_SAMPLE, PRANA_LOOK_SECTIONS } from "./templates/prana";
 import { SALON_GALLERY_SAMPLE } from "./templates/salon";
 
 /** Every string inside a value, however deep. */
@@ -45,23 +47,30 @@ describe("LOOK_SHOWCASE_TEMPLATE (DEC-182)", () => {
             expect(Object.hasOwn(GALLERY_SAMPLES, id), `${look}: ${id}`).toBe(
                 true,
             );
-            expect(
-                (GALLERY_PATCHES[id] ?? []).length,
-                `${look}: ${id}`,
-            ).toBeGreaterThan(0);
+            // A showcase-only template lays its sample words itself.
+            if (!SHOWCASE_ONLY_TEMPLATES[id]) {
+                expect(
+                    (GALLERY_PATCHES[id] ?? []).length,
+                    `${look}: ${id}`,
+                ).toBeGreaterThan(0);
+            }
             expect(
                 lookShowcaseTemplate(look === "classic" ? null : look).id,
             ).toBe(id);
         }
     });
 
-    it("is the owner's mapping: Quiet Salon, Live Gym, Folio Studio, Classic Bakery", () => {
+    it("is the boards' studio for every look, and the Bakery for Classic", () => {
         expect(LOOK_SHOWCASE_TEMPLATE).toEqual({
-            quiet: "salon",
-            live: "gym",
-            folio: "studio",
+            quiet: "prana",
+            live: "prana",
+            folio: "prana",
             classic: "bakery",
         });
+    });
+
+    it("keeps Prana out of the registry, so no merchant picks it", () => {
+        expect(listTemplates().some((t) => t.id === "prana")).toBe(false);
     });
 });
 
@@ -87,7 +96,10 @@ describe("the starter content copy path (DEC-182)", () => {
                     strings(s.content).filter((t) => !made.has(t)),
                 ),
             );
-            expect(added.length).toBeGreaterThan(0);
+            // A showcase-only template is never made as a site: its pages
+            // are the sample's words already.
+            const onlyShowcase = Boolean(SHOWCASE_ONLY_TEMPLATES[id]);
+            if (!onlyShowcase) expect(added.length).toBeGreaterThan(0);
 
             // The pre-publish check's matcher names a block on the copy…
             const named = copied.pages.flatMap((p) =>
@@ -99,6 +111,7 @@ describe("the starter content copy path (DEC-182)", () => {
             expect(named.length).toBeGreaterThan(0);
             expect(named.every((f) => f.templateId === id)).toBe(true);
             // …and none on the site as made.
+            if (onlyShowcase) return;
             for (const p of built.pages) {
                 for (const s of p.sections) {
                     expect(
@@ -118,16 +131,17 @@ describe("the starter content copy path (DEC-182)", () => {
         expect(JSON.stringify(built)).toBe(before);
     });
 
-    it("puts the Salon's stylists on its home page", () => {
-        const template = lookShowcaseTemplate("quiet");
-        const copied = withGallerySamples(
-            template.id,
-            instantiateTemplate(template, business(template)),
-        );
-        const home = copied.pages.find((p) => p.isHome);
-        const text = strings(home?.sections.map((s) => s.content));
-        for (const stylist of SALON_GALLERY_SAMPLE.stylists) {
-            expect(text).toContain(stylist.name);
+    it("puts Prana's teachers on every look's home page", () => {
+        for (const look of LOOK_IDS) {
+            const template = lookShowcaseTemplate(look);
+            const home = withLookShowcase(
+                look,
+                instantiateTemplate(template, business(template)),
+            ).pages.find((p) => p.isHome);
+            const text = strings(home?.sections.map((s) => s.content));
+            for (const teacher of PRANA_GALLERY_SAMPLE.teachers.people) {
+                expect(text, look).toContain(teacher.name);
+            }
         }
     });
 });
@@ -230,24 +244,40 @@ describe("starterCopyPlan", () => {
     });
 });
 
-describe("withLookShowcase (DEC-172 amendment, 22 Oct)", () => {
-    const gym = lookShowcaseTemplate("live");
-    const made = instantiateTemplate(gym, {
-        organizationName: "Iron & Oak",
-        modules: ["WEBSITE", ...(gym.uses ?? [])],
-    });
+describe("withLookShowcase (DEC-182, amended 22 Oct)", () => {
+    const prana = lookShowcaseTemplate("live");
+    const made = instantiateTemplate(prana, business(prana));
 
-    it("gives Live's showcase home a visible hero, in sample words the check lists", () => {
+    it.each(LOOK_IDS)(
+        "%s's home is its board's sections, in the boards' order, with no variant but the team",
+        (look) => {
+            const home = withLookShowcase(look, made).pages.find(
+                (p) => p.isHome,
+            );
+            expect(home?.sections.map((s) => s.type)).toEqual(
+                PRANA_LOOK_SECTIONS[look],
+            );
+            for (const section of home?.sections ?? []) {
+                // The team is the one: a Person block is one person unless
+                // it says so.
+                if (section.type === "person") continue;
+                expect(
+                    (section.content as { variant?: unknown }).variant,
+                    `${look} ${section.type}`,
+                ).toBeUndefined();
+            }
+        },
+    );
+
+    it("words Live's hero as its board does, in sample words the check lists", () => {
         const home = withLookShowcase("live", made).pages.find((p) => p.isHome);
         const hero = home?.sections.find((s) => s.type === "hero");
         const content = hero?.content as Record<string, unknown>;
-        expect(content.variant).toBeUndefined();
-        expect(content.titleVisible).toBeUndefined();
+        expect(content.heading).toBe(PRANA_GALLERY_SAMPLE.live.heading);
         expect(gallerySampleIn([String(content.heading)])).not.toBeNull();
     });
 
-    it("leaves every other look's pages as they are", () => {
-        expect(withLookShowcase("quiet", made)).toBe(made);
+    it("leaves Classic's pages as they are", () => {
         expect(withLookShowcase(null, made)).toBe(made);
     });
 });

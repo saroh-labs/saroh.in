@@ -4,28 +4,39 @@ import type { InstantiatedTemplate } from "./instantiate";
 import type { TemplateManifest } from "./manifest";
 import { getTemplate } from "./registry";
 import { BAKERY_TEMPLATE_ID } from "./templates/bakery";
-import { GYM_GALLERY_SAMPLE, GYM_TEMPLATE_ID } from "./templates/gym";
-import { SALON_TEMPLATE_ID } from "./templates/salon";
-import { STUDIO_TEMPLATE_ID } from "./templates/studio";
+import {
+    PRANA_LOOK_SECTIONS,
+    PRANA_LOOK_WORDS,
+    PRANA_TEMPLATE_ID,
+    pranaShowcase,
+} from "./templates/prana";
 
 /** A choice in the editor's Look row: one of the looks, or Classic. */
 export type ShowcaseLook = LookId | "classic";
 
 /**
- * The template each look's Preview shows (DEC-182): the one that shows
- * best what the look and its sections can do, filled with its gallery
- * sample words and pictures. "Use this look with its starter content"
- * copies the same template's pages into the draft.
- *
- * Folio uses Studio until a Yoga or Classes template exists (Folio's own
- * industries, `TEMPLATE_LOOKS`). Every template named here has gallery
- * samples (`look-showcase.test.ts`).
+ * The template each look's Preview shows (DEC-182): the business its
+ * boards draw, Prana Yoga (VA01, VD01, VB01), for Quiet, Folio and Live
+ * (amended 22 Oct: the showcase is the board's page), and the Bakery for
+ * Classic. "Use this look with its starter content" copies the same pages
+ * into the draft. Every template named here has gallery samples
+ * (`look-showcase.test.ts`).
  */
 export const LOOK_SHOWCASE_TEMPLATE: Readonly<Record<ShowcaseLook, string>> = {
-    quiet: SALON_TEMPLATE_ID,
-    live: GYM_TEMPLATE_ID,
-    folio: STUDIO_TEMPLATE_ID,
+    quiet: PRANA_TEMPLATE_ID,
+    live: PRANA_TEMPLATE_ID,
+    folio: PRANA_TEMPLATE_ID,
     classic: BAKERY_TEMPLATE_ID,
+};
+
+/**
+ * Templates drawn only as a look's showcase: never in the registry, so no
+ * merchant picks one and the gallery never lists it.
+ */
+export const SHOWCASE_ONLY_TEMPLATES: Readonly<
+    Partial<Record<string, TemplateManifest>>
+> = {
+    [PRANA_TEMPLATE_ID]: pranaShowcase,
 };
 
 /**
@@ -96,38 +107,38 @@ export const LOOK_SHOWCASE_PALETTE: Readonly<Record<LookId, SitePalette>> = {
 
 /**
  * A showcase template's pages as its look's Preview draws them, and as
- * "Use this look with its starter content" copies them (DEC-182). Live's
- * board opens on a hero; the Gym's home hides its own, so Live's showcase
- * shows it with the Gym's sample words (`GYM_GALLERY_SAMPLE.liveHero`).
+ * "Use this look with its starter content" copies them (DEC-182): Prana's
+ * home keeps the look's own board's sections, in its words. Any other
+ * template's pages are given back as they are.
  */
 export function withLookShowcase(
     look: LookId | null | undefined,
     built: InstantiatedTemplate,
 ): InstantiatedTemplate {
-    if (look !== "live") return built;
+    if (!look || !built.pages.some((p) => p.isHome)) return built;
+    const keep = PRANA_LOOK_SECTIONS[look];
+    const words = PRANA_LOOK_WORDS[look];
     return {
         pages: built.pages.map((page) =>
             page.isHome
                 ? {
                       ...page,
-                      sections: page.sections.map((section) =>
-                          section.type === "hero"
-                              ? {
-                                    ...section,
-                                    content: {
-                                        heading:
-                                            GYM_GALLERY_SAMPLE.liveHero.heading,
-                                        subheading:
-                                            GYM_GALLERY_SAMPLE.liveHero
-                                                .subheading,
-                                        cta: {
-                                            label: "See the timetable",
-                                            href: "#timetable",
+                      sections: page.sections
+                          .filter((section) => keep.includes(section.type))
+                          .map((section) =>
+                              words[section.type]
+                                  ? {
+                                        ...section,
+                                        content: {
+                                            ...(section.content as Record<
+                                                string,
+                                                unknown
+                                            >),
+                                            ...words[section.type],
                                         },
-                                    },
-                                }
-                              : section,
-                      ),
+                                    }
+                                  : section,
+                          ),
                   }
                 : page,
         ),
@@ -139,7 +150,7 @@ export function lookShowcaseTemplate(
     look: LookId | null | undefined,
 ): TemplateManifest {
     const id = LOOK_SHOWCASE_TEMPLATE[look ?? "classic"];
-    const template = getTemplate(id);
+    const template = SHOWCASE_ONLY_TEMPLATES[id] ?? getTemplate(id);
     // The mapping names registered templates only (its test holds it).
     if (!template) throw new Error(`No showcase template "${id}"`);
     return template;

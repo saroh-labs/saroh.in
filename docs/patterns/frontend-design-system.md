@@ -89,8 +89,11 @@
   drawn for its sample business with the gallery's sample words
   (`LookShowcase`, DEC-182: `LOOK_SHOWCASE_TEMPLATE`, the gallery's own
   `templateRender`) in its board's colours (`LOOK_SHOWCASE_PALETTE`; the
-  template's Classic colourways are untouched) and pages
-  (`withLookShowcase`: Live's opens on a hero), inert, with a Desk and Phone switch, the look's name
+  template's Classic colourways are untouched) and pages: every look
+  previews Prana Yoga, the studio its home board draws (a showcase-only
+  manifest, `templates/prana.ts`), its board's sections in its board's
+  words (`withLookShowcase`, DEC-182 amended 22 Oct), the hero's next free
+  time from the sample's today, inert, with a Desk and Phone switch, the look's name
   and `suits`, Close, "Use this look", and, for someone who may change the
   site, "Use this look with its starter content". That one first says, in
   the dialog's foot, which pages it replaces and adds and that the words

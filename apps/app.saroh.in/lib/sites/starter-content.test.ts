@@ -35,44 +35,34 @@ const page = (
     ...extra,
 });
 
-/** The Gym template's own pages besides home, as the plan reads them. */
-const gymPages = () => {
-    const gym = lookShowcaseTemplate("live");
-    return instantiateTemplate(gym, sampleContext(gym)).pages.filter(
+/** Classic's showcase (the Bakery)'s pages besides home, as the plan reads them. */
+const bakeryPages = () => {
+    const bakery = lookShowcaseTemplate(null);
+    return instantiateTemplate(bakery, sampleContext(bakery)).pages.filter(
         (p) => !p.isHome,
     );
 };
 
 describe("starterPlanFor", () => {
     it("replaces the home page and adds the template's other pages", () => {
-        const plan = starterPlanFor("live", [page("h", "/", "Welcome")]);
-        expect(plan.templateName).toBe("Gym");
+        const plan = starterPlanFor(null, [page("h", "/", "Welcome")]);
+        expect(plan.templateName).toBe("Bakery");
         expect(plan.replace).toEqual(["Welcome"]);
-        expect(plan.create).toEqual(gymPages().map((p) => p.title));
+        expect(plan.create).toEqual(bakeryPages().map((p) => p.title));
+        // Free-form and module pages at a template page's address: the
+        // copy plan's own tests (`look-showcase.test.ts`).
     });
 
-    it("names each look's showcase template, Classic's the Bakery", () => {
+    it("names each look's showcase, the boards' Prana Yoga; Classic's the Bakery", () => {
         const home = [page("h", "/", "Home")];
-        expect(starterPlanFor("quiet", home).templateName).toBe("Salon");
-        expect(starterPlanFor("folio", home).templateName).toBe("Studio");
+        for (const look of ["quiet", "folio", "live"] as const) {
+            const plan = starterPlanFor(look, home);
+            expect(plan.templateName).toBe("Prana Yoga");
+            // Prana is one page: it replaces the home page's draft only.
+            expect(plan.replace).toEqual(["Home"]);
+            expect(plan.create).toEqual([]);
+        }
         expect(starterPlanFor(null, home).templateName).toBe("Bakery");
-    });
-
-    it("replaces a free-form page at a template page's address, never a module page", () => {
-        const [first] = gymPages();
-        const free = starterPlanFor("live", [
-            page("h", "/", "Home"),
-            page("f", first.path, "Ours"),
-        ]);
-        expect(free.replace).toEqual(["Home", "Ours"]);
-        expect(free.create).not.toContain(first.title);
-
-        const onModule = starterPlanFor("live", [
-            page("h", "/", "Home"),
-            page("m", first.path, "Book", { kind: "BOOK" }),
-        ]);
-        expect(onModule.replace).toEqual(["Home"]);
-        expect(onModule.create).not.toContain(first.title);
     });
 });
 

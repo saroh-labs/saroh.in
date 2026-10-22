@@ -415,7 +415,7 @@ function LiveTile({
     return (
         <div
             aria-hidden="true"
-            className="bg-site-bg text-site-fg min-[700px]:rounded-site-photo flex size-[76px] shrink-0 flex-col items-center justify-center rounded-[14px] p-2 min-[700px]:h-[200px] min-[700px]:w-auto min-[700px]:items-start min-[700px]:justify-between min-[700px]:p-[18px]"
+            className="bg-site-bg text-site-fg min-[700px]:rounded-site-photo flex size-[76px] min-w-0 shrink-0 flex-col items-center justify-center overflow-hidden rounded-[14px] p-2 min-[700px]:h-[200px] min-[700px]:w-auto min-[700px]:items-start min-[700px]:justify-between min-[700px]:p-[18px]"
         >
             <span className="bg-site-surface rounded-[9px] px-[9px] py-1 text-[12.5px] font-bold max-[699px]:hidden">
                 {duration}
@@ -424,7 +424,7 @@ function LiveTile({
                 {minutes}
             </span>
             <span className="text-[12.5px] min-[700px]:hidden">min</span>
-            <span className="font-site-heading line-clamp-2 text-[52px] font-extrabold leading-[0.9] tracking-[-0.03em] [font-stretch:80%] [overflow-wrap:anywhere] max-[699px]:hidden">
+            <span className="font-site-heading line-clamp-2 min-w-0 max-w-full text-[clamp(28px,2.3vw,52px)] font-extrabold leading-[0.9] tracking-[-0.03em] [font-stretch:80%] [overflow-wrap:break-word] max-[699px]:hidden">
                 {name.split(/\s+/)[0]}
             </span>
         </div>

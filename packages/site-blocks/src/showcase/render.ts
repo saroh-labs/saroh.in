@@ -13,6 +13,7 @@ import {
     LOOK_SHOWCASE_PALETTE,
     LOOK_SHOWCASE_TEMPLATE,
     presetSiteStyle,
+    SHOWCASE_ONLY_TEMPLATES,
     STARTER_TEMPLATE_ID,
     templateFooterLineFor,
     templateModulePageKinds,
@@ -21,6 +22,7 @@ import {
     withLookShowcase,
 } from "@saroh/templates";
 import type { JournalFeed } from "../blocks/journal";
+import type { FrontDoor } from "../blocks/look-front";
 import type { PacksFeed } from "../blocks/packs";
 import type { PlansFeed } from "../blocks/plans";
 import type { ProductGridFeed } from "../blocks/product-grid";
@@ -139,6 +141,11 @@ export interface TemplateRender {
     shopServes: boolean;
     footer: SiteFooterContent | null;
     sections: Section[];
+    /**
+     * The hero's way in under a look, as a live site's page passes it
+     * (`PageSections`): the booking page, for a business that books.
+     */
+    frontDoor: FrontDoor | null;
     journal?: JournalFeed;
     plans?: PlansFeed;
     packs?: PacksFeed;
@@ -226,7 +233,10 @@ function renderSample(templateId: string): RenderSample | null {
             briefsAsPhotos: false,
         };
     }
-    const template = galleryTemplates().find((t) => t.id === templateId);
+    // A gallery template, or a look's showcase-only one (Prana, DEC-182).
+    const template =
+        galleryTemplates().find((t) => t.id === templateId) ??
+        SHOWCASE_ONLY_TEMPLATES[templateId];
     if (!template) return null;
     return {
         template,
@@ -333,6 +343,8 @@ export function templateRender(
         shopServes: sells,
         footer: footerOf(template, fixture, context),
         sections,
+        frontDoor:
+            action?.href === "/book" ? { kind: "book", href: "/book" } : null,
         journal: fixture?.posts
             ? {
                   posts: fixture.posts.map(({ brief, ...post }) => ({

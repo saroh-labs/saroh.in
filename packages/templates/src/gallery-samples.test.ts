@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { GALLERY_SAMPLES } from "./gallery-samples";
 import { instantiateTemplate } from "./instantiate";
+import { SHOWCASE_ONLY_TEMPLATES } from "./look-showcase";
 import type { TemplateContext, TemplateManifest } from "./manifest";
 import { listTemplates } from "./registry";
 
@@ -77,8 +78,11 @@ describe("gallery samples (KTD-6)", () => {
         }
     });
 
-    it("names only gallery templates", () => {
-        const ids = gallery.map((t) => t.id).sort();
+    it("names only gallery templates, and the looks' showcase", () => {
+        const ids = [
+            ...gallery.map((t) => t.id),
+            ...Object.keys(SHOWCASE_ONLY_TEMPLATES),
+        ].sort();
         expect(Object.keys(GALLERY_SAMPLES).sort()).toEqual(ids);
     });
 

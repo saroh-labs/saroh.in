@@ -1526,7 +1526,7 @@ describe("a showcase template's sample words (DEC-182)", () => {
             expect(flag.type).toBe("placeholderText");
             expect(flag.pageId).toBe("page_1");
             expect(flag.sectionIndex).not.toBeNull();
-            expect(flag.message).toMatch(/from the Salon starter/);
+            expect(flag.message).toMatch(/from the Prana Yoga starter/);
         }
         const person = (home?.sections ?? []).findIndex(
             (s) => s.type === "person",

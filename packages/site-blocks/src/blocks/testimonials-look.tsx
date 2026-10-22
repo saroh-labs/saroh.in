@@ -41,7 +41,7 @@ export default function LookTestimonials({
     if (items.length === 0) return null;
     const heading = said(content.heading);
     const type = FRONT_TYPE[look];
-    const title = heading ? (
+    const title = (
         <>
             <LookEyebrow
                 content={content}
@@ -51,19 +51,21 @@ export default function LookTestimonials({
                     look === "quiet" && "min-[700px]:text-center",
                 )}
             />
-            <h2
-                data-site-title=""
-                className={cn(
-                    type.h2,
-                    "pb-6 min-[700px]:pb-10",
-                    look === "quiet" &&
-                        "min-[700px]:pb-14 min-[700px]:text-center",
-                )}
-            >
-                {heading}
-            </h2>
+            {heading ? (
+                <h2
+                    data-site-title=""
+                    className={cn(
+                        type.h2,
+                        "pb-6 min-[700px]:pb-10",
+                        look === "quiet" &&
+                            "min-[700px]:pb-14 min-[700px]:text-center",
+                    )}
+                >
+                    {heading}
+                </h2>
+            ) : null}
         </>
-    ) : null;
+    );
 
     return (
         <section

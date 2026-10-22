@@ -103,6 +103,8 @@ export default function HeroSection({
                 proof={proof}
                 siteId={siteId}
                 apiUrl={apiUrl}
+                today={today}
+                now={now}
             />
         );
     }

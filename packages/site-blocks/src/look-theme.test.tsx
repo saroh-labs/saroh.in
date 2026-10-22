@@ -235,12 +235,10 @@ describe("a look's type", () => {
         expect(lastValue(folio, "--site-content-width")).toBe("initial");
         // No column rule for a width the look does not set.
         expect(folio).not.toContain("max-width: var(--site-content-width)");
-        // Folio's section titles are eyebrows in the quiet colour, not the
-        // template's accent ones.
-        const label = block(folio, ":is([data-site-title]");
-        expect(label).toContain("color: hsl(var(--site-muted));");
-        expect(label).not.toContain("--site-accent");
-        // Quiet sets no label style: plain titles.
+        // No look sets a label style (VA01 draws a section's own small
+        // label over a large heading, DEC-172 22 Oct), and the template's
+        // is cleared: plain titles under Folio and Quiet alike.
+        expect(folio).not.toContain("letter-spacing: 0.14em;");
         expect(css("quiet")).not.toContain("letter-spacing: 0.14em;");
     });
 

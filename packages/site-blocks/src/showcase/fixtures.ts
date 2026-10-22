@@ -7,6 +7,7 @@ import {
     DEVELOPER_GALLERY_SAMPLE,
     DIETICIAN_GALLERY_SAMPLE,
     GYM_GALLERY_SAMPLE,
+    PRANA_GALLERY_SAMPLE,
     SALON_GALLERY_SAMPLE,
     STUDIO_GALLERY_SAMPLE,
 } from "@saroh/templates";
@@ -772,6 +773,186 @@ const clinic: TemplateFixture = {
 };
 
 /** By template id. A gallery template with no entry renders with none. */
+// ---------------------------------------------------------------------------
+// Prana Yoga — the looks' boards' studio (VA01, VD01, VB01; DEC-182)
+// ---------------------------------------------------------------------------
+
+/** The day after the render's day, for the boards' "today and tomorrow". */
+const NEXT_DAY = "2026-10-14";
+
+/** The boards' classes and services, in their order (VD01's list). */
+const PRANA_CLASSES: [
+    id: string,
+    name: string,
+    line: string,
+    minutes: number,
+    rupees: number,
+][] = [
+    [
+        "prana-hatha",
+        "Hatha yoga",
+        "Slow, held poses and long breaths. Good for a first class.",
+        60,
+        600,
+    ],
+    [
+        "prana-vinyasa",
+        "Vinyasa flow",
+        "Poses linked by breath, at a steady pace. You’ll be warm.",
+        60,
+        700,
+    ],
+    [
+        "prana-foundations",
+        "Foundations",
+        "The basic poses taken apart, with time for questions.",
+        75,
+        800,
+    ],
+    [
+        "prana-pranayama",
+        "Pranayama",
+        "Seated breathing practice. No mat work.",
+        45,
+        350,
+    ],
+    [
+        "prana-online",
+        "Live online",
+        "The 7 am Hatha class, streamed to your room.",
+        60,
+        400,
+    ],
+    [
+        "prana-private",
+        "Private session",
+        "One teacher, your body, your goals.",
+        60,
+        2500,
+    ],
+    [
+        "prana-intro",
+        "Free intro class",
+        "Meet the studio and a teacher before you buy anything.",
+        30,
+        0,
+    ],
+];
+
+/** One class on the boards' week: name, teacher, places left of 16. */
+function pranaSession(
+    date: string,
+    time: string,
+    id: string,
+    teacher: string,
+    placesLeft: number,
+): TimetableSession {
+    const [, name, , minutes, rupees] =
+        PRANA_CLASSES.find((c) => c[0] === id) ?? PRANA_CLASSES[0];
+    return {
+        serviceId: id,
+        serviceName: name,
+        durationMinutes: minutes,
+        startAt: istInstant(date, time),
+        date,
+        time,
+        staffName: teacher,
+        placesLeft,
+        capacity: 16,
+        priceCents: rupees * 100,
+        currency: "INR",
+    };
+}
+
+/** VD01 and VA01: weekdays 6 am to 8:30 pm, Saturday mornings. */
+const PRANA_HOURS = week({
+    MON: ["06:00", "20:30"],
+    TUE: ["06:00", "20:30"],
+    WED: ["06:00", "20:30"],
+    THU: ["06:00", "20:30"],
+    FRI: ["06:00", "20:30"],
+    SAT: ["07:00", "13:00"],
+});
+
+/** VB01's "Next free": today and tomorrow, the Foundations full. */
+const PRANA_WEEK: TimetableSession[] = [
+    pranaSession(FIXTURE_DAY, "18:00", "prana-vinyasa", "Kabir", 3),
+    pranaSession(FIXTURE_DAY, "19:30", "prana-online", "Ananya", 12),
+    pranaSession(NEXT_DAY, "06:00", "prana-pranayama", "Ananya", 9),
+    pranaSession(NEXT_DAY, "07:00", "prana-hatha", "Meera", 7),
+    pranaSession(NEXT_DAY, "18:00", "prana-foundations", "Meera", 0),
+];
+
+const prana: TemplateFixture = {
+    context: { serviceIds: PRANA_CLASSES.map(([id]) => id) },
+    services: PRANA_CLASSES.map(([id, name, description, minutes, rupees]) => ({
+        id,
+        name,
+        description,
+        durationMinutes: minutes,
+        priceCents: rupees * 100,
+        currency: "INR",
+    })),
+    // VD01's next free: "Vinyasa flow with Kabir · today 6 pm · 4 places left".
+    today: {
+        timezone: FIXTURE_TIME_ZONE,
+        date: FIXTURE_DAY,
+        appointments: true,
+        classes: true,
+        items: [
+            {
+                kind: "class",
+                serviceId: "prana-vinyasa",
+                serviceName: "Vinyasa flow",
+                durationMinutes: 60,
+                startAt: istInstant(FIXTURE_DAY, "18:00"),
+                date: FIXTURE_DAY,
+                time: "18:00",
+                staffName: "Kabir",
+                placesLeft: 4,
+            },
+        ],
+        hours: PRANA_HOURS,
+        closedDates: [],
+    },
+    timetable: {
+        timezone: FIXTURE_TIME_ZONE,
+        days: [FIXTURE_DAY, NEXT_DAY],
+        sessions: PRANA_WEEK,
+    },
+    plans: [
+        {
+            id: "prana-unlimited",
+            name: "Unlimited monthly",
+            description:
+                "Every class, studio and online. Pause for 2, 4 or 8 weeks when you travel.",
+            price: "4500.00",
+            currency: "INR",
+            interval: "MONTH",
+            mostChosen: false,
+        },
+    ],
+    packs: [
+        {
+            id: "prana-ten",
+            name: "10-class pack",
+            description: "₹550 a class. Use any class within 3 months.",
+            credits: 10,
+            validityDays: 90,
+            price: "5500.00",
+            currency: "INR",
+            kind: "CLASSES",
+            singlePrice: null,
+        },
+    ],
+    visit: {
+        address: PRANA_GALLERY_SAMPLE.address,
+        phone: null,
+        hours: PRANA_HOURS,
+    },
+    footer: PRANA_GALLERY_SAMPLE.footer,
+};
+
 export const TEMPLATE_FIXTURES: Readonly<
     Partial<Record<string, TemplateFixture>>
 > = {
@@ -784,6 +965,7 @@ export const TEMPLATE_FIXTURES: Readonly<
     developer,
     salon,
     clinic,
+    prana,
 };
 
 // ---------------------------------------------------------------------------

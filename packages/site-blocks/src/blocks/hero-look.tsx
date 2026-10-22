@@ -4,7 +4,9 @@ import type { ReactNode } from "react";
 
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
+import type { LiveToday } from "../live/next-free";
 import { HeroNextFree } from "../live/next-free";
+import type { LiveRead } from "../live/use-live-read";
 import { HeroHeading } from "./hero-heading";
 import type { HeroLevel } from "./hero-level";
 import type { FrontDoor, PageProof } from "./look-front";
@@ -16,6 +18,7 @@ import {
     LookEyebrow,
 } from "./look-front";
 import { OwnerPhotoNote } from "./no-photo";
+import type { PublicToday } from "./on-today";
 
 /**
  * The hero under a look (DEC-172, plan U6, #1094), as each look's fixed
@@ -85,6 +88,8 @@ export default function LookHero({
     proof = null,
     siteId,
     apiUrl,
+    today,
+    now,
 }: {
     content: RenderedHero;
     look: LookId;
@@ -97,6 +102,10 @@ export default function LookHero({
     siteId?: string | null;
     /** Base URL of the public API, for that read. */
     apiUrl?: string;
+    /** A sample's today (a template's render), drawn instead of the read. */
+    today?: PublicToday;
+    /** The render's pinned moment, for the sample's "checked" time. */
+    now?: Date;
 }) {
     const src = content.image?.src.trim() ? content.image : null;
     const second =
@@ -146,6 +155,18 @@ export default function LookHero({
                 look={look}
                 siteId={siteId}
                 apiUrl={apiUrl}
+                sample={
+                    !siteId && today
+                        ? {
+                              status: "fresh",
+                              data: {
+                                  ...today,
+                                  nextFree: today.items[0] ?? null,
+                              },
+                              fetchedAt: now?.getTime(),
+                          }
+                        : undefined
+                }
             />
         ) : null,
         proof: proof ? <ProofLine proof={proof} look={look} /> : null,
@@ -467,11 +488,14 @@ function FrontDoorSlot({
     look,
     siteId,
     apiUrl,
+    sample,
 }: {
     door: FrontDoor;
     look: LookId;
     siteId?: string | null;
     apiUrl?: string;
+    /** A sample's next free time, drawn as a fresh read (no site). */
+    sample?: LiveRead<LiveToday>;
 }) {
     const label = door.kind === "book" ? "See times" : "See the shop";
     const plain =
@@ -505,7 +529,7 @@ function FrontDoorSlot({
                 door.kind === "book" && DOOR_HEIGHT[look],
             )}
         >
-            {door.kind === "book" && siteId ? (
+            {door.kind === "book" && (siteId || sample) ? (
                 // Next free, read in the browser; "See times" until then
                 // and whenever it can't say (U8, #1042).
                 <HeroNextFree
@@ -514,6 +538,7 @@ function FrontDoorSlot({
                     apiUrl={apiUrl}
                     bookHref={door.href}
                     fallback={plain}
+                    read={sample}
                 />
             ) : (
                 plain

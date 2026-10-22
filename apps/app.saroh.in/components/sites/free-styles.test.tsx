@@ -347,12 +347,12 @@ describe("Preview", () => {
         const drawn = d.querySelector<HTMLElement>("[data-look-preview]");
         expect(drawn?.dataset.lookPreview).toBe("folio");
         expect(drawn?.hasAttribute("inert")).toBe(true);
-        // Folio's showcase is the Studio template, for its sample business.
+        // Folio's showcase is its board's studio, Prana Yoga (DEC-182).
         expect(
             d.querySelector<HTMLElement>("[data-look-showcase]")?.dataset
                 .lookShowcase,
-        ).toBe("studio");
-        expect(drawn?.textContent).toContain("Studio Neue");
+        ).toBe("prana");
+        expect(drawn?.textContent).toContain("Yoga at your pace.");
         // A paid look is shown on any plan, marked.
         expect(d.textContent).toContain("Paid plans");
 
@@ -422,7 +422,7 @@ describe("a look's starter content (DEC-182)", () => {
 
         const confirm = shown().querySelector("[data-look-starter-confirm]");
         expect(confirm?.textContent).toContain(
-            "Your draft of Home is replaced with the Gym template's.",
+            "Your draft of Home is replaced with the Prana Yoga template's.",
         );
         expect(confirm?.textContent).toContain(
             "Your other pages stay as they are.",

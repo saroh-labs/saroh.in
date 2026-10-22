@@ -246,6 +246,11 @@ export {
     clinicTemplate,
 } from "./templates/clinic";
 export {
+    PRANA_GALLERY_SAMPLE,
+    PRANA_TEMPLATE_ID,
+    pranaShowcase,
+} from "./templates/prana";
+export {
     SALON_GALLERY_SAMPLE,
     SALON_TEMPLATE_ID,
     salonServiceIds,
@@ -273,6 +278,7 @@ export type { BusinessFacts, FillResult, FilledKind } from "./fill-details";
 export {
     LOOK_SHOWCASE_PALETTE,
     LOOK_SHOWCASE_TEMPLATE,
+    SHOWCASE_ONLY_TEMPLATES,
     lookShowcaseTemplate,
     starterCopyPlan,
     withLookShowcase,

@@ -57,6 +57,7 @@ export function LookShowcase({ look: chosen }: { look: LookId | null }) {
                     packs={render.packs}
                     productGrids={render.productGrids}
                     fixtures={render.fixtures}
+                    frontDoor={render.frontDoor}
                     look={look}
                 />
                 <SiteFooter

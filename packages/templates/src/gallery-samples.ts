@@ -14,6 +14,7 @@ import {
     DIETICIAN_TEMPLATE_ID,
 } from "./templates/dietician";
 import { GYM_GALLERY_SAMPLE, GYM_TEMPLATE_ID } from "./templates/gym";
+import { PRANA_GALLERY_SAMPLE, PRANA_TEMPLATE_ID } from "./templates/prana";
 import { SALON_GALLERY_SAMPLE, SALON_TEMPLATE_ID } from "./templates/salon";
 import { STUDIO_GALLERY_SAMPLE, STUDIO_TEMPLATE_ID } from "./templates/studio";
 
@@ -46,4 +47,6 @@ export const GALLERY_SAMPLES: Readonly<
     [DEVELOPER_TEMPLATE_ID]: DEVELOPER_GALLERY_SAMPLE,
     [SALON_TEMPLATE_ID]: SALON_GALLERY_SAMPLE,
     [CLINIC_TEMPLATE_ID]: CLINIC_GALLERY_SAMPLE,
+    // Showcase only (DEC-182, 22 Oct): the looks' boards' studio.
+    [PRANA_TEMPLATE_ID]: PRANA_GALLERY_SAMPLE,
 };

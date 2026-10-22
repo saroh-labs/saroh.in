@@ -172,25 +172,42 @@ describe("templateRender", () => {
             const id = LOOK_SHOWCASE_TEMPLATE[look];
             const shown = templateRender(id, undefined, "/", look);
             const theirs = templateRender(id, undefined, "/");
-            expect(shown?.styleVariables["--site-surface"]).not.toEqual(
-                theirs?.styleVariables["--site-surface"],
+            expect(shown?.styleVariables["--site-bg"]).not.toEqual(
+                theirs?.styleVariables["--site-bg"],
             );
         },
     );
 
-    it("opens Live's showcase on a hero with the Gym's sample words", () => {
-        const render = templateRender(
+    it("draws each look's board's page: Prana's sections, in its words, with the way in", () => {
+        const types = (look: "quiet" | "folio" | "live") =>
+            templateRender(
+                LOOK_SHOWCASE_TEMPLATE[look],
+                undefined,
+                "/",
+                look,
+            )?.sections.map((s) => s.type);
+        expect(types("quiet")).toEqual([
+            "hero",
+            "richText",
+            "servicesList",
+            "person",
+            "testimonials",
+            "visitUs",
+        ]);
+        expect(types("live")?.slice(0, 2)).toEqual(["hero", "timetable"]);
+        const live = templateRender(
             LOOK_SHOWCASE_TEMPLATE.live,
             undefined,
             "/",
             "live",
         );
-        const hero = render?.sections.find((s) => s.type === "hero");
+        const hero = live?.sections.find((s) => s.type === "hero");
         expect(hero?.content).toMatchObject({
-            heading: "Strength, conditioning and boxing in Bandra West.",
+            heading: "Yoga in HSR Layout. Every day from 6 am.",
         });
         expect(hero?.content).not.toHaveProperty("variant");
-        expect(hero?.content).not.toHaveProperty("titleVisible");
+        expect(live?.frontDoor).toEqual({ kind: "book", href: "/book" });
+        expect(live?.name).toBe("Prana Yoga");
     });
 
     it("is null for what it cannot draw", () => {
@@ -658,7 +675,7 @@ describe("a look's Preview draws on its board's ground (DEC-172, 22 Oct)", () =>
             "/",
             look,
         );
-        const vars = render?.styleVariables as Record<string, string>;
+        const vars = render?.styleVariables ?? {};
         expect(vars["--site-bg"]).toBe(
             hexToHslTriple(LOOK_SHOWCASE_PALETTE[look].bg),
         );
