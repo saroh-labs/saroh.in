@@ -4,11 +4,11 @@ import type { HomeModel } from "@/lib/home/service";
 import { nextBookingSentence, tileViews } from "@/lib/home/tiles";
 import { goingCards, goingIntro, showsGoing } from "@/lib/home/week";
 
+import { NeedGroups } from "@/components/home/needs-you/need-groups";
+import { NeedsYou } from "@/components/home/needs-you/needs-you";
+import { TakeMoneyChecklist } from "@/components/home/setup/take-money-checklist";
 import type { HomeSetup } from "./home-setup";
 import { HowItsGoing } from "./how-its-going";
-import { NeedGroups } from "./need-groups";
-import { NeedsYou } from "./needs-you";
-import { TakeMoneyChecklist } from "./take-money-checklist";
 import { Today } from "./today";
 import { TodayTiles } from "./today-tiles";
 

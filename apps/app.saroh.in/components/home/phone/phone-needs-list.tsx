@@ -26,9 +26,9 @@ import type {
     HomeUnavailable,
 } from "@/lib/home/service";
 
-import { PhoneChequesLine } from "../cheques-line";
-import { GROUP_ICONS } from "../need-group";
-import { useInlineActions } from "../use-inline-actions";
+import { PhoneChequesLine } from "@/components/home/needs-you/cheques-line";
+import { GROUP_ICONS } from "@/components/home/needs-you/need-group";
+import { useInlineActions } from "@/components/home/needs-you/use-inline-actions";
 import { NeedSheet } from "./need-sheet";
 
 /**

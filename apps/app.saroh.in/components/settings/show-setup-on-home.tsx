@@ -5,7 +5,7 @@ import { TextLink } from "@saroh/ui/text-link";
 import {
     setSetupHidden,
     useSetupHidden,
-} from "@/components/home/use-setup-hidden";
+} from "@/components/home/setup/use-setup-hidden";
 
 /**
  * "Show setup on Home" (Home plan A4, U6): Hide for now on Home's "Finish

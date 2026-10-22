@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
     setSetupHidden,
     useSetupHidden,
-} from "@/components/home/use-setup-hidden";
+} from "@/components/home/setup/use-setup-hidden";
 import { readSetupHidden } from "@/lib/settings/ready";
 
 import { ShowSetupOnHome } from "./show-setup-on-home";

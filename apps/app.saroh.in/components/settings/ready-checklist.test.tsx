@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ReadyChecklist as Checklist } from "@/lib/settings/ready";
 
-import { TakeMoneyChecklist } from "../home/take-money-checklist";
+import { TakeMoneyChecklist } from "@/components/home/setup/take-money-checklist";
 import { ReadyChecklist } from "./ready-checklist";
 
 /**

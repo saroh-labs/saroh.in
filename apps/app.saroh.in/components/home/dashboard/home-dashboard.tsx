@@ -19,12 +19,12 @@ import type { ModuleView } from "@/lib/modules/schema";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 
 import { PlanLockedCard } from "@/components/billing/plan-way";
+import { PhoneHome } from "@/components/home/phone/phone-home";
+import { TakeMoneyChecklist } from "@/components/home/setup/take-money-checklist";
 import { WHO_CAN_CHANGE } from "@/components/shared/states/who-can-change";
 import { FirstRunJobs } from "./first-run-jobs";
 import { HomeDesk } from "./home-desk";
 import type { HomeSetup } from "./home-setup";
-import { PhoneHome } from "./phone/phone-home";
-import { TakeMoneyChecklist } from "./take-money-checklist";
 
 export type { HomeSetup } from "./home-setup";
 

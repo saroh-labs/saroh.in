@@ -3,9 +3,9 @@ import type { HomeModel } from "@/lib/home/service";
 import { storesOnly } from "@/lib/home/staff";
 import type { ModuleView } from "@/lib/modules/schema";
 
+import { HomeHeader } from "@/components/home/header/home-header";
+import { NewSpace } from "@/components/home/header/new-sheet";
 import { HomeDashboard } from "./home-dashboard";
-import { HomeHeader } from "./home-header";
-import { NewSpace } from "./new-sheet";
 
 /**
  * A staff member's Home, as the Home design draws it for Arjun, Sana and

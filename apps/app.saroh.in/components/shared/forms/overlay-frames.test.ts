@@ -81,7 +81,7 @@ const NOT_FORMS: Record<string, string> = {
     "components/shared/shell/tab-bar-sheet.tsx": "the phone's menu",
     "components/insights/period-control.tsx":
         "a picker: choosing Insights' period goes there",
-    "components/home/new-sheet.tsx":
+    "components/home/header/new-sheet.tsx":
         "Home's New on a phone: a menu of starts, each going to its flow",
     // The phone Home's sheets (U17, DEC-171): what is done inside is done
     // row by row with its own confirm, hold and Undo, so only Close.

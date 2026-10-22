@@ -21,7 +21,7 @@ import type {
 } from "@/lib/home/service";
 import type { ReadyChecklist } from "@/lib/settings/ready";
 
-import { HomeDashboard } from "../home-dashboard";
+import { HomeDashboard } from "@/components/home/dashboard/home-dashboard";
 import { PhoneHome } from "./phone-home";
 
 vi.mock("@/lib/api/http", () => ({}));

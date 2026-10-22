@@ -21,8 +21,8 @@ import type {
     ReminderSendResult,
 } from "@/lib/invoices/remind-all";
 
+import { PhoneNeeds } from "@/components/home/phone/phone-needs-list";
 import { NeedGroups } from "./need-groups";
-import { PhoneNeeds } from "./phone/phone-needs-list";
 
 const calls = vi.hoisted(() => ({
     previewReminders: vi.fn(),

@@ -138,10 +138,10 @@ export const RAW_ALLOWED = {
     // button: a control styled by its screen's own helper
     "components/customers/detail/overview.tsx": ["button"],
     // button: a row or card that is one button
-    "components/home/first-run-jobs.tsx": ["button"],
+    "components/home/dashboard/first-run-jobs.tsx": ["button"],
     // button: Home's + on a phone, the 56px square floating over the tab bar
     // that opens the New sheet (DEC-171); no Button size is that shape
-    "components/home/new-sheet.tsx": ["button"],
+    "components/home/header/new-sheet.tsx": ["button"],
     // button: the phone Home's Next line, a row that is one button (U17)
     "components/home/phone/phone-next-line.tsx": ["button"],
     // button: each Needs you group's line on a phone, a row that is one

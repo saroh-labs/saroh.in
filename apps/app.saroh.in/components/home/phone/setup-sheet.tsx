@@ -20,7 +20,10 @@ import { checklistWords, takeMoneyPlace } from "@/lib/settings/ready";
 import type { ChecklistRow } from "@/lib/setup-checklist";
 import { countRows, orderRows } from "@/lib/setup-checklist";
 
-import { setSetupHidden, useSetupHidden } from "../use-setup-hidden";
+import {
+    setSetupHidden,
+    useSetupHidden,
+} from "@/components/home/setup/use-setup-hidden";
 import { HomeSheet } from "./home-sheet";
 
 /** Said with Undo: on a phone, Settings is the way back (A4). */
