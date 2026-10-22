@@ -7,11 +7,10 @@ import { Refusal } from "@/components/shared/refusal";
 import { runAction } from "@/lib/api/run-action";
 import { createRole } from "@/lib/organizations/role-actions";
 import type { Role, RoleCatalogue } from "@/lib/organizations/roles";
-import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
 import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { RoleNameField } from "./role-name-field";
 import { ROLE_LABEL, ROLE_PLAIN } from "./role-words";
 
 /** The built-ins a new role may start from. Owner is not offered: see below. */
@@ -120,30 +119,14 @@ export function NewRoleSheet({
             onClose={close}
             onSubmit={create}
         >
-            <div className="grid gap-1.5">
-                <Label htmlFor="new-role-name">Name</Label>
-                <Input
-                    id="new-role-name"
-                    value={label}
-                    onChange={(e) => setLabel(e.target.value)}
-                    placeholder="Stock clerk"
-                    maxLength={40}
-                    disabled={pending}
-                    aria-invalid={nameless || undefined}
-                    aria-describedby={
-                        nameless ? "new-role-name-problem" : undefined
-                    }
-                />
-                {nameless ? (
-                    <p
-                        id="new-role-name-problem"
-                        role="alert"
-                        className="text-[12.5px] font-medium text-destructive-subtle-foreground"
-                    >
-                        A role needs a name.
-                    </p>
-                ) : null}
-            </div>
+            <RoleNameField
+                id="new-role-name"
+                value={label}
+                onChange={setLabel}
+                nameless={nameless}
+                disabled={pending}
+                placeholder="Stock clerk"
+            />
             <fieldset className="grid gap-2">
                 <legend className="mb-1.5 text-sm font-medium">
                     Start from

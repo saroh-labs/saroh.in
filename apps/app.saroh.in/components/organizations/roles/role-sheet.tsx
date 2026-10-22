@@ -5,12 +5,11 @@ import { Refusal } from "@/components/shared/refusal";
 import { runAction } from "@/lib/api/run-action";
 import { updateRole } from "@/lib/organizations/role-actions";
 import type { Role, RoleCatalogue } from "@/lib/organizations/roles";
-import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
 import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Permissions } from "./permissions";
+import { RoleNameField } from "./role-name-field";
 
 /**
  * Edit a role of the business's own: its name and its ticks, in the one
@@ -92,29 +91,13 @@ export function RoleSheet({
             onClose={onClose}
             onSubmit={save}
         >
-            <div className="grid gap-1.5">
-                <Label htmlFor={`role-name-${role.key}`}>Name</Label>
-                <Input
-                    id={`role-name-${role.key}`}
-                    value={label}
-                    onChange={(e) => setLabel(e.target.value)}
-                    maxLength={40}
-                    disabled={pending}
-                    aria-invalid={nameless || undefined}
-                    aria-describedby={
-                        nameless ? `role-name-${role.key}-problem` : undefined
-                    }
-                />
-                {nameless ? (
-                    <p
-                        id={`role-name-${role.key}-problem`}
-                        role="alert"
-                        className="text-[12.5px] font-medium text-destructive-subtle-foreground"
-                    >
-                        A role needs a name.
-                    </p>
-                ) : null}
-            </div>
+            <RoleNameField
+                id={`role-name-${role.key}`}
+                value={label}
+                onChange={setLabel}
+                nameless={nameless}
+                disabled={pending}
+            />
             <div>
                 <Permissions
                     idPrefix={`edit-perm-${role.key}`}
