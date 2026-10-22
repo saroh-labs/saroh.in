@@ -194,6 +194,21 @@ const INTENT = {
     currency: "INR",
 };
 
+/** A paid order as the pay-link rules read it: 42.50 taken of 42.50. */
+function paidOrder(over: Record<string, unknown> = {}) {
+    return {
+        paymentStatus: "PAID",
+        status: "CONFIRMED",
+        total: "42.50",
+        paidByHand: null,
+        placedOnline: false,
+        payOnHandover: false,
+        paymentIntents: [{ amountCents: 4250, refunds: [] }],
+        invoices: [],
+        ...over,
+    };
+}
+
 /** Sign the raw body exactly as the FakeWebhookProvider verifies it. */
 function sign(raw: Buffer, secret = SECRET): string {
     return createHmac("sha256", secret).update(raw).digest("hex");
@@ -961,7 +976,8 @@ describe("WebhooksService — the order's invoice (ADR-008)", () => {
         providerFindUnique.mockResolvedValue(providerRow());
         whCreate.mockResolvedValue({ id: "wh_3" });
         intentFindFirst.mockResolvedValue({ ...INTENT, id: "pi_2" });
-        orderFindUnique.mockResolvedValue({ paymentStatus: "PAID" });
+        // The edit raised the total past what was taken: money is due.
+        orderFindUnique.mockResolvedValue(paidOrder({ total: "92.50" }));
         const raw = bodyOf({ providerEventId: "evt_3" });
         await service.handle("razorpay", "org_1", raw, {
             "x-fake-signature": sign(raw),
@@ -1092,6 +1108,36 @@ describe("WebhooksService — a payment on a superseded edit charge (#508 U8)", 
             (invoiceSupersededPayment as jest.Mock).mock
                 .invocationCallOrder[0]!,
         );
+    });
+
+    it("a second tab's payment on an order paid in full is owed back, never counted", async () => {
+        // Tab A's intent paid the order; tab B's, made beside it, pays now.
+        intentFindFirst.mockResolvedValue({ ...INTENT, id: "pi_tab_b" });
+        orderFindUnique.mockResolvedValue(paidOrder());
+        attemptFindFirst.mockResolvedValue(null);
+
+        await expect(pay("evt_tab_b")).resolves.toEqual({
+            status: "processed",
+            changed: true,
+        });
+        expect(intentUpdate).toHaveBeenCalledWith({
+            where: { id: "pi_tab_b" },
+            data: { status: "SUPERSEDED" },
+        });
+        expect(intentUpdate).not.toHaveBeenCalledWith(
+            expect.objectContaining({ data: { status: "SUCCEEDED" } }),
+        );
+        expect(attemptCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                paymentIntentId: "pi_tab_b",
+                status: "CAPTURED_NEEDS_REFUND",
+            }),
+        });
+        expect(attemptCreate).not.toHaveBeenCalledWith({
+            data: expect.objectContaining({ status: "CAPTURED" }),
+        });
+        expect(settleSupplementary).not.toHaveBeenCalled();
+        expect(orderUpdate).not.toHaveBeenCalled();
     });
 
     it("reads the status under the intent's lock: superseded a moment ago is superseded", async () => {

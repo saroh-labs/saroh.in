@@ -37,7 +37,11 @@ import type { PaymentStatus } from "../orders/dto";
 import { leftToRefundCents } from "../orders/hand-payments";
 import { holdsOnPayment } from "../orders/online-checkout";
 import { finishCancelInTx } from "../orders/order-cancel";
-import { RETIRED_PAY_LINK } from "../orders/order-pay-link";
+import {
+    dueCentsOf,
+    PAY_LINK_ORDER_SELECT,
+    RETIRED_PAY_LINK,
+} from "../orders/order-pay-link";
 import { assertPaymentTransition } from "../orders/order-state";
 import { orderMoneyIntents } from "../orders/treatment-ledger";
 import {
@@ -814,6 +818,26 @@ export class WebhooksService {
                 );
             }
             return { applied: online.applied };
+        }
+
+        // A second capture on an order with nothing left to take (two tabs
+        // on the pay page, each with its own intent) is not the order's
+        // money: it is settled as a superseded charge, owed back, never
+        // counted. A balance or an edit's difference still has money due.
+        if (
+            intent.status !== "SUCCEEDED" &&
+            (await nothingLeftToTake(tx, orderId))
+        ) {
+            await tx.paymentIntent.update({
+                where: { id: intent.id },
+                data: { status: SUPERSEDED_INTENT },
+            });
+            return this.applySupersededSuccess(
+                tx,
+                { ...intent, status: SUPERSEDED_INTENT },
+                orderId,
+                event,
+            );
         }
 
         // Read before the move: money arriving on an order cancelled in the
@@ -1735,6 +1759,24 @@ function capturedOf(event: NormalizedWebhookEvent): CapturedAmount {
         amountCents: event.capturedAmountCents,
         currency: event.capturedCurrency,
     };
+}
+
+/**
+ * Whether a paid order has nothing left to take, read under the order's
+ * lock (after the intent's, as reserve.ts orders them) so two captures
+ * settling at once see each other.
+ */
+async function nothingLeftToTake(tx: Tx, orderId: string): Promise<boolean> {
+    await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
+    const order = await tx.order.findUnique({
+        where: { id: orderId },
+        select: PAY_LINK_ORDER_SELECT,
+    });
+    return (
+        order?.paymentStatus === "PAID" &&
+        order.status !== "CANCELLED" &&
+        dueCentsOf(order) <= 0
+    );
 }
 
 async function lockIntent(tx: Tx, intent: IntentRow): Promise<string> {

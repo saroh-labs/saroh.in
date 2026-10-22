@@ -7,7 +7,10 @@ import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
  * paid, and no longer asked for: the later edit's charge — or no charge, when
  * the order went back to what was paid — is what the order is owed. There is
  * no provider cancel, so a customer still on its checkout can pay it anyway;
- * the webhook then records that money as owed back, never as paid.
+ * the webhook then records that money as owed back, never as paid. A
+ * capture that arrives when the order has nothing left to take (two tabs on
+ * the pay page, each with its own intent) is marked SUPERSEDED by the
+ * webhook and owed back the same way.
  * `PaymentIntent.status` is a string, so this needs no migration.
  */
 export const SUPERSEDED_INTENT = "SUPERSEDED";

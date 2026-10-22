@@ -237,7 +237,10 @@ a note saying so.
 - **Current** — **Money that arrives for something already settled is kept,
   not lost.** A webhook success on a paid or void invoice marks the intent
   SUCCEEDED and records a `CAPTURED_NEEDS_REFUND` attempt, which Home raises
-  until a refund is recorded.
+  until a refund is recorded. A capture on a paid order with nothing
+  left to take (two tabs on its pay page) marks its intent SUPERSEDED and is
+  owed back as a superseded edit charge is, never counted
+  (`webhooks.service.ts` `nothingLeftToTake`).
 - **Current** — **Consent gates the send.** A revoked consent makes a message
   `SUPPRESSED`: no job, no delivery.
 - **Current** (D17) — **One transactional path.** A message about a
