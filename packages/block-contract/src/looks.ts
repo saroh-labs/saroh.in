@@ -77,8 +77,10 @@ export interface LookColour {
 export interface SiteLook {
     id: LookId;
     name: string;
-    /** One line on what it suits, for the picker (U16). */
+    /** What it is and what it suits, in full: the Preview dialog (U16). */
     suits: string;
+    /** A few words for the Look list's card, where `suits` is too long. */
+    short: string;
     tokens: LookTokens;
     fontPair: LookFontPair;
     type: SiteTypeScale;
@@ -106,6 +108,7 @@ export const LOOKS: Readonly<Record<LookId, SiteLook>> = {
     folio: {
         id: "folio",
         name: "Folio",
+        short: "Like a printed magazine",
         suits: "Like a printed magazine: a tinted page, square corners and a serif. Suits classes and yoga.",
         tokens: {
             radius: 0,
@@ -135,6 +138,7 @@ export const LOOKS: Readonly<Record<LookId, SiteLook>> = {
     quiet: {
         id: "quiet",
         name: "Quiet",
+        short: "Warm, airy, rounded",
         suits: "Warm white and airy, with rounded buttons and one question at a time. Suits salons, clinics, studios, bakeries, shops and makers.",
         tokens: {
             radius: 999,
@@ -159,6 +163,7 @@ export const LOOKS: Readonly<Record<LookId, SiteLook>> = {
     live: {
         id: "live",
         name: "Live",
+        short: "Bold, like an app",
         suits: "Like an app, with cards and what's on now. Suits gyms and classes that fill up.",
         tokens: {
             radius: 16,

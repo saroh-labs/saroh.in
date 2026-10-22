@@ -34,7 +34,7 @@ const buttonVariants = cva(
      * otherwise, and a pencil at 24 beside a 13px label reads as a mistake.
      * An icon that states its own size (`size-*`, `h-*`) keeps it.
      */
-    "inline-flex cursor-pointer items-center justify-center whitespace-nowrap rounded-md text-sm font-semibold [&_svg]:shrink-0 [&_svg:not([class*='size-']):not([class*='h-'])]:size-4 ring-offset-background transition-[color,background-color,border-color,text-decoration-color] duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:border-transparent disabled:bg-disabled disabled:text-disabled-foreground disabled:shadow-[inset_0_0_0_1px_hsl(var(--disabled-border))] aria-busy:cursor-progress",
+    "inline-flex cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-semibold [&_svg]:shrink-0 [&_svg:not([class*='size-']):not([class*='h-'])]:size-4 ring-offset-background transition-[color,background-color,border-color,text-decoration-color] duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:border-transparent disabled:bg-disabled disabled:text-disabled-foreground disabled:shadow-[inset_0_0_0_1px_hsl(var(--disabled-border))] aria-busy:cursor-progress",
     {
         variants: {
             variant: {

@@ -135,9 +135,14 @@ describe("the looks on offer", () => {
         renderPicker(classic);
         expect(choices()).toEqual(["classic", "quiet", "folio", "live"]);
         expect(choice("classic").getAttribute("aria-checked")).toBe("true");
-        // Each with one line on what it suits.
-        expect(choice("live").textContent).toContain("Suits gyms");
-        expect(choice("quiet").textContent).toContain("salons");
+        // Each with a few words; the full line is in its Preview.
+        expect(choice("live").textContent).toContain("Bold, like an app");
+        expect(choice("quiet").textContent).toContain("Warm, airy, rounded");
+        // The chosen one is ticked, not only outlined.
+        expect(
+            choice("classic").querySelector("svg.lucide-check"),
+        ).not.toBeNull();
+        expect(choice("quiet").querySelector("svg.lucide-check")).toBeNull();
     });
 
     it.each([

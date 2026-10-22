@@ -5,6 +5,7 @@ import { LOOKS, lookSuggestion } from "@saroh/block-contract";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { Check } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import { useId, useRef, useState } from "react";
 
@@ -27,6 +28,7 @@ const ORDER: readonly LookChoice[] = ["classic", "quiet", "folio", "live"];
 const CLASSIC = {
     name: "Classic",
     suits: "The look Saroh sites have had so far, set by your choices below.",
+    short: "Your own fonts and colours",
 };
 
 /** A look's name, Classic's for none. */
@@ -174,19 +176,14 @@ export function LookPicker({
                 onChange={(choice) =>
                     onChoose(choice === "classic" ? null : choice)
                 }
-                // Each look with its Preview beside it (DEC-177): a button
+                // Each look with its Preview under it (DEC-177): a button
                 // of its own, never inside the radio.
                 layout={
                     preview
                         ? (item) =>
                               choices.map((choice) => (
-                                  <div
-                                      key={choice}
-                                      className="flex items-stretch gap-1.5"
-                                  >
-                                      <div className="min-w-0 flex-1">
-                                          {item(choice)}
-                                      </div>
+                                  <div key={choice} className="space-y-0.5">
+                                      {item(choice)}
                                       <Button
                                           ref={(el) => {
                                               if (el) {
@@ -201,11 +198,11 @@ export function LookPicker({
                                               }
                                           }}
                                           type="button"
-                                          variant="outline"
+                                          variant="ghost"
                                           size="sm"
                                           data-look-preview-open={choice}
                                           aria-label={`Preview ${lookName(choice === "classic" ? null : choice)}`}
-                                          className="h-auto min-h-9 shrink-0 self-center px-2.5 coarse:min-h-11"
+                                          className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground coarse:min-h-11"
                                           // The row's arrows move the look;
                                           // on this button they do nothing.
                                           onKeyDown={stopArrows}
@@ -242,26 +239,36 @@ export function LookPicker({
                                     image={lookThumbnail(templateId, choice)}
                                 />
                                 <span className="min-w-0 flex-1 space-y-1">
-                                    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                        <span className="text-sm font-medium">
+                                    <span className="flex items-center gap-2">
+                                        <span className="min-w-0 flex-1 truncate text-sm font-medium">
                                             {name}
                                         </span>
-                                        {suggested ? (
-                                            <Badge variant="tag" size="sm">
-                                                {suggested}
-                                            </Badge>
-                                        ) : null}
-                                        {paid(look) ? (
-                                            <Badge variant="tag" size="sm">
-                                                Paid plans
-                                            </Badge>
+                                        {choice === (draftLook ?? "classic") ? (
+                                            <Check
+                                                aria-hidden
+                                                className="size-4 shrink-0"
+                                            />
                                         ) : null}
                                     </span>
                                     <span className="block text-xs leading-snug text-muted-foreground">
                                         {look
-                                            ? LOOKS[look].suits
-                                            : CLASSIC.suits}
+                                            ? LOOKS[look].short
+                                            : CLASSIC.short}
                                     </span>
+                                    {suggested || paid(look) ? (
+                                        <span className="flex flex-wrap gap-1">
+                                            {suggested ? (
+                                                <Badge variant="tag" size="sm">
+                                                    {suggested}
+                                                </Badge>
+                                            ) : null}
+                                            {paid(look) ? (
+                                                <Badge variant="tag" size="sm">
+                                                    Paid plans
+                                                </Badge>
+                                            ) : null}
+                                        </span>
+                                    ) : null}
                                 </span>
                             </>
                         ),
