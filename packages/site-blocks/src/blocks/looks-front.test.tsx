@@ -356,6 +356,31 @@ describe.each(LOOKS)("%s: the rest of the front door", (look) => {
         expect(section).not.toHaveTextContent("No photo yet");
     });
 
+    it("people: names and roles alone take the Home grid; with their lines, the About rows", () => {
+        const draw = (bio?: string) =>
+            render(
+                <PageSections
+                    sections={[
+                        {
+                            type: "person",
+                            content: { ...(team.content as object), bio },
+                        },
+                    ]}
+                    look={look}
+                />,
+            ).container.querySelector(`[data-site-look-team="${look}"] ul`);
+        const grid = must(draw());
+        const rows = must(draw("Taught Hatha for twelve years."));
+        if (look === "live") {
+            // Live has one layout: cards either way.
+            expect(rows.className).toBe(grid.className);
+        } else {
+            expect(rows.className).not.toBe(grid.className);
+            expect(rows.className).not.toContain("min-[700px]:grid-cols-3");
+            expect(grid.className).toContain("min-[700px]:grid-cols-3");
+        }
+    });
+
     it("people: a person's own photo is used when the owner set one", () => {
         const { container } = render(
             <PageSections

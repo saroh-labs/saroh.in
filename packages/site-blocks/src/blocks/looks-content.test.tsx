@@ -416,7 +416,9 @@ describe.each(LOOKS)("%s: the timetable", (look) => {
         expect(w).not.toHaveTextContent("9 places");
         const quiet = w.querySelectorAll('[data-timetable-places=""]');
         expect(quiet.length).toBeGreaterThan(0);
-        quiet.forEach((el) => expect(el.className).toContain("min-h-[20px]"));
+        // Live's tag row is 24 tall (VB09), the others' line 20.
+        const height = look === "live" ? "min-h-[24px]" : "min-h-[20px]";
+        quiet.forEach((el) => expect(el.className).toContain(height));
     });
 
     it("says 1 pack class for a class the signed-in customer's pack covers, asked once a class", async () => {

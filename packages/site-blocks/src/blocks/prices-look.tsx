@@ -98,10 +98,14 @@ export function priceColumn(look: LookId, highlighted: boolean): string {
         look === "folio" && "border-site-fg border-t pt-6",
         look === "quiet" &&
             "border-site-border border-t pt-6 min-[700px]:text-center",
+        // VB10: white cards; the highlighted plan an ink card, its words
+        // turned to the ink's own text colour.
         look === "live" &&
             cn(
-                "bg-site-surface rounded-site-photo p-5",
-                highlighted && "ring-site-accent ring-2",
+                "rounded-site-photo p-6",
+                highlighted
+                    ? "bg-site-cta-bg [--site-body:var(--site-cta-fg)] [--site-border:var(--site-cta-fg)] [--site-fg:var(--site-cta-fg)] [--site-muted:var(--site-cta-fg)]"
+                    : "bg-site-surface",
             ),
     );
 }
@@ -134,6 +138,29 @@ export function PriceParts({
     const type = FRONT_TYPE[look];
     const shown = rules.filter((r): r is string => Boolean(r));
     const said = lines.filter((l): l is string => Boolean(l));
+    const title = (
+        <h3 className={cn(type.name, "[overflow-wrap:anywhere]")}>{name}</h3>
+    );
+    const amount = price ? (
+        <p
+            className={cn(
+                "font-site-heading text-site-fg tabular-nums leading-none [font-variant-numeric:lining-nums]",
+                look === "live"
+                    ? "text-[56px] font-extrabold tracking-[-0.03em] [font-stretch:80%] min-[700px]:text-[64px]"
+                    : "text-[40px] font-light tracking-[-0.02em] min-[700px]:text-[52px]",
+            )}
+        >
+            {price}
+            {gst ? (
+                <span
+                    data-price-gst=""
+                    className="text-site-muted font-site-body mt-2 block text-[13px] font-normal tracking-normal [font-stretch:100%]"
+                >
+                    {gst}
+                </span>
+            ) : null}
+        </p>
+    ) : null;
     return (
         <>
             <span
@@ -146,34 +173,21 @@ export function PriceParts({
                     <span className={type.eyebrow}>{eyebrow}</span>
                 ) : null}
                 {badge ? (
-                    <span className="bg-site-accent-soft text-site-fg rounded-site-s px-2 py-0.5 text-[12px] font-semibold">
+                    <span
+                        className={
+                            look === "live"
+                                ? // VB10's tag: the accent, 9px corners.
+                                  "bg-site-accent text-site-accent-fg rounded-[9px] px-[9px] py-1 text-[12.5px] font-bold"
+                                : "bg-site-accent-soft text-site-fg rounded-site-s px-2 py-0.5 text-[12px] font-semibold"
+                        }
+                    >
                         {badge}
                     </span>
                 ) : null}
             </span>
-            <h3 className={cn(type.name, "[overflow-wrap:anywhere]")}>
-                {name}
-            </h3>
-            {price ? (
-                <p
-                    className={cn(
-                        "font-site-heading text-site-fg text-[40px] tabular-nums leading-none [font-variant-numeric:lining-nums] min-[700px]:text-[52px]",
-                        look === "live"
-                            ? "font-extrabold tracking-[-0.03em] [font-stretch:80%]"
-                            : "font-light tracking-[-0.02em]",
-                    )}
-                >
-                    {price}
-                    {gst ? (
-                        <span
-                            data-price-gst=""
-                            className="text-site-muted font-site-body mt-2 block text-[13px] font-normal tracking-normal"
-                        >
-                            {gst}
-                        </span>
-                    ) : null}
-                </p>
-            ) : null}
+            {/* VB10 leads with the number, then the plan's name. */}
+            {look === "live" ? amount : title}
+            {look === "live" ? title : amount}
             {said.map((line, i) => (
                 <p
                     key={i}
@@ -204,6 +218,8 @@ export function PriceParts({
                         "pt-2",
                         look === "quiet" &&
                             "min-[700px]:flex min-[700px]:justify-center",
+                        // VB10: the button full width, 48 tall.
+                        look === "live" && "[&>*]:min-h-12 [&>*]:w-full",
                     )}
                 >
                     {action}
