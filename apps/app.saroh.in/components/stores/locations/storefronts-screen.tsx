@@ -33,19 +33,19 @@ import type {
 } from "@/lib/stores/storefronts";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
+import { FulfilmentSection } from "@/components/stores/delivery/fulfilment-section";
+import { PaymentsSection } from "@/components/stores/payments/payments-section";
+import { PlaceSection } from "@/components/stores/place/place-section";
+import { usePlaceSheets } from "@/components/stores/place/use-place-sheets";
 import { runAction } from "@/lib/api/run-action";
 import { TabStrip } from "@saroh/ui/tabs";
 import { ClosingSection } from "./closing-section";
-import { FulfilmentSection } from "./fulfilment-section";
 import { LocationReadinessCard } from "./location-readiness-card";
 import type { Saver } from "./location-save";
 import { jumpTo } from "./location-save";
-import { PaymentsSection } from "./payments-section";
 import { PeopleSection } from "./people-section";
-import { PlaceSection } from "./place-section";
 import { SameEmailSection } from "./same-email-section";
 import { StorefrontList } from "./storefront-list";
-import { usePlaceSheets } from "./use-place-sheets";
 
 /** The id of the panel the tabs control, and of each tab. */
 const LOCATION_PANEL_ID = "location-panel";

@@ -27,11 +27,11 @@ import type {
     StorefrontSettings,
 } from "@/lib/stores/storefronts";
 
+import type { Saver } from "@/components/stores/locations/location-save";
+import { Note } from "@/components/stores/locations/storefront-section";
 import { Segmented } from "@saroh/ui/segmented";
 import { LocationAddressFields } from "./location-address-fields";
-import type { Saver } from "./location-save";
 import { DEFAULT_WEEK, OpeningHoursFields } from "./opening-hours";
-import { Note } from "./storefront-section";
 
 const PROBLEM =
     "text-pretty text-[12.5px] font-medium leading-[1.5] text-destructive-subtle-foreground";

@@ -22,9 +22,13 @@ import {
 } from "@/lib/stores/location-readiness";
 import { taxRateSays } from "@/lib/stores/tax-rate";
 
-import type { SectionProps } from "./location-save";
+import type { SectionProps } from "@/components/stores/locations/location-save";
+import {
+    Note,
+    Section,
+    ToggleRow,
+} from "@/components/stores/locations/storefront-section";
 import { PayOnHandoverRow } from "./pay-on-handover-row";
-import { Note, Section, ToggleRow } from "./storefront-section";
 import { TAX_RATE_ROW_ID, TaxRateSheet } from "./tax-rate-sheet";
 
 /**

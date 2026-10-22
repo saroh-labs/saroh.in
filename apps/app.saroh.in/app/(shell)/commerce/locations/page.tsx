@@ -1,5 +1,5 @@
 import { PageContainer } from "@/components/shared/page/page-container";
-import { StorefrontsScreen } from "@/components/stores/storefronts-screen";
+import { StorefrontsScreen } from "@/components/stores/locations/storefronts-screen";
 import { pausedLocationIds } from "@/lib/billing/paused";
 import { mayAddStorefront } from "@/lib/business-limits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";

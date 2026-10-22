@@ -13,7 +13,7 @@ import {
 } from "@/components/shared/lists/list-toolbar";
 import { useArrivals } from "@/components/shared/live-refresh/use-arrivals";
 import { SinceNotice } from "@/components/shared/notices/since-notice";
-import { StorefrontFilter } from "@/components/stores/storefront-filter";
+import { StorefrontFilter } from "@/components/stores/locations/storefront-filter";
 import type { CustomerPick } from "@/lib/customers/picker";
 import { useNarrow } from "@/lib/hooks/use-narrow";
 import type {

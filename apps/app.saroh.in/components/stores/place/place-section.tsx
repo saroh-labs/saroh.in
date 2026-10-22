@@ -23,16 +23,19 @@ import {
     placeEditId,
 } from "@/lib/stores/place-rows";
 
+import type {
+    Saver,
+    SectionProps,
+} from "@/components/stores/locations/location-save";
+import { Section } from "@/components/stores/locations/storefront-section";
 import { Notice } from "@saroh/ui/notice";
 import { LocationDetailsSheet } from "./location-details-sheet";
-import type { Saver, SectionProps } from "./location-save";
 import {
     PlaceAddressSheet,
     PlaceHoursSheet,
     PlaceKindSheet,
     PlaceNameSheet,
 } from "./place-sheets";
-import { Section } from "./storefront-section";
 import type { PlaceSheets } from "./use-place-sheets";
 
 /**

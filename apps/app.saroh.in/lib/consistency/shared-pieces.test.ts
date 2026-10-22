@@ -108,7 +108,7 @@ describe("one of each small piece", () => {
                 "the GSTIN field: a registration number is capitals",
             "components/settings/plan-billing/plan-chooser.tsx":
                 "the offer code field: a code is capitals",
-            "components/stores/discount-form.tsx":
+            "components/stores/discounts/discount-form.tsx":
                 "the discount code field: a code is capitals",
         };
         const pattern = /(?<![\w-])uppercase(?![\w-])/;

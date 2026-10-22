@@ -241,7 +241,7 @@ export const RAW_ALLOWED = {
     // input: a slider
     "components/sites/style-panel.tsx": ["input"],
     // input: a file picker
-    "components/stores/csv-import.tsx": ["input"],
+    "components/stores/import/csv-import.tsx": ["input"],
     // input: a native radio inside its card; label: a radio card with a timeline in it
     "components/subscriptions/timing-card.tsx": ["input", "label"],
 };

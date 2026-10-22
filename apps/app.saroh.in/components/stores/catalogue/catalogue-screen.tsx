@@ -38,16 +38,16 @@ import type { SellsOnline } from "@/lib/products/quick-look";
 import { statusToast, step } from "@/lib/products/quick-look";
 import type { CataloguePage, ProductStatus } from "@/lib/products/service";
 
-import { catalogueColumns, RowMenu } from "./catalogue/catalogue-columns";
-import { emptyState, NoStorefront } from "./catalogue/catalogue-empty";
-import { CatalogueHeader } from "./catalogue/catalogue-header";
+import { catalogueColumns, RowMenu } from "./catalogue-columns";
+import { emptyState, NoStorefront } from "./catalogue-empty";
+import { CatalogueHeader } from "./catalogue-header";
 import {
     CatalogueFilters,
     CatalogueMoreFilters,
     catalogueNarrowed,
     CatalogueSearch,
-} from "./catalogue/catalogue-toolbar";
-import { QuickLook } from "./catalogue/quick-look";
+} from "./catalogue-toolbar";
+import { QuickLook } from "./quick-look";
 
 /**
  * Sell → Products, after the "Saroh Products Screen" design (#519, #520).

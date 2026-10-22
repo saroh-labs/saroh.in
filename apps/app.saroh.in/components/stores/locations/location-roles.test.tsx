@@ -5,7 +5,7 @@ import type { LocationAbilities } from "@/lib/stores/abilities";
 import type { LocationDetails } from "@/lib/stores/location-details";
 import type { StorefrontSettings } from "@/lib/stores/storefronts";
 
-import { LocationDetailsSheet } from "./location-details-sheet";
+import { LocationDetailsSheet } from "@/components/stores/place/location-details-sheet";
 import { aboutOnlyNote, StorefrontsScreen } from "./storefronts-screen";
 
 vi.mock("next/navigation", () => ({

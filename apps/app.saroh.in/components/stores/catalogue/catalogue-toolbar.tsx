@@ -7,7 +7,7 @@ import {
 import { FailedRead } from "@/components/shared/states/failed-read";
 import { ListSearch } from "@saroh/ui/list-search";
 
-import { StorefrontFilter } from "@/components/stores/storefront-filter";
+import { StorefrontFilter } from "@/components/stores/locations/storefront-filter";
 import type { FilterChoices } from "@/lib/products/filter-choices";
 import type { ListQuery } from "@/lib/products/list-query";
 import type { CataloguePage, ProductStatus } from "@/lib/products/service";

@@ -31,8 +31,8 @@ import {
     catalogueNarrowed,
     CatalogueSearch,
 } from "@/components/stores/catalogue/catalogue-toolbar";
-import { StorefrontFilter } from "@/components/stores/storefront-filter";
-import { StorefrontList } from "@/components/stores/storefront-list";
+import { StorefrontFilter } from "@/components/stores/locations/storefront-filter";
+import { StorefrontList } from "@/components/stores/locations/storefront-list";
 import type { CustomersPage } from "@/lib/customers/list";
 import { readListQuery as readCustomersQuery } from "@/lib/customers/list";
 import { FACT_DOT, joinFacts } from "@/lib/format/join";

@@ -47,9 +47,9 @@ const MOVED = [
     "components/sites/add-domain-dialog.tsx",
     "components/sites/media-picker.tsx",
     "components/sites/settings/site-address-sheet.tsx",
-    "components/stores/location-address-fields.tsx",
-    "components/stores/location-details-sheet.tsx",
-    "components/stores/place-sheets.tsx",
+    "components/stores/place/location-address-fields.tsx",
+    "components/stores/place/location-details-sheet.tsx",
+    "components/stores/place/place-sheets.tsx",
 ];
 
 function sources(dir: string): string[] {

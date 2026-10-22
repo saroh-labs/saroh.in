@@ -5,7 +5,10 @@ import type {
     StorefrontSettings,
 } from "@/lib/stores/storefronts";
 
-import { Note, ToggleRow } from "./storefront-section";
+import {
+    Note,
+    ToggleRow,
+} from "@/components/stores/locations/storefront-section";
 
 type Saver = (
     input: StorefrontInput,

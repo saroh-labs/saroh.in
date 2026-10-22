@@ -250,9 +250,9 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
         "components/sites/editor-chrome.tsx": "the site editor's panels",
         "components/sites/website-header.tsx":
             "Website's sub-pages: Pages, Posts, Forms, Review, Settings",
-        "components/stores/products-tabs.tsx":
+        "components/stores/catalogue/products-tabs.tsx":
             "All, Collections, Stock and Reviews: the catalogue, then three other panels",
-        "components/stores/storefronts-screen.tsx":
+        "components/stores/locations/storefronts-screen.tsx":
             "a location's settings sections",
         "components/subscriptions/plan-detail/detail-screen.tsx":
             "a plan's sections: Overview, Subscribers, History",

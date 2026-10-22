@@ -10,7 +10,7 @@ import { useState } from "react";
 
 import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
-import { LocationAddressFields } from "@/components/stores/location-address-fields";
+import { LocationAddressFields } from "@/components/stores/place/location-address-fields";
 import { runAction } from "@/lib/api/run-action";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
 import type {

@@ -4,13 +4,13 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { OrderPayments } from "@/components/stores/order-payments";
 import type { CounterPayment } from "@/lib/orders/kitchen-service";
 import { paidByHandWords } from "@/lib/orders/paid-how";
 import type { OrderRead, OrderReadMoney } from "@/lib/orders/read";
 import { refundLines } from "@/lib/orders/refund-line";
 import { providerName } from "@/lib/payments/providers";
 import type { OrderPaymentsSummary } from "@/lib/payments/service";
+import { OrderPayments } from "./order-payments";
 
 import { Notice } from "@saroh/ui/notice";
 import { FOCUS, Panel, PanelTitle } from "./parts";

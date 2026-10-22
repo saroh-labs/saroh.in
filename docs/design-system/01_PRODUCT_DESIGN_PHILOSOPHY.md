@@ -152,7 +152,7 @@ one-product debt to retire.
 
 **Grounded risk to watch:** the app already carries small colour-discipline leaks —
 `components/crm/activity-timeline.tsx` uses raw `border-amber-400` / `border-blue-400` /
-`border-emerald-400`, and `components/stores/order-payments.tsx` uses
+`border-emerald-400`, and `components/commerce/order-detail/order-payments.tsx` uses
 `text-amber-700 dark:text-amber-400`. These are exactly the "rainbow creep" this section
 guards against, and are why [06 Design Tokens](./06_DESIGN_TOKENS.md) defines semantic
 `success` / `warning` / `info` tokens to replace them.

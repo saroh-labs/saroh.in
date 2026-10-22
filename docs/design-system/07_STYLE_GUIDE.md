@@ -126,14 +126,14 @@ situation), one line of `text-muted-foreground` (the reason/benefit), one primar
 Consistency here is a usability feature: predictable formatting lets users scan columns
 and compare values without re-reading ([01 P5](./01_PRODUCT_DESIGN_PHILOSOPHY.md)).
 
-| Data                     | Rule                                                                                                 | Notes                                                                                                               |
-| ------------------------ | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| **Tabular numbers**      | Use `tabular-nums` for any column/aligned figures (prices, totals, counts).                          | Already used in `components/stores/order-payments.tsx`; figures line up so the eye compares magnitudes at a glance. |
-| **Currency**             | Format via `Intl.NumberFormat` with the store/org currency; symbol + grouped thousands + 2 decimals. | Never hand-concatenate `"$" + amount`. Locale-aware formatting handles grouping and symbol placement.               |
-| **Dates**                | Human, unambiguous: "20 Jul 2026" or "Jul 20, 2026" — not `07/20/2026` (ambiguous across locales).   | Use `Intl.DateTimeFormat`. For recent events, relative time ("2 hours ago") in timelines.                           |
-| **Relative time**        | "just now", "2h ago", "yesterday" for < 1 week; absolute date beyond.                                | Matches the activity-timeline context; reduces mental math for recent items.                                        |
-| **Percentages / counts** | Whole numbers unless precision matters; group thousands (`1,240` not `1240`).                        | The notification badge already shows a bare count — fine for small integers.                                        |
-| **Empty / zero**         | Show "—" or "None", not "0" or blank, where zero is a state not a measurement.                       | Distinguishes "no data" from "a value of zero".                                                                     |
+| Data                     | Rule                                                                                                 | Notes                                                                                                                              |
+| ------------------------ | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **Tabular numbers**      | Use `tabular-nums` for any column/aligned figures (prices, totals, counts).                          | Already used in `components/commerce/order-detail/order-payments.tsx`; figures line up so the eye compares magnitudes at a glance. |
+| **Currency**             | Format via `Intl.NumberFormat` with the store/org currency; symbol + grouped thousands + 2 decimals. | Never hand-concatenate `"$" + amount`. Locale-aware formatting handles grouping and symbol placement.                              |
+| **Dates**                | Human, unambiguous: "20 Jul 2026" or "Jul 20, 2026" — not `07/20/2026` (ambiguous across locales).   | Use `Intl.DateTimeFormat`. For recent events, relative time ("2 hours ago") in timelines.                                          |
+| **Relative time**        | "just now", "2h ago", "yesterday" for < 1 week; absolute date beyond.                                | Matches the activity-timeline context; reduces mental math for recent items.                                                       |
+| **Percentages / counts** | Whole numbers unless precision matters; group thousands (`1,240` not `1240`).                        | The notification badge already shows a bare count — fine for small integers.                                                       |
+| **Empty / zero**         | Show "—" or "None", not "0" or blank, where zero is a state not a measurement.                       | Distinguishes "no data" from "a value of zero".                                                                                    |
 
 Centralise these in shared formatters (a `lib/format` module) so no screen re-implements
 them — one place to fix, consistent everywhere ([01 P6](./01_PRODUCT_DESIGN_PHILOSOPHY.md)).
@@ -184,18 +184,18 @@ not "Store Created!!!".
 
 ## 8. Do / Don't — pulled from real Saroh screens
 
-| #   | Do                                                                              | Don't                                                        | Source / rule                                                                           |
-| --- | ------------------------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| 1   | "Your stores" as a single `h1`, one "New store" primary button.                 | Two primary buttons competing in the page header.            | `app/page.tsx` · [01 P2](./01_PRODUCT_DESIGN_PHILOSOPHY.md)                             |
-| 2   | Mark the active nav item with `aria-current="page"` + `bg-accent`.              | Style the active tab with a raw colour or leave it unmarked. | `components/stores/store-nav.tsx` · [06 §11](./06_DESIGN_TOKENS.md)                     |
-| 3   | Pair icon-only controls with `aria-label` ("Switch organization").              | Ship a bare `ChevronsUpDown` with no accessible name.        | `components/organizations/switcher/organization-switcher.tsx` · [07 §3](#3-iconography) |
-| 4   | Show a guarded error via `toast.error(res.error)`.                              | Let an unauthorized org selection 403 silently downstream.   | org switcher · [07 §7](#7-feedback-toasts-loading-errors)                               |
-| 5   | Use `text-muted-foreground` for secondary text (`/{store.slug}`, helper lines). | Reach for a grey hex or `text-gray-500`.                     | store layout, empty state · [06 §1](./06_DESIGN_TOKENS.md)                              |
-| 6   | Tokenise status: `text-warning` for an amount that needs attention.             | `text-amber-700 dark:text-amber-400`.                        | `components/stores/order-payments.tsx` · [06 §2/§12](./06_DESIGN_TOKENS.md)             |
-| 7   | `text-xs` (12px) for a badge.                                                   | `text-[10px]` arbitrary size.                                | `components/stores/store-nav.tsx` · [06 §12](./06_DESIGN_TOKENS.md)                     |
-| 8   | Render "Soon" as a `secondary` `Badge` on a disabled item with `aria-disabled`. | A dead link that 404s.                                       | `StoreNav` `comingSoon` pattern · [01 §4](./01_PRODUCT_DESIGN_PHILOSOPHY.md)            |
-| 9   | `tabular-nums` for money columns.                                               | Proportional figures that misalign in a table.               | `order-payments.tsx` · [07 §5](#5-numbers-dates--currency-formatting)                   |
-| 10  | Sentence case labels ("Create organization").                                   | Title Case ("Create Organization").                          | org switcher · [07 §2](#2-capitalization)                                               |
+| #   | Do                                                                              | Don't                                                        | Source / rule                                                                              |
+| --- | ------------------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| 1   | "Your stores" as a single `h1`, one "New store" primary button.                 | Two primary buttons competing in the page header.            | `app/page.tsx` · [01 P2](./01_PRODUCT_DESIGN_PHILOSOPHY.md)                                |
+| 2   | Mark the active nav item with `aria-current="page"` + `bg-accent`.              | Style the active tab with a raw colour or leave it unmarked. | `components/stores/store-nav.tsx` · [06 §11](./06_DESIGN_TOKENS.md)                        |
+| 3   | Pair icon-only controls with `aria-label` ("Switch organization").              | Ship a bare `ChevronsUpDown` with no accessible name.        | `components/organizations/switcher/organization-switcher.tsx` · [07 §3](#3-iconography)    |
+| 4   | Show a guarded error via `toast.error(res.error)`.                              | Let an unauthorized org selection 403 silently downstream.   | org switcher · [07 §7](#7-feedback-toasts-loading-errors)                                  |
+| 5   | Use `text-muted-foreground` for secondary text (`/{store.slug}`, helper lines). | Reach for a grey hex or `text-gray-500`.                     | store layout, empty state · [06 §1](./06_DESIGN_TOKENS.md)                                 |
+| 6   | Tokenise status: `text-warning` for an amount that needs attention.             | `text-amber-700 dark:text-amber-400`.                        | `components/commerce/order-detail/order-payments.tsx` · [06 §2/§12](./06_DESIGN_TOKENS.md) |
+| 7   | `text-xs` (12px) for a badge.                                                   | `text-[10px]` arbitrary size.                                | `components/stores/store-nav.tsx` · [06 §12](./06_DESIGN_TOKENS.md)                        |
+| 8   | Render "Soon" as a `secondary` `Badge` on a disabled item with `aria-disabled`. | A dead link that 404s.                                       | `StoreNav` `comingSoon` pattern · [01 §4](./01_PRODUCT_DESIGN_PHILOSOPHY.md)               |
+| 9   | `tabular-nums` for money columns.                                               | Proportional figures that misalign in a table.               | `order-payments.tsx` · [07 §5](#5-numbers-dates--currency-formatting)                      |
+| 10  | Sentence case labels ("Create organization").                                   | Title Case ("Create Organization").                          | org switcher · [07 §2](#2-capitalization)                                                  |
 
 ---
 

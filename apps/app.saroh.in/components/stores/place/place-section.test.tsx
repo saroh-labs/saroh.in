@@ -17,7 +17,7 @@ import type {
     Weekday,
 } from "@/lib/stores/storefronts";
 
-import { StorefrontsScreen } from "./storefronts-screen";
+import { StorefrontsScreen } from "@/components/stores/locations/storefronts-screen";
 
 /** The address's query, as each test sets it. */
 const address = vi.hoisted(() => ({ query: "" }));

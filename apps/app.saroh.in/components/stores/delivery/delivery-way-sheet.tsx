@@ -23,9 +23,9 @@ import type { StorefrontFulfilmentType } from "@/lib/stores/fulfilment-types";
 import { FULFILMENT_LABEL } from "@/lib/stores/late-after";
 import type { StorefrontSettings } from "@/lib/stores/storefronts";
 
+import type { Saver } from "@/components/stores/locations/location-save";
 import { Segmented } from "@saroh/ui/segmented";
 import { LateAfterField } from "./delivery-fields";
-import type { Saver } from "./location-save";
 
 const OTHER = "other";
 

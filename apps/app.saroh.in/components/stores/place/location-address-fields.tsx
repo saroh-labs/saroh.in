@@ -10,7 +10,7 @@ import type { AddressDraft } from "@/lib/stores/location-address";
 import { MAP_LINK, readMapLink } from "@/lib/stores/location-address";
 import { ADDRESS_FIELD_ID } from "@/lib/stores/location-readiness";
 
-import { Note } from "./storefront-section";
+import { Note } from "@/components/stores/locations/storefront-section";
 
 const PROBLEM =
     "text-pretty text-[12.5px] font-medium leading-[1.5] text-destructive-subtle-foreground";

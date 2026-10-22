@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 
 import { StorefrontChooser } from "@/components/commerce/storefront-chooser";
 import { PageContainer } from "@/components/shared/page/page-container";
-import { CsvImport } from "@/components/stores/csv-import";
+import { CsvImport } from "@/components/stores/import/csv-import";
 import { requireCan } from "@/lib/access/require-can";
 import { importCustomersHref } from "@/lib/customers/links";
 import { describeImport } from "@/lib/imports/service";

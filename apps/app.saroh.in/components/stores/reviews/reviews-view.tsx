@@ -17,7 +17,6 @@ import type {
     DataFilter,
 } from "@/components/shared/data-view/types";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import { InviteReviewsSheet } from "@/components/stores/invite-reviews-sheet";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
 import { replyToReview, setReviewHidden } from "@/lib/product-reviews/actions";
@@ -25,6 +24,7 @@ import type { ReviewEmailNote } from "@/lib/product-reviews/describe";
 import { stars } from "@/lib/product-reviews/describe";
 import type { InvitableOrder, Review } from "@/lib/product-reviews/service";
 import { Field } from "@saroh/ui/field";
+import { InviteReviewsSheet } from "./invite-reviews-sheet";
 
 const FILTERS: DataFilter<Review>[] = [
     { id: "all", label: "All" },

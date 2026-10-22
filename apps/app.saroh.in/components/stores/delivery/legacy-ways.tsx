@@ -1,7 +1,7 @@
 "use client";
 
-import type { SectionProps } from "./location-save";
-import { ToggleRow } from "./storefront-section";
+import type { SectionProps } from "@/components/stores/locations/location-save";
+import { ToggleRow } from "@/components/stores/locations/storefront-section";
 
 /**
  * Delivery for an API from before B17's chips: the two switches it had,

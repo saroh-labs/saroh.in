@@ -74,7 +74,7 @@ vi.mock("@/lib/discounts/options", () => ({
     loadReachOptions: () => loadReachOptions(),
 }));
 // The forms themselves are not under test: a marker says one was drawn.
-vi.mock("@/components/stores/discount-form", () => ({
+vi.mock("@/components/stores/discounts/discount-form", () => ({
     DiscountForm: () => <form data-testid="discount-form" />,
 }));
 vi.mock("@/components/customers/add-customer-form", () => ({

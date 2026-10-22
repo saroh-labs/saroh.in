@@ -4,8 +4,8 @@ import { Button } from "@saroh/ui/button";
 import { useState } from "react";
 
 import { FormSheet } from "@/components/shared/forms/form-sheet";
-import { CustomerForm } from "@/components/stores/customer-form";
 import type { Customer } from "@/lib/customers/service";
+import { CustomerForm } from "./customer-form";
 
 /**
  * "Edit details" on a location's own customer record (one not linked to a

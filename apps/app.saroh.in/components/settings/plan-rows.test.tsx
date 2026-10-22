@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { PlanAccessProvider } from "@/components/billing/plan-way";
-import { rowOf } from "@/components/stores/location-readiness-card";
+import { rowOf } from "@/components/stores/locations/location-readiness-card";
 import type { ReadyAside, ReadyStep } from "@/lib/settings/ready";
 import type { ReadyItem } from "@/lib/stores/location-readiness";
 

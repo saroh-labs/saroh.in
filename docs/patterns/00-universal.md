@@ -241,7 +241,7 @@ with why it stops there:
   `backfill/listings-stock-levels.ts` (491) and `backfill/held-stock.ts`
   (481) — one-off backfills, each one exported unit that the integration
   suite runs twice. The merge is already split, into deciding and moving.
-- `stores/catalogue-screen.tsx` (425; 401 before the Collections chip,
+- `stores/catalogue/catalogue-screen.tsx` (425; 401 before the Collections chip,
   #524) — the Products list's rows, paging, bulk bar, quick look and
   delete confirm share its list state. The Collections chip's cards and
   sheet went to their own `commerce/collections/collections-panel.tsx`,

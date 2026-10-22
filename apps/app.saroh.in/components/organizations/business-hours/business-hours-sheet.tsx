@@ -8,7 +8,7 @@ import { FormSheet } from "@/components/shared/forms/form-sheet";
 import {
     DEFAULT_WEEK,
     OpeningHoursFields,
-} from "@/components/stores/opening-hours";
+} from "@/components/stores/place/opening-hours";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { sheetWords } from "@/lib/organizations/business-sheet-words";
 import { sameWeek } from "@/lib/organizations/opening-hours";

@@ -16,8 +16,8 @@ import {
 } from "@/lib/stores/opening-hours-summary";
 import type { OpeningHoursDay, Weekday } from "@/lib/stores/storefronts";
 
+import { Note } from "@/components/stores/locations/storefront-section";
 import { Segmented } from "@saroh/ui/segmented";
-import { Note } from "./storefront-section";
 
 const DAYS: { key: Weekday; label: string }[] = [
     { key: "MON", label: "Monday" },

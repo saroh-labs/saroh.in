@@ -14,11 +14,14 @@ import {
 } from "@/lib/stores/location-readiness";
 import type { StorefrontFulfilmentType } from "@/lib/stores/storefronts";
 
+import type { SectionProps } from "@/components/stores/locations/location-save";
+import { jumpTo } from "@/components/stores/locations/location-save";
+import {
+    Note,
+    Section,
+} from "@/components/stores/locations/storefront-section";
 import { DeliveryWaySheet } from "./delivery-way-sheet";
 import { LegacyWays } from "./legacy-ways";
-import type { SectionProps } from "./location-save";
-import { jumpTo } from "./location-save";
-import { Note, Section } from "./storefront-section";
 
 /** Where Orders' notice sends someone to change a threshold. */
 export const LATE_AFTER_ANCHOR = "late-after";

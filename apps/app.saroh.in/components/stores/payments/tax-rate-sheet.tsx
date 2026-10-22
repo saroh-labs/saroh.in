@@ -8,7 +8,7 @@ import { FormSheet } from "@/components/shared/forms/form-sheet";
 import type { StorefrontSettings } from "@/lib/stores/storefronts";
 import { taxRateField, taxRateValid } from "@/lib/stores/tax-rate";
 
-import type { Saver } from "./location-save";
+import type { Saver } from "@/components/stores/locations/location-save";
 
 /** The row the sheet is opened from; its Edit takes the keyboard back. */
 export const TAX_RATE_ROW_ID = "location-tax-rate";
