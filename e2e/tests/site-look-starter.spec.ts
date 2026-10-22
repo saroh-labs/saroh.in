@@ -139,7 +139,13 @@ test.describe("a look's starter content", { tag: "@serial" }, () => {
             const preview = page.getByRole("dialog", { name: "Live" });
             await expect(preview).toBeVisible();
             // Prana Yoga, the board's sample business, not Northwind (94399ac1d).
-            const showcase = preview.locator('[data-look-showcase="prana"]');
+            // A phone opens the Preview at phone width: the page is drawn
+            // in the device frame's iframe.
+            const showcase = (
+                phone
+                    ? preview.frameLocator("iframe[data-device-frame]")
+                    : preview
+            ).locator('[data-look-showcase="prana"]');
             await expect(showcase).toBeVisible({ timeout: 15_000 });
             await expect(showcase).toContainText("Prana Yoga");
 
