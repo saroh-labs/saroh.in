@@ -10,6 +10,7 @@ jest.mock("@saroh/database", () => {
                 findMany: jest.fn(),
                 update: jest.fn(),
                 delete: jest.fn(),
+                deleteMany: jest.fn(),
             },
             site: {
                 findUnique: jest.fn(),
@@ -128,6 +129,53 @@ describe("DomainsService.claim", () => {
             service.claim(ctx(), { hostname: "shop.acme.com" }),
         ).rejects.toBeInstanceOf(ConflictException);
         expect(domainCreate).not.toHaveBeenCalled();
+    });
+
+    it("lets another org's unproved claim lapse after a week, so nobody holds a domain by claiming first", async () => {
+        const service = new DomainsService(new FakeDomainVerifier(), ent());
+        const claimed = (days: number, status = "PENDING") => ({
+            id: "dom_x",
+            organizationId: "org_OTHER",
+            hostname: "shop.acme.com",
+            status,
+            hostingId: null,
+            createdAt: new Date(Date.now() - days * 86_400_000),
+        });
+
+        // A day old: still theirs.
+        domainFindUnique.mockResolvedValue(claimed(1));
+        await expect(
+            service.claim(ctx(), { hostname: "shop.acme.com" }),
+        ).rejects.toBeInstanceOf(ConflictException);
+
+        // Proved, however old: still theirs.
+        domainFindUnique.mockResolvedValue(claimed(30, "VERIFIED"));
+        await expect(
+            service.claim(ctx(), { hostname: "shop.acme.com" }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(prisma.domain.deleteMany).not.toHaveBeenCalled();
+
+        // Unproved for 8 days: it lapses and the new claim is made.
+        domainFindUnique.mockResolvedValue(claimed(8));
+        domainCreate.mockResolvedValue({
+            id: "dom_new",
+            organizationId: "org_A",
+            hostname: "shop.acme.com",
+            status: "PENDING",
+            verificationToken: "t",
+            hostingId: null,
+        });
+        await service
+            .claim(ctx(), { hostname: "shop.acme.com" })
+            .catch(() => {});
+        expect(prisma.domain.deleteMany).toHaveBeenCalledWith({
+            where: {
+                id: "dom_x",
+                status: { not: "VERIFIED" },
+                hostingId: null,
+            },
+        });
+        expect(domainCreate).toHaveBeenCalled();
     });
 
     it("validates the bound Site belongs to the org (cross-tenant siteId → 404)", async () => {
