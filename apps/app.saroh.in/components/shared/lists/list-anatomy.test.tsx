@@ -8,7 +8,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/orders/list-actions", () => ({ findOrderProducts: vi.fn() }));
 
-import { ClassPacksTabs } from "@/components/class-packs/class-packs-tabs";
+import { ClassPacksTabs } from "@/components/class-packs/list/class-packs-tabs";
 import {
     moreFiltersOn,
     OrderAttention,

@@ -223,7 +223,7 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
      * A new `TabStrip` goes here with what its views are.
      */
     const VIEWS: Allow = {
-        "components/class-packs/class-packs-tabs.tsx":
+        "components/class-packs/list/class-packs-tabs.tsx":
             "Packs and Who holds one: two pages with different columns",
         "components/class-packs/pack-detail/pack-detail.tsx":
             "a pack's sections: Overview, Who has it, Used, Sales, Activity",

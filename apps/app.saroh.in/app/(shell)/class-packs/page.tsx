@@ -1,4 +1,4 @@
-import { PacksScreen } from "@/components/class-packs/packs-screen";
+import { PacksScreen } from "@/components/class-packs/list/packs-screen";
 import { PageContainer } from "@/components/shared/page/page-container";
 import { canSellPacks, canWritePacks } from "@/lib/class-packs/access";
 import { cardNotes } from "@/lib/class-packs/pack-card-notes";

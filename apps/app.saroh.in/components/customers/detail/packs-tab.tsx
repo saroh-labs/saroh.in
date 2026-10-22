@@ -5,10 +5,10 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useId, useState } from "react";
 
+import type { SellablePack } from "@/components/class-packs/list/sell-pack-dialog";
+import { SellPackDialog } from "@/components/class-packs/list/sell-pack-dialog";
 import type { ExtendTarget } from "@/components/class-packs/pack-detail/extend-dialog";
 import { ExtendDialog } from "@/components/class-packs/pack-detail/extend-dialog";
-import type { SellablePack } from "@/components/class-packs/sell-pack-dialog";
-import { SellPackDialog } from "@/components/class-packs/sell-pack-dialog";
 import { MAX_EXTEND_DAYS } from "@/lib/class-packs/pack-detail";
 import type {
     CustomerDetail,

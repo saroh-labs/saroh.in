@@ -23,9 +23,9 @@ import type { ClassPack, PackPurchase } from "@/lib/class-packs/service";
 import { personHref } from "@/lib/contacts/person-href";
 import type { GstAsk } from "@/lib/gst/item-words";
 
+import { ClassPacksTabs } from "@/components/class-packs/list/class-packs-tabs";
+import { SellPackDialog } from "@/components/class-packs/list/sell-pack-dialog";
 import { TextLink } from "@saroh/ui/text-link";
-import { ClassPacksTabs } from "./class-packs-tabs";
-import { SellPackDialog } from "./sell-pack-dialog";
 
 const STANDING: Record<
     PackStanding,

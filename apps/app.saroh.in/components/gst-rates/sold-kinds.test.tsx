@@ -22,8 +22,8 @@ import {
     ratePicker,
 } from "@/components/shared/fields/gst-rate-picker.testing";
 
-import type { SellablePack } from "@/components/class-packs/sell-pack-dialog";
-import { SellPackDialog } from "@/components/class-packs/sell-pack-dialog";
+import type { SellablePack } from "@/components/class-packs/list/sell-pack-dialog";
+import { SellPackDialog } from "@/components/class-packs/list/sell-pack-dialog";
 import type { EnrolCourse } from "@/components/courses/enrol-dialog";
 import { EnrolDialog } from "@/components/courses/enrol-dialog";
 import { SubscribeDialog } from "@/components/subscriptions/list/subscribe-dialog";
