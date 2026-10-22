@@ -39,6 +39,7 @@ import { ISSUE_AND_SHARE, ISSUE_IT } from "@/lib/invoices/words";
 import type { DetailsOnFile } from "@/lib/organizations/business-details";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 
+import { saveOrganizationSettingsInPlace } from "@/lib/organizations/settings-actions";
 import { CustomerBlock, NoContactsYet } from "./new-invoice/customer-block";
 import { DueStrip } from "./new-invoice/due-strip";
 import { finishInvoice } from "./new-invoice/finish";
@@ -130,7 +131,7 @@ export function InvoiceForm({
         continueLabel: "Save and issue",
         onFile: detailsOnFile,
         // Saved here, the editor stays drawn (review #15).
-        inPlace: true,
+        save: saveOrganizationSettingsInPlace,
     });
     const ids = { preview: useId(), why: useId() };
     // Which button is working, for its label. Never what a submit does:

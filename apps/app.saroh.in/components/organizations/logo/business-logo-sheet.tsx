@@ -9,10 +9,7 @@ import { LogoUpload } from "@/components/shared/logo-upload";
 import { runAction } from "@/lib/api/run-action";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { sheetWords } from "@/lib/organizations/business-sheet-words";
-import {
-    saveBusinessLogo,
-    saveBusinessLogoInPlace,
-} from "@/lib/organizations/settings-actions";
+import { saveBusinessLogo } from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 
 /**
@@ -32,7 +29,7 @@ export function BusinessLogoSheet({
     returnTo,
     onClose,
     onSaved,
-    inPlace = false,
+    save = saveBusinessLogo,
 }: {
     settings: Pick<OrganizationSettings, "name" | "logo">;
     open: boolean;
@@ -41,10 +38,10 @@ export function BusinessLogoSheet({
     /** Saved: the settings now, and what to say (the page offers Undo). */
     onSaved: (next: OrganizationSettings, said: string) => void;
     /**
-     * Saved from a screen that must stay drawn (the invoice editor): the
-     * save revalidates nothing (review #15).
+     * The save. A screen that must stay drawn (the invoice editor) passes
+     * the in-place one, which revalidates nothing (review #15).
      */
-    inPlace?: boolean;
+    save?: typeof saveBusinessLogo;
 }) {
     const saved: LogoValue | null = settings.logo ?? null;
     const [logo, setLogo] = useState(saved);
@@ -54,19 +51,15 @@ export function BusinessLogoSheet({
     // The logo's words are the same for every kind of business.
     const words = sheetWords("logo", { kind: undefined, registered: false });
 
-    async function save() {
+    async function submit() {
         if (logo?.url === saved?.url) {
             onClose();
             return;
         }
         setRefusal(null);
-        const result = await runAction(
-            () =>
-                (inPlace ? saveBusinessLogoInPlace : saveBusinessLogo)(
-                    logo?.mediaId ?? null,
-                ),
-            { setBusy: setSaving },
-        );
+        const result = await runAction(() => save(logo?.mediaId ?? null), {
+            setBusy: setSaving,
+        });
         if (!result) return;
         if (!result.ok) {
             setRefusal(result.error);
@@ -93,7 +86,7 @@ export function BusinessLogoSheet({
             onClose={onClose}
             onSubmit={(e) => {
                 e.preventDefault();
-                void save();
+                void submit();
             }}
         >
             <LogoUpload

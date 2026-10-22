@@ -34,10 +34,7 @@ import {
     payValuesOf,
     UPI_EXAMPLE,
 } from "@/lib/organizations/pay-instructions";
-import {
-    saveOrganizationSettings,
-    saveOrganizationSettingsInPlace,
-} from "@/lib/organizations/settings-actions";
+import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 import { PayPreview } from "./pay-preview";
 
@@ -109,7 +106,7 @@ export function PayInstructionsSheet({
     returnTo,
     onClose,
     onSaved,
-    inPlace = false,
+    save = saveOrganizationSettings,
 }: {
     /** The settings read's `payInstructions`; absent from an older API. */
     saved: PayInstructionsSettings | undefined;
@@ -120,10 +117,10 @@ export function PayInstructionsSheet({
     /** The settings as the save answered. */
     onSaved: (next: OrganizationSettings) => void;
     /**
-     * Saved from a screen that must stay drawn (the invoice editor): the
-     * save revalidates nothing (review #15).
+     * The save. A screen that must stay drawn (the invoice editor) passes
+     * the in-place one, which revalidates nothing (review #15).
      */
-    inPlace?: boolean;
+    save?: typeof saveOrganizationSettings;
 }) {
     const values = payValuesOf(saved);
     const form = useForm<PayValues>({
@@ -139,9 +136,6 @@ export function PayInstructionsSheet({
             onClose();
             return;
         }
-        const save = inPlace
-            ? saveOrganizationSettingsInPlace
-            : saveOrganizationSettings;
         const res = await save({ payInstructions: input });
         if (!res.ok) {
             if (

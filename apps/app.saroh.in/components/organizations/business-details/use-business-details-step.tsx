@@ -1,5 +1,6 @@
 "use client";
 
+import type { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
 import { useRef, useState } from "react";
 
 import type { BusinessDetail } from "@/lib/organizations/business-details";
@@ -37,7 +38,7 @@ export function useBusinessDetailsStep({
     then,
     continueLabel,
     onFile: readWithPage = null,
-    inPlace = false,
+    save,
 }: {
     /** What happens once saved ("issue it"). */
     then: string;
@@ -46,10 +47,10 @@ export function useBusinessDetailsStep({
     /** What is on file, read with the page; enables `ensure`. */
     onFile?: DetailsOnFile | null;
     /**
-     * Asked from a screen that must stay drawn (the invoice editor): the
-     * save revalidates nothing (review #15).
+     * The save, when not the usual one: a screen that must stay drawn (the
+     * invoice editor) passes the in-place one (review #15).
      */
-    inPlace?: boolean;
+    save?: typeof saveOrganizationSettings;
 }) {
     const [asking, setAsking] = useState<{
         missing: BusinessDetail[];
@@ -110,7 +111,7 @@ export function useBusinessDetailsStep({
             then={then}
             continueLabel={continueLabel}
             onDone={done}
-            inPlace={inPlace}
+            save={save}
         />
     );
     return { run, ensure, step };

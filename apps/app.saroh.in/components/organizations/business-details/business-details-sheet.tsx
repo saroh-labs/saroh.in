@@ -39,7 +39,6 @@ import {
 import {
     readBusinessDetails,
     saveOrganizationSettings,
-    saveOrganizationSettingsInPlace,
 } from "@/lib/organizations/settings-actions";
 import { RegisteredAddressFields } from "./registered-address-fields";
 import { registeredAddressShape } from "./registered-address-shape";
@@ -84,7 +83,7 @@ export function BusinessDetailsSheet({
     then,
     continueLabel,
     onDone,
-    inPlace = false,
+    save = saveOrganizationSettings,
 }: {
     /** What is on file; the sheet is open while there is something. */
     onFile: DetailsOnFile | null;
@@ -96,10 +95,10 @@ export function BusinessDetailsSheet({
     /** Saved (carry on), or closed without saving. */
     onDone: (saved: boolean) => void;
     /**
-     * Saved from a screen that must stay drawn (the invoice editor): the
-     * save revalidates nothing (review #15).
+     * The save. A screen that must stay drawn (the invoice editor) passes
+     * the in-place one, which revalidates nothing (review #15).
      */
-    inPlace?: boolean;
+    save?: typeof saveOrganizationSettings;
 }) {
     // A role that can't read the settings can't read the kind either: it
     // reads in a business's words.
@@ -116,7 +115,7 @@ export function BusinessDetailsSheet({
                     onFile={onFile}
                     continueLabel={continueLabel}
                     onDone={onDone}
-                    inPlace={inPlace}
+                    save={save}
                 />
             ) : null}
         </FormSheet>
@@ -131,12 +130,12 @@ function DetailsBody({
     onFile,
     continueLabel,
     onDone,
-    inPlace,
+    save,
 }: {
     onFile: DetailsOnFile;
     continueLabel: string;
     onDone: (saved: boolean) => void;
-    inPlace: boolean;
+    save: typeof saveOrganizationSettings;
 }) {
     if (onFile.state === "ready") {
         return (
@@ -145,7 +144,7 @@ function DetailsBody({
                 inIndia={onFile.inIndia}
                 continueLabel={continueLabel}
                 onDone={onDone}
-                inPlace={inPlace}
+                save={save}
             />
         );
     }
@@ -168,13 +167,13 @@ function DetailsForm({
     inIndia: indian,
     continueLabel,
     onDone,
-    inPlace,
+    save,
 }: {
     initial: BusinessDetailsValues;
     inIndia: boolean;
     continueLabel: string;
     onDone: (saved: boolean) => void;
-    inPlace: boolean;
+    save: typeof saveOrganizationSettings;
 }) {
     const [refusal, setRefusal] = useState<string | null>(null);
     const schema = z
@@ -204,9 +203,6 @@ function DetailsForm({
 
     async function onSubmit(values: BusinessDetailsValues) {
         setRefusal(null);
-        const save = inPlace
-            ? saveOrganizationSettingsInPlace
-            : saveOrganizationSettings;
         const res = await save(detailsInput(values, initial));
         if (!res.ok) {
             const field = FIELDS.find((f) => f === res.field);

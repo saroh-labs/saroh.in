@@ -22,7 +22,9 @@ vi.mock("next/navigation", () => ({
 // On the paper (U15), the business\'s settings save in place.
 vi.mock("@/lib/organizations/settings-actions", () => ({
     saveOrganizationSettings: vi.fn(),
+    saveOrganizationSettingsInPlace: vi.fn(),
     saveBusinessLogo: vi.fn(),
+    saveBusinessLogoInPlace: vi.fn(),
 }));
 vi.mock("@/components/shared/logo-upload", () => ({ LogoUpload: () => null }));
 const actions = vi.hoisted(() => ({

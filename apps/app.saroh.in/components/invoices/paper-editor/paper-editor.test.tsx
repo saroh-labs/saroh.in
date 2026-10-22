@@ -656,7 +656,9 @@ describe("the style rail", () => {
         step.ensure.mockClear();
         // No payment link to make: Issue it, and the page moves on.
         render({ providerConnected: false });
-        expect(step.options.at(-1)).toMatchObject({ inPlace: true });
+        expect(step.options.at(-1)).toMatchObject({
+            save: settings.saveOrganizationSettingsInPlace,
+        });
         act(() => part("Change line 2: Butter croissant (trade)").click());
         setValue(byLabel("Qty"), "24");
         act(() => part("Change line 2: Butter croissant (trade)").click());
