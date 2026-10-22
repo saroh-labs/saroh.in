@@ -5828,3 +5828,10 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** `fillPerson` counted staff from the start on every run, never asking who the block already showed; the agent that wrote it couldn't run db specs (they reset a database, which Prisma refuses an agent without the owner's word), so the spec that would have shown it never ran. The palette: `presetSiteStyle` keeps a palette only when `parsePalette` passes, and the board's lime accent reads 1.10:1 as link text; the look-showcase tests checked the palette existed, not that it was kept.
 - **Fix:** `fill-details.ts` skips staff already on the block (unit test "finds nothing to fill the second time"); a test that every `LOOK_SHOWCASE_PALETTE` parses.
 - **Rule:** a fill or migration-like write is idempotent and its spec runs the same action twice; a db spec an agent couldn't run is run by the owner's consent before the unit is called done, not left to the gate. A style value that can be silently dropped is tested for being kept, not for being present.
+
+### The People drawer carried one owner's unsaved extras to the next person (organizations refactor audit; 22 Oct 2026)
+
+- **Symptom:** open an owner (with another owner in the business) in Settings › Team › People, tick an extra permission, press "Remove from {business}", Keep in the confirm, then Edit anyone else: their drawer showed the first owner's tick as an unsaved change.
+- **Cause:** `MemberDrawer` is one sheet that is never remounted between people. `close()` reset both drafts, the role and the extras (`useMemberExtras`), but the owner's Remove path reset only the role.
+- **Fix:** Remove resets the extras too (`team/member-drawer.tsx`); `team/member-drawer.test.tsx` ticks, removes, opens another person and checks nothing is ticked. Keying the drawer by person would also fix it but remounts the sheet on close and loses its closing animation.
+- **Rule:** a sheet that is reused for one record after another clears every draft it holds on each way out, not only on Close; a test opens it for a second record after each exit.

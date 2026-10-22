@@ -54,11 +54,12 @@ export function BusinessPriceModeField({
 }) {
     const chosen = useWatch({ control, name: "priceMode" });
     const { defaultValues } = useFormState({ control });
+    const switching = defaultValues?.priceMode !== "ADDED";
+    const read = useOverMrp(chosen === "ADDED");
     // While the list of products over their MRP is on the sheet it is the
     // whole of what a refused save has to say: the refusal's own sentence
     // would say it twice, and no choice is the one in error.
-    const [listed, setListed] = useState(false);
-    const said = chosen === "ADDED" && listed;
+    const said = chosen === "ADDED" && overMrpWords(read, switching) !== null;
     return (
         <FormField
             control={control}
@@ -78,9 +79,9 @@ export function BusinessPriceModeField({
                     />
                     {chosen === "ADDED" ? (
                         <BusinessOverMrp
-                            switching={defaultValues?.priceMode !== "ADDED"}
+                            read={read}
+                            switching={switching}
                             refused={Boolean(fieldState.error)}
-                            onListed={setListed}
                         />
                     ) : null}
                     <FormDescription id="business-price-mode-note">
@@ -104,35 +105,16 @@ export function BusinessPriceModeField({
  * list is then what is over as things stand.
  */
 export function BusinessOverMrp({
+    read,
     switching,
     refused = false,
-    onListed,
 }: {
+    read: OverMrpRead | null;
     switching: boolean;
     /** A save was just refused for these: the notice is the error. */
     refused?: boolean;
-    /** Told whether there is a list on the sheet. */
-    onListed?: (listed: boolean) => void;
 }) {
-    const [read, setRead] = useState<OverMrpRead | null>(null);
-    useEffect(() => {
-        let live = true;
-        void loadOverMrpIfAdded()
-            .then((answer) => {
-                if (live) setRead(answer);
-            })
-            // Couldn't be read: say nothing; the save is still checked.
-            .catch(() => undefined);
-        return () => {
-            live = false;
-        };
-    }, []);
     const words = overMrpWords(read, switching);
-    const listed = words !== null;
-    useEffect(() => {
-        onListed?.(listed);
-        return () => onListed?.(false);
-    }, [listed, onListed]);
     if (!words) return null;
     return (
         <Notice
@@ -152,4 +134,27 @@ export function BusinessOverMrp({
             <p className="mt-2">{words.fix}</p>
         </Notice>
     );
+}
+
+/**
+ * The products over their MRP, read each time "GST is added" is picked;
+ * null while reading, when not picked, or when it couldn't be read (the
+ * save is still checked).
+ */
+function useOverMrp(active: boolean): OverMrpRead | null {
+    const [read, setRead] = useState<OverMrpRead | null>(null);
+    useEffect(() => {
+        if (!active) return;
+        let live = true;
+        void loadOverMrpIfAdded()
+            .then((answer) => {
+                if (live) setRead(answer);
+            })
+            .catch(() => undefined);
+        return () => {
+            live = false;
+            setRead(null);
+        };
+    }, [active]);
+    return read;
 }

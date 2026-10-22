@@ -151,9 +151,10 @@ export function MemberDrawer({
                         className="text-destructive-subtle-foreground hover:text-destructive-subtle-foreground"
                         disabled={saving}
                         onClick={() => {
-                            // A role picked and not saved must not follow
-                            // the sheet to the next person it opens for.
+                            // A role or extras picked and not saved must not
+                            // follow the sheet to the next person it opens for.
                             setDraft(null);
+                            extras.reset();
                             onRemove(member);
                         }}
                     >
