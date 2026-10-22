@@ -81,7 +81,13 @@ export const lookField = cn(
 );
 
 /** A field that holds a wrong answer: its edge says so, with the words. */
-export const lookFieldBad = "border-site-fg border-2";
+export const lookFieldBad = cn(
+    "border-site-fg border-2",
+    // The looks' own edges are more specific than a class, so each says it again.
+    "[[data-site-look=quiet]_&]:border-site-fg",
+    "[[data-site-look=folio]_&]:border-site-fg",
+    "[[data-site-look=live]_&]:shadow-[inset_0_0_0_2px_hsl(var(--site-fg))]",
+);
 
 /**
  * A step's choices (a service, a person, a way to pay) as each look's board
@@ -145,8 +151,10 @@ export const LOOK_CHOICE: Record<LookId, LookChoice> = {
                 "py-5",
                 LOOK_RING,
                 LOOK_EASE,
+                // The fill alone reads about 1.2:1, so an ink line at the
+                // band's left edge says which row is picked.
                 on &&
-                    "bg-site-accent-soft shadow-[-20px_0_0_hsl(var(--site-accent-soft)),20px_0_0_hsl(var(--site-accent-soft))]",
+                    "bg-site-accent-soft shadow-[-20px_0_0_hsl(var(--site-accent-soft)),-22px_0_0_hsl(var(--site-fg)),20px_0_0_hsl(var(--site-accent-soft))]",
             ),
         name: "font-site-heading block text-[20px] font-light leading-[1.2] tracking-[-0.01em] min-[700px]:text-[24px]",
         meta: "text-site-muted mt-0.5 block text-[14px]",
