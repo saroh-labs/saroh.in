@@ -163,6 +163,7 @@ function LiveLookTimetable({
     if (read.data === undefined) {
         return read.status === "failed" ? (
             <LookTimetableNote
+                content={content}
                 look={look}
                 title={title}
                 lede={said(content.intro)}
@@ -173,6 +174,7 @@ function LiveLookTimetable({
             </LookTimetableNote>
         ) : (
             <LookTimetableNote
+                content={content}
                 look={look}
                 title={title}
                 lede={said(content.intro)}
@@ -186,6 +188,7 @@ function LiveLookTimetable({
     const counts = showsCount(read.status);
     return (
         <LookTimetable
+            content={content}
             look={look}
             title={title}
             lede={lookLede(content, week)}
@@ -314,6 +317,7 @@ function TimetableBlock({
     if (siteLook) {
         return (
             <LookTimetable
+                content={content}
                 look={siteLook}
                 title={title}
                 lede={lookLede(content, week)}

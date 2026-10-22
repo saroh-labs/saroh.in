@@ -95,6 +95,8 @@ export interface HeroContent {
     onToday?: boolean;
     /** `false`: the `none` look's heading is for screen readers only. */
     titleVisible?: boolean;
+    /** A quieter link beside the button, drawn by the looks (DEC-172). */
+    secondaryCta?: { label: string; href: string };
 }
 
 export interface RichTextContent {

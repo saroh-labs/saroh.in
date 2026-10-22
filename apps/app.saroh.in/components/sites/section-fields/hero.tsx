@@ -30,6 +30,15 @@ import type { SectionFieldsProps } from "./props";
  * handlers. The refactor changes where the code lives and nothing about what it
  * does.
  */
+/** The hero's second link, or none while it has no words (DEC-172). */
+function secondLink(
+    label: string,
+    href: string | undefined,
+): { label: string; href: string } | undefined {
+    if (label.trim() === "") return undefined;
+    return { label, href: href ?? "/" };
+}
+
 export function HeroFields({
     section,
     pages,
@@ -111,6 +120,40 @@ export function HeroFields({
                     }
                 />
             ) : null}
+            <Field label="Second link">
+                <Input
+                    value={c.secondaryCta?.label ?? ""}
+                    onChange={(e) =>
+                        patch({
+                            secondaryCta: secondLink(
+                                e.target.value,
+                                c.secondaryCta?.href,
+                            ),
+                        })
+                    }
+                    placeholder="See the timetable"
+                />
+            </Field>
+            {c.secondaryCta ? (
+                <Field label="Second link goes to">
+                    <Input
+                        value={c.secondaryCta.href}
+                        onChange={(e) =>
+                            patch({
+                                secondaryCta: secondLink(
+                                    c.secondaryCta?.label ?? "",
+                                    e.target.value,
+                                ),
+                            })
+                        }
+                        placeholder="/#timetable"
+                    />
+                </Field>
+            ) : null}
+            <p className="-mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+                A quieter link beside the button. The Quiet, Folio and Live
+                looks show it.
+            </p>
             <Field label="Image">
                 {/*
                  * The picture first, the address second. A merchant

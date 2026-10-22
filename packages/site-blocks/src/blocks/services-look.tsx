@@ -1,6 +1,7 @@
 "use client";
 
 import type { LookId, RenderedServicesList } from "@saroh/block-contract";
+import { sectionFrameOf } from "@saroh/block-contract";
 
 import { destructiveAlertClasses } from "../alert";
 import { cn } from "../lib/utils";
@@ -10,8 +11,9 @@ import {
     FRONT_RING,
     FRONT_TYPE,
     FRONT_WRAP,
-    FrontCta,
     frontButton,
+    FrontCta,
+    LookEyebrow,
     said,
 } from "./look-front";
 import type { PublicService } from "./service-words";
@@ -64,8 +66,9 @@ export default function LookServices({
     const type = FRONT_TYPE[look];
     const heading = said(content.heading);
     const intro = said(content.intro);
+    const eyebrow = sectionFrameOf(content).eyebrow;
     const head =
-        heading || intro ? (
+        heading || intro || eyebrow ? (
             <div
                 className={cn(
                     "grid gap-3 pb-6 min-[700px]:pb-10",
@@ -73,6 +76,7 @@ export default function LookServices({
                         "min-[700px]:gap-4 min-[700px]:pb-14 min-[700px]:text-center",
                 )}
             >
+                <LookEyebrow content={content} look={look} />
                 {heading ? (
                     <h2 data-site-title="" className={type.h2}>
                         {heading}

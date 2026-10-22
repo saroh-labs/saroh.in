@@ -15,6 +15,7 @@ import {
     FRONT_TYPE,
     FRONT_WRAP,
     frontButton,
+    LookEyebrow,
     said,
 } from "./look-front";
 import { formatDuration, servicePriceWords } from "./service-words";
@@ -153,6 +154,7 @@ export function usePaidWith(
 }
 
 export function LookTimetable({
+    content,
     look,
     title,
     lede,
@@ -162,6 +164,8 @@ export function LookTimetable({
     credit,
     checked = null,
 }: {
+    /** The section's content, for its eyebrow. */
+    content?: unknown;
     look: LookId;
     title: string;
     /** "13 sessions across 5 days." and the merchant's line, when set. */
@@ -190,6 +194,7 @@ export function LookTimetable({
                         look === "quiet" && "min-[700px]:text-center",
                     )}
                 >
+                    <LookEyebrow content={content} look={look} />
                     <h2 data-site-title="" className={type.h2}>
                         {title}
                     </h2>
@@ -812,6 +817,7 @@ function Action({
  * when the classes come. The cached page is always the loading one.
  */
 export function LookTimetableNote({
+    content,
     look,
     title,
     lede,
@@ -819,6 +825,8 @@ export function LookTimetableNote({
     onRetry,
     children,
 }: {
+    /** The section's content, for its eyebrow. */
+    content?: unknown;
     look: LookId;
     title: string;
     lede: string | null;
@@ -839,6 +847,7 @@ export function LookTimetableNote({
                         look === "quiet" && "min-[700px]:text-center",
                     )}
                 >
+                    <LookEyebrow content={content} look={look} />
                     <h2 data-site-title="" className={type.h2}>
                         {title}
                     </h2>

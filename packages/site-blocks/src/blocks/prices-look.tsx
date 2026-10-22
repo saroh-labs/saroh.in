@@ -2,7 +2,7 @@ import type { LookId } from "@saroh/block-contract";
 
 import { cn } from "../lib/utils";
 import type { FrontButtonKind } from "./look-front";
-import { FRONT_TYPE, FRONT_WRAP, frontButton } from "./look-front";
+import { FRONT_TYPE, FRONT_WRAP, frontButton, LookEyebrow } from "./look-front";
 
 /**
  * Plans and Class packs under a look (DEC-172, plan U7, #1096), as VA10,
@@ -36,11 +36,14 @@ export function weeksWords(weeks: readonly number[]): string | null {
 
 /** The section around a look's plans or packs. */
 export function PriceFrame({
+    content,
     look,
     title,
     intro = null,
     children,
 }: {
+    /** The section's content, for its eyebrow. */
+    content?: unknown;
     look: LookId;
     title: string;
     intro?: string | null;
@@ -59,6 +62,7 @@ export function PriceFrame({
                         look === "quiet" && "min-[700px]:text-center",
                     )}
                 >
+                    <LookEyebrow content={content} look={look} />
                     <h2 data-site-title="" className={type.h2}>
                         {title}
                     </h2>

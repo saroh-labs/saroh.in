@@ -2,7 +2,13 @@ import type { LookId, RenderedTestimonials } from "@saroh/block-contract";
 import type { ReactNode } from "react";
 
 import { cn } from "../lib/utils";
-import { FRONT_RING, FRONT_TYPE, FRONT_WRAP, said } from "./look-front";
+import {
+    FRONT_RING,
+    FRONT_TYPE,
+    FRONT_WRAP,
+    LookEyebrow,
+    said,
+} from "./look-front";
 
 /**
  * What customers said, under a look (DEC-172, plan U6, #1094), as each
@@ -36,16 +42,27 @@ export default function LookTestimonials({
     const heading = said(content.heading);
     const type = FRONT_TYPE[look];
     const title = heading ? (
-        <h2
-            data-site-title=""
-            className={cn(
-                type.h2,
-                "pb-6 min-[700px]:pb-10",
-                look === "quiet" && "min-[700px]:pb-14 min-[700px]:text-center",
-            )}
-        >
-            {heading}
-        </h2>
+        <>
+            <LookEyebrow
+                content={content}
+                look={look}
+                className={cn(
+                    "pb-4",
+                    look === "quiet" && "min-[700px]:text-center",
+                )}
+            />
+            <h2
+                data-site-title=""
+                className={cn(
+                    type.h2,
+                    "pb-6 min-[700px]:pb-10",
+                    look === "quiet" &&
+                        "min-[700px]:pb-14 min-[700px]:text-center",
+                )}
+            >
+                {heading}
+            </h2>
+        </>
     ) : null;
 
     return (

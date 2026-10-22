@@ -8,7 +8,13 @@ import { HeroNextFree } from "../live/next-free";
 import { HeroHeading } from "./hero-heading";
 import type { HeroLevel } from "./hero-level";
 import type { FrontDoor, PageProof } from "./look-front";
-import { FRONT_RING, FRONT_WRAP, FrontCta, frontButton } from "./look-front";
+import {
+    FRONT_RING,
+    FRONT_WRAP,
+    frontButton,
+    FrontCta,
+    LookEyebrow,
+} from "./look-front";
 import { OwnerPhotoNote } from "./no-photo";
 
 /**
@@ -52,6 +58,23 @@ import { OwnerPhotoNote } from "./no-photo";
  *
  * Drawn from `--site-*` only (gates G2 and G7).
  */
+/** Room under the hero's eyebrow, as each board sets it (VA01, VD01, VB01). */
+const EYEBROW_SPACE: Record<LookId, string> = {
+    folio: "pb-5",
+    quiet: "pb-6",
+    live: "pb-3",
+};
+
+/**
+ * The button and the quieter link beside it: VD01 centres them 28px apart,
+ * VB01 sets them 20px apart, Folio's sit together.
+ */
+const SECOND_ROW: Record<LookId, string> = {
+    folio: "flex flex-wrap items-center gap-x-6 gap-y-3",
+    quiet: "flex flex-wrap items-center justify-center gap-x-7 gap-y-3",
+    live: "flex flex-wrap items-center gap-x-5 gap-y-3",
+};
+
 export default function LookHero({
     content,
     look,
@@ -76,25 +99,47 @@ export default function LookHero({
     apiUrl?: string;
 }) {
     const src = content.image?.src.trim() ? content.image : null;
+    const second =
+        content.secondaryCta?.label.trim() && content.secondaryCta.href.trim()
+            ? content.secondaryCta
+            : null;
     const parts: HeroParts = {
         heading: (
-            <HeroHeading
-                level={level}
-                className={cn(HEADING[look], "[overflow-wrap:anywhere]")}
-            >
-                {content.heading}
-            </HeroHeading>
+            <>
+                <LookEyebrow
+                    content={content}
+                    look={look}
+                    className={EYEBROW_SPACE[look]}
+                />
+                <HeroHeading
+                    level={level}
+                    className={cn(HEADING[look], "[overflow-wrap:anywhere]")}
+                >
+                    {content.heading}
+                </HeroHeading>
+            </>
         ),
         line: content.subheading ? (
             <p className={LINE[look]}>{content.subheading}</p>
         ) : null,
-        button: content.cta ? (
-            <FrontCta
-                content={content.cta}
-                look={look}
-                className={BUTTON_WIDTH[look]}
-            />
-        ) : null,
+        button:
+            content.cta || second ? (
+                <div className={SECOND_ROW[look]}>
+                    {content.cta ? (
+                        <FrontCta
+                            content={content.cta}
+                            look={look}
+                            className={BUTTON_WIDTH[look]}
+                        />
+                    ) : null}
+                    {second ? (
+                        <FrontCta
+                            content={{ ...second, style: "link" }}
+                            look={look}
+                        />
+                    ) : null}
+                </div>
+            ) : null,
         door: frontDoor ? (
             <FrontDoorSlot
                 door={frontDoor}

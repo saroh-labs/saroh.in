@@ -578,3 +578,51 @@ describe("a hero's desk grid", () => {
         ).toBe("'h p' 'c c'");
     });
 });
+
+describe("a section's eyebrow and the hero's second link (DEC-172, 22 Oct)", () => {
+    it.each(LOOKS)("%s draws them where the section sets them", (look) => {
+        const html = renderToStaticMarkup(
+            <PageSections
+                sections={[
+                    hero({
+                        eyebrow: "HSR Layout, Bengaluru",
+                        secondaryCta: {
+                            label: "See the timetable",
+                            href: "/#timetable",
+                        },
+                    }),
+                    {
+                        ...services,
+                        content: {
+                            ...(services.content as object),
+                            eyebrow: "Classes and services",
+                        },
+                    },
+                ]}
+                look={look}
+                bookHref="/book"
+                fixtures={{ services: SERVICES }}
+            />,
+        );
+        expect(html).toContain("HSR Layout, Bengaluru");
+        expect(html).toContain("Classes and services");
+        expect(html).toContain('href="/#timetable"');
+        expect(html).toContain("See the timetable");
+    });
+
+    it("Classic draws neither", () => {
+        const html = renderToStaticMarkup(
+            <PageSections
+                sections={[
+                    hero({
+                        eyebrow: "HSR Layout, Bengaluru",
+                        secondaryCta: { label: "See it", href: "/#t" },
+                    }),
+                ]}
+                bookHref="/book"
+            />,
+        );
+        expect(html).not.toContain("data-site-eyebrow");
+        expect(html).not.toContain('href="/#t"');
+    });
+});

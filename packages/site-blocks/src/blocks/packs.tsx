@@ -401,7 +401,7 @@ function PackCards({
     // page, the first Buy is the page's own action.
     if (look) {
         return (
-            <PriceFrame look={look} title={title}>
+            <PriceFrame content={content} look={look} title={title}>
                 {done && prices ? (
                     <PricesDone
                         message={done}

@@ -2,7 +2,13 @@ import type { LookId, RenderedPerson } from "@saroh/block-contract";
 
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
-import { FRONT_TYPE, FRONT_WRAP, FrontCta, said } from "./look-front";
+import {
+    FRONT_TYPE,
+    FRONT_WRAP,
+    FrontCta,
+    LookEyebrow,
+    said,
+} from "./look-front";
 import { InitialsPlate } from "./no-photo";
 
 /**
@@ -133,6 +139,14 @@ export default function LookTeam({
             className="text-site-fg w-full py-[var(--site-section-padding)]"
         >
             <div className={FRONT_WRAP}>
+                <LookEyebrow
+                    content={content}
+                    look={look}
+                    className={cn(
+                        "pb-4",
+                        look === "quiet" && "min-[700px]:text-center",
+                    )}
+                />
                 {title ? (
                     <Title
                         data-site-title=""

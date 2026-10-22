@@ -1,4 +1,5 @@
 import type { LookId, RenderedCta } from "@saroh/block-contract";
+import { sectionFrameOf } from "@saroh/block-contract";
 import Link from "next/link";
 
 import { cn } from "../lib/utils";
@@ -213,6 +214,31 @@ function firstLetter(word: string): string {
         Array.from(word).find(
             (c) => !/[\s.,;:'"()[\]{}\-–—·&/\\!?*_+=@#%^`~|<>]/.test(c),
         ) ?? ""
+    );
+}
+
+/**
+ * The small label over a block's heading (the section's `eyebrow`, DEC-172,
+ * 22 Oct), in the look's eyebrow style; nothing when the section has none.
+ */
+export function LookEyebrow({
+    content,
+    look,
+    className,
+}: {
+    content: unknown;
+    look: LookId;
+    className?: string;
+}) {
+    const eyebrow = sectionFrameOf(content).eyebrow;
+    if (!eyebrow) return null;
+    return (
+        <p
+            data-site-eyebrow=""
+            className={cn(FRONT_TYPE[look].eyebrow, className)}
+        >
+            {eyebrow}
+        </p>
     );
 }
 

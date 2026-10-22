@@ -448,7 +448,12 @@ function PlanCards({
     if (look) {
         const pause = weeksWords(feed.pauseWeeks ?? []);
         return (
-            <PriceFrame look={look} title={title} intro={said(content.intro)}>
+            <PriceFrame
+                content={content}
+                look={look}
+                title={title}
+                intro={said(content.intro)}
+            >
                 {done && prices ? (
                     <PricesDone
                         message={done}
