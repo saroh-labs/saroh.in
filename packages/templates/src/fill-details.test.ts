@@ -65,6 +65,17 @@ describe("fillBusinessDetails", () => {
         expect(gallerySampleIn([String(people[1]?.bio)])).not.toBeNull();
     });
 
+    it("finds nothing to fill the second time, so no one is shown twice", () => {
+        const once = fillBusinessDetails(
+            "person",
+            section("quiet", "person"),
+            facts,
+        );
+        const twice = fillBusinessDetails("person", once.content, facts);
+        expect(twice.filled).toEqual([]);
+        expect(twice.content).toEqual(once.content);
+    });
+
     it("never replaces a person the owner has renamed", () => {
         const person = {
             ...section("live", "person"),

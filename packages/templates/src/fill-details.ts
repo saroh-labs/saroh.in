@@ -97,10 +97,19 @@ function fillPerson(
     facts: BusinessFacts,
     filled: Set<FilledKind>,
 ): Record<string, unknown> {
+    // Staff already on the block (a fill run before) aren't placed twice.
+    const people = [
+        content,
+        ...(Array.isArray(content.people) ? content.people : []),
+    ];
+    const placed = new Set(
+        people.map((p) => (p as Record<string, unknown> | null)?.name),
+    );
+    const waiting = facts.team.filter((s) => !placed.has(s.name));
     let next = 0;
     const take = (person: Record<string, unknown>) => {
         if (!isGallerySample(person.name)) return person;
-        const staff = facts.team.at(next);
+        const staff = waiting.at(next);
         if (!staff) return person;
         next += 1;
         filled.add("team");
