@@ -133,10 +133,7 @@ describe("deriveSafeColours", () => {
         );
         // A business's own lime (no accent text) is still moved under Live.
         const { accentText: _none, ...business } = board;
-        const moved = deriveSafeColours(
-            business as SitePalette,
-            "live",
-        ).palette;
+        const moved = deriveSafeColours(business, "live").palette;
         expect(contrastRatio(moved.accent, moved.bg)).toBeGreaterThanOrEqual(
             PALETTE_GRAPHIC_CONTRAST,
         );

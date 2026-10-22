@@ -18,7 +18,7 @@ import {
 } from "@saroh/database";
 import type { Catalog } from "@saroh/pricing-catalog";
 import { planRows } from "@saroh/pricing-catalog";
-import { GYM_GALLERY_SAMPLE } from "@saroh/templates";
+import { PRANA_GALLERY_SAMPLE, PRANA_TEMPLATE_ID } from "@saroh/templates";
 
 import { fakeMeteredCatalog } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -182,13 +182,13 @@ afterAll(async () => {
 });
 
 describe("starter content (DEC-182)", () => {
-    it("sets the look and copies Live's Gym into the draft, sample words and all, leaving other pages alone", async () => {
+    it("sets the look and copies Live's showcase, Prana, into the draft, sample words and all, leaving other pages alone", async () => {
         const { owner, siteId, homeId, aboutId } = await business("pro");
         const result = await asOrg(owner, () =>
             copyStarterContent(owner, siteId, "live"),
         );
 
-        expect(result.templateId).toBe("gym");
+        expect(result.templateId).toBe(PRANA_TEMPLATE_ID);
         expect(result.look).toBe("live");
         expect(result.replaced).toEqual(["Welcome"]);
         expect((await styleOf(siteId))?.look).toBe("live");
@@ -198,7 +198,7 @@ describe("starter content (DEC-182)", () => {
         expect(home.revision).toBe(4);
         const text = JSON.stringify(home.sections);
         expect(text).not.toContain("Our own words");
-        expect(text).toContain(GYM_GALLERY_SAMPLE.coaches[0].name);
+        expect(text).toContain(PRANA_GALLERY_SAMPLE.teachers.people[0].name);
         // About is not the template's: untouched.
         const about = await draftOf(aboutId);
         expect(about.revision).toBe(3);
@@ -232,14 +232,14 @@ describe("starter content (DEC-182)", () => {
             outcome: "SUCCESS",
         });
         expect(activity.metadata).toMatchObject({
-            template: "gym",
+            template: PRANA_TEMPLATE_ID,
             look: "live",
             pagesReplaced: 1,
             pagesCreated: result.created.length,
         });
         // Counts only: never a line of the site's words.
         expect(JSON.stringify(activity.metadata)).not.toContain(
-            GYM_GALLERY_SAMPLE.coaches[0].name,
+            PRANA_GALLERY_SAMPLE.teachers.people[0].name,
         );
     });
 
@@ -301,7 +301,7 @@ describe("starter content (DEC-182)", () => {
         });
         // Nothing was put back.
         expect(JSON.stringify((await draftOf(homeId)).sections)).toContain(
-            GYM_GALLERY_SAMPLE.coaches[0].name,
+            PRANA_GALLERY_SAMPLE.teachers.people[0].name,
         );
     });
 
@@ -386,7 +386,7 @@ async function staff(organizationId: string) {
 }
 
 describe("filling in the business's details (DEC-182, 22 Oct)", () => {
-    it("fills the sample coaches with the business's staff as the starter copies, and says so", async () => {
+    it("fills the sample teachers with the business's staff as the starter copies, and says so", async () => {
         const { owner, siteId, homeId } = await business("pro");
         await staff(owner.organizationId);
         const result = await asOrg(owner, () =>
@@ -396,9 +396,11 @@ describe("filling in the business's details (DEC-182, 22 Oct)", () => {
         const text = JSON.stringify((await draftOf(homeId)).sections);
         expect(text).toContain("Asha Rao");
         expect(text).toContain("Vikram");
-        expect(text).not.toContain(GYM_GALLERY_SAMPLE.coaches[0].name);
-        // Past the staff, the sample coaches stay for the check to name.
-        expect(text).toContain(GYM_GALLERY_SAMPLE.coaches[2].name);
+        expect(text).not.toContain(
+            PRANA_GALLERY_SAMPLE.teachers.people[0].name,
+        );
+        // Past the staff, the sample teachers stay for the check to name.
+        expect(text).toContain(PRANA_GALLERY_SAMPLE.teachers.people[2].name);
     });
 
     it("brings the details in later, only over sample words, with an Undo", async () => {
