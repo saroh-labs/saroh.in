@@ -130,9 +130,7 @@ export function PeopleTab({
                                     </Avatar>
                                     <div className="min-w-0">
                                         <p className="truncate text-[13.5px] font-medium">
-                                            {m.name && m.name.length > 0
-                                                ? m.name
-                                                : m.email}
+                                            {nameOf(m)}
                                             {m.isSelf ? (
                                                 <span className="font-normal text-muted-foreground">
                                                     {" "}

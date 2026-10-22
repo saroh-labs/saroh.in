@@ -4,6 +4,7 @@ import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { FailedRead } from "@/components/shared/failed-read";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { count, plural } from "@/lib/format/plural";
 import { deleteRole } from "@/lib/organizations/role-actions";
 import type { Role, RoleCatalogue } from "@/lib/organizations/roles";
 import { RoleDot } from "@saroh/ui/avatar";
@@ -77,9 +78,7 @@ export function RoleDetail({
                         <StatusBadge tone="neutral" className="ml-auto">
                             {held === 0
                                 ? "Nobody holds it yet"
-                                : held === 1
-                                  ? "1 person holds it"
-                                  : `${held} people hold it`}
+                                : `${count(held, "person", "people")} ${plural(held, "holds", "hold")} it`}
                         </StatusBadge>
                     )}
                 </div>

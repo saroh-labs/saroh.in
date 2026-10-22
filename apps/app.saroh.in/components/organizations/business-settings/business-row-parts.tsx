@@ -55,16 +55,32 @@ export function EditRow({
  * set and the words to add one otherwise.
  */
 export function rowActions(canEdit: boolean, sheets: BusinessSheets) {
-    const edit = (sheet: BusinessSheet, label: string, name?: string) =>
+    const edit = (
+        sheet: BusinessSheet,
+        label: string,
+        name?: string,
+        id?: string,
+    ) =>
         canEdit ? (
-            <EditRow sheet={sheet} sheets={sheets} label={label} name={name} />
+            <EditRow
+                sheet={sheet}
+                sheets={sheets}
+                label={label}
+                name={name}
+                id={id}
+            />
         ) : null;
     const editOrAdd = (
         sheet: BusinessSheet,
         set: boolean,
         what: string,
         add: string,
-    ) => (set ? edit(sheet, "Edit", `Edit ${what}`) : edit(sheet, add));
+        /** A sheet with several rows names the row's own button. */
+        id?: string,
+    ) =>
+        set
+            ? edit(sheet, "Edit", `Edit ${what}`, id)
+            : edit(sheet, add, undefined, id);
     return { edit, editOrAdd };
 }
 

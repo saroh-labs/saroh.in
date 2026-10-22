@@ -17,7 +17,10 @@ import type { OrganizationRole } from "@/lib/organizations/service";
 
 /** A person's name, or their email while they have not given one. */
 export function nameOf(person: { name: string | null; email: string }): string {
-    return person.name?.trim() ? person.name : person.email;
+    const name = person.name?.trim();
+    // A blank name is no name: the email stands in.
+    if (name) return name;
+    return person.email;
 }
 
 /**

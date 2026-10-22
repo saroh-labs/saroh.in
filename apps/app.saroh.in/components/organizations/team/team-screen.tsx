@@ -1,10 +1,6 @@
 "use client";
 
 import { PausedDiary } from "@/components/billing/paused-diary";
-import {
-    ROLE_BLURB,
-    ROLE_PLAIN,
-} from "@/components/organizations/roles/role-words";
 import { RolesTab } from "@/components/organizations/roles/roles-tab";
 import { SettingsPanelHeader } from "@/components/settings/settings-panel";
 import type { PausedTeam } from "@/lib/billing/paused";
@@ -243,8 +239,6 @@ export function TeamScreen({
                     canEdit={canEditRoles}
                     myActions={myActions}
                     organizationName={organizationName}
-                    builtInBlurb={ROLE_BLURB}
-                    builtInPlain={ROLE_PLAIN}
                     rolesLock={rolesLock}
                 />
             ) : members.length <= 1 && invitations.length === 0 ? (

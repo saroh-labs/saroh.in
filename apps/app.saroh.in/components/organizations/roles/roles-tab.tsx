@@ -12,7 +12,11 @@ import { NewRoleSheet } from "./new-role-sheet";
 import { RoleDetail } from "./role-detail";
 import { ListSection, RoleRow } from "./role-list";
 import { viewerHolds } from "./role-reach";
+import { ROLE_BLURB, ROLE_PLAIN } from "./role-words";
 
+/** Role words by key: a custom role's key finds none. */
+const BUILT_IN_BLURB: Record<string, string> = ROLE_BLURB;
+const BUILT_IN_PLAIN: Record<string, string> = ROLE_PLAIN;
 /**
  * Team → Roles: the roles a business has, and the ones it invents.
  *
@@ -41,8 +45,6 @@ export function RolesTab({
     canEdit,
     myActions,
     organizationName,
-    builtInBlurb,
-    builtInPlain,
     rolesLock = null,
 }: {
     roles: Role[];
@@ -52,10 +54,6 @@ export function RolesTab({
     /** What the viewer may do; `null` when unknown, and nothing is held back. */
     myActions: string[] | null;
     organizationName: string;
-    /** What each built-in is for, in the words the People tab already uses. */
-    builtInBlurb: Record<string, string>;
-    /** The same in a few words, under each built-in's name in the list. */
-    builtInPlain: Record<string, string>;
     /**
      * The plan leaves roles of your own off (UX-030): the way up stands
      * where New role would, rather than a sheet the API refuses.
@@ -94,7 +92,7 @@ export function RolesTab({
                         <RoleRow
                             key={role.key}
                             role={role}
-                            plain={builtInPlain[role.key]}
+                            plain={BUILT_IN_PLAIN[role.key]}
                             on={role.key === active.key}
                             onPick={() => setActiveKey(role.key)}
                         />
@@ -160,7 +158,7 @@ export function RolesTab({
                 holds={holds}
                 blurb={
                     active.system
-                        ? (builtInBlurb[active.key] ?? "")
+                        ? (BUILT_IN_BLURB[active.key] ?? "")
                         : "Made for this business. Whoever holds it can do exactly what is ticked below, and nothing more."
                 }
                 onRemoved={() => setActiveKey("MEMBER")}

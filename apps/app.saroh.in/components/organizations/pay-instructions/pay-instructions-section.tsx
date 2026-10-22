@@ -4,7 +4,7 @@ import { cn } from "@saroh/ui/lib/utils";
 
 import {
     BusinessRows,
-    EditRow,
+    rowActions,
 } from "@/components/organizations/business-settings/business-row-parts";
 import type { OfferUndo } from "@/components/organizations/business-settings/use-settings-undo";
 import { Absent, Row } from "@/components/sites/settings-rows";
@@ -76,16 +76,9 @@ export function PayInstructionsSection({
             : "";
     const editing = sheets.editing?.which === "pay" ? sheets.editing : null;
 
+    const { editOrAdd } = rowActions(canEdit, sheets);
     const edit = (id: string, set: boolean, what: string, add: string) =>
-        canEdit ? (
-            <EditRow
-                sheet="pay"
-                sheets={sheets}
-                id={id}
-                label={set ? "Edit" : add}
-                name={set ? `Edit ${what}` : undefined}
-            />
-        ) : null;
+        editOrAdd("pay", set, what, add, id);
 
     return (
         <div

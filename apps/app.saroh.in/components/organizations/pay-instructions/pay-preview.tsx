@@ -1,5 +1,3 @@
-"use client";
-
 import { PayInstructionsCard, SiteThemeScope } from "@saroh/site-blocks";
 import { cn } from "@saroh/ui/lib/utils";
 

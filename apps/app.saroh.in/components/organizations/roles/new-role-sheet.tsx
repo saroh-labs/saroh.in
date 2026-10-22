@@ -12,18 +12,13 @@ import { Label } from "@saroh/ui/label";
 import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ROLE_LABEL, ROLE_PLAIN } from "./role-words";
 
 /** The built-ins a new role may start from. Owner is not offered: see below. */
 export const START_FROM = [
     { key: "", label: "Nothing. I will tick what it needs" },
-    {
-        key: "MEMBER",
-        label: "Member: runs the day, no money or settings",
-    },
-    {
-        key: "ADMIN",
-        label: "Admin: everything except the Saroh plan and removing an owner",
-    },
+    { key: "MEMBER", label: `${ROLE_LABEL.MEMBER}: ${ROLE_PLAIN.MEMBER}` },
+    { key: "ADMIN", label: `${ROLE_LABEL.ADMIN}: ${ROLE_PLAIN.ADMIN}` },
     { key: "REVIEWER", label: "Reviewer: look at websites and sign them off" },
 ] as const;
 

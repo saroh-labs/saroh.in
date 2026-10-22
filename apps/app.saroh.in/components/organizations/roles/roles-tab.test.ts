@@ -57,8 +57,6 @@ function render(first: Role, myActions: string[] | null) {
             canEdit: true,
             myActions,
             organizationName: "Rye Bakery",
-            builtInBlurb: {},
-            builtInPlain: {},
         }),
     );
 }
@@ -140,8 +138,6 @@ describe("changing the Saroh plan is the owner's alone (DEC-131, amended 2026-10
                 canEdit: true,
                 myActions,
                 organizationName: "Rye Bakery",
-                builtInBlurb: {},
-                builtInPlain: {},
             }),
         );
 
@@ -208,8 +204,6 @@ describe("RolesTab where the plan leaves roles of your own off (UX-030)", () => 
                 canEdit: true,
                 myActions: null,
                 organizationName: "Rye Bakery",
-                builtInBlurb: {},
-                builtInPlain: {},
                 rolesLock,
             }),
         );
