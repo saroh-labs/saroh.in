@@ -152,9 +152,13 @@ export function dockTabs({
         href: home,
         icon: "home",
     };
-    // Home, the pages, then the action in the thumb's reach, then the
-    // shop and You at the end, as the board lays them.
-    return [home0, ...own, ...fixed];
+    // The action in the middle, in the thumb's reach, with Home and the
+    // pages before it and the shop and You after (VB: Home, Timetable,
+    // Book, Plans, You).
+    const main = fixed.filter((t) => t.primary);
+    const rest = [home0, ...own, ...fixed.filter((t) => !t.primary)];
+    const middle = Math.floor((rest.length + main.length) / 2);
+    return [...rest.slice(0, middle), ...main, ...rest.slice(middle)];
 }
 
 /** Which looks draw a phone Book bar (Live has its dock instead). */

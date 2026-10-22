@@ -40,26 +40,45 @@ import type { SiteNavItem } from "./site-header-menu";
 
 const LOOK: Record<
     LookId,
-    { footer: string; lead: string; name: string; closing: string }
+    {
+        footer: string;
+        lead: string;
+        name: string;
+        closing: string;
+        rule: string;
+        button: string;
+    }
 > = {
+    // VA: the name block is the first of the columns (2fr), spanning both
+    // columns on a phone.
     folio: {
         footer: "pt-14 pb-8 min-[700px]:pt-24 min-[700px]:pb-10",
-        lead: "grid justify-items-start gap-3 pb-10 min-[700px]:pb-14",
+        lead: "order-first col-span-full grid content-start justify-items-start gap-3 min-[700px]:col-span-1",
         name: "text-[44px] font-light leading-[0.95] tracking-[-0.035em] min-[700px]:text-[72px]",
         closing: "mt-10 min-[700px]:mt-[72px] justify-between",
+        rule: "border-site-footer-fg/20",
+        button: "px-[26px] font-semibold",
     },
+    // VD: centred; the columns 72px under the name, the closing rule the
+    // page's own hairline.
     quiet: {
         footer: "pt-[72px] pb-8 min-[700px]:pt-[120px] min-[700px]:pb-10",
         lead: "grid justify-items-center gap-5 pb-12 text-center min-[700px]:pb-[72px]",
         name: "text-[42px] font-normal leading-none min-[700px]:text-[64px] min-[700px]:font-light",
         closing:
             "mt-14 min-[700px]:mt-24 justify-center text-center min-[700px]:justify-between",
+        rule: "border-site-border",
+        button: "px-[30px] font-medium",
     },
+    // VB: the name and its line on the left, the columns beside it; no
+    // Book (the dock and the page carry it); room under for the dock.
     live: {
-        footer: "pt-10 pb-8 min-[700px]:pt-14 min-[700px]:pb-10",
-        lead: "grid justify-items-start gap-4 pb-10",
+        footer: "mt-14 pt-10 pb-[120px] min-[700px]:mt-[88px] min-[700px]:pt-14 min-[700px]:pb-10",
+        lead: "grid content-start justify-items-start gap-4 pb-10 min-[700px]:pb-0",
         name: "text-[64px] font-extrabold leading-[0.85] tracking-[-0.05em] [font-stretch:80%] min-[700px]:text-[96px]",
         closing: "mt-10 min-[700px]:mt-14 justify-between",
+        rule: "border-site-footer-fg/15",
+        button: "",
     },
 };
 
@@ -100,28 +119,60 @@ export function LookFooter({
     owner: ReactNode;
 }) {
     const style = LOOK[look];
+    const classes = lookFooterClasses(look);
     const account = (
         <FooterSessionLinks
             session={session}
             basePath={basePath}
-            headingClassName={lookFooterClasses.heading}
-            linkClassName={lookFooterClasses.link}
+            headingClassName={classes.heading}
+            linkClassName={classes.link}
         />
     );
+    const lead = (
+        <div className={style.lead}>
+            <p
+                data-site-footer-name=""
+                className={`font-site-heading m-0 text-balance [font-variant-numeric:lining-nums] ${style.name}`}
+            >
+                {name.trim()}
+            </p>
+            {line ? (
+                <p
+                    className={`text-site-footer-muted m-0 text-[15px] leading-relaxed ${look === "live" ? "max-w-[360px]" : "max-w-[40ch]"}`}
+                >
+                    {line}
+                </p>
+            ) : null}
+            {block}
+            {action && look !== "live" ? (
+                <Link
+                    href={action.href}
+                    className={`border-site-footer-fg text-site-footer-fg rounded-site focus-visible:ring-site-footer-fg focus-visible:ring-offset-site-footer-bg mt-2 inline-flex h-[52px] cursor-pointer items-center justify-center whitespace-nowrap border bg-transparent text-[15px] tracking-[0.02em] transition-opacity duration-[var(--site-motion-base,140ms)] hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:opacity-70 ${style.button}`}
+                >
+                    {action.label}
+                </Link>
+            ) : null}
+        </div>
+    );
+    const folio = look === "folio";
     const facts = hasFooterFacts(contact, menu) ? (
         <FooterContact
             contact={contact}
             menu={menu}
             look={look}
+            leading={folio ? lead : null}
             trailing={account}
         />
     ) : (
         // No facts: Your account still has its column.
         <div
             className={
-                look === "quiet" ? "grid justify-items-center text-center" : ""
+                look === "quiet"
+                    ? "grid justify-items-center text-center"
+                    : "grid gap-8 min-[700px]:grid-cols-[2fr_1fr]"
             }
         >
+            {folio ? lead : null}
             {account}
         </div>
     );
@@ -132,33 +183,23 @@ export function LookFooter({
             className={`bg-site-footer-bg text-site-footer-fg font-site-body w-full ${style.footer}`}
         >
             <div className="max-w-site-content mx-auto px-5 min-[700px]:px-[var(--site-page-margin)]">
-                <div className={style.lead}>
-                    <p
-                        data-site-footer-name=""
-                        className={`font-site-heading m-0 text-balance [font-variant-numeric:lining-nums] ${style.name}`}
-                    >
-                        {name.trim()}
-                    </p>
-                    {line ? (
-                        <p className="text-site-footer-muted m-0 max-w-[40ch] text-[15px] leading-relaxed">
-                            {line}
-                        </p>
-                    ) : null}
-                    {block}
-                    {action ? (
-                        <Link
-                            href={action.href}
-                            className={`border-site-footer-fg text-site-footer-fg rounded-site focus-visible:ring-site-footer-fg focus-visible:ring-offset-site-footer-bg mt-2 inline-flex h-[52px] cursor-pointer items-center justify-center whitespace-nowrap border bg-transparent px-[26px] text-[15px] font-semibold tracking-[0.02em] transition-opacity duration-[var(--site-motion-base,140ms)] hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:opacity-70`}
-                        >
-                            {action.label}
-                        </Link>
-                    ) : null}
-                </div>
-                <div id={VISIT_US_ID} className="scroll-mt-6">
-                    {facts}
-                </div>
+                {look === "live" ? (
+                    <div className="min-[700px]:flex min-[700px]:items-start min-[700px]:justify-between min-[700px]:gap-4">
+                        {lead}
+                        <div id={VISIT_US_ID} className="scroll-mt-6">
+                            {facts}
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        {folio ? null : lead}
+                        <div id={VISIT_US_ID} className="scroll-mt-6">
+                            {facts}
+                        </div>
+                    </>
+                )}
                 <div
-                    className={`border-site-footer-fg/20 text-site-footer-muted flex flex-wrap items-center gap-x-6 gap-y-1 border-t pt-5 text-[13px] ${style.closing} ${CLOSING_TARGETS}`}
+                    className={`${style.rule} text-site-footer-muted flex flex-wrap items-center gap-x-6 gap-y-1 border-t pt-5 text-[13px] ${style.closing} ${CLOSING_TARGETS}`}
                 >
                     <span className="flex flex-wrap items-center gap-x-5">
                         {closing}

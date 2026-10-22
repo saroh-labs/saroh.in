@@ -340,9 +340,8 @@ function LookVisitFrame({
                 <div
                     className={cn(
                         "grid gap-6",
-                        look === "live"
-                            ? "bg-site-surface rounded-site-photo p-5 min-[700px]:p-8"
-                            : "border-site-border border-t pt-8",
+                        look === "live" &&
+                            "bg-site-surface rounded-site-photo p-5 min-[700px]:p-8",
                     )}
                 >
                     <div className="grid min-w-0 gap-3">
@@ -370,6 +369,34 @@ const SHORT_DAY: Record<string, string> = {
     SUN: "Sun",
 };
 
+/** Visit us's measures per look, from boards VA07, VD01/VD07 and VB07. */
+const VISIT: Record<
+    LookId,
+    { grid: string; hours: string; today: string; other: string }
+> = {
+    // VD: two halves 96px apart; hours in a 140px column, no rules.
+    quiet: {
+        grid: "grid gap-10 min-[1000px]:grid-cols-2 min-[1000px]:items-center min-[1000px]:gap-24",
+        hours: "grid grid-cols-[140px_minmax(0,1fr)] gap-x-4 gap-y-2 text-[15.5px] tabular-nums",
+        today: "text-site-fg font-medium",
+        other: "text-site-body",
+    },
+    // VA: hours in a 110px column, 15px, today at 600.
+    folio: {
+        grid: "grid gap-10 min-[1000px]:grid-cols-2 min-[1000px]:gap-16",
+        hours: "grid grid-cols-[110px_minmax(0,1fr)] gap-x-4 gap-y-1 text-[15px] tabular-nums",
+        today: "text-site-fg font-semibold",
+        other: "text-site-muted",
+    },
+    // VB: the place and the week as two cards.
+    live: {
+        grid: "grid gap-5 min-[1000px]:grid-cols-2",
+        hours: "grid text-[14px] tabular-nums",
+        today: "text-site-fg font-bold",
+        other: "text-site-fg",
+    },
+};
+
 function LookVisit({
     look,
     title,
@@ -393,132 +420,157 @@ function LookVisit({
     directions: string | null;
 }) {
     const type = FRONT_TYPE[look];
+    const measure = VISIT[look];
     const rows = hoursRows(week, true);
     const today = rows ? weekdayIn(now ?? new Date(), timeZone) : null;
+    const live = look === "live";
+    const card = "bg-site-surface rounded-site-photo";
+    const todayRow = rows?.find((r) => r.day === today);
+    const open = (
+        <OpenLine
+            week={week}
+            timeZone={timeZone}
+            now={now}
+            closedDates={closedDates}
+            todayHours={
+                todayRow
+                    ? todayRow.hours
+                        ? `Today: ${todayRow.hours}`
+                        : "Closed today"
+                    : null
+            }
+        />
+    );
+    // Quiet's title is the eyebrow and the address its heading (VD01).
+    const head =
+        look === "quiet" && address ? (
+            <>
+                <p data-site-title="" className={type.eyebrow}>
+                    {title}
+                </p>
+                <h2
+                    data-visit-address=""
+                    className={cn(type.h2, "whitespace-pre-line")}
+                >
+                    {address}
+                </h2>
+            </>
+        ) : (
+            <>
+                <h2 data-site-title="" className={type.h2}>
+                    {title}
+                </h2>
+                {address ? (
+                    <p
+                        data-visit-address=""
+                        className={cn(
+                            live
+                                ? "text-site-fg text-[18px] font-bold leading-snug"
+                                : type.name,
+                            "whitespace-pre-line [overflow-wrap:anywhere]",
+                        )}
+                    >
+                        {address}
+                    </p>
+                ) : null}
+            </>
+        );
+    const hours = rows ? (
+        <dl data-visit-hours="" className={measure.hours}>
+            {rows.map((row) => {
+                const on = row.day === today;
+                const tone = on ? measure.today : measure.other;
+                return (
+                    <div
+                        key={row.day}
+                        className={
+                            live
+                                ? "flex justify-between gap-4 py-1.5"
+                                : "contents"
+                        }
+                    >
+                        <dt className={tone}>
+                            {SHORT_DAY[row.day]}
+                            {on ? " · today" : ""}
+                        </dt>
+                        <dd className={tone}>{row.hours ?? "Closed"}</dd>
+                    </div>
+                );
+            })}
+        </dl>
+    ) : null;
+    const actions =
+        directions || phone ? (
+            <div className="flex flex-wrap gap-3">
+                {directions ? (
+                    <a
+                        href={directions}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={frontButton(look, "outline")}
+                    >
+                        <LookIcon name="pin" look={look} size={18} />
+                        Get directions
+                    </a>
+                ) : null}
+                {phone ? (
+                    <a
+                        href={ctaHref({ kind: "call", number: phone }, noPage)}
+                        className={frontButton(
+                            look,
+                            live ? "outline" : "quiet",
+                        )}
+                    >
+                        <LookIcon name="call" look={look} size={18} />
+                        Call {phoneText(phone)}
+                    </a>
+                ) : null}
+            </div>
+        ) : null;
     return (
         <section
             data-site-look-visit={look}
             className="text-site-fg w-full py-[var(--site-section-padding)]"
         >
             <div className={FRONT_WRAP}>
-                <div
-                    className={cn(
-                        "grid gap-8 min-[1000px]:grid-cols-2 min-[1000px]:gap-16",
-                        look === "live"
-                            ? "bg-site-surface rounded-site-photo p-5 min-[700px]:p-8"
-                            : "border-site-border border-t pt-8",
-                    )}
-                >
-                    <div className="grid min-w-0 content-start gap-4">
-                        <h2 data-site-title="" className={type.h2}>
-                            {title}
-                        </h2>
-                        {address ? (
-                            <p
-                                data-visit-address=""
+                {live ? (
+                    <div className={measure.grid}>
+                        <div
+                            className={cn(
+                                card,
+                                "grid min-w-0 content-start gap-4 p-6",
+                            )}
+                        >
+                            {head}
+                            {open}
+                            {actions}
+                        </div>
+                        {hours ? (
+                            <div
                                 className={cn(
-                                    type.name,
-                                    "whitespace-pre-line [overflow-wrap:anywhere]",
+                                    card,
+                                    "grid content-start gap-1 px-6 py-4",
                                 )}
                             >
-                                {address}
-                            </p>
-                        ) : null}
-                        <OpenLine
-                            week={week}
-                            timeZone={timeZone}
-                            now={now}
-                            closedDates={closedDates}
-                            todayHours={
-                                rows && today
-                                    ? (() => {
-                                          const row = rows.find(
-                                              (r) => r.day === today,
-                                          );
-                                          if (!row) return null;
-                                          return row.hours
-                                              ? `Today: ${row.hours}`
-                                              : "Closed today";
-                                      })()
-                                    : null
-                            }
-                        />
-                    </div>
-                    <div className="grid min-w-0 content-start gap-6">
-                        {rows ? (
-                            <dl
-                                data-visit-hours=""
-                                className="border-site-border grid border-t text-[15px]"
-                            >
-                                {rows.map((row) => {
-                                    const on = row.day === today;
-                                    return (
-                                        <div
-                                            key={row.day}
-                                            className="border-site-border grid grid-cols-[8rem_minmax(0,1fr)] gap-x-6 border-b py-2.5"
-                                        >
-                                            <dt
-                                                className={cn(
-                                                    on
-                                                        ? "text-site-fg font-semibold"
-                                                        : "text-site-body",
-                                                )}
-                                            >
-                                                {SHORT_DAY[row.day]}
-                                                {on ? " · today" : ""}
-                                            </dt>
-                                            <dd
-                                                className={cn(
-                                                    "tabular-nums",
-                                                    on
-                                                        ? "text-site-fg font-semibold"
-                                                        : "text-site-body",
-                                                )}
-                                            >
-                                                {row.hours ?? "Closed"}
-                                            </dd>
-                                        </div>
-                                    );
-                                })}
-                            </dl>
-                        ) : null}
-                        {directions || phone ? (
-                            <div className="flex flex-wrap gap-3">
-                                {directions ? (
-                                    <a
-                                        href={directions}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className={frontButton(look, "outline")}
-                                    >
-                                        <LookIcon
-                                            name="pin"
-                                            look={look}
-                                            size={18}
-                                        />
-                                        Get directions
-                                    </a>
-                                ) : null}
-                                {phone ? (
-                                    <a
-                                        href={ctaHref(
-                                            { kind: "call", number: phone },
-                                            noPage,
-                                        )}
-                                        className={frontButton(look, "quiet")}
-                                    >
-                                        <LookIcon
-                                            name="call"
-                                            look={look}
-                                            size={18}
-                                        />
-                                        Call {phoneText(phone)}
-                                    </a>
-                                ) : null}
+                                <p className="text-site-fg m-0 font-bold">
+                                    Hours
+                                </p>
+                                {hours}
                             </div>
                         ) : null}
                     </div>
-                </div>
+                ) : (
+                    <div className={measure.grid}>
+                        <div className="grid min-w-0 content-start gap-4">
+                            {head}
+                            {open}
+                        </div>
+                        <div className="grid min-w-0 content-start gap-7">
+                            {hours}
+                            {actions}
+                        </div>
+                    </div>
+                )}
             </div>
         </section>
     );

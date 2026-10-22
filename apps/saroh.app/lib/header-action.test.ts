@@ -215,7 +215,8 @@ describe("Live's dock (DEC-172, U5)", () => {
             action: book,
             accountArea: false,
         });
-        expect(tabs.map((t) => t.label)).toEqual(["Home", "Timetable", "Book"]);
+        // The main action stands in the middle (board VB).
+        expect(tabs.map((t) => t.label)).toEqual(["Home", "Book", "Timetable"]);
     });
 
     it("doesn't repeat the shop when Order is the main action", () => {
@@ -229,8 +230,8 @@ describe("Live's dock (DEC-172, U5)", () => {
         expect(tabs.map((t) => t.label)).toEqual([
             "Home",
             "Timetable",
-            "Book a class",
             "Order",
+            "Book a class",
         ]);
     });
 });
