@@ -97,7 +97,7 @@ export const RAW_ALLOWED = {
     // button: a row or card that is one button
     "components/commerce/orders/bulk-bar.tsx": ["button"],
     // button: the ink bar's own buttons, as Orders' bulk bar draws them
-    "components/invoices/remind-bar.tsx": ["button"],
+    "components/invoices/list/remind-bar.tsx": ["button"],
     // button: a row or card that is one button
     "components/commerce/orders/order-row.tsx": ["button"],
     // button: a combobox trigger
@@ -165,11 +165,11 @@ export const RAW_ALLOWED = {
     // button: "Add a line" under the paper's lines, a row that is one button (U15)
     "components/invoices/paper-editor/add-line.tsx": ["button"],
     // button: "Cheques not in the bank", a line that is one pressed filter (DEC-173)
-    "components/invoices/cheques-line.tsx": ["button"],
+    "components/invoices/list/cheques-line.tsx": ["button"],
     // button: a row or card that is one button
-    "components/invoices/invoice-row.tsx": ["button"],
+    "components/invoices/list/invoice-row.tsx": ["button"],
     // button: a figure of the money strip, a card that is one pressed filter (DEC-173)
-    "components/invoices/money-strip.tsx": ["button"],
+    "components/invoices/list/money-strip.tsx": ["button"],
     // button: a line's remove button, drawn twice (phone and desk) in the table's own grid
     "components/invoices/new-invoice/lines-table.tsx": ["button"],
     // button: a row or card that is one button

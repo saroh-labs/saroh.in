@@ -21,7 +21,7 @@ import {
 import type { InvoiceFormBusiness } from "@/lib/invoices/new-invoice";
 import type { Invoice } from "@/lib/invoices/service";
 
-import { InvoiceForm } from "../invoice-form";
+import { InvoiceForm } from "./invoice-form";
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({

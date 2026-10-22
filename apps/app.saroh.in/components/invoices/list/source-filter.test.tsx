@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { paymentsLockedCopy } from "@/lib/invoices/access";
 import { chipsFor } from "@/lib/invoices/sources";
 
-import { PaymentsLocked } from "./payments-locked";
+import { PaymentsLocked } from "@/components/invoices/locked/payments-locked";
 import { ScopeNotice, SourceFilter } from "./source-filter";
 
 const noop = () => undefined;

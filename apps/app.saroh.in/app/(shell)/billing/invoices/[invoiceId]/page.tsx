@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
-import { InvoiceDetail } from "@/components/invoices/invoice-detail";
-import { PaymentsLocked } from "@/components/invoices/payments-locked";
+import { InvoiceDetail } from "@/components/invoices/details/invoice-detail";
+import { PaymentsLocked } from "@/components/invoices/locked/payments-locked";
 import { PageContainer } from "@/components/shared/page/page-container";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
 import { readInvoiceDetails } from "@/lib/invoices/details";

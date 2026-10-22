@@ -79,7 +79,7 @@ describe("one of each small piece", () => {
         const allow = {
             "components/commerce/orders/bulk-bar.tsx":
                 "the bulk bar's ten-second hold, a floating toolbar with Undo and Send now",
-            "components/invoices/source-filter.tsx":
+            "components/invoices/list/source-filter.tsx":
                 "the chip that says a list is narrowed to one pack or course",
             "components/sites/settings/publish-bar.tsx":
                 "the sticky publish bar: an action bar that also says what is waiting",

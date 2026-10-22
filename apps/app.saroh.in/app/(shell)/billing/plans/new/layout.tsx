@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { paymentsDenied } from "@/components/invoices/payments-denied";
+import { paymentsDenied } from "@/components/invoices/locked/payments-denied";
 import { ModuleGate } from "@/components/modules/module-gate";
 
 /**

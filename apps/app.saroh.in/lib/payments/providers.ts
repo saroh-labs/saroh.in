@@ -3,7 +3,7 @@
  * sends the stored key ("RAZORPAY"); nothing on screen should shout it.
  *
  * Promoted from the storefronts screen when Order Detail became its third
- * reader (`components/invoices/pay-link.tsx` still keeps its own copy).
+ * reader (`components/invoices/details/pay-link.tsx` still keeps its own copy).
  */
 const PROVIDER_NAME: Record<string, string> = {
     STRIPE: "Stripe",

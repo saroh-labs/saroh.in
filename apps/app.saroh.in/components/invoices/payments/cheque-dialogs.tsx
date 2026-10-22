@@ -15,7 +15,7 @@ import { chequeBounced, chequeCleared } from "@/lib/invoices/actions";
 import type { Invoice, InvoicePayment } from "@/lib/invoices/service";
 import { SHARE_RECEIPT_ON_WHATSAPP } from "@/lib/invoices/words";
 
-import { openWhatsAppShare } from "./whatsapp-share";
+import { openWhatsAppShare } from "@/components/invoices/share/whatsapp-share";
 
 /**
  * A waiting cheque's two endings (DEC-173, INVRecordPlus): it is in the

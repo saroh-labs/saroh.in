@@ -4,7 +4,7 @@ import { reaching, textOn } from "./safe-colours";
 /**
  * How an invoice's paper looks (DEC-173, #1118): three styles in the
  * business's colour, shared by the API's PDF (`invoices/invoice-pdf.ts`)
- * and the app's paper (`components/invoices/invoice-paper.tsx`), so the two
+ * and the app's paper (`components/invoices/details/invoice-paper.tsx`), so the two
  * draw the same colours from the same rule. Pure: no React, no Nest.
  *
  * - **Classic**, plain and printable: today's paper. In a colour, the

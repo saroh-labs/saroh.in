@@ -39,22 +39,17 @@ import { ISSUE_AND_SHARE, ISSUE_IT } from "@/lib/invoices/words";
 import type { DetailsOnFile } from "@/lib/organizations/business-details";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 
+import { PaperEditor } from "@/components/invoices/paper-editor/paper-editor";
+import { SeeAsCustomer } from "@/components/invoices/paper-editor/see-as-customer";
 import { saveOrganizationSettingsInPlace } from "@/lib/organizations/settings-actions";
-import { CustomerBlock, NoContactsYet } from "./new-invoice/customer-block";
-import { DueStrip } from "./new-invoice/due-strip";
-import { finishInvoice } from "./new-invoice/finish";
-import {
-    FormButtons,
-    PhoneFoot,
-    SavePill,
-    SeeItToggle,
-} from "./new-invoice/form-parts";
-import { LinesTable } from "./new-invoice/lines-table";
-import { paperPropsOf } from "./new-invoice/paper-props";
-import { PreviewAside } from "./new-invoice/preview-aside";
-import { useInvoiceDraft } from "./new-invoice/use-invoice-draft";
-import { PaperEditor } from "./paper-editor/paper-editor";
-import { SeeAsCustomer } from "./paper-editor/see-as-customer";
+import { CustomerBlock, NoContactsYet } from "./customer-block";
+import { DueStrip } from "./due-strip";
+import { finishInvoice } from "./finish";
+import { FormButtons, PhoneFoot, SavePill, SeeItToggle } from "./form-parts";
+import { LinesTable } from "./lines-table";
+import { paperPropsOf } from "./paper-props";
+import { PreviewAside } from "./preview-aside";
+import { useInvoiceDraft } from "./use-invoice-draft";
 
 /** How it is written: the form, or on the paper (U15), in `?mode=`. */
 const MODES = ["form", "paper"] as const;

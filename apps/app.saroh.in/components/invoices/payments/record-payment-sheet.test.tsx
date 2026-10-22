@@ -40,7 +40,7 @@ const { actions, toast, router, wa } = vi.hoisted(() => ({
 vi.mock("@/lib/invoices/actions", () => actions);
 vi.mock("@saroh/ui/toast", () => toast);
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
-vi.mock("./whatsapp-share", () => wa);
+vi.mock("@/components/invoices/share/whatsapp-share", () => wa);
 // A picked day, typed: the calendar popover is the date picker's own test.
 vi.mock("@saroh/ui/date-picker", () => ({
     DatePicker: ({

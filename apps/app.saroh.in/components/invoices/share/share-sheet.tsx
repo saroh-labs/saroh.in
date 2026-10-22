@@ -19,11 +19,6 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { refusedResult } from "@/components/billing/plan-refusal";
 import { EmailNoteText } from "@/components/communications/email-note";
-import { useInvoiceSend } from "@/components/invoices/send-dialog";
-import {
-    NewLinkConfirm,
-    UnseenLinkNote,
-} from "@/components/invoices/unseen-link";
 import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
 import { QrButton } from "@/components/qr/qr-button";
 import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
@@ -69,6 +64,8 @@ import {
     OPEN_WHATSAPP,
     WHATSAPP_HOW,
 } from "@/lib/invoices/words";
+import { useInvoiceSend } from "./send-dialog";
+import { NewLinkConfirm, UnseenLinkNote } from "./unseen-link";
 
 const TABS: { value: ShareTab; label: string }[] = [
     { value: "whatsapp", label: "WhatsApp" },

@@ -8,11 +8,8 @@ import type { ReactNode } from "react";
 import { useReducer, useRef, useState } from "react";
 
 import { refusedResult } from "@/components/billing/plan-refusal";
-import { cancelTargetOf } from "@/components/invoices/cancel-or-correct-sheet";
-import {
-    ChequeBouncedDialog,
-    ChequeClearedDialog,
-} from "@/components/invoices/cheque-dialogs";
+import { cancelTargetOf } from "@/components/invoices/cancel-or-correct/cancel-or-correct-sheet";
+import { useWriteAgain } from "@/components/invoices/cancel-or-correct/use-write-again";
 import type { ActionDoes } from "@/components/invoices/details/action-bar";
 import {
     useCancelFlow,
@@ -20,14 +17,12 @@ import {
     useShareFlow,
 } from "@/components/invoices/details/flows";
 import { RemovePaymentDialog } from "@/components/invoices/details/remove-payment-dialog";
-import type { InvoiceRef } from "@/components/invoices/invoice-actions";
 import {
-    DeleteDraftDialog,
-    IssueDialog,
-} from "@/components/invoices/invoice-actions";
-import { useInvoiceSend } from "@/components/invoices/send-dialog";
-import { NewLinkConfirm } from "@/components/invoices/unseen-link";
-import { useWriteAgain } from "@/components/invoices/use-write-again";
+    ChequeBouncedDialog,
+    ChequeClearedDialog,
+} from "@/components/invoices/payments/cheque-dialogs";
+import { useInvoiceSend } from "@/components/invoices/share/send-dialog";
+import { NewLinkConfirm } from "@/components/invoices/share/unseen-link";
 import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
 import { QrButton } from "@/components/qr/qr-button";
 import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
@@ -53,6 +48,8 @@ import { canSend, paysOnline } from "@/lib/invoices/send";
 import type { InvoicePayment } from "@/lib/invoices/service";
 import { billedTo } from "@/lib/invoices/status";
 import { invoiceZone } from "@/lib/invoices/zone";
+import type { InvoiceRef } from "./invoice-actions";
+import { DeleteDraftDialog, IssueDialog } from "./invoice-actions";
 
 type Open = "issue" | "delete" | "newLink" | "newViewLink" | null;
 type PaymentDialog = "remove" | "cleared" | "bounced";

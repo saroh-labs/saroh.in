@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Invoice, InvoiceGst, InvoiceLine } from "@/lib/invoices/service";
 
-import { LineRow } from "./details/lines";
 import { InvoicePaper } from "./invoice-paper";
+import { LineRow } from "./lines";
 
 // The first test draws the whole paper.
 vi.setConfig({ testTimeout: 20_000 });

@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { InvoiceForm } from "@/components/invoices/invoice-form";
+import { InvoiceForm } from "@/components/invoices/new-invoice/invoice-form";
 import { PageContainer } from "@/components/shared/page/page-container";
 import { requireCan } from "@/lib/access/require-can";
 import { canPickProducts } from "@/lib/invoices/can-pick-products";

@@ -10,8 +10,8 @@ import { TextLink } from "@saroh/ui/text-link";
 import { Check, Mail, MessageCircle } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { shortNumber } from "@/components/invoices/invoice-row";
-import { MessagePreview } from "@/components/invoices/share-sheet";
+import { shortNumber } from "@/components/invoices/list/invoice-row";
+import { MessagePreview } from "@/components/invoices/share/share-sheet";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { FailedRead } from "@/components/shared/states/failed-read";
 import { CONNECT_EMAIL_HREF } from "@/lib/communications/email-setup";

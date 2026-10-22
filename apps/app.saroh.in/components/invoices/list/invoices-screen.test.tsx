@@ -46,7 +46,7 @@ vi.mock("@/components/invoices/details/invoice-details-sheet", () => ({
 // Remind many's sheet and a row's share sheet have their own tests: here
 // it is what they are opened on.
 const remind = vi.hoisted(() => ({ rowShare: vi.fn() }));
-vi.mock("@/components/invoices/bulk-remind-sheet", () => ({
+vi.mock("@/components/invoices/bulk-remind/bulk-remind-sheet", () => ({
     BulkRemindSheet: ({
         open,
         rows,
@@ -64,7 +64,7 @@ vi.mock("@/components/invoices/bulk-remind-sheet", () => ({
             />
         ) : null,
 }));
-vi.mock("@/components/invoices/row-share", () => ({
+vi.mock("./row-share", () => ({
     useRowShare: () => ({
         open: remind.rowShare,
         loading: null,

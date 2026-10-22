@@ -11,7 +11,7 @@ import type { InvoiceLineView, InvoiceViewModel } from "./serialize";
 
 /**
  * The invoice's paper as words, laid out the way Invoice Detail prints it
- * (`app.saroh.in` `components/invoices/invoice-paper.tsx`, after "Saroh
+ * (`app.saroh.in` `components/invoices/details/invoice-paper.tsx`, after "Saroh
  * Invoice Detail") — so the PDF (D16) and the printed paper agree line for
  * line. Pure: every figure is the one frozen on the invoice when it was
  * issued, formatted, never summed here.

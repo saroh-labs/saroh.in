@@ -8,7 +8,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
-import type { InvoiceRef } from "@/components/invoices/invoice-actions";
+import type { InvoiceRef } from "@/components/invoices/details/invoice-actions";
 import { RadioCards } from "@/components/shared/fields/choice-group";
 import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";

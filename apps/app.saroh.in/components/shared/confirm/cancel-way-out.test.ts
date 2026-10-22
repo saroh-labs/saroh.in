@@ -59,13 +59,13 @@ const CONFIRMS: [what: string, file: string, verb: string, keep: string][] = [
     ],
     [
         "an invoice (Cancel or correct, DEC-173 U13)",
-        "components/invoices/cancel-or-correct-sheet.tsx",
+        "components/invoices/cancel-or-correct/cancel-or-correct-sheet.tsx",
         'tone="destructive"',
         'cancelLabel="Keep invoice"',
     ],
     [
         "a paid invoice, by Refund…",
-        "components/invoices/invoice-actions.tsx",
+        "components/invoices/details/invoice-actions.tsx",
         "Issue the credit note",
         'cancelLabel="Keep invoice"',
     ],

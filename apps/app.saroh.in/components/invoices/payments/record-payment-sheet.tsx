@@ -45,7 +45,7 @@ import {
 import type { Invoice, InvoicePaymentMethod } from "@/lib/invoices/service";
 import { RECORD_PAYMENT } from "@/lib/invoices/words";
 
-import { offerWhatsAppReceipt } from "./whatsapp-share";
+import { offerWhatsAppReceipt } from "@/components/invoices/share/whatsapp-share";
 
 /** The reason a payment taken back by Undo is kept with in the history. */
 export const UNDONE_REASON = "Undone straight after recording";

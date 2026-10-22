@@ -5,7 +5,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useState } from "react";
 
-import { RecordPaymentSheet } from "@/components/invoices/record-payment-sheet";
+import { RecordPaymentSheet } from "@/components/invoices/payments/record-payment-sheet";
 import type {
     DetailInvoice,
     DetailSubscription,

@@ -3,13 +3,13 @@
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 
-import { SidePanel } from "@/components/invoices/connected-panel";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import type { HistoryTone } from "@/lib/invoices/details-view";
 import { historyLines, nextStep } from "@/lib/invoices/details-view";
 import type { Invoice, InvoicePayment } from "@/lib/invoices/service";
 import { billedTo } from "@/lib/invoices/status";
 import { BOUNCED, REMOVE_THIS_PAYMENT } from "@/lib/invoices/words";
+import { SidePanel } from "./connected-panel";
 
 const DOT: Record<HistoryTone | "next", string> = {
     ok: "bg-success",

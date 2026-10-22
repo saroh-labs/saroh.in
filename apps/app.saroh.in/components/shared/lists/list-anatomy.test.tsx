@@ -22,7 +22,10 @@ import { LevelsPanel } from "@/components/commerce/stock/levels-panel";
 import { Chips } from "@/components/customers/detail/parts";
 import { Filters } from "@/components/customers/list/filters";
 import { Rows } from "@/components/customers/list/rows";
-import { INVOICE_GRID, InvoiceRow } from "@/components/invoices/invoice-row";
+import {
+    INVOICE_GRID,
+    InvoiceRow,
+} from "@/components/invoices/list/invoice-row";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { SetupChecklist } from "@/components/shared/setup-checklist/setup-checklist";
 import {

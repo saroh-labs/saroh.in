@@ -8,7 +8,6 @@ import { ReceiptText } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { INVOICE_GRID, InvoiceRow } from "@/components/invoices/invoice-row";
 import {
     ListTable,
     listTable,
@@ -16,6 +15,7 @@ import {
 } from "@/components/shared/lists/list-toolbar";
 import type { Invoice } from "@/lib/invoices/service";
 import { LIST_LIMIT } from "@/lib/lists/capped";
+import { INVOICE_GRID, InvoiceRow } from "./invoice-row";
 
 /** What an empty list is, and the way back from it. */
 export type ListEmpty =

@@ -4,15 +4,7 @@ import { Button } from "@saroh/ui/button";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
-import type { WaysRead } from "@/components/invoices/bulk-remind-steps";
-import {
-    DoneStep,
-    EmailCard,
-    PickStep,
-    WalkCard,
-    WaysStep,
-} from "@/components/invoices/bulk-remind-steps";
-import { openWhatsAppShare } from "@/components/invoices/whatsapp-share";
+import { openWhatsAppShare } from "@/components/invoices/share/whatsapp-share";
 import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { useLatestCall } from "@/components/shared/live-refresh/use-latest-call";
 import { useHold } from "@/components/shared/undo/use-hold";
@@ -40,6 +32,14 @@ import {
 } from "@/lib/invoices/remind-many";
 import type { Invoice } from "@/lib/invoices/service";
 import { previewMessage } from "@/lib/invoices/share";
+import type { WaysRead } from "./bulk-remind-steps";
+import {
+    DoneStep,
+    EmailCard,
+    PickStep,
+    WalkCard,
+    WaysStep,
+} from "./bulk-remind-steps";
 
 type Step = "pick" | "ways" | "send";
 

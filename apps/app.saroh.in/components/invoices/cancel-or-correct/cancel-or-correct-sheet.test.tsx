@@ -22,12 +22,12 @@ import {
     detailActions,
 } from "@/lib/invoices/detail-actions";
 
+import { RefundInvoiceDialog } from "@/components/invoices/details/invoice-actions";
 import type { CancelOrCorrectInvoice } from "./cancel-or-correct-sheet";
 import {
     CancelOrCorrectSheet,
     cancelTargetOf,
 } from "./cancel-or-correct-sheet";
-import { RefundInvoiceDialog } from "./invoice-actions";
 import { useWriteAgain } from "./use-write-again";
 
 const actions = {

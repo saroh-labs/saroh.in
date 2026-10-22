@@ -20,7 +20,7 @@ import {
 import type { InvoiceFormBusiness } from "@/lib/invoices/new-invoice";
 import type { Invoice } from "@/lib/invoices/service";
 
-import { InvoiceForm } from "../invoice-form";
+import { InvoiceForm } from "@/components/invoices/new-invoice/invoice-form";
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),

@@ -96,7 +96,7 @@ describe("a list draws the one table", () => {
                     "the Orders grid: already the band, the 14px gutter and the wash, with a selection column and a step bar of its own (marked data-list-head)",
                 "components/crm/enquiry-card.tsx":
                     "a card's title strip over one enquiry's answers, not a list's column names",
-                "components/invoices/invoice-paper.tsx":
+                "components/invoices/details/invoice-paper.tsx":
                     "the invoice as it prints: the paper's own ruled table, never a screen's list",
             },
         );
@@ -150,7 +150,7 @@ describe("a list draws the one toolbar", () => {
             {
                 "components/commerce/orders/order-search.tsx":
                     "the Orders search field itself; orders-screen draws it in ListToolbar's search slot",
-                "components/invoices/invoice-search.tsx":
+                "components/invoices/list/invoice-search.tsx":
                     "the Invoices search field itself; invoices-screen draws it in ListToolbar's search slot",
                 "components/stores/catalogue/catalogue-toolbar.tsx":
                     "the Products search field itself; catalogue-screen hands it to DataView's toolbarSearch",
@@ -237,7 +237,7 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
             "Customers, and their requests to remove their data (DEC-172)",
         "components/customers/detail/header.tsx":
             "a person's sections: Overview, Orders, Bookings and the rest",
-        "components/invoices/share-sheet.tsx":
+        "components/invoices/share/share-sheet.tsx":
             "Share's ways: WhatsApp, Email, Link and PDF, each its own panel (INVShareA)",
         "components/insights/insights-tabs.tsx":
             "Insights' answers: Overview, Money, What sells, Where customers come from",

@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 
-import { InvoiceDetailsView } from "@/components/invoices/details/invoice-details-view";
 import type { InvoiceDetails } from "@/lib/invoices/details";
+import { InvoiceDetailsView } from "./invoice-details-view";
 
 /**
  * One invoice's page, `/billing/invoices/[id]` (DEC-173, U9 #1121,

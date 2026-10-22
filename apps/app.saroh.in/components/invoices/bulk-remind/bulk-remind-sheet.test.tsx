@@ -56,14 +56,14 @@ vi.mock("@/lib/invoices/actions", () => ({
     previewReminders: calls.previewReminders,
     sendReminders: calls.sendReminders,
 }));
-vi.mock("@/components/invoices/whatsapp-share", () => ({
+vi.mock("@/components/invoices/share/whatsapp-share", () => ({
     openWhatsAppShare: calls.openWhatsAppShare,
 }));
 vi.mock("@/lib/invoices/minted-links", () => ({
     forgetLink: calls.forgetLink,
 }));
 // The share sheet's own module is drawn only for its preview bubble.
-vi.mock("@/components/invoices/share-sheet", () => ({
+vi.mock("@/components/invoices/share/share-sheet", () => ({
     MessagePreview: ({ text }: { text: string }) => (
         <blockquote data-preview="">{text}</blockquote>
     ),

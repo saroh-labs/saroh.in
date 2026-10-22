@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 
-import { PaymentsLocked } from "@/components/invoices/payments-locked";
 import { paymentsLockedCopy } from "@/lib/invoices/access";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { PaymentsLocked } from "./payments-locked";
 
 /**
  * What Payments' gate shows a role the module is out of reach for (a

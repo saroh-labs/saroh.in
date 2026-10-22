@@ -7,18 +7,8 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { BulkRemindSheet } from "@/components/invoices/bulk-remind-sheet";
-import { ChequesLine } from "@/components/invoices/cheques-line";
+import { BulkRemindSheet } from "@/components/invoices/bulk-remind/bulk-remind-sheet";
 import { InvoiceDetailsSheet } from "@/components/invoices/details/invoice-details-sheet";
-import type { InvoiceBusinessTax } from "@/components/invoices/gst-status-line";
-import { GstStatusLine } from "@/components/invoices/gst-status-line";
-import type { ListEmpty } from "@/components/invoices/invoice-list-body";
-import { InvoiceListBody } from "@/components/invoices/invoice-list-body";
-import { InvoiceSearch } from "@/components/invoices/invoice-search";
-import { MoneyStrip } from "@/components/invoices/money-strip";
-import { RemindBar } from "@/components/invoices/remind-bar";
-import { useRowShare } from "@/components/invoices/row-share";
-import { ScopeNotice, SourceFilter } from "@/components/invoices/source-filter";
 import {
     ListFilter,
     ListToolbar,
@@ -60,8 +50,18 @@ import { inTab, INVOICE_TABS, paidSinceRows } from "@/lib/invoices/status";
 import type { InvoiceSummary, SummaryFilter } from "@/lib/invoices/summary";
 import { invoiceZone } from "@/lib/invoices/zone";
 import { withoutSince } from "@/lib/views/since";
+import { ChequesLine } from "./cheques-line";
+import type { InvoiceBusinessTax } from "./gst-status-line";
+import { GstStatusLine } from "./gst-status-line";
+import type { ListEmpty } from "./invoice-list-body";
+import { InvoiceListBody } from "./invoice-list-body";
+import { InvoiceSearch } from "./invoice-search";
+import { MoneyStrip } from "./money-strip";
+import { RemindBar } from "./remind-bar";
+import { useRowShare } from "./row-share";
+import { ScopeNotice, SourceFilter } from "./source-filter";
 
-export type { InvoiceBusinessTax } from "@/components/invoices/gst-status-line";
+export type { InvoiceBusinessTax } from "./gst-status-line";
 
 /**
  * Payments → Invoices (DEC-173, U8 #1120, INVListAC and INVListACPhone):

@@ -24,7 +24,7 @@ const FLOWS: [flow: string, file: string][] = [
         "product settings",
         "components/commerce/product-settings/product-settings.tsx",
     ],
-    ["invoice", "components/invoices/invoice-form.tsx"],
+    ["invoice", "components/invoices/new-invoice/invoice-form.tsx"],
     ["course", "components/courses/course-form.tsx"],
     ["discount", "components/stores/discounts/discount-form.tsx"],
     ["customer (new)", "components/customers/add-customer-form.tsx"],

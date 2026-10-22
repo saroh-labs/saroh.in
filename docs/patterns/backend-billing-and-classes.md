@@ -18,7 +18,7 @@
   invoice back to ISSUED. "Partly paid" is derived like Overdue (ISSUED
   with `paidCents > 0`, `isPartlyPaid`), never a status.
 - **Cancel or correct** (DEC-173, U13 #1125): one sheet in the app
-  (`components/invoices/cancel-or-correct-sheet.tsx`) for every way an
+  (`components/invoices/cancel-or-correct/cancel-or-correct-sheet.tsx`) for every way an
   unpaid issued invoice is taken back. A registered business credits all
   of it (`POST :id/credit`) or credits it and writes a correct one
   (`POST :id/credit-and-rewrite`: the credit note and a draft with the same
@@ -305,7 +305,7 @@ requireProvider: false })`), the email says "view it and download a copy",
   `whatsappChatLink(phone, text)` (`@saroh/block-contract`); the API
   answers the same link so the bulk flow needs no second rule. Saroh can't
   know a WhatsApp message went: words say "shared on WhatsApp".
-- **The share sheet** (U11 #1123, `components/invoices/share-sheet.tsx`,
+- **The share sheet** (U11 #1123, `components/invoices/share/share-sheet.tsx`,
   rules in `lib/invoices/share.ts`) is the one place an invoice is shared
   by hand: the details open it through `useShareFlow`, and Record
   payment's "Share receipt on WhatsApp" opens it on the receipt. Tabs
@@ -356,7 +356,7 @@ invoices/reminders` (`InvoiceRemindersService`, `invoice:write`, at most
   opens each WhatsApp one through the share route. Never a failure for
   the lot.
 - **Remind many's three steps** (U12 #1124, INVBulkSend;
-  `components/invoices/bulk-remind-sheet.tsx`, its steps in
+  `components/invoices/bulk-remind/bulk-remind-sheet.tsx`, its steps in
   `bulk-remind-steps.tsx`, the words in `lib/invoices/remind-many.ts`):
   "Remind all N" on the Overdue view, or the rows ticked at a desk (the
   ink bar, `remind-bar.tsx`), opens one `FormSheet`: Pick who (all

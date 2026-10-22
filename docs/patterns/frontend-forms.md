@@ -202,7 +202,7 @@ course session removed). See `frontend-error-feedback.md`.
 
 **Current** — **Money recorded by hand is one sheet, written at once
 with Undo** (DEC-173, U10 #1122). Record payment
-(`components/invoices/record-payment-sheet.tsx`) is the one way an
+(`components/invoices/payments/record-payment-sheet.tsx`) is the one way an
 invoice's payment is written down, opened from the page, the details
 sheet, the list and the customer's Invoices tab; it takes an invoice
 already read (`PaymentTarget`, `paymentTargetOf`) or an id, and reads the
