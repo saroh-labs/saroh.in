@@ -2342,3 +2342,16 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Consequences:
     - The order fields and their migration go before release (never applied to an environment). A site's link list (name, label, made by, when) is new. The privacy-review fixes stay (daily per-site salt, server-side cleaning, private pages silent, hour-only step times).
 - Rules (as built, #1099): `docs/patterns/saroh-product.md` → Insights, "where a site visit came from", "the links a business makes to share its site" and "what visit tracking collects". `SiteLink` (migration `20261225100000_site_links`, RLS `org_isolation`), read with `analytics:read`, made and archived with `site:update`, each write in Activity; the intake keeps a step's label only when it is a live link's of that site (a minute's cache per site, dropped on every write). `site.paid` is sent by the private `/shop/order/<id>` page, which sends no page view, only for an order paid online at the checkout; a refund isn't taken off a source.
+
+## DEC-182 A look's Preview shows its own showcase template with sample words, and its starter content can be taken into the draft
+
+**Status: Accepted — 2026-10-22** · owner · amends KTD-6 of the templates gallery (sample words were gallery-only) and DEC-177's Preview
+
+- Context:
+    - Preview drew the business's own home page in each look. With little content of its own (a heading and "No photo yet"), the owner found it showed nothing of what each look and its sections can do, so a business couldn't tell the looks apart.
+- Decision:
+    - **Preview shows each look's showcase template, filled in.** Quiet previews the Salon template, Live the Gym template, Folio the Studio template (until a Yoga or Classes template exists) and Classic the Bakery template, each with its gallery sample words and pictures. One mapping in code, easy to change.
+    - **"Use this look" offers the starter's content too.** In Preview the business can choose the look alone, or the look with that template's sections and sample words copied into its draft. Copying replaces the draft's pages it covers; nothing goes live until Publish; Undo puts the previous draft back.
+    - **Sample words may now reach a merchant's draft**, only by that explicit choice. The check before publishing lists every sample word or sample price, hour or name still on a page, so none goes live unnoticed. `instantiateTemplate` still never adds them on its own.
+- Consequences:
+    - `gallery-samples.test.ts`'s "none reach a merchant's site" holds for site creation only; the copy path is tested on its own, and the pre-publish check learns the sample words.
