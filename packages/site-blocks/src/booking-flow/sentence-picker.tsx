@@ -66,7 +66,7 @@ export function SentencePicker({
 
     return (
         <div data-sentence-picker="">
-            <p className="font-site-heading text-site-fg text-[calc(1.75rem*var(--site-heading-scale,1))] font-light leading-[1.35] tracking-[-0.015em] min-[700px]:text-[calc(2rem*var(--site-heading-scale,1))]">
+            <p className="font-site-heading text-site-fg text-[calc(1.4375rem*var(--site-heading-scale,1))] font-light leading-[1.62] tracking-[-0.02em] min-[700px]:text-[calc(1.875rem*var(--site-heading-scale,1))] min-[700px]:leading-[1.32]">
                 {phrases.map((phrase, i) => (
                     <span key={phrase.kind}>
                         {phrase.before}{" "}
@@ -190,19 +190,33 @@ function PhraseButton({ phrase }: { phrase: Phrase }) {
                 }
                 onClick={() => (open ? close() : show())}
                 onKeyDown={onButtonKey}
+                // VA08's `.sw`: dotted all round in the accent, `.sw-e` muted
+                // italic on the control edge while empty, `.sw-on` filled open.
                 className={cn(
-                    "inline-flex min-h-11 cursor-pointer items-baseline gap-1.5 border-b border-dashed px-0.5 text-left",
+                    "my-px inline-flex min-h-11 cursor-pointer items-center gap-[0.18em] border border-dotted py-0 pl-[0.3em] pr-[0.22em] text-left leading-[1.15]",
                     phrase.value
-                        ? "border-site-fg text-site-fg"
-                        : "border-site-muted text-site-muted",
+                        ? "border-site-accent-text text-site-accent-text"
+                        : "border-site-rule text-site-muted italic",
+                    open && "bg-site-accent-soft border-solid",
                     LOOK_RING,
                     LOOK_EASE,
                 )}
             >
                 <span>{shown}</span>
-                <span aria-hidden="true" className="text-[0.55em]">
-                    ⌄
-                </span>
+                <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    className="size-[0.6em] shrink-0"
+                    fill="none"
+                >
+                    <path
+                        d="m6 9 6 6 6-6"
+                        stroke="currentColor"
+                        strokeWidth="1.75"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                </svg>
             </button>
             {open ? (
                 <ul

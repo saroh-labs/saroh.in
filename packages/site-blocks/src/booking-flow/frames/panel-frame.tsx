@@ -23,8 +23,17 @@ import {
  * the look's 200ms (`data-site-rise`).
  */
 export function PanelFrame(props: FrameProps) {
-    const { label, countText, onBack, onClose, top, heading, children, bar } =
-        props;
+    const {
+        look,
+        label,
+        countText,
+        onBack,
+        onClose,
+        top,
+        heading,
+        children,
+        bar,
+    } = props;
     const labelId = useId();
     const box = useRef<HTMLDivElement>(null);
     useFrameEscape(onClose);
@@ -35,7 +44,7 @@ export function PanelFrame(props: FrameProps) {
                 aria-hidden="true"
                 data-site-fade=""
                 onClick={onClose}
-                className="fixed inset-0 z-[55] bg-[hsl(var(--site-fg)/0.32)] max-[699px]:hidden"
+                className="fixed inset-0 z-[55] bg-[hsl(var(--site-fg)/0.42)] max-[699px]:hidden"
             />
             <div
                 ref={box}
@@ -46,9 +55,9 @@ export function PanelFrame(props: FrameProps) {
                 data-site-rise=""
                 onKeyDown={(e) => holdTab(e, box.current)}
                 style={FRAME_PILL}
-                className="bg-site-bg text-site-fg border-site-fg fixed inset-y-0 right-0 z-[56] flex w-full max-w-[600px] flex-col min-[700px]:border-l"
+                className="bg-site-surface text-site-fg border-site-border fixed inset-y-0 right-0 z-[56] flex w-full max-w-[600px] flex-col min-[700px]:border-l"
             >
-                <div className="border-site-border flex items-center gap-2 border-b px-3 py-2 min-[700px]:px-6">
+                <div className="border-site-border flex items-center gap-2 border-b px-3 py-2 min-[700px]:pb-[18px] min-[700px]:pl-9 min-[700px]:pr-7 min-[700px]:pt-[22px]">
                     {onBack ? (
                         <BackButton onBack={onBack} />
                     ) : (
@@ -61,7 +70,7 @@ export function PanelFrame(props: FrameProps) {
                         {label}
                     </p>
                     {countText ? (
-                        <p className="text-site-body text-[13px]">
+                        <p className="text-site-muted text-[12.5px]">
                             {countText}
                         </p>
                     ) : null}
@@ -69,7 +78,7 @@ export function PanelFrame(props: FrameProps) {
                 </div>
                 <div
                     style={FRAME_RADII}
-                    className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-8 pt-6 min-[700px]:px-10"
+                    className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-8 pt-6 min-[700px]:px-9 min-[700px]:pb-7 min-[700px]:pt-7"
                 >
                     {top ? <div className="mb-6">{top}</div> : null}
                     {heading}
@@ -78,9 +87,9 @@ export function PanelFrame(props: FrameProps) {
                 {bar ? (
                     <div
                         data-booking-bar=""
-                        className="border-site-fg bg-site-bg border-t px-5 pb-[calc(14px+env(safe-area-inset-bottom))] pt-3.5 min-[700px]:px-10"
+                        className="border-site-fg bg-site-surface border-t px-5 pb-[calc(14px+env(safe-area-inset-bottom))] pt-3.5 min-[700px]:px-9 min-[700px]:pb-[22px] min-[700px]:pt-[18px]"
                     >
-                        <BarContent bar={bar} />
+                        <BarContent bar={bar} look={look} />
                     </div>
                 ) : null}
             </div>
