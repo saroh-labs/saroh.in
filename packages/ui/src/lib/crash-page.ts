@@ -19,6 +19,7 @@
 
 import {
     SYMBOL_PATH,
+    WORDMARK_HEIGHT_EM,
     WORDMARK_PATH,
     WORDMARK_VIEWBOX,
 } from "./wordmark-geometry";
@@ -151,7 +152,7 @@ function wordmarkSvg(): string {
         `<svg width="1.385em" height="1.385em" viewBox="0 0 64 64" fill="none" aria-hidden="true" focusable="false">` +
         `<path d="${SYMBOL_PATH}" stroke="hsl(var(--crash-fg))" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>` +
         `<circle cx="50" cy="48" r="5.6" fill="hsl(var(--crash-highlight))"/></svg>` +
-        `<svg viewBox="${WORDMARK_VIEWBOX}" style="height:0.769em;width:auto" aria-hidden="true" focusable="false">` +
+        `<svg viewBox="${WORDMARK_VIEWBOX}" style="height:${WORDMARK_HEIGHT_EM};width:auto" aria-hidden="true" focusable="false">` +
         `<path d="${WORDMARK_PATH}" fill="hsl(var(--crash-fg))"/></svg></span>`
     );
 }

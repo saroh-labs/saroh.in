@@ -2,6 +2,7 @@ import * as React from "react";
 
 import {
     SYMBOL_PATH,
+    WORDMARK_HEIGHT_EM,
     WORDMARK_PATH,
     WORDMARK_VIEWBOX,
 } from "../../lib/wordmark-geometry";
@@ -109,10 +110,11 @@ export function Wordmark({
                 <>
                     <svg
                         viewBox={WORDMARK_VIEWBOX}
-                        // 769 font units of a 1000-unit em: the letters sit at
-                        // the size live text would set them.
+                        // The letters are 769 font units of a 1000-unit em, the
+                        // size live text would set them; the box adds room above
+                        // and below so their edges aren't clipped.
                         style={{
-                            height: "0.769em",
+                            height: WORDMARK_HEIGHT_EM,
                             width: "auto",
                             flex: "none",
                         }}
