@@ -968,6 +968,8 @@ export class PaymentsService {
                 paymentIntent: {
                     select: {
                         id: true,
+                        orderId: true,
+                        invoiceId: true,
                         provider: true,
                         providerIntentId: true,
                         currency: true,
@@ -991,6 +993,8 @@ export class PaymentsService {
             found = await this.factory.get(call.provider).findRefund({
                 reference: row.id,
                 providerIntentId: row.paymentIntent.providerIntentId ?? "",
+                merchantRef:
+                    row.paymentIntent.orderId ?? row.paymentIntent.invoiceId,
                 providerPaymentRef: call.providerPaymentRef,
                 credentials: call.credentials,
             });
@@ -1048,6 +1052,7 @@ export class PaymentsService {
                     select: {
                         id: true,
                         orderId: true,
+                        invoiceId: true,
                         provider: true,
                         providerIntentId: true,
                         currency: true,
@@ -1100,6 +1105,7 @@ export class PaymentsService {
                     select: {
                         id: true,
                         orderId: true,
+                        invoiceId: true,
                         provider: true,
                         providerIntentId: true,
                         currency: true,
@@ -1119,6 +1125,8 @@ export class PaymentsService {
             found = await this.factory.get(call.provider).findRefund({
                 reference: row.id,
                 providerIntentId: row.paymentIntent.providerIntentId ?? "",
+                merchantRef:
+                    row.paymentIntent.orderId ?? row.paymentIntent.invoiceId,
                 providerPaymentRef: call.providerPaymentRef,
                 credentials: call.credentials,
             });
@@ -1173,6 +1181,8 @@ export class PaymentsService {
                 paymentIntent: {
                     select: {
                         id: true,
+                        orderId: true,
+                        invoiceId: true,
                         provider: true,
                         providerIntentId: true,
                         currency: true,
@@ -1244,6 +1254,7 @@ export class PaymentsService {
                 found = await this.factory.get(call.provider).findRefund({
                     reference: row.id,
                     providerIntentId: intent.providerIntentId ?? "",
+                    merchantRef: intent.orderId ?? intent.invoiceId,
                     providerPaymentRef: call.providerPaymentRef,
                     credentials: call.credentials,
                 });
@@ -1479,6 +1490,9 @@ export class PaymentsService {
         row: { id: string; amountCents: number },
         intent: {
             id: string;
+            /** The Order's or Invoice's id: older Cashfree intents' order id. */
+            orderId: string | null;
+            invoiceId: string | null;
             provider: string;
             providerIntentId: string | null;
             currency: string;
@@ -1508,6 +1522,7 @@ export class PaymentsService {
             result = await provider.refund({
                 reference: row.id,
                 providerIntentId: intent.providerIntentId ?? "",
+                merchantRef: intent.orderId ?? intent.invoiceId,
                 providerPaymentRef: call.providerPaymentRef,
                 amountCents: row.amountCents,
                 currency: intent.currency,

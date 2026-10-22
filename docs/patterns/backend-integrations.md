@@ -191,6 +191,13 @@ a note saying so.
   invoice or credit note; its refund webhook (Saroh's, or a dashboard
   refund matched by payment id) settles on that row before the order's
   refund path (`payments/mismatch-refund.ts`).
+- **Current** (22 Oct 2026) — **A provider order id Saroh chooses is unique
+  per intent.** Cashfree refuses an `order_id` it has seen, so each intent
+  sends `<Order or Invoice id>_<12 hex>` and keeps it as its
+  `providerIntentId`; refunds, look-ups and webhooks name the order by it.
+  An intent made before kept Cashfree's numeric `cf_order_id` and was sent
+  under its Order's or Invoice's id, which `cashfreeOrderId` falls back to
+  (`payments/providers/cashfree.provider.ts`).
 - **Current** — **The server derives amounts.** A payment intent's amount comes
   from the Order or, for an invoice pay link, the Invoice — never from the
   request. The public invoice intent route reads its body by hand, so an

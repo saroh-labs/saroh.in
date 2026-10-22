@@ -5855,3 +5855,10 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** the pay page makes a fresh intent per tab. When the second capture arrived, `applySuccess` saw PAID → PAID as a no-op, took it for an edit's difference, and marked the intent SUCCEEDED with a CAPTURED attempt. Only superseded charges and the invoice path recorded money that arrived for something already settled.
 - **Fix:** under the order's lock, a capture on a paid order with nothing left to take (`dueCentsOf` ≤ 0) marks its intent SUPERSEDED and goes through `applySupersededSuccess`: CAPTURED_NEEDS_REFUND, invoiced, shown as owed back, never counted. A balance or a difference charge still has money due and settles as before. `webhooks.service.spec.ts` ("a second tab's payment on an order paid in full is owed back").
 - **Rule:** `backend-integrations.md` › Money that arrives for something already settled is kept, not lost: an order's too, decided by what is due, not by the intent's kind.
+
+### Cashfree refused every second payment on the same Order or Invoice (money review; 22 Oct 2026)
+
+- **Symptom:** on a Cashfree business, paying again after a failed try, paying an edit's difference or a balance link, or retrying after a create that timed out answered the customer with a 503 ("online payment is down").
+- **Cause:** `CashfreeProvider.createOrderIntent` sent the Order's or Invoice's id as `order_id`, which Cashfree requires to be unique, so the second order on one target was refused. Refunds and refund look-ups also posted to `/orders/<cf_order_id>/…`, while Cashfree's refund API takes the merchant `order_id`.
+- **Fix:** each intent sends `<target id>_<12 hex>` and keeps it as `providerIntentId`; refunds, refund look-ups, payment look-ups and the webhook's `providerIntentId` all use it. Intents made before (a numeric `cf_order_id`, no `_`) fall back to their Order's or Invoice's id, passed as `merchantRef` (`cashfreeOrderId`). `cashfree.provider.spec.ts` ("order ids (one per intent)"), `webhook-provider.spec.ts`.
+- **Rule:** `backend-integrations.md` › A provider order id Saroh chooses is unique per intent.
