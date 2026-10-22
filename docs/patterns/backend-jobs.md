@@ -1043,7 +1043,11 @@ overrideId, reason }`. Re-read, then decide
   charge, queued with the rows (a purchase, a renewal, a change of
   provider subscription). Each row goes under its own id as the reference
   and only a QUEUED row becomes SENT; a refusal is logged and the row
-  waits for the next charge; anything unanswered is retried.
+  waits for the next charge; anything unanswered is retried. Razorpay
+  keeps no reference, so its adapter first looks for an add-on on the
+  subscription whose description is `saroh_ref:<row id>` and posts only
+  when there is none: a retry after a lost answer or a failed SENT mark
+  never adds the item twice (22 Oct 2026).
 - **`billing.moves.apply`** is the hourly self-rescheduling sweep (one
   PENDING run, a partial unique index): due pending moves that are ready
   (`plan-moves.ts`) and OPEN checkouts past `expiresAt`. A paid

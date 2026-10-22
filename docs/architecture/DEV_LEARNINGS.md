@@ -5862,3 +5862,10 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** `CashfreeProvider.createOrderIntent` sent the Order's or Invoice's id as `order_id`, which Cashfree requires to be unique, so the second order on one target was refused. Refunds and refund look-ups also posted to `/orders/<cf_order_id>/…`, while Cashfree's refund API takes the merchant `order_id`.
 - **Fix:** each intent sends `<target id>_<12 hex>` and keeps it as `providerIntentId`; refunds, refund look-ups, payment look-ups and the webhook's `providerIntentId` all use it. Intents made before (a numeric `cf_order_id`, no `_`) fall back to their Order's or Invoice's id, passed as `merchantRef` (`cashfreeOrderId`). `cashfree.provider.spec.ts` ("order ids (one per intent)"), `webhook-provider.spec.ts`.
 - **Rule:** `backend-integrations.md` › A provider order id Saroh chooses is unique per intent.
+
+### A Razorpay add-on could be put on a business's next charge twice (money review; 22 Oct 2026)
+
+- **Symptom:** found by reading, not seen live: an add-on charge whose Razorpay answer was lost (a timeout, a 5xx) or whose SENT mark failed would be posted again by the job's retry, and the business charged for it twice.
+- **Cause:** `billing.addons.sync` moves a row QUEUED → SENT only after `POST /subscriptions/:id/addons` answers. An UNKNOWN answer is rethrown and the row stays QUEUED, and Razorpay has no idempotency key for add-ons, so the retry made a second one.
+- **Fix:** `RazorpayBillingProvider.addToNextCharge` first reads the newest add-ons (`GET /addons`, as `findPlan` reads plans) for one on the same subscription whose description is `saroh_ref:<row id>`, and returns it without posting. The lookup decides, so no SENDING state was needed. `billing-provider.spec.ts` ("never adds an item twice").
+- **Rule:** `backend-jobs.md` › `billing.addons.sync`: a provider call with no idempotency key looks for its own reference before it creates.
