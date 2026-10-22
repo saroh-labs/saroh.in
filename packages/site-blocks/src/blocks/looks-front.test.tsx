@@ -313,18 +313,27 @@ describe.each(LOOKS)("%s: the rest of the front door", (look) => {
             const name = row.querySelector("[data-service-row-link]");
             expect(name).not.toBeNull();
             expect(name?.className).toContain("after:inset-0");
-            const book = within(row as HTMLElement).getByRole("link", {
+            const book = within(row as HTMLElement).queryByRole("link", {
                 name: /^Book: /,
             });
-            expect(book.className).toContain("min-h-11");
-            expect(book.className).toContain("z-10");
-            expect(name?.getAttribute("href")).toBe(book.getAttribute("href"));
+            if (look === "quiet") {
+                // VD01: the whole row is the way in, with no Book of its own.
+                expect(book).toBeNull();
+                return;
+            }
+            expect(book?.className).toContain("min-h-11");
+            expect(book?.className).toContain("z-10");
+            expect(name?.getAttribute("href")).toBe(book?.getAttribute("href"));
         });
         expect(
             section.querySelectorAll("a a, a button, button a, a [role=link]"),
         ).toHaveLength(0);
         expect(
-            within(section).getByRole("link", { name: "Book: Hatha yoga" }),
+            look === "quiet"
+                ? within(section).getByRole("link", { name: "Hatha yoga" })
+                : within(section).getByRole("link", {
+                      name: "Book: Hatha yoga",
+                  }),
         ).toHaveAttribute("href", "/book?service=svc_hatha");
         // One filled button a view: no Book on a row is filled.
         expect(section.querySelector(".bg-site-accent")).toBeNull();

@@ -482,6 +482,24 @@ describe("the hero's Next free", () => {
         );
     });
 
+    it("Folio says it as the board's sentence, one link to that time", () => {
+        render(
+            <HeroNextFree
+                look="folio"
+                bookHref="/book"
+                fallback={fallback}
+                read={fresh()}
+            />,
+        );
+        const link = screen.getByRole("link", {
+            name: /^I’d like a Hatha yoga with Meera on tomorrow at 7:00 am/,
+        });
+        expect(link.getAttribute("href")).toBe(
+            "/book?service=svc_hatha&date=2026-10-21&start=07%3A00",
+        );
+        expect(theFact().textContent).toContain("1 hr · 3 places left");
+    });
+
     it("says nothing about places when more than 5 are free", () => {
         render(
             <HeroNextFree

@@ -12,8 +12,9 @@ import { FRONT_RING, FRONT_TYPE, FRONT_WRAP, said } from "./look-front";
  * - **Folio** (VA01): one pull quote, set large in the display face
  *   between two rules; the rest beside it on a desk. On a phone the page
  *   is kept short (VA-16): the pull quote, and the rest behind "Read all".
- * - **Quiet** (VD01): short quotes, one under another, between hairlines,
- *   in the display face's italic.
+ * - **Quiet** (VD01): short quotes in the display face's italic, three
+ *   centred columns on a desk, one under another between hairlines on a
+ *   phone.
  * - **Live** (VB01): white cards, in a row that scrolls sideways on a
  *   phone and a grid on a desk.
  *
@@ -40,7 +41,7 @@ export default function LookTestimonials({
             className={cn(
                 type.h2,
                 "pb-6 min-[700px]:pb-10",
-                look === "quiet" && "min-[700px]:text-center",
+                look === "quiet" && "min-[700px]:pb-14 min-[700px]:text-center",
             )}
         >
             {heading}
@@ -56,12 +57,17 @@ export default function LookTestimonials({
                 {look === "folio" ? (
                     <FolioQuotes items={items} title={title} />
                 ) : look === "quiet" ? (
-                    <div className="mx-auto max-w-[760px]">
+                    <div>
                         {title}
-                        <ul>
+                        {/* VD01: three centred columns on a desk, between
+                            hairlines one under another on a phone. */}
+                        <ul className="min-[700px]:flex min-[700px]:flex-wrap min-[700px]:justify-center min-[700px]:gap-12">
                             {items.map((item, i) => (
-                                <li key={i}>
-                                    <figure className="border-site-border m-0 grid gap-2.5 border-t py-5 min-[700px]:py-7">
+                                <li
+                                    key={i}
+                                    className="min-[700px]:basis-[calc((100%-6rem)/3)]"
+                                >
+                                    <figure className="border-site-border m-0 grid gap-2.5 border-t py-5 min-[700px]:border-t-0 min-[700px]:py-0 min-[700px]:text-center">
                                         <blockquote className="font-site-heading text-site-fg m-0 whitespace-pre-line text-[22px] italic leading-[1.3] [text-wrap:balance] min-[700px]:text-[26px]">
                                             “{item.quote}”
                                         </blockquote>
@@ -165,7 +171,7 @@ function FolioQuotes({ items, title }: { items: Item[]; title: ReactNode }) {
                     </p>
                 )}
                 <figure className="m-0 grid gap-4">
-                    <blockquote className="font-site-heading text-site-fg border-t-site-fg border-b-site-border m-0 whitespace-pre-line border-b border-t py-7 text-[28px] font-light italic leading-[1.25] tracking-[-0.02em] min-[700px]:py-10 min-[700px]:text-[40px]">
+                    <blockquote className="font-site-heading text-site-fg border-t-site-fg border-b-site-border m-0 whitespace-pre-line border-b border-t py-7 text-[40px] font-light italic leading-[1.25] tracking-[-0.02em] min-[700px]:py-10">
                         “{lead.quote}”
                     </blockquote>
                     <Caption

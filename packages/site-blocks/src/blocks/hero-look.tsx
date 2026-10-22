@@ -189,7 +189,7 @@ export function gridAreas(rows: (string[] | null | false)[]): {
 /** The headline per look: the boards' display sizes, phone then desk. */
 const HEADING: Record<LookId, string> = {
     folio: "font-site-heading text-[calc(clamp(3.25rem,10vw,9rem)*var(--site-heading-scale,1))] font-light leading-[0.95] tracking-[-0.045em] [text-wrap:balance] min-[700px]:leading-[0.9]",
-    quiet: "font-site-heading text-[calc(clamp(3.75rem,8.9vw,8rem)*var(--site-heading-scale,1))] font-light leading-none tracking-[-0.02em] [font-variant-numeric:lining-nums] [text-wrap:balance] min-[700px]:leading-[0.95]",
+    quiet: "font-site-heading text-[calc(clamp(3.25rem,8.9vw,8rem)*var(--site-heading-scale,1))] font-light leading-none tracking-[-0.02em] [font-variant-numeric:lining-nums] [text-wrap:balance] min-[700px]:leading-[0.95]",
     live: "font-site-heading text-[calc(clamp(2.5rem,7.8vw,7rem)*var(--site-heading-scale,1))] font-extrabold leading-[0.95] tracking-[-0.035em] [font-stretch:80%] [text-wrap:balance] min-[700px]:leading-[0.86] min-[700px]:tracking-[-0.045em]",
 };
 
@@ -225,7 +225,7 @@ function FolioHero({
         door || button ? (
             <div
                 data-site-rise=""
-                className="border-t-site-fg border-b-site-border grid gap-3 border-t pt-4 min-[700px]:grid-cols-[minmax(0,1fr)_auto] min-[700px]:items-center min-[700px]:gap-5 min-[700px]:border-b min-[700px]:py-[18px]"
+                className="border-t-site-fg border-b-site-border grid gap-2.5 border-t pt-4 min-[700px]:min-h-[150px] min-[700px]:grid-cols-[minmax(0,1fr)_auto] min-[700px]:items-center min-[700px]:gap-5 min-[700px]:border-b min-[700px]:py-[18px]"
             >
                 {door ?? <span />}
                 {button}
@@ -306,8 +306,11 @@ function QuietHero({
             <div
                 className={cn(
                     FRONT_WRAP,
-                    "flex flex-col gap-3.5 pb-7 max-[699px]:order-2 min-[700px]:items-center min-[700px]:gap-6 min-[700px]:pb-[72px] min-[700px]:pt-[88px] min-[700px]:text-center",
-                    hasPhoto ? "pt-6" : "pt-10",
+                    "flex flex-col gap-3.5 pb-7 max-[699px]:order-2 min-[700px]:items-center min-[700px]:gap-6 min-[700px]:text-center",
+                    // VD01 pads a hero with no photo 136/136 on a desk.
+                    hasPhoto
+                        ? "pt-6 min-[700px]:pb-[72px] min-[700px]:pt-[88px]"
+                        : "pt-10 min-[700px]:py-[136px]",
                 )}
             >
                 <div data-site-rise="">{heading}</div>
@@ -320,7 +323,7 @@ function QuietHero({
                     </div>
                 ) : null}
                 {door ? (
-                    <div className="w-full min-[700px]:flex min-[700px]:justify-center">
+                    <div className="w-full min-[700px]:flex min-[700px]:justify-center min-[700px]:pt-2">
                         {door}
                     </div>
                 ) : null}
@@ -483,11 +486,11 @@ const DOOR: Record<LookId, string> = {
 
 /**
  * The height kept for the next booking (VD01's 96px on a phone and 72px
- * on a desk; VA01's card; VB01's Now strip).
+ * on a desk; VA01's sentence card; VB01's Now strip).
  */
 const DOOR_HEIGHT: Record<LookId, string> = {
-    folio: "min-h-[72px]",
-    quiet: "min-h-[72px]",
+    folio: "min-h-[150px] min-[700px]:min-h-[106px]",
+    quiet: "min-h-[96px] min-[700px]:min-h-[72px]",
     live: "min-h-[54px]",
 };
 
