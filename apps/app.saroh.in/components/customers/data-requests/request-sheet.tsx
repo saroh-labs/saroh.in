@@ -5,7 +5,7 @@ import { showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useState } from "react";
 
-import { RemoveDetailsDialog } from "@/components/customers/detail/remove-details-dialog";
+import { RemoveDetailsDialog } from "@/components/customers/more-actions/remove-details-dialog";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { StatusBadge } from "@/components/shared/lists/status-badge";

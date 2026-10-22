@@ -27,7 +27,10 @@ const FLOWS: [flow: string, file: string][] = [
     ["invoice", "components/invoices/new-invoice/invoice-form.tsx"],
     ["course", "components/courses/course-form.tsx"],
     ["discount", "components/stores/discounts/discount-form.tsx"],
-    ["customer (new)", "components/customers/add-customer-form.tsx"],
+    [
+        "customer (new)",
+        "components/customers/store-customer/add-customer-form.tsx",
+    ],
     ["location (new)", "components/stores/locations/create-store-form.tsx"],
     ["create site", "components/sites/new-site/create-site-form.tsx"],
     ["CSV import review", "components/stores/import/csv-import.tsx"],

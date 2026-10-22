@@ -77,7 +77,7 @@ vi.mock("@/lib/discounts/options", () => ({
 vi.mock("@/components/stores/discounts/discount-form", () => ({
     DiscountForm: () => <form data-testid="discount-form" />,
 }));
-vi.mock("@/components/customers/add-customer-form", () => ({
+vi.mock("@/components/customers/store-customer/add-customer-form", () => ({
     AddCustomerForm: () => <form data-testid="add-customer-form" />,
 }));
 vi.mock("@/components/sites/posts/post-editor", () => ({

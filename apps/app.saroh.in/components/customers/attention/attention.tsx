@@ -11,10 +11,6 @@ import { Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import {
-    AttentionTag,
-    AttentionTags,
-} from "@/components/customers/attention-tags";
 import { removeAttentionAction } from "@/lib/customer-workspace/actions";
 import type {
     AttentionEntry,
@@ -28,10 +24,11 @@ import {
 } from "@/lib/customer-workspace/attention";
 import type { HoldSlot } from "@/lib/hold-undo";
 import { createHoldSlot, HOLD_UNDO_MS } from "@/lib/hold-undo";
+import { AttentionTag, AttentionTags } from "./attention-tags";
 
+import { CARD, LABEL } from "@/components/customers/detail/parts";
 import { TextLink } from "@saroh/ui/text-link";
 import { AttentionSheet } from "./attention-sheet";
-import { CARD, LABEL } from "./parts";
 
 /**
  * Needs attention on Customer Detail (DEC-040, C5): the tags by the name, a

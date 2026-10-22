@@ -32,8 +32,8 @@ import {
     unlinkedLine,
 } from "@/lib/customer-workspace/site-account";
 
-import { IdentityLinkDialog } from "../identity-link-dialog";
 import { EditSheet } from "./edit-sheet";
+import { IdentityLinkDialog } from "./identity-link-dialog";
 import { MergeDialog } from "./merge-dialog";
 import { RemoveDetailsDialog } from "./remove-details-dialog";
 
