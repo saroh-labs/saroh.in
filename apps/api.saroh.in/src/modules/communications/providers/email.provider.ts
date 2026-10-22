@@ -12,6 +12,7 @@ import type {
     CommsSendResult,
     CommsVerifyInput,
 } from "./provider.port";
+import { relayBase } from "./relay-base";
 
 const RESEND_API = "https://api.resend.com";
 
@@ -114,7 +115,7 @@ export class EmailCommsProvider implements CommsProvider {
             // Shape error only — never name/echo any credential value.
             throw new Error("Email send failed: provider api key is missing");
         }
-        const url = `${(baseUrl ?? RESEND_API).replace(/\/$/, "")}/emails`;
+        const url = `${await relayBase(baseUrl, RESEND_API)}/emails`;
 
         let res: Response;
         try {
