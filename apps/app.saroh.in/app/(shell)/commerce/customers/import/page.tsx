@@ -2,7 +2,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { StorefrontChooser } from "@/components/commerce/storefront-chooser";
+import { StorefrontChooser } from "@/components/commerce/sell-pages/storefront-chooser";
 import { PageContainer } from "@/components/shared/page/page-container";
 import { CsvImport } from "@/components/stores/import/csv-import";
 import { requireCan } from "@/lib/access/require-can";

@@ -17,8 +17,8 @@ import {
 } from "@/lib/products/overview-words";
 import type { ProductStock } from "@/lib/stock/product-stock";
 
+import { StockSheetButton } from "@/components/commerce/product-stock/stock-sheet";
 import { ProductStat } from "./overview-parts";
-import { StockSheetButton } from "./sheets/stock-sheet";
 
 const FOCUS =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";

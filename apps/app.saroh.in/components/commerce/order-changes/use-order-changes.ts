@@ -10,9 +10,12 @@ import type { ChangeFulfilmentInput } from "@/lib/orders/kitchen-service";
 import { HOLD_MS } from "@/lib/orders/lifecycle";
 import type { OrderRead } from "@/lib/orders/read";
 
+import type {
+    Panel,
+    PendingHold,
+} from "@/components/commerce/order-detail/use-kitchen";
 import { runAction } from "@/lib/api/run-action";
 import type { CancelChoice } from "./cancel-panel";
-import type { Panel, PendingHold } from "./use-kitchen";
 
 /**
  * Order Detail's two changes after it was placed (round-2 B9): how it is

@@ -12,11 +12,11 @@ import type { VariantRow } from "@/lib/products/variant-rows";
 import { isLegacy, legacyNote } from "@/lib/products/variant-rows";
 import { OptionSelect } from "@saroh/ui/option-select";
 
+import { FieldHelp } from "@/components/commerce/product-editor-v2/fields";
 import { ChoiceGroup } from "@/components/shared/fields/choice-group";
 import { Chip } from "@/components/shared/lists/chip";
 import { MoneyInput } from "@saroh/ui/money-input";
 import { TextLink } from "@saroh/ui/text-link";
-import { FieldHelp } from "./fields";
 
 export const VARIANT_GRID =
     "grid grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_minmax(0,1fr)_30px] gap-1.5";

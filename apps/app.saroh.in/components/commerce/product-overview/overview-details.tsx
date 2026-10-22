@@ -10,8 +10,8 @@ import {
 } from "@/lib/products/overview-words";
 import { untrackedDetail } from "@/lib/products/tracking";
 
+import { SheetButton } from "@/components/commerce/product-page/sheet-button";
 import { CardHead, DetailRow } from "./overview-parts";
-import { SheetButton } from "./sheet-button";
 
 /**
  * Details (#522), in two groups as the design has them: "How it's sold" —

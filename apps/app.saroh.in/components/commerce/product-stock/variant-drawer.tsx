@@ -26,7 +26,7 @@ import type { ProductStock } from "@/lib/stock/product-stock";
 import { TextLink } from "@saroh/ui/text-link";
 
 import { DrawerAddStock } from "./drawer-add-stock";
-import { StockSheetButton } from "./sheets/stock-sheet";
+import { StockSheetButton } from "./stock-sheet";
 
 export const WORD_BADGE = {
     IN_STOCK: "success",

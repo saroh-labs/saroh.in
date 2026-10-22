@@ -8,10 +8,14 @@ import { useState } from "react";
 import type { StockDraft, StockLine } from "@/lib/products/editor-sections";
 import { isCount, optionPlural } from "@/lib/products/editor-sections";
 
+import {
+    FIND_FROM,
+    FindRow,
+    matchesFind,
+} from "@/components/commerce/product-variants/find-row";
 import { Field } from "@saroh/ui/field";
 import { Notice } from "@saroh/ui/notice";
 import { FieldHelp } from "./fields";
-import { FIND_FROM, FindRow, matchesFind } from "./find-row";
 
 /**
  * The Stock section's two ways of counting, after the Editor design: one

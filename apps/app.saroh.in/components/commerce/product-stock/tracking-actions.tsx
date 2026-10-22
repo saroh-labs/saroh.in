@@ -25,7 +25,7 @@ import {
     TRACKING_ON_SAID,
     TRACKING_STILL_ON,
 } from "@/lib/products/tracking";
-import { STOCK_SHEET_PARAM } from "./sheets/stock-sheet";
+import { STOCK_SHEET_PARAM } from "./stock-sheet";
 
 /**
  * Track stock from the product page (#515), Owner and Admin only — the page

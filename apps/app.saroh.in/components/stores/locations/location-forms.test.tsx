@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { StorefrontChooser } from "@/components/commerce/storefront-chooser";
+import { StorefrontChooser } from "@/components/commerce/sell-pages/storefront-chooser";
 
 import { CreateStoreForm } from "./create-store-form";
 

@@ -1,6 +1,6 @@
 import type { Tone } from "@/lib/stock/screen";
 
-import { STOCK_TEXT } from "../stock-tones";
+import { STOCK_TEXT } from "./stock-tones";
 
 /**
  * The Stock design's colour roles on the app's tokens: danger, accent (low,

@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { pressOutside } from "@/components/shared/forms/press-outside.test-kit";
 import type { OrderRead, OrderReadLine } from "@/lib/orders/read";
 
-import { OrderDetail } from "./order-detail";
+import { OrderDetail } from "@/components/commerce/order-detail/order-detail";
 
 /**
  * Order Detail is read first (owner, 10 Oct): status, items, payments and
@@ -77,16 +77,18 @@ vi.mock("@saroh/ui/toast", () => ({
     showUndo: (...a: unknown[]) => toast.showUndo(...a) as unknown,
     dismissToasts: () => toast.dismissToasts() as unknown,
 }));
-vi.mock("@/components/commerce/order-actions", () => ({
+vi.mock("@/components/commerce/order-payment/order-actions", () => ({
     OrderActions: () => null,
 }));
-vi.mock("./pay-link", () => ({
+vi.mock("@/components/commerce/order-payment/pay-link", () => ({
     usePayLink: () => ({ ask: vi.fn(), busy: false, dialog: null }),
     PayLinkBlock: () => null,
 }));
 // A treatment's "Book visit N" brings the booking dialog's server reads.
-vi.mock("./visits-next", () => ({ VisitsNextAction: () => null }));
-vi.mock("./money-card", () => ({
+vi.mock("@/components/commerce/order-detail/visits-next", () => ({
+    VisitsNextAction: () => null,
+}));
+vi.mock("@/components/commerce/order-payment/money-card", () => ({
     MoneyCard: () => <section aria-label="Money" />,
 }));
 

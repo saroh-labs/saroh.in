@@ -20,9 +20,12 @@ import type { WaitingCount } from "@/lib/stock/waiting";
 
 import { WaitingLine } from "@/components/commerce/stock/waiting-line";
 
-import { PanelFailed, TabState } from "./panel-state";
-import { StockSheetButton } from "./sheets/stock-sheet";
+import {
+    PanelFailed,
+    TabState,
+} from "@/components/commerce/product-page/panel-state";
 import { LastChange, ProductChecks, RecentChanges } from "./stock-recent";
+import { StockSheetButton } from "./stock-sheet";
 import { StockTable } from "./stock-table";
 import { StopTrackingButton } from "./tracking-actions";
 import { VariantDrawer } from "./variant-drawer";

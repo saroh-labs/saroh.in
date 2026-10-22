@@ -9,8 +9,8 @@ import { onTheShop } from "@/lib/products/overview-rules";
 import { detailTag } from "@/lib/products/overview-words";
 import { EmptyState } from "@saroh/ui/data-state";
 
+import { SheetButton } from "@/components/commerce/product-page/sheet-button";
 import { CardHead, DetailRow, ShownTag } from "./overview-parts";
-import { SheetButton } from "./sheet-button";
 
 const FOCUS =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";

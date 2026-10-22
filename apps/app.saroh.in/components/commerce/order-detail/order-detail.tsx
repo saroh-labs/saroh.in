@@ -4,8 +4,8 @@ import { Button } from "@saroh/ui/button";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
-import type { OrderMenuPending } from "@/components/commerce/order-actions";
-import { OrderActions } from "@/components/commerce/order-actions";
+import type { OrderMenuPending } from "@/components/commerce/order-payment/order-actions";
+import { OrderActions } from "@/components/commerce/order-payment/order-actions";
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { useClock } from "@/lib/hooks/use-clock";
@@ -39,22 +39,28 @@ import type { OrderPaymentsSummary } from "@/lib/payments/service";
 
 import { changeAccess } from "@/lib/orders/fulfilment-change";
 
-import { ChangeCard, PaymentBanner } from "./change-panels";
+import {
+    ChangeCard,
+    PaymentBanner,
+} from "@/components/commerce/order-changes/change-panels";
+import { useOrderPanel } from "@/components/commerce/order-changes/order-sheet";
+import { OrderSheets } from "@/components/commerce/order-changes/order-sheets";
+import { useOrderChanges } from "@/components/commerce/order-changes/use-order-changes";
+import { KitchenPaymentCard } from "@/components/commerce/order-payment/kitchen-payment-card";
+import { MoneyCard } from "@/components/commerce/order-payment/money-card";
+import {
+    PayLinkBlock,
+    usePayLink,
+} from "@/components/commerce/order-payment/pay-link";
 import { CustomerCard } from "./customer-card";
 import { HoldCard } from "./hold-card";
 import { AllergyBanner, OrderItems } from "./items";
-import { KitchenPaymentCard } from "./kitchen-payment-card";
-import { MoneyCard } from "./money-card";
 import { OrderHeading } from "./order-header";
-import { useOrderPanel } from "./order-sheet";
-import { OrderSheets } from "./order-sheets";
 import type { PillTone } from "./parts";
-import { PayLinkBlock, usePayLink } from "./pay-link";
 import { KitchenStepper } from "./stepper";
 import { OrderTimeline } from "./timeline";
 import { useArrival } from "./use-arrival";
 import { useKitchen } from "./use-kitchen";
-import { useOrderChanges } from "./use-order-changes";
 import { VisitsSection } from "./visits-card";
 import { VisitsNextAction } from "./visits-next";
 import { NoCustomerCard } from "./walk-in-card";

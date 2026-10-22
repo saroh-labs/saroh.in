@@ -8,7 +8,7 @@ import { Textarea } from "@saroh/ui/textarea";
 import {
     REPLY_MAX,
     useReviewActions,
-} from "@/components/commerce/product-page/use-review-actions";
+} from "@/components/commerce/product-reviews/use-review-actions";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { stars } from "@/lib/product-reviews/describe";
 import type { Review } from "@/lib/product-reviews/service";

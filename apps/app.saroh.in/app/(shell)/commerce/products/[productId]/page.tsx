@@ -3,6 +3,7 @@ import { cache } from "react";
 
 import { PausedNote } from "@/components/billing/paused-banner";
 import { ProductCollectionsTab } from "@/components/commerce/collections/collections-tab";
+import { ProductOverviewTab } from "@/components/commerce/product-overview/overview-tab";
 import { ArchivedBanner } from "@/components/commerce/product-page/archived-banner";
 import { CustomerView } from "@/components/commerce/product-page/customer-view";
 import { ProductDiscountsTab } from "@/components/commerce/product-page/discounts-tab";
@@ -11,12 +12,11 @@ import {
     ProductHeader,
 } from "@/components/commerce/product-page/header";
 import { ProductOrdersTab } from "@/components/commerce/product-page/orders-tab";
-import { ProductOverviewTab } from "@/components/commerce/product-page/overview-tab";
 import { ProductPageFrame } from "@/components/commerce/product-page/page-state";
 import { ProductPhotosTab } from "@/components/commerce/product-page/photos-tab";
-import { ProductReviewsTab } from "@/components/commerce/product-page/reviews-tab";
-import { ProductStockTab } from "@/components/commerce/product-page/stock-tab";
 import { ProductTabs } from "@/components/commerce/product-page/tabs";
+import { ProductReviewsTab } from "@/components/commerce/product-reviews/reviews-tab";
+import { ProductStockTab } from "@/components/commerce/product-stock/stock-tab";
 import { AccessDenied } from "@/components/shared/states/access-denied";
 import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { activeCut, pausedByCut, pausedWords } from "@/lib/billing/paused";

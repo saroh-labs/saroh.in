@@ -5,12 +5,15 @@ import type { Shipment } from "@/lib/orders/courier";
 import type { OrderRead } from "@/lib/orders/read";
 import type { Sellable } from "@/lib/orders/sellables";
 
+import type {
+    Panel,
+    useKitchen,
+} from "@/components/commerce/order-detail/use-kitchen";
 import { CancelPanel } from "./cancel-panel";
 import { CourierPanel } from "./courier-panel";
 import { EditPanel } from "./edit-panel";
 import { FulfilmentPanel } from "./fulfilment-panel";
 import { RefundPanel } from "./refund-panel";
-import type { Panel, useKitchen } from "./use-kitchen";
 import type { useOrderChanges } from "./use-order-changes";
 
 /**

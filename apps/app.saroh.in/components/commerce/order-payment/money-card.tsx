@@ -12,8 +12,12 @@ import { providerName } from "@/lib/payments/providers";
 import type { OrderPaymentsSummary } from "@/lib/payments/service";
 import { OrderPayments } from "./order-payments";
 
+import {
+    FOCUS,
+    Panel,
+    PanelTitle,
+} from "@/components/commerce/order-detail/parts";
 import { Notice } from "@saroh/ui/notice";
-import { FOCUS, Panel, PanelTitle } from "./parts";
 import { RecordPayment } from "./record-payment";
 
 const KIND_LABEL: Record<string, string> = {

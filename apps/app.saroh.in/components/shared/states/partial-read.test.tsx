@@ -22,7 +22,7 @@ vi.mock("@/lib/subscriptions/actions", () => ({
 }));
 
 import { LeavesStep } from "@/components/commerce/new-order/leaves-step";
-import { PanelLine } from "@/components/commerce/product-page/overview-parts";
+import { PanelLine } from "@/components/commerce/product-overview/overview-parts";
 import { ChangesCard } from "@/components/subscriptions/subscription-detail/changes-card";
 import type {
     Optional,

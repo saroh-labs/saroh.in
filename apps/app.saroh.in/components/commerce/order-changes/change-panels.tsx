@@ -6,9 +6,9 @@ import { sentenceStart } from "@/lib/format/sentence";
 import type { OnlinePaymentWords } from "@/lib/orders/online-payment";
 import { uncollectedHeading } from "@/lib/orders/pay-on-handover";
 
+import { Panel, PanelTitle } from "@/components/commerce/order-detail/parts";
 import { Notice } from "@saroh/ui/notice";
 import { Tip } from "@saroh/ui/tooltip";
-import { Panel, PanelTitle } from "./parts";
 
 /**
  * The Change card's buttons, by the sheet each opens: where the keyboard

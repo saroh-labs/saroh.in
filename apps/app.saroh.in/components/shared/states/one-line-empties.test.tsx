@@ -102,7 +102,7 @@ describe("no tab, sheet or picker prints a bare empty sentence", () => {
             "a step with nothing to fill in, not an empty list",
         "components/bookings/booking-page/pay-link-panel.tsx":
             "why a plan made no payment link, not an empty list",
-        "components/commerce/product-page/review-list.tsx":
+        "components/commerce/product-reviews/review-list.tsx":
             "a review left without words: a value",
         "components/customers/detail/reviews-tab.tsx":
             "a review left without words: a value",

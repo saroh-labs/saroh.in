@@ -19,6 +19,8 @@ import type { ProductStock } from "@/lib/stock/product-stock";
 
 import { PriceHistoryList } from "@/components/shared/price-history/price-history";
 
+import { StockSheetButton } from "@/components/commerce/product-stock/stock-sheet";
+import { UntrackedStat } from "@/components/commerce/product-stock/untracked-stat";
 import { DraftChecklist } from "./draft-checklist";
 import { ProductDetailsCard } from "./overview-details";
 import { OverviewDescription, OverviewPhotos } from "./overview-media";
@@ -30,8 +32,6 @@ import {
     ProductStat,
 } from "./overview-parts";
 import { AvailabilityCard, VariantsStat } from "./overview-stats";
-import { StockSheetButton } from "./sheets/stock-sheet";
-import { UntrackedStat } from "./untracked-stat";
 
 /**
  * The product at a glance (#522): the cards a merchant checks first — what

@@ -22,9 +22,9 @@ import {
 } from "@/lib/products/stock-sheet";
 import type { ProductStock } from "@/lib/stock/product-stock";
 
+import { QuickSheet } from "@/components/commerce/product-page/quick-sheet";
 import { Field } from "@saroh/ui/field";
 import { MoneyInput } from "@saroh/ui/money-input";
-import { QuickSheet } from "../quick-sheet";
 import { MoveStock } from "./move-stock";
 import { PRICE_ROW, ROW, SheetSizeRow } from "./stock-sheet-row";
 import { saveStockSheet } from "./stock-sheet-save";

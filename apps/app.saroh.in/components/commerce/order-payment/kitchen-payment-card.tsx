@@ -1,8 +1,8 @@
 import { kitchenPayment } from "@/lib/orders/pay-on-handover";
 import type { OrderRead } from "@/lib/orders/read";
 
+import { Panel, PanelTitle } from "@/components/commerce/order-detail/parts";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
-import { Panel, PanelTitle } from "./parts";
 
 /**
  * The money column for someone without the money read (UX-010): whether

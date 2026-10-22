@@ -16,13 +16,13 @@ const read = (file: string) => readFileSync(path.join(APP, file), "utf8");
 const CONFIRMS: [what: string, file: string, verb: string, keep: string][] = [
     [
         "an order, from its page",
-        "components/commerce/order-detail/cancel-panel.tsx",
+        "components/commerce/order-changes/cancel-panel.tsx",
         'tone="destructive"',
         'cancelLabel="Keep order"',
     ],
     [
         "an order, from the older menu",
-        "components/commerce/order-actions.tsx",
+        "components/commerce/order-payment/order-actions.tsx",
         'verb: "Cancel order"',
         'keep: "Keep order"',
     ],
@@ -82,8 +82,8 @@ describe("the way out of a confirm that cancels", () => {
         // From the Orders list a cancel asks nothing: it is held ten
         // seconds with Undo.
         for (const file of [
-            "components/commerce/order-detail/cancel-panel.tsx",
-            "components/commerce/order-actions.tsx",
+            "components/commerce/order-changes/cancel-panel.tsx",
+            "components/commerce/order-payment/order-actions.tsx",
         ]) {
             const src = read(file);
             expect(src, file).toContain("Keep order");

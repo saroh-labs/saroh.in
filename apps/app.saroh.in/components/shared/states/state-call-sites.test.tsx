@@ -27,7 +27,7 @@ vi.mock("@/components/organizations/team/switch-account-button", () => ({
     ),
 }));
 
-import { ProductLimitReached } from "@/components/commerce/product-limit-reached";
+import { ProductLimitReached } from "@/components/commerce/product-editor-v2/product-limit-reached";
 import {
     PanelFailed,
     PanelForbidden,

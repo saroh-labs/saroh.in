@@ -29,7 +29,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { usePayLink } from "@/components/commerce/order-detail/pay-link";
+import { usePayLink } from "@/components/commerce/order-payment/pay-link";
 import { QrButton } from "@/components/qr/link-qr/qr-button";
 import { useHold } from "@/components/shared/undo/use-hold";
 import { cancelOrder } from "@/lib/orders/actions";

@@ -6,7 +6,11 @@ import { Star } from "lucide-react";
 import type { ProductOverview } from "@/lib/products/overview";
 import { ratingBars } from "@/lib/products/overview-rules";
 
-import { PanelFailed, PanelForbidden, TabState } from "./panel-state";
+import {
+    PanelFailed,
+    PanelForbidden,
+    TabState,
+} from "@/components/commerce/product-page/panel-state";
 import { ReviewList } from "./review-list";
 
 /**

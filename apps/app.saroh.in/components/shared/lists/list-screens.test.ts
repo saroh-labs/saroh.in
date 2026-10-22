@@ -154,7 +154,7 @@ describe("a list draws the one toolbar", () => {
                     "the Invoices search field itself; invoices-screen draws it in ListToolbar's search slot",
                 "components/stores/catalogue/catalogue-toolbar.tsx":
                     "the Products search field itself; catalogue-screen hands it to DataView's toolbarSearch",
-                "components/commerce/product-editor-v2/find-row.tsx":
+                "components/commerce/product-variants/find-row.tsx":
                     "the product editor's search over a long variants list, inside a section card that has no list toolbar",
             },
         );

@@ -20,7 +20,10 @@ import type { PlanRefusal } from "@/lib/billing/refusal";
 import type { VariantCap } from "@/lib/billing/variant-cap";
 import type { ProductDetail, ProductOptionView } from "@/lib/products/service";
 
-import { ProductEditorProvider, useEditor } from "./editor-state";
+import {
+    ProductEditorProvider,
+    useEditor,
+} from "@/components/commerce/product-editor-v2/editor-state";
 import { VariantsSection } from "./variants-section";
 
 const createVariant = vi.fn();

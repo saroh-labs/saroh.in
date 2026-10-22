@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { kitchenPayment } from "@/lib/orders/pay-on-handover";
 import type { OrderRead } from "@/lib/orders/read";
 
-import { PaymentBanner } from "./change-panels";
+import { PaymentBanner } from "@/components/commerce/order-changes/change-panels";
 import { KitchenPaymentCard } from "./kitchen-payment-card";
 
 /**

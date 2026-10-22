@@ -23,9 +23,9 @@ import { untrackedShort } from "@/lib/products/tracking";
 import type { ProductStock } from "@/lib/stock/product-stock";
 import { TextLink } from "@saroh/ui/text-link";
 
+import { StockSheetButton } from "@/components/commerce/product-stock/stock-sheet";
 import type { SheetKind } from "./sheet-button";
 import { SheetButton } from "./sheet-button";
-import { StockSheetButton } from "./sheets/stock-sheet";
 
 type NoteAction =
     | { label: string; sheet: SheetKind }

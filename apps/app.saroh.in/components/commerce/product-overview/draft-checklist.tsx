@@ -12,10 +12,10 @@ import { optionNoun } from "@/lib/products/overview-words";
 import { untrackedShort } from "@/lib/products/tracking";
 import type { ProductStock } from "@/lib/stock/product-stock";
 
-import { PublishButton } from "./product-actions";
-import type { SheetKind } from "./sheet-button";
-import { SheetButton } from "./sheet-button";
-import { StockSheetButton } from "./sheets/stock-sheet";
+import { PublishButton } from "@/components/commerce/product-page/product-actions";
+import type { SheetKind } from "@/components/commerce/product-page/sheet-button";
+import { SheetButton } from "@/components/commerce/product-page/sheet-button";
+import { StockSheetButton } from "@/components/commerce/product-stock/stock-sheet";
 
 type Cta =
     | { label: string; sheet: SheetKind }

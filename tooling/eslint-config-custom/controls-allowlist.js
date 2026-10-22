@@ -112,13 +112,13 @@ export const RAW_ALLOWED = {
     // button: a row or card that is one button
     "components/commerce/product-editor-v2/visibility-section.tsx": ["button"],
     // button: a control styled by its screen's own helper
-    "components/commerce/product-page/sold-out-actions.tsx": ["button"],
+    "components/commerce/product-stock/sold-out-actions.tsx": ["button"],
     // button: a row or card that is one button
-    "components/commerce/product-page/stock-tab.tsx": ["button"],
+    "components/commerce/product-stock/stock-tab.tsx": ["button"],
     // button: a row or card that is one button
-    "components/commerce/product-page/stock-table.tsx": ["button"],
+    "components/commerce/product-stock/stock-table.tsx": ["button"],
     // button: a control styled by its screen's own helper
-    "components/commerce/product-page/tracking-actions.tsx": ["button"],
+    "components/commerce/product-stock/tracking-actions.tsx": ["button"],
     // button: a rich text toolbar's toggles
     "components/commerce/product-sections/description-editor.tsx": ["button"],
     // button: a row or card that is one button

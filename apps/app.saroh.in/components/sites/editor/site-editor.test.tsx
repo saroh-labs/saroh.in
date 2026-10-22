@@ -619,7 +619,7 @@ describe("SiteEditor shell", () => {
      * The zoom readout starts at 100% and the frame is unscaled. Choosing
      * another step goes through a Radix Select, which jsdom drives badly
      * (every later test stalls for seconds), so the steps and "Fit" are
-     * pinned as maths in `editor/use-editor-viewport.test.ts` instead.
+     * pinned as maths in `canvas/use-editor-viewport.test.ts` instead.
      */
     it("reads the zoom out of the readout, and the canvas width does not scale an unzoomed frame", () => {
         render();

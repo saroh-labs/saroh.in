@@ -33,12 +33,15 @@ import {
 import { EmptyState } from "@saroh/ui/data-state";
 import { TextLink } from "@saroh/ui/text-link";
 
+import {
+    useEditor,
+    useSection,
+} from "@/components/commerce/product-editor-v2/editor-state";
+import { FieldHelp } from "@/components/commerce/product-editor-v2/fields";
+import { SectionCard } from "@/components/commerce/product-editor-v2/section-card";
 import { ChangeOption, OptionShown } from "./change-option";
-import { useEditor, useSection } from "./editor-state";
-import { FieldHelp } from "./fields";
 import { FIND_FROM, FindRow, matchesFind } from "./find-row";
 import { OptionValuesInline } from "./option-values-inline";
-import { SectionCard } from "./section-card";
 import { OptionChoice, VariantAddRow } from "./variant-add-row";
 import { VARIANT_GRID, VariantRowView } from "./variant-row";
 import { DROPPED, saveVariantList } from "./variant-save";

@@ -39,6 +39,7 @@ import { effectiveDefaults } from "@/lib/products/settings-actions";
 import { trackingControl } from "@/lib/products/tracking";
 
 import { PlanWay } from "@/components/billing/plan-way";
+import { VariantsSection } from "@/components/commerce/product-variants/variants-section";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { UNREACHED } from "@/lib/api/unreached";
 import { TextLink } from "@saroh/ui/text-link";
@@ -51,7 +52,6 @@ import { ProductEditorProvider, useEditor } from "./editor-state";
 import { MadeBySection } from "./made-by-section";
 import { PhotosSection } from "./photos-section";
 import { StockSection } from "./stock-section";
-import { VariantsSection } from "./variants-section";
 import { VisibilitySection } from "./visibility-section";
 
 export interface ProductEditorProps {

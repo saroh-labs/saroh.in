@@ -9,7 +9,6 @@ import type { ReactNode } from "react";
 import { useCallback, useMemo, useState, useTransition } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
-import { NeedsYou } from "@/components/commerce/needs-you";
 import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { DataView } from "@/components/shared/data-view/data-view";
 import type { PlanMeter } from "@/lib/billing/meter";
@@ -37,6 +36,7 @@ import { needOf } from "@/lib/products/needs-you";
 import type { SellsOnline } from "@/lib/products/quick-look";
 import { statusToast, step } from "@/lib/products/quick-look";
 import type { CataloguePage, ProductStatus } from "@/lib/products/service";
+import { NeedsYou } from "./needs-you";
 
 import { catalogueColumns, RowMenu } from "./catalogue-columns";
 import { emptyState, NoStorefront } from "./catalogue-empty";

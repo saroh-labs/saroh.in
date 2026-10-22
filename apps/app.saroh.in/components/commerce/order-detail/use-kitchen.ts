@@ -38,10 +38,10 @@ import type {
 import { HOLD_MS, STAGE_LABEL } from "@/lib/orders/lifecycle";
 import type { KitchenStage, OrderRead } from "@/lib/orders/read";
 
+import type { Panel } from "@/components/commerce/order-changes/panel";
+import type { RefundChoice } from "@/components/commerce/order-changes/refund-panel";
 import { runAction } from "@/lib/api/run-action";
 import type { Hold } from "./hold-card";
-import type { Panel } from "./panel";
-import type { RefundChoice } from "./refund-panel";
 
 export type PendingHold = Hold & {
     /** What the hold records when it runs out, or on "now". */

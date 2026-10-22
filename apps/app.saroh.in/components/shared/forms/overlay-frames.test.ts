@@ -58,7 +58,7 @@ const NOT_FORMS: Record<string, string> = {
     "components/stores/catalogue/quick-look.tsx": "a read-only quick look",
     "components/bookings/quick-look/booking-quick-look.tsx":
         "a read-only quick look with its own actions",
-    "components/commerce/product-page/variant-drawer.tsx":
+    "components/commerce/product-stock/variant-drawer.tsx":
         "a read-only quick look",
     "components/calendar/day-sheet.tsx": "a read-only list of a day",
     // An invoice's details from its row (DEC-173, U9): the quick look's
@@ -121,7 +121,7 @@ const NOT_FORMS: Record<string, string> = {
 const PASS_THROUGH = [
     "components/sites/settings/settings-sheet.tsx",
     "components/sites/test-releases/test-release-sheets.tsx",
-    "components/commerce/product-page/sheets/stock-sheet-row.tsx",
+    "components/commerce/product-stock/stock-sheet-row.tsx",
 ];
 
 describe("every sheet and dialog file draws the one frame", () => {
