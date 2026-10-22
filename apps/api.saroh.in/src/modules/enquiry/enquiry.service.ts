@@ -417,11 +417,13 @@ export class EnquiryService {
 
     /**
      * Upsert the Contact by `(organizationId, email)`: a repeat enquiry from the
-     * same address updates the existing person (only the fields actually
-     * supplied, so a sparse repeat never clobbers known values) rather than
-     * forking a duplicate.
+     * same address finds the existing person rather than forking a duplicate,
+     * and fills only what the business doesn't know yet. Anyone can type
+     * anyone's email into a public form, so a form never changes a name or
+     * phone the business already has: it would send their messages to a
+     * stranger's number.
      */
-    private upsertContact(
+    private async upsertContact(
         tx: Prisma.TransactionClient,
         organizationId: string,
         formId: string,
@@ -430,11 +432,21 @@ export class EnquiryService {
         const first = c.firstName ?? this.splitName(c.fullName).first;
         const last = c.lastName ?? this.splitName(c.fullName).last;
 
+        const known = await tx.contact.findUnique({
+            where: { organizationId_email: { organizationId, email: c.email } },
+            select: {
+                firstName: true,
+                lastName: true,
+                phone: true,
+                company: true,
+            },
+        });
         const update: Prisma.ContactUpdateInput = {};
-        if (first !== undefined) update.firstName = first;
-        if (last !== undefined) update.lastName = last;
-        if (c.phone !== undefined) update.phone = c.phone;
-        if (c.company !== undefined) update.company = c.company;
+        if (first !== undefined && !known?.firstName) update.firstName = first;
+        if (last !== undefined && !known?.lastName) update.lastName = last;
+        if (c.phone !== undefined && !known?.phone) update.phone = c.phone;
+        if (c.company !== undefined && !known?.company)
+            update.company = c.company;
 
         return tx.contact.upsert({
             where: {
