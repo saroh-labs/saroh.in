@@ -492,7 +492,7 @@ describe("the hero's Next free", () => {
             />,
         );
         const link = screen.getByRole("link", {
-            name: /^I’d like a Hatha yoga with Meera on tomorrow at 7:00 am/,
+            name: /^I’d like a Hatha yoga with Meera tomorrow at 7:00 am/,
         });
         expect(link.getAttribute("href")).toBe(
             "/book?service=svc_hatha&date=2026-10-21&start=07%3A00",

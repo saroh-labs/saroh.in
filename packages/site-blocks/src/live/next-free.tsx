@@ -188,7 +188,7 @@ const SLOT_HEIGHT: Record<LookId, string> = {
 
 /**
  * Folio's next booking as the board's sentence card (VA01 `.now`): its
- * label and length beside "I'd like a Hatha yoga with Meera on today at
+ * label and length beside "I'd like a Hatha yoga with Meera today at
  * 7:00 am." on a desk, under it on a phone. The sentence is the link to
  * book that time; its phrases are drawn as the board's dotted choices.
  */
@@ -223,7 +223,8 @@ function FolioSentence({
             >
                 I&rsquo;d like {words.article}{" "}
                 <span className={phrase}>{words.what}</span> with{" "}
-                <span className={phrase}>{words.who}</span> on{" "}
+                <span className={phrase}>{words.who}</span>
+                {words.on ? " on " : " "}
                 <span className={phrase}>{words.when}</span>.
             </Link>
             <p className="text-site-body min-[700px]:text-site-muted text-[14px] min-[700px]:self-start min-[700px]:text-[13px] min-[700px]:[grid-area:m]">

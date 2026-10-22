@@ -20,6 +20,7 @@ describe("nextFreeSentence (Folio's next booking)", () => {
             article: "a",
             what: "Hatha yoga",
             who: "Meera",
+            on: false,
             when: "today at 7:00 am",
         });
     });
@@ -37,5 +38,20 @@ describe("nextFreeSentence (Folio's next booking)", () => {
         expect(words.article).toBe("an");
         expect(words.who).toBe("anyone free");
         expect(words.when).toBe("tomorrow at 5:30 pm");
+        expect(words.on).toBe(false);
+    });
+
+    it("says on before a date, never before today or tomorrow", () => {
+        const words = nextFreeSentence(
+            {
+                serviceName: "Hatha yoga",
+                staffName: "Meera",
+                date: "2026-10-24",
+                time: "07:00",
+            },
+            today,
+        );
+        expect(words.on).toBe(true);
+        expect(words.when).toMatch(/ at 7:00 am$/);
     });
 });

@@ -371,6 +371,8 @@ describe.each(LOOKS)("%s: the timetable", (look) => {
         expect(books).toHaveLength(3);
         for (const book of books) {
             expect(book.className).toContain("min-h-11");
+            // Folio's is a text link: as wide as a fingertip too.
+            if (look === "folio") expect(book.className).toContain("min-w-11");
             expect(book.className).not.toContain("bg-site-accent ");
             expect(book).not.toHaveAttribute("data-site-primary");
             expect(book.getAttribute("href")).toMatch(

@@ -881,9 +881,9 @@ function Action({
             aria-label={`Book ${session.serviceName}, ${when}`}
             className={
                 look === "folio"
-                    ? // VA09: Book is an accent text link, 44 tall to tap.
+                    ? // VA09: Book is an accent text link, 44 by 44 to tap.
                       cn(
-                          "text-site-accent-text inline-flex min-h-11 items-center text-[13px] font-semibold underline underline-offset-4",
+                          "text-site-accent-text inline-flex min-h-11 min-w-11 items-center justify-center text-[13px] font-semibold underline underline-offset-4",
                           FRONT_RING,
                           className,
                       )
