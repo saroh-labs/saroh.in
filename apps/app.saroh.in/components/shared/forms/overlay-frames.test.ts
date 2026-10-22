@@ -56,7 +56,7 @@ const NOT_FORMS: Record<string, string> = {
     "components/sites/looks/draft-tools.tsx":
         "the draft's previous versions, read-only, each with Roll back and Bring in",
     "components/stores/catalogue/quick-look.tsx": "a read-only quick look",
-    "components/bookings/calendar/booking-quick-look.tsx":
+    "components/bookings/quick-look/booking-quick-look.tsx":
         "a read-only quick look with its own actions",
     "components/commerce/product-page/variant-drawer.tsx":
         "a read-only quick look",

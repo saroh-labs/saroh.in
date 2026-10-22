@@ -10,7 +10,7 @@ import {
 } from "@saroh/ui/toast";
 import { useEffect, useRef, useState } from "react";
 
-import { makePayLink } from "@/components/bookings/pay-link-panel";
+import { makePayLink } from "@/components/bookings/booking-page/pay-link-panel";
 import { runAction } from "@/lib/api/run-action";
 import { replyAction } from "@/lib/customer-workspace/actions";
 import { formatTime, viewerTimeZone } from "@/lib/format/datetime";

@@ -6,26 +6,10 @@ import { Notice } from "@saroh/ui/notice";
 import type { CSSProperties, ReactElement } from "react";
 import { useId, useState } from "react";
 
-import { BookingPackControl } from "@/components/bookings/booking-pack-control";
-import {
-    HistoryCard,
-    MoneyCard,
-    OutcomeCard,
-    PageNote,
-} from "@/components/bookings/booking-page/cards";
-import { CustomerCard } from "@/components/bookings/booking-page/customer-card";
-import { PageHead } from "@/components/bookings/booking-page/head";
-import { MainButton } from "@/components/bookings/booking-page/main-action";
-import type { PageSheet } from "@/components/bookings/booking-page/overlays";
-import { PageOverlays } from "@/components/bookings/booking-page/overlays";
-import { useOutcomeMark } from "@/components/bookings/booking-page/use-outcome-mark";
-import type { MoreRow } from "@/components/bookings/calendar/quick-look-more";
-import { ClassWaitlist } from "@/components/bookings/class-waitlist";
-import { JoinOnline } from "@/components/bookings/join-online";
 import { useNewBookingLauncher } from "@/components/bookings/new-booking/launcher";
+import type { MoreRow } from "@/components/bookings/quick-look/quick-look-more";
 import type { ReassignScope } from "@/components/bookings/sheets/change-who";
 import { mayChangeWho, onlyTo } from "@/components/bookings/sheets/change-who";
-import { TreatmentVisits } from "@/components/bookings/treatment-visits";
 import { PageContainer } from "@/components/shared/page/page-container";
 import { useHold } from "@/components/shared/undo/use-hold";
 import { personHref } from "@/lib/contacts/person-href";
@@ -53,6 +37,17 @@ import { localDateOf } from "@/lib/services/diary";
 import { joinLink } from "@/lib/services/meeting-link";
 import type { PeekPerson } from "@/lib/services/peek";
 import { zoneShortName } from "@/lib/services/time-picker";
+import { BookingPackControl } from "./booking-pack-control";
+import { HistoryCard, MoneyCard, OutcomeCard, PageNote } from "./cards";
+import { ClassWaitlist } from "./class-waitlist";
+import { CustomerCard } from "./customer-card";
+import { PageHead } from "./head";
+import { JoinOnline } from "./join-online";
+import { MainButton } from "./main-action";
+import type { PageSheet } from "./overlays";
+import { PageOverlays } from "./overlays";
+import { TreatmentVisits } from "./treatment-visits";
+import { useOutcomeMark } from "./use-outcome-mark";
 
 /**
  * A booking's page (U12, #1028; BKMBookingDetail, BKDBooking), one

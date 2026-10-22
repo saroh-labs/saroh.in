@@ -1,4 +1,4 @@
-import type { PayLinkResult } from "@/components/bookings/pay-link-panel";
+import type { PayLinkResult } from "@/components/bookings/booking-page/pay-link-panel";
 import { formatTimeRange } from "@/lib/format/datetime";
 import { firstName } from "@/lib/names";
 import type { PaidBy, PayChoice } from "@/lib/services/booking-pay";

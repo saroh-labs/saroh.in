@@ -5,7 +5,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
-import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
+import { NewBookingDialog } from "@/components/bookings/new-booking/new-booking-dialog";
 import { markVisitAttended } from "@/lib/orders/actions";
 import type { OrderVisits } from "@/lib/orders/read";
 import {

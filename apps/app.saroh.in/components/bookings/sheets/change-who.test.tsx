@@ -14,11 +14,11 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BookingQuickLook } from "@/components/bookings/calendar/booking-quick-look";
+import { BookingQuickLook } from "@/components/bookings/quick-look/booking-quick-look";
 import type {
     QuickLookActions,
     QuickLookContext,
-} from "@/components/bookings/calendar/quick-look-types";
+} from "@/components/bookings/quick-look/quick-look-types";
 import type { DiaryBooking } from "@/lib/services/booking-calendar";
 import type { Block } from "@/lib/services/diary";
 import { bookingState } from "@/lib/services/diary";

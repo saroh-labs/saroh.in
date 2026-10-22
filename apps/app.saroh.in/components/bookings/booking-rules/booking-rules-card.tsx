@@ -8,7 +8,7 @@ import { ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { ROW as CHOICE_ROW } from "./whose-hours";
+import { ROW as CHOICE_ROW } from "@/components/bookings/availability/whose-hours";
 
 import { SwitchRow } from "@/components/shared/fields/check-row";
 import { RadioCards } from "@/components/shared/fields/choice-group";

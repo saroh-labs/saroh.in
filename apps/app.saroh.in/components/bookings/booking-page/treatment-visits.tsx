@@ -1,7 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 
-import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
+import { NewBookingDialog } from "@/components/bookings/new-booking/new-booking-dialog";
 import type { TreatmentView } from "@/lib/services/booking-calendar";
 import {
     orderHref,

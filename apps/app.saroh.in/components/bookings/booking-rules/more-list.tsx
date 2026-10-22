@@ -3,7 +3,7 @@
 import { ChevronRight, Clock, Eye, SlidersHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { Face } from "./face";
+import { Face } from "@/components/bookings/availability/face";
 
 /**
  * A row that opens a sheet (More's rows, Booking rules): an icon, its name,

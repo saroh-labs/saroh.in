@@ -15,8 +15,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BookingMoney } from "@/lib/services/booking-money";
 import type { BookingDetail } from "@/lib/services/service";
 
+import { FRONT_DESK_LINE } from "@/components/bookings/quick-look/quick-look-one";
 import { BookingDetailView } from "./booking-detail";
-import { FRONT_DESK_LINE } from "./calendar/quick-look-one";
 import { TakePayment } from "./take-payment";
 
 const takeDeskPayment = vi.fn();
@@ -404,4 +404,4 @@ describe("the booking page's Take ₹X", () => {
     });
 });
 
-// The calendar quick look's Take ₹X: `calendar/booking-quick-look.test.tsx`.
+// The calendar quick look's Take ₹X: `quick-look/booking-quick-look.test.tsx`.

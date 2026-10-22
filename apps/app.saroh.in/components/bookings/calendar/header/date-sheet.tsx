@@ -19,7 +19,7 @@ import type { CalendarLayout } from "@/lib/services/calendar-href";
 import type { LocalDate } from "@/lib/services/diary";
 import { addDays, weekStartOf } from "@/lib/services/diary";
 
-import { BookingsViewSwitch } from "../../bookings-view-switch";
+import { BookingsViewSwitch } from "@/components/bookings/all-bookings/bookings-view-switch";
 import { HeaderOverlay } from "./header-overlay";
 import { usePhone } from "./use-phone";
 

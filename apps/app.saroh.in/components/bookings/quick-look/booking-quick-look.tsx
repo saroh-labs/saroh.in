@@ -16,10 +16,10 @@ import {
     useState,
 } from "react";
 
+import { TakePayment } from "@/components/bookings/booking-page/take-payment";
 import type { SendHeld } from "@/components/bookings/sheets/cancel-sheet";
 import { CancelSheet } from "@/components/bookings/sheets/cancel-sheet";
 import { mayChangeWho } from "@/components/bookings/sheets/change-who";
-import { TakePayment } from "@/components/bookings/take-payment";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { useHold } from "@/components/shared/undo/use-hold";
 import { formatClockRange, formatDay } from "@/lib/format/datetime";
@@ -35,7 +35,7 @@ import {
 } from "@/lib/services/diary";
 import type { PeekPerson } from "@/lib/services/peek";
 
-import { STATE_TONE } from "./parts";
+import { STATE_TONE } from "@/components/bookings/calendar/parts";
 import { ChooseStep, MoveStep } from "./quick-look-change";
 import { ClassLook } from "./quick-look-class";
 import { NextVisitStep } from "./quick-look-next-visit";

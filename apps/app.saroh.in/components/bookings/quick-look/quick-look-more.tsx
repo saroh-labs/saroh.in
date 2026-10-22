@@ -22,7 +22,7 @@ import Link from "next/link";
 import type { ReactElement, ReactNode } from "react";
 import { useState } from "react";
 
-import { HeaderOverlay } from "./header/header-overlay";
+import { HeaderOverlay } from "@/components/bookings/calendar/header/header-overlay";
 import { QL_BTN } from "./quick-look-parts";
 
 /** One row of More: something to do, or somewhere to go. */

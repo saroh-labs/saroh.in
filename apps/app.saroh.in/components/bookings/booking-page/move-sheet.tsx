@@ -9,7 +9,7 @@ import {
     changeToldText,
     isTakenRefusal,
     movedToldText,
-} from "@/components/bookings/calendar/quick-look-state";
+} from "@/components/bookings/quick-look/quick-look-state";
 import { TimePicker } from "@/components/bookings/sheets/time-picker";
 import {
     FormSheet,

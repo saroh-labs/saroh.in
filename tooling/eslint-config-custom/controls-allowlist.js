@@ -29,7 +29,7 @@ export const RAW_ALLOWED = {
     // button: each item of a row's menu sheet on a phone, a row that is one button
     "components/bookings/all-bookings/row-menu.tsx": ["button"],
     // button: a row that is one button (a rule, opened to change it)
-    "components/bookings/availability/booking-rules-card.tsx": ["button"],
+    "components/bookings/booking-rules/booking-rules-card.tsx": ["button"],
     // button: a row that opens its time picker under it
     "components/bookings/availability/clock-select.tsx": ["button"],
     // button: a row that is one button (a shift, a person's day, add a shift)
@@ -39,9 +39,9 @@ export const RAW_ALLOWED = {
     // button: a row that is one button (add someone else)
     "components/bookings/availability/first-hours.tsx": ["button"],
     // button: a row that is one button (More's rows)
-    "components/bookings/availability/more-list.tsx": ["button"],
+    "components/bookings/booking-rules/more-list.tsx": ["button"],
     // button: a row or card that is one button
-    "components/bookings/availability/time-off-card.tsx": ["button"],
+    "components/bookings/time-off/time-off-card.tsx": ["button"],
     // button: a chip, a row or card that is one button
     "components/bookings/availability/weekly-hours.tsx": ["button"],
     // button: a card that is one button (whose hours, opened to pick)
@@ -62,7 +62,7 @@ export const RAW_ALLOWED = {
     // button: a row that is one button (a person, picked to see theirs)
     "components/bookings/calendar/header/people-sheet.tsx": ["button"],
     // button: a menu row that is one button (the quick look's More)
-    "components/bookings/calendar/quick-look-more.tsx": ["button"],
+    "components/bookings/quick-look/quick-look-more.tsx": ["button"],
     // button: a cell covered by its button, a row or card that is one button
     "components/bookings/calendar/day-by-person.tsx": ["button"],
     // button: a booking on the Day calendar, a block that is one button
@@ -70,7 +70,7 @@ export const RAW_ALLOWED = {
     // button: a booking on the diary, a block that is one button
     "components/bookings/calendar/diary-block.tsx": ["button"],
     // button: free time on the diary, a cell covered by its button
-    "components/bookings/calendar/free-gap.tsx": ["button"],
+    "components/bookings/free-time/free-gap.tsx": ["button"],
     // button: a day heading, a cell that is one button
     "components/bookings/calendar/week-view.tsx": ["button"],
     // button: free time and a booking on the diary, each one button

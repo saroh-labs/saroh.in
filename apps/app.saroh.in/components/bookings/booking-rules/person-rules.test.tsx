@@ -56,7 +56,7 @@ import type {
     StaffView,
 } from "@/lib/staff/types";
 
-import type { EditorProps } from "./hours.test-kit";
+import type { EditorProps } from "@/components/bookings/availability/hours.test-kit";
 import {
     ARJUN,
     MEERA,
@@ -71,9 +71,9 @@ import {
     said,
     setWidth,
     settle,
-} from "./hours.test-kit";
+} from "@/components/bookings/availability/hours.test-kit";
+import { MEMBER_LINE } from "@/components/bookings/availability/whose-hours";
 import type { PersonRulesData } from "./use-person-rules";
-import { MEMBER_LINE } from "./whose-hours";
 
 const SAME: PersonRules = {
     bookAheadDays: null,

@@ -19,9 +19,9 @@ import type { BookingMoney } from "@/lib/services/booking-money";
 import type { PageBooking } from "@/lib/services/booking-page";
 import type { PeekPerson } from "@/lib/services/peek";
 
+import { LauncherContext } from "@/components/bookings/new-booking/launcher";
+import { FRONT_DESK_LINE } from "@/components/bookings/quick-look/quick-look-one";
 import { BookingDetailView } from "./booking-detail";
-import { FRONT_DESK_LINE } from "./calendar/quick-look-one";
-import { LauncherContext } from "./new-booking/launcher";
 
 const recordBookingOutcome = vi.fn();
 const takeDeskPayment = vi.fn();

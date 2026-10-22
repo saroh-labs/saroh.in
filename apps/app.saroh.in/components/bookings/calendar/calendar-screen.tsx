@@ -19,9 +19,12 @@ import { addDays } from "@/lib/services/diary";
 import type { Service } from "@/lib/services/service";
 import type { BookingRules, StaffView } from "@/lib/staff/types";
 
+import { NewBookingFromGap } from "@/components/bookings/free-time/new-booking-from-gap";
+import { OpenHoursDialog } from "@/components/bookings/free-time/open-hours-dialog";
+import { useGapTargets } from "@/components/bookings/free-time/use-gap-targets";
+import { BookingQuickLook } from "@/components/bookings/quick-look/booking-quick-look";
 import { TextLink } from "@saroh/ui/text-link";
 import { AddPersonDialog } from "../availability/add-person-dialog";
-import { BookingQuickLook } from "./booking-quick-look";
 import { DayByPerson } from "./day-by-person";
 import {
     DayFoot,
@@ -33,11 +36,8 @@ import { CalendarHeader } from "./header/calendar-header";
 import { useSwipe } from "./header/use-swipe";
 import { ListView } from "./list/list-view";
 import { useOpeningView } from "./list/use-opening-view";
-import { NewBookingFromGap } from "./new-booking-from-gap";
-import { OpenHoursDialog } from "./open-hours-dialog";
 import { useCalendarActions, withOverrides } from "./use-calendar-actions";
 import { useCalendarDays } from "./use-calendar-days";
-import { useGapTargets } from "./use-gap-targets";
 import { WeekPhone } from "./week-phone";
 import { WeekView } from "./week-view";
 

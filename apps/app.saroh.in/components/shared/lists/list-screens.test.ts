@@ -304,7 +304,7 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
                 (listScreen(code) &&
                     /<(?:Chip|ChipGroup)\b|chipClass\(/.test(code)),
             {
-                "components/bookings/bookings-view.tsx":
+                "components/bookings/all-bookings/bookings-view.tsx":
                     "All bookings (U11): its six views are chips with counts in the toolbar's one row, as the boards the owner signed off on 19 Oct draw them (BKMAllBookings, BKDAllBookings; DEC-170)",
             },
         );

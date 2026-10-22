@@ -17,11 +17,11 @@ import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AllBookingsCan } from "@/components/bookings/bookings-view";
 import { UNREACHED } from "@/lib/api/unreached";
 import type { DiaryBooking } from "@/lib/services/booking-calendar";
 import type { BookingMoney } from "@/lib/services/booking-money";
 import { BOOKINGS_FIRST_RUN, shareLink } from "@/lib/sites/share-links";
+import type { AllBookingsCan } from "./bookings-view";
 
 import { BookingsCouldntLoad, BookingsView } from "./bookings-view";
 
@@ -707,7 +707,7 @@ describe("All bookings, first run and failure", () => {
         const loader = readFileSync(
             path.resolve(
                 __dirname,
-                "../../app/(shell)/bookings/all/loading.tsx",
+                "../../../app/(shell)/bookings/all/loading.tsx",
             ),
             "utf8",
         );
@@ -720,10 +720,10 @@ describe("All bookings, first run and failure", () => {
 describe("every cancel on All bookings asks about the money (BA-01)", () => {
     const files = [
         "bookings-view.tsx",
-        "all-bookings/booking-row.tsx",
-        "all-bookings/row-menu.tsx",
-        "all-bookings/more-filters.tsx",
-        "all-bookings/move-sheet.tsx",
+        "booking-row.tsx",
+        "row-menu.tsx",
+        "more-filters.tsx",
+        "move-sheet.tsx",
     ].map((f) => readFileSync(path.resolve(__dirname, f), "utf8"));
 
     it("never cancels around the one cancel sheet", () => {

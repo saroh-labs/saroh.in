@@ -34,8 +34,11 @@ import {
 } from "@/lib/staff/time-off";
 import type { Closure, StaffView } from "@/lib/staff/types";
 
-import { ClockRow } from "./clock-select";
-import { PanelGroup, PanelLabel } from "./hours-panel";
+import { ClockRow } from "@/components/bookings/availability/clock-select";
+import {
+    PanelGroup,
+    PanelLabel,
+} from "@/components/bookings/availability/hours-panel";
 import { OffKind } from "./off-kind";
 
 /** "Add time off" under the list: where the keyboard goes back to. */

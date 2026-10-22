@@ -12,14 +12,8 @@ import { CalendarDays } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 
-import {
-    BookingRow,
-    ROW_GRID,
-} from "@/components/bookings/all-bookings/booking-row";
-import { MoreBookingFilters } from "@/components/bookings/all-bookings/more-filters";
-import { MoveSheet } from "@/components/bookings/all-bookings/move-sheet";
+import { TakePayment } from "@/components/bookings/booking-page/take-payment";
 import { CancelSheet } from "@/components/bookings/sheets/cancel-sheet";
-import { TakePayment } from "@/components/bookings/take-payment";
 import { ChipGroup } from "@/components/shared/fields/choice-group";
 import { ShareLinkButton } from "@/components/shared/share-link/share-link-button";
 import { useHold } from "@/components/shared/undo/use-hold";
@@ -59,6 +53,9 @@ import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import { whoFor } from "@/lib/services/diary";
 import { zoneShortName } from "@/lib/services/time-picker";
 import type { ShareLink } from "@/lib/sites/share-links";
+import { BookingRow, ROW_GRID } from "./booking-row";
+import { MoreBookingFilters } from "./more-filters";
+import { MoveSheet } from "./move-sheet";
 
 /**
  * All bookings (U11; BKMAllBookings on a phone, BKDAllBookings at a desk):

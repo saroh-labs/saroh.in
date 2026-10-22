@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
-import { makePayLink } from "@/components/bookings/pay-link-panel";
+import { makePayLink } from "@/components/bookings/booking-page/pay-link-panel";
 import {
     CustomerStep,
     useCustomerFinder,
@@ -52,6 +52,7 @@ import {
 import type { Service } from "@/lib/services/service";
 import { zoneShortName } from "@/lib/services/time-picker";
 
+import { isTakenRefusal } from "@/components/bookings/quick-look/quick-look-state";
 import { blockGapTime, closeExtraHours, useGapStarts } from "./gap-actions";
 import type { GapBookedInfo } from "./gap-booked";
 import { GapBooked } from "./gap-booked";
@@ -63,7 +64,6 @@ import {
     StepBar,
 } from "./gap-parts";
 import type { GapHead, GapTarget } from "./gap-types";
-import { isTakenRefusal } from "./quick-look-state";
 
 /**
  * The free-time sheet's draft (U9): Book someone or Block this time, the

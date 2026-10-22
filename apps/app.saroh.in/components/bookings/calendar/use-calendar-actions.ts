@@ -19,7 +19,10 @@ import { pastFreeCancel } from "@/lib/staff/free-cancel";
 import type { BookingRules } from "@/lib/staff/types";
 import { showError } from "@saroh/ui/toast";
 
-import type { HeldFor, QuickLookActions } from "./quick-look-types";
+import type {
+    HeldFor,
+    QuickLookActions,
+} from "@/components/bookings/quick-look/quick-look-types";
 
 /** What this screen shows changed before the server has it. */
 export type Override = Partial<

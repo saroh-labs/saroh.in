@@ -24,6 +24,7 @@ import {
 } from "@/lib/staff/actions";
 import type { StaffView } from "@/lib/staff/types";
 
+import { Eyebrow } from "@/components/bookings/calendar/parts";
 import {
     bookingsIn,
     closedRun,
@@ -34,7 +35,6 @@ import {
     rangeOf,
     withoutRange,
 } from "./open-hours-words";
-import { Eyebrow } from "./parts";
 
 export interface HoursTarget {
     staff: StaffView;

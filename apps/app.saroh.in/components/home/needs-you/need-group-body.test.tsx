@@ -53,7 +53,7 @@ vi.mock("@/lib/orders/actions", () => ({
 vi.mock("@/lib/services/actions", () => ({
     turnDownBooking: calls.turnDownBooking,
 }));
-vi.mock("@/components/bookings/pay-link-panel", () => ({
+vi.mock("@/components/bookings/booking-page/pay-link-panel", () => ({
     makePayLink: calls.makePayLink,
 }));
 vi.mock("@/lib/customer-workspace/actions", () => ({

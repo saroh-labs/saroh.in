@@ -45,18 +45,20 @@ vi.mock("@/lib/services/bookings-opens-actions", () => ({
         Promise.resolve({ ok: true, data: change }),
     ),
 }));
-vi.mock("../availability/add-person-dialog", () => ({
+vi.mock("@/components/bookings/availability/add-person-dialog", () => ({
     AddPersonDialog: () => null,
 }));
-vi.mock("./booking-quick-look", () => ({ BookingQuickLook: () => null }));
+vi.mock("@/components/bookings/quick-look/booking-quick-look", () => ({
+    BookingQuickLook: () => null,
+}));
 vi.mock("./new-booking-from-gap", () => ({ NewBookingFromGap: () => null }));
 
 import type { BookingsCalendar } from "@/lib/services/booking-calendar";
 import type { Block } from "@/lib/services/diary";
 import type { StaffView, WeeklyRange } from "@/lib/staff/types";
 
-import { CalendarScreen } from "./calendar-screen";
-import { resetFirstDayHelp } from "./day-states";
+import { CalendarScreen } from "@/components/bookings/calendar/calendar-screen";
+import { resetFirstDayHelp } from "@/components/bookings/calendar/day-states";
 import type { HoursTarget } from "./open-hours-dialog";
 import { OpenHoursDialog } from "./open-hours-dialog";
 

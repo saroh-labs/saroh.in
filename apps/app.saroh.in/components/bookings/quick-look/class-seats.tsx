@@ -19,8 +19,8 @@ import {
     whoFor,
 } from "@/lib/services/diary";
 
+import { STATE_TONE } from "@/components/bookings/calendar/parts";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
-import { STATE_TONE } from "./parts";
 import type {
     HeldFor,
     QuickLookActions,

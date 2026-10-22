@@ -3,7 +3,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { cookies } from "next/headers";
 
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
-import { BookingsViewSwitch } from "@/components/bookings/bookings-view-switch";
+import { BookingsViewSwitch } from "@/components/bookings/all-bookings/bookings-view-switch";
 import { CalendarScreen } from "@/components/bookings/calendar/calendar-screen";
 import {
     NewBookingButton,

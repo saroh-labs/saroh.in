@@ -19,8 +19,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
-import type { PayLinkResult } from "@/components/bookings/pay-link-panel";
-import { PayLinkPanel } from "@/components/bookings/pay-link-panel";
+import type { PayLinkResult } from "@/components/bookings/booking-page/pay-link-panel";
+import { PayLinkPanel } from "@/components/bookings/booking-page/pay-link-panel";
 import { firstName } from "@/lib/names";
 import type { MessagePay } from "@/lib/services/booking-message";
 import {

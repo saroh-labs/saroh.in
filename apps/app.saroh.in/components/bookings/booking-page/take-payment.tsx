@@ -17,12 +17,6 @@ import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import type { PayLinkResult } from "@/components/bookings/pay-link-panel";
-import {
-    LINK_STEP,
-    makePayLink,
-    PayLinkPanel,
-} from "@/components/bookings/pay-link-panel";
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
 import { Chip } from "@/components/shared/lists/chip";
 import { runAction } from "@/lib/api/run-action";
@@ -44,6 +38,8 @@ import { MoneyInput } from "@saroh/ui/money-input";
 import { Segmented } from "@saroh/ui/segmented";
 import { Tip } from "@saroh/ui/tooltip";
 import { Link2 } from "lucide-react";
+import type { PayLinkResult } from "./pay-link-panel";
+import { LINK_STEP, makePayLink, PayLinkPanel } from "./pay-link-panel";
 
 /**
  * "Take ₹X" at the desk for a booking (round-2 P2): the walk-in's ways to

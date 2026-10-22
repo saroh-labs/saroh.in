@@ -10,8 +10,8 @@ import type { TimeOffInput } from "@/lib/staff/service";
 import type { OffLine } from "@/lib/staff/time-off";
 import { offDates, offRowWords } from "@/lib/staff/time-off";
 
+import { Face } from "@/components/bookings/availability/face";
 import { ADD_TIME_OFF_ID } from "./add-time-off-sheet";
-import { Face } from "./face";
 
 const ROW =
     "flex min-h-[60px] w-full items-center gap-3 bg-card py-2 pl-3.5 pr-3 text-left text-foreground min-[760px]:min-h-[58px] min-[760px]:px-[18px]";

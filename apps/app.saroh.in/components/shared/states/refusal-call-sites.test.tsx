@@ -35,9 +35,9 @@ const APP = join(__dirname, "..", "..", "..");
 /** The forms whose save line was drawn by hand, now `Refusal`. */
 const MOVED = [
     "components/bookings/availability/add-person-dialog.tsx",
-    "components/bookings/calendar/gap-form.tsx",
-    "components/bookings/pay-link-panel.tsx",
-    "components/bookings/take-payment.tsx",
+    "components/bookings/free-time/gap-form.tsx",
+    "components/bookings/booking-page/pay-link-panel.tsx",
+    "components/bookings/booking-page/take-payment.tsx",
     "components/class-packs/pack-detail/extend-dialog.tsx",
     "components/customers/detail/merge-dialog.tsx",
     "components/customers/detail/remove-details-dialog.tsx",

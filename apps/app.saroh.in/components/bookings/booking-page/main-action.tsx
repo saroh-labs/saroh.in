@@ -4,10 +4,10 @@ import { Button } from "@saroh/ui/button";
 import { CalendarPlus, IndianRupee, Plus } from "lucide-react";
 import type { ReactElement } from "react";
 
-import type { MoreRow } from "@/components/bookings/calendar/quick-look-more";
-import { QuickLookMore } from "@/components/bookings/calendar/quick-look-more";
-import { TakePaymentLocked } from "@/components/bookings/take-payment-locked";
+import type { MoreRow } from "@/components/bookings/quick-look/quick-look-more";
+import { QuickLookMore } from "@/components/bookings/quick-look/quick-look-more";
 import type { PageMain } from "@/lib/services/booking-page";
+import { TakePaymentLocked } from "./take-payment-locked";
 
 /** The board's buttons: 48px on a phone, 44px at a desk. */
 const BIG = "h-12 gap-2 text-[15px] min-[760px]:h-11 min-[760px]:text-[14.5px]";

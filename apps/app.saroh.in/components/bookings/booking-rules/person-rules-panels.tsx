@@ -24,10 +24,10 @@ import {
 } from "@/lib/staff/person-rules";
 import type { RuleRequest, StaffView } from "@/lib/staff/types";
 
+import { HoursPanel } from "@/components/bookings/availability/hours-panel";
+import { ROW as CHOICE_ROW } from "@/components/bookings/availability/whose-hours";
 import { PersonRulesList } from "./booking-rules-card";
-import { HoursPanel } from "./hours-panel";
 import type { PersonRulesState } from "./use-person-rules";
-import { ROW as CHOICE_ROW } from "./whose-hours";
 
 const HELP = "text-pretty text-[12.5px] leading-normal text-muted-foreground";
 

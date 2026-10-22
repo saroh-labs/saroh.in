@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
     BookingsCouldntLoad,
     BookingsView,
-} from "@/components/bookings/bookings-view";
+} from "@/components/bookings/all-bookings/bookings-view";
 import {
     NewBookingButton,
     NewBookingHost,

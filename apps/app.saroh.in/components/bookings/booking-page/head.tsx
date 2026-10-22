@@ -6,7 +6,7 @@ import { ArrowLeft, MoreHorizontal } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import type { MoreRow } from "@/components/bookings/calendar/quick-look-more";
+import type { MoreRow } from "@/components/bookings/quick-look/quick-look-more";
 import type { StatusTone } from "@/components/shared/lists/status-badge";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 

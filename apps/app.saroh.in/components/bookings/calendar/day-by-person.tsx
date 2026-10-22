@@ -19,9 +19,9 @@ import {
     offSpans,
 } from "@/lib/services/diary-view";
 
+import { FreeGap } from "@/components/bookings/free-time/free-gap";
 import { DayBlock } from "./day-block";
 import { lanePlace } from "./diary-block";
-import { FreeGap } from "./free-gap";
 import { at, CLOSED_HATCH, OFF_HATCH, tall } from "./geometry";
 import { FirstSight, NowLine, NowTime, useNowMinute } from "./now-line";
 

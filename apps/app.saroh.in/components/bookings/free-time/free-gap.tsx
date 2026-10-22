@@ -9,7 +9,7 @@ import { useState } from "react";
 import type { Column, Span } from "@/lib/services/diary";
 import { slotIn } from "@/lib/services/diary-view";
 
-import { at, tall } from "./geometry";
+import { at, tall } from "@/components/bookings/calendar/geometry";
 
 /**
  * Free time someone can be booked in (U4, BA-04): a green dashed block that
