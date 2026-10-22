@@ -1,6 +1,4 @@
 import { toMoneyString } from "../../common/money";
-import type { VisitOrigin } from "../analytics/visit-source";
-import { visitOriginOf } from "../analytics/visit-source";
 import { contactEmailForDisplay } from "../contacts/contact-email";
 import type { OrderLineKind } from "./order-line";
 import { lineKind, lineName } from "./order-line";
@@ -71,21 +69,6 @@ export interface OrderDetailDto extends OrderSummaryDto {
         /** "15% off" or "10.00 off" — the rule that produced `discount`. */
         rule: string;
     } | null;
-    /**
-     * Where the website visit that placed it came from (U15): one of the
-     * five groups and the merchant's own link label. `null` for an order
-     * taken any other way, placed before tracking began, or past retention.
-     *
-     * Only for someone who reads Insights (`analytics:read`, U15 privacy
-     * review): absent for everyone else, who reads the order without it.
-     */
-    cameFrom?: VisitOrigin | null;
-}
-
-/** What the reader of an order detail may see beyond the order itself. */
-export interface OrderDetailSight {
-    /** `analytics:read`: where the visit that placed it came from. */
-    visitSource: boolean;
 }
 
 interface RawCustomer {
@@ -133,8 +116,6 @@ interface RawDetail extends RawSummary {
         ruleAmount: DecimalLike | null;
         currency: string;
     } | null;
-    visitSource?: string | null;
-    visitRef?: string | null;
 }
 
 function ruleOf(r: NonNullable<RawDetail["discountRedemption"]>): string {
@@ -167,10 +148,7 @@ export function serializeOrderSummary(order: RawSummary): OrderSummaryDto {
     };
 }
 
-export function serializeOrderDetail(
-    order: RawDetail,
-    sight: OrderDetailSight = { visitSource: false },
-): OrderDetailDto {
+export function serializeOrderDetail(order: RawDetail): OrderDetailDto {
     return {
         ...serializeOrderSummary(order),
         updatedAt: order.updatedAt ?? null,
@@ -196,8 +174,5 @@ export function serializeOrderDetail(
                   rule: ruleOf(order.discountRedemption),
               }
             : null,
-        ...(sight.visitSource
-            ? { cameFrom: visitOriginOf(order.visitSource, order.visitRef) }
-            : {}),
     };
 }

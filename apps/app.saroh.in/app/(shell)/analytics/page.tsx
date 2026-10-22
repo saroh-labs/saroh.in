@@ -15,6 +15,7 @@ import type { SiteOption } from "@/components/insights/site-picker";
 import { SuggestionCard } from "@/components/insights/suggestion-card";
 import { PageContainer } from "@/components/shared/page-container";
 import {
+    readLinks,
     readMoney,
     readSells,
     readSiteChoices,
@@ -110,6 +111,7 @@ export default async function AnalyticsPage({
         canRemind: permits(organization, "invoice:write"),
         canTakeOrder: permits(organization, "order:create"),
         canAddService: permits(organization, "service:write"),
+        canMakeLinks: permits(organization, "site:update"),
     });
 
     return (
@@ -156,7 +158,12 @@ function tabBody(
     address: InsightsAddress,
     window: PeriodWindow,
     today: string,
-    can: { canRemind: boolean; canTakeOrder: boolean; canAddService: boolean },
+    can: {
+        canRemind: boolean;
+        canTakeOrder: boolean;
+        canAddService: boolean;
+        canMakeLinks: boolean;
+    },
 ) {
     switch (address.tab) {
         case "money":
@@ -172,7 +179,14 @@ function tabBody(
                 />
             );
         case "from":
-            return <FromPart address={address} window={window} today={today} />;
+            return (
+                <FromPart
+                    address={address}
+                    window={window}
+                    today={today}
+                    canMakeLinks={can.canMakeLinks}
+                />
+            );
         default:
             return <OverviewTab address={address} window={window} />;
     }
@@ -311,18 +325,22 @@ async function FromPart({
     address,
     window,
     today,
+    canMakeLinks,
 }: {
     address: InsightsAddress;
     window: PeriodWindow;
     today: string;
+    canMakeLinks: boolean;
 }) {
-    const [traffic, earlier, sites, links, sourcesRead] = await Promise.all([
-        trafficFor(window.from, window.to),
-        trafficFor(window.beforeFrom, window.beforeTo),
-        readSiteChoices(),
-        readWebAddressLinks(),
-        readSources(address.period, address.siteId),
-    ]);
+    const [traffic, earlier, sites, links, sourcesRead, madeRead] =
+        await Promise.all([
+            trafficFor(window.from, window.to),
+            trafficFor(window.beforeFrom, window.beforeTo),
+            readSiteChoices(),
+            readWebAddressLinks(),
+            readSources(address.period, address.siteId),
+            readLinks(address.period, address.siteId),
+        ]);
     if (traffic.status === "denied") forbidden();
     const list = sites.status === "ok" ? sites.data : null;
     // A website no longer the business's (or never) reads as all of them.
@@ -332,10 +350,20 @@ async function FromPart({
             : null;
     const fold = { siteId, from: window.from, to: window.to };
     // A website no longer the business's reads as all of them, sources too.
-    const sources =
+    const [sources, made] =
         siteId === address.siteId
-            ? sourcesRead
-            : await readSources(address.period, siteId);
+            ? [sourcesRead, madeRead]
+            : await Promise.all([
+                  readSources(address.period, siteId),
+                  readLinks(address.period, siteId),
+              ]);
+    // Each website's real address, as every share link reads it, for the
+    // links made in Saroh to copy (DEC-181).
+    const linkSites = (list ?? []).map((s) => ({
+        id: s.id,
+        name: s.name,
+        url: siteAddressOf(s, links, RENDERER_APEX)?.url ?? null,
+    }));
     const options: SiteOption[] | null = list
         ? [
               {
@@ -380,6 +408,9 @@ async function FromPart({
             siteId={siteId}
             retryHref={insightsHref({ ...address, siteId })}
             sources={sources}
+            links={made}
+            linkSites={linkSites}
+            canMakeLinks={canMakeLinks}
             today={today}
         />
     );

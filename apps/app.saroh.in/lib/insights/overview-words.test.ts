@@ -465,9 +465,9 @@ describe("Where do customers come from?", () => {
         orders: 159,
     };
 
-    it("visits, people, enquiries and online orders (IBOverviewD)", () => {
+    it("visits, visitors, enquiries and online orders (IBOverviewD)", () => {
         expect(fromAnswer(summary, "4w")).toBe(
-            "1,689 visits from 1,109 people, 23 enquiries and 159 online orders.",
+            "1,689 visits from 1,109 visitors, 23 enquiries and 159 online orders.",
         );
     });
 
@@ -478,7 +478,7 @@ describe("Where do customers come from?", () => {
                 "4w",
                 true,
             ),
-        ).toBe("48 visits from 31 people. No orders yet.");
+        ).toBe("48 visits from 31 visitors. No orders yet.");
     });
 
     it("says no visits in words", () => {
@@ -489,7 +489,7 @@ describe("Where do customers come from?", () => {
             ),
         ).toBe("No visits to your website in the last 7 days.");
         expect(fromAnswer({ ...summary, enquiries: 0, orders: 0 }, "4w")).toBe(
-            "1,689 visits from 1,109 people, no enquiries and no online orders.",
+            "1,689 visits from 1,109 visitors, no enquiries and no online orders.",
         );
     });
 });

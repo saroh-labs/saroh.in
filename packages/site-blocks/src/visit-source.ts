@@ -21,13 +21,21 @@
  *   is closed or reloaded, or after 30 minutes without a page
  *   ({@link VISIT_IDLE_MS}). A link inside the site keeps it; a reload or
  *   another tab starts a new one, as a QR code's tag does (DEC-108).
- * - **What ties it to a paid order** is its group and label, sent with the
- *   checkout ({@link visitFields}) and kept on the order, never an id.
+ * - **Nothing ties it to an order** (DEC-181): no order says which visit
+ *   placed it. Paid is the visit's own fourth step, sent by the order's
+ *   confirmation page after a successful online payment, with the group
+ *   and label only, never the order or its amount.
  * - **Each step is sent at most once per visit**: the visit began, it
- *   looked at a product or the booking page, it started a checkout. The
- *   page-view beacon starts the visit, so a browser that asks not to be
- *   tracked, a private page, a preview or a test release starts none, and
- *   then no step and no checkout source is sent either.
+ *   looked at a product or the booking page, it started a checkout, it
+ *   paid. The page-view beacon starts the visit, so a browser that asks
+ *   not to be tracked, a private page, a preview or a test release starts
+ *   none, and then no step is sent either. The checkout and the
+ *   confirmation page are private: they send no page view, but a visit
+ *   begun on a public page still sends its step from them.
+ * - **Labels are the business's own.** The site sends any well-shaped
+ *   `ref`; the API keeps it only when it is one of the links the business
+ *   made in Saroh for this site, and otherwise counts the step under its
+ *   group alone.
  *
  * A plain module: its state is the module's, shared by the beacon in the
  * site's layout and the checkout in this package, which import the same
@@ -39,7 +47,7 @@ export type VisitSource =
     "instagram" | "google" | "whatsapp" | "direct" | "other";
 
 /** The steps a visit sends, at most once each. */
-export type VisitStep = "visit" | "looked" | "started";
+export type VisitStep = "visit" | "looked" | "started" | "paid";
 
 /** What a visit says about where it came from. */
 export interface VisitOrigin {
@@ -235,8 +243,9 @@ function sendOnce(v: Visit, step: VisitStep): boolean {
 }
 
 /**
- * The visit looked at a product or the booking page, or started a
- * checkout: sent once per visit, and only while a visit is going.
+ * The visit looked at a product or the booking page, started a checkout,
+ * or paid online (its confirmation page): sent once per visit, and only
+ * while a visit is going.
  */
 export function markVisitStep(
     step: Exclude<VisitStep, "visit">,
@@ -252,21 +261,6 @@ export function markVisitStep(
 export function currentVisit(now: number = Date.now()): VisitOrigin | null {
     const current = live(now);
     return current ? originOf(current) : null;
-}
-
-/**
- * The fields a checkout sends so its order is counted to its visit's
- * source; empty when no visit is going.
- */
-export function visitFields(now: number = Date.now()): {
-    visitSource?: VisitSource;
-    visitRef?: string;
-} {
-    const current = live(now);
-    if (!current) return {};
-    return current.ref
-        ? { visitSource: current.source, visitRef: current.ref }
-        : { visitSource: current.source };
 }
 
 /** Tests only: forget the visit and the sender. */

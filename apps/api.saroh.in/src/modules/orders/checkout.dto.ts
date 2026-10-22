@@ -14,7 +14,6 @@ import {
     ValidateNested,
 } from "class-validator";
 
-import { isVisitSource, visitRefOf } from "../analytics/visit-source";
 import { qrSourceTagOf } from "../sites/qr-target";
 import { MAX_BAG_LINES, MAX_LINE_QUANTITY } from "./checkout-quote";
 import type { CheckoutPayment } from "./checkout-readiness";
@@ -154,29 +153,4 @@ export class CheckoutStartDto {
     @Transform(({ value }: { value: unknown }) => qrSourceTagOf(value))
     @IsString()
     source?: string;
-
-    /**
-     * Where the visit that reached this checkout came from (U15, #1099):
-     * one of the five groups, as the site's own beacon decided it in the
-     * browser. Never refuses an order: anything else is dropped before
-     * validation, and no visit id is ever taken.
-     */
-    @IsOptional()
-    @Transform(({ value }: { value: unknown }) =>
-        isVisitSource(value) ? value : undefined,
-    )
-    @IsString()
-    visitSource?: string;
-
-    /**
-     * The merchant's own link label the visit arrived with (`?ref=`), in
-     * the allowed shape (`analytics/visit-source.ts`) or dropped. Kept only
-     * beside a `visitSource`.
-     */
-    @IsOptional()
-    @Transform(
-        ({ value }: { value: unknown }) => visitRefOf(value) ?? undefined,
-    )
-    @IsString()
-    visitRef?: string;
 }

@@ -306,24 +306,15 @@ describe("AnalyticsAggregateHandler — where visits came from (U15)", () => {
             );
     }
 
-    it("breaks the visit steps and paid orders down by source and by ref", async () => {
+    it("breaks the visit's four steps down by source and by ref", async () => {
         eventFindMany.mockResolvedValue([
             step("site.visit", { source: "instagram", ref: "diwali-post" }),
             step("site.visit", { source: "instagram" }),
             step("site.visit", { source: "direct" }),
             step("site.looked", { source: "instagram", ref: "diwali-post" }),
             step("site.started", { source: "instagram", ref: "diwali-post" }),
-            step(
-                "order.paid",
-                {
-                    orderId: "o1",
-                    amountCents: 100,
-                    source: "instagram",
-                    ref: "diwali-post",
-                },
-                null,
-            ),
-            // Paid before tracking began: no source, totals only.
+            step("site.paid", { source: "instagram", ref: "diwali-post" }),
+            // An order's own paid event carries no source (DEC-181).
             step("order.paid", { orderId: "o2", amountCents: 100 }, null),
         ]);
 
@@ -348,14 +339,15 @@ describe("AnalyticsAggregateHandler — where visits came from (U15)", () => {
         expect(rowOf("site.started", "", "ref", "diwali-post")).toMatchObject({
             count: 1,
         });
-        // Paid names no site: the business's row only.
-        expect(rowOf("order.paid", "", "source", "instagram")).toMatchObject({
+        // Paid is the visit's own step, on its site (DEC-181).
+        expect(rowOf("site.paid", "", "source", "instagram")).toMatchObject({
             count: 1,
         });
-        expect(rowOf("order.paid", "", "ref", "diwali-post")).toMatchObject({
-            count: 1,
-        });
-        expect(rowOf("order.paid", "", "", "")).toMatchObject({ count: 2 });
+        expect(
+            rowOf("site.paid", "site_1", "ref", "diwali-post"),
+        ).toMatchObject({ count: 1 });
+        expect(rowOf("order.paid", "", "", "")).toMatchObject({ count: 1 });
+        expect(rowOf("order.paid", "", "source", "instagram")).toBeUndefined();
         // Nothing is broken down by anything else.
         const dimensions = new Set(
             aggregateUpsert.mock.calls.map((c) => c[0].create.dimension),

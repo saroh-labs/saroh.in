@@ -19,8 +19,9 @@
  *   customer reading their own page isn't a site visit.
  *
  * Where a visit came from (U15) rides the same beacon: the visit's steps
- * carry one of five groups and the merchant's own link label, never the
- * path, the address or anything about the visitor
+ * (visit, looked, started and, since DEC-181, paid) carry one of five
+ * groups and the merchant's own link label, never the path, the address,
+ * an order or anything about the visitor
  * (`@saroh/site-blocks/visit-source`, {@link visitStepBody}).
  */
 
@@ -102,6 +103,7 @@ const STEP_TYPES: Record<VisitStep, string> = {
     visit: "site.visit",
     looked: "site.looked",
     started: "site.started",
+    paid: "site.paid",
 };
 
 /**

@@ -1,9 +1,8 @@
 import type { Prisma } from "@saroh/database";
 
 import {
-    ORDER_PAID_TYPE,
-    ORDER_REFUNDED_TYPE,
     SITE_LOOKED_TYPE,
+    SITE_PAID_TYPE,
     SITE_STARTED_TYPE,
     SITE_VISIT_TYPE,
 } from "./event-contract";
@@ -24,13 +23,20 @@ import { isVisitSource, VISIT_SOURCES, visitRefOf } from "./visit-source";
  *   the business: tracking began the day U15 shipped, and nothing before it
  *   is made up (DEC-012). Null when no visit has been counted yet, so the
  *   screen can say "counted from …" or "not counted yet".
- * - **Paid** is `order.paid` less `order.refunded` for the same source,
- *   net as the orders figure is. A paid order names no site, so `paid` is
- *   the whole business's even when `siteId` narrows the visits.
+ * - **Paid** is the `site.paid` step (DEC-181): sent once by the visitor's
+ *   own confirmation page after a successful online payment, with the
+ *   visit's group and label only, never the order. It names its site, so
+ *   `siteId` narrows paid as it narrows the other steps. A payment made
+ *   later another way (a pay link, at the counter) isn't counted to a
+ *   source, and a later refund isn't taken off one: these are totals of
+ *   visits, not of orders, and no order says which visit placed it.
+ * - **Labels** are only the business's own links (`SiteLink`, DEC-181):
+ *   intake keeps a step's `ref` only when it is a live link's label on that
+ *   site, so every label here is one the business made.
  * - Each step is sent at most once per visit by the site, so the steps are
- *   visits that reached them. They can still disagree a little (a paid
- *   order from a visit started the day before; one checkout whose visit was
- *   on a reloaded page); the screen keeps them from going up.
+ *   visits that reached them. They can still disagree a little (a payment
+ *   whose visit began the day before; one checkout whose visit was on a
+ *   reloaded page); the screen keeps them from going up.
  */
 
 /** One step's counts. */
@@ -81,12 +87,11 @@ export const OTHER_LINKS_REF = "_other";
 export const OTHER_LINKS_LABEL = "Other links";
 
 /** Which step an event type is. */
-const STEP_OF: Partial<Record<string, keyof VisitSteps | "refunded">> = {
+const STEP_OF: Partial<Record<string, keyof VisitSteps>> = {
     [SITE_VISIT_TYPE]: "visits",
     [SITE_LOOKED_TYPE]: "looked",
     [SITE_STARTED_TYPE]: "started",
-    [ORDER_PAID_TYPE]: "paid",
-    [ORDER_REFUNDED_TYPE]: "refunded",
+    [SITE_PAID_TYPE]: "paid",
 };
 
 const STEP_TYPES = Object.keys(STEP_OF);
@@ -103,18 +108,16 @@ export interface VisitSourceAggregate {
     count: number;
 }
 
-const zero = (): VisitSteps & { refunded: number } => ({
+const zero = (): VisitSteps => ({
     visits: 0,
     looked: 0,
     started: 0,
     paid: 0,
-    refunded: 0,
 });
 
 /**
  * Fold rollup rows into the read. Pure, so the rules are unit tested apart
- * from the database. `siteId` narrows the three visit steps; paid stays the
- * whole business's (it names no site).
+ * from the database. `siteId` narrows all four steps.
  */
 export function foldVisitSources(
     rows: readonly VisitSourceAggregate[],
@@ -129,9 +132,7 @@ export function foldVisitSources(
     for (const row of rows) {
         const step = STEP_OF[row.type];
         if (!step) continue;
-        const isMoney = step === "paid" || step === "refunded";
-        const wantSite = isMoney ? ALL_SITES : visitSite;
-        if (row.siteId !== wantSite) continue;
+        if (row.siteId !== visitSite) continue;
         if (row.dimension === "source" && isVisitSource(row.dimensionValue)) {
             const counts = bySource.get(row.dimensionValue);
             if (counts) counts[step] += row.count;
@@ -144,13 +145,8 @@ export function foldVisitSources(
         }
     }
 
-    const net = ({ refunded, ...steps }: ReturnType<typeof zero>) => ({
-        ...steps,
-        paid: Math.max(0, steps.paid - refunded),
-    });
-
     const seen = [...byRef.entries()]
-        .map(([ref, counts]) => ({ ref, ...net(counts) }))
+        .map(([ref, counts]) => ({ ref, ...counts }))
         .filter((r) => r.visits + r.looked + r.started + r.paid > 0);
     const shown = seen
         .filter((r) => r.visits >= MIN_VISITS_PER_LABEL)
@@ -181,7 +177,7 @@ export function foldVisitSources(
     return {
         sources: VISIT_SOURCES.map((source) => ({
             source,
-            ...net(bySource.get(source) ?? zero()),
+            ...(bySource.get(source) ?? zero()),
         })),
         refs,
     };
@@ -229,4 +225,45 @@ export async function readVisitSources(
         countedFrom: first._min.date ?? null,
         ...foldVisitSources(rows, range.siteId),
     };
+}
+
+/** One label's visits and paid in a range, unfolded. */
+export interface LinkCounts {
+    visits: number;
+    paid: number;
+}
+
+/**
+ * Visits and paid by site and label in a range, keyed `<siteId>:<label>`:
+ * what the list of the business's own links shows beside each link
+ * (DEC-181). One site when `siteId` is given, else each site apart (never
+ * the all-sites rows). Unfolded; the caller holds back a small count as
+ * the sources table folds it (`site-links.service.ts`).
+ */
+export async function readLinkCounts(
+    db: Pick<Prisma.TransactionClient, "analyticsDailyAggregate">,
+    organizationId: string,
+    range: { from: Date; to: Date; siteId?: string },
+): Promise<Map<string, LinkCounts>> {
+    const rows = await db.analyticsDailyAggregate.groupBy({
+        by: ["siteId", "type", "dimensionValue"],
+        where: {
+            organizationId,
+            siteId: range.siteId ?? { not: ALL_SITES },
+            type: { in: [SITE_VISIT_TYPE, SITE_PAID_TYPE] },
+            dimension: "ref",
+            date: { gte: range.from, lte: range.to },
+        },
+        _sum: { count: true },
+    });
+    const counts = new Map<string, LinkCounts>();
+    for (const row of rows) {
+        const key = `${row.siteId}:${row.dimensionValue}`;
+        const now = counts.get(key) ?? { visits: 0, paid: 0 };
+        const n = row._sum.count ?? 0;
+        if (row.type === SITE_VISIT_TYPE) now.visits += n;
+        else now.paid += n;
+        counts.set(key, now);
+    }
+    return counts;
 }

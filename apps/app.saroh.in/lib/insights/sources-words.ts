@@ -266,10 +266,6 @@ export function countedFromLine(
     return `Counted from ${formatDay(read.countedFrom, { today })}, when your site began noting where each visit came from.`;
 }
 
-/** Paid is the business's: said when one website is chosen. */
-export const PAID_WHOLE_BUSINESS =
-    "Paid is counted for your whole business, not one website.";
-
 /**
  * The Overview's answer to "Where do customers come from?" from the
  * sources (`IBOverviewD`): the source that brings the most, then how many

@@ -325,7 +325,8 @@ export interface RefRowRead {
  * `GET organizations/:id/analytics/sources?period=&siteId=` (#1101,
  * `apps/api.saroh.in/src/modules/analytics/sources.ts`), `analytics:read`:
  * the path from visit to paid and where visits came from. Counts only.
- * Paid is the business's even when a website is chosen.
+ * Paid is the visit's own `site.paid` step (DEC-181), so a website chosen
+ * narrows it as it narrows the visits.
  */
 export interface SourcesRead {
     period: InsightsPeriod;

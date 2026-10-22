@@ -13,11 +13,14 @@
  * - The browser's word is not trusted: the group must be one of
  *   {@link VISIT_SOURCES} and the label must have the shape of
  *   {@link visitRefOf} (no run of six digits, no more than six in all, never
- *   a record's id). Anything else is no source, never a refused order.
+ *   a record's id).
  * - No visit id is ever sent or stored. A visit lives in the visitor's tab
- *   memory only; what ties a paid order to its visit is the visit's group and
- *   label, copied onto the order at checkout (`Order.visitSource`,
- *   `Order.visitRef`) and onto its `order.paid` event.
+ *   memory only, and nothing about it is kept on an order or a customer
+ *   (DEC-181): paid is the visit's own `site.paid` step, sent by its
+ *   confirmation page with the group and label only.
+ * - Only the business's own links count as a label (DEC-181): the intake
+ *   keeps a step's label only when it is one of the site's live links made
+ *   in Saroh (`site-link-labels.ts`), else the step counts under its group.
  *
  * The groups, as the merchant reads them (U16 draws them):
  *   instagram → "Instagram", google → "Google search",
@@ -84,23 +87,4 @@ export function visitRefOf(value: unknown): string | null {
     if ((ref.match(/\d/g)?.length ?? 0) > VISIT_REF_MAX_DIGITS) return null;
     if (ID_SHAPE.test(ref)) return null;
     return ref;
-}
-
-/** What a visit is said to have come from, as stored. */
-export interface VisitOrigin {
-    source: VisitSource;
-    ref: string | null;
-}
-
-/**
- * The visit a checkout sent, cleaned, or null when it sent none or one that
- * isn't well formed. A label without a group is dropped with it: the label
- * says which of the merchant's links, the group where it was shared.
- */
-export function visitOriginOf(
-    source: unknown,
-    ref: unknown,
-): VisitOrigin | null {
-    if (!isVisitSource(source)) return null;
-    return { source, ref: visitRefOf(ref) };
 }

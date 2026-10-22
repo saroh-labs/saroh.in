@@ -58,13 +58,6 @@ describe("the export's tables", () => {
         },
     );
 
-    it("orders.csv says where each order's visit came from (U15), which a removal clears", () => {
-        const columns = columnsOf("Order").map((c) => c.name);
-        expect(columns).toEqual(
-            expect.arrayContaining(["visitSource", "visitRef"]),
-        );
-    });
-
     it("leaves hashes, tokens and keys out, and keeps what a person reads", () => {
         for (const name of [
             "payTokenHash",

@@ -143,7 +143,7 @@ describe("the Overview, for an owner", () => {
         expect(said).toContain("₹74,160");
         expect(said).toContain("Where do customers come from?");
         expect(said).toContain(
-            "1,689 visits from 1,109 people, 23 enquiries and 159 online orders.",
+            "1,689 visits from 1,109 visitors, 23 enquiries and 159 online orders.",
         );
         // Sources weren't read: the website's figures answer alone, and
         // nothing says it comes next (U16).
@@ -241,7 +241,7 @@ describe("the Overview's other states", () => {
         expect(said).toContain("Your first sale shows here the week it's paid");
         expect(html).toContain('href="/commerce/orders/new"');
         expect(html).toContain('href="/billing/invoices/new"');
-        expect(said).toContain("48 visits from 31 people. No orders yet.");
+        expect(said).toContain("48 visits from 31 visitors. No orders yet.");
         // No money chart and no ₹0.
         expect(said).not.toContain("Am I making more money?");
         expect(said).not.toContain("₹0");
@@ -361,7 +361,7 @@ describe("the Overview's sources answer (U16)", () => {
         expect(said).not.toContain("Typed your address");
         // Every figure the card had stays.
         expect(said).toContain(
-            "1,689 visits from 1,109 people, 23 enquiries and 159 online orders.",
+            "1,689 visits from 1,109 visitors, 23 enquiries and 159 online orders.",
         );
         expect(html).toContain('href="/analytics?tab=from"');
         // Counts, never a percentage, in this card.
@@ -384,7 +384,7 @@ describe("the Overview's sources answer (U16)", () => {
             }),
         );
         expect(said).toContain(
-            "1,689 visits from 1,109 people, 23 enquiries and 159 online orders.",
+            "1,689 visits from 1,109 visitors, 23 enquiries and 159 online orders.",
         );
         expect(said).toContain(
             "Where visits come from is counted from the next visit to your site.",
@@ -394,7 +394,7 @@ describe("the Overview's sources answer (U16)", () => {
     it("keeps the website's answer when the sources couldn't be read", () => {
         const said = text(draw({ sources: { status: "failed" } }));
         expect(said).toContain(
-            "1,689 visits from 1,109 people, 23 enquiries and 159 online orders.",
+            "1,689 visits from 1,109 visitors, 23 enquiries and 159 online orders.",
         );
         expect(said).not.toContain("brings the most visits");
     });

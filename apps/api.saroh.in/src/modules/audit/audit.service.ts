@@ -176,6 +176,13 @@ export const AuditAction = {
     InvoicePaymentRemoved: "invoice.payment.removed",
     InvoiceChequeCleared: "invoice.payment.cheque_cleared",
     InvoiceChequeBounced: "invoice.payment.cheque_bounced",
+    // A link to share a site made, archived or brought back on Insights ›
+    // Where customers come from (DEC-181, #1099), each in the write's own
+    // transaction with the link as the target. Metadata: the site, and the
+    // link's name and label, the business's own words for a post.
+    SiteLinkCreated: "site-link.created",
+    SiteLinkArchived: "site-link.archived",
+    SiteLinkRestored: "site-link.restored",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

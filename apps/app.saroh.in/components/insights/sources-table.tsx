@@ -9,7 +9,6 @@ import type { InsightsPeriod } from "@/lib/insights/period";
 import type { SourcesRead, VisitSource } from "@/lib/insights/reads";
 import {
     foldedLine,
-    PAID_WHOLE_BUSINESS,
     paidShares,
     SOURCE_NAME,
     sourcesAnswer,
@@ -52,9 +51,9 @@ export function SourcesTable({
 }) {
     const shares = paidShares(read.sources);
     const folded = foldedLine(read.folded);
-    const notes = [folded, read.siteId ? PAID_WHOLE_BUSINESS : null].filter(
-        (x): x is string => x !== null,
-    );
+    // Paid is per website since DEC-181 (the visit's own `site.paid`), so
+    // a website chosen narrows it too and needs no note.
+    const notes = [folded].filter((x): x is string => x !== null);
     return (
         <section
             aria-labelledby="sources-heading"

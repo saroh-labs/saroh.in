@@ -10,7 +10,7 @@ import { OTHER_LINKS_LABEL, OTHER_LINKS_REF } from "./visit-sources";
  * draw, folded from U15's read (`visit-sources.ts`). The service reads.
  *
  * - **The path never goes up.** Each step is a visit that reached it, but
- *   a paid order whose visit began the day before the period, or a
+ *   a payment whose visit began the day before the period, or a
  *   checkout started on a reloaded page, can make a later step a little
  *   larger than the one before. The path holds each step to at most the
  *   one before it, so it reads as people leaving, never arriving.
@@ -20,8 +20,9 @@ import { OTHER_LINKS_LABEL, OTHER_LINKS_REF } from "./visit-sources";
  * - **Counted from**: the first day a visit's source was recorded. The
  *   screen says it when that is after the period's first day, and says
  *   counting starts with the next visit when nothing has been counted.
- * - Paid is the business's (a paid order names no site), so a website
- *   chosen narrows visits, looked and started only.
+ * - Paid is per site, from the visit's own `site.paid` step (DEC-181), so
+ *   a website chosen narrows all four steps. A later refund isn't taken off
+ *   a source, and a payment made later another way isn't counted to one.
  */
 
 /** Fewer visits than this and a source's "how many paid" says nothing. */

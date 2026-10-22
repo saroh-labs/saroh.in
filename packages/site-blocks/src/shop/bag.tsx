@@ -16,7 +16,7 @@ import { readQrSource } from "../qr-source";
 import { useTestRelease } from "../test-release/context";
 import { TestReleaseStopSheet } from "../test-release/test-release-stop";
 import { itemsText } from "../test-release/words";
-import { markVisitStep, visitFields } from "../visit-source";
+import { markVisitStep } from "../visit-source";
 import type {
     CheckoutStarted,
     ShopCheckoutApi,
@@ -236,12 +236,7 @@ export function ShopBag({
     async function start(request: StartCheckout, who: SignedInCustomer) {
         setBusy(true);
         setProblem(null);
-        // The QR code's tag and the visit's source (U15), when there are.
-        const asked = {
-            ...request,
-            ...(source ? { source } : {}),
-            ...visitFields(),
-        };
+        const asked = source ? { ...request, source } : request;
         const result = await api.start(asked).catch(() => ({
             ok: false as const,
             reason: "error" as const,

@@ -670,34 +670,57 @@ organizations/:org/customers`: everyone who has paid (an order through a
   hyphens, 32 at most, no run of six digits, no more than six digits in all,
   never an id's shape `c` + 24); nothing else in the address is read, and
   `ref` is never read on `/book` (or under it) or beside the booking flow's
-  `step=`, where it is a booking's id. Each step is sent once a visit, with
-  the source only and no visitor hash: `site.visit`, `site.looked` (a
+  `step=`, where it is a booking's id. **Totals only, from links made in
+  Saroh (DEC-181):** the intake keeps a step's label only when it is one
+  of that site's live `SiteLink` labels (`analytics/site-link-labels.ts`,
+  a minute's cache per site, dropped on every link write); any other `ref`
+  counts under its group with no label. Each step is sent once a visit,
+  with the source only and no visitor hash: `site.visit`, `site.looked` (a
   product or the booking page), `site.started` (a checkout: `/checkout`
-  sends no page view, being private, but does send this step, with its
-  group and label only). The checkout copies the source onto the order
-  (`Order.visitSource`, `visitRef`) and `order.paid` / `order.refunded`
-  carry it; `analytics.retention` clears it off orders past 400 days. The
-  rollup adds `source` and `ref` dimensions; `analytics/visit-sources.ts`
-  is the read (counted from the first day a source was recorded; paid is
-  the business's, not a site's; labels with fewer than 3 visits in the range
-  fold into one `OTHER_LINKS_REF` row, "Other links"). A paid order with no
-  source was taken another way, before tracking began, or from a visit that
-  sent nothing.
+  sends no page view, being private, but does send this step) and
+  `site.paid` (the order's own confirmation page, `/shop/order/<id>`, also
+  private, after a successful online payment there and then: exactly this
+  step, with the group and label only, never the order or its amount).
+  Nothing about a visit is kept on an order or a customer: no
+  `Order.visitSource` / `visitRef`, no "came from" on the order, and
+  `order.paid` / `order.refunded` carry no source. A payment made later
+  another way (a pay link, at the counter, at pick-up) isn't counted to a
+  source, and a refund isn't taken off one. The rollup adds `source` and
+  `ref` dimensions; `analytics/visit-sources.ts` is the read (counted from
+  the first day a source was recorded; paid per site from `site.paid`;
+  labels with fewer than 3 visits in the range fold into one
+  `OTHER_LINKS_REF` row, "Other links").
+- **Current** — **the links a business makes to share its site**
+  (DEC-181, #1099): `SiteLink` (site, name, label, made by, when,
+  archived), made, listed and archived with Undo on Insights › Where
+  customers come from under the sources ("Links made in Saroh",
+  `components/insights/site-links.tsx`). Make a link takes a name ("Name
+  the post, not the person." under it), proposes the label from it, shows
+  it editable with the whole link, and copies
+  `https://<site's real address>/?ref=<label>` once made (the address is
+  `siteAddressOf`, as every share link). Each link shows its visits and
+  paid in the period, or "Fewer than 3 visits". Reading is
+  `analytics:read`; making and archiving is `site:update`, each written to
+  Activity (`site-link.created`, `.archived`, `.restored`). A label is
+  unique per site among live links and passes the label checks; an
+  archived label is free again.
 - **Current** — **what visit tracking collects, where, for how long and who
   sees it** (U15 privacy review, 21 Oct). The browser's word is never
   trusted: each promise below is kept by the API too.
 
-    | What                                                                                                                                        | Where it is kept                                                                                                                                                                                       | For how long                                                                                                    | Who sees it                                                                                   |
-    | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-    | A page view: its path (cut at `?` and `#`), the referrer's origin, no title                                                                 | `AnalyticsEvent` `site.view`                                                                                                                                                                           | 400 days, then the retention sweep deletes it                                                                   | Nobody row by row; counted into Insights for `analytics:read`                                 |
-    | A visitor hash on a page view: `sha256(daily salt : site : address)`, the salt an HMAC of `ANALYTICS_IP_SALT` and the UTC day, never stored | `AnalyticsEvent.visitorHash`                                                                                                                                                                           | With the view (400 days); a new hash every day and on every site                                                | Nobody; only "unique visitors a day"                                                          |
-    | A visit's steps (`site.visit`, `site.looked`, `site.started`): a group and a label, no visitor, time to the hour, random id                 | `AnalyticsEvent`                                                                                                                                                                                       | 400 days                                                                                                        | Counted into Insights for `analytics:read`                                                    |
-    | Daily counts by path, source and label                                                                                                      | `AnalyticsDailyAggregate`                                                                                                                                                                              | Kept (they name no one)                                                                                         | `analytics:read`; labels under 3 visits only as "Other links"                                 |
-    | Where an order's visit came from (group, label)                                                                                             | `Order.visitSource`, `visitRef`, and its `order.paid` / `order.refunded` event                                                                                                                         | Cleared at 400 days (not while the business is on legal hold) and by the customer's removal (`PERSONAL_FIELDS`) | `cameFrom` on the order only with `analytics:read`; in the owner's data export (`orders.csv`) |
-    | Nothing at all                                                                                                                              | Private pages (`PRIVATE_PATH_PREFIXES` in `@saroh/block-contract`, one list for the site and the API, which refuses a view of one), Do Not Track or Global Privacy Control, previews and test releases |                                                                                                                 |                                                                                               |
+    | What                                                                                                                                                   | Where it is kept                                                                                                                                                                                       | For how long                                                     | Who sees it                                                         |
+    | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------- |
+    | A page view: its path (cut at `?` and `#`), the referrer's origin, no title                                                                            | `AnalyticsEvent` `site.view`                                                                                                                                                                           | 400 days, then the retention sweep deletes it                    | Nobody row by row; counted into Insights for `analytics:read`       |
+    | A visitor hash on a page view: `sha256(daily salt : site : address)`, the salt an HMAC of `ANALYTICS_IP_SALT` and the UTC day, never stored            | `AnalyticsEvent.visitorHash`                                                                                                                                                                           | With the view (400 days); a new hash every day and on every site | Nobody; only "unique visitors a day"                                |
+    | A visit's steps (`site.visit`, `site.looked`, `site.started`, `site.paid`): a group and a label made in Saroh, no visitor, time to the hour, random id | `AnalyticsEvent`                                                                                                                                                                                       | 400 days                                                         | Counted into Insights for `analytics:read`                          |
+    | Daily counts by path, source and label                                                                                                                 | `AnalyticsDailyAggregate`                                                                                                                                                                              | Kept (they name no one)                                          | `analytics:read`; labels under 3 visits only as "Other links"       |
+    | The links a business made to share its site: name, label, who made it, when                                                                            | `SiteLink`                                                                                                                                                                                             | Kept; archived, never deleted                                    | `analytics:read`; made and archived with `site:update`, in Activity |
+    | Nothing at all                                                                                                                                         | Private pages (`PRIVATE_PATH_PREFIXES` in `@saroh/block-contract`, one list for the site and the API, which refuses a view of one), Do Not Track or Global Privacy Control, previews and test releases |                                                                  |                                                                     |
 
-    Never kept: the address, a cookie or browser storage, the query string
-    beyond one allowed label, the referrer's path, a page title, a consent
+    Never kept: anything about a visit on an order or a customer (DEC-181),
+    a label that isn't one of the site's links made in Saroh, the address,
+    a cookie or browser storage, the query string beyond one allowed label,
+    the referrer's path, a page title, a consent
     value, a time or a dedupe key the browser sent (a public event is stored
     `anonymous`, at the server's time). Views stored before the review under
     a private path are removed by the one-off
@@ -712,13 +735,17 @@ organizations/:org/customers`: everyone who has paid (an order through a
   started, paid) are each held to at most the one before, so it never goes
   up. A share is said as a count reads ("1 in 7", "3 in 4", "about half",
   `lib/insights/sources-words.ts` `oneIn`), never a percentage, and what
-  is counted is called visits, never people (no visitor is kept). A source
+  is counted is called visits, never people (no visitor is kept); the
+  website figure of unique visitors a day is "Visitors", never "People"
+  (owner, 21 Oct: one who comes back another day is counted again, and How
+  these are counted says so). A source
   with fewer than 5 visits is counted in Other sites and the line under the
   table names it; the merchant's own `?ref=` links are listed under the
   table when any were visited. Counting that began inside the period says
   from when; before anything is counted one message says it starts with
-  the next visit. With a website chosen, paid stays the business's and the
-  table says so. Where customers come from is no longer marked Next.
+  the next visit. With a website chosen, all four steps are that
+  website's, paid included (DEC-181: paid is the visit's own `site.paid`).
+  Where customers come from is no longer marked Next.
 
 ## One word each
 

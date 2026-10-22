@@ -126,13 +126,13 @@ test("a business that has sold reads its answers, then the figures behind them",
         /^\/commerce\/orders\?date=custom&from=\d{4}-\d{2}-\d{2}&to=\d{4}-\d{2}-\d{2}&payment=paid$/,
     );
     await expect(website).toContainText(
-        "visits, people, enquiries, and paid orders and bookings",
+        "visits, visitors, enquiries, and paid orders and bookings",
     );
     const visits = page.getByRole("group", { name: /^Visits each day/ });
     if ((await visits.count()) > 0) {
         await visits.getByRole("button").first().click();
         await expect(page.locator("main")).toContainText(
-            /\w+day \d+ \w+ · (no visits|[\d,]+ visits? · [\d,]+ (person|people))/,
+            /\w+day \d+ \w+ · (no visits|[\d,]+ visits? · [\d,]+ visitors?)/,
         );
     }
     await expect(page.locator("main")).not.toContainText(/\b\d{2}-\d{2}\b/);

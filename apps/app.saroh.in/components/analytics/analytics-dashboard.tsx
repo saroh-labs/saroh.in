@@ -35,7 +35,7 @@ import { ReadoutBars } from "./readout-bars";
  * this component only presents:
  *
  * 1. four figures, each with how it moved on the period before: Visits,
- *    People, Enquiries (opening Leads) and Paid orders and bookings
+ *    Visitors, Enquiries (opening Leads) and Paid orders and bookings
  *    (opening those days' paid orders), with the orders' counted-from note;
  * 2. what the tab puts between (`between`): the path from visit to paid
  *    and where visitors come from (U16, #1101);
@@ -212,7 +212,7 @@ export function DailyVisits({
                         data-ph-unmask=""
                         className="text-xs leading-[1.5] text-muted-foreground"
                     >
-                        Tap a day to read its visits and the people who came.
+                        Tap a day to read its visits and visitors.
                     </p>
                 </>
             )}
@@ -339,8 +339,8 @@ export function AnalyticsDashboard({
                     period={range.period}
                 />
                 <Figure
-                    testId="people"
-                    label={WEBSITE_FIGURE.people}
+                    testId="visitors"
+                    label={WEBSITE_FIGURE.visitors}
                     value={summary.uniqueVisitors}
                     before={before?.uniqueVisitors ?? null}
                     period={range.period}

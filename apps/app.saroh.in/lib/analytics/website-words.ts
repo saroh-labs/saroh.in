@@ -16,7 +16,7 @@ export function dayTick(date: string): string {
 }
 
 /**
- * A day's readout: "Thursday 1 Oct · 412 visits · 280 people", and a day
+ * A day's readout: "Thursday 1 Oct · 412 visits · 280 visitors", and a day
  * nobody came "Thursday 1 Oct · no visits" (zero said in words).
  */
 export function dayReadout(point: {
@@ -26,12 +26,12 @@ export function dayReadout(point: {
 }): string {
     const day = formatDay(point.date, { weekday: "long", year: "never" });
     if (point.views <= 0) return `${day} · no visits`;
-    return `${day} · ${count(point.views, "visit", "visits")} · ${count(point.uniques, "person", "people")}`;
+    return `${day} · ${count(point.views, "visit", "visits")} · ${count(point.uniques, "visitor")}`;
 }
 
 /**
  * The sentence above the visits chart (`IBFromD`): "1,689 visits from
- * 1,109 people. Busiest on Saturday 17 Oct. On 1 Oct nobody visited."
+ * 1,109 visitors. Busiest on Saturday 17 Oct. On 1 Oct nobody visited."
  * Days nobody came are named (one) or counted (more), never left out.
  */
 export function visitsLine(
@@ -41,10 +41,10 @@ export function visitsLine(
     const views = daily.reduce((n, d) => n + d.views, 0);
     if (views <= 0)
         return `No visits to your website in ${lastPeriod(period)}.`;
-    const people = daily.reduce((n, d) => n + d.uniques, 0);
+    const visitors = daily.reduce((n, d) => n + d.uniques, 0);
     const busiest = daily.reduce((top, d) => (d.views > top.views ? d : top));
     const empty = daily.filter((d) => d.views <= 0);
-    const head = `${count(views, "visit")} from ${count(people, "person", "people")}. Busiest on ${formatDay(busiest.date, { weekday: "long", year: "never" })}`;
+    const head = `${count(views, "visit")} from ${count(visitors, "visitor")}. Busiest on ${formatDay(busiest.date, { weekday: "long", year: "never" })}`;
     if (empty.length === 0) return `${head}.`;
     if (empty.length === 1) {
         return `${head}. On ${dayTick(empty[0].date)} nobody visited.`;
@@ -52,10 +52,14 @@ export function visitsLine(
     return `${head}. Nobody visited on ${count(empty.length, "day")}.`;
 }
 
-/** A figure's names on the tab (`IBFromD`), in its order. */
+/**
+ * A figure's names on the tab (`IBFromD`), in its order. Visitors, not
+ * People (owner, 21 Oct): a visitor who comes back another day is counted
+ * again, so it is never a count of people.
+ */
 export const WEBSITE_FIGURE = {
     visits: "Visits",
-    people: "People",
+    visitors: "Visitors",
     enquiries: "Enquiries",
     orders: "Paid orders and bookings",
 } as const;

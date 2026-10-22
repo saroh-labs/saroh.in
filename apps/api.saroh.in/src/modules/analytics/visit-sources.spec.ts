@@ -35,17 +35,20 @@ describe("foldVisitSources — the read U16 builds on (U15)", () => {
         expect(read.refs).toEqual([]);
     });
 
-    it("adds each step's days up by source and by ref, paid net of refunds", () => {
+    it("adds each step's days up by source and by ref, paid from site.paid (DEC-181)", () => {
         const read = foldVisitSources([
             row("site.visit", "source", "instagram", 10),
             row("site.visit", "source", "instagram", 4),
             row("site.looked", "source", "instagram", 6),
             row("site.started", "source", "instagram", 3),
+            row("site.paid", "source", "instagram", 1),
+            // An order's own events carry no source any more, and a refund
+            // is never taken off a source.
             row("order.paid", "source", "instagram", 2),
             row("order.refunded", "source", "instagram", 1),
             row("site.visit", "ref", "diwali-post", 5),
             row("site.visit", "ref", "story", 7),
-            row("order.paid", "ref", "diwali-post", 1),
+            row("site.paid", "ref", "diwali-post", 1),
             // Totals and other dimensions are not this read's.
             row("site.visit", "", "", 99),
             row("site.view", "path", "/", 50),
@@ -63,30 +66,33 @@ describe("foldVisitSources — the read U16 builds on (U15)", () => {
         ]);
     });
 
-    it("narrows the visit steps to one site, keeping paid the business's", () => {
+    it("narrows every step to one site, paid included (DEC-181)", () => {
         const rows = [
             row("site.visit", "source", "google", 9),
             row("site.visit", "source", "google", 4, "site_1"),
             row("site.visit", "source", "google", 5, "site_2"),
-            row("order.paid", "source", "google", 2),
+            row("site.paid", "source", "google", 3),
+            row("site.paid", "source", "google", 1, "site_1"),
+            row("site.paid", "source", "google", 2, "site_2"),
         ];
         expect(foldVisitSources(rows).sources[1]).toMatchObject({
             visits: 9,
-            paid: 2,
+            paid: 3,
         });
         expect(foldVisitSources(rows, "site_1").sources[1]).toMatchObject({
             visits: 4,
-            paid: 2,
+            paid: 1,
         });
     });
 
-    it("never reads paid below zero, nor a value that isn't well formed", () => {
+    it("never reads a refund off paid, nor a value that isn't well formed", () => {
         const read = foldVisitSources([
+            row("site.paid", "source", "other", 1),
             row("order.refunded", "source", "other", 2),
             row("site.visit", "source", "tiktok", 3),
             row("site.visit", "ref", "someone@example.com", 3),
         ]);
-        expect(read.sources[4]).toMatchObject({ source: "other", paid: 0 });
+        expect(read.sources[4]).toMatchObject({ source: "other", paid: 1 });
         expect(read.sources.reduce((n, s) => n + s.visits, 0)).toBe(0);
         expect(read.refs).toEqual([]);
     });
@@ -99,11 +105,11 @@ describe("foldVisitSources — the read U16 builds on (U15)", () => {
             // One or two people: maybe a link sent to one person.
             row("site.visit", "ref", "asha-wedding", 1),
             row("site.looked", "ref", "asha-wedding", 1),
-            row("order.paid", "ref", "asha-wedding", 1),
+            row("site.paid", "ref", "asha-wedding", 1),
             row("site.visit", "ref", "for-ravi", 2),
             row("site.started", "ref", "for-ravi", 1),
-            // A paid order whose label had no visit in the range.
-            row("order.paid", "ref", "old-post", 1),
+            // A payment whose visit began before the range.
+            row("site.paid", "ref", "old-post", 1),
         ]);
         expect(read.refs).toEqual([
             { ref: "diwali-post", visits: 12, looked: 0, started: 0, paid: 0 },

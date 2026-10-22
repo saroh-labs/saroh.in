@@ -59,7 +59,7 @@ describe("the website's figures (#919, U14)", () => {
         ]);
         for (const label of [
             "Visits",
-            "People",
+            "Visitors",
             "Enquiries",
             "Paid orders and bookings",
         ]) {
@@ -145,14 +145,14 @@ describe("visits every day", () => {
         expect(bars).toHaveLength(7);
         expect(html).toContain('aria-label="Tuesday 13 Oct · no visits"');
         expect(html).toContain(
-            'aria-label="Saturday 17 Oct · 30 visits · 21 people"',
+            'aria-label="Saturday 17 Oct · 30 visits · 21 visitors"',
         );
         // The empty day is the baseline's colour, at no height.
         expect(html).toMatch(
             /aria-label="Tuesday 13 Oct · no visits"[^>]*><span[^>]*bg-border-strong[^>]*style="height:0%"/,
         );
         expect(html).toContain(
-            "42 visits from 30 people. Busiest on Saturday 17 Oct. Nobody visited on 5 days.",
+            "42 visits from 30 visitors. Busiest on Saturday 17 Oct. Nobody visited on 5 days.",
         );
         // The busiest day is where the readout starts.
         expect(html).toMatch(

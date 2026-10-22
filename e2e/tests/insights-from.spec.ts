@@ -36,6 +36,11 @@ import { ignoreHTTPSErrors, NORTHWIND_ORG, urls } from "../playwright.config";
  *
  * A read that fails is named on the tab (`from-tab.test.tsx`): a browser
  * can't make the API fail on cue, so it isn't repeated here.
+ *
+ * The links made in Saroh (DEC-181, #1099) are made, copied and archived
+ * with Undo on a business and website of the spec's own; their rules are
+ * pinned by `site-links.db.spec.ts`, `link-maker.test.ts` and
+ * `site-links.test.tsx`.
  */
 
 const onPhone = () => test.info().project.name.startsWith("phone");
@@ -184,12 +189,12 @@ test("a business with one website reads every figure for the period, with how it
 
     const website = page.getByRole("region", { name: "Your website" });
     await expect(website).toContainText(
-        "Last 3 months: visits, people, enquiries, and paid orders and bookings. Updated every hour.",
+        "Last 3 months: visits, visitors, enquiries, and paid orders and bookings. Updated every hour.",
     );
     const figures = page.getByTestId("website-figures");
     for (const name of [
         "Visits",
-        "People",
+        "Visitors",
         "Enquiries",
         "Paid orders and bookings",
     ]) {
@@ -221,7 +226,7 @@ test("a business with one website reads every figure for the period, with how it
     const firstDay = visits.getByRole("button").first();
     await firstDay.click();
     await expect(visits.locator("[aria-live=polite]")).toHaveText(
-        /^\w+day \d+ \w{3} · (no visits|[\d,]+ visits? · [\d,]+ (person|people))$/,
+        /^\w+day \d+ \w{3} · (no visits|[\d,]+ visits? · [\d,]+ visitors?)$/,
     );
 
     // The pages, each named, its path kept under it.
@@ -435,4 +440,89 @@ test("with more than one website the picker chooses one and keeps it in the addr
     await page.reload();
     await expect(page.getByTestId("site-picker")).toHaveText(second.name);
     await expectNoSidewaysScroll(page);
+});
+
+test("a link made in Saroh: the label made from the name, copied with the site's address, archived with Undo (DEC-181)", async ({
+    page,
+    browser,
+    context,
+}, testInfo) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"], {
+        origin: new URL(urls.APP_URL).origin,
+    });
+    const business = await makeBusiness(page, testInfo, "insl");
+    await rollOut(browser, business.id, "INSIGHTS", testInfo);
+    await rollOut(browser, business.id, "WEBSITE", testInfo);
+    await turnOn(page.request, business.id, "INSIGHTS");
+    await turnOn(page.request, business.id, "WEBSITE");
+    const address = ownAddress("insl", testInfo);
+    const site = await addSite(page.request, business, address);
+    test.skip(
+        "refused" in site,
+        "this stack wouldn't make a website for the business; the maker is covered by site-links.test.tsx",
+    );
+    if ("refused" in site) return;
+
+    await openFrom(page, business.id, `&period=7d&siteId=${site.id}`);
+    const links = page.getByTestId("site-links");
+    await expect(links).toContainText("Links made in Saroh");
+    await expect(page.getByTestId("site-links-none")).toContainText(
+        "No links yet.",
+    );
+
+    // Make a link: the label follows the name, and the hint says what a
+    // name is for.
+    await links.getByRole("button", { name: "Make a link" }).click();
+    const dialog = page.getByRole("dialog", { name: "Make a link" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("Name the post, not the person.");
+    await dialog.getByLabel("Name").fill("Diwali post");
+    const label = dialog.getByLabel("Label");
+    await expect(label).toHaveValue("diwali-post");
+    // The label is the person's to change.
+    await label.fill("diwali-reel");
+    await expect(dialog).toContainText(
+        new RegExp(`The link: https://\\S*${address}\\S*/\\?ref=diwali-reel`),
+    );
+    await dialog.getByRole("button", { name: "Make and copy link" }).click();
+    await expect(dialog).toBeHidden();
+
+    // Made and copied: the site's own address with the label.
+    const row = links.locator(
+        '[data-testid="site-link"][data-label="diwali-reel"]',
+    );
+    await expect(row).toContainText("Diwali post");
+    await expect(row).toContainText("?ref=diwali-reel");
+    await expect(row).toContainText("Fewer than 3 visits");
+    await expect
+        .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+        .toMatch(new RegExp(`^https://\\S*${address}\\S*/\\?ref=diwali-reel$`));
+
+    // Copy again from the list.
+    await page.evaluate(() => navigator.clipboard.writeText(""));
+    await row
+        .getByRole("button", { name: "Copy the link for Diwali post" })
+        .click();
+    await expect
+        .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+        .toMatch(/\?ref=diwali-reel$/);
+    if (onPhone()) {
+        const box = await row
+            .getByRole("button", { name: "Archive Diwali post" })
+            .boundingBox();
+        expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    }
+    await expectNoSidewaysScroll(page);
+
+    // Archive, then Undo brings it back.
+    await row.getByRole("button", { name: "Archive Diwali post" }).click();
+    await expect(row).toHaveCount(0);
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect(row).toBeVisible();
+
+    // It stays after a reload: the Undo reached the API.
+    await page.reload();
+    await expect(
+        page.locator('[data-testid="site-link"][data-label="diwali-reel"]'),
+    ).toBeVisible();
 });

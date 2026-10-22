@@ -7,12 +7,15 @@ import { PartialRead } from "@/components/shared/failed-read";
 import type { AnalyticsSummary, AnalyticsView } from "@/lib/analytics/summary";
 import type { SourceRead } from "@/lib/analytics/takings";
 import { beforePeriod } from "@/lib/insights/compare-words";
+import type { SiteLinksRead } from "@/lib/insights/link-maker";
 import type { InsightsPeriod, PeriodWindow } from "@/lib/insights/period";
 import { PERIOD_LABEL } from "@/lib/insights/period";
 import type { SourcesRead } from "@/lib/insights/reads";
 import { countedFromLine } from "@/lib/insights/sources-words";
 
 import { HowCounted } from "./overview";
+import type { LinkSite } from "./site-links";
+import { SiteLinks } from "./site-links";
 import type { SiteOption } from "./site-picker";
 import { SitePicker } from "./site-picker";
 import { SourcesTable } from "./sources-table";
@@ -26,13 +29,16 @@ import { VisitPath } from "./visit-path";
  *
  * 1. Your website, with the site picker only when there is more than one
  *    (a sheet on a phone), keeping `siteId` in the address.
- * 2. Visits, People, Enquiries and Paid orders and bookings, each with how
- *    it moved on the period before.
+ * 2. Visits, Visitors, Enquiries and Paid orders and bookings, each with
+ *    how it moved on the period before ("People" went back to "Visitors",
+ *    owner, 21 Oct: a visitor who comes back another day is counted again).
  * 3. From visit to paid and Where do visitors come from? (U16), side by
  *    side at a desk and one under the other on a phone; when counting
  *    began inside the period the line above them says from when, and
  *    before anything is counted one message says it starts with the next
- *    visit. The "Coming next" banner (A9) went when these came.
+ *    visit. The "Coming next" banner (A9) went when these came. Under
+ *    them, the links made in Saroh (DEC-181, `site-links.tsx`): only these
+ *    are counted as themselves; make one, copy it, archive it with Undo.
  * 4. Visits every day, a day nobody came drawn too; which pages people
  *    open, the path kept.
  *
@@ -53,6 +59,9 @@ export function FromTab({
     siteId,
     retryHref,
     sources = null,
+    links = null,
+    linkSites = [],
+    canMakeLinks = false,
     today,
 }: {
     period: InsightsPeriod;
@@ -71,6 +80,12 @@ export function FromTab({
     retryHref: string;
     /** Where the period's visits came from (U16); null: not read. */
     sources?: SourceRead<SourcesRead> | null;
+    /** The links made in Saroh (DEC-181); null: not read. */
+    links?: SourceRead<SiteLinksRead> | null;
+    /** The websites a link opens, with their real addresses. */
+    linkSites?: readonly LinkSite[];
+    /** Making and archiving a link is the website's (`site:update`). */
+    canMakeLinks?: boolean;
     /** Today in the business's zone, `2026-10-19`, for the dates said. */
     today?: string;
 }) {
@@ -84,12 +99,23 @@ export function FromTab({
         sitesFailed ? "your list of websites" : null,
     ].filter((x): x is string => x !== null);
     const sourcesPart = (
-        <SourcesPart
-            sources={sources}
-            period={period}
-            retryHref={retryHref}
-            today={today}
-        />
+        <>
+            <SourcesPart
+                sources={sources}
+                period={period}
+                retryHref={retryHref}
+                today={today}
+            />
+            <SiteLinks
+                // A new list for each website and period chosen.
+                key={`${siteId ?? "all"}:${period}`}
+                read={links}
+                sites={linkSites}
+                siteId={siteId}
+                canMake={canMakeLinks}
+                retryHref={retryHref}
+            />
+        </>
     );
 
     return (
@@ -108,7 +134,7 @@ export function FromTab({
                             data-ph-unmask=""
                             className="mt-1 text-[13px] leading-[1.5] text-muted-foreground"
                         >
-                            {PERIOD_LABEL[period]}: visits, people, enquiries,
+                            {PERIOD_LABEL[period]}: visits, visitors, enquiries,
                             and paid orders and bookings
                             {chosen?.id ? (
                                 <>

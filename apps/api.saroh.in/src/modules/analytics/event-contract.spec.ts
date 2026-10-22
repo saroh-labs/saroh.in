@@ -143,7 +143,7 @@ describe("event-contract — every declared type is used", () => {
 });
 
 describe("event-contract — where a visit came from (U15)", () => {
-    const STEPS = ["site.visit", "site.looked", "site.started"];
+    const STEPS = ["site.visit", "site.looked", "site.started", "site.paid"];
 
     it.each(STEPS)(
         "%s keeps only a known source and an allowed ref",
@@ -205,7 +205,7 @@ describe("event-contract — where a visit came from (U15)", () => {
         expect(PUBLIC_INGESTABLE_TYPES.has("order.refunded")).toBe(false);
     });
 
-    it("lets order.paid and order.refunded say where the visit came from, optionally", () => {
+    it("keeps where a visit came from off an order's own events (DEC-181)", () => {
         expect(
             validateEventProperties("order.paid", 1, {
                 orderId: "o1",
@@ -213,26 +213,29 @@ describe("event-contract — where a visit came from (U15)", () => {
                 source: "whatsapp",
                 ref: "status",
             }),
-        ).toEqual({
-            orderId: "o1",
-            amountCents: 100,
-            source: "whatsapp",
-            ref: "status",
-        });
+        ).toEqual({ orderId: "o1", amountCents: 100 });
         expect(
             validateEventProperties("order.refunded", 1, {
                 orderId: "o1",
                 amountCents: 100,
-                source: null,
+                source: "whatsapp",
             }),
         ).toEqual({ orderId: "o1", amountCents: 100 });
-        expect(() =>
-            validateEventProperties("order.paid", 1, {
+    });
+
+    it("takes site.paid like the other steps: the group and label only (DEC-181)", () => {
+        expect(
+            validateEventProperties("site.paid", 1, {
+                source: "instagram",
+                ref: "diwali-post",
                 orderId: "o1",
                 amountCents: 100,
-                source: "tiktok",
             }),
+        ).toEqual({ source: "instagram", ref: "diwali-post" });
+        expect(() =>
+            validateEventProperties("site.paid", 1, { source: "tiktok" }),
         ).toThrow(BadRequestException);
+        expect(PUBLIC_INGESTABLE_TYPES.has("site.paid")).toBe(true);
     });
 });
 

@@ -154,12 +154,6 @@ export interface StartCheckout {
      * else; it never refuses an order over it.
      */
     source?: string;
-    /**
-     * Where the visit came from (U15, `visit-source.ts`): one of five
-     * groups and the merchant's own link label. Never an id.
-     */
-    visitSource?: string;
-    visitRef?: string;
 }
 
 /**

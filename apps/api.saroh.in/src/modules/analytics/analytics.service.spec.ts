@@ -6,6 +6,7 @@ jest.mock("@saroh/database", () => {
         ...actual,
         prisma: {
             site: { findUnique: jest.fn() },
+            siteLink: { findMany: jest.fn() },
             analyticsEvent: { create: jest.fn(), findFirst: jest.fn() },
             analyticsDailyAggregate: { findMany: jest.fn() },
         },
@@ -18,11 +19,13 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { AnalyticsService } from "./analytics.service";
+import { forgetAllSiteLinkLabels } from "./site-link-labels";
 
 const siteFindUnique = prisma.site.findUnique as jest.Mock;
 const eventCreate = prisma.analyticsEvent.create as jest.Mock;
 const eventFindFirst = prisma.analyticsEvent.findFirst as jest.Mock;
 const aggregateFindMany = prisma.analyticsDailyAggregate.findMany as jest.Mock;
+const linkFindMany = prisma.siteLink.findMany as jest.Mock;
 
 const SITE = { id: "site_1", organizationId: "org_SITE" };
 
@@ -35,6 +38,8 @@ const ctx = (role: OrganizationContext["role"]): OrganizationContext => ({
 function wireSite() {
     siteFindUnique.mockResolvedValue(SITE);
     eventCreate.mockResolvedValue({ id: "evt_1" });
+    linkFindMany.mockResolvedValue([]);
+    forgetAllSiteLinkLabels();
 }
 
 const viewInput = {
@@ -176,7 +181,13 @@ describe("AnalyticsService.ingestPublic — what the visitor's browser says is n
     beforeEach(() => jest.clearAllMocks());
     afterEach(() => jest.useRealTimers());
 
-    it.each(["site.view", "site.visit", "site.looked", "site.started"])(
+    it.each([
+        "site.view",
+        "site.visit",
+        "site.looked",
+        "site.started",
+        "site.paid",
+    ])(
         "%s ignores the client's dedupeKey, occurredAt and consent",
         async (type) => {
             const service = new AnalyticsService();
@@ -216,7 +227,7 @@ describe("AnalyticsService.record — a visit's steps keep their time to the hou
     });
     afterEach(() => jest.useRealTimers());
 
-    it.each(["site.visit", "site.looked", "site.started"])(
+    it.each(["site.visit", "site.looked", "site.started", "site.paid"])(
         "%s is stored at the hour's start, received at its end, with a random id",
         async (type) => {
             const service = new AnalyticsService();
@@ -340,5 +351,75 @@ describe("AnalyticsService.getDashboard — org-safe reads", () => {
         aggregateFindMany.mockResolvedValue([]);
 
         await expect(service.getDashboard(ctx("ADMIN"))).resolves.toEqual([]);
+    });
+});
+
+describe("AnalyticsService.ingestPublic — only the site's own links count as a label (DEC-181)", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    async function stepWith(ref: unknown, type = "site.visit") {
+        await new AnalyticsService().ingestPublic(
+            "site_1",
+            { type, properties: { source: "instagram", ref } },
+            "203.0.113.7",
+        );
+        return eventCreate.mock.calls.at(-1)?.[0].data.properties;
+    }
+
+    it("keeps a live link's label, read for the Site's own business and site", async () => {
+        wireSite();
+        linkFindMany.mockResolvedValue([{ label: "diwali-post" }]);
+
+        expect(await stepWith("Diwali-Post")).toEqual({
+            source: "instagram",
+            ref: "diwali-post",
+        });
+        expect(linkFindMany).toHaveBeenCalledWith({
+            where: {
+                siteId: "site_1",
+                organizationId: "org_SITE",
+                archivedAt: null,
+            },
+            select: { label: true },
+        });
+    });
+
+    it("counts any other label under its group, never refusing the step", async () => {
+        wireSite();
+        linkFindMany.mockResolvedValue([{ label: "diwali-post" }]);
+
+        for (const ref of [
+            "someone-else",
+            "asha-9876543210",
+            "cmh2k9x0a0001qz8l3v5d7f9b",
+            "a@b.c",
+            7,
+        ]) {
+            expect(await stepWith(ref, "site.paid")).toEqual({
+                source: "instagram",
+            });
+        }
+    });
+
+    it("reads a site's links once a while, not for every step", async () => {
+        wireSite();
+        linkFindMany.mockResolvedValue([{ label: "diwali-post" }]);
+
+        await stepWith("diwali-post");
+        await stepWith("diwali-post", "site.looked");
+        await stepWith("other-post", "site.started");
+
+        expect(linkFindMany).toHaveBeenCalledTimes(1);
+    });
+
+    it("reads no links for a page view or a step with no label", async () => {
+        wireSite();
+        await new AnalyticsService().ingestPublic(
+            "site_1",
+            viewInput,
+            "203.0.113.7",
+        );
+        expect(await stepWith(undefined)).toEqual({ source: "instagram" });
+        expect(linkFindMany).not.toHaveBeenCalled();
     });
 });

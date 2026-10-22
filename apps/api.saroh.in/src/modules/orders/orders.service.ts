@@ -191,15 +191,7 @@ export class OrdersService {
         if (!order) {
             throw new NotFoundException("Order not found");
         }
-        // Where its visit came from is Insights' (U15 privacy review): shown
-        // to someone whose business role reads Insights, never to everyone
-        // who reads the order.
-        const visitSource = await this.stores.moneyAllows(
-            storeId,
-            userId,
-            "analytics:read",
-        );
-        return serializeOrderDetail(order, { visitSource });
+        return serializeOrderDetail(order);
     }
 
     async create(storeId: string, userId: string, dto: CreateOrderDto) {

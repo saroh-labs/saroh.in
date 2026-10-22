@@ -1,9 +1,4 @@
-import {
-    isVisitSource,
-    VISIT_SOURCES,
-    visitOriginOf,
-    visitRefOf,
-} from "./visit-source";
+import { isVisitSource, VISIT_SOURCES, visitRefOf } from "./visit-source";
 
 describe("visit-source — what a visit's source may be (U15)", () => {
     it("has the five groups the merchant reads", () => {
@@ -50,19 +45,6 @@ describe("visit-source — what a visit's source may be (U15)", () => {
         expect(visitRefOf("pin-12345")).toBe("pin-12345");
     });
 
-    it("cleans what a checkout sent: a label only beside a group", () => {
-        expect(visitOriginOf("instagram", "Diwali")).toEqual({
-            source: "instagram",
-            ref: "diwali",
-        });
-        expect(visitOriginOf("direct", "bad label")).toEqual({
-            source: "direct",
-            ref: null,
-        });
-        expect(visitOriginOf(undefined, "diwali")).toBeNull();
-        expect(visitOriginOf("tiktok", "diwali")).toBeNull();
-    });
-
     it("refuses seven or more digits in all, however they are split (privacy review)", () => {
         expect(visitRefOf("98765-43210")).toBeNull();
         expect(visitRefOf("call-987-654-3")).toBeNull();
@@ -73,10 +55,6 @@ describe("visit-source — what a visit's source may be (U15)", () => {
     it("refuses a record's id, as the booking page's own ref carries (privacy review)", () => {
         expect(visitRefOf("cmh2k9x0a0001qz8l3v5d7f9b")).toBeNull();
         expect(visitRefOf("CMH2K9X0A0001QZ8L3V5D7F9B")).toBeNull();
-        expect(visitOriginOf("direct", "cmh2k9x0a0001qz8l3v5d7f9b")).toEqual({
-            source: "direct",
-            ref: null,
-        });
         // An id with few digits is refused by its shape alone.
         expect(visitRefOf("ckzqmabcdefghijklmnopqrst")).toBeNull();
         // A label that only starts with c, or is one letter short, is kept.

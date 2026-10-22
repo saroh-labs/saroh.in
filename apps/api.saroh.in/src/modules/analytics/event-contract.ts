@@ -183,50 +183,34 @@ function visitOriginProps(
 }
 
 /**
- * The same, optional: an order placed before tracking began, at the
- * counter, or from a visit that sent nothing (Do Not Track) has no source.
- */
-function optionalVisitOrigin(
-    props: Record<string, unknown>,
-): Record<string, unknown> {
-    if (props.source === undefined || props.source === null) return {};
-    return visitOriginProps(props);
-}
-
-/**
- * The three steps of a visit (U15), each sent at most once per visit by
- * the site's own beacon and carrying only where the visit came from: no
- * path, no product, no visitor (`AnalyticsService.ingestPublic` stores no
- * visitor hash for them).
+ * The four steps of a visit (U15; `site.paid` since DEC-181), each sent at
+ * most once per visit by the site's own beacon and carrying only where the
+ * visit came from: no path, no product, no order, no amount, no visitor
+ * (`AnalyticsService.ingestPublic` stores no visitor hash for them).
  *
  * - `site.visit`: a visit began (its first page on the site);
  * - `site.looked`: it opened a product or the booking page;
- * - `site.started`: it opened the checkout.
- *
- * The fourth step, paid, is `order.paid` with the same two fields.
+ * - `site.started`: it opened the checkout;
+ * - `site.paid`: its own confirmation page showed a successful online
+ *   payment (DEC-181: paid is counted from the visit, never from the
+ *   order, so nothing about a visit is kept on an order).
  */
 const visitStepV1: EventValidator = (props) => visitOriginProps(props);
 
-/**
- * The `order.paid` contract (v1): an org-internal commerce event. Since
- * U15 it may say where the visit that placed the order came from.
- */
+/** The `order.paid` contract (v1): an org-internal commerce event. */
 const orderPaidV1: EventValidator = (props) => ({
     orderId: requireString(props, "orderId", 128),
     amountCents: requireNumber(props, "amountCents"),
-    ...optionalVisitOrigin(props),
 });
 
 /**
  * The `order.refunded` contract (v1, #867): an order that `order.paid`
  * counted has had all of its money back, so Insights' orders figure takes
- * it off again, net as Sales is. `amountCents` is the counted sale's, and
- * since U15 its source is the counted sale's too.
+ * it off again, net as Sales is. `amountCents` is the counted sale's.
  */
 const orderRefundedV1: EventValidator = (props) => ({
     orderId: requireString(props, "orderId", 128),
     amountCents: requireNumber(props, "amountCents"),
-    ...optionalVisitOrigin(props),
 });
 
 /* ------------------------------------------------------------------------- *
@@ -379,28 +363,32 @@ export const ENQUIRY_SUBMITTED_TYPE = "enquiry.submitted";
 export const ORDER_PAID_TYPE = "order.paid";
 export const ORDER_REFUNDED_TYPE = "order.refunded";
 
-/** A visit's steps (U15): began, looked, started. Public, from the site. */
+/**
+ * A visit's steps (U15): began, looked, started and, since DEC-181, paid.
+ * Public, from the site.
+ */
 export const SITE_VISIT_TYPE = "site.visit";
 export const SITE_LOOKED_TYPE = "site.looked";
 export const SITE_STARTED_TYPE = "site.started";
+export const SITE_PAID_TYPE = "site.paid";
 
 /** The visit steps, which carry a source and never a visitor. */
 export const VISIT_STEP_TYPES: ReadonlySet<string> = new Set([
     SITE_VISIT_TYPE,
     SITE_LOOKED_TYPE,
     SITE_STARTED_TYPE,
-]);
-
-/** Every event type that carries where a visit came from. */
-export const VISIT_ORIGIN_TYPES: ReadonlySet<string> = new Set([
-    ...VISIT_STEP_TYPES,
-    ORDER_PAID_TYPE,
-    ORDER_REFUNDED_TYPE,
+    SITE_PAID_TYPE,
 ]);
 
 /**
+ * Every event type that carries where a visit came from: the steps only.
+ * No order carries a source (DEC-181).
+ */
+export const VISIT_ORIGIN_TYPES: ReadonlySet<string> = VISIT_STEP_TYPES;
+
+/**
  * The set of event types a public visitor may ingest: a page view and the
- * visit's three steps. Org-internal types (`enquiry.submitted`,
+ * visit's four steps. Org-internal types (`enquiry.submitted`,
  * `order.paid`, `order.refunded`) are produced server-side and MUST be
  * rejected on the public endpoint: a visitor can't forge a paid order.
  */
@@ -418,6 +406,7 @@ const REGISTRY = new Map<string, EventValidator>([
     [key(SITE_VISIT_TYPE, 1), visitStepV1],
     [key(SITE_LOOKED_TYPE, 1), visitStepV1],
     [key(SITE_STARTED_TYPE, 1), visitStepV1],
+    [key(SITE_PAID_TYPE, 1), visitStepV1],
     // Activation (#176) — server-produced only; absent from
     // PUBLIC_INGESTABLE_TYPES on purpose.
     [key(ORGANIZATION_CREATED_TYPE, 1), organizationCreatedV1],

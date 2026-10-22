@@ -9,6 +9,12 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
+vi.mock("@/lib/insights/link-actions", () => ({
+    makeSiteLink: vi.fn(),
+    archiveSiteLink: vi.fn(),
+    restoreSiteLink: vi.fn(),
+}));
+
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn() }),
 }));
@@ -16,6 +22,7 @@ vi.mock("next/navigation", () => ({
 import type { AnalyticsSummary, AnalyticsView } from "@/lib/analytics/summary";
 import { summarizeAnalytics } from "@/lib/analytics/summary";
 import type { SourceRead } from "@/lib/analytics/takings";
+import type { SiteLinksRead } from "@/lib/insights/link-maker";
 import { insightsHref, periodWindow } from "@/lib/insights/period";
 import type { SourcesRead } from "@/lib/insights/reads";
 
@@ -81,8 +88,10 @@ function render({
     sitesFailed = false,
     siteId = null,
     sources = OK_SOURCES,
+    links = null,
 }: {
     sources?: SourceRead<SourcesRead> | null;
+    links?: SourceRead<SiteLinksRead> | null;
     current?: SourceRead<AnalyticsView>;
     before?: SourceRead<AnalyticsSummary>;
     sites?: SiteOption[] | null;
@@ -101,6 +110,11 @@ function render({
             siteId={siteId}
             retryHref={insightsHref({ tab: "from", siteId })}
             sources={sources}
+            links={links}
+            linkSites={[
+                { id: "rye", name: "Rye & Co.", url: "https://rye.saroh.app" },
+            ]}
+            canMakeLinks
             today="2026-10-19"
         />,
     );
@@ -108,6 +122,33 @@ function render({
 }
 
 describe("Where customers come from, now", () => {
+    it("puts the links made in Saroh under where visitors come from (DEC-181)", () => {
+        const host = render({
+            links: { status: "ok", data: { links: [], minVisits: 3 } },
+        });
+        const table = host.querySelector('[data-testid="sources-table"]');
+        const links = host.querySelector('[data-testid="site-links"]');
+        expect(links?.textContent).toContain("Links made in Saroh");
+        expect(links?.textContent).toContain("Make a link");
+        expect(
+            table && links
+                ? table.compareDocumentPosition(links) &
+                      Node.DOCUMENT_POSITION_FOLLOWING
+                : 0,
+        ).toBeTruthy();
+        // Before anything is counted, links can still be made.
+        const early = render({
+            sources: {
+                status: "ok",
+                data: { ...SOURCES, countedFrom: null },
+            },
+            links: { status: "ok", data: { links: [], minVisits: 3 } },
+        });
+        expect(
+            early.querySelector('[data-testid="site-links"]'),
+        ).not.toBeNull();
+    });
+
     it("says nothing is still to come: no Coming next banner (A9 done)", () => {
         const host = render();
         expect(host.querySelector('[data-testid="from-next"]')).toBeNull();
@@ -205,7 +246,7 @@ describe("Where customers come from, now", () => {
     it("shows the period's figures with how they moved", () => {
         const host = render();
         expect(host.textContent).toContain(
-            "Last 4 weeks: visits, people, enquiries, and paid orders and bookings. Updated every hour.",
+            "Last 4 weeks: visits, visitors, enquiries, and paid orders and bookings. Updated every hour.",
         );
         expect(host.textContent).toContain("10 more than the 4 weeks before");
         // Every day of the four weeks is drawn.
@@ -213,6 +254,10 @@ describe("Where customers come from, now", () => {
             host.querySelectorAll('[data-testid="website-visits"] button'),
         ).toHaveLength(28);
         expect(host.textContent).toContain("How these are counted");
+        // Visitors, not people (owner, 21 Oct): said how they are counted.
+        expect(host.textContent).toContain(
+            "a visitor who comes back on another day is counted again",
+        );
     });
 
     it("offers no picker with one website", () => {

@@ -264,6 +264,7 @@ model Organization {
   siteTrackingSettings SiteTrackingSettings[]
   // A site's QR codes and their daily scan counts.
   qrCodes              QrCode[]
+  siteLinks            SiteLink[]
   qrScanDays           QrScanDay[]
   // What customers reported about this business at saroh.in/customers.
   businessReports      BusinessReport[]
@@ -1904,15 +1905,6 @@ model Order {
   // Null for every other order.
   sourceCode String?
 
-  // Where the website visit that placed this order came from (U15, #1099):
-  // one of five groups (instagram, google, whatsapp, direct, other) and the
-  // merchant's own link label (`?ref=`), both checked by
-  // `analytics/visit-source.ts`. No visit id and nothing about the visitor.
-  // Copied onto `order.paid`; cleared by `analytics.retention` once the
-  // order is older than the analytics retention (400 days).
-  visitSource String?
-  visitRef    String?
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1994,9 +1986,6 @@ model Order {
   @@index([customerAccountId, createdAt])
   // The QR list's Orders count: the few orders that name a code.
   @@index([sourceCode], map: "Order_sourceCode_idx", where: raw("\"sourceCode\" IS NOT NULL"))
-  // The retention sweep's read (U15): orders past retention still holding
-  // a visit's source.
-  @@index([createdAt], map: "Order_visitSource_retention_idx", where: raw("\"visitSource\" IS NOT NULL"))
 }
 
 model OrderItem {
@@ -3759,6 +3748,7 @@ model Site {
   trackingSettings SiteTrackingSettings?
   // The site's QR codes: short links at `/q/<code>` on its Saroh address.
   qrCodes          QrCode[]
+  siteLinks        SiteLink[]
   // "Tell me when it's back" asked on this site (DEC-174 U23).
   stockWatches     StockWatch[]
 
@@ -4385,6 +4375,35 @@ model SiteTrackingSettings {
 
   @@unique([siteId, organizationId])
   @@index([organizationId])
+}
+
+/// A link a business made in Saroh to share its site (DEC-181, #1099):
+/// `<site address>/?ref=<label>`. Only these labels are counted on
+/// Insights › Where customers come from; any other `ref` a visit carries
+/// counts under its group with no label. Archived, never deleted, so the
+/// figures a label already counted keep their name.
+model SiteLink {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // The `ref` in the link: lower-case letters, digits and hyphens, the
+  // shape `analytics/visit-source.ts` keeps (no record id, under seven
+  // digits). Unique per site among live links.
+  label String
+  // What the team calls it ("Diwali post"). Never sent to the site.
+  name  String
+
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  archivedAt      DateTime?
+
+  // One live link per label on a site; an archived one frees its label.
+  @@unique([siteId, label], map: "SiteLink_siteId_label_live_key", where: raw("\"archivedAt\" IS NULL"))
+  @@index([organizationId, siteId])
 }
 
 /// A QR code a business made for its site. The printed code holds a short

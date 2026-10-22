@@ -4,6 +4,7 @@ import {
 } from "@/lib/communications/customer-emails";
 import { formatNumber } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import { insightsHref } from "@/lib/insights/period";
 import { ALERT_CHANNELS, ALERTS } from "@/lib/notifications/preferences";
 import { productHref } from "@/lib/products/links";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
@@ -104,6 +105,11 @@ export const ACTIVITY_ACTIONS = [
     // its price, MRP, GST rate or "GST on this price", from any screen.
     // (An item's first entry, `price.set`, is its own history's.)
     "price.changed",
+    // A link to share a website made, archived or brought back on Insights
+    // › Where customers come from (DEC-181, #1099).
+    "site-link.created",
+    "site-link.archived",
+    "site-link.restored",
 ] as const;
 
 /** Someone an event names, as they are now; `null` when they are gone. */
@@ -168,6 +174,26 @@ const TEAM = (view: "people" | "roles" = "people") => ({
 const MODULES = { label: "Modules", href: "/settings/modules" };
 const PRODUCTS = { label: "Products", href: "/commerce/products" };
 const PLAN = { label: "Plan and billing", href: "/settings/billing" };
+/** Where the links made in Saroh live (DEC-181), for the link's website. */
+const links = (siteId: string | null) => ({
+    label: "Insights",
+    href: insightsHref({ tab: "from", siteId }),
+});
+
+/**
+ * A link to share a website made, archived or brought back (DEC-181), as
+ * the rest of a sentence: "made the link Diwali post (diwali-post)".
+ */
+function siteLinkWhat(action: string, meta: Record<string, unknown>): string {
+    const name = text(meta.name);
+    const label = text(meta.label);
+    const which = name
+        ? `the link ${name}${label ? ` (${label})` : ""}`
+        : "a link";
+    if (action === "site-link.archived") return `archived ${which}`;
+    if (action === "site-link.restored") return `brought back ${which}`;
+    return `made ${which}`;
+}
 /** A storefront's own settings, or the list when it isn't named. */
 const STOREFRONTS_HREF = (storeId: string | null) =>
     storeId ? storefrontHref(storeId) : "/commerce/locations";
@@ -467,6 +493,13 @@ export function activityLine(
         // Their page is gone (C11): the line leads to the list.
         case "customer.removed":
             return line(removedWhat(meta), customerPlace(null));
+        case "site-link.created":
+        case "site-link.archived":
+        case "site-link.restored":
+            return line(
+                siteLinkWhat(event.action, meta),
+                links(text(meta.siteId)),
+            );
         default:
             return null;
     }

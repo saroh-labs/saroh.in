@@ -4,17 +4,6 @@ import { prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
 import { heldOrganizationIds } from "../organizations/legal-hold";
-import { ANALYTICS_RETENTION_DAYS } from "./event-contract";
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/**
- * A Date as the `timestamp without time zone` Prisma stores, the UTC
- * wall-clock (as `analytics-rollup.handler.ts` binds it).
- */
-function utc(at: Date): string {
-    return at.toISOString().replace("Z", "");
-}
 
 /**
  * The self-rescheduling job that deletes detailed analytics rows past their
@@ -23,11 +12,6 @@ function utc(at: Date): string {
  * the rows whose stamp has passed. The daily rollups
  * (`AnalyticsDailyAggregate`) are never touched: Insights and the plan's
  * visits a month read those, and they outlive the events they came from.
- *
- * Since U15 (#1099) it also clears where a website visit came from off the
- * orders it placed (`Order.visitSource`, `Order.visitRef`) once the order
- * is older than the same retention: the order itself stays, as the law
- * keeps it, and only the visit's source goes, as its events did.
  */
 export const ANALYTICS_RETENTION_TYPE = "analytics.retention";
 
@@ -52,12 +36,6 @@ export const ANALYTICS_RETENTION_MAX_BATCHES = 50;
 /** What one sweep did: rows deleted, and whether it stopped with more due. */
 export interface RetentionSweep {
     deleted: number;
-    more: boolean;
-}
-
-/** What one sweep of the orders did: sources cleared, and whether more are due. */
-export interface SourceSweep {
-    cleared: number;
     more: boolean;
 }
 
@@ -97,21 +75,6 @@ export class AnalyticsRetentionHandler {
                 `analytics.retention: sweep failed before it finished: ${error instanceof Error ? error.name : "unknown"}`,
             );
         }
-        // The orders' visit sources, apart: a failure in one sweep never
-        // stops the other.
-        try {
-            const sources = await this.sweepOrderSources(now);
-            more = more || sources.more;
-            if (sources.cleared > 0) {
-                this.logger.log(
-                    `analytics.retention: cleared the visit source of ${sources.cleared} orders past retention${sources.more ? "; more due, next run soon" : ""}`,
-                );
-            }
-        } catch (error) {
-            this.logger.error(
-                `analytics.retention: order source sweep failed before it finished: ${error instanceof Error ? error.name : "unknown"}`,
-            );
-        }
         const wait = more
             ? ANALYTICS_RETENTION_BACKLOG_MS
             : ANALYTICS_RETENTION_EVERY_MS;
@@ -125,11 +88,13 @@ export class AnalyticsRetentionHandler {
     /** Delete events whose retention ended before `now`, up to the run's cap. */
     async sweep(now: Date): Promise<RetentionSweep> {
         let deleted = 0;
-        // On legal hold: read once a run; there are few.
-        const held = await heldOrganizationIds(prisma);
-        const notHeld =
-            held.length > 0 ? { organizationId: { notIn: held } } : {};
         for (let batch = 0; batch < ANALYTICS_RETENTION_MAX_BATCHES; batch++) {
+            // On legal hold: read again each batch, and checked again by the
+            // delete itself (U15 privacy review), so a hold placed while a
+            // run is under way is never swept past. There are few.
+            const held = await heldOrganizationIds(prisma);
+            const notHeld =
+                held.length > 0 ? { organizationId: { notIn: held } } : {};
             const due = await prisma.analyticsEvent.findMany({
                 where: { expiresAt: { lt: now }, ...notHeld },
                 select: { id: true },
@@ -152,52 +117,6 @@ export class AnalyticsRetentionHandler {
             }
         }
         return { deleted, more: true };
-    }
-
-    /**
-     * Clear `visitSource` and `visitRef` off orders created more than
-     * `ANALYTICS_RETENTION_DAYS` before `now` (U15), in the same batches and
-     * cap as the events, skipping a business on legal hold. Taken in
-     * `createdAt` order through `Order_visitSource_retention_idx`.
-     */
-    async sweepOrderSources(now: Date): Promise<SourceSweep> {
-        const cutoff = new Date(
-            now.getTime() - ANALYTICS_RETENTION_DAYS * DAY_MS,
-        );
-        let cleared = 0;
-        for (let batch = 0; batch < ANALYTICS_RETENTION_MAX_BATCHES; batch++) {
-            // On legal hold: read again each batch, and checked again by the
-            // UPDATE itself (U15 privacy review), so a hold placed while a
-            // run is under way is never cleared past.
-            const held = await heldOrganizationIds(prisma);
-            const rows = await prisma.order.findMany({
-                where: {
-                    visitSource: { not: null },
-                    createdAt: { lt: cutoff },
-                    ...(held.length > 0
-                        ? { organizationId: { notIn: held } }
-                        : {}),
-                },
-                select: { id: true },
-                orderBy: { createdAt: "asc" },
-                take: ANALYTICS_RETENTION_BATCH,
-            });
-            if (rows.length === 0) return { cleared, more: false };
-            // Raw, so the order's `updatedAt` stays as it was: clearing a
-            // source is no change to the order anyone made.
-            const ids = rows.map((row) => row.id);
-            const count = await prisma.$executeRaw`
-                UPDATE "Order" SET "visitSource" = NULL, "visitRef" = NULL
-                WHERE "id" = ANY(${ids}::text[])
-                  AND "visitSource" IS NOT NULL
-                  AND "createdAt" < ${utc(cutoff)}::timestamp
-                  AND "organizationId" <> ALL(${held}::text[])`;
-            cleared += count;
-            if (rows.length < ANALYTICS_RETENTION_BATCH || count === 0) {
-                return { cleared, more: false };
-            }
-        }
-        return { cleared, more: true };
     }
 
     /**

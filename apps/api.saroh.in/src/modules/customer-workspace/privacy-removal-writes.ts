@@ -123,9 +123,7 @@ export async function removeDetailsInTx(
     const orderIds = orders.map((o) => o.id);
 
     // Orders keep their lines, amounts, status and `deliveryState` (the GST
-    // place of supply); the recipient, the free-text note and where their
-    // visit to the site came from (U15: the group and the merchant's link
-    // label, which can name a link sent to them) go.
+    // place of supply); the recipient and the free-text note go.
     const scrubbed = await tx.order.updateMany({
         where: { id: { in: orderIds } },
         data: {
@@ -136,8 +134,6 @@ export async function removeDetailsInTx(
             deliveryCity: null,
             deliveryPostalCode: null,
             notes: null,
-            visitSource: null,
-            visitRef: null,
         },
     });
     await tx.reviewInvitation.updateMany({

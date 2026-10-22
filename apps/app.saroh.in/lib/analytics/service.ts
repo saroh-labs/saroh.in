@@ -1,5 +1,6 @@
 import { apiFetch, getActiveOrgId } from "@/lib/api/http";
 
+import type { SiteLinksRead } from "@/lib/insights/link-maker";
 import type { InsightsPeriod } from "@/lib/insights/period";
 import type {
     MoneyRead,
@@ -108,6 +109,24 @@ export async function readSources(
     if (siteId) qs.set("siteId", siteId);
     return readSource<SourcesRead>(
         `/organizations/${orgId}/analytics/sources?${qs.toString()}`,
+    );
+}
+
+/**
+ * The business's own links (DEC-181, #1099), live and newest first, each
+ * with its visits and paid in the period; one website's when `siteId` is
+ * given. `analytics:read`; a failure is `failed`, said where they show.
+ */
+export async function readLinks(
+    period: InsightsPeriod,
+    siteId: string | null = null,
+): Promise<SourceRead<SiteLinksRead> | null> {
+    const orgId = await getActiveOrgId();
+    if (!orgId) return null;
+    const qs = new URLSearchParams({ period });
+    if (siteId) qs.set("siteId", siteId);
+    return readSource<SiteLinksRead>(
+        `/organizations/${orgId}/analytics/links?${qs.toString()}`,
     );
 }
 

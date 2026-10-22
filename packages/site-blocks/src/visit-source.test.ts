@@ -9,7 +9,6 @@ import {
     registerVisitSender,
     seeVisitPage,
     VISIT_IDLE_MS,
-    visitFields,
     visitRefOf,
 } from "./visit-source";
 
@@ -186,17 +185,18 @@ describe("the visit, in this tab's memory (U15)", () => {
         expect(markVisitStep("looked", t + 2000)).toBe(true);
         expect(markVisitStep("looked", t + 3000)).toBe(false);
         expect(markVisitStep("started", t + 4000)).toBe(true);
+        // Paid (DEC-181): the confirmation page's, once, the group and
+        // the label only.
+        expect(markVisitStep("paid", t + 5000)).toBe(true);
+        expect(markVisitStep("paid", t + 6000)).toBe(false);
 
         const origin = { source: "instagram", ref: "story" };
         expect(sent).toEqual([
             ["visit", origin],
             ["looked", origin],
             ["started", origin],
+            ["paid", origin],
         ]);
-        expect(visitFields(t + 5000)).toEqual({
-            visitSource: "instagram",
-            visitRef: "story",
-        });
     });
 
     it("writes nothing to any storage", () => {
@@ -215,7 +215,6 @@ describe("the visit, in this tab's memory (U15)", () => {
         seeVisitPage(t, page("https://www.google.com/"));
         expect(currentVisit(t + VISIT_IDLE_MS - 1)?.source).toBe("google");
         expect(currentVisit(t + VISIT_IDLE_MS)).toBeNull();
-        expect(visitFields(t + VISIT_IDLE_MS)).toEqual({});
         expect(markVisitStep("looked", t + VISIT_IDLE_MS)).toBe(false);
 
         // The page load's referrer is the old visit's, not this one's.
@@ -223,11 +222,11 @@ describe("the visit, in this tab's memory (U15)", () => {
         expect(sent.at(-1)).toEqual(["visit", { source: "direct", ref: null }]);
     });
 
-    it("sends no step and no checkout source when no visit began", () => {
+    it("sends no step, paid included, when no visit began", () => {
         const send = vi.fn();
         registerVisitSender(send);
         expect(markVisitStep("started", 1)).toBe(false);
-        expect(visitFields(1)).toEqual({});
+        expect(markVisitStep("paid", 1)).toBe(false);
         expect(send).not.toHaveBeenCalled();
     });
 

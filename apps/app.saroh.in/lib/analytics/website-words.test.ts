@@ -16,9 +16,9 @@ describe("website words", () => {
         expect(dayTick("2026-09-04")).toBe("4 Sep");
         expect(
             dayReadout({ date: "2026-10-01", views: 4120, uniques: 1 }),
-        ).toBe("Thursday 1 Oct · 4,120 visits · 1 person");
+        ).toBe("Thursday 1 Oct · 4,120 visits · 1 visitor");
         expect(dayReadout({ date: "2026-10-02", views: 12, uniques: 9 })).toBe(
-            "Friday 2 Oct · 12 visits · 9 people",
+            "Friday 2 Oct · 12 visits · 9 visitors",
         );
     });
 
@@ -99,7 +99,7 @@ describe("the visits sentence (IBFromD)", () => {
         uniques,
     });
 
-    it("says the visits, the people, the busiest day and the day nobody came", () => {
+    it("says the visits, the visitors, the busiest day and the day nobody came", () => {
         expect(
             visitsLine(
                 [
@@ -110,7 +110,7 @@ describe("the visits sentence (IBFromD)", () => {
                 "4w",
             ),
         ).toBe(
-            "141 visits from 102 people. Busiest on Saturday 3 Oct. On 1 Oct nobody visited.",
+            "141 visits from 102 visitors. Busiest on Saturday 3 Oct. On 1 Oct nobody visited.",
         );
     });
 
@@ -125,7 +125,7 @@ describe("the visits sentence (IBFromD)", () => {
                 "7d",
             ),
         ).toBe(
-            "3 visits from 3 people. Busiest on Friday 2 Oct. Nobody visited on 2 days.",
+            "3 visits from 3 visitors. Busiest on Friday 2 Oct. Nobody visited on 2 days.",
         );
     });
 
@@ -137,7 +137,7 @@ describe("the visits sentence (IBFromD)", () => {
 
     it("leaves the empty days out when there are none", () => {
         expect(visitsLine([day("2026-10-01", 1)], "7d")).toBe(
-            "1 visit from 1 person. Busiest on Thursday 1 Oct.",
+            "1 visit from 1 visitor. Busiest on Thursday 1 Oct.",
         );
     });
 });

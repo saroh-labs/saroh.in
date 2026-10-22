@@ -25,6 +25,7 @@ import {
 import type { IngestResult } from "./analytics.service";
 import { AnalyticsService } from "./analytics.service";
 import {
+    CreateSiteLinkDto,
     IngestAnalyticsEventDto,
     InsightsPeriodQueryDto,
     InsightsSourcesQueryDto,
@@ -33,6 +34,8 @@ import type { MoneyRead } from "./money";
 import { DEFAULT_PERIOD } from "./period";
 import type { SellsRead } from "./sells";
 import { SellsService } from "./sells.service";
+import type { SiteLinksRead, SiteLinkView } from "./site-links.service";
+import { SiteLinksService } from "./site-links.service";
 import type { SourcesRead } from "./sources";
 import { SourcesService } from "./sources.service";
 import type { SuggestionsRead } from "./suggestions";
@@ -103,6 +106,7 @@ export class AnalyticsController {
         private readonly sells: SellsService,
         private readonly sources: SourcesService,
         private readonly suggestions: SuggestionsService,
+        private readonly links: SiteLinksService,
     ) {}
 
     /**
@@ -141,8 +145,9 @@ export class AnalyticsController {
      * and paid, each at most the one before; visits and paid by source,
      * small sources folded into Other sites; the merchant's own links; and
      * the day counting began. `?period=7d|4w|3m`, 4 weeks when absent;
-     * `?siteId=` narrows the visits to one website (paid stays the
-     * business's). Needs `analytics:read`; counts only, no money.
+     * `?siteId=` narrows all four steps to one website (paid is the
+     * visit's own `site.paid` step, DEC-181). Needs `analytics:read`;
+     * counts only, no money.
      */
     @Get("sources")
     getSources(
@@ -154,6 +159,56 @@ export class AnalyticsController {
             query.period ?? DEFAULT_PERIOD,
             query.siteId ?? null,
         );
+    }
+
+    /**
+     * The business's own links (DEC-181, #1099), live and newest first,
+     * each with its visits and paid in the period: `?period=7d|4w|3m`,
+     * `?siteId=` for one website. Only these labels are counted as
+     * themselves. Needs `analytics:read`.
+     */
+    @Get("links")
+    getLinks(
+        @OrgContext() ctx: OrganizationContext,
+        @Query() query: InsightsSourcesQueryDto,
+    ): Promise<SiteLinksRead> {
+        return this.links.list(
+            ctx,
+            query.period ?? DEFAULT_PERIOD,
+            query.siteId ?? null,
+        );
+    }
+
+    /**
+     * Make a link from a name, with the label shown and maybe changed.
+     * Needs `site:update`; written to Activity.
+     */
+    @Post("links")
+    makeLink(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: CreateSiteLinkDto,
+    ): Promise<SiteLinkView> {
+        return this.links.create(ctx, dto);
+    }
+
+    /** Archive a link; its past figures stay. `site:update`; to Activity. */
+    @Post("links/:linkId/archive")
+    @HttpCode(200)
+    archiveLink(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("linkId") linkId: string,
+    ): Promise<SiteLinkView> {
+        return this.links.archive(ctx, linkId);
+    }
+
+    /** Undo Archive: the link counts again. `site:update`; to Activity. */
+    @Post("links/:linkId/restore")
+    @HttpCode(200)
+    restoreLink(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("linkId") linkId: string,
+    ): Promise<SiteLinkView> {
+        return this.links.restore(ctx, linkId);
     }
 
     /**

@@ -89,12 +89,10 @@ describe("Where do visitors come from?", () => {
         );
     });
 
-    it("says paid is the whole business's when one website is chosen", () => {
-        expect(
-            render({ siteId: "site_1" }).querySelector(
-                '[data-testid="sources-note"]',
-            )?.textContent,
-        ).toBe("Paid is counted for your whole business, not one website.");
+    it("says nothing more of paid when one website is chosen: it is that website's (DEC-181)", () => {
+        expect(render({ siteId: "site_1" }).textContent).not.toContain(
+            "whole business",
+        );
     });
 
     it("lists the merchant's own links when any were visited", () => {

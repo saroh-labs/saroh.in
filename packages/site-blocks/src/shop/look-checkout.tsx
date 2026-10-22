@@ -22,7 +22,6 @@ import { readQrSource } from "../qr-source";
 import { SoldByLine } from "../sold-by";
 import { useTestRelease } from "../test-release/context";
 import { TestReleaseStopSheet } from "../test-release/test-release-stop";
-import { visitFields } from "../visit-source";
 import type {
     CheckoutQuote,
     CheckoutStarted,
@@ -520,8 +519,6 @@ export function LookCheckout({
             ...body,
             key: checkout.key,
             ...(source ? { source } : {}),
-            // Where the visit came from (U15): a group and a label, no id.
-            ...visitFields(),
         };
         const result = await api.start(request).catch(() => ({
             ok: false as const,

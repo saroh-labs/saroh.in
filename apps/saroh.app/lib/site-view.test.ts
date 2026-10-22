@@ -95,6 +95,15 @@ describe("site view beacon", () => {
         expect(
             visitStepBody("started", { source: "other", ref: null }).type,
         ).toBe("site.started");
+        // Paid (DEC-181): the group and label only, never the order.
+        expect(
+            visitStepBody("paid", { source: "instagram", ref: "diwali-post" }),
+        ).toEqual({
+            type: "site.paid",
+            schemaVersion: 1,
+            consent: "anonymous",
+            properties: { source: "instagram", ref: "diwali-post" },
+        });
     });
 
     it("keeps only another site's origin as the referrer", () => {

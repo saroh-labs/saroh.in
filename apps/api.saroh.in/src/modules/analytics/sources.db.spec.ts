@@ -5,8 +5,8 @@
  * source with too few visits is folded into Other sites and one nobody
  * came from is left out; the merchant's own links are listed; counting
  * that began inside the period says from when, and a business with
- * nothing counted says so; a website chosen narrows the visits and never
- * the paid; another business's rows never count; and a role without
+ * nothing counted says so; a website chosen narrows every step, paid
+ * included (DEC-181); another business's rows never count; and a role without
  * Insights is refused. Runs in the integration project, plain and under
  * TEST_RLS=on, each read in the business's context as a request is.
  */
@@ -110,24 +110,23 @@ beforeAll(async () => {
         // Counting began on 10 Oct, inside the 4 weeks.
         { day: "2026-10-10", type: "site.visit", count: 30 },
         { day: "2026-10-12", type: "site.visit", count: 70 },
-        // Instagram: 50 visits, 20 looked, 6 started, 9 paid (a paid
-        // order whose visit was before the period): the path holds paid
-        // to what started.
+        // Instagram: 50 visits, 20 looked, 6 started, 9 paid (payments
+        // whose visits began before the period): the path holds paid to
+        // what started. Paid is the visit's own `site.paid` (DEC-181).
         ...step("2026-10-10", "site.visit", "instagram", 20, SITE),
         ...step("2026-10-12", "site.visit", "instagram", 30, SITE),
         ...step("2026-10-12", "site.looked", "instagram", 20, SITE),
         ...step("2026-10-12", "site.started", "instagram", 6, SITE),
-        ...step("2026-10-12", "order.paid", "instagram", 10),
-        ...step("2026-10-13", "order.refunded", "instagram", 1),
+        ...step("2026-10-12", "site.paid", "instagram", 9, SITE),
         // Google: 30 visits on another website, 4 paid.
         ...step("2026-10-12", "site.visit", "google", 30, `${SITE}-b`),
         ...step("2026-10-12", "site.looked", "google", 10, `${SITE}-b`),
         ...step("2026-10-12", "site.started", "google", 5, `${SITE}-b`),
-        ...step("2026-10-13", "order.paid", "google", 4),
+        ...step("2026-10-13", "site.paid", "google", 4, `${SITE}-b`),
         // WhatsApp: 3 visits, too few, folded into Other sites with its
-        // paid order.
+        // payment.
         ...step("2026-10-12", "site.visit", "whatsapp", 3, SITE),
-        ...step("2026-10-12", "order.paid", "whatsapp", 1),
+        ...step("2026-10-12", "site.paid", "whatsapp", 1, SITE),
         // Other sites: 17 visits.
         ...step("2026-10-12", "site.visit", "other", 17, SITE),
         // Nobody typed the address: left out.
@@ -143,7 +142,7 @@ beforeAll(async () => {
         },
         {
             day: "2026-10-12",
-            type: "order.paid",
+            type: "site.paid",
             dimension: "ref",
             value: "diwali-post",
             count: 2,
@@ -160,7 +159,7 @@ beforeAll(async () => {
     await rollups(other, [
         { day: "2026-09-01", type: "site.visit", count: 9 },
         ...step("2026-10-12", "site.visit", "instagram", 900),
-        ...step("2026-10-12", "order.paid", "instagram", 90),
+        ...step("2026-10-12", "site.paid", "instagram", 90),
     ]);
 });
 
@@ -218,7 +217,7 @@ describe("Insights: sources and the path from visit to paid (U16)", () => {
             started: 0,
             paid: 0,
         });
-        // Paid is still said by source: Google's order was paid on 13 Oct.
+        // Paid is still said by source: Google's visit paid on 13 Oct.
         expect(week.sources).toEqual([{ source: "other", visits: 0, paid: 4 }]);
         expect(week.folded).toEqual(["google"]);
     });
@@ -233,7 +232,7 @@ describe("Insights: sources and the path from visit to paid (U16)", () => {
         expect(r.refs).toEqual([]);
     });
 
-    it("narrows the visits to the website chosen; paid stays the business's", async () => {
+    it("narrows all four steps to the website chosen, paid included (DEC-181)", async () => {
         const r = await read(ctx(bakery), "4w", SITE);
 
         expect(r.siteId).toBe(SITE);
@@ -242,11 +241,16 @@ describe("Insights: sources and the path from visit to paid (U16)", () => {
             visits: 50,
             paid: 9,
         });
-        // Google's visits were on the other website; its paid is the
-        // business's, so it is still said, folded with Other sites.
+        // Google's visits and its payments were on the other website: none
+        // of it is this one's.
         expect(r.sources.find((s) => s.source === "google")).toBeUndefined();
-        expect(r.folded).toEqual(["google", "whatsapp"]);
-        expect(r.path.visits).toBe(70);
+        expect(r.folded).toEqual(["whatsapp"]);
+        expect(r.path).toEqual({
+            visits: 70,
+            looked: 20,
+            started: 6,
+            paid: 6,
+        });
     });
 
     it("never counts another business's visits, even given its website", async () => {

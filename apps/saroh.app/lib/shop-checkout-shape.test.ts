@@ -112,41 +112,6 @@ describe("what the site's server sends on", () => {
             quoteBody({ lines: start.lines, source: "qr-h7c" }),
         ).not.toHaveProperty("source");
     });
-
-    it("passes on where the visit came from, a group and a label only (U15)", () => {
-        const start = {
-            lines: [{ listingId: "l1", variantId: null, quantity: 1 }],
-            fulfilment: "PICKUP",
-            key: "abcdefgh",
-        };
-        expect(
-            startBody({
-                ...start,
-                visitSource: "instagram",
-                visitRef: "Diwali-Post",
-                visitId: "v_1",
-            }),
-        ).toEqual({
-            ...start,
-            visitSource: "instagram",
-            visitRef: "diwali-post",
-        });
-        expect(
-            startBody({
-                ...start,
-                visitSource: "direct",
-                visitRef: "someone@example.com",
-            }),
-        ).toEqual({ ...start, visitSource: "direct" });
-        for (const visitSource of ["facebook", 7, null, undefined]) {
-            expect(
-                startBody({ ...start, visitSource, visitRef: "story" }),
-            ).toEqual(start);
-        }
-        expect(
-            quoteBody({ lines: start.lines, visitSource: "google" }),
-        ).not.toHaveProperty("visitSource");
-    });
 });
 
 describe("the API's answers", () => {

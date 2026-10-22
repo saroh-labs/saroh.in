@@ -11,12 +11,14 @@ import { ignoreHTTPSErrors, NORTHWIND_ORG, urls } from "../playwright.config";
 import { asNewVisitor, readSiteCode } from "./site-codes";
 
 /**
- * Where a visit came from, followed to a paid order (U15, #1099), on
- * Northwind's own site, desk and phone (the `desk-serial` and
+ * Where a visit came from, followed to its payment (U15, #1099; DEC-181),
+ * on Northwind's own site, desk and phone (the `desk-serial` and
  * `phone-serial` projects).
  *
- * A new visitor arrives from Instagram on a product page by the merchant's
- * own link (`?ref=<this run's label>`), with more in the address than may
+ * The team first makes the link in Saroh (`POST …/analytics/links`, as
+ * Insights' Make a link does): only a label made there is counted as
+ * itself. A new visitor then arrives from Instagram on a product page by
+ * that link (`?ref=<this run's label>`), with more in the address than may
  * be kept. The site's own beacon:
  *
  * - sends the visit once, with its group and label only: never the query,
@@ -25,10 +27,16 @@ import { asNewVisitor, readSiteCode } from "./site-codes";
  *   checkout, and no page view for the checkout or the order's page;
  * - writes nothing to cookies or browser storage for it.
  *
- * The visitor orders, paying at pick-up; the team records it as paid, and
- * the order says where its visit came from. The daily rollup that counts it
- * runs hourly and is pinned by `visit-sources.db.spec.ts`; this spec proves
- * the real site, checkout and API carry the source to the paid order.
+ * Paid is the visit's own fourth step (DEC-181): the order's confirmation
+ * page sends `site.paid`, with the group and label only, once the order is
+ * paid online there and then. Where the stack has a Razorpay test
+ * connection (`E2E_SITE_SHOP=1`, as `site-shop.spec.ts` needs) the visitor
+ * pays online through a stand-in for Razorpay's window, the team records
+ * the payment as the webhook would, and the confirmation page sends
+ * `site.paid`. Elsewhere the visitor pays at pick-up, and a payment taken
+ * later another way is never counted to the source: no `site.paid`. Either
+ * way nothing about the visit is kept on the order. The daily rollup that
+ * counts the steps runs hourly and is pinned by `visit-sources.db.spec.ts`.
  *
  * Signed in, the account area sends nothing at all.
  *
@@ -36,9 +44,10 @@ import { asNewVisitor, readSiteCode } from "./site-codes";
  * (per-business overrides, put back after), Northwind's site style (Quiet,
  * put back and published again), the storefront's Pick-up and "Pay when you
  * collect" (put back), the site's storefront when the seed left it
- * unanswered (cleared again), and one product called "E2E Visit Source
- * Loaf", brought back the same each run. It leaves one paid pick-up order
- * per project on Northwind.
+ * unanswered (cleared again), one product called "E2E Visit Source
+ * Loaf", brought back the same each run, and one link of this run's own
+ * label (archived after). It leaves one paid order per project on
+ * Northwind.
  *
  * @serial: it changes and publishes Northwind's site style.
  */
@@ -46,6 +55,8 @@ import { asNewVisitor, readSiteCode } from "./site-codes";
 const renderer = new URL(urls.RENDERER_URL);
 const SITE = `${renderer.protocol}//northwind.${renderer.host}`;
 const PRODUCT = "E2E Visit Source Loaf";
+/** A Razorpay test connection on the stack: the visitor can pay online. */
+const ONLINE = process.env.E2E_SITE_SHOP === "1";
 
 interface Storefront {
     id: string;
@@ -78,9 +89,11 @@ const ofType = (sent: Beacon[], type: string) =>
     sent.filter((b) => b.type === type);
 
 /** The storefront Northwind's site sells from, given one if unanswered. */
-async function sellsFrom(
-    nw: ReturnType<typeof northwind>,
-): Promise<{ storeId: string; restore: () => Promise<void> }> {
+async function sellsFrom(nw: ReturnType<typeof northwind>): Promise<{
+    siteId: string;
+    storeId: string;
+    restore: () => Promise<void>;
+}> {
     const sites =
         await nw.get<{ id: string; subdomain: string | null }[]>("/sites");
     const site = sites.find((s) => s.subdomain === "northwind");
@@ -94,11 +107,14 @@ async function sellsFrom(
     }>(`/sites/${siteId}`);
     expect(read.sellsFrom, "SITE_SHOP is on for Northwind").toBeTruthy();
     const chosen = read.sellsFrom?.storefront?.id;
-    if (chosen) return { storeId: chosen, restore: () => Promise.resolve() };
+    if (chosen) {
+        return { siteId, storeId: chosen, restore: () => Promise.resolve() };
+    }
     const first = read.sellsFrom?.choices.at(0)?.id;
     expect(first, "Northwind has a storefront to sell from").toBeTruthy();
     await nw.patch(`/sites/${siteId}/settings`, { storefrontId: first });
     return {
+        siteId,
         storeId: first ?? "",
         restore: async () => {
             await nw.patch(`/sites/${siteId}/settings`, {
@@ -111,10 +127,35 @@ async function sellsFrom(
 const visible = (page: Page, selector: string) =>
     page.locator(selector).filter({ visible: true }).first();
 
+/**
+ * Razorpay's script, stood in for: its window pays at once, as the real one
+ * does once the visitor pays (`public-booking.spec.ts`'s fake). The order is
+ * still unpaid on the API until the team records it.
+ */
+async function fakeRazorpayWindow(page: Page) {
+    await page.route("https://checkout.razorpay.com/v1/checkout.js", (route) =>
+        route.fulfill({
+            contentType: "application/javascript",
+            body: `window.Razorpay = function (options) {
+                window.__razorpay = JSON.parse(JSON.stringify(options));
+                return {
+                    open: function () {
+                        setTimeout(function () {
+                            options.handler({ razorpay_payment_id: "pay_e2e", razorpay_order_id: options.order_id });
+                        }, 300);
+                    },
+                    close: function () {},
+                    on: function () {},
+                };
+            };`,
+        }),
+    );
+}
+
 test.describe("where a visit came from", { tag: "@serial" }, () => {
     test.beforeEach(({ page }) => asNewVisitor(page));
 
-    test("a visit from Instagram by the merchant's own link is followed to its paid order", async ({
+    test("a visit from Instagram by a link made in Saroh is counted to its payment, and nothing is kept on the order", async ({
         page,
         browser,
     }, testInfo) => {
@@ -142,7 +183,17 @@ test.describe("where a visit came from", { tag: "@serial" }, () => {
         await useSession(teamPage);
         const nw = northwind(teamPage.request);
         const sells = await sellsFrom(nw);
-        const { storeId } = sells;
+        const { storeId, siteId } = sells;
+        // The link made in Saroh first (DEC-181): only its label counts.
+        const link = await nw.post<{ id: string; label: string }>(
+            "/analytics/links",
+            {
+                siteId,
+                name: `Visit source ${testInfo.project.name}`,
+                label: ref,
+            },
+        );
+        expect(link.label).toBe(ref);
         const was = await nw.get<Storefront>(`/storefronts/${storeId}`);
         await nw.patch(`/storefronts/${storeId}`, {
             kind: "SHOP",
@@ -168,7 +219,7 @@ test.describe("where a visit came from", { tag: "@serial" }, () => {
             expect(slug, `${PRODUCT} has an address on the shop`).not.toBe("");
             await look.publish();
 
-            // From Instagram, by the merchant's own link, with more in the
+            // From Instagram, by the link made in Saroh, with more in the
             // address than may be kept.
             const sent = watchBeacon(page);
             await page.goto(
@@ -258,20 +309,69 @@ test.describe("where a visit came from", { tag: "@serial" }, () => {
             await expect(page.getByText(/^Ordering as/)).toBeVisible({
                 timeout: 15_000,
             });
-            const collect = page
-                .getByRole("radiogroup", { name: "3 · How you'll pay" })
-                .getByRole("radio", { name: /Pay at pick-up/ });
-            await collect.click();
-            await page.route("https://checkout.razorpay.com/**", (r) =>
-                r.abort(),
-            );
+            const pays = page.getByRole("radiogroup", {
+                name: "3 · How you'll pay",
+            });
+            if (ONLINE) {
+                await fakeRazorpayWindow(page);
+                await pays.getByRole("radio", { name: /online/i }).click();
+            } else {
+                await pays
+                    .getByRole("radio", { name: /Pay at pick-up/ })
+                    .click();
+                await page.route("https://checkout.razorpay.com/**", (r) =>
+                    r.abort(),
+                );
+            }
             await visible(page, "[data-place-order]").click();
+            if (ONLINE) {
+                // The window paid; the team records the payment as the
+                // provider's webhook would, and the page moves on by itself.
+                const description = () =>
+                    page.evaluate(
+                        () =>
+                            (
+                                window as unknown as {
+                                    __razorpay?: { description?: string };
+                                }
+                            ).__razorpay?.description ?? "",
+                    );
+                await expect.poll(description).toMatch(/^Order /);
+                const number = (await description()).replace(/^Order /, "");
+                const found = await nw.get<{
+                    rows: { id: string; orderId: string }[];
+                }>(`/orders?v=2&q=${encodeURIComponent(number)}`);
+                const placed = found.rows.find((r) => r.orderId === number);
+                expect(placed, `order ${number} is on the list`).toBeTruthy();
+                await nw.patch(`/stores/${storeId}/orders/${placed?.id}`, {
+                    paymentStatus: "PAID",
+                    paidHow: "UPI",
+                });
+            }
             await expect(page).toHaveURL(/\/shop\/order\//, {
                 timeout: 30_000,
             });
             const orderId =
                 new URL(page.url()).pathname.split("/").at(-1) ?? "";
             expect(orderId).not.toBe("");
+
+            if (ONLINE) {
+                // Paid online there and then: the confirmation page sends
+                // the visit's paid step once, with the group and label only,
+                // never the order or its amount (DEC-181).
+                await expect
+                    .poll(() => ofType(sent, "site.paid").length)
+                    .toBe(1);
+                expect(ofType(sent, "site.paid")[0]?.properties).toEqual({
+                    source: "instagram",
+                    ref,
+                });
+            } else {
+                // Placed to be paid at pick-up: nothing paid online, so no
+                // paid step, now or when the team records the payment.
+                await page.waitForLoadState("networkidle");
+                expect(ofType(sent, "site.paid")).toHaveLength(0);
+            }
 
             // Each step once a visit; no page view for the checkout or the
             // order's page, whose paths name one customer's order.
@@ -283,18 +383,23 @@ test.describe("where a visit came from", { tag: "@serial" }, () => {
                 );
             }
 
-            // The team records it as paid; the order says where it came from
-            // to the owner, who reads Insights (`analytics:read`).
-            await nw.patch(`/stores/${storeId}/orders/${orderId}`, {
-                paymentStatus: "PAID",
-                paidHow: "UPI",
-            });
-            const detail = await nw.get<{
-                paymentStatus: string;
-                cameFrom: { source: string; ref: string | null } | null;
-            }>(`/stores/${storeId}/orders/${orderId}`);
+            // Paid (the team records a pick-up payment); the order keeps
+            // nothing about the visit, even for the owner (DEC-181).
+            if (!ONLINE) {
+                await nw.patch(`/stores/${storeId}/orders/${orderId}`, {
+                    paymentStatus: "PAID",
+                    paidHow: "UPI",
+                });
+                expect(ofType(sent, "site.paid")).toHaveLength(0);
+            }
+            const detail = await nw.get<Record<string, unknown>>(
+                `/stores/${storeId}/orders/${orderId}`,
+            );
             expect(detail.paymentStatus).toBe("PAID");
-            expect(detail.cameFrom).toEqual({ source: "instagram", ref });
+            expect(detail).not.toHaveProperty("cameFrom");
+            expect(detail).not.toHaveProperty("visitSource");
+            expect(detail).not.toHaveProperty("visitRef");
+            expect(JSON.stringify(detail)).not.toContain(ref);
 
             // Signed in now, the account area sends nothing at all.
             const before = sent.length;
@@ -302,6 +407,7 @@ test.describe("where a visit came from", { tag: "@serial" }, () => {
             await page.waitForLoadState("networkidle");
             expect(sent.slice(before)).toEqual([]);
         } finally {
+            await nw.post(`/analytics/links/${link.id}/archive`);
             await look.restore();
             await nw.patch(`/storefronts/${storeId}`, {
                 kind: was.kind,

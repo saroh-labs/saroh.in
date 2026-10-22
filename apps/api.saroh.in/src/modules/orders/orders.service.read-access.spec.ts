@@ -16,7 +16,6 @@ jest.mock("@saroh/database", () => ({
 }));
 
 import { ForbiddenException, NotFoundException } from "@nestjs/common";
-import { prisma } from "@saroh/database";
 
 import type { StoresService } from "../stores/stores.service";
 import { OrdersService } from "./orders.service";
@@ -88,50 +87,5 @@ describe("OrdersService store-scoped reads", () => {
         await expect(
             orders.get("store_1", "order_1", "user_1"),
         ).rejects.toThrow(ForbiddenException);
-    });
-});
-
-describe("OrdersService.get: where the order's visit came from (U15 privacy review)", () => {
-    const findFirst = prisma.order.findFirst as jest.Mock;
-
-    beforeEach(() => {
-        findFirst.mockResolvedValueOnce({
-            id: "order_1",
-            orderId: "ORD-001",
-            customerId: null,
-            status: "PENDING",
-            paymentStatus: "PAID",
-            total: "10.00",
-            currency: "INR",
-            createdAt: new Date("2026-10-01T10:00:00Z"),
-            customer: null,
-            subtotal: "10.00",
-            tax: "0.00",
-            shipping: "0.00",
-            discount: "0.00",
-            items: [],
-            discountRedemption: null,
-            visitSource: "whatsapp",
-            visitRef: "status",
-        });
-    });
-
-    it("shows it to a role that reads Insights", async () => {
-        const detail = await service(["order:read", "analytics:read"]).get(
-            "store_1",
-            "order_1",
-            "user_1",
-        );
-        expect(detail.cameFrom).toEqual({ source: "whatsapp", ref: "status" });
-    });
-
-    it("leaves it out for a role that reads the order but not Insights", async () => {
-        const detail = await service(["order:read", "order:stage"]).get(
-            "store_1",
-            "order_1",
-            "user_1",
-        );
-        expect(detail).toMatchObject({ id: "order_1", total: "10.00" });
-        expect("cameFrom" in detail).toBe(false);
     });
 });

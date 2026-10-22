@@ -7,7 +7,6 @@ import {
     ORDER_REFUNDED_TYPE,
     validateEventProperties,
 } from "./event-contract";
-import { visitOriginOf } from "./visit-source";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -20,23 +19,6 @@ export type OrderEventTx = Pick<
 /** The one `order.paid` an order can ever have: PAID happens once. */
 export function orderPaidKey(orderId: string): string {
     return `${ORDER_PAID_TYPE}:${orderId}`;
-}
-
-/**
- * Where the visit that placed an order came from, as `order.paid` carries
- * it (U15): the order's own group and label, read again so a value that
- * isn't well formed is left off rather than refusing the payment's
- * transaction. Nothing for an order with no source.
- */
-function originProps(order: {
-    visitSource: string | null;
-    visitRef: string | null;
-}): { source?: string; ref?: string } {
-    const origin = visitOriginOf(order.visitSource, order.visitRef);
-    if (!origin) return {};
-    return origin.ref
-        ? { source: origin.source, ref: origin.ref }
-        : { source: origin.source };
 }
 
 /** The one `order.refunded` that takes it off again. */
@@ -59,9 +41,8 @@ export function orderRefundedKey(orderId: string): string {
  * payment status moves to PAID once in an order's life (`order-state.ts`).
  *
  * The amount is the order's total as it was paid, in minor units; no
- * customer detail is stored, only the order's id and, when the order came
- * from a visit to the site, that visit's source group and link label (U15).
- * Returns whether a row was written.
+ * customer detail is stored, only the order's id. Returns whether a row
+ * was written.
  */
 export async function recordOrderPaidInTx(
     tx: OrderEventTx,
@@ -73,8 +54,6 @@ export async function recordOrderPaidInTx(
         select: {
             total: true,
             organizationId: true,
-            visitSource: true,
-            visitRef: true,
             store: { select: { organizationId: true } },
         },
     });
@@ -85,7 +64,6 @@ export async function recordOrderPaidInTx(
     const properties = validateEventProperties(ORDER_PAID_TYPE, 1, {
         orderId,
         amountCents: toMinor(order.total),
-        ...originProps(order),
     });
     const { count } = await tx.analyticsEvent.createMany({
         data: [
@@ -150,21 +128,11 @@ export async function recordOrderRefundedInTx(
         select: { occurredAt: true, properties: true },
     });
     if (!paid) return false;
-    const counted = paid.properties as {
-        amountCents?: unknown;
-        source?: unknown;
-        ref?: unknown;
-    } | null;
-    // Taken off the source the sale was counted to (U15), not the order's
-    // as it stands now: the two agree unless retention cleared the order's.
-    const origin = visitOriginOf(counted?.source, counted?.ref);
+    const counted = paid.properties as { amountCents?: unknown } | null;
     const properties = validateEventProperties(ORDER_REFUNDED_TYPE, 1, {
         orderId,
         amountCents:
             typeof counted?.amountCents === "number" ? counted.amountCents : 0,
-        ...(origin
-            ? originProps({ visitSource: origin.source, visitRef: origin.ref })
-            : {}),
     });
     const { count } = await tx.analyticsEvent.createMany({
         data: [

@@ -17,6 +17,7 @@ import {
     validateEventProperties,
     VISIT_STEP_TYPES,
 } from "./event-contract";
+import { liveLinkLabel } from "./site-link-labels";
 import { visitorHashOf } from "./visitor-hash";
 
 /** ms in one day, for stamping `expiresAt` from the retention window. */
@@ -82,6 +83,21 @@ export interface DashboardFilter {
     type?: string;
     from?: Date;
     to?: Date;
+}
+
+/**
+ * A visit step's properties with its `ref` kept only when it is a live
+ * link label of the site (DEC-181, `site-link-labels.ts`), else left out.
+ * Everything else is the contract's to check.
+ */
+async function withLiveLabel(
+    site: { id: string; organizationId: string },
+    properties: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+    const { ref, ...rest } = properties;
+    if (ref === undefined || ref === null) return rest;
+    const label = await liveLinkLabel(site, ref);
+    return label === null ? rest : { ...rest, ref: label };
 }
 
 /**
@@ -168,9 +184,17 @@ export class AnalyticsService {
         // A visit's steps (U15) are counted once per visit by the site
         // itself, so they need no visitor grouping: none is stored with them,
         // and a source is never kept beside anything about the person.
-        const visitorHash = VISIT_STEP_TYPES.has(input.type)
-            ? null
-            : (ipHash ?? null);
+        const step = VISIT_STEP_TYPES.has(input.type);
+        const visitorHash = step ? null : (ipHash ?? null);
+
+        // Only the business's own links are counted as themselves
+        // (DEC-181): a step's `ref` is kept when it is the label of one of
+        // this site's live links made in Saroh, and otherwise dropped, so
+        // the step counts under its group with no label. Never a reason to
+        // refuse the step.
+        const properties = step
+            ? await withLiveLabel(site, input.properties)
+            : input.properties;
 
         // What the browser says about consent, its clock and its own dedupe
         // key is never stored (U15 privacy review): a public event is
@@ -181,7 +205,7 @@ export class AnalyticsService {
             siteId: site.id,
             type: input.type,
             schemaVersion: input.schemaVersion,
-            properties: input.properties,
+            properties,
             consent: "anonymous",
             visitorHash,
             occurredAt: undefined,
