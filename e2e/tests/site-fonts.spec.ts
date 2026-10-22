@@ -160,15 +160,25 @@ test.describe("merchant sites load no Saroh font", () => {
         if ((await brand.getAttribute("aria-selected")) !== "true") {
             await brand.click();
         }
-        // The pairing picker (industry templates, KTD-2). Read-only here: a
-        // seeded site has chosen no pair, so the system font is checked.
-        const typeface = page.getByRole("radiogroup", { name: "Typeface" });
-        await expect(typeface).toBeVisible();
+        // The pairing picker (industry templates, KTD-2; DEC-184). Read-only
+        // here: a seeded site has chosen no pair, so the system font is the
+        // one in force, and the search behind Change offers the rest.
+        await expect(page.locator("[data-typeface-current]")).toHaveAttribute(
+            "data-typeface-current",
+            "system",
+        );
+        await page.locator("[data-typeface-change]").click();
+        const typeface = page.getByRole("dialog", { name: "Typeface" });
         await expect(
-            typeface.getByRole("radio", { name: "Your visitor's system font" }),
-        ).toHaveAttribute("aria-checked", "true");
+            typeface.getByRole("option", {
+                name: /Your visitor's system font/,
+            }),
+        ).toHaveAttribute("aria-selected", "true");
         await expect(
-            typeface.getByRole("radio", { name: "Fraunces and Inter Tight" }),
+            typeface.getByRole("option", { name: "Fraunces and Inter Tight" }),
         ).toBeVisible();
+        // Escape puts the search away, nothing chosen.
+        await page.keyboard.press("Escape");
+        await expect(typeface).toHaveCount(0);
     });
 });

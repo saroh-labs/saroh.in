@@ -72,6 +72,19 @@ async function openEditor(page: Page, siteId: string, phone: boolean) {
     await openBrand(page, phone);
 }
 
+/** The looks' gallery behind the Look card's Change (DEC-184). */
+async function gallery(page: Page) {
+    const dialog = page.getByRole("dialog", { name: "Change look" });
+    if (!(await dialog.isVisible())) {
+        await page.locator("[data-look-change]").click();
+    }
+    await expect(dialog).toBeVisible();
+    return dialog;
+}
+
+/** The look in force, as the Look card says it. */
+const lookCard = (page: Page) => page.locator("[data-look-current]");
+
 /** Every style save the editor sends that names `id`: a server action. */
 function savesNaming(page: Page, id: string): string[] {
     const saves: string[] = [];
@@ -120,19 +133,33 @@ test.describe("free and paid styles", { tag: "@serial" }, () => {
 
             await openEditor(page, look.siteId, phone);
             const saves = savesNaming(page, '"quiet"');
-            const row = page.getByRole("radiogroup", { name: "Look" });
-            const classic = row.locator('[data-look-choice="classic"]');
-            const quiet = row.locator('[data-look-choice="quiet"]');
+            const looks = await gallery(page);
+            const classic = looks.locator('[data-look-choice="classic"]');
+            const quiet = looks.locator('[data-look-choice="quiet"]');
             await expect(classic).toHaveAttribute("aria-checked", "true");
+            // One "Paid plans" mark for the group, in the gallery's foot.
             await expect(classic).not.toContainText("Paid plans");
-            await expect(quiet).toContainText("Paid plans");
+            await expect(looks).toContainText(/Paid plans.*Quiet/);
 
             await quiet.click();
+            // Refused: the gallery stays open, Classic chosen, the line in
+            // its foot.
             await expect(quiet).toHaveAttribute("aria-checked", "false");
             await expect(classic).toHaveAttribute("aria-checked", "true");
             const line = page.locator("[data-paid-refusal]");
             await expect(line).toHaveCount(1);
+            await expect(looks.locator("[data-paid-refusal]")).toContainText(
+                "Quiet comes with a paid plan",
+            );
+            // Closed, the same line sits under the Look card.
+            await page.keyboard.press("Escape");
+            await expect(looks).toHaveCount(0);
+            await expect(line).toHaveCount(1);
             await expect(line).toContainText("Quiet comes with a paid plan");
+            await expect(lookCard(page)).toHaveAttribute(
+                "data-look-current",
+                "classic",
+            );
             // Past the autosave's wait: a save of Quiet would have been sent
             // by now. None was, and the API still holds Classic.
             await page.clock.runFor(2_000);
@@ -177,23 +204,24 @@ test.describe("free and paid styles", { tag: "@serial" }, () => {
             await openEditor(page, look.siteId, phone);
             const saves = savesNaming(page, paid.key);
 
-            // A paid typeface: marked, refused in place, nothing saved.
-            const typeface = page.getByRole("radiogroup", {
-                name: "Typeface",
-            });
-            const option = typeface.getByRole("radio", {
-                name: new RegExp(paid.name),
-            });
-            await expect(option).toContainText("Paid plans");
+            // A paid typeface: under "Paid plans" in the search behind
+            // Change, refused in place (the search stays open), nothing saved.
+            await page.locator("[data-typeface-change]").click();
+            const typeface = page.getByRole("dialog", { name: "Typeface" });
+            const option = typeface
+                .locator("[cmdk-group]", { hasText: "Paid plans" })
+                .locator(`[data-typeface="${paid.key}"]`);
+            await expect(option).toBeVisible();
             await option.click();
-            await expect(option).toHaveAttribute("aria-checked", "false");
+            await expect(typeface).toBeVisible();
             const line = page.locator("[data-paid-refusal]");
             await expect(line).toHaveCount(1);
             await expect(line).toContainText(
                 `${paid.name} comes with a paid plan`,
             );
             await page.clock.runFor(2_000);
-            await expect(option).toHaveAttribute("aria-checked", "false");
+            const current = page.locator("[data-typeface-current]");
+            await expect(current).toHaveAttribute("data-typeface-current", had);
             expect(saves).toEqual([]);
             const after = await look.owner.get<SiteView>(
                 `/sites/${look.siteId}`,
@@ -225,12 +253,17 @@ test.describe("free and paid styles", { tag: "@serial" }, () => {
             expect(site.styleAccess?.paidIncluded).toBe(true);
 
             await openEditor(page, look.siteId, phone);
-            const row = page.getByRole("radiogroup", { name: "Look" });
-            const quiet = row.locator('[data-look-choice="quiet"]');
+            const looks = await gallery(page);
+            const quiet = looks.locator('[data-look-choice="quiet"]');
             // Still marked: a paid look is marked on every plan.
-            await expect(quiet).toContainText("Paid plans");
+            await expect(looks).toContainText(/Paid plans.*Quiet/);
             await quiet.click();
-            await expect(quiet).toHaveAttribute("aria-checked", "true");
+            // Taken: the gallery closes and the card says Quiet.
+            await expect(looks).toHaveCount(0);
+            await expect(lookCard(page)).toHaveAttribute(
+                "data-look-current",
+                "quiet",
+            );
             await expect(page.locator("[data-paid-refusal]")).toHaveCount(0);
             await page.clock.runFor(1_000);
             await expect

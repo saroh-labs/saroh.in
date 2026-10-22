@@ -135,7 +135,13 @@ test.describe("a look's starter content", { tag: "@serial" }, () => {
             await page.goto(`${urls.APP_URL}${site}?page=${home.id}`);
             await openBrand(page, phone);
 
-            await page.getByRole("button", { name: "Preview Live" }).click();
+            // Live's Preview is on its card in the gallery behind Change
+            // (DEC-184).
+            await page.locator("[data-look-change]").click();
+            await page
+                .getByRole("dialog", { name: "Change look" })
+                .getByRole("button", { name: "Preview Live" })
+                .click();
             const preview = page.getByRole("dialog", { name: "Live" });
             await expect(preview).toBeVisible();
             // Prana Yoga, the board's sample business, not Northwind (94399ac1d).
@@ -184,9 +190,9 @@ test.describe("a look's starter content", { tag: "@serial" }, () => {
                     ),
                 )
                 .toBe(true);
-            await expect(
-                page.getByRole("radiogroup", { name: "Look" }),
-            ).toBeVisible({ timeout: 30_000 });
+            await expect(page.locator("[data-look-current]")).toBeVisible({
+                timeout: 30_000,
+            });
 
             // Undo, within the toast's ten seconds.
             await page.getByRole("button", { name: "Undo" }).click();
@@ -242,7 +248,13 @@ test.describe("a look's starter content", { tag: "@serial" }, () => {
             await page.goto(`${urls.APP_URL}${site}?page=${home.id}`);
             await openBrand(page, phone);
 
-            await page.getByRole("button", { name: "Preview Live" }).click();
+            // Live's Preview is on its card in the gallery behind Change
+            // (DEC-184).
+            await page.locator("[data-look-change]").click();
+            await page
+                .getByRole("dialog", { name: "Change look" })
+                .getByRole("button", { name: "Preview Live" })
+                .click();
             const preview = page.getByRole("dialog", { name: "Live" });
             await preview
                 .getByRole("button", {
@@ -265,9 +277,9 @@ test.describe("a look's starter content", { tag: "@serial" }, () => {
             await expect(
                 page.getByText("Starter content added to your draft."),
             ).toBeVisible();
-            await expect(
-                page.getByRole("radiogroup", { name: "Look" }),
-            ).toBeVisible({ timeout: 30_000 });
+            await expect(page.locator("[data-look-current]")).toBeVisible({
+                timeout: 30_000,
+            });
 
             // Bring in my details: what Northwind has replaces the samples,
             // or it says there is nothing to bring.
@@ -279,9 +291,9 @@ test.describe("a look's starter content", { tag: "@serial" }, () => {
                     .getByText(/^Brought in your |^Nothing to bring in\.$/)
                     .first(),
             ).toBeVisible({ timeout: 15_000 });
-            await expect(
-                page.getByRole("radiogroup", { name: "Look" }),
-            ).toBeVisible({ timeout: 30_000 });
+            await expect(page.locator("[data-look-current]")).toBeVisible({
+                timeout: 30_000,
+            });
 
             // Previous versions: the draft before the copy, rolled back to
             // after its own confirm.
