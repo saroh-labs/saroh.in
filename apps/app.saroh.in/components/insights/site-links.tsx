@@ -10,8 +10,8 @@ import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { Archive, Link2, Plus } from "lucide-react";
 import { useId, useState } from "react";
 
-import { ChipGroup } from "@/components/shared/choice-group";
-import { FormDialog } from "@/components/shared/form-dialog";
+import { ChipGroup } from "@/components/shared/fields/choice-group";
+import { FormDialog } from "@/components/shared/forms/form-dialog";
 import type { SourceRead } from "@/lib/analytics/takings";
 import { runAction } from "@/lib/api/run-action";
 import {

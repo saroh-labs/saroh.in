@@ -8,7 +8,7 @@
 ## 1. The problem with today's IA
 
 `apps/app.saroh.in` ships a **flat, technical** nav. The single `AppHeader`
-(`components/shared/app-header.tsx`) lists modules as engineers built them:
+(`components/shared/shell/app-header.tsx`) lists modules as engineers built them:
 
 ```
 Stores · Sites · Contacts · Leads · Pipeline · Services · Bookings · Analytics

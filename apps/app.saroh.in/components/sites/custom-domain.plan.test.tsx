@@ -36,7 +36,7 @@ vi.mock("@/env", () => ({
         },
     },
 }));
-vi.mock("@/components/shared/business-zone", () => ({
+vi.mock("@/components/shared/dates/business-zone", () => ({
     useBusinessZone: () => "Asia/Kolkata",
 }));
 const showPlanRefusal = vi.fn();

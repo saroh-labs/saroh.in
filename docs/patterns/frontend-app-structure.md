@@ -26,7 +26,7 @@ components/shared/             app shell, navigation, command menu
 ## Rules
 
 - **Current** — **Every shell page renders inside `PageContainer`.**
-  `components/shared/page-container.tsx` owns the page's gutter and measure, so
+  `components/shared/page/page-container.tsx` owns the page's gutter and measure, so
   a screen cannot arrive with its own. Four widths: `full` (the whole work
   area, for lists, boards and dashboards), `form` (`max-w-2xl`, create and
   edit forms), the default (`max-w-5xl`, a record) and `wide` (`max-w-7xl`).
@@ -52,10 +52,10 @@ components/shared/             app shell, navigation, command menu
   `next/headers` and so can never reach a client component; the 20
   `lib/<domain>/actions.ts` files are what client components call.
 - **Current** — **One server fetcher for the chrome.**
-  `components/shared/app-shell.tsx` reads session, organizations, the active
+  `components/shared/shell/app-shell.tsx` reads session, organizations, the active
   organization, modules and counts once per render and passes props down.
 - **Current** — **Navigation has one source.**
-  `components/shared/nav-items.tsx` feeds the sidebar, the phone tab bar (below 760px) and the
+  `components/shared/navigation/nav-items.tsx` feeds the sidebar, the phone tab bar (below 760px) and the
   command menu, and lists only routes that exist; `pnpm run check:routes` fails
   on a link that would 404.
 - **Current** — **Capability gating in the UI is an aid, not a permission.** A

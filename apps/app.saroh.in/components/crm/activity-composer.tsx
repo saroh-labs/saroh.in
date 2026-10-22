@@ -6,7 +6,10 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { FormSheetBody, FormSheetFoot } from "@/components/shared/form-sheet";
+import {
+    FormSheetBody,
+    FormSheetFoot,
+} from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import { logActivity } from "@/lib/leads/actions";
 

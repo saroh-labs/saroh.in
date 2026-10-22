@@ -3,7 +3,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Users } from "lucide-react";
 import Link from "next/link";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import type { SubscriberRow } from "@/lib/subscriptions/plan-detail";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 

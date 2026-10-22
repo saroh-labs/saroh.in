@@ -12,7 +12,7 @@ import type {
     DataColumn,
     DataFilter,
 } from "@/components/shared/data-view/types";
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { describeDiscount } from "@/lib/discounts/describe";
 import type { Discount, DiscountState } from "@/lib/discounts/service";
 

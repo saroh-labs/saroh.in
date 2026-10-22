@@ -1,11 +1,11 @@
 "use client";
 
-import { Refusal } from "@/components/shared/refusal";
+import { Refusal } from "@/components/shared/states/refusal";
 import { useState } from "react";
 
-import { FormSheet } from "@/components/shared/form-sheet";
-import type { LogoValue } from "@/components/shared/logo-upload";
-import { LogoUpload } from "@/components/shared/logo-upload";
+import type { LogoValue } from "@/components/shared/fields/logo-upload";
+import { LogoUpload } from "@/components/shared/fields/logo-upload";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { sheetWords } from "@/lib/organizations/business-sheet-words";

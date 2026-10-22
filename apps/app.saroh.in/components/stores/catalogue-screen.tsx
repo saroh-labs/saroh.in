@@ -10,7 +10,7 @@ import { useCallback, useMemo, useState, useTransition } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { NeedsYou } from "@/components/commerce/needs-you";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { DataView } from "@/components/shared/data-view/data-view";
 import type { PlanMeter } from "@/lib/billing/meter";
 import type { PausedCut } from "@/lib/billing/paused";

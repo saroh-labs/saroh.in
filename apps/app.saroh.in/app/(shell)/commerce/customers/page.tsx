@@ -6,7 +6,7 @@ import { OpenRequestsBanner } from "@/components/customers/data-requests/open-re
 import { RequestsView } from "@/components/customers/data-requests/requests-view";
 import { CustomersList } from "@/components/customers/list/customers-list";
 import { ListHeading, ListLocked } from "@/components/customers/list/states";
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { listContacts } from "@/lib/contacts/service";
 import { listDataRequests } from "@/lib/customer-workspace/data-requests";
 import { readRequestFilter } from "@/lib/customer-workspace/data-requests-view";

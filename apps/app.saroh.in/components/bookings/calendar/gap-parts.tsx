@@ -1,6 +1,6 @@
 "use client";
 
-import { ChipGroup, RadioCards } from "@/components/shared/choice-group";
+import { ChipGroup, RadioCards } from "@/components/shared/fields/choice-group";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";

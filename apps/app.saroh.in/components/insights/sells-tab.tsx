@@ -11,7 +11,7 @@ import { TextLink } from "@saroh/ui/text-link";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
 
-import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
+import { WHO_CAN_CHANGE } from "@/components/shared/states/who-can-change";
 import type { SourceRead } from "@/lib/analytics/takings";
 import type { SellsRead } from "@/lib/insights/reads";
 import type { ChangeView, SellsParts } from "@/lib/insights/sells-words";

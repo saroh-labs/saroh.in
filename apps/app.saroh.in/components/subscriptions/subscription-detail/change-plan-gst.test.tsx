@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
     pickRate,
     ratePicker,
-} from "@/components/shared/gst-rate-picker.testing";
+} from "@/components/shared/fields/gst-rate-picker.testing";
 
 import type { Plan, Subscription } from "@/lib/subscriptions/service";
 

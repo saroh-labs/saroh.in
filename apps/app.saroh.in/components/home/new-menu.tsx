@@ -18,7 +18,10 @@ import {
 import Link from "next/link";
 import { useId } from "react";
 
-import type { HomeNew, HomeNewKey } from "@/components/shared/quick-actions";
+import type {
+    HomeNew,
+    HomeNewKey,
+} from "@/components/shared/navigation/quick-actions";
 
 /** The board's glyph for each start: a shop, a dated clock, a page. */
 export const HOME_NEW_ICONS: Record<HomeNewKey, LucideIcon> = {

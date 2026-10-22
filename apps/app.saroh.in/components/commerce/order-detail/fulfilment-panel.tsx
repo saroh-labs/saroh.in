@@ -15,8 +15,8 @@ import {
 import type { ChangeFulfilmentInput } from "@/lib/orders/kitchen-service";
 import type { DeliveryAddress, FulfilmentType } from "@/lib/orders/read";
 
-import { CheckRow } from "@/components/shared/check-row";
-import { ChipGroup } from "@/components/shared/choice-group";
+import { CheckRow } from "@/components/shared/fields/check-row";
+import { ChipGroup } from "@/components/shared/fields/choice-group";
 import { Field } from "@saroh/ui/field";
 import { MoneyInput } from "@saroh/ui/money-input";
 import {

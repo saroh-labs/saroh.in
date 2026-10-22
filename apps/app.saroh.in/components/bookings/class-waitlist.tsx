@@ -1,7 +1,7 @@
 import { Badge } from "@saroh/ui/badge";
 import Link from "next/link";
 
-import { FailedRead } from "@/components/shared/failed-read";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { personHref } from "@/lib/contacts/person-href";
 import type { ClassWaitlistRow } from "@/lib/services/class-waitlist-words";
 import {

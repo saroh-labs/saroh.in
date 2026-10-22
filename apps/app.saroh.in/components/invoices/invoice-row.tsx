@@ -3,10 +3,10 @@
 import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
 
-import { listTable } from "@/components/shared/list-toolbar";
+import { listTable } from "@/components/shared/lists/list-toolbar";
 
-import { StatusBadge } from "@/components/shared/status-badge";
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { formatMoneyMajor } from "@/lib/format/money";
 import type { Invoice } from "@/lib/invoices/service";
 import {

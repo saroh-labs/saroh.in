@@ -11,7 +11,7 @@ import { TextLink } from "@saroh/ui/text-link";
 import { CalendarClock, Check } from "lucide-react";
 import Link from "next/link";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import type { PickerRow } from "@/lib/saroh-billing/plan-view";
 
 import { RefreshButton } from "./refresh-button";

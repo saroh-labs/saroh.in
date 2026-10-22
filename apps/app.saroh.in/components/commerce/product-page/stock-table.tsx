@@ -5,8 +5,8 @@ import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { listTable } from "@/components/shared/list-toolbar";
-import { StatusBadge } from "@/components/shared/status-badge";
+import { listTable } from "@/components/shared/lists/list-toolbar";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import type { ProductDetail } from "@/lib/products/service";
 import type {
     ProductStock,

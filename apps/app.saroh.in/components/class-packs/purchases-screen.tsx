@@ -10,13 +10,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import type { ContactOption } from "@/components/shared/contact-picker";
 import { DataView } from "@/components/shared/data-view/data-view";
 import type {
     DataColumn,
     DataFilter,
 } from "@/components/shared/data-view/types";
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import type { ContactOption } from "@/components/shared/fields/contact-picker";
 import type { PackStanding } from "@/lib/class-packs/balance";
 import { paidByLabel } from "@/lib/class-packs/sell-words";
 import type { ClassPack, PackPurchase } from "@/lib/class-packs/service";

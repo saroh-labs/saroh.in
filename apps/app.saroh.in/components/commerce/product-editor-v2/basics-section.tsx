@@ -36,7 +36,7 @@ import { OptionSelect } from "@saroh/ui/option-select";
 import {
     GstRatePicker,
     pickerWiring,
-} from "@/components/shared/gst-rate-picker";
+} from "@/components/shared/fields/gst-rate-picker";
 import { Field } from "@saroh/ui/field";
 import { MoneyInput } from "@saroh/ui/money-input";
 import { TextLink } from "@saroh/ui/text-link";

@@ -6,7 +6,7 @@ import { useState } from "react";
  * What Website › Settings' Edit sheets share besides their frame: the two
  * lines of type under a field, and which opening a row's sheet is on. The
  * frame itself is the app's one `FormSheet`
- * (`components/shared/form-sheet.tsx`), which says how a sheet
+ * (`components/shared/forms/form-sheet.tsx`), which says how a sheet
  * saves and closes.
  */
 

@@ -6,7 +6,7 @@ import { Label } from "@saroh/ui/label";
 import { RefreshCw } from "lucide-react";
 import { useId, useState } from "react";
 
-import { FailedRead } from "@/components/shared/failed-read";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { providerName } from "@/lib/payments/providers";
 import type {
     PaymentProviderName,

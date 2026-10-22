@@ -15,8 +15,8 @@ import {
     ChoiceGroup,
     Eyebrow,
     pillClass,
-} from "@/components/shared/choice-group";
-import { FailedRead } from "@/components/shared/failed-read";
+} from "@/components/shared/fields/choice-group";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { Field } from "@saroh/ui/field";
 import { Notice } from "@saroh/ui/notice";
 import { QrAddLogo } from "./qr-add-logo";

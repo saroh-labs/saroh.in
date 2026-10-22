@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 
-import { RadioCards } from "@/components/shared/choice-group";
-import { FormDialog } from "@/components/shared/form-dialog";
+import { RadioCards } from "@/components/shared/fields/choice-group";
+import { FormDialog } from "@/components/shared/forms/form-dialog";
 import { count, plural } from "@/lib/format/plural";
 import { optionPlural } from "@/lib/products/editor-sections";
 import { productSettingsHref } from "@/lib/products/links";

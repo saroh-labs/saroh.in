@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { PaymentsLocked } from "@/components/invoices/payments-locked";
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { SubscriptionDetail } from "@/components/subscriptions/subscription-detail/detail-screen";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
 import { contactPickerOptions } from "@/lib/invoices/contacts";

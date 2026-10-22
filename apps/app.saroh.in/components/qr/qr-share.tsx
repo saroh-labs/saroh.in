@@ -5,8 +5,8 @@ import { Archive } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { retireQrCode } from "@/lib/qr/actions";
 import type { QrScreen } from "@/lib/qr/screen";
 import type { QrCodeView } from "@/lib/qr/types";

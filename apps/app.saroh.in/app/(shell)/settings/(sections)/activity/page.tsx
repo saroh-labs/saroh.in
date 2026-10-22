@@ -5,8 +5,8 @@ import {
     SettingsPanel,
     SettingsPanelHeader,
 } from "@/components/settings/settings-panel";
-import { navCan } from "@/components/shared/nav-items";
-import { whoCanChange } from "@/components/shared/who-can-change";
+import { navCan } from "@/components/shared/navigation/nav-items";
+import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { listRoles } from "@/lib/organizations/roles";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { getOrganizationSettings } from "@/lib/organizations/settings-service";

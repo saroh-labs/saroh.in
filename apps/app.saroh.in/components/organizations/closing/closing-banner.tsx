@@ -1,4 +1,4 @@
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import type { ClosingView } from "@/lib/organizations/closing";
 import { closingBanner } from "@/lib/organizations/closing";
 import { Notice } from "@saroh/ui/notice";

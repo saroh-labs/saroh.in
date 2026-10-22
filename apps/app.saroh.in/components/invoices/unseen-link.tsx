@@ -3,9 +3,9 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { Link2Off } from "lucide-react";
 
-import type { ConfirmResult } from "@/components/shared/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { ViewerDate } from "@/components/shared/viewer-date";
+import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import {
     newLinkWarning,
     UNSEEN_LINK,

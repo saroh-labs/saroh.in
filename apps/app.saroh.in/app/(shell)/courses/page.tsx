@@ -1,5 +1,5 @@
 import { CoursesScreen } from "@/components/courses/courses-screen";
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { canWriteCourses } from "@/lib/courses/access";
 import { listCourses } from "@/lib/courses/service";
 import { readMissingRates } from "@/lib/gst-rates/service";

@@ -1,6 +1,6 @@
 "use client";
 
-import { FailedRead } from "@/components/shared/failed-read";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useState } from "react";

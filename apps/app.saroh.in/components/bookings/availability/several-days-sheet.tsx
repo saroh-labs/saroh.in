@@ -5,7 +5,7 @@ import { Segmented } from "@saroh/ui/segmented";
 import { Switch } from "@saroh/ui/switch";
 import { useId, useState } from "react";
 
-import { FormSheet } from "@/components/shared/form-sheet";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { count } from "@/lib/format/plural";
 import type { DayPlan, SeveralChoice } from "@/lib/staff/day-plan";
 import { DAYS, lunchFor, planRefusal, shortDays } from "@/lib/staff/day-plan";

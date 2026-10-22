@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { navFor } from "@/components/shared/nav-items";
+import { navFor } from "@/components/shared/navigation/nav-items";
 
 import {
     buildMobileNav,

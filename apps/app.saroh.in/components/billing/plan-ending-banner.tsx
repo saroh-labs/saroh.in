@@ -3,7 +3,7 @@ import { Button } from "@saroh/ui/button";
 import { planLabel } from "@saroh/ui/lib/state-copy";
 import Link from "next/link";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import type { BillingAccessView } from "@/lib/billing/access";
 import { upgradeHref } from "@/lib/billing/access";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";

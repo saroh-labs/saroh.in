@@ -4,7 +4,7 @@ import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
 
-import { BusinessPhoneInput } from "@/components/shared/business-phone-input";
+import { BusinessPhoneInput } from "@/components/shared/fields/business-phone-input";
 import type { ContactContent } from "@/lib/sites/service";
 
 import type { SectionFieldsProps } from "./props";

@@ -3,7 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { useState } from "react";
 
-import { FormSheet } from "@/components/shared/form-sheet";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { MediaPicker } from "@/components/sites/media-picker";
 import type { SiteDetail, SiteIconSaved } from "@/lib/sites/service";
 import { settingsEditId } from "@/lib/sites/settings-edit";

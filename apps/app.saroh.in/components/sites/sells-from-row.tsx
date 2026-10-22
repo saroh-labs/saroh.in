@@ -6,8 +6,8 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
-import { RadioCards } from "@/components/shared/choice-group";
-import { FormSheet } from "@/components/shared/form-sheet";
+import { RadioCards } from "@/components/shared/fields/choice-group";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { Row, Section } from "@/components/sites/settings-rows";
 import type { SheetControl } from "@/components/sites/settings/settings-sheet";
 import {

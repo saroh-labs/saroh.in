@@ -19,8 +19,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { BusinessPhoneInput } from "@/components/shared/business-phone-input";
-import { useLeaveGuard } from "@/components/shared/use-leave-guard";
+import { BusinessPhoneInput } from "@/components/shared/fields/business-phone-input";
+import { useLeaveGuard } from "@/components/shared/forms/use-leave-guard";
 import { personHref } from "@/lib/contacts/person-href";
 import { addCustomerAction } from "@/lib/customer-workspace/actions";
 import type { EmailHolder } from "@/lib/customer-workspace/service";

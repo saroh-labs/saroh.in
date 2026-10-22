@@ -61,7 +61,7 @@ function stale(pattern: RegExp, allow: Record<string, string>) {
 describe("one of each small piece", () => {
     it("no hand-rolled tab strip: role=tablist belongs to TabStrip", () => {
         const allow = {
-            "components/shared/section-list.tsx":
+            "components/shared/page/section-list.tsx":
                 "the one vertical list of sections, shared by Settings and Website › Settings",
         };
         const pattern = /role="tablist"/;
@@ -118,9 +118,9 @@ describe("one of each small piece", () => {
 
     it("Saffron is the menu's current-page marker and Button variant=highlight, nothing else", () => {
         const allow = {
-            "components/shared/app-sidebar.tsx":
+            "components/shared/shell/app-sidebar.tsx":
                 "the menu's current-page marker and label, at the desk",
-            "components/shared/tab-bar.tsx":
+            "components/shared/shell/tab-bar.tsx":
                 "the menu's current-page marker, on a phone",
         };
         const pattern =

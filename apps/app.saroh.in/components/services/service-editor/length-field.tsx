@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { useId, useState } from "react";
 
-import { ChipGroup } from "@/components/shared/choice-group";
+import { ChipGroup } from "@/components/shared/fields/choice-group";
 
 import { LABEL, NumberField } from "./fields";
 

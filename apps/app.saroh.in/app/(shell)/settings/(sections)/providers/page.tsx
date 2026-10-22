@@ -10,7 +10,7 @@ import {
     SettingsPanel,
     SettingsPanelHeader,
 } from "@/components/settings/settings-panel";
-import { whoCanChange } from "@/components/shared/who-can-change";
+import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { readAccountUpdates } from "@/lib/communications/account-updates-service";
 import { readCustomerEmails } from "@/lib/communications/customer-emails-service";
 import { emailPrompt } from "@/lib/communications/email-setup";

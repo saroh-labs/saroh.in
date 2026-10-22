@@ -14,8 +14,8 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
-import { CheckRow } from "@/components/shared/check-row";
-import { ChoiceGroup } from "@/components/shared/choice-group";
+import { CheckRow } from "@/components/shared/fields/check-row";
+import { ChoiceGroup } from "@/components/shared/fields/choice-group";
 import { UNREACHED } from "@/lib/api/unreached";
 import {
     confirmAttentionAction,

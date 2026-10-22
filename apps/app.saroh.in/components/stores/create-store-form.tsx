@@ -17,7 +17,10 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { lostNew, useLeaveGuard } from "@/components/shared/use-leave-guard";
+import {
+    lostNew,
+    useLeaveGuard,
+} from "@/components/shared/forms/use-leave-guard";
 import { trimmedOr } from "@/lib/forms/values";
 import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import { createStore } from "@/lib/stores/actions";

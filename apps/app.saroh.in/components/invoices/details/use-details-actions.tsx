@@ -30,8 +30,11 @@ import { NewLinkConfirm } from "@/components/invoices/unseen-link";
 import { useWriteAgain } from "@/components/invoices/use-write-again";
 import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
 import { QrButton } from "@/components/qr/qr-button";
-import type { ConfirmResult } from "@/components/shared/confirm-dialog";
-import { ConfirmDialog, sayRefusal } from "@/components/shared/confirm-dialog";
+import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
+import {
+    ConfirmDialog,
+    sayRefusal,
+} from "@/components/shared/confirm/confirm-dialog";
 import { runAction } from "@/lib/api/run-action";
 import { formatMoneyMajor } from "@/lib/format/money";
 import type { InvoiceActions } from "@/lib/invoices/detail-actions";

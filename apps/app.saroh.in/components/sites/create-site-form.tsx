@@ -1,6 +1,6 @@
 "use client";
 
-import { PartialRead } from "@/components/shared/failed-read";
+import { PartialRead } from "@/components/shared/states/failed-read";
 import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
@@ -21,7 +21,10 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { lostNew, useLeaveGuard } from "@/components/shared/use-leave-guard";
+import {
+    lostNew,
+    useLeaveGuard,
+} from "@/components/shared/forms/use-leave-guard";
 import {
     cleanAddressInput,
     MAX_ADDRESS_LENGTH,

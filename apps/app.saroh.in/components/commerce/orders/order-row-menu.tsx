@@ -31,7 +31,7 @@ import { useState } from "react";
 
 import { usePayLink } from "@/components/commerce/order-detail/pay-link";
 import { QrButton } from "@/components/qr/qr-button";
-import { useHold } from "@/components/shared/use-hold";
+import { useHold } from "@/components/shared/undo/use-hold";
 import { cancelOrder } from "@/lib/orders/actions";
 import type { OrderRow } from "@/lib/orders/business-service";
 import type { OrderAbilities, RowMenuItem } from "@/lib/orders/row-menu";

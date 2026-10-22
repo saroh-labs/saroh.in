@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { productSettingsHref } from "@/lib/products/links";
 import { OptionSelect } from "@saroh/ui/option-select";
 
-import { ChipGroup } from "@/components/shared/choice-group";
+import { ChipGroup } from "@/components/shared/fields/choice-group";
 import { MoneyInput } from "@saroh/ui/money-input";
 import { TextLink } from "@saroh/ui/text-link";
 

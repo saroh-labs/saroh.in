@@ -269,7 +269,7 @@ with why it stops there:
   paths; and the header, jumps, create flow and two columns. The library
   panel went to `photo-library-panel.tsx`, and the status pill, read-only
   note and next steps to `editor-parts.tsx` (leaving asks through the one
-  guard, `components/shared/use-leave-guard.tsx`). A little over;
+  guard, `components/shared/forms/use-leave-guard.tsx`). A little over;
   what is left shares one component's state.
 - `sites/custom-domain.tsx` (417 after DEC-140's bare domains) — the
   domains' read, add, check and remove share its list and busy state. The
@@ -364,7 +364,7 @@ says why.
 ## 9. No `alert()` or `confirm()`
 
 **Current** — none in app code (the last three went in #329). For a
-confirmation in `app.saroh.in` use `components/shared/confirm-dialog.tsx`,
+confirmation in `app.saroh.in` use `components/shared/confirm/confirm-dialog.tsx`,
 and only for what cannot be undone (`frontend-forms.md`: one sheet, one
 dialog, one confirm); elsewhere `@saroh/ui/alert-dialog` or
 `@saroh/ui/dialog`, and `@saroh/ui/toast`.

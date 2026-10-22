@@ -57,7 +57,7 @@ vi.mock("@saroh/ui/toast", () => ({
     },
 }));
 
-import { BusinessZoneProvider } from "@/components/shared/business-zone";
+import { BusinessZoneProvider } from "@/components/shared/dates/business-zone";
 import { UNREACHED } from "@/lib/api/unreached";
 import type { Notification } from "@/lib/notifications/service";
 

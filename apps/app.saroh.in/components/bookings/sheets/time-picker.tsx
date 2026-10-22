@@ -11,7 +11,10 @@ import { TextLink } from "@saroh/ui/text-link";
 import { CalendarDays } from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
 
-import { ChipGroup, ChoiceGroup } from "@/components/shared/choice-group";
+import {
+    ChipGroup,
+    ChoiceGroup,
+} from "@/components/shared/fields/choice-group";
 import { formatTime } from "@/lib/format/datetime";
 import { listAvailability } from "@/lib/services/actions";
 import type { LocalDate } from "@/lib/services/diary";

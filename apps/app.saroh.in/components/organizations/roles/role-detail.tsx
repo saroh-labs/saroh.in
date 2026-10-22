@@ -1,9 +1,9 @@
 "use client";
 
-import type { ConfirmResult } from "@/components/shared/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { FailedRead } from "@/components/shared/failed-read";
-import { StatusBadge } from "@/components/shared/status-badge";
+import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { count, plural } from "@/lib/format/plural";
 import { deleteRole } from "@/lib/organizations/role-actions";
 import type { Role, RoleCatalogue } from "@/lib/organizations/roles";

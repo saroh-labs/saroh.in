@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 
-import { SettingsColumns } from "@/components/shared/settings-columns";
+import { SettingsColumns } from "@/components/shared/page/settings-columns";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import type { SettingsSheet } from "@/lib/sites/settings-edit";
 import {
@@ -22,7 +22,7 @@ import {
 } from "@/lib/sites/settings-page";
 import { OptionSelect } from "@saroh/ui/option-select";
 
-import { SectionList } from "@/components/shared/section-list";
+import { SectionList } from "@/components/shared/page/section-list";
 import { Label } from "@saroh/ui/label";
 import { ShareChecklist } from "./share-checklist";
 

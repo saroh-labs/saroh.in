@@ -6,11 +6,11 @@ import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { customerHref } from "@/lib/customers/links";
 import type { OverviewReview } from "@/lib/products/overview-rules";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { TextLink } from "@saroh/ui/text-link";
 
 import { REPLY_MAX, useReviewActions } from "./use-review-actions";

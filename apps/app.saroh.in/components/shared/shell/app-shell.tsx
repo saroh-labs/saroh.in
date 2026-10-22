@@ -1,0 +1,419 @@
+import { getServerSession } from "@saroh/auth/next";
+import { cookies, headers } from "next/headers";
+
+import { PausedBanner } from "@/components/billing/paused-banner";
+import { PlanEndingBanner } from "@/components/billing/plan-ending-banner";
+import { PlanRefusalHost } from "@/components/billing/plan-refusal";
+import { PlanAccessProvider } from "@/components/billing/plan-way";
+import { ClosingBanner } from "@/components/organizations/closing/closing-banner";
+import { BusinessZoneProvider } from "@/components/shared/dates/business-zone";
+import { BusinessCountryProvider } from "@/components/shared/fields/business-country";
+import { LiveRefresh } from "@/components/shared/live-refresh/live-refresh";
+import { CommandMenu } from "@/components/shared/navigation/command-menu";
+import type { NavCounts } from "@/components/shared/navigation/nav-items";
+import {
+    navCan,
+    NOTIFICATIONS_NAV,
+} from "@/components/shared/navigation/nav-items";
+import {
+    lockedNavHrefs,
+    planLockedModuleKeys,
+} from "@/components/shared/navigation/nav-locks";
+import { PageContainer } from "@/components/shared/page/page-container";
+import { accountsUrl } from "@/lib/accounts";
+import { mayChangePlan } from "@/lib/billing/plan-access";
+import { businessZone } from "@/lib/format/business-zone";
+import { getHomeRail } from "@/lib/home/service";
+import { listModules } from "@/lib/modules/service";
+import { RAIL_COLLAPSED, RAIL_COOKIE } from "@/lib/nav/rail-cookie";
+import { unreadNotificationCount } from "@/lib/notifications/service";
+import { closingOrNull } from "@/lib/organizations/closing-service";
+import {
+    accountManagerOrNull,
+    activeOrganizationOnce,
+    organizationsOnce,
+} from "@/lib/organizations/service";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
+import { billingAccessOrNull, pausedOrNull } from "@/lib/saroh-billing/service";
+import { listSites } from "@/lib/sites/service";
+import { getStockTracking } from "@/lib/stock/service";
+import { getStorefrontAllowance } from "@/lib/stores/storefronts";
+import { usageSharingOrNull } from "@/lib/usage-sharing/service";
+import { Button } from "@saroh/ui/button";
+import { PausedState } from "@saroh/ui/data-state";
+import { AppHeader } from "./app-header";
+import { AppSidebar } from "./app-sidebar";
+import { JoinedNotice } from "./joined-notice";
+import { TabBar } from "./tab-bar";
+import { recordingSwitchedOn, UsageRecording } from "./usage-recording";
+
+/**
+ * The authenticated app shell, rendered once in the root layout. It is the
+ * SINGLE server-side fetcher for the chrome — session, org list, active org,
+ * and unread count are read here exactly once and passed as props to the
+ * (client) `AppSidebar` / `TabBar` and the presentational `AppHeader`.
+ * `getServerSession` is a `no-store` network call, so consolidating the fetch
+ * here (instead of each chrome piece fetching) avoids duplicate round-trips.
+ *
+ * Non-throwing by design: this renders inside the root layout on every page, so
+ * it must not redirect. Middleware already gates unauthenticated access; with
+ * no session we render the page bare (no chrome).
+ */
+export async function AppShell({ children }: { children: React.ReactNode }) {
+    const session = await getServerSession(await headers());
+    if (!session) return <>{children}</>;
+
+    // Read once for the request: the layout's tab title uses the same two.
+    const organizations = await organizationsOnce();
+
+    // Zero-org onboarding: no sidebar yet — just a slim top bar (brand +
+    // sign-out) so the funnel stays uncluttered.
+    if (organizations.length === 0) {
+        return (
+            <div className="flex min-h-screen flex-col">
+                <AppHeader onboarding user={session.user} />
+                {children}
+            </div>
+        );
+    }
+
+    // Reuse the already-fetched list instead of re-fetching it (#102).
+    const activeOrg = await activeOrganizationOnce();
+
+    // Every business they're in has paused their access (#800): the API
+    // would refuse each read, so say why once instead of a page of denials.
+    // Paused, not denied: no role changed, and the way back is the plan.
+    if (activeOrg?.paused) {
+        return (
+            <div className="flex min-h-screen flex-col">
+                <AppHeader onboarding user={session.user} />
+                <main id="main-content" className="flex-1">
+                    <PageContainer>
+                        <PausedState
+                            business={activeOrg.name}
+                            action={
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    className="wk-press"
+                                >
+                                    <a href={`${accountsUrl}/apps`}>
+                                        Your businesses
+                                    </a>
+                                </Button>
+                            }
+                        />
+                    </PageContainer>
+                </main>
+            </div>
+        );
+    }
+
+    // Whether session recording is switched on for this environment
+    // (DEC-125): a PostHog key and the replay switch. Off, nothing is read.
+    const recordingOn = recordingSwitchedOn();
+
+    // Concurrently, because none of the three depends on another. They used to
+    // run one after the next, which cost the sum of three round trips on every
+    // page in the app rather than the slowest one.
+    //
+    // Capability-aware chrome (ADR-003): `moduleKeys` is the effective module
+    // availability, passed to the nav as serializable strings (icons are client
+    // refs and can't cross the boundary).
+    //
+    // `null` on failure, NOT `[]`: the two mean different things to
+    // `filterNavGroups`. A failed fetch is "we don't know" and must fail open so
+    // a transient API error never blanks the shell; a successful fetch that
+    // returns nothing is "nothing is enabled yet", which a new Organization
+    // should see reflected in its nav rather than papered over.
+    const [
+        unread,
+        modules,
+        home,
+        sites,
+        storefronts,
+        stock,
+        billing,
+        paused,
+        closing,
+        usageSharing,
+        accountManager,
+    ] = await Promise.all([
+        unreadNotificationCount(),
+        listModules().catch(() => null),
+        // The rail's work counts come from the same ranked actions Home ranks,
+        // so the two can never disagree, through the rail's own read: none of
+        // what only Home's page draws (review #16). Non-fatal: a rail without
+        // badges is a working rail, and this renders on every page.
+        getHomeRail().catch(() => null),
+        /*
+         * The merchant's own sites, for the command palette's jump to one.
+         *
+         * Non-fatal like the counts: a palette without them still works, and
+         * this renders on every screen in the app. It joins the same
+         * Promise.all rather than being awaited after, so it costs the slowest
+         * of four round trips instead of adding a fifth in series.
+         */
+        listSites().catch(() => []),
+        /*
+         * How many storefronts, and how many the plan allows (ADR-010):
+         * the palette stops offering "New storefront" at the limit, and
+         * the rail names the row "Storefronts" once there are several.
+         * `null` on failure: the palette then offers it, and the page
+         * says whether another can be made.
+         */
+        getStorefrontAllowance().catch(() => null),
+        /*
+         * The business's Track stock switch (#515): off, Sell › Stock has
+         * nothing to show and the rail leaves it out. `null` on failure
+         * (or a role that can't read stock, which the row's own action
+         * already withholds): the nav fails open.
+         */
+        getStockTracking().catch(() => null),
+        /*
+         * What the plan locks (U14), for the rail's locks. An aid: null
+         * when it can't be read or the role may not (the page and the
+         * API still say so).
+         */
+        billingAccessOrNull(),
+        // What a move to a lower plan paused, or will (#800): the banner.
+        // An aid; null when unread, and the API still refuses.
+        pausedOrNull(),
+        // Scheduled for deletion (#921): the refunds still owed and
+        // the memberships it won't cancel. Read only then.
+        activeOrg?.lifecycleStatus === "PENDING_DELETION"
+            ? closingOrNull()
+            : null,
+        // "Help improve Saroh" (DEC-125): the person's own choice and
+        // whether they have seen the notice, read before the recorder
+        // could start, and only where session recording is switched on at
+        // all. Null when unread: not recorded.
+        recordingOn ? usageSharingOrNull() : null,
+        // Who at Saroh looks after this business (DEC-169, U26), for the
+        // account menu's card. Null without a manager or when unread.
+        activeOrg ? accountManagerOrNull(activeOrg.id) : null,
+    ]);
+    // Available modules, plus those shut only by the plan: locked, not off,
+    // so they stay in the rail with a lock and a way up (U14). None while
+    // plans aren't shown (DEC-136): a lock would name a plan.
+    const planLocked =
+        modules && plansShown() ? planLockedModuleKeys(modules) : [];
+    const moduleKeys = modules
+        ? [
+              ...modules
+                  .filter((m) => m.readiness !== "DISABLED")
+                  .map((m) => m.key),
+              ...planLocked,
+          ]
+        : null;
+    const lockedHrefs = lockedNavHrefs(planLocked, billing);
+    const stockTracked = stock?.tracked ?? null;
+
+    /*
+     * Only actions that represent OUTSTANDING WORK become badges.
+     *
+     * A SETUP or SUGGESTION action is advice, not a queue — badging "Add a
+     * product to your catalog" as a 1 next to Sell would train merchants to
+     * ignore the badges within a week, which is precisely what makes the count
+     * on Leads worth reading when it does appear.
+     */
+    const counts: NavCounts = Object.fromEntries(
+        (home?.actions ?? [])
+            .filter((a) => a.severity === "OVERDUE" && (a.count ?? 0) > 0)
+            .map((a) => [a.href, a.count]),
+    );
+
+    /*
+     * Only what the nav needs crosses the boundary. `SiteSummary` carries a
+     * publication pointer, a style blob and timestamps; the palette wants a name
+     * and an id, and shipping the rest to a client component on every page
+     * would be paying for it in the payload on every navigation.
+     */
+    const navSites = sites.map((site) => ({ id: site.id, name: site.name }));
+
+    /*
+     * Resolved once and handed to every navigation alike — the rail, the tab
+     * bar and the command menu — so a role the business invented is offered
+     * the same destinations in each. The phone drawer this replaced was given
+     * the role but not the permissions, and judged an invented role by the
+     * built-in it maps to.
+     */
+    const role = activeOrg?.role ?? null;
+    const actions = activeOrg?.actions ?? null;
+    // A location's team is offered Sell with Orders alone (DEC-074).
+    const roleKey = activeOrg?.roleKey ?? null;
+
+    return (
+        <ShellFrame canChangePlan={mayChangePlan(activeOrg)}>
+            {/*
+             * Without this, reaching the page content by keyboard means tabbing
+             * through the wordmark, search, every nav item, the org switcher,
+             * the theme toggle and the account menu — on every single page.
+             * Visible only when focused, so it costs sighted users nothing.
+             */}
+            <a
+                href="#main-content"
+                className="sr-only bg-background text-foreground outline-none focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:border focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+                Skip to content
+            </a>
+            {/*
+             * The role, alongside module availability, decides what the chrome
+             * offers. Two different questions — does this business have the
+             * capability, and may this person use it — and a merchant meets
+             * both (#313). It comes off the resolved active organization, so
+             * switching workspaces changes it with everything else.
+             */}
+            {/*
+             * The page reads again by itself, the unread count sits in the
+             * tab's title, and "signed out" gets its Sign in button (10 Oct
+             * 2026). Draws nothing.
+             */}
+            <LiveRefresh
+                unread={
+                    navCan({ role, actions }, NOTIFICATIONS_NAV.action)
+                        ? unread
+                        : null
+                }
+            />
+            <CommandMenu
+                moduleKeys={moduleKeys}
+                role={role}
+                roleKey={roleKey}
+                actions={actions}
+                kind={activeOrg?.kind}
+                // What was opened in this business, not in another.
+                recentsScope={activeOrg?.id ?? ""}
+                sites={navSites}
+                stockTracked={stockTracked}
+                storefronts={storefronts}
+            />
+            {/* The top bar runs the full width; the rail and the working
+                area sit below it. */}
+            <AppHeader
+                user={session.user}
+                organizations={organizations}
+                activeOrg={activeOrg}
+                accountManager={accountManager}
+                moduleKeys={moduleKeys}
+                unread={
+                    navCan({ role, actions }, NOTIFICATIONS_NAV.action)
+                        ? unread
+                        : null
+                }
+            />
+            <div className="flex min-h-0 flex-1">
+                <AppSidebar
+                    collapsed={
+                        (await cookies()).get(RAIL_COOKIE)?.value ===
+                        RAIL_COLLAPSED
+                    }
+                    unread={unread}
+                    moduleKeys={moduleKeys}
+                    role={role}
+                    roleKey={roleKey}
+                    actions={actions}
+                    counts={counts}
+                    locked={lockedHrefs}
+                    stockTracked={stockTracked}
+                    storefronts={storefronts?.used ?? null}
+                    kind={activeOrg?.kind ?? null}
+                />
+                {/* The working area is white and the rail sits on Paper: the
+                product spends white surfaces, and the page you work on is
+                the raised one (brand file §5, and the applied screens). In
+                dark it is the ground, as on the marketing site: the tables
+                and cards on it are what rise, a surface step up. */}
+                <div className="flex min-w-0 flex-1 flex-col bg-card dark:bg-background">
+                    {/*
+                     * `tabIndex={-1}` makes this a valid focus target: following the
+                     * skip link must MOVE focus, not just scroll, or the next Tab
+                     * would land back at the top of the nav.
+                     */}
+                    {/*
+                     * Padded by the tab bar's height below 760px (0 above;
+                     * `--tab-bar-inset` in workspace.css), so the last row
+                     * of a page scrolls clear of the bar instead of ending
+                     * underneath it.
+                     */}
+                    <div
+                        id="main-content"
+                        tabIndex={-1}
+                        className="flex flex-1 flex-col pb-[var(--tab-bar-inset)] outline-none"
+                    >
+                        {/*
+                         * The business's zone (UX-008): every time a page
+                         * writes with `BusinessDate` reads as the business
+                         * keeps it, on the server's first paint too.
+                         */}
+                        <BusinessZoneProvider zone={businessZone(activeOrg)}>
+                            {/* Its country: where a phone field starts (#1036). */}
+                            <BusinessCountryProvider
+                                country={activeOrg?.country}
+                            >
+                                {/*
+                                 * PostHog in the signed-in shell (DEC-125):
+                                 * internal ids beside the workspace's error
+                                 * reports, the one-time notice that it is
+                                 * recorded, and the recorder, which waits for
+                                 * that notice. Nothing without a key.
+                                 */}
+                                <UsageRecording
+                                    userId={session.user.id}
+                                    organizationId={activeOrg?.id}
+                                    usage={usageSharing}
+                                />
+                                {/* Scheduled for deletion (#921). */}
+                                <ClosingBanner view={closing} />
+                                {/* A plan that ends within 30 days (#805). */}
+                                <PlanEndingBanner
+                                    ending={billing?.planEnding}
+                                />
+                                {/* What a lower plan paused, or will (#800). */}
+                                <PausedBanner view={paused} />
+                                {/* Just accepted an invitation: which business
+                                this is and what their role opens, once. */}
+                                <JoinedNotice />
+                                {children}
+                            </BusinessCountryProvider>
+                        </BusinessZoneProvider>
+                    </div>
+                </div>
+            </div>
+            {/* A write the plan refused, shown as its notice (U14). */}
+            <PlanRefusalHost />
+            {/* Below 760px, the rail's place is taken by this. */}
+            <TabBar
+                unread={unread}
+                moduleKeys={moduleKeys}
+                role={role}
+                roleKey={roleKey}
+                actions={actions}
+                counts={counts}
+                stockTracked={stockTracked}
+                storefronts={storefronts?.used ?? null}
+                kind={activeOrg?.kind ?? null}
+            />
+        </ShellFrame>
+    );
+}
+
+/**
+ * The shell's outer box, which also says once whether this person may
+ * change the plan (`billing:manage`): every plan prompt under it offers the
+ * way to another plan to someone who may, and says who can to anyone else
+ * (`PlanWay`).
+ */
+function ShellFrame({
+    canChangePlan,
+    children,
+}: {
+    canChangePlan: boolean;
+    children: React.ReactNode;
+}) {
+    return (
+        <PlanAccessProvider canChangePlan={canChangePlan}>
+            <div className="flex min-h-screen flex-col">{children}</div>
+        </PlanAccessProvider>
+    );
+}

@@ -10,8 +10,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { useBusinessZone } from "@/components/shared/business-zone";
-import { FailedRead } from "@/components/shared/failed-read";
+import { useBusinessZone } from "@/components/shared/dates/business-zone";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { SectionReview } from "@/components/sites/section-review";
 import { VerdictControls } from "@/components/sites/verdict-controls";
 import { runAction } from "@/lib/api/run-action";

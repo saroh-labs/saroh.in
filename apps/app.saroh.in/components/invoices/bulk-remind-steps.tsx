@@ -12,8 +12,8 @@ import type { ReactNode } from "react";
 
 import { shortNumber } from "@/components/invoices/invoice-row";
 import { MessagePreview } from "@/components/invoices/share-sheet";
-import { FailedRead } from "@/components/shared/failed-read";
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { CONNECT_EMAIL_HREF } from "@/lib/communications/email-setup";
 import { formatMoney } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";

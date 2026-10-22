@@ -33,7 +33,7 @@ import {
     lostChanges,
     lostNew,
     useLeaveGuard,
-} from "@/components/shared/use-leave-guard";
+} from "@/components/shared/forms/use-leave-guard";
 import { runAction } from "@/lib/api/run-action";
 import { createCourse, updateCourse } from "@/lib/courses/actions";
 import type { CourseFormValues } from "@/lib/courses/course-form";

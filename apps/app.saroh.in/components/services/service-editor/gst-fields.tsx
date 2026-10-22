@@ -8,7 +8,7 @@ import type { FocusEvent } from "react";
 import {
     GstRatePicker,
     pickerWiring,
-} from "@/components/shared/gst-rate-picker";
+} from "@/components/shared/fields/gst-rate-picker";
 import type { GstForm } from "@/lib/gst/item-words";
 import type { GstPriceMode, ItemModeValue } from "@/lib/gst/price-mode";
 import {

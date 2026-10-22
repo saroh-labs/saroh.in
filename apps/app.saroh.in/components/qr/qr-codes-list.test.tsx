@@ -59,7 +59,7 @@ vi.mock("next/link", () => ({
     ),
 }));
 // Drawn in place: a portal is not what is tested here.
-vi.mock("@/components/shared/confirm-dialog", () => ({
+vi.mock("@/components/shared/confirm/confirm-dialog", () => ({
     ConfirmDialog: ({
         open,
         title,

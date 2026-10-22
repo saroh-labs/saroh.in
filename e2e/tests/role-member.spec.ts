@@ -40,7 +40,7 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  */
 
 /**
- * `NAV_GROUPS` (`components/shared/nav-items.tsx`) for a Member's
+ * `NAV_GROUPS` (`components/shared/navigation/nav-items.tsx`) for a Member's
  * permissions and the modules they reach: Payments (`payment:read`),
  * Insights (`analytics:read`), Courses and Class packs are out of reach, and
  * so are Leads, Pipeline, Discount codes and Invoices by their own reads.

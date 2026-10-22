@@ -1,6 +1,6 @@
 "use client";
 
-import { FormDialog } from "@/components/shared/form-dialog";
+import { FormDialog } from "@/components/shared/forms/form-dialog";
 import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
@@ -8,9 +8,9 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
-import { ChipGroup } from "@/components/shared/choice-group";
-import type { ContactOption } from "@/components/shared/contact-picker";
-import { ContactPicker } from "@/components/shared/contact-picker";
+import { ChipGroup } from "@/components/shared/fields/choice-group";
+import type { ContactOption } from "@/components/shared/fields/contact-picker";
+import { ContactPicker } from "@/components/shared/fields/contact-picker";
 import { runAction } from "@/lib/api/run-action";
 import { sellPack } from "@/lib/class-packs/actions";
 import type { PackKind } from "@/lib/class-packs/pack-cards";

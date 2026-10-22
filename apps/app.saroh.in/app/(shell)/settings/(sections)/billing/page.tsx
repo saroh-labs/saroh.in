@@ -1,4 +1,4 @@
-import { PartialRead } from "@/components/shared/failed-read";
+import { PartialRead } from "@/components/shared/states/failed-read";
 import { autopayCharges, formatInr } from "@saroh/pricing-catalog";
 import { Button } from "@saroh/ui/button";
 import { PermissionDeniedState } from "@saroh/ui/data-state";
@@ -19,8 +19,8 @@ import {
     SettingsPanel,
     SettingsPanelHeader,
 } from "@/components/settings/settings-panel";
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
-import { whoCanChange } from "@/components/shared/who-can-change";
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
+import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { mayChangePlan, mayOpenPlan } from "@/lib/billing/plan-access";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { planSummary, usageLine } from "@/lib/saroh-billing/plan";

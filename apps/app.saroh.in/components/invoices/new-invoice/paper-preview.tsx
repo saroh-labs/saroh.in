@@ -4,7 +4,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Lock } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { formatMoney } from "@/lib/format/money";
 import type { Place, PreviewSeller } from "@/lib/invoices/new-invoice";
 import type { PreviewSums } from "@/lib/invoices/new-invoice-lines";

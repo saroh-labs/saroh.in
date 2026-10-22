@@ -7,8 +7,8 @@ import { showError } from "@saroh/ui/toast";
 import { useId, useOptimistic, useTransition } from "react";
 
 import { useSettingsUndo } from "@/components/organizations/business-settings/use-settings-undo";
-import { SwitchRow } from "@/components/shared/check-row";
-import { FormSheet } from "@/components/shared/form-sheet";
+import { SwitchRow } from "@/components/shared/fields/check-row";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
 import type {

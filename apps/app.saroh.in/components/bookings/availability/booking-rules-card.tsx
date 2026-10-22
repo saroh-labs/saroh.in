@@ -10,9 +10,9 @@ import { useState } from "react";
 
 import { ROW as CHOICE_ROW } from "./whose-hours";
 
-import { SwitchRow } from "@/components/shared/check-row";
-import { RadioCards } from "@/components/shared/choice-group";
-import { FailedRead } from "@/components/shared/failed-read";
+import { SwitchRow } from "@/components/shared/fields/check-row";
+import { RadioCards } from "@/components/shared/fields/choice-group";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { runAction } from "@/lib/api/run-action";
 import type { RuleKey, RuleRow } from "@/lib/services/availability-rules";
 import {

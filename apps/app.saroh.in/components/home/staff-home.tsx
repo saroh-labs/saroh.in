@@ -1,4 +1,4 @@
-import type { HomeNew } from "@/components/shared/quick-actions";
+import type { HomeNew } from "@/components/shared/navigation/quick-actions";
 import type { HomeModel } from "@/lib/home/service";
 import { storesOnly } from "@/lib/home/staff";
 import type { ModuleView } from "@/lib/modules/schema";

@@ -3,7 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { Notice } from "@saroh/ui/notice";
 
-import { RadioCards } from "@/components/shared/choice-group";
+import { RadioCards } from "@/components/shared/fields/choice-group";
 import { ChevronDown, Plus, Users } from "lucide-react";
 
 import { Face } from "./face";

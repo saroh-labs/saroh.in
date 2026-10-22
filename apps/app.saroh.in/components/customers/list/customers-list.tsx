@@ -18,7 +18,7 @@ import {
     pageText,
 } from "@/lib/customers/list";
 
-import { ListPaging } from "@/components/shared/list-toolbar";
+import { ListPaging } from "@/components/shared/lists/list-toolbar";
 import { Filters } from "./filters";
 import { NoMatch, Rows } from "./rows";
 import { ListFirstRun, ListHeading, ListNote } from "./states";

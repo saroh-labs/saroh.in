@@ -3,7 +3,7 @@ import { AbsentValue } from "@saroh/ui/absent-value";
 import { cn } from "@saroh/ui/lib/utils";
 import type { CSSProperties } from "react";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { howToPayLines } from "@/lib/invoices/how-to-pay";
 import {

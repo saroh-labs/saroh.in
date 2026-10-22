@@ -27,7 +27,7 @@ import { mayAddWebsite } from "@/lib/business-limits";
 import type { PostCategory } from "@/lib/content/service";
 import type { SiteStateTone } from "@/lib/sites/site-state";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { TabStrip } from "@saroh/ui/tabs";
 import { PostCategoriesSheet } from "./post-categories-sheet";
 

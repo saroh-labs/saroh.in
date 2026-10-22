@@ -20,8 +20,8 @@ import { MoreBookingFilters } from "@/components/bookings/all-bookings/more-filt
 import { MoveSheet } from "@/components/bookings/all-bookings/move-sheet";
 import { CancelSheet } from "@/components/bookings/sheets/cancel-sheet";
 import { TakePayment } from "@/components/bookings/take-payment";
-import { ChipGroup } from "@/components/shared/choice-group";
-import { useHold } from "@/components/shared/use-hold";
+import { ChipGroup } from "@/components/shared/fields/choice-group";
+import { useHold } from "@/components/shared/undo/use-hold";
 import { ShareLinkButton } from "@/components/sites/share-link-button";
 import { personHref } from "@/lib/contacts/person-href";
 import { formatDateTime } from "@/lib/format/datetime";

@@ -3,7 +3,7 @@ import { WHO_CAN_CHANGE_PLAN } from "@saroh/ui/lib/state-copy";
 import Link from "next/link";
 
 import { PlanWay } from "@/components/billing/plan-way";
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { isPlanHref } from "@/lib/billing/plan-access";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import type { ReadyAside, ReadyStep } from "@/lib/settings/ready";
@@ -11,7 +11,7 @@ import type { ChecklistRow } from "@/lib/setup-checklist";
 
 /**
  * What "Finish setup" lists on Home and Settings › Business, as the one
- * checklist's rows (`components/shared/setup-checklist.tsx`): the same
+ * checklist's rows (`components/shared/setup-checklist/setup-checklist.tsx`): the same
  * steps on both, each with why it matters and one button to where it is
  * done. Most open a row's sheet in place (`?edit=`).
  *

@@ -1,4 +1,4 @@
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { StorefrontsScreen } from "@/components/stores/storefronts-screen";
 import { pausedLocationIds } from "@/lib/billing/paused";
 import { mayAddStorefront } from "@/lib/business-limits";

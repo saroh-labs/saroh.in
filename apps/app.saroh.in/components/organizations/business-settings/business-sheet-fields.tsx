@@ -16,7 +16,7 @@ import { fieldWidth } from "@/components/organizations/business-details/register
 import { TimeZoneSelect } from "@/components/organizations/business-details/time-zone-select";
 import { BusinessPriceModeField } from "@/components/organizations/price-mode/business-price-mode-field";
 import { BusinessTaxFields } from "@/components/organizations/tax/business-tax-fields";
-import { BusinessPhoneInput } from "@/components/shared/business-phone-input";
+import { BusinessPhoneInput } from "@/components/shared/fields/business-phone-input";
 import type { BusinessSheet } from "@/lib/organizations/business-rows";
 import { nameLabelOf } from "@/lib/organizations/business-sheet-words";
 import { BUSINESS_TYPE_OPTIONS } from "@/lib/organizations/business-types";

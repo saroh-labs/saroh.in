@@ -1,6 +1,6 @@
 "use client";
 
-import { SetupChecklist } from "@/components/shared/setup-checklist";
+import { SetupChecklist } from "@/components/shared/setup-checklist/setup-checklist";
 import type { ShareStep, ShareStepKey } from "@/lib/sites/settings-page";
 
 /** The verb on an unmet step. */
@@ -14,7 +14,7 @@ const VERB: Record<ShareStepKey, string> = {
 /**
  * "Before you share your site · 2 of 4 done" (Website › Settings audit, the
  * goal gradient told honestly), drawn by the one checklist
- * (`components/shared/setup-checklist.tsx`): the steps that are true to ask
+ * (`components/shared/setup-checklist/setup-checklist.tsx`): the steps that are true to ask
  * for, from what is already done. Each one not done has one button, which
  * opens its row in place where the reader may change it: `onJump` switches
  * to its tab first.

@@ -3,7 +3,7 @@ import { Badge } from "@saroh/ui/badge";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
-import { listTable } from "@/components/shared/list-toolbar";
+import { listTable } from "@/components/shared/lists/list-toolbar";
 import { storefrontHref } from "@/lib/stores/links";
 import type {
     StorefrontKind,

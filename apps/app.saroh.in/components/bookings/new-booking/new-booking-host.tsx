@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { FormSheet } from "@/components/shared/form-sheet";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { withoutArrival } from "@/lib/customers/prefill";
 
 import { LauncherContext, useNewBookingLauncher } from "./launcher";

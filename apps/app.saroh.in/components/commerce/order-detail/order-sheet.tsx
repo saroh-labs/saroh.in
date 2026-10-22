@@ -8,7 +8,7 @@ import {
     FormSheetBody,
     FormSheetFoot,
     useFormSheetDraft,
-} from "@/components/shared/form-sheet";
+} from "@/components/shared/forms/form-sheet";
 
 import { CHANGE_BUTTON_ID } from "./change-panels";
 import type { Panel } from "./panel";
@@ -58,7 +58,7 @@ export function useOrderPanel() {
 
 /**
  * The side sheet a change to an order opens in: the app's one `FormSheet`
- * (`components/shared/form-sheet.tsx`), drawn by its parts because each
+ * (`components/shared/forms/form-sheet.tsx`), drawn by its parts because each
  * panel's draft is a component of its own, fresh on every opening. Its
  * title and a line under it, the fields (`OrderSheetBody`, which scrolls)
  * and, pinned at the foot, what the change does to the money with the

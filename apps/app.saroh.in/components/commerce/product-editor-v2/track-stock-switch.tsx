@@ -6,8 +6,8 @@ import { PackageX } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { runAction } from "@/lib/api/run-action";
 import { setProductStockTracking } from "@/lib/products/actions";
 import type { TrackingControl } from "@/lib/products/tracking";

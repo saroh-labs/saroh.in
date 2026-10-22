@@ -6,7 +6,7 @@ import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import type { DataRequestRow } from "@/lib/customer-workspace/data-requests-view";
 
 import { CloseRequestDialog } from "./close-request-dialog";

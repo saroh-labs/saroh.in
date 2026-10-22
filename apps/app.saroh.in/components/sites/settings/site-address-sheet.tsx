@@ -1,6 +1,6 @@
 "use client";
 
-import { Refusal } from "@/components/shared/refusal";
+import { Refusal } from "@/components/shared/states/refusal";
 import { MAP_LINK_MAX } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
@@ -8,8 +8,8 @@ import { Label } from "@saroh/ui/label";
 import { Switch } from "@saroh/ui/switch";
 import { useState } from "react";
 
-import { FormSheet } from "@/components/shared/form-sheet";
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { LocationAddressFields } from "@/components/stores/location-address-fields";
 import { runAction } from "@/lib/api/run-action";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";

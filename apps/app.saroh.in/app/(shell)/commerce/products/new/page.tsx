@@ -2,7 +2,7 @@ import { ProductEditorV2 } from "@/components/commerce/product-editor-v2/editor-
 import { NoProductAccess } from "@/components/commerce/product-editor-v2/no-access";
 import { ProductLimitReached } from "@/components/commerce/product-limit-reached";
 import { StorefrontChooser } from "@/components/commerce/storefront-chooser";
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { planMeter } from "@/lib/billing/meter";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { loadEditorContext } from "@/lib/products/editor-data";

@@ -7,8 +7,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import {
     disconnectCommsProvider,
     disconnectPaymentProvider,
@@ -26,8 +26,8 @@ import type {
 } from "@/lib/providers/service";
 
 import { PlanWay } from "@/components/billing/plan-way";
-import type { StatusTone } from "@/components/shared/status-badge";
-import { StatusBadge } from "@/components/shared/status-badge";
+import type { StatusTone } from "@/components/shared/lists/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { CopyButton } from "@saroh/ui/copy-button";
 import { ProviderSetupSheet } from "./provider-setup-sheet";
 

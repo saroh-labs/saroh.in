@@ -13,7 +13,7 @@ import { shownRoleLabel } from "./storefront-team";
  * the one place that may write the open business. So a location's
  * invitation switches to the right business too, which it never did. The
  * door leaves the line in a cookie that lasts a minute, and the shell shows
- * it and takes it away (`components/shared/joined-notice.tsx`).
+ * it and takes it away (`components/shared/shell/joined-notice.tsx`).
  *
  * Pure, so the words and the way in are tested without a browser.
  */

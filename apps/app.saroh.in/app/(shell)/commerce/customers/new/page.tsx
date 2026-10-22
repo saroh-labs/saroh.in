@@ -2,7 +2,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { AddCustomerForm } from "@/components/customers/add-customer-form";
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { requireCan } from "@/lib/access/require-can";
 import { requireSession } from "@/lib/session";
 

@@ -2,8 +2,8 @@
 
 import { useId, useState } from "react";
 
-import { RadioCards } from "@/components/shared/choice-group";
-import { FormDialog } from "@/components/shared/form-dialog";
+import { RadioCards } from "@/components/shared/fields/choice-group";
+import { FormDialog } from "@/components/shared/forms/form-dialog";
 import { runAction } from "@/lib/api/run-action";
 import type { PaymentMethod } from "@/lib/invoices/service";
 import type { HandRefundChoice } from "@/lib/orders/hand-refund";

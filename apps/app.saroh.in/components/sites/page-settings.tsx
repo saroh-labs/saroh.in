@@ -6,7 +6,7 @@ import { Input } from "@saroh/ui/input";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useId, useState } from "react";
 
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { ChoiceField, SHOW_HIDE } from "@/components/sites/choice-field";
 import { FIELD_LABEL } from "@/components/sites/section-fields/constants";
 import { runAction } from "@/lib/api/run-action";

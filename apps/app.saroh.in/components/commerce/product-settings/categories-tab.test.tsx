@@ -45,7 +45,7 @@ vi.mock("@saroh/ui/sheet", async () =>
 vi.mock("@saroh/ui/dialog", async () =>
     (await import("./test-kit")).dialogMock(),
 );
-vi.mock("@/components/shared/confirm-dialog", async () =>
+vi.mock("@/components/shared/confirm/confirm-dialog", async () =>
     (await import("./test-kit")).confirmMock(),
 );
 

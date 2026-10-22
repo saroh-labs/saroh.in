@@ -5,7 +5,7 @@ import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
-import { QuickLook } from "@/components/shared/quick-look";
+import { QuickLook } from "@/components/shared/forms/quick-look";
 import { useNarrow } from "@/lib/hooks/use-narrow";
 
 /**

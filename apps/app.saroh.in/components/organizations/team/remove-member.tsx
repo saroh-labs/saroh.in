@@ -1,7 +1,7 @@
 "use client";
 
-import type { ConfirmResult } from "@/components/shared/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { count } from "@/lib/format/plural";
 import { removeMember } from "@/lib/organizations/member-actions";
 import type { OrganizationMember } from "@/lib/organizations/members";

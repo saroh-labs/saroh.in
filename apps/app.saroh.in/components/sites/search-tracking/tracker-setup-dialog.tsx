@@ -1,6 +1,6 @@
 "use client";
 
-import { FormDialog } from "@/components/shared/form-dialog";
+import { FormDialog } from "@/components/shared/forms/form-dialog";
 import type { PosthogRegion, TrackerKind } from "@saroh/block-contract";
 import { POSTHOG_REGIONS } from "@saroh/block-contract";
 import { Label } from "@saroh/ui/label";
@@ -15,7 +15,7 @@ import {
     trackerHelpHref,
 } from "@/lib/sites/search-tracking";
 
-import { RadioCards } from "@/components/shared/choice-group";
+import { RadioCards } from "@/components/shared/fields/choice-group";
 import { runAction } from "@/lib/api/run-action";
 import { TextLink } from "@saroh/ui/text-link";
 import type { SaveOutcome } from "./parts";

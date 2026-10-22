@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { LimitNoticeBlock } from "@/components/billing/limit-notice";
-import type { ContactOption } from "@/components/shared/contact-picker";
+import type { ContactOption } from "@/components/shared/fields/contact-picker";
 import type { OnlinePaymentsLock } from "@/lib/billing/access";
 import type { MissingRates } from "@/lib/gst-rates/missing";
 import { LIST_LIMIT } from "@/lib/lists/capped";

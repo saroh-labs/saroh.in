@@ -1,6 +1,6 @@
 "use client";
 
-import { DeleteMenu } from "@/components/shared/delete-menu";
+import { DeleteMenu } from "@/components/shared/confirm/delete-menu";
 import { deleteCustomer } from "@/lib/customers/actions";
 
 /**

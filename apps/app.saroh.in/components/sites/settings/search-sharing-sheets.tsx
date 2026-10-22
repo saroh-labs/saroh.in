@@ -8,7 +8,7 @@ import { ShareCards } from "@saroh/ui/share-cards";
 import { Textarea } from "@saroh/ui/textarea";
 import { useState } from "react";
 
-import { FormSheet } from "@/components/shared/form-sheet";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { MediaPicker } from "@/components/sites/media-picker";
 import type { updateSiteSettings } from "@/lib/sites/actions";
 import { settingsEditId } from "@/lib/sites/settings-edit";

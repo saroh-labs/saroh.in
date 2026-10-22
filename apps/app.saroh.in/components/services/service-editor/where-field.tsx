@@ -7,7 +7,7 @@ import { Eyebrow } from "@/components/bookings/calendar/parts";
 import type { LocationType } from "@/lib/services/service";
 import { needsMeetingLink, whereNote } from "@/lib/services/service-editor";
 
-import { ChipGroup } from "@/components/shared/choice-group";
+import { ChipGroup } from "@/components/shared/fields/choice-group";
 import { Field } from "@saroh/ui/field";
 import { HELP } from "./fields";
 

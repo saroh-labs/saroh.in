@@ -4,9 +4,9 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { PlanLocked } from "@/components/billing/plan-locked";
-import { AccessDenied } from "@/components/shared/access-denied";
-import { PageContainer } from "@/components/shared/page-container";
-import { whoCanChange } from "@/components/shared/who-can-change";
+import { PageContainer } from "@/components/shared/page/page-container";
+import { AccessDenied } from "@/components/shared/states/access-denied";
+import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { moduleAccess } from "@/lib/modules/guard";
 import { moduleName } from "@/lib/modules/names";
 import type { ModuleView } from "@/lib/modules/schema";

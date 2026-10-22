@@ -15,13 +15,13 @@ import {
     reportFailure,
 } from "@/components/billing/plan-refusal";
 import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
-import type { ConfirmResult } from "@/components/shared/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import {
     FormSheet,
     FormSheetBody,
     FormSheetFoot,
-} from "@/components/shared/form-sheet";
+} from "@/components/shared/forms/form-sheet";
 import {
     connectCommsProvider,
     connectPaymentProvider,

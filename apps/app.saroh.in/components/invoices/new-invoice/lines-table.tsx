@@ -10,7 +10,7 @@ import { useId } from "react";
 import type { UseFieldArrayReturn, UseFormReturn } from "react-hook-form";
 import { Controller } from "react-hook-form";
 
-import { GstRatePicker } from "@/components/shared/gst-rate-picker";
+import { GstRatePicker } from "@/components/shared/fields/gst-rate-picker";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import type { InvoiceFormValues } from "@/lib/invoices/new-invoice";
 import type { PickRow } from "@/lib/invoices/new-invoice-lines";

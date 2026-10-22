@@ -21,7 +21,7 @@ import { useCallback, useRef, useState, useTransition } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { PlanWay } from "@/components/billing/plan-way";
-import { useLeaveGuard } from "@/components/shared/use-leave-guard";
+import { useLeaveGuard } from "@/components/shared/forms/use-leave-guard";
 import { runAction } from "@/lib/api/run-action";
 import type { PlanMeter } from "@/lib/billing/meter";
 import { importRoom } from "@/lib/billing/meter";

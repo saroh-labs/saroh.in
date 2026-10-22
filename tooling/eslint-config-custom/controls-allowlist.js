@@ -191,21 +191,21 @@ export const RAW_ALLOWED = {
     // button: a control styled by its screen's own helper, an option in a list; input: a field its screen draws itself
     "components/settings/settings-search.tsx": ["button", "input"],
     // button: a row or card that is one button
-    "components/shared/app-sidebar.tsx": ["button"],
+    "components/shared/shell/app-sidebar.tsx": ["button"],
     // button: the one hand-drawn radio, shared by every choice group
-    "components/shared/choice-group.tsx": ["button"],
+    "components/shared/fields/choice-group.tsx": ["button"],
     // button: a control styled by its screen's own helper
-    "components/shared/failed-read.tsx": ["button"],
+    "components/shared/states/failed-read.tsx": ["button"],
     // button: Other rate, a chip-shaped disclosure (aria-expanded) beside the rates (DEC-176)
-    "components/shared/gst-rate-picker.tsx": ["button"],
+    "components/shared/fields/gst-rate-picker.tsx": ["button"],
     // input: a file picker
-    "components/shared/logo-upload.tsx": ["input"],
+    "components/shared/fields/logo-upload.tsx": ["input"],
     // button: a tab
-    "components/shared/section-list.tsx": ["button"],
+    "components/shared/page/section-list.tsx": ["button"],
     // button: a control styled by its screen's own helper
-    "components/shared/tab-bar.tsx": ["button"],
+    "components/shared/shell/tab-bar.tsx": ["button"],
     // button: a chip
-    "components/shared/user-menu.tsx": ["button"],
+    "components/shared/shell/user-menu.tsx": ["button"],
     // button: a row or card that is one button
     "components/sites/add-block-panel.tsx": ["button"],
     // button: a row or card that is one button

@@ -1,4 +1,4 @@
-import { PageLoading } from "@/components/shared/page-loading";
+import { PageLoading } from "@/components/shared/page/page-loading";
 
 /**
  * App-root loading state. Rendered by Next for any segment that suspends and

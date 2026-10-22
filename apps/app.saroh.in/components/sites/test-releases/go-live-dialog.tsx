@@ -7,7 +7,10 @@ import { showError } from "@saroh/ui/toast";
 import { ShieldAlert } from "lucide-react";
 import { useState } from "react";
 
-import { FormDialog, FormDialogFoot } from "@/components/shared/form-dialog";
+import {
+    FormDialog,
+    FormDialogFoot,
+} from "@/components/shared/forms/form-dialog";
 import type { GoLiveTarget } from "@/components/sites/editor/use-test-releases";
 import { runAction } from "@/lib/api/run-action";
 import type {

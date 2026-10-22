@@ -11,7 +11,7 @@ import {
     SettingsPanel,
     SettingsPanelHeader,
 } from "@/components/settings/settings-panel";
-import { SectionError } from "@/components/shared/section-error";
+import { SectionError } from "@/components/shared/states/section-error";
 import { isDenial } from "@/lib/api/errors";
 import type { SettingsSection } from "@/lib/settings/section-failure";
 import { SECTION_FAILURE } from "@/lib/settings/section-failure";

@@ -6,7 +6,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useId } from "react";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import type { CardNote } from "@/lib/class-packs/pack-card-notes";
 import type { PackCardView } from "@/lib/class-packs/pack-cards";
 const EYEBROW = "label";

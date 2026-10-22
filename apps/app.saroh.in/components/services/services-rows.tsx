@@ -7,8 +7,8 @@ import { TextLink } from "@saroh/ui/text-link";
 import Link from "next/link";
 
 import { PlanWay } from "@/components/billing/plan-way";
-import { SwitchRow } from "@/components/shared/check-row";
-import { StatusBadge } from "@/components/shared/status-badge";
+import { SwitchRow } from "@/components/shared/fields/check-row";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { isPlanHref } from "@/lib/billing/plan-access";
 import type { OnlineProblem } from "@/lib/services/online-booking";
 import type { Service } from "@/lib/services/service";

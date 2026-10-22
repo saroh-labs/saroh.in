@@ -173,7 +173,7 @@ pattern files refer back here.
 - **Current** (10 Oct 2026) — **A moment is one calm line where the product
   marks that something good happened for the business**, in the right place,
   once, with the real fact in it and at most one thing worth doing next. The
-  shared piece is `Moment` (`apps/app.saroh.in/components/shared/moment.tsx`):
+  shared piece is `Moment` (`apps/app.saroh.in/components/shared/notices/moment.tsx`):
   a `Notice` in the success tone with a title, one fact line, one optional
   action and Dismiss, announced politely (`role="status"`), entering on the
   motion tokens and still under reduced motion.

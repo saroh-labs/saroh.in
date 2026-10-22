@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 
 import { CoursePage } from "@/components/courses/course-page";
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { canWriteCourses } from "@/lib/courses/access";
 import { getCourse } from "@/lib/courses/service";
 import { readGstAsk } from "@/lib/gst-rates/service";

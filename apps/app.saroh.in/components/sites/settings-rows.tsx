@@ -1,4 +1,4 @@
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { Card, CardContent } from "@saroh/ui/card";
 
 /**

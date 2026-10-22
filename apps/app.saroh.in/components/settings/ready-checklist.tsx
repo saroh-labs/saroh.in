@@ -2,7 +2,7 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
-import { SetupChecklist } from "@/components/shared/setup-checklist";
+import { SetupChecklist } from "@/components/shared/setup-checklist/setup-checklist";
 import type {
     ReadyChecklist as Checklist,
     ReadyStep,
@@ -14,7 +14,7 @@ import { PlanAsides, readyRows } from "./ready-rows";
 /**
  * "Finish setup" on Settings › Business ("Saroh Settings" design): the one
  * "what's left" card on Business, drawn by the one checklist
- * (`components/shared/setup-checklist.tsx`). The page's layout places it
+ * (`components/shared/setup-checklist/setup-checklist.tsx`). The page's layout places it
  * (`SettingsColumns`): above the tabs, and to their right on a wide screen,
  * as on Sell › Location. The steps and the count are Home's
  * (`readyChecklist`, F8, UX-019), under the same name, and the line under

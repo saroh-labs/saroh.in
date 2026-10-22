@@ -5,8 +5,8 @@ import { ChevronRight, IndianRupee, Info } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { PartialRead } from "@/components/shared/failed-read";
-import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
+import { PartialRead } from "@/components/shared/states/failed-read";
+import { WHO_CAN_CHANGE } from "@/components/shared/states/who-can-change";
 import type { AnalyticsSummary } from "@/lib/analytics/summary";
 import type { SourceRead } from "@/lib/analytics/takings";
 import type { MoneyBar, OverviewPart } from "@/lib/insights/overview-words";

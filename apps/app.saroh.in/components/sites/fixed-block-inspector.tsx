@@ -10,7 +10,7 @@ import { Lock, PanelBottom, PanelTop } from "lucide-react";
 import Link from "next/link";
 import { useId } from "react";
 
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { settingsEditHref } from "@/lib/sites/settings-edit";
 
 /** The lock's reason, said beside the controls it disables (G6). */

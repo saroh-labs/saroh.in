@@ -1,10 +1,10 @@
 "use client";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
-import { CheckRow } from "@/components/shared/check-row";
-import { ChoiceGroup } from "@/components/shared/choice-group";
-import { FormSheet } from "@/components/shared/form-sheet";
-import { useHold } from "@/components/shared/use-hold";
+import { CheckRow } from "@/components/shared/fields/check-row";
+import { ChoiceGroup } from "@/components/shared/fields/choice-group";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
+import { useHold } from "@/components/shared/undo/use-hold";
 import type { DiaryPerson } from "@/lib/organizations/calendar-only";
 import {
     CALENDAR_ONLY_ROLE,

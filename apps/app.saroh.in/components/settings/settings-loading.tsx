@@ -1,6 +1,6 @@
 import type { SettingsWidth } from "@/components/settings/settings-panel";
 import { SETTINGS_ROWS } from "@/components/settings/settings-panel";
-import { PageLoading } from "@/components/shared/page-loading";
+import { PageLoading } from "@/components/shared/page/page-loading";
 
 /**
  * A Settings section while it loads: inside the panel, with the side list

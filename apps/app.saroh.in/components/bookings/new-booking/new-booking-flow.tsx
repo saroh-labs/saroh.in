@@ -16,7 +16,7 @@ import {
     useOverlayDirty,
     useOverlaySubmit,
     useToastsAboveFoot,
-} from "@/components/shared/overlay-form";
+} from "@/components/shared/forms/overlay-form";
 import { runAction } from "@/lib/api/run-action";
 import { classesLeft, packOffer, usablePacks } from "@/lib/class-packs/balance";
 import type { CustomerPick } from "@/lib/customers/picker";

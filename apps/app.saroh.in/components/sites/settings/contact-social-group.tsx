@@ -31,7 +31,7 @@ import {
 } from "@/lib/sites/site-contact";
 import type { VisitedLocation } from "@/lib/stores/storefronts";
 
-import { FailedRead } from "@/components/shared/failed-read";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { EditAction } from "./edit-actions";
 import { SiteAddressSheet } from "./site-address-sheet";
 import type { SettingsSave } from "./use-settings-save";

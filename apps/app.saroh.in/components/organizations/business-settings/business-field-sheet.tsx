@@ -9,7 +9,7 @@ import type { Resolver } from "react-hook-form";
 import { useForm, useWatch } from "react-hook-form";
 
 import { BusinessPrintPreview } from "@/components/organizations/business-details/business-print-preview";
-import { FormSheet } from "@/components/shared/form-sheet";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import {
     defaultNumberFormat,
     formatFields,

@@ -7,9 +7,12 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { StatusBadge } from "@/components/shared/status-badge";
-import { lostNew, useLeaveGuard } from "@/components/shared/use-leave-guard";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
+import {
+    lostNew,
+    useLeaveGuard,
+} from "@/components/shared/forms/use-leave-guard";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
 import { callName } from "@/lib/services/call-name";
 import type { ServiceDraft, ServiceField } from "@/lib/services/service-editor";

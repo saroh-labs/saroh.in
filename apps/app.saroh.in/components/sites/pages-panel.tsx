@@ -7,8 +7,8 @@ import { useRouter } from "next/navigation";
 import type { KeyboardEvent } from "react";
 import { useId, useRef, useState } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { AddPagePanel, MENU_ROW } from "@/components/sites/add-page-panel";
 import { leavePageMessage } from "@/components/sites/editor/use-editor-selection";
 import { PageSettings } from "@/components/sites/page-settings";

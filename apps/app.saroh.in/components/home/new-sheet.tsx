@@ -6,7 +6,7 @@ import { Plus, X } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
 
-import type { HomeNew } from "@/components/shared/quick-actions";
+import type { HomeNew } from "@/components/shared/navigation/quick-actions";
 
 import { NEW_ROW, NewRowBody } from "./new-menu";
 

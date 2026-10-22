@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
-import { useHold } from "@/components/shared/use-hold";
+import { useHold } from "@/components/shared/undo/use-hold";
 import { UNREACHED } from "@/lib/api/unreached";
 import { newPayLink as makePayLink } from "@/lib/invoices/link-actions";
 import {

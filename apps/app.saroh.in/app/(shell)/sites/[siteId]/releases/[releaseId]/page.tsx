@@ -4,7 +4,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { OpenOnTestAddress } from "@/components/sites/test-releases/open-on-test-address";
 import { ReleaseReviewView } from "@/components/sites/test-releases/release-review-view";
 import { requireSession } from "@/lib/session";

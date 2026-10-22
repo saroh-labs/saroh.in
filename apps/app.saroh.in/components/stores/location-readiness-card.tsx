@@ -2,7 +2,7 @@
 
 import { useCanChangePlan } from "@/components/billing/plan-way";
 import { planRow } from "@/components/settings/ready-rows";
-import { SetupChecklist } from "@/components/shared/setup-checklist";
+import { SetupChecklist } from "@/components/shared/setup-checklist/setup-checklist";
 import type { ChecklistRow } from "@/lib/setup-checklist";
 import type {
     LocationReadiness,
@@ -16,7 +16,7 @@ type Jump = (tab: LocationTab, focus?: string) => void;
 /**
  * "Get ready for online orders · 2 of 4 done" at the top of a location (the
  * 9 Oct audit), drawn by the one checklist
- * (`components/shared/setup-checklist.tsx`): what's already done first,
+ * (`components/shared/setup-checklist/setup-checklist.tsx`): what's already done first,
  * then each step left with the one thing that does it. The items are
  * `locationReadiness`'s, read from what the page holds. Once everything is
  * done it says "Ready for online orders." and folds to one quiet line.

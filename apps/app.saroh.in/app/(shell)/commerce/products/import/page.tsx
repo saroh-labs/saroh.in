@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { sellCrumbs } from "@/components/commerce/sell-crumbs";
 import { StorefrontChooser } from "@/components/commerce/storefront-chooser";
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { CsvImport } from "@/components/stores/csv-import";
 import { requireCan } from "@/lib/access/require-can";
 import { planMeter } from "@/lib/billing/meter";

@@ -1,6 +1,6 @@
 import { PageHeader } from "@saroh/ui/page-header";
 
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { DiscountForm } from "@/components/stores/discount-form";
 import { requireCan } from "@/lib/access/require-can";
 import { loadReachOptions } from "@/lib/discounts/options";

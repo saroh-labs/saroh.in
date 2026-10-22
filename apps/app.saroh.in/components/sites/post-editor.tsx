@@ -16,10 +16,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { PausedNote } from "@/components/billing/paused-banner";
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
-import { useBusinessZone } from "@/components/shared/business-zone";
-import type { ConfirmResult } from "@/components/shared/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { useLeaveGuard } from "@/components/shared/use-leave-guard";
+import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
+import { useBusinessZone } from "@/components/shared/dates/business-zone";
+import { useLeaveGuard } from "@/components/shared/forms/use-leave-guard";
 import { MediaPicker } from "@/components/sites/media-picker";
 import { accountSettingsUrl } from "@/lib/accounts";
 import { runAction } from "@/lib/api/run-action";

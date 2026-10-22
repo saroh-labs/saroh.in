@@ -13,7 +13,7 @@ import type { Control } from "react-hook-form";
 import { useFormState, useWatch } from "react-hook-form";
 
 import type { FormValues } from "@/components/organizations/business-settings/business-form";
-import { RadioCards } from "@/components/shared/choice-group";
+import { RadioCards } from "@/components/shared/fields/choice-group";
 import type { OverMrpRead } from "@/lib/gst-rates/over-mrp";
 import { overMrpWords } from "@/lib/gst-rates/over-mrp";
 import {

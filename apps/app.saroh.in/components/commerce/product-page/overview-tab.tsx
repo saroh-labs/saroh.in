@@ -17,7 +17,7 @@ import type { ProductTracking } from "@/lib/products/tracking";
 import { canMarkSoldOut } from "@/lib/products/tracking";
 import type { ProductStock } from "@/lib/stock/product-stock";
 
-import { PriceHistoryList } from "@/components/shared/price-history";
+import { PriceHistoryList } from "@/components/shared/price-history/price-history";
 
 import { DraftChecklist } from "./draft-checklist";
 import { ProductDetailsCard } from "./overview-details";

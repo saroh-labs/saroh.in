@@ -1,6 +1,6 @@
 "use client";
 
-import { FailedRead } from "@/components/shared/failed-read";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { Button } from "@saroh/ui/button";
 import { qrFileName, qrSvg } from "@saroh/ui/lib/qr-art";
 import { NOTHING_CHANGED } from "@saroh/ui/lib/state-copy";
@@ -17,7 +17,7 @@ import { instantOpens, NOT_COUNTED, QR_SHARE_HREF } from "@/lib/qr/panel";
 import type { QrCodeView } from "@/lib/qr/types";
 import { linkWords, opensWords, refusalWords } from "@/lib/qr/words";
 
-import { Refusal } from "@/components/shared/refusal";
+import { Refusal } from "@/components/shared/states/refusal";
 import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
 import type { DownloadEnv, QrFile, QrFormat } from "./qr-download";
 import { artOf, BROWSER, downloadQr, qrFile } from "./qr-download";

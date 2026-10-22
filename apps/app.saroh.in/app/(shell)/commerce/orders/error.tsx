@@ -4,8 +4,8 @@ import { reportError } from "@saroh/ui/lib/report-error";
 import { useEffect } from "react";
 
 import { OrdersFailed } from "@/components/commerce/orders/orders-states";
-import { PageContainer } from "@/components/shared/page-container";
-import { SectionError } from "@/components/shared/section-error";
+import { PageContainer } from "@/components/shared/page/page-container";
+import { SectionError } from "@/components/shared/states/section-error";
 import { isDenial } from "@/lib/api/errors";
 
 /**

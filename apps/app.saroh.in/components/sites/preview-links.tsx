@@ -6,7 +6,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useEffect, useState } from "react";
 
 import { QrButton } from "@/components/qr/qr-button";
-import { useBusinessZone } from "@/components/shared/business-zone";
+import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { env } from "@/env";
 import { runAction } from "@/lib/api/run-action";
 import {

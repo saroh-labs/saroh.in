@@ -6,7 +6,7 @@ import { Download } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { runAction } from "@/lib/api/run-action";
 import { getDataExportLink, startDataExport } from "@/lib/data-export/actions";
 import type { DataExportLine } from "@/lib/data-export/words";

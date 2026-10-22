@@ -9,7 +9,7 @@ import { OptionsTab } from "@/components/commerce/product-settings/options-tab";
 import { ProductSettings } from "@/components/commerce/product-settings/product-settings";
 import { SkuTab } from "@/components/commerce/product-settings/sku-tab";
 import { sellCrumbs } from "@/components/commerce/sell-crumbs";
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import type { SettingsTab } from "@/lib/products/links";
 import { isSettingsTab, productSettingsHref } from "@/lib/products/links";
 import {
@@ -101,10 +101,7 @@ export default async function ProductSettingsPage({
                     ) : tab === "options" ? (
                         <OptionsTab catalogue={catalogue} />
                     ) : tab === "fields" ? (
-                        <FieldsTab
-                            catalogue={catalogue}
-                            fields={fields}
-                        />
+                        <FieldsTab catalogue={catalogue} fields={fields} />
                     ) : tab === "allergens" ? (
                         <AllergensTab
                             allergens={allergens}

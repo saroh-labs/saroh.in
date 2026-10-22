@@ -1,9 +1,9 @@
-import { FailedRead } from "@/components/shared/failed-read";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { plural } from "@/lib/format/plural";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import {
     customerHref,

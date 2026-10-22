@@ -23,13 +23,11 @@ import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import type { MultiOption } from "@/components/shared/multi-select";
-import { MultiSelect } from "@/components/shared/multi-select";
 import {
     lostChanges,
     lostNew,
     useLeaveGuard,
-} from "@/components/shared/use-leave-guard";
+} from "@/components/shared/forms/use-leave-guard";
 import { runAction } from "@/lib/api/run-action";
 import { createDiscount, updateDiscount } from "@/lib/discounts/actions";
 import type { Selections } from "@/lib/discounts/reach";
@@ -48,6 +46,8 @@ import type {
 import { amountProblem, percentProblem } from "@/lib/discounts/value";
 import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import { Segmented } from "@saroh/ui/segmented";
+import type { MultiOption } from "./multi-select";
+import { MultiSelect } from "./multi-select";
 
 const formSchema = z
     .object({

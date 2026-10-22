@@ -6,7 +6,7 @@ import { listTable } from "@saroh/ui/list-table";
 import { Check, X } from "lucide-react";
 import Link from "next/link";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { formatTime } from "@/lib/format/datetime";
 import type { RowStatus } from "@/lib/services/all-bookings";
 import { ROW_STATUS } from "@/lib/services/all-bookings";

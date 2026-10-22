@@ -1,4 +1,4 @@
-import { PartialRead } from "@/components/shared/failed-read";
+import { PartialRead } from "@/components/shared/states/failed-read";
 import { Button } from "@saroh/ui/button";
 import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
 import { Home } from "lucide-react";
@@ -19,7 +19,7 @@ import type { ModuleView } from "@/lib/modules/schema";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 
 import { PlanLockedCard } from "@/components/billing/plan-way";
-import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
+import { WHO_CAN_CHANGE } from "@/components/shared/states/who-can-change";
 import { FirstRunJobs } from "./first-run-jobs";
 import { HomeDesk } from "./home-desk";
 import type { HomeSetup } from "./home-setup";

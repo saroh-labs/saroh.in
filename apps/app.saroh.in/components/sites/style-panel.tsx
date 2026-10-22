@@ -7,7 +7,7 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { useState } from "react";
 
-import { ChoiceGroup } from "@/components/shared/choice-group";
+import { ChoiceGroup } from "@/components/shared/fields/choice-group";
 import type { LookChoices } from "@/components/sites/look-picker";
 import { LookPicker, lookName } from "@/components/sites/look-picker";
 import { PaidRefusal } from "@/components/sites/paid-refusal";

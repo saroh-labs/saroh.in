@@ -2,7 +2,7 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
-import { BusinessDate } from "@/components/shared/business-zone";
+import { BusinessDate } from "@/components/shared/dates/business-zone";
 import { cardAttention } from "@/lib/orders/attention";
 import type { Shipment } from "@/lib/orders/courier";
 import type { AllergyNote, OrderAttention, OrderRead } from "@/lib/orders/read";

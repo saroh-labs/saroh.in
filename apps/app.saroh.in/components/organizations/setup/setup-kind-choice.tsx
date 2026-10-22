@@ -3,7 +3,7 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { Check } from "lucide-react";
 
-import { ChoiceGroup } from "@/components/shared/choice-group";
+import { ChoiceGroup } from "@/components/shared/fields/choice-group";
 import type { OrganizationKind } from "@/lib/organizations/kind";
 import { KIND_CHOICES } from "@/lib/organizations/kind";
 

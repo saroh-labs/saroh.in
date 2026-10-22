@@ -15,8 +15,8 @@ import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
-import { ChipGroup } from "@/components/shared/choice-group";
-import { FormSheet } from "@/components/shared/form-sheet";
+import { ChipGroup } from "@/components/shared/fields/choice-group";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import {
     readInvoice,

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
-import { CheckRow } from "@/components/shared/check-row";
+import { CheckRow } from "@/components/shared/fields/check-row";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
 import { setModuleStatusAction } from "@/lib/modules/actions";

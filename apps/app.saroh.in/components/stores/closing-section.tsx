@@ -6,7 +6,7 @@ import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { heldStock } from "@/lib/stores/closing";
 import { LOCATION_SECTIONS } from "@/lib/stores/location-readiness";
 import {

@@ -5,10 +5,10 @@ import { Skeleton } from "@saroh/ui/skeleton";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { FailedRead } from "@/components/shared/failed-read";
-import { QuickLook } from "@/components/shared/quick-look";
-import { useHold } from "@/components/shared/use-hold";
-import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
+import { QuickLook } from "@/components/shared/forms/quick-look";
+import { FailedRead } from "@/components/shared/states/failed-read";
+import { WHO_CAN_CHANGE } from "@/components/shared/states/who-can-change";
+import { useHold } from "@/components/shared/undo/use-hold";
 import { formatMoney } from "@/lib/format/money";
 import { useNarrow } from "@/lib/hooks/use-narrow";
 import type { SheetRead } from "@/lib/insights/money-actions";

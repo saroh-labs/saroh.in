@@ -4,7 +4,7 @@ import { AbsentValue } from "@saroh/ui/absent-value";
 import { cn } from "@saroh/ui/lib/utils";
 import { useState } from "react";
 
-import { SwitchRow } from "@/components/shared/check-row";
+import { SwitchRow } from "@/components/shared/fields/check-row";
 import type { ExtraGroup } from "@/lib/organizations/extras";
 import {
     extraGroups,

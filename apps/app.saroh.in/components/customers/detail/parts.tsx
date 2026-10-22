@@ -1,5 +1,5 @@
-import { FailedRead } from "@/components/shared/failed-read";
-import { ListFilter } from "@/components/shared/list-toolbar";
+import { ListFilter } from "@/components/shared/lists/list-toolbar";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { EmptyState } from "@saroh/ui/data-state";
 import { ProgressBar } from "@saroh/ui/progress-bar";
 

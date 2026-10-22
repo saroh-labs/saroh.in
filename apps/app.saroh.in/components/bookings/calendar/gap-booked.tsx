@@ -1,7 +1,7 @@
 "use client";
 
-import { FormSheetBody } from "@/components/shared/form-sheet";
-import { useToastsAboveFoot } from "@/components/shared/overlay-form";
+import { FormSheetBody } from "@/components/shared/forms/form-sheet";
+import { useToastsAboveFoot } from "@/components/shared/forms/overlay-form";
 import { Button } from "@saroh/ui/button";
 import { useCopy } from "@saroh/ui/copy-button";
 import { showError } from "@saroh/ui/toast";

@@ -13,7 +13,10 @@ import {
 import { Textarea } from "@saroh/ui/textarea";
 import { useForm } from "react-hook-form";
 
-import { FormDialog, FormDialogFoot } from "@/components/shared/form-dialog";
+import {
+    FormDialog,
+    FormDialogFoot,
+} from "@/components/shared/forms/form-dialog";
 import type { ClassCancelReason } from "@/lib/services/class-cancel-reason";
 import {
     CLASS_CANCEL_REASON_MAX,

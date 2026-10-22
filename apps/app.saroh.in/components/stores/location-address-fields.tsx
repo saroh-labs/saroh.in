@@ -1,6 +1,6 @@
 "use client";
 
-import { Refusal } from "@/components/shared/refusal";
+import { Refusal } from "@/components/shared/states/refusal";
 import { MAP_LINK_MAX } from "@saroh/block-contract";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";

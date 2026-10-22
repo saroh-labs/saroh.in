@@ -2,8 +2,8 @@
 
 import { usePathname } from "next/navigation";
 
-import { SETTINGS_PAGES } from "@/components/shared/nav-items";
-import { SectionList } from "@/components/shared/section-list";
+import { SETTINGS_PAGES } from "@/components/shared/navigation/nav-items";
+import { SectionList } from "@/components/shared/page/section-list";
 import { settingsPageLabel } from "@/lib/settings/search";
 
 /**

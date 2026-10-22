@@ -8,15 +8,15 @@ import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState, useTransition } from "react";
 
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import {
     ListFilter,
     ListTable,
     listTable,
     ListTableHead,
     ListToolbar,
-} from "@/components/shared/list-toolbar";
-import { StatusBadge } from "@/components/shared/status-badge";
-import { ViewerDate } from "@/components/shared/viewer-date";
+} from "@/components/shared/lists/list-toolbar";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import type {
     DataRequestRow,
     RequestFilter,

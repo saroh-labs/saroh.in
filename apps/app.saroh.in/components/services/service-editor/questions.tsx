@@ -12,8 +12,8 @@ import type { ReactNode } from "react";
 import { useId } from "react";
 
 import { Face } from "@/components/bookings/availability/face";
-import { CheckRow } from "@/components/shared/check-row";
-import { FailedRead } from "@/components/shared/failed-read";
+import { CheckRow } from "@/components/shared/fields/check-row";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { AVAILABILITY_HREF } from "@/lib/services/service-cards";
 import type { ServiceKind } from "@/lib/services/service-editor";
 import { sameNameLine } from "@/lib/services/service-form";

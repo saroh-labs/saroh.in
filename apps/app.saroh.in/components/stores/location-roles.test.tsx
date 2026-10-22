@@ -23,7 +23,7 @@ vi.mock("@/lib/members/actions", () => ({
     revokeInvitation: vi.fn(),
     updateMemberRole: vi.fn(),
 }));
-vi.mock("@/components/shared/logo-upload", () => ({
+vi.mock("@/components/shared/fields/logo-upload", () => ({
     LogoUpload: () => <button type="button">Upload a logo</button>,
 }));
 // The sheet in place, so its body can be read without a browser.

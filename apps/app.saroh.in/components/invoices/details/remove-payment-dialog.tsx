@@ -5,7 +5,7 @@ import { Input } from "@saroh/ui/input";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useState } from "react";
 
-import { FormDialog } from "@/components/shared/form-dialog";
+import { FormDialog } from "@/components/shared/forms/form-dialog";
 import { runAction } from "@/lib/api/run-action";
 import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";

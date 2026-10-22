@@ -5,7 +5,7 @@ import { showError } from "@saroh/ui/toast";
 import { CircleAlert, LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import type { PendingCheckout } from "@/lib/saroh-billing/plan-view";
 import { openRazorpayWindow } from "@/lib/saroh-billing/razorpay-window";
 

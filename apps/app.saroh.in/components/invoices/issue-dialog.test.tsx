@@ -16,7 +16,7 @@ import {
     pickRate,
     ratePicker,
     rateShown,
-} from "@/components/shared/gst-rate-picker.testing";
+} from "@/components/shared/fields/gst-rate-picker.testing";
 
 import { IssueDialog } from "./invoice-actions";
 

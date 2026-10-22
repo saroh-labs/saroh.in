@@ -3,8 +3,8 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { arrivalProps } from "@/components/shared/arrival-props";
-import { BusinessDate } from "@/components/shared/business-zone";
+import { BusinessDate } from "@/components/shared/dates/business-zone";
+import { arrivalProps } from "@/components/shared/live-refresh/arrival-props";
 import type { RowAttention } from "@/lib/orders/attention";
 import { rowAttention } from "@/lib/orders/attention";
 import type { OrderRow } from "@/lib/orders/business-service";
@@ -19,7 +19,7 @@ import {
 } from "@/lib/orders/list-row";
 import { onlinePaymentLine } from "@/lib/orders/online-payment";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { Tip } from "@saroh/ui/tooltip";
 import { AgeText, StepBar, StepPill } from "./step-pill";
 

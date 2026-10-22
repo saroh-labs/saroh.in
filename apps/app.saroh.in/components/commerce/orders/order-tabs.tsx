@@ -1,6 +1,6 @@
 "use client";
 
-import { ListFilter } from "@/components/shared/list-toolbar";
+import { ListFilter } from "@/components/shared/lists/list-toolbar";
 import type { OrderListPage } from "@/lib/orders/business-service";
 import type { OrdersQuery, OrdersTab } from "@/lib/orders/list-query";
 import { ORDERS_TABS } from "@/lib/orders/list-query";

@@ -13,7 +13,6 @@ import {
     BusinessTaxRows,
     TAX_TAB,
 } from "@/components/organizations/tax/business-tax-rows";
-import { countryName } from "@/components/shared/country-select";
 import { Absent, Row } from "@/components/sites/settings-rows";
 import { phoneLabel } from "@/lib/organizations/business-phone";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
@@ -30,6 +29,7 @@ import {
 } from "@/lib/organizations/social-links";
 import { zoneLabel } from "@/lib/organizations/time-zones";
 import { KIND_ROW_LABEL, kindChoiceLabel } from "./business-kind-field";
+import { countryName } from "./country-select";
 
 import type { BusinessSheets } from "@/components/organizations/business-settings/use-business-sheets";
 

@@ -1,8 +1,8 @@
-import type { NavRole } from "@/components/shared/nav-items";
+import type { NavRole } from "@/components/shared/navigation/nav-items";
 import {
     SETTINGS_PAGES,
     settingsPagesFor,
-} from "@/components/shared/nav-items";
+} from "@/components/shared/navigation/nav-items";
 import { mayChangePlan } from "@/lib/billing/plan-access";
 import { BUSINESS_TAB_PARAM } from "@/lib/organizations/business-rows";
 import { BUSINESS_TYPE_OPTIONS } from "@/lib/organizations/business-types";

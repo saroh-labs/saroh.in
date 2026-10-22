@@ -16,7 +16,7 @@ import {
     lostChanges,
     lostNew,
     useLeaveGuard,
-} from "@/components/shared/use-leave-guard";
+} from "@/components/shared/forms/use-leave-guard";
 import { formatMoney } from "@/lib/format/money";
 import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { PAGE_FORM, toFirstError, toFirstErrorIn } from "@/lib/hooks/page-form";

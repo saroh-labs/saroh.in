@@ -29,7 +29,7 @@ import {
 } from "@/lib/class-packs/pack-editor-words";
 
 import { GstFields } from "@/components/services/service-editor/gst-fields";
-import { CheckRow } from "@/components/shared/check-row";
+import { CheckRow } from "@/components/shared/fields/check-row";
 import type { GstAsk } from "@/lib/gst/item-words";
 import { NOT_ASKED } from "@/lib/gst/item-words";
 import { itemModeInput, itemModeValue } from "@/lib/gst/price-mode";

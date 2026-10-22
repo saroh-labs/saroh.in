@@ -22,7 +22,7 @@ import {
 } from "@/lib/customer-workspace/packs";
 import type { GstAsk } from "@/lib/gst/item-words";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { TextLink } from "@saroh/ui/text-link";
 import { Bar, CARD, Chips, Empty, Failed } from "./parts";
 

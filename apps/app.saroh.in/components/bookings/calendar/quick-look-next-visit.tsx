@@ -13,8 +13,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
-import { ChoiceGroup } from "@/components/shared/choice-group";
-import { FailedRead } from "@/components/shared/failed-read";
+import { ChoiceGroup } from "@/components/shared/fields/choice-group";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { runAction } from "@/lib/api/run-action";
 import { formatDay, formatTime } from "@/lib/format/datetime";
 import { firstName } from "@/lib/names";

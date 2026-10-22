@@ -16,7 +16,10 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { FormDialog, FormDialogFoot } from "@/components/shared/form-dialog";
+import {
+    FormDialog,
+    FormDialogFoot,
+} from "@/components/shared/forms/form-dialog";
 import { LinkBox } from "@/components/sites/test-releases/link-box";
 import type {
     CreatedTestReleaseLink,

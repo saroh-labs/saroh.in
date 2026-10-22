@@ -15,7 +15,7 @@ import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
-import { LogoUpload } from "@/components/shared/logo-upload";
+import { LogoUpload } from "@/components/shared/fields/logo-upload";
 import { trimmedOr } from "@/lib/forms/values";
 import { updateStore } from "@/lib/stores/actions";
 import type {
@@ -29,7 +29,7 @@ import {
     logoSource,
 } from "@/lib/stores/location-details";
 
-import { Refusal } from "@/components/shared/refusal";
+import { Refusal } from "@/components/shared/states/refusal";
 
 import { PlaceSheetFrame } from "./place-sheets";
 

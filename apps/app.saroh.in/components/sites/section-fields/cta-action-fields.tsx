@@ -10,7 +10,7 @@ import {
     SelectValue,
 } from "@saroh/ui/select";
 
-import { BusinessPhoneInput } from "@/components/shared/business-phone-input";
+import { BusinessPhoneInput } from "@/components/shared/fields/business-phone-input";
 import type {
     CtaAction,
     CtaKind,

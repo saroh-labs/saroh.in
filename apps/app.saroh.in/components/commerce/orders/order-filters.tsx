@@ -22,7 +22,7 @@ import {
     AttentionToggle,
     listFilterClass,
     NARROWED,
-} from "@/components/shared/list-toolbar";
+} from "@/components/shared/lists/list-toolbar";
 import { ProductFilter } from "./product-filter";
 
 interface FilterProps {

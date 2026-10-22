@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { BusinessZoneProvider } from "@/components/shared/business-zone";
+import { BusinessZoneProvider } from "@/components/shared/dates/business-zone";
 import { ReviewPanel } from "@/components/sites/review-panel";
 import { RESTORE_NEEDS_OWNER } from "@/lib/sites/release-review";
 import type { ReviewState, SitePublication } from "@/lib/sites/service";

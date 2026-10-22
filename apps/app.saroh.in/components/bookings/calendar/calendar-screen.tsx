@@ -1,6 +1,6 @@
 "use client";
 
-import { PartialRead } from "@/components/shared/failed-read";
+import { PartialRead } from "@/components/shared/states/failed-read";
 import { formatDay, timeZoneName } from "@/lib/format/datetime";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";

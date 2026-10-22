@@ -5,8 +5,8 @@ import { Field } from "@saroh/ui/field";
 import { Textarea } from "@saroh/ui/textarea";
 import { Fragment, useState } from "react";
 
-import { RadioCards } from "@/components/shared/choice-group";
-import { FailedRead } from "@/components/shared/failed-read";
+import { RadioCards } from "@/components/shared/fields/choice-group";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { formatDateTime } from "@/lib/format/datetime";
 import { firstName } from "@/lib/names";
 import type { PersonRuleKey } from "@/lib/staff/person-rules";

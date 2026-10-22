@@ -1,5 +1,5 @@
 import { packCrumbs } from "@/components/class-packs/pack-editor/pack-crumbs";
-import { PageLoading } from "@/components/shared/page-loading";
+import { PageLoading } from "@/components/shared/page/page-loading";
 
 export default function Loading() {
     return (

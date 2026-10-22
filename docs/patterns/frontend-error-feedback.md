@@ -93,7 +93,7 @@
   or leaving) and `undo`; `createHoldSlot` keeps one hold at a time. A
   failed callback ends the hold as `failed` for the caller to word. The site
   editor's `use-undo.ts` is the reference caller of the helper itself.
-  With a toast, use **`useHold`** (`components/shared/use-hold.ts`):
+  With a toast, use **`useHold`** (`components/shared/undo/use-hold.ts`):
   `hold(key, message, commit, onUndo)` shows the thing as done and writes
   it when the ten seconds are up, `send(key, { run, sent })` is the same
   for anything that tells a customer ("Sending in 10 seconds", then "Sent
@@ -193,7 +193,7 @@ Before the split, one API restart signed out every user.
   and the `neutral` crash page, never Saroh's brand.
 - **Current** (10 Oct 2026) — **A segment boundary passes what it knows, not a
   sentence.** Every `error.tsx` in `app.saroh.in` renders `SectionError`
-  (`components/shared/section-error.tsx`; a settings tab,
+  (`components/shared/states/section-error.tsx`; a settings tab,
   `SettingsSectionError`) with Next 16.3's `retry`, which reads the segment
   again. `reset` only redraws the failed read, and no boundary takes it.
   It passes `heading` (the page's title, kept above the card), `things`
@@ -258,7 +258,7 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
       `showError(res.error)` says a refusal through `showRefusal`: the
       neutral toast, ten seconds, closable. Inside a sheet, dialog or
       confirm that is still open it is `Refusal`
-      (`components/shared/refusal.tsx`): a neutral `Notice` for a refusal
+      (`components/shared/states/refusal.tsx`): a neutral `Notice` for a refusal
       by role, the error `Notice` for anything else. `ConfirmDialog` draws
       its refusal with it. A new refusal by role in the API starts "Your
       role " or "Only the owner can ", or carries `ROLE_DENIED`, or it is
@@ -274,7 +274,7 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
   has been changed.", and **Try again** reads again (`retry`, a refetch or
   `router.refresh()`), never "reload the page" and never "Retry". A part of
   a page that couldn't be read is `FailedRead`
-  (`components/shared/failed-read.tsx`), and a page that is drawn without
+  (`components/shared/states/failed-read.tsx`), and a page that is drawn without
   it says so above with `PartialRead`: "Couldn't load {things}.", one
   sentence on what that leaves unsaid (`so`), and Try again. Both take
   `onRetry` for a read the component made itself (a preview, a picker's
@@ -306,7 +306,7 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
   boundary mounts `SiteTheme` on its neutral defaults. New files there go on the
   G6 allowlist (`frontend-design-system.md`).
 - **Current** — **One loading shell: `PageLoading`**
-  (`components/shared/page-loading.tsx`, 10 Oct 2026). Every `loading.tsx`
+  (`components/shared/page/page-loading.tsx`, 10 Oct 2026). Every `loading.tsx`
   under `app/(shell)` returns it with the page's `shape` (`list`, `detail`,
   `form`, `editor`, `dashboard`, `settings`) and the page's own `width`,
   the same `PageContainer` width its `page.tsx` sits at, left-aligned. It
@@ -321,7 +321,7 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
   `bg-muted` block or "Loading…" as a page or panel loader) and one way of
   saying it: `role="status"`, `aria-busy`, one `sr-only` sentence, the grey
   `aria-hidden`. A new route gets its own `loading.tsx` when its shape or
-  width differs from its parent's. `components/shared/page-chrome.test.ts`
+  width differs from its parent's. `components/shared/page/page-chrome.test.ts`
   fails on a page with no loader of its width, on one that falls back to
   Home's, and on a loader drawn by hand.
 

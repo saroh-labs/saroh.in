@@ -1,6 +1,6 @@
 import { ShareCards } from "@saroh/ui/share-cards";
 
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { SellsFromRow } from "@/components/sites/sells-from-row";
 import {
     Absent,

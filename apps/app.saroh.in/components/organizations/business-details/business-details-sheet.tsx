@@ -21,8 +21,8 @@ import {
     FormSheet,
     FormSheetBody,
     FormSheetFoot,
-} from "@/components/shared/form-sheet";
-import { Refusal } from "@/components/shared/refusal";
+} from "@/components/shared/forms/form-sheet";
+import { Refusal } from "@/components/shared/states/refusal";
 import { GSTIN_EXAMPLE } from "@/lib/invoices/gstin";
 import type {
     BusinessDetail,

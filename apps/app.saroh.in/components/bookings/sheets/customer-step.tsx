@@ -11,7 +11,7 @@ import { Notice } from "@saroh/ui/notice";
 import { Check, Plus, Search } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
-import { BusinessPhoneInput } from "@/components/shared/business-phone-input";
+import { BusinessPhoneInput } from "@/components/shared/fields/business-phone-input";
 import { findCustomers, readCustomerAttention } from "@/lib/customers/actions";
 import type {
     CustomerPick,

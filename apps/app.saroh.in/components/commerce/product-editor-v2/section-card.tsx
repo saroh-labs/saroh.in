@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 
 import type { SectionKey } from "@/lib/products/editor-sections";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { useEditor } from "./editor-state";
 
 /** What each section's bar says it will save, when nothing needs a fix. */

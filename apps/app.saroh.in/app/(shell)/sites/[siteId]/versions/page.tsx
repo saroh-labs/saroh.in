@@ -3,7 +3,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import type { ScheduledGoLives } from "@/components/sites/site-versions";
 import { SiteVersions } from "@/components/sites/site-versions";
 import { requireSession } from "@/lib/session";

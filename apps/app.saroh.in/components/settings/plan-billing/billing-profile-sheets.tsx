@@ -11,7 +11,7 @@ import {
     NewProfileFields,
     SetupBillingStep,
 } from "@/components/organizations/setup/setup-billing-step";
-import { FormSheet } from "@/components/shared/form-sheet";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import type {
     BusinessBillingProfile,

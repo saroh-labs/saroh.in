@@ -1,4 +1,4 @@
-import { ListFilter } from "@/components/shared/list-toolbar";
+import { ListFilter } from "@/components/shared/lists/list-toolbar";
 import type { SourceChip } from "@/lib/invoices/sources";
 import { TextLink } from "@saroh/ui/text-link";
 

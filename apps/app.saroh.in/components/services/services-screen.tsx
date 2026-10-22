@@ -25,8 +25,8 @@ import {
     ServicesTable,
 } from "@/components/services/services-rows";
 import { useTakingBookings } from "@/components/services/use-taking-bookings";
-import { ListToolbar } from "@/components/shared/list-toolbar";
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { ListToolbar } from "@/components/shared/lists/list-toolbar";
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import type { MissingRates } from "@/lib/gst-rates/missing";
 import type { ModuleView } from "@/lib/modules/schema";
 import type { AlsoSellFeature } from "@/lib/services/also-sell";

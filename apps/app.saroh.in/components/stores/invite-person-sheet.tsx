@@ -1,6 +1,6 @@
 "use client";
 
-import { useHold } from "@/components/shared/use-hold";
+import { useHold } from "@/components/shared/undo/use-hold";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
     Form,
@@ -15,7 +15,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { FormSheet } from "@/components/shared/form-sheet";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { inviteMember } from "@/lib/members/actions";
 import { LOCATION_ROLES, roleLabel, roleLine } from "@/lib/stores/people";
 import { OptionSelect } from "@saroh/ui/option-select";
@@ -54,7 +54,7 @@ const ROLE_OPTIONS = LOCATION_ROLES.map((r) => ({
  * it again with that, the refusal under the email when the API names it.
  * Sent, the page reads the roster again, so the invitation shows under
  * Invited. It is drawn in the
- * app's one sheet frame (`components/shared/form-sheet.tsx`): it
+ * app's one sheet frame (`components/shared/forms/form-sheet.tsx`): it
  * can't be dismissed while it is sending, Cancel, Escape and the close
  * button drop what was typed, and a press outside does nothing once an
  * email is typed.

@@ -1,6 +1,6 @@
 "use client";
 
-import { ListFilter } from "@/components/shared/list-toolbar";
+import { ListFilter } from "@/components/shared/lists/list-toolbar";
 import { count } from "@/lib/format/plural";
 
 const ALL = "";

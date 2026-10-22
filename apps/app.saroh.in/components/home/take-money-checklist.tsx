@@ -2,7 +2,7 @@
 
 import { useCanChangePlan } from "@/components/billing/plan-way";
 import { PlanAsides, readyRows } from "@/components/settings/ready-rows";
-import { SetupChecklist } from "@/components/shared/setup-checklist";
+import { SetupChecklist } from "@/components/shared/setup-checklist/setup-checklist";
 import type { ReadyChecklist } from "@/lib/settings/ready";
 import { checklistWords, takeMoneyPlace } from "@/lib/settings/ready";
 
@@ -11,7 +11,7 @@ import { setSetupHidden, useSetupHidden } from "./use-setup-hidden";
 /**
  * "Finish setup" on Home ("Saroh Home" design, F8): the same steps Settings
  * › Business lists, drawn by the one checklist
- * (`components/shared/setup-checklist.tsx`), each with why it matters and
+ * (`components/shared/setup-checklist/setup-checklist.tsx`), each with why it matters and
  * one button to where it is done.
  *
  * Home renders this twice — `slot="first"` above Needs you and `slot="late"`

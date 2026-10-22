@@ -3,7 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { useState } from "react";
 
-import { FormSheet } from "@/components/shared/form-sheet";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { CustomerForm } from "@/components/stores/customer-form";
 import type { Customer } from "@/lib/customers/service";
 

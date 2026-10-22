@@ -12,7 +12,7 @@ import {
     FormSheet,
     FormSheetBody,
     FormSheetFoot,
-} from "@/components/shared/form-sheet";
+} from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import { bookVisit } from "@/lib/services/actions";
 import type { VisitToBook } from "@/lib/services/treatment";

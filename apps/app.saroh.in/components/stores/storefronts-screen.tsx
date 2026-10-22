@@ -9,8 +9,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { PausedNote } from "@/components/billing/paused-banner";
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
-import { SettingsColumns } from "@/components/shared/settings-columns";
+import { SettingsColumns } from "@/components/shared/page/settings-columns";
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { pausedWords } from "@/lib/billing/paused";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import type { SiteSelling } from "@/lib/sites/sells-from";

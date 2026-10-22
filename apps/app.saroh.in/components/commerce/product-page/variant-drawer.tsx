@@ -11,8 +11,8 @@ import {
 } from "@saroh/ui/sheet";
 import type { ReactNode } from "react";
 
-import { FailedRead } from "@/components/shared/failed-read";
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { orderHref } from "@/lib/orders/links";
 import type { ProductOverview } from "@/lib/products/overview-rules";

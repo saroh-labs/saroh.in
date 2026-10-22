@@ -28,9 +28,9 @@ import {
     toEntry,
 } from "@/lib/products/settings-rules";
 
-import { CheckRow } from "@/components/shared/check-row";
-import { ChipGroup } from "@/components/shared/choice-group";
-import { listTable } from "@/components/shared/list-toolbar";
+import { CheckRow } from "@/components/shared/fields/check-row";
+import { ChipGroup } from "@/components/shared/fields/choice-group";
+import { listTable } from "@/components/shared/lists/list-toolbar";
 import { runAction } from "@/lib/api/run-action";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
 import { Field } from "@saroh/ui/field";

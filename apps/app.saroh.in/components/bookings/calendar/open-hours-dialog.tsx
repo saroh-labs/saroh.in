@@ -4,15 +4,15 @@ import {
     FormSheet,
     FormSheetBody,
     FormSheetFoot,
-} from "@/components/shared/form-sheet";
-import { Refusal } from "@/components/shared/refusal";
+} from "@/components/shared/forms/form-sheet";
+import { Refusal } from "@/components/shared/states/refusal";
 import { formatClock, formatWeekday } from "@/lib/format/datetime";
 import { cn } from "@saroh/ui/lib/utils";
 import { showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { ChipGroup, RadioCards } from "@/components/shared/choice-group";
+import { ChipGroup, RadioCards } from "@/components/shared/fields/choice-group";
 import { runAction } from "@/lib/api/run-action";
 import { firstName } from "@/lib/names";
 import type { Block, LocalDate, Span } from "@/lib/services/diary";

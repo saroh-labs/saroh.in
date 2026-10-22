@@ -15,7 +15,7 @@ import { Check } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import { useFormContext, useWatch } from "react-hook-form";
 
-import { ChoiceGroup } from "@/components/shared/choice-group";
+import { ChoiceGroup } from "@/components/shared/fields/choice-group";
 import { GST_STATES } from "@/lib/invoices/gst";
 import type {
     BillingField,

@@ -7,7 +7,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useId } from "react";
 
-import { ChipGroup, RadioCards } from "@/components/shared/choice-group";
+import { ChipGroup, RadioCards } from "@/components/shared/fields/choice-group";
 import { initialsOf } from "@/lib/customers/picker";
 import type { LocalDate } from "@/lib/services/diary";
 import type { FlowPerson, FlowService } from "@/lib/services/new-booking";

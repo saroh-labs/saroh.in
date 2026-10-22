@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import type { OrderMenuPending } from "@/components/commerce/order-actions";
 import { OrderActions } from "@/components/commerce/order-actions";
-import { useBusinessZone } from "@/components/shared/business-zone";
+import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { useClock } from "@/lib/hooks/use-clock";
 import { readyNoticeText } from "@/lib/messages/notice-reach";

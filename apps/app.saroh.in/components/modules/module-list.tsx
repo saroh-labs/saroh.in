@@ -10,8 +10,8 @@ import { useEffect, useId, useRef, useState, useTransition } from "react";
 
 import { PlanWay } from "@/components/billing/plan-way";
 import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
-import { navRowsForModule } from "@/components/shared/nav-items";
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
+import { navRowsForModule } from "@/components/shared/navigation/nav-items";
 import { runAction } from "@/lib/api/run-action";
 import {
     readModuleImpactAction,

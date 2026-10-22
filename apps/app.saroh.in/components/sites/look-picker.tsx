@@ -9,7 +9,7 @@ import { Check } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import { useId, useRef, useState } from "react";
 
-import { ChoiceGroup } from "@/components/shared/choice-group";
+import { ChoiceGroup } from "@/components/shared/fields/choice-group";
 import { DraftTools } from "@/components/sites/draft-tools";
 import type { LookPreviewSource } from "@/components/sites/look-preview";
 import { LookPreview } from "@/components/sites/look-preview";

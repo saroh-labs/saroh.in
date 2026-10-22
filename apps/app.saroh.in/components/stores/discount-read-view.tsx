@@ -2,9 +2,9 @@ import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import Link from "next/link";
 
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
-import { ViewerDate } from "@/components/shared/viewer-date";
-import { readOnlyLine } from "@/components/shared/who-can-change";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
+import { readOnlyLine } from "@/components/shared/states/who-can-change";
 import { reachOf, ruleOf } from "@/lib/discounts/describe";
 import type { Discount, DiscountState } from "@/lib/discounts/service";
 

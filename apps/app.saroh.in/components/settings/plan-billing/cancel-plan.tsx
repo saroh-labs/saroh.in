@@ -6,8 +6,8 @@ import { CalendarX2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { runAction } from "@/lib/api/run-action";
 import { formatDate, viewerTimeZone } from "@/lib/format/datetime";
 import {

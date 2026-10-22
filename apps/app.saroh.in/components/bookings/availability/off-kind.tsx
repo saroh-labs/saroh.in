@@ -4,7 +4,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Store, UserRound } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { RadioCards } from "@/components/shared/choice-group";
+import { RadioCards } from "@/components/shared/fields/choice-group";
 
 /** A kind of time off: its sign over its few words. */
 function KindLabel({

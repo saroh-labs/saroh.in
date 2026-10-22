@@ -33,7 +33,7 @@ import type {
     DataColumn,
     DataFilter,
 } from "@/components/shared/data-view/types";
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { runAction } from "@/lib/api/run-action";
 import type { OnlinePaymentsLock } from "@/lib/billing/access";
 import { formatNumber } from "@/lib/format/money";

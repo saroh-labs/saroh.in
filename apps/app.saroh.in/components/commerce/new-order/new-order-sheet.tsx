@@ -1,6 +1,6 @@
 "use client";
 
-import { FailedRead } from "@/components/shared/failed-read";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -8,13 +8,13 @@ import { useState } from "react";
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
 import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
-import { Chip } from "@/components/shared/chip";
 import {
     FormSheet,
     FormSheetBody,
     FormSheetFoot,
     useFormSheetDirty,
-} from "@/components/shared/form-sheet";
+} from "@/components/shared/forms/form-sheet";
+import { Chip } from "@/components/shared/lists/chip";
 import type { CustomerPick } from "@/lib/customers/picker";
 import { pickName } from "@/lib/customers/picker";
 import { orderHref } from "@/lib/orders/links";

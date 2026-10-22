@@ -12,7 +12,7 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { homeNewFor } from "@/components/shared/quick-actions";
+import { homeNewFor } from "@/components/shared/navigation/quick-actions";
 
 import { HomeHeader } from "./home-header";
 import { NewMenu } from "./new-menu";

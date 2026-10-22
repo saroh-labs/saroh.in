@@ -5,7 +5,7 @@ import { dismissToasts, showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import type { ContactOption } from "@/components/shared/contact-picker";
+import type { ContactOption } from "@/components/shared/fields/contact-picker";
 import { setPackArchived } from "@/lib/class-packs/actions";
 import { usedEmptyText, usedRows } from "@/lib/class-packs/pack-activity";
 import { packKind, unitWord } from "@/lib/class-packs/pack-cards";

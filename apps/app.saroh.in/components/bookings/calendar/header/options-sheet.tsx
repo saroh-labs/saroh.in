@@ -5,8 +5,8 @@ import { ChevronRight, Clock, Eye, List } from "lucide-react";
 import Link from "next/link";
 import type { ReactElement, ReactNode } from "react";
 
-import { SwitchRow } from "@/components/shared/check-row";
-import { RadioCards } from "@/components/shared/choice-group";
+import { SwitchRow } from "@/components/shared/fields/check-row";
+import { RadioCards } from "@/components/shared/fields/choice-group";
 import type { ShowFor, StartView } from "@/lib/services/bookings-opens";
 
 import { CLOSED_HATCH, OFF_HATCH } from "../geometry";

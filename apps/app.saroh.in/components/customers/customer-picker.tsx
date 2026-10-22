@@ -1,10 +1,10 @@
 "use client";
 
-import { FailedRead } from "@/components/shared/failed-read";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { Input } from "@saroh/ui/input";
 import { useEffect, useRef, useState } from "react";
 
-import { Chip } from "@/components/shared/chip";
+import { Chip } from "@/components/shared/lists/chip";
 import { findCustomers, readCustomerAttention } from "@/lib/customers/actions";
 import type {
     CustomerPick,

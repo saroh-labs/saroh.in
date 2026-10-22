@@ -1,4 +1,4 @@
-import { PartialRead } from "@/components/shared/failed-read";
+import { PartialRead } from "@/components/shared/states/failed-read";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 

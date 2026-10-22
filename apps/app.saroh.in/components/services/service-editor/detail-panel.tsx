@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { FormSheet } from "@/components/shared/form-sheet";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import type {
     ServiceDraft,
     ServiceField,

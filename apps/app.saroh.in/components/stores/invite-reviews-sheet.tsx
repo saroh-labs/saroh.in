@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { EmailNoteText } from "@/components/communications/email-note";
-import { CheckRow } from "@/components/shared/check-row";
-import { FormSheet } from "@/components/shared/form-sheet";
-import { useHold } from "@/components/shared/use-hold";
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { CheckRow } from "@/components/shared/fields/check-row";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
+import { useHold } from "@/components/shared/undo/use-hold";
 import { inviteReviews } from "@/lib/product-reviews/actions";
 import type { ReviewEmailNote } from "@/lib/product-reviews/describe";
 import type {

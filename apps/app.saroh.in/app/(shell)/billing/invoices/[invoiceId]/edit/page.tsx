@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { InvoiceForm } from "@/components/invoices/invoice-form";
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { requireCan } from "@/lib/access/require-can";
 import { canPickProducts } from "@/lib/invoices/can-pick-products";
 import { contactPickerOptions } from "@/lib/invoices/contacts";

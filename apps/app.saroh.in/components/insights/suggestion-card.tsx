@@ -8,8 +8,8 @@ import Link from "next/link";
 import type { RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 
-import { FailedRead } from "@/components/shared/failed-read";
-import { useHold } from "@/components/shared/use-hold";
+import { FailedRead } from "@/components/shared/states/failed-read";
+import { useHold } from "@/components/shared/undo/use-hold";
 import type { SourceRead } from "@/lib/analytics/takings";
 import { runAction } from "@/lib/api/run-action";
 import type { Suggestion, SuggestionsRead } from "@/lib/insights/reads";

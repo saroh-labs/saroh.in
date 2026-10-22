@@ -11,9 +11,9 @@ import {
     reportFailure,
 } from "@/components/billing/plan-refusal";
 import { QrButton } from "@/components/qr/qr-button";
-import { BusinessDate } from "@/components/shared/business-zone";
-import type { ConfirmResult } from "@/components/shared/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
+import { BusinessDate } from "@/components/shared/dates/business-zone";
 import { makeOrderPayLink } from "@/lib/orders/actions";
 import { ProviderDisconnectedState } from "@saroh/ui/data-state";
 

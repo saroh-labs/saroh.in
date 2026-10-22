@@ -52,7 +52,7 @@ vi.mock("next/link", () => ({
     ),
 }));
 const guard = { release: vi.fn() };
-vi.mock("@/components/shared/use-leave-guard", () => ({
+vi.mock("@/components/shared/forms/use-leave-guard", () => ({
     useLeaveGuard: () => ({ dialog: null, release: guard.release }),
     lostNew: (noun: string) => `The ${noun} isn't created yet.`,
 }));

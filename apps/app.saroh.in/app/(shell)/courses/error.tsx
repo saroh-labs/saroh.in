@@ -1,6 +1,6 @@
 "use client";
 
-import { SectionError } from "@/components/shared/section-error";
+import { SectionError } from "@/components/shared/states/section-error";
 
 /** A read that failed is not an empty list: nobody's enrolment changed. */
 export default function Error({

@@ -28,7 +28,7 @@ import { REVIEWED_SITE } from "../playwright.config";
  */
 
 /**
- * `NAV_GROUPS` (`components/shared/nav-items.tsx`) for `site:read` alone:
+ * `NAV_GROUPS` (`components/shared/navigation/nav-items.tsx`) for `site:read` alone:
  * Home, which asks nothing, and Website. Calendar asks `org:read` and
  * Settings one of four reads a Reviewer has none of.
  */

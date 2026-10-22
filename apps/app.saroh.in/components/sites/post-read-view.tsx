@@ -3,10 +3,10 @@ import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import Link from "next/link";
 
-import { PageContainer } from "@/components/shared/page-container";
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
-import { ViewerDate } from "@/components/shared/viewer-date";
-import { readOnlyLine } from "@/components/shared/who-can-change";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { PageContainer } from "@/components/shared/page/page-container";
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
+import { readOnlyLine } from "@/components/shared/states/who-can-change";
 import { postParagraphs } from "@/lib/content/plain-text";
 import type { PostDetail } from "@/lib/content/service";
 

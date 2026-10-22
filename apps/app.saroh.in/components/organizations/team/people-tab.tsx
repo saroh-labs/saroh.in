@@ -5,7 +5,7 @@ import {
     ListTable,
     listTable,
     ListTableHead,
-} from "@/components/shared/list-toolbar";
+} from "@/components/shared/lists/list-toolbar";
 import type { PausedTeam } from "@/lib/billing/paused";
 import { pausedWords } from "@/lib/billing/paused";
 import { count } from "@/lib/format/plural";

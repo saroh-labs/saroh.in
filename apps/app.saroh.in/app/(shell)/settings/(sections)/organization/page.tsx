@@ -12,7 +12,7 @@ import {
     SettingsPanelHeader,
 } from "@/components/settings/settings-panel";
 import { ShowSetupOnHome } from "@/components/settings/show-setup-on-home";
-import { SettingsColumns } from "@/components/shared/settings-columns";
+import { SettingsColumns } from "@/components/shared/page/settings-columns";
 import { mayChangePlan } from "@/lib/billing/plan-access";
 import { kindWords } from "@/lib/organizations/kind";
 import {

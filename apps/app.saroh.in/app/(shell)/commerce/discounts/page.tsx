@@ -1,4 +1,4 @@
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { DiscountsScreen } from "@/components/stores/discounts-screen";
 import { listDiscounts } from "@/lib/discounts/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";

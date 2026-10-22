@@ -8,7 +8,7 @@ import { Textarea } from "@saroh/ui/textarea";
 import dynamic from "next/dynamic";
 import { useState } from "react";
 
-import { FormSheet } from "@/components/shared/form-sheet";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import type {
     SiteFooter,
     SiteNavigationItem,

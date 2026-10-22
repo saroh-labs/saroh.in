@@ -9,7 +9,7 @@ import {
 import { showError } from "@saroh/ui/toast";
 import { useState, useTransition } from "react";
 
-import { whoCanChange } from "@/components/shared/who-can-change";
+import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { runAction } from "@/lib/api/run-action";
 import { olderPackEvents } from "@/lib/class-packs/actions";
 import {

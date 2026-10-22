@@ -7,12 +7,12 @@ import { HomeHeader } from "@/components/home/home-header";
 import { NewSpace } from "@/components/home/new-sheet";
 import { ReviewerHome } from "@/components/home/reviewer-home";
 import { StaffHome } from "@/components/home/staff-home";
-import { Moment } from "@/components/shared/moment";
-import { PageContainer } from "@/components/shared/page-container";
 import {
     homeNewFor,
     homeNewModuleKeys,
-} from "@/components/shared/quick-actions";
+} from "@/components/shared/navigation/quick-actions";
+import { Moment } from "@/components/shared/notices/moment";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 import type { InvoiceJobFacts } from "@/lib/home/first-run";
 import { mayWriteInvoices } from "@/lib/home/first-run";

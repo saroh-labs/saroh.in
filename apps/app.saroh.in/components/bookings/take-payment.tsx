@@ -1,12 +1,15 @@
 "use client";
 
-import { FormDialog, FormDialogFoot } from "@/components/shared/form-dialog";
+import {
+    FormDialog,
+    FormDialogFoot,
+} from "@/components/shared/forms/form-dialog";
 import {
     FormSheet,
     FormSheetBody,
     FormSheetFoot,
-} from "@/components/shared/form-sheet";
-import { Refusal } from "@/components/shared/refusal";
+} from "@/components/shared/forms/form-sheet";
+import { Refusal } from "@/components/shared/states/refusal";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
@@ -21,7 +24,7 @@ import {
     PayLinkPanel,
 } from "@/components/bookings/pay-link-panel";
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
-import { Chip } from "@/components/shared/chip";
+import { Chip } from "@/components/shared/lists/chip";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
 import { formatMoney } from "@/lib/format/money";

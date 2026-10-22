@@ -1,9 +1,9 @@
 "use client";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
-import { RadioCards } from "@/components/shared/choice-group";
-import { FormSheet } from "@/components/shared/form-sheet";
-import { Refusal } from "@/components/shared/refusal";
+import { RadioCards } from "@/components/shared/fields/choice-group";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
+import { Refusal } from "@/components/shared/states/refusal";
 import { runAction } from "@/lib/api/run-action";
 import { createRole } from "@/lib/organizations/role-actions";
 import type { Role, RoleCatalogue } from "@/lib/organizations/roles";

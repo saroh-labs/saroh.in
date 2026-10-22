@@ -8,7 +8,7 @@ import type {
     DataColumn,
     DataFilter,
 } from "@/components/shared/data-view/types";
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import type { Plan, Subscription } from "@/lib/subscriptions/service";
 import type { ListView } from "@/lib/subscriptions/view";
 import {

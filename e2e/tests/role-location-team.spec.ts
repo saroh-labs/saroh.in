@@ -47,7 +47,7 @@ const ONLINE = "seed_store_online";
 const ONLINE_LINE = "E2E Online Line";
 
 /**
- * `NAV_GROUPS` (`components/shared/nav-items.tsx`) for the role's
+ * `NAV_GROUPS` (`components/shared/navigation/nav-items.tsx`) for the role's
  * permissions, then `sellOrdersOnly`: Sell lands on Orders and holds only
  * that. Website, Bookings and Contacts are modules out of the role's reach.
  */

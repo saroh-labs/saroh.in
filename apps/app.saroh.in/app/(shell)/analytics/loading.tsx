@@ -1,6 +1,6 @@
 import { Skeleton } from "@saroh/ui/skeleton";
 
-import { PageLoading } from "@/components/shared/page-loading";
+import { PageLoading } from "@/components/shared/page/page-loading";
 import { INSIGHTS_TABS, TAB_LABEL } from "@/lib/insights/period";
 
 /**

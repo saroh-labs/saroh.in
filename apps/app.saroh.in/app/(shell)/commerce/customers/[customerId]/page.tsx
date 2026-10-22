@@ -6,9 +6,9 @@ import type { ReactNode } from "react";
 
 import { DeleteCustomerMenu } from "@/components/customers/delete-customer-menu";
 import { EditStoreCustomer } from "@/components/customers/edit-store-customer";
-import { FailedRead } from "@/components/shared/failed-read";
-import { PageContainer } from "@/components/shared/page-container";
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { PageContainer } from "@/components/shared/page/page-container";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { personHref } from "@/lib/contacts/person-href";
 import { contactForCustomer } from "@/lib/customer-workspace/detail";
 import { customerHref } from "@/lib/customers/links";

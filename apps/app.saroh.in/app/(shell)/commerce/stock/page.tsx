@@ -5,7 +5,7 @@ import {
     StockLocked,
     StockTrackingOff,
 } from "@/components/commerce/stock/stock-states";
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { rememberedPageSize } from "@/lib/paging/remembered";
 import { listProducts } from "@/lib/products/service";

@@ -1,4 +1,4 @@
-import { PageLoading } from "@/components/shared/page-loading";
+import { PageLoading } from "@/components/shared/page/page-loading";
 
 /**
  * Segment loading state. Without a `loading.tsx` this route has no Suspense

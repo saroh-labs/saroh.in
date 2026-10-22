@@ -1,6 +1,6 @@
 /**
  * The screen updates by itself (10 Oct 2026): the rules, apart from the
- * hook that runs them (`components/shared/use-live-refresh.ts`), so they
+ * hook that runs them (`components/shared/live-refresh/use-live-refresh.ts`), so they
  * can be tested without a browser.
  *
  * Nothing here fetches. "Refresh" is `router.refresh()`: the server reads

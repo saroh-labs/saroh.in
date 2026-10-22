@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
  * The editor shell's smaller pieces, after the Editor design: the saved
  * status beside the name, the read-only note and what opens once a new
  * product exists. Leaving with unsaved changes asks through the app's one
- * guard (`components/shared/use-leave-guard.tsx`).
+ * guard (`components/shared/forms/use-leave-guard.tsx`).
  */
 
 /** Under the header for someone who can't change (all of) the product. */

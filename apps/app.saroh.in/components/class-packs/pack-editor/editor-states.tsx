@@ -1,4 +1,4 @@
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { Button } from "@saroh/ui/button";
 import {
     EmptyState,
@@ -11,7 +11,10 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { Archive } from "lucide-react";
 import Link from "next/link";
 
-import { readOnlyLine, whoCanChange } from "@/components/shared/who-can-change";
+import {
+    readOnlyLine,
+    whoCanChange,
+} from "@/components/shared/states/who-can-change";
 import { packCrumbs } from "./pack-crumbs";
 
 export type PackEditorStateKind =

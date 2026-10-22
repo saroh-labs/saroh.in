@@ -16,7 +16,7 @@ import {
     ratePicker,
     rateShown,
     ratesOffered,
-} from "@/components/shared/gst-rate-picker.testing";
+} from "@/components/shared/fields/gst-rate-picker.testing";
 
 import type { InvoiceFormBusiness } from "@/lib/invoices/new-invoice";
 import type { Invoice } from "@/lib/invoices/service";
@@ -35,7 +35,9 @@ vi.mock("@/lib/organizations/settings-actions", () => ({
     saveBusinessLogo: vi.fn(),
     saveBusinessLogoInPlace: vi.fn(),
 }));
-vi.mock("@/components/shared/logo-upload", () => ({ LogoUpload: () => null }));
+vi.mock("@/components/shared/fields/logo-upload", () => ({
+    LogoUpload: () => null,
+}));
 const actions = vi.hoisted(() => ({
     createInvoice: vi.fn(),
     issueInvoice: vi.fn(),

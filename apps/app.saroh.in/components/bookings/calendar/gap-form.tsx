@@ -1,11 +1,11 @@
 "use client";
 
-import { FormSheetBody } from "@/components/shared/form-sheet";
+import { FormSheetBody } from "@/components/shared/forms/form-sheet";
 import {
     useOverlaySubmit,
     useToastsAboveFoot,
-} from "@/components/shared/overlay-form";
-import { Refusal } from "@/components/shared/refusal";
+} from "@/components/shared/forms/overlay-form";
+import { Refusal } from "@/components/shared/states/refusal";
 import { Segmented } from "@saroh/ui/segmented";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";

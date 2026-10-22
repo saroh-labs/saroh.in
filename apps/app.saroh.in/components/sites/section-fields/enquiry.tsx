@@ -13,7 +13,7 @@ import {
 } from "@saroh/ui/select";
 import { Textarea } from "@saroh/ui/textarea";
 
-import { CheckRow } from "@/components/shared/check-row";
+import { CheckRow } from "@/components/shared/fields/check-row";
 import type {
     EnquiryContent,
     EnquiryField,

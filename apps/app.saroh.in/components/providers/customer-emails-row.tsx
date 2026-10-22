@@ -3,7 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { useId, useState } from "react";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { Row } from "@/components/sites/settings-rows";
 import type { CustomerEmails } from "@/lib/communications/customer-emails";
 import {

@@ -13,8 +13,8 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Check } from "lucide-react";
 import { useFormContext, useWatch } from "react-hook-form";
 
-import { Chip } from "@/components/shared/chip";
-import { CountrySelect } from "@/components/shared/country-select";
+import { CountrySelect } from "@/components/organizations/business-details/country-select";
+import { Chip } from "@/components/shared/lists/chip";
 import { cleanAddressInput } from "@/lib/organizations/address";
 import { kindDefaults, kindWords } from "@/lib/organizations/kind";
 import type { SetupValues } from "@/lib/organizations/setup-steps";

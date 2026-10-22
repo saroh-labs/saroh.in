@@ -3,7 +3,7 @@ import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { Route } from "lucide-react";
 
 import { AnalyticsDashboard } from "@/components/analytics/analytics-dashboard";
-import { PartialRead } from "@/components/shared/failed-read";
+import { PartialRead } from "@/components/shared/states/failed-read";
 import type { AnalyticsSummary, AnalyticsView } from "@/lib/analytics/summary";
 import type { SourceRead } from "@/lib/analytics/takings";
 import { beforePeriod } from "@/lib/insights/compare-words";

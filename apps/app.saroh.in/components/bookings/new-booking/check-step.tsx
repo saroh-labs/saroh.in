@@ -6,7 +6,7 @@ import { OptionSelect } from "@saroh/ui/option-select";
 import type { ComponentProps } from "react";
 
 import { PayChoice } from "@/components/bookings/sheets/pay-choice";
-import { Refusal } from "@/components/shared/refusal";
+import { Refusal } from "@/components/shared/states/refusal";
 
 import type { CheckRow } from "./steps";
 import { CheckCard } from "./steps";

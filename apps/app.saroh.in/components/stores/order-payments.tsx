@@ -1,4 +1,4 @@
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { formatMoney } from "@/lib/format/money";
 import { formatStatus } from "@/lib/format/status";
 import { providerName } from "@/lib/payments/providers";

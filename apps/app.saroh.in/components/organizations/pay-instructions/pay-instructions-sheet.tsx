@@ -16,7 +16,7 @@ import { Textarea } from "@saroh/ui/textarea";
 import { showError } from "@saroh/ui/toast";
 import { useForm, useWatch } from "react-hook-form";
 
-import { FormSheet } from "@/components/shared/form-sheet";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { sheetWords } from "@/lib/organizations/business-sheet-words";
 import type {

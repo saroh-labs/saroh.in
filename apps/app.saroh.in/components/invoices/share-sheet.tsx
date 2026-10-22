@@ -26,11 +26,11 @@ import {
 } from "@/components/invoices/unseen-link";
 import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
 import { QrButton } from "@/components/qr/qr-button";
-import type { ConfirmResult } from "@/components/shared/confirm-dialog";
-import { sayRefusal } from "@/components/shared/confirm-dialog";
-import { FormSheet } from "@/components/shared/form-sheet";
-import { useHold } from "@/components/shared/use-hold";
-import { ViewerDate } from "@/components/shared/viewer-date";
+import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
+import { sayRefusal } from "@/components/shared/confirm/confirm-dialog";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
+import { useHold } from "@/components/shared/undo/use-hold";
 import { runAction } from "@/lib/api/run-action";
 import type { EmailNote } from "@/lib/communications/email-setup";
 import { CONNECT_EMAIL_HREF } from "@/lib/communications/email-setup";

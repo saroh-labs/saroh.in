@@ -6,7 +6,7 @@ import { Switch } from "@saroh/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import { useState } from "react";
 
-import { FormSheet } from "@/components/shared/form-sheet";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import {
     checkoutLine,
     draftProblems,
@@ -42,7 +42,7 @@ const CHIP =
  *
  * Nothing saves until Save, which sends everything changed in one update
  * (`wayInput`, the same fields the page always saved). It is drawn in the
- * app's one sheet frame (`components/shared/form-sheet.tsx`),
+ * app's one sheet frame (`components/shared/forms/form-sheet.tsx`),
  * which says how it closes: Cancel, Escape and the close button drop the
  * draft, and a press outside does nothing once something is changed. A
  * refusal keeps the sheet open with what was typed.

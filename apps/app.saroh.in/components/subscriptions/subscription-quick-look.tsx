@@ -1,6 +1,6 @@
 "use client";
 
-import { FailedRead } from "@/components/shared/failed-read";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { AbsentValue } from "@saroh/ui/absent-value";
@@ -8,10 +8,10 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
-import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
+import { QuickLook, QuickLookCard } from "@/components/shared/forms/quick-look";
 import { EmptyState } from "@saroh/ui/data-state";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import type {
     Optional,
     Plan,

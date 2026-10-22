@@ -3,7 +3,7 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { ScrollX } from "@saroh/ui/scroll-x";
 
-import { FailedRead } from "@/components/shared/failed-read";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import type { ListQuery } from "@/lib/invoices/list-view";
 import { figureOn } from "@/lib/invoices/list-view";
 import type {

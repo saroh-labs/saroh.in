@@ -25,7 +25,7 @@ vi.mock("@/lib/domains/actions", () => ({
     removeDomain: vi.fn(),
 }));
 vi.mock("@/env", () => ({ env: {} }));
-vi.mock("@/components/shared/business-zone", () => ({
+vi.mock("@/components/shared/dates/business-zone", () => ({
     useBusinessZone: () => "Asia/Kolkata",
 }));
 const showSuccess = vi.fn();

@@ -9,7 +9,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { ChevronUp, IndianRupee } from "lucide-react";
 import Link from "next/link";
 
-import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
+import { WHO_CAN_CHANGE } from "@/components/shared/states/who-can-change";
 import type { SourceRead } from "@/lib/analytics/takings";
 import type { MoneyTile } from "@/lib/insights/money-words";
 import {

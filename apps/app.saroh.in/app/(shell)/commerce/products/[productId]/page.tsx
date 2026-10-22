@@ -17,8 +17,8 @@ import { ProductPhotosTab } from "@/components/commerce/product-page/photos-tab"
 import { ProductReviewsTab } from "@/components/commerce/product-page/reviews-tab";
 import { ProductStockTab } from "@/components/commerce/product-page/stock-tab";
 import { ProductTabs } from "@/components/commerce/product-page/tabs";
-import { AccessDenied } from "@/components/shared/access-denied";
-import { whoCanChange } from "@/components/shared/who-can-change";
+import { AccessDenied } from "@/components/shared/states/access-denied";
+import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { activeCut, pausedByCut, pausedWords } from "@/lib/billing/paused";
 import { listCollections } from "@/lib/collections/service";
 import { knownRoleName } from "@/lib/organizations/role-name";

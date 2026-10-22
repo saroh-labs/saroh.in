@@ -1,7 +1,7 @@
 "use client";
 
-import { FormSheet } from "@/components/shared/form-sheet";
-import { Refusal } from "@/components/shared/refusal";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
+import { Refusal } from "@/components/shared/states/refusal";
 import { runAction } from "@/lib/api/run-action";
 import { updateRole } from "@/lib/organizations/role-actions";
 import type { Role, RoleCatalogue } from "@/lib/organizations/roles";

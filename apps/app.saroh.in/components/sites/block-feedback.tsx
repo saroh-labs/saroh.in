@@ -7,7 +7,7 @@ import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState } from "react";
 
-import { useBusinessZone } from "@/components/shared/business-zone";
+import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { runAction } from "@/lib/api/run-action";
 import { initials } from "@/lib/names";
 import { createComment, setCommentResolved } from "@/lib/sites/actions";

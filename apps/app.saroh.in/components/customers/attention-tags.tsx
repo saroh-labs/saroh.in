@@ -1,7 +1,7 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { Lock, TriangleAlert } from "lucide-react";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import type { AttentionTagInput } from "@/lib/customer-workspace/attention";
 import { hiddenText, tagText } from "@/lib/customer-workspace/attention";
 

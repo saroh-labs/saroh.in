@@ -1,6 +1,9 @@
 "use client";
 
-import { ListTableHead, listTable } from "@/components/shared/list-toolbar";
+import {
+    ListTableHead,
+    listTable,
+} from "@/components/shared/lists/list-toolbar";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";

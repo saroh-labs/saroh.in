@@ -1,7 +1,7 @@
 "use client";
 
-import { ChoiceGroup } from "@/components/shared/choice-group";
-import { FormSheet } from "@/components/shared/form-sheet";
+import { ChoiceGroup } from "@/components/shared/fields/choice-group";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import {
     setMemberExtraActions,

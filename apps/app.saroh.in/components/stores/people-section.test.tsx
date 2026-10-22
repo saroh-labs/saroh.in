@@ -29,8 +29,8 @@ vi.mock("@/lib/members/actions", () => ({
 const showError = vi.fn();
 const showSuccess = vi.fn();
 vi.mock(
-    "@/components/shared/use-hold",
-    () => import("@/components/shared/hold-now.test-kit"),
+    "@/components/shared/undo/use-hold",
+    () => import("@/components/shared/undo/hold-now.test-kit"),
 );
 vi.mock("@saroh/ui/toast", () => ({
     showError: (...args: unknown[]) => showError(...args) as unknown,

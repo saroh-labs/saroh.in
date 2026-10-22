@@ -6,7 +6,7 @@ import {
     CalendarLocked,
     CalendarNothing,
 } from "@/components/calendar/calendar-nothing";
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import {
     calendarLocked,
     calendarRange,

@@ -7,8 +7,8 @@ import { TextLink } from "@saroh/ui/text-link";
 import Link from "next/link";
 import { useRef } from "react";
 
-import { arrivalProps } from "@/components/shared/arrival-props";
-import { useArrivals } from "@/components/shared/use-arrivals";
+import { arrivalProps } from "@/components/shared/live-refresh/arrival-props";
+import { useArrivals } from "@/components/shared/live-refresh/use-arrivals";
 import { addStockLink, moreLabel, stockNote } from "@/lib/home/group-body";
 import { needLine, needTitle } from "@/lib/home/needs";
 import type { HomeNeed, HomeNeedGroup } from "@/lib/home/service";

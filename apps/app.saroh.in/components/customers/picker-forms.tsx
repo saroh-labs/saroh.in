@@ -5,7 +5,7 @@ import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { useId, useState } from "react";
 
-import { BusinessPhoneInput } from "@/components/shared/business-phone-input";
+import { BusinessPhoneInput } from "@/components/shared/fields/business-phone-input";
 import { runAction } from "@/lib/api/run-action";
 import type {
     CustomerSearchResult,

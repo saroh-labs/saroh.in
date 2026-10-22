@@ -2,7 +2,10 @@
 
 import { ListSearch } from "@saroh/ui/list-search";
 
-import { ListFilter, ListToolbar } from "@/components/shared/list-toolbar";
+import {
+    ListFilter,
+    ListToolbar,
+} from "@/components/shared/lists/list-toolbar";
 import type {
     CustomerChip,
     CustomerSort,

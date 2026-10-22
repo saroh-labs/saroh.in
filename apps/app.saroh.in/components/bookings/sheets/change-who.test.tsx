@@ -27,8 +27,8 @@ import type { ReassignCandidate } from "@/lib/services/service";
 import { candidateNote, changeWhoSave, changeWhoTitle } from "./change-who";
 
 vi.mock(
-    "@/components/shared/use-hold",
-    () => import("@/components/shared/hold-now.test-kit"),
+    "@/components/shared/undo/use-hold",
+    () => import("@/components/shared/undo/hold-now.test-kit"),
 );
 
 const readBookingPerson = vi.fn();

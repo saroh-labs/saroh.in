@@ -26,8 +26,8 @@ import { useNewBookingLauncher } from "@/components/bookings/new-booking/launche
 import type { ReassignScope } from "@/components/bookings/sheets/change-who";
 import { mayChangeWho, onlyTo } from "@/components/bookings/sheets/change-who";
 import { TreatmentVisits } from "@/components/bookings/treatment-visits";
-import { PageContainer } from "@/components/shared/page-container";
-import { useHold } from "@/components/shared/use-hold";
+import { PageContainer } from "@/components/shared/page/page-container";
+import { useHold } from "@/components/shared/undo/use-hold";
 import { personHref } from "@/lib/contacts/person-href";
 import { formatMoney } from "@/lib/format/money";
 import { firstName } from "@/lib/names";

@@ -1,6 +1,6 @@
 "use client";
 
-import { Refusal } from "@/components/shared/refusal";
+import { Refusal } from "@/components/shared/states/refusal";
 import { isRoleRefusal } from "@/lib/api/role-denied";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";

@@ -8,8 +8,8 @@ import { useEffect, useState } from "react";
 
 import { PausedNote } from "@/components/billing/paused-banner";
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
-import { useBusinessZone } from "@/components/shared/business-zone";
-import { FailedRead } from "@/components/shared/failed-read";
+import { useBusinessZone } from "@/components/shared/dates/business-zone";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { AddDomainDialog } from "@/components/sites/add-domain-dialog";
 import { BareDomainPart } from "@/components/sites/bare-domain-step";
 import { DomainRecords } from "@/components/sites/domain-records";

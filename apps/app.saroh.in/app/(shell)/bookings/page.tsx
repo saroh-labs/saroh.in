@@ -13,7 +13,7 @@ import {
     flowServices,
     flowStaff,
 } from "@/components/bookings/new-booking/setup";
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { ShareLinkButton } from "@/components/sites/share-link-button";
 import { takesOnlinePayment } from "@/lib/billing/access";
 import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";

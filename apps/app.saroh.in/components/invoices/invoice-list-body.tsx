@@ -13,7 +13,7 @@ import {
     ListTable,
     listTable,
     ListTableHead,
-} from "@/components/shared/list-toolbar";
+} from "@/components/shared/lists/list-toolbar";
 import type { Invoice } from "@/lib/invoices/service";
 import { LIST_LIMIT } from "@/lib/lists/capped";
 

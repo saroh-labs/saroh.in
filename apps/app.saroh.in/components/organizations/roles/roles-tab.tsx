@@ -1,7 +1,7 @@
 "use client";
 
 import { PlanWay } from "@/components/billing/plan-way";
-import { FailedRead } from "@/components/shared/failed-read";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import type { Role, RoleCatalogue } from "@/lib/organizations/roles";
 import type { RolesLock } from "@/lib/organizations/roles-lock";
 import { EmptyState } from "@saroh/ui/data-state";

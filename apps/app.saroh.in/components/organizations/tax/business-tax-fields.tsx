@@ -17,7 +17,7 @@ import {
     RegisteredAddressFields,
 } from "@/components/organizations/business-details/registered-address-fields";
 import type { FormValues } from "@/components/organizations/business-settings/business-form";
-import { GstRatePicker } from "@/components/shared/gst-rate-picker";
+import { GstRatePicker } from "@/components/shared/fields/gst-rate-picker";
 import { rateOption } from "@/lib/invoices/gst";
 import { GSTIN_EXAMPLE } from "@/lib/invoices/gstin";
 import { formatOf, prefixOf } from "@/lib/invoices/invoice-number";

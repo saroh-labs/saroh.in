@@ -138,18 +138,18 @@ and a new record's are said as before. Give any new publish rule a `note`.
 Every overlay in `app.saroh.in` is one of three components, by the size of
 the task. Never write a `SheetContent`, a `DialogContent` or an
 `AlertDialog` and a footer by hand for something that saves:
-`components/shared/overlay-frames.test.ts` reads the app and fails a copy
+`components/shared/forms/overlay-frames.test.ts` reads the app and fails a copy
 (what is not a form, such as a quick look or a picker, is on its short
 list with its reason).
 
-| Component       | For                                | File                                   |
-| --------------- | ---------------------------------- | -------------------------------------- |
-| `FormSheet`     | More than three fields             | `components/shared/form-sheet.tsx`     |
-| `FormDialog`    | One to three fields, or one choice | `components/shared/form-dialog.tsx`    |
-| `ConfirmDialog` | Only what cannot be undone         | `components/shared/confirm-dialog.tsx` |
+| Component       | For                                | File                                           |
+| --------------- | ---------------------------------- | ---------------------------------------------- |
+| `FormSheet`     | More than three fields             | `components/shared/forms/form-sheet.tsx`       |
+| `FormDialog`    | One to three fields, or one choice | `components/shared/forms/form-dialog.tsx`      |
+| `ConfirmDialog` | Only what cannot be undone         | `components/shared/confirm/confirm-dialog.tsx` |
 
 The sheet and the dialog share one set of rules
-(`components/shared/overlay-form.tsx`):
+(`components/shared/forms/overlay-form.tsx`):
 
 - **Width.** A sheet is the screen on a phone and 448px beside the page,
   512px with `wide`. A dialog is `size="sm" | "md" | "lg"` (420, 460,
@@ -259,7 +259,7 @@ the draft, it can't be dismissed while saving, each opening is a fresh
 draft (a `key` per opening) and the keyboard returns to the row's Edit. A link opens one with `?edit=` (`lib/stores/place-rows.ts`).
 Product settings' lists (`components/commerce/product-settings/`) are the
 same rule for a list you manage: `NameDialog`
-(`components/shared/name-dialog.tsx`, a `FormDialog` with one field) for a
+(`components/shared/forms/name-dialog.tsx`, a `FormDialog` with one field) for a
 one-field add or rename, a `FormSheet` with a `trigger` for anything with
 more (an option's name and values, a field, a merge), so the keyboard
 returns to the button that opened it. A delete that can be undone asks
@@ -271,7 +271,7 @@ No row turns into a form, and the task finishes inside what opened.
 nothing has changed. Once the draft differs from what it opened with, a
 press outside does nothing, and Cancel, Escape and the close button are the
 ways out. The frame reads that from its own fields
-(`components/shared/use-draft-changed.ts`: boxes, ticks, chips, what a
+(`components/shared/forms/use-draft-changed.ts`: boxes, ticks, chips, what a
 picker shows, a picture, a rich text box), so an overlay passes nothing.
 One whose work the fields can't show passes `dirty`, or calls
 `useFormSheetDraft` / `useFormSheetDirty` from a draft under the frame.
@@ -334,7 +334,7 @@ the row's Edit. A link opens one with `?edit=` (`lib/stores/place-rows.ts`,
 `businessEditHref`). With the draft in a sheet, the page needs no
 leave-with-unsaved-changes guard. **What a row needs is done in its sheet**
 (owner, 10 Oct): an Edit never sends someone to another page, so an upload
-sits in the sheet itself (`components/shared/logo-upload.tsx`, a logo field
+sits in the sheet itself (`components/shared/fields/logo-upload.tsx`, a logo field
 with no page state; a location's own logo uses it too, with the business
 logo standing in until it has one, DEC-123) and a field another row owns
 joins the sheet that needs it (turning GST on asks for the registered
@@ -384,7 +384,7 @@ preview under its fields, from the draft.
   course), it is the submit, so Enter runs it.
 - **Current** — **One leave guard, one question** (UX audit, 10 Oct). Every
   create and edit flow mounts `useLeaveGuard({ dirty, lost, save? })` from
-  `components/shared/use-leave-guard.tsx` and draws its `dialog`: "Leave
+  `components/shared/forms/use-leave-guard.tsx` and draws its `dialog`: "Leave
   without saving?", one sentence saying what would be lost (`lostNew`,
   `lostChanges`, or the flow's own), then Stay (the default) or Leave, and
   Save and leave only where a draft can be kept. It catches every link, the
@@ -460,7 +460,7 @@ preview under its fields, from the draft.
   as typed; a whole number pasted ("+44 …", "0091 …", "098765 43210")
   picks its country. The value is E.164 ("+919876543210") or "". In
   `app.saroh.in` use `BusinessPhoneInput`
-  (`components/shared/business-phone-input.tsx`), which starts on the
+  (`components/shared/fields/business-phone-input.tsx`), which starts on the
   active business's country. What a number means is one pure module,
   `packages/block-contract/src/phone.ts` (`normalisePhoneNumber`,
   `phoneNumberProblem`, `phoneLabel`), which the API's
@@ -485,7 +485,7 @@ preview under its fields, from the draft.
   Undo** (UX audit, 10 Oct): a reminder or an invoice sent, a message, a
   team or location invite, review invitations, a booking or an order
   cancelled from a list, a subscription cancelled. `useHold().send` in
-  `components/shared/use-hold.ts` is the one way: "Sending in 10 seconds",
+  `components/shared/undo/use-hold.ts` is the one way: "Sending in 10 seconds",
   then "Sent to {name}.". The overlay closes keeping what was typed, and a
   refusal or an Undo opens it again with that. Money out stays as built.
 - **Current** — **shadcn controls, never native pickers.** A list is a
@@ -507,13 +507,13 @@ preview under its fields, from the draft.
   (10 Oct). All but the tick are a radio group to a screen reader and a
   keyboard: one tab stop, and the arrows move the choice.
 
-    | Piece         | For                                              | File                                 |
-    | ------------- | ------------------------------------------------ | ------------------------------------ |
-    | `Segmented`   | A two- or three-way switch of view or mode       | `@saroh/ui/segmented`                |
-    | `ChipGroup`   | A short list of short names (a kind, a courier)  | `components/shared/choice-group.tsx` |
-    | `RadioCards`  | Choices that are a sentence, or carry a note     | `components/shared/choice-group.tsx` |
-    | `ChoiceGroup` | The same group drawn the screen's own way        | `components/shared/choice-group.tsx` |
-    | `CheckRow`    | A tick with its words (`SwitchRow` for a switch) | `components/shared/check-row.tsx`    |
+    | Piece         | For                                              | File                                        |
+    | ------------- | ------------------------------------------------ | ------------------------------------------- |
+    | `Segmented`   | A two- or three-way switch of view or mode       | `@saroh/ui/segmented`                       |
+    | `ChipGroup`   | A short list of short names (a kind, a courier)  | `components/shared/fields/choice-group.tsx` |
+    | `RadioCards`  | Choices that are a sentence, or carry a note     | `components/shared/fields/choice-group.tsx` |
+    | `ChoiceGroup` | The same group drawn the screen's own way        | `components/shared/fields/choice-group.tsx` |
+    | `CheckRow`    | A tick with its words (`SwitchRow` for a switch) | `components/shared/fields/check-row.tsx`    |
 
     `ChoiceGroup` is for what the first three can't draw (colour swatches,
     photo thumbnails, times under day headings with `layout`, a card with
@@ -523,7 +523,7 @@ preview under its fields, from the draft.
     or `role="switch"` button.
 
 - **Current** — **A GST rate is always chosen with `GstRatePicker`**
-  (`components/shared/gst-rate-picker.tsx`, DEC-176, 20 Oct), never a
+  (`components/shared/fields/gst-rate-picker.tsx`, DEC-176, 20 Oct), never a
   dropdown, a typed box or chips of a screen's own. Its main row is GST's
   slabs since GST 2.0, 0%, 5%, 18% and 40% (`MAIN_GST_RATES`); "Other
   rate" is a disclosure beside them (`aria-expanded`, not a radio) that

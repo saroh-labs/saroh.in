@@ -4,7 +4,7 @@ import { showError } from "@saroh/ui/toast";
 import { useState } from "react";
 
 import type { UndoOutcome } from "@/components/organizations/business-settings/use-settings-undo";
-import { FormSheet } from "@/components/shared/form-sheet";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import {
     DEFAULT_WEEK,
     OpeningHoursFields,

@@ -6,8 +6,8 @@ import { Input } from "@saroh/ui/input";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState } from "react";
 
-import { CheckRow } from "@/components/shared/check-row";
-import { FormDialog } from "@/components/shared/form-dialog";
+import { CheckRow } from "@/components/shared/fields/check-row";
+import { FormDialog } from "@/components/shared/forms/form-dialog";
 import { runAction } from "@/lib/api/run-action";
 import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";

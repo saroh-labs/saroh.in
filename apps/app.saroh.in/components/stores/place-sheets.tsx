@@ -1,12 +1,12 @@
 "use client";
 
-import { Refusal } from "@/components/shared/refusal";
+import { Refusal } from "@/components/shared/states/refusal";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import type { FormEventHandler, ReactNode } from "react";
 import { useState } from "react";
 
-import { FormSheet } from "@/components/shared/form-sheet";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import {
     addressDraftOf,
     addressPatch,
@@ -38,7 +38,7 @@ const PROBLEM =
 
 /**
  * The frame every Edit sheet in The place shares: the settings rows' own
- * (`components/shared/form-sheet.tsx`, which says how it saves,
+ * (`components/shared/forms/form-sheet.tsx`, which says how it saves,
  * closes and hands the keyboard back), named by the row it edits.
  */
 export function PlaceSheetFrame({

@@ -1,6 +1,6 @@
 "use client";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import type { InvoiceOnlinePayment } from "@/lib/invoices/service";
 import { Notice } from "@saroh/ui/notice";

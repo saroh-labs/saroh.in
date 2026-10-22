@@ -18,7 +18,7 @@ import {
     OWN_DRIVER,
 } from "@/lib/orders/courier";
 
-import { ChipGroup } from "@/components/shared/choice-group";
+import { ChipGroup } from "@/components/shared/fields/choice-group";
 import { Field } from "@saroh/ui/field";
 import {
     OrderSheet,

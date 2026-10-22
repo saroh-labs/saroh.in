@@ -9,7 +9,7 @@ import { showError } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import {
     markThreadReadAction,
     replyAction,

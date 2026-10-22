@@ -1,6 +1,6 @@
 import { PageHeader } from "@saroh/ui/page-header";
 
-import type { HomeNew } from "@/components/shared/quick-actions";
+import type { HomeNew } from "@/components/shared/navigation/quick-actions";
 import { dateLine, greeting, sinceLinks } from "@/lib/home/last-day";
 import type { HomeLastDay } from "@/lib/home/service";
 import { cn } from "@saroh/ui/lib/utils";

@@ -12,8 +12,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { useBusinessZone } from "@/components/shared/business-zone";
-import { FailedRead } from "@/components/shared/failed-read";
+import { useBusinessZone } from "@/components/shared/dates/business-zone";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { runAction } from "@/lib/api/run-action";
 import { restorePublication } from "@/lib/sites/actions";
 import type { RestoreGate, VersionBadgeTone } from "@/lib/sites/release-review";

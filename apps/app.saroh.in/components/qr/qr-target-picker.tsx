@@ -11,13 +11,13 @@ import { QR_PLACE_NOTE_MAX } from "@/lib/qr/types";
 import { QR_PLACES } from "@/lib/qr/words";
 import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
-import type { Choice } from "@/components/shared/choice-group";
+import type { Choice } from "@/components/shared/fields/choice-group";
 import {
     ChoiceGroup,
     Eyebrow,
     pillClass,
-} from "@/components/shared/choice-group";
-import { Refusal } from "@/components/shared/refusal";
+} from "@/components/shared/fields/choice-group";
+import { Refusal } from "@/components/shared/states/refusal";
 import { Field } from "@saroh/ui/field";
 import { TextLink } from "@saroh/ui/text-link";
 

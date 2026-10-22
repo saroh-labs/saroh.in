@@ -6,9 +6,9 @@ import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { RadioCards } from "@/components/shared/choice-group";
-import { FormSheet } from "@/components/shared/form-sheet";
-import { StatusBadge } from "@/components/shared/status-badge";
+import { RadioCards } from "@/components/shared/fields/choice-group";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { Row } from "@/components/sites/settings-rows";
 import { runAction } from "@/lib/api/run-action";
 import type {

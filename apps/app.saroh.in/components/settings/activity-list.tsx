@@ -4,9 +4,9 @@ import { Button } from "@saroh/ui/button";
 import Link from "next/link";
 import { useState } from "react";
 
-import { listTable } from "@/components/shared/list-toolbar";
-import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { QuickLook, QuickLookCard } from "@/components/shared/forms/quick-look";
+import { listTable } from "@/components/shared/lists/list-toolbar";
 import { useNarrow } from "@/lib/hooks/use-narrow";
 import type { ActivityLine } from "@/lib/settings/activity";
 import type { ActivityDetail } from "@/lib/settings/activity-detail";

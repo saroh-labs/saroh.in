@@ -16,7 +16,9 @@ vi.mock("@/lib/organizations/settings-actions", () => ({
     saveBusinessLogo: vi.fn(),
     saveBusinessLogoInPlace: vi.fn(),
 }));
-vi.mock("@/components/shared/logo-upload", () => ({ LogoUpload: () => null }));
+vi.mock("@/components/shared/fields/logo-upload", () => ({
+    LogoUpload: () => null,
+}));
 vi.mock("@/lib/invoices/actions", () => ({
     createInvoice: vi.fn(),
     createPayLink: vi.fn(),

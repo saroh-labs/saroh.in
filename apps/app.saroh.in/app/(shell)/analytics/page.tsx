@@ -13,7 +13,7 @@ import {
 import { SellsTab } from "@/components/insights/sells-tab";
 import type { SiteOption } from "@/components/insights/site-picker";
 import { SuggestionCard } from "@/components/insights/suggestion-card";
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import {
     readLinks,
     readMoney,

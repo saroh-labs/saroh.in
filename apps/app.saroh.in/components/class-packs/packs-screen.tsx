@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { MissingRatesNotice } from "@/components/gst-rates/missing-rates-notice";
-import type { ContactOption } from "@/components/shared/contact-picker";
+import type { ContactOption } from "@/components/shared/fields/contact-picker";
 import { setPackArchived } from "@/lib/class-packs/actions";
 import type { CardNote } from "@/lib/class-packs/pack-card-notes";
 import type { PackListItem } from "@/lib/class-packs/pack-cards";

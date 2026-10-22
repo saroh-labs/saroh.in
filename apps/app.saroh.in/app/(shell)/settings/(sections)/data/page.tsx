@@ -5,7 +5,7 @@ import {
     SettingsPanel,
     SettingsPanelHeader,
 } from "@/components/settings/settings-panel";
-import { whoCanChange } from "@/components/shared/who-can-change";
+import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { listDataExports } from "@/lib/data-export/service";
 import { dataExportLine } from "@/lib/data-export/words";
 import { resolveActiveOrganization } from "@/lib/organizations/service";

@@ -15,7 +15,7 @@ import {
     REFUND_REASONS,
 } from "@/lib/orders/refund-choice";
 
-import { CheckRow } from "@/components/shared/check-row";
+import { CheckRow } from "@/components/shared/fields/check-row";
 import { Field } from "@saroh/ui/field";
 import { MoneyInput } from "@saroh/ui/money-input";
 import {

@@ -19,7 +19,7 @@ import {
     whoFor,
 } from "@/lib/services/diary";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { STATE_TONE } from "./parts";
 import type {
     HeldFor,

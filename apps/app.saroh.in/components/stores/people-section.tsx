@@ -11,9 +11,9 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { useHold } from "@/components/shared/use-hold";
+import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
+import { useHold } from "@/components/shared/undo/use-hold";
 import { Section as Rows } from "@/components/sites/settings-rows";
 import {
     removeMember,

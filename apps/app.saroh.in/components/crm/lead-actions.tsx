@@ -3,7 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { useId, useState } from "react";
 
-import { FormSheet } from "@/components/shared/form-sheet";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import type { ComposerGate } from "@/lib/messages/composer-gate";
 import type { ConsentStatus, MessageChannel } from "@/lib/messages/constants";
 

@@ -1,9 +1,9 @@
-import { FailedRead } from "@/components/shared/failed-read";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import type { DetailTag } from "@/lib/products/overview-words";
 
 /** Small pieces the product page's Overview is built from, at the design's sizes. */

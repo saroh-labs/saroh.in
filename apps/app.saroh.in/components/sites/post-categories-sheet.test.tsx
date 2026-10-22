@@ -42,7 +42,7 @@ vi.mock("@saroh/ui/toast", () => ({
     showSuccess: (...a: unknown[]) => showSuccess(...a) as unknown,
     showError: (...a: unknown[]) => showError(...a) as unknown,
 }));
-vi.mock("@/components/shared/confirm-dialog", () => ({
+vi.mock("@/components/shared/confirm/confirm-dialog", () => ({
     ConfirmDialog: () => null,
 }));
 
