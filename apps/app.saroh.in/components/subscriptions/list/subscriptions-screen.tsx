@@ -30,7 +30,10 @@ import {
     viewFromQuery,
 } from "@/lib/subscriptions/view";
 
-import { NEW_PLAN_HREF, PlansTab } from "./plans-tab";
+import {
+    NEW_PLAN_HREF,
+    PlansTab,
+} from "@/components/subscriptions/plans/plans-tab";
 import { SubscribeDialog } from "./subscribe-dialog";
 import { SubscribersList } from "./subscribers-list";
 import { SubscriptionQuickLook } from "./subscription-quick-look";

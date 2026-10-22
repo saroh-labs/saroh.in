@@ -85,7 +85,7 @@ describe("one of each small piece", () => {
                 "the sticky publish bar: an action bar that also says what is waiting",
             "components/subscriptions/subscription-detail/panels.tsx":
                 "a list's last line (\"Couldn't load more\"), ruled off above, not a box",
-            "components/subscriptions/subscription-quick-look.tsx":
+            "components/subscriptions/list/subscription-quick-look.tsx":
                 "a list's last line, ruled off above, not a box",
         };
         // An element with an alert, status or note role that also draws

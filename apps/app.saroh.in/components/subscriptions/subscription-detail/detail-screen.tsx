@@ -41,8 +41,8 @@ import {
 } from "@/lib/subscriptions/view";
 
 import { StatusBadge } from "@/components/shared/lists/status-badge";
+import { SubscribeDialog } from "@/components/subscriptions/list/subscribe-dialog";
 import { Notice } from "@saroh/ui/notice";
-import { SubscribeDialog } from "../subscribe-dialog";
 import type { Step } from "./action-dialogs";
 import { ActionDialog } from "./action-dialogs";
 import { AutopayActions } from "./autopay-panel";

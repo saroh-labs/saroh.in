@@ -2,13 +2,13 @@
 # Every label below was checked against the real screens on 6 Oct 2026
 # (R7), in the code and in the captured shots. Sources, from the repo root:
 #   NAV   apps/app.saroh.in/components/shared/navigation/nav-items.tsx (Payments ›
-#         Subscriptions); components/subscriptions/subscriptions-screen.tsx
+#         Subscriptions); components/subscriptions/list/subscriptions-screen.tsx
 #         (tabs Subscribers and Plans); lib/subscriptions/view.ts (the
 #         list's views Need you, Active, Paused, Cancelled, All
 #         subscriptions; a row's status "Payment failed")
-#   PLANS apps/app.saroh.in/components/subscriptions/subscriptions-screen.tsx
+#   PLANS apps/app.saroh.in/components/subscriptions/list/subscriptions-screen.tsx
 #         ("New plan", the page's button on the Plans tab);
-#         plans-tab.tsx (plans as rows). The tip under step 2 stood on the
+#         subscriptions/plans/plans-tab.tsx (plans as rows). The tip under step 2 stood on the
 #         Plans tab until 12 Oct 2026; it is a fact of how plans work
 #         (lib/subscriptions/view.ts, `olderPrice`).
 #   EDIT  .../subscriptions/plan-editor/details-section.tsx ("Details",
@@ -20,7 +20,7 @@
 #         autopay is offered; "Draft · saved, nobody can join it yet")
 #   PUB   lib/editor-shell/state.ts ("Publish", "Publish changes");
 #         plan-editor.ts ("… is open for sign-ups.")
-#   SUB   .../subscriptions/subscribe-dialog.tsx, lib/subscriptions/autopay.ts,
+#   SUB   .../subscriptions/list/subscribe-dialog.tsx, lib/subscriptions/autopay.ts,
 #         lib/subscriptions/renewal.ts ("Subscribe someone"; "It renews with
 #         an invoice each period. Nothing is charged and nobody is
 #         contacted."; Who, Plan, Starting; "The first invoice is issued

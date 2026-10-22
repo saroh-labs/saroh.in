@@ -531,7 +531,7 @@
     `lib/subscriptions/view.ts` puts that view first, and the header
     leads with it), and a plan's Archive and Sell again are in its row's
     menu. What is set once for every plan is a group of read-first rows
-    under the list (`components/subscriptions/plan-settings.tsx`). Stock's
+    under the list (`components/subscriptions/plans/plan-settings.tsx`). Stock's
     three lists (Levels, Log, Checks) end with `ListPaging`, each with its
     own page and size in the address (`lib/stock/list-query.ts`); Levels
     pages by product, so its footer counts products, not rows. A list

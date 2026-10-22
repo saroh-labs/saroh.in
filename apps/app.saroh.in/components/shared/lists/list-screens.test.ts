@@ -256,7 +256,7 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
             "a location's settings sections",
         "components/subscriptions/plan-detail/detail-screen.tsx":
             "a plan's sections: Overview, Subscribers, History",
-        "components/subscriptions/subscriptions-screen.tsx":
+        "components/subscriptions/list/subscriptions-screen.tsx":
             "Subscribers and Plans: who is subscribed, and what is on sale",
     };
     const drawsTabs = (code: string) => /<TabStrip\b/.test(code);

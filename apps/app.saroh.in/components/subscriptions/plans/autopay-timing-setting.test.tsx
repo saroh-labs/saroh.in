@@ -21,8 +21,8 @@ import type {
 } from "@/lib/subscriptions/autopay-timing";
 import type { SubscriptionSettings } from "@/lib/subscriptions/service";
 
+import { PlanAutopayTiming } from "@/components/subscriptions/plan-detail/plan-autopay-timing";
 import { AutopayTimingSetting } from "./autopay-timing-setting";
-import { PlanAutopayTiming } from "./plan-detail/plan-autopay-timing";
 import { PlanSettings } from "./plan-settings";
 import { PlansTab } from "./plans-tab";
 

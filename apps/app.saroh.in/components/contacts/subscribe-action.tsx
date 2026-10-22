@@ -4,7 +4,7 @@ import { Button } from "@saroh/ui/button";
 import { useState } from "react";
 
 import type { ContactOption } from "@/components/shared/fields/contact-picker";
-import { SubscribeDialog } from "@/components/subscriptions/subscribe-dialog";
+import { SubscribeDialog } from "@/components/subscriptions/list/subscribe-dialog";
 import type { Plan } from "@/lib/subscriptions/service";
 
 /**
