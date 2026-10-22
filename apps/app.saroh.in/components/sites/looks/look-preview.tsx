@@ -19,6 +19,7 @@ import {
     SheetDescription,
     SheetTitle,
 } from "@saroh/ui/sheet";
+import { showSuccess } from "@saroh/ui/toast";
 import type { ReactNode } from "react";
 import { useId, useState } from "react";
 
@@ -119,6 +120,8 @@ export function LookPreview({
         }
         onUse();
         onClose();
+        // The dialog covered the row's own status line, so it is said here.
+        showSuccess(`${name} is your site's look. Publish to put it live.`);
     }
 
     function startStarter() {

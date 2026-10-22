@@ -49,6 +49,8 @@ const actions = vi.hoisted(() => ({
     updateSiteStyle: vi.fn(),
 }));
 vi.mock("@/lib/sites/actions", () => actions);
+const toasts = vi.hoisted(() => ({ showSuccess: vi.fn(), showError: vi.fn() }));
+vi.mock("@saroh/ui/toast", () => toasts);
 
 // A colourway is told apart by its exact palette (DEC-090), as the API's
 // save tells it (review #22).
@@ -392,6 +394,10 @@ describe("Preview", () => {
         press(button(host, "Preview Folio"));
         press(button(shown(), "Use this look"));
         expect(onChoose).toHaveBeenCalledWith("folio");
+        expect(dialog()).toBeNull();
+        expect(toasts.showSuccess).toHaveBeenCalledWith(
+            "Folio is your site's look. Publish to put it live.",
+        );
     });
 
     it("says the draft is in the look already, with nothing to use", () => {
