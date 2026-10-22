@@ -14,6 +14,7 @@ import {
     recordOrderPaidInTx,
     recordOrderRefundedInTx,
 } from "../analytics/order-events";
+import { raiseBillingOpsNoticeInTx } from "../billing/billing-ops-notice";
 import { confirmHoldInTx } from "../bookings/booking-hold";
 import { markBookingPaidInTx } from "../bookings/booking-pay-link";
 import { completePackDraftInTx } from "../class-packs/pack-checkout";
@@ -32,6 +33,7 @@ import {
     invoiceSupersededPayment,
     settleSupplementaryInvoices,
 } from "../invoices/order-invoicing";
+import { RETRY_SCHEDULES } from "../jobs/job-queue.port";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import type { PaymentStatus } from "../orders/dto";
 import { leftToRefundCents } from "../orders/hand-payments";
@@ -95,8 +97,9 @@ type Tx = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
 
 /** The job that retries a stored delivery the request could not apply. */
 export const WEBHOOK_PROCESS_TYPE = "webhook.process";
-/** 1 s doubling to the queue's 5 min cap: about half an hour of tries. */
-const WEBHOOK_PROCESS_ATTEMPTS = 12;
+/** The first run, then one per entry of its retry schedule: about 16 hours. */
+const WEBHOOK_PROCESS_ATTEMPTS =
+    (RETRY_SCHEDULES[WEBHOOK_PROCESS_TYPE]?.length ?? 0) + 1;
 /** The request's own try goes first; the job waits this long behind it. */
 const WEBHOOK_RETRY_AFTER_MS = 60_000;
 
@@ -356,17 +359,31 @@ export class WebhooksService {
         } catch (err) {
             if (!lastTry && !wouldFailAgain(err)) throw err;
             const message = err instanceof Error ? err.message : String(err);
-            await prisma.webhookEvent.updateMany({
-                where: { id, status: "RECEIVED" },
-                data: {
-                    status: "FAILED",
-                    error: message,
-                    processedAt: new Date(),
-                },
+            await prisma.$transaction(async (tx) => {
+                const marked = await tx.webhookEvent.updateMany({
+                    where: { id, status: "RECEIVED" },
+                    data: {
+                        status: "FAILED",
+                        error: message,
+                        processedAt: new Date(),
+                    },
+                });
+                if (marked.count === 0) return;
+                // Nothing retries it now: an operator replays it or
+                // settles the payment by hand.
+                await raiseBillingOpsNoticeInTx(tx, this.logger, {
+                    code: "merchant_webhook_failed",
+                    organizationId,
+                    refs: {
+                        webhookEvent: id,
+                        provider: name,
+                        providerEvent: event.providerEventId,
+                        eventType: event.eventType,
+                    },
+                    note: `A ${name} ${event.eventType} event for this business could not be applied after its tries (${message.slice(0, 200)}). Its payment, refund or mandate may be out of step until it is replayed in Operations › Webhooks.`,
+                    dedupeKey: `merchant_webhook_failed:${id}`,
+                });
             });
-            this.logger.warn(
-                `Webhook ${name}/${event.providerEventId} reconcile failed: ${message}`,
-            );
             return { status: "failed", changed: false };
         }
     }

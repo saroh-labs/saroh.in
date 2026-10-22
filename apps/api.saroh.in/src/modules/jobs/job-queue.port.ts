@@ -130,6 +130,31 @@ export function nextBackoff(attempts: number): number {
     return Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * 2 ** n);
 }
 
+const MINUTE_MS = 60_000;
+
+/**
+ * Job types that retry on their own schedule instead of {@link nextBackoff}'s
+ * five-minute cap: the wait before retry N is entry N (the last repeats).
+ * A merchant's webhook (`webhook.process`) is the provider's only word on a
+ * payment, so it is retried for about 16 hours, as Razorpay retries its own
+ * deliveries for a day: an outage of hours still lands it.
+ */
+export const RETRY_SCHEDULES: Readonly<
+    Partial<Record<string, readonly number[]>>
+> = {
+    "webhook.process": [1, 5, 15, 30, 60, 120, 240, 480].map(
+        (m) => m * MINUTE_MS,
+    ),
+};
+
+/** The wait before a failed job of `type` runs again (`attempts` as in {@link nextBackoff}). */
+export function retryDelay(type: string, attempts: number): number {
+    const schedule = RETRY_SCHEDULES[type];
+    if (!schedule?.length) return nextBackoff(attempts);
+    const i = Math.min(Math.max(1, Math.floor(attempts)), schedule.length) - 1;
+    return schedule[i] ?? nextBackoff(attempts);
+}
+
 /**
  * In-memory {@link JobQueue} for unit tests and local drive-by use. No DB, no
  * network, no timers. `claimDue` mirrors the real visibility semantics (a
@@ -209,7 +234,7 @@ export class FakeJobQueue implements JobQueue {
             job.processedAt = new Date();
         } else {
             job.status = "PENDING";
-            job.runAt = new Date(Date.now() + nextBackoff(attempts));
+            job.runAt = new Date(Date.now() + retryDelay(job.type, attempts));
         }
         return Promise.resolve(true);
     }

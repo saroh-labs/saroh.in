@@ -168,10 +168,12 @@ a note saying so.
   transitions.
   A merchant delivery is stored, answered 200 and then applied: its row
   commits with a `webhook.process` retry job, the request tries once, an
-  unexpected error is left to the job's backoff, and a 4xx refusal or the
-  last try keeps the row FAILED for replay. Only a row that could not be
-  stored is a 5xx, because a provider switches off a webhook that keeps
-  failing (`webhooks/webhooks.service.ts`).
+  unexpected error is left to the job's retries (about 16 hours, its own
+  schedule in `RETRY_SCHEDULES`, `jobs/job-queue.port.ts`), and a 4xx
+  refusal or the last try keeps the row FAILED for replay and raises
+  `merchant_webhook_failed` in Admin › Billing › Needs action. Only a row
+  that could not be stored is a 5xx, because a provider switches off a
+  webhook that keeps failing (`webhooks/webhooks.service.ts`).
 - **Current** — **Stored provider payloads are for verification and audit,**
   never read on a serving path (`WebhookEvent.payload`).
 - **Current** — **A capture is compared before it pays anything** (PAY-06).

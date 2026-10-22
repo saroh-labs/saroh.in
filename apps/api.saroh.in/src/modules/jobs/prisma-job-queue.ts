@@ -3,7 +3,7 @@ import { Prisma, prisma } from "@saroh/database";
 
 import { env } from "../../env";
 import type { EnqueueJobInput, JobQueue } from "./job-queue.port";
-import { nextBackoff } from "./job-queue.port";
+import { retryDelay } from "./job-queue.port";
 
 /**
  * Postgres-backed {@link JobQueue} (S3-003).
@@ -126,7 +126,7 @@ export class PrismaJobQueue implements JobQueue {
     /**
      * Record a failure. Reads the job to know its attempt count, then either
      * dead-letters (FAILED, terminal) once `attempts+1 >= maxAttempts`, or
-     * reschedules PENDING at `now + nextBackoff(attempts)`. The lock is always
+     * reschedules PENDING at `now + retryDelay(type, attempts)`. The lock is always
      * released so a reclaim/retry can proceed.
      *
      * Both the read and the write are fenced on the lease. The read is only a
@@ -159,7 +159,9 @@ export class PrismaJobQueue implements JobQueue {
                       status: "PENDING",
                       attempts,
                       lastError: error,
-                      runAt: new Date(Date.now() + nextBackoff(attempts)),
+                      runAt: new Date(
+                          Date.now() + retryDelay(job.type, attempts),
+                      ),
                       lockedAt: null,
                       lockedBy: null,
                   },

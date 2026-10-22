@@ -28,6 +28,8 @@ export const BILLING_ACTION_CODES = [
     // couldn't write after its tries, and a refund after the line was paid.
     "commission_line_failed",
     "commission_refund_after_payout",
+    // A merchant's payment webhook that failed after all its tries.
+    "merchant_webhook_failed",
 ] as const;
 
 export type BillingActionCode = (typeof BILLING_ACTION_CODES)[number];

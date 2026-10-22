@@ -1,6 +1,11 @@
 // Pure unit tests for the backoff helper. job-queue.port.ts has only type-only
 // imports, so nothing touches a DB, the network, or env here.
-import { BACKOFF_BASE_MS, BACKOFF_CAP_MS, nextBackoff } from "./job-queue.port";
+import {
+    BACKOFF_BASE_MS,
+    BACKOFF_CAP_MS,
+    nextBackoff,
+    retryDelay,
+} from "./job-queue.port";
 
 describe("nextBackoff", () => {
     it("is the base delay for the first retry", () => {
@@ -31,5 +36,24 @@ describe("nextBackoff", () => {
         for (let attempts = 0; attempts <= 100; attempts++) {
             expect(nextBackoff(attempts)).toBeLessThanOrEqual(BACKOFF_CAP_MS);
         }
+    });
+});
+
+describe("retryDelay", () => {
+    it("keeps the five-minute backoff for a job with no schedule", () => {
+        expect(retryDelay("orders.notify", 3)).toBe(nextBackoff(3));
+        expect(retryDelay("orders.notify", 30)).toBe(BACKOFF_CAP_MS);
+    });
+
+    it("spreads a merchant webhook's retries over about 16 hours", () => {
+        const MIN = 60_000;
+        expect(retryDelay("webhook.process", 1)).toBe(MIN);
+        expect(retryDelay("webhook.process", 8)).toBe(480 * MIN);
+        // Past the schedule, the last wait repeats.
+        expect(retryDelay("webhook.process", 20)).toBe(480 * MIN);
+        const total = [1, 2, 3, 4, 5, 6, 7, 8]
+            .map((n) => retryDelay("webhook.process", n))
+            .reduce((a, b) => a + b, 0);
+        expect(total / (60 * MIN)).toBeGreaterThan(15);
     });
 });

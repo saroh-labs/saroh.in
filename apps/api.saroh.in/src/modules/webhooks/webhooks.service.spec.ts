@@ -83,6 +83,11 @@ jest.mock("@saroh/database", () => {
         job: { create: jest.fn() },
         // The business's notice switches (U12): none stored, so on.
         customerNoticeSetting: { findUnique: jest.fn() },
+        // A delivery that fails for good is raised for an operator.
+        adminOrganizationNote: { create: jest.fn() },
+        billingAction: {
+            createMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
     };
     return {
         ...actual,
@@ -519,7 +524,7 @@ describe("WebhooksService stores, answers 200, then applies", () => {
         );
     });
 
-    it("keeps the row FAILED for replay when the last try fails", async () => {
+    it("keeps the row FAILED for replay and raises it for an operator when the last try fails", async () => {
         const { service } = makeService();
         providerFindUnique.mockResolvedValue(providerRow());
         whCreate.mockResolvedValue({ id: "wh_1" });
@@ -536,8 +541,12 @@ describe("WebhooksService stores, answers 200, then applies", () => {
             payload: JSON.parse(raw.toString("utf8")),
             status: "RECEIVED",
         });
-        const job = queuedJob(11);
-        await service.processJob(job);
+        const first = queuedJob() as unknown as { maxAttempts: number };
+        // The retries run for hours, not half an hour.
+        expect(first.maxAttempts).toBe(9);
+        const createMany = prisma.billingAction.createMany as jest.Mock;
+        createMany.mockClear();
+        await service.processJob(queuedJob(first.maxAttempts - 1));
         expect(whUpdateMany).toHaveBeenLastCalledWith({
             where: { id: "wh_1", status: "RECEIVED" },
             data: expect.objectContaining({
@@ -545,6 +554,20 @@ describe("WebhooksService stores, answers 200, then applies", () => {
                 error: "connection lost",
             }),
         });
+        // Admin › Billing › Needs action lists it until it is resolved,
+        // once however often it is raised.
+        expect(createMany).toHaveBeenCalledWith({
+            data: [
+                expect.objectContaining({
+                    organizationId: "org_1",
+                    code: "merchant_webhook_failed",
+                    refs: expect.objectContaining({ webhookEvent: "wh_1" }),
+                    dedupeKey: "merchant_webhook_failed:wh_1",
+                }),
+            ],
+            skipDuplicates: true,
+        });
+        expect(prisma.adminOrganizationNote.create).toHaveBeenCalled();
         orderUpdate.mockReset();
     });
 

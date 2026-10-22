@@ -145,6 +145,7 @@ export const BILLING_ACTION_CODES = [
     "billing_profile_gone",
     "commission_line_failed",
     "commission_refund_after_payout",
+    "merchant_webhook_failed",
 ] as const;
 export type BillingActionCode = (typeof BILLING_ACTION_CODES)[number];
 
@@ -294,6 +295,15 @@ const ACTION_WORDS: Record<BillingActionCode, ActionWords> = {
         what: "A payment was refunded after its account manager's commission on it was paid, and nothing was taken back.",
         tone: "warning",
         fix: { kind: "resolve", label: "Decide with them, then mark resolved" },
+    },
+    merchant_webhook_failed: {
+        label: "Payment event not applied",
+        what: "A business's payment provider sent an event Saroh couldn't apply after a day of tries, so a payment, refund or mandate may be out of step.",
+        tone: "danger",
+        fix: {
+            kind: "resolve",
+            label: "Replay it in Operations › Webhooks, then mark resolved",
+        },
     },
 };
 
