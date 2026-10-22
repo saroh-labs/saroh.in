@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import { PlanAccessProvider } from "@/components/billing/plan-way";
-import { ModuleGate } from "@/components/modules/module-gate";
+import { ModuleGate } from "@/components/modules/gate/module-gate";
 import { SiteFacesProvider } from "@/components/sites/looks/site-faces";
 import { mayChangePlan } from "@/lib/billing/plan-access";
 import { activeOrganizationOnce } from "@/lib/organizations/service";

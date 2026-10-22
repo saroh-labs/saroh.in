@@ -159,7 +159,7 @@ each with why it stops there:
   `SETTINGS_PAGES`) and every rule that filters it by role, module and
   site; half of it is the table itself. Splitting data from rules is a move,
   not yet made.
-- `modules/module-list.tsx` (430) — one list and its row, switch and state
+- `modules/catalog/module-list.tsx` (430) — one list and its row, switch and state
   tag; a little over, and the row carries most of it.
 - `site-accounts/customer-view.ts` (502 after A6) — the account area's one
   allow-list (ADR-011): every answer a signed-in customer gets is built here,

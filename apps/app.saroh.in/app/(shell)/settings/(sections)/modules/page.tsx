@@ -1,4 +1,4 @@
-import { ModuleCatalog } from "@/components/modules/module-catalog";
+import { ModuleCatalog } from "@/components/modules/catalog/module-catalog";
 import {
     SettingsPanel,
     SettingsPanelHeader,

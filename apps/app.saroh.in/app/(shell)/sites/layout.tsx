@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { ModuleGate } from "@/components/modules/module-gate";
+import { ModuleGate } from "@/components/modules/gate/module-gate";
 import { SiteFacesProvider } from "@/components/sites/looks/site-faces";
 import { SITE_FACES } from "@/lib/sites/site-fonts";
 

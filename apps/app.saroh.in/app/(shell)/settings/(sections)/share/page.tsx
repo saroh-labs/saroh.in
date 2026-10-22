@@ -3,7 +3,7 @@ import { EmptyState } from "@saroh/ui/data-state";
 import { QrCode } from "lucide-react";
 import Link from "next/link";
 
-import { ModuleGate } from "@/components/modules/module-gate";
+import { ModuleGate } from "@/components/modules/gate/module-gate";
 import { QrShare } from "@/components/qr/share/qr-share";
 import {
     SettingsPanel,

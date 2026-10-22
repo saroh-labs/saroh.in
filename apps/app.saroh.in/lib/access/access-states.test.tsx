@@ -49,7 +49,7 @@ import { ActivityTimeline } from "@/components/crm/activity-timeline";
 import { ConsentToggle } from "@/components/crm/consent-toggle";
 import { LeadActions } from "@/components/crm/lead-actions";
 import { FollowUpsList } from "@/components/leads/follow-ups-list";
-import { ModuleGate } from "@/components/modules/module-gate";
+import { ModuleGate } from "@/components/modules/gate/module-gate";
 import { ServiceEditorState } from "@/components/services/service-editor/editor-states";
 import { postParagraphs } from "@/lib/content/plain-text";
 import type { ComposerGate } from "@/lib/messages/composer-gate";
