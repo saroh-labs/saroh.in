@@ -1,3 +1,4 @@
+import type { EditorSheet } from "@/components/sites/editor/use-editor-layout";
 import type { SiteChangeKind } from "@/lib/sites/pending";
 import type {
     ModulePageKind,
@@ -109,7 +110,10 @@ export interface SiteEditorProps {
      * Read the draft again and start the editor afresh on it, on the page
      * named or this one (`SiteEditorHost`): after a write that changed the
      * draft on the server, as a look's starter content does (DEC-182).
-     * Absent, nothing offers such a write.
+     * Absent, nothing offers such a write. `sheet` is the sheet open when
+     * it was asked, opened again on the fresh editor.
      */
-    reloadDraft?: (pageId?: string) => void;
+    reloadDraft?: (pageId?: string, sheet?: EditorSheet) => void;
+    /** The sheet open when the editor was last started afresh. */
+    initialSheet?: EditorSheet;
 }

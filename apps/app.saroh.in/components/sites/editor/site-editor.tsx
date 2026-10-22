@@ -79,6 +79,7 @@ export function SiteEditor({
     canOverride = false,
     livePublishedAt = null,
     reloadDraft,
+    initialSheet = null,
 }: SiteEditorProps) {
     const review = useEditorReview({
         siteId,
@@ -144,7 +145,12 @@ export function SiteEditor({
         narrow: layout !== "wide",
     });
     // Below the desk width, choosing something opens its sheet (G4).
-    const sheets = useEditorSheets(placed, layout, viewport.previewing);
+    const sheets = useEditorSheets(
+        placed,
+        layout,
+        viewport.previewing,
+        initialSheet,
+    );
     const { selection } = sheets;
     const { setSelectedIndex, setRail, setInspector } = selection;
     const draft = useEditorDraft({
@@ -241,7 +247,8 @@ export function SiteEditor({
               homePageId: homePage?.id ?? null,
               unsaved,
               settleUndo: () => edits.settleUndo(),
-              reloadDraft,
+              // A phone's Brand sheet stays open on the fresh editor.
+              reloadDraft: (page) => reloadDraft(page, sheets.sheet),
           })
         : null;
 

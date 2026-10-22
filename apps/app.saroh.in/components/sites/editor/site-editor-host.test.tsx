@@ -19,8 +19,9 @@ vi.mock("next/navigation", () => ({ useRouter: () => router }));
 // `reloadDraft`.
 const editor = vi.hoisted(() => ({
     mounts: 0,
-    reload: null as null | ((pageId?: string) => void),
+    reload: null as null | SiteEditorProps["reloadDraft"],
     sections: [] as unknown[],
+    sheet: undefined as SiteEditorProps["initialSheet"],
 }));
 vi.mock("./site-editor", async () => {
     const { useState } = await import("react");
@@ -32,6 +33,7 @@ vi.mock("./site-editor", async () => {
                 return props.initialSections;
             });
             editor.reload = props.reloadDraft ?? null;
+            editor.sheet = props.initialSheet;
             editor.sections = sections;
             return null;
         },
@@ -76,6 +78,15 @@ describe("SiteEditorHost", () => {
         expect(editor.sections).toEqual([
             { type: "hero", content: { heading: "Sample" } },
         ]);
+    });
+
+    it("starts the fresh editor with the sheet that was open (a phone's Brand)", () => {
+        act(() => root.render(<SiteEditorHost {...props("Ours")} />));
+        expect(editor.sheet).toBeNull();
+        act(() => editor.reload?.(undefined, "rail"));
+        act(() => root.render(<SiteEditorHost {...props("Sample")} />));
+        expect(editor.mounts).toBe(2);
+        expect(editor.sheet).toBe("rail");
     });
 
     it("leaves the editor alone when new props arrive unasked", () => {
