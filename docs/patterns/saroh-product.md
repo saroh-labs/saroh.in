@@ -596,7 +596,7 @@ organizations/:org/customers`: everyone who has paid (an order through a
   flips its own line in the same commit, so no switch ever does nothing.
 - **Current** (DEC-174, U4 #1135) — **Settings › Providers' "Emails to
   your customers"**, under "Updates in Messages"
-  (`components/providers/customer-emails-row.tsx`, words in
+  (`components/providers/customer-emails/customer-emails-row.tsx`, words in
   `lib/communications/customer-emails.ts`): a read row ("9 on, 1 off",
   "Not sent: Overdue reminders.") and at most one quiet line under it (no
   email provider: "None of these go out until your email is connected";

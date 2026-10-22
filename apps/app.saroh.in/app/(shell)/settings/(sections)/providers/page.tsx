@@ -3,9 +3,9 @@ import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
 import { OnlinePaymentsLockNotice } from "@/components/billing/online-payments-lock";
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { EmailPromptBlock } from "@/components/communications/email-prompt";
-import { AccountUpdatesBlock } from "@/components/providers/account-updates-row";
-import { CustomerEmailsBlock } from "@/components/providers/customer-emails-row";
-import { ProviderList } from "@/components/providers/provider-list";
+import { AccountUpdatesBlock } from "@/components/providers/account-updates/account-updates-row";
+import { ProviderList } from "@/components/providers/connections/provider-list";
+import { CustomerEmailsBlock } from "@/components/providers/customer-emails/customer-emails-row";
 import {
     SettingsPanel,
     SettingsPanelHeader,
