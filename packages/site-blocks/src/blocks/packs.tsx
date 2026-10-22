@@ -131,8 +131,14 @@ export default function PacksSection({
     apiUrl = DEFAULT_API_URL,
     look,
     plansOnPage = false,
+    bare = false,
 }: LookProps & {
     content: RenderedPacks;
+    /**
+     * Under a look, only the packs' cards (and their sheets), for the
+     * plans' row they join (Live, VB01: `PageSections`). With a feed only.
+     */
+    bare?: boolean;
     /**
      * Under a look (U7): the page also lists plans on sale. Their Join is
      * then the page's one filled button, and the packs say a membership is
@@ -194,6 +200,7 @@ export default function PacksSection({
                 apiUrl={apiUrl}
                 look={look}
                 plansOnPage={plansOnPage}
+                bare={bare}
             />
         );
     }
@@ -336,6 +343,7 @@ function PackCards({
     apiUrl,
     look,
     plansOnPage = false,
+    bare = false,
 }: {
     content: RenderedPacks;
     title: string;
@@ -349,6 +357,8 @@ function PackCards({
     look?: LookId;
     /** The page also lists plans on sale (U7). */
     plansOnPage?: boolean;
+    /** Only the cards, for the plans' row (`PacksSection`'s `bare`). */
+    bare?: boolean;
 }) {
     // Not taking orders (#800): nothing to click that cannot work, not even
     // "Ask about this pack".
@@ -400,8 +410,68 @@ function PackCards({
     // outline beside plans (their Join is the filled one); alone on the
     // page, the first Buy is the page's own action.
     if (look) {
-        return (
-            <PriceFrame content={content} look={look} title={title}>
+        const columns = feed.packs.map((pack, index) => {
+            const primary = !plansOnPage && index === 0;
+            const classes = priceButton(look, primary);
+            const mark = primary ? { "data-site-primary": "" } : {};
+            const action = canvas ? (
+                <span className={classes}>{label}</span>
+            ) : buys ? (
+                <button
+                    type="button"
+                    onClick={() => buy(pack)}
+                    aria-label={`${label}: ${pack.name}`}
+                    className={classes}
+                    {...mark}
+                >
+                    {label}
+                </button>
+            ) : feed.askHref && !stopped ? (
+                <a
+                    href={askAboutHref(feed.askHref, pack.name, "pack")}
+                    aria-label={`${label}: ${pack.name}`}
+                    className={classes}
+                    {...mark}
+                >
+                    {label}
+                </a>
+            ) : null;
+            return (
+                <li
+                    key={pack.id}
+                    data-pack-column=""
+                    className={priceColumn(look, false)}
+                >
+                    <PriceParts
+                        look={look}
+                        eyebrow={packEyebrow(pack)}
+                        name={pack.name}
+                        price={
+                            buyWords
+                                ? packPayPrice(pack)
+                                : packBrowsePrice(pack)
+                        }
+                        gst={
+                            buyWords
+                                ? gstUnderWords(pack.gst, pack.currency)
+                                : null
+                        }
+                        lines={[
+                            packPerClass(pack),
+                            showDescriptions ? said(pack.description) : null,
+                        ]}
+                        rules={[
+                            plansOnPage
+                                ? "A membership is used before a pack."
+                                : null,
+                        ]}
+                        action={action}
+                    />
+                </li>
+            );
+        });
+        const notes = (
+            <>
                 {done && prices ? (
                     <PricesDone
                         message={done}
@@ -409,77 +479,24 @@ function PackCards({
                     />
                 ) : null}
                 {stopped ? <NotTakingOrders /> : null}
-                <ul className={priceList(look)}>
-                    {feed.packs.map((pack, index) => {
-                        const primary = !plansOnPage && index === 0;
-                        const classes = priceButton(look, primary);
-                        const mark = primary ? { "data-site-primary": "" } : {};
-                        const action = canvas ? (
-                            <span className={classes}>{label}</span>
-                        ) : buys ? (
-                            <button
-                                type="button"
-                                onClick={() => buy(pack)}
-                                aria-label={`${label}: ${pack.name}`}
-                                className={classes}
-                                {...mark}
-                            >
-                                {label}
-                            </button>
-                        ) : feed.askHref && !stopped ? (
-                            <a
-                                href={askAboutHref(
-                                    feed.askHref,
-                                    pack.name,
-                                    "pack",
-                                )}
-                                aria-label={`${label}: ${pack.name}`}
-                                className={classes}
-                                {...mark}
-                            >
-                                {label}
-                            </a>
-                        ) : null;
-                        return (
-                            <li
-                                key={pack.id}
-                                data-pack-column=""
-                                className={priceColumn(look, false)}
-                            >
-                                <PriceParts
-                                    look={look}
-                                    eyebrow={packEyebrow(pack)}
-                                    name={pack.name}
-                                    price={
-                                        buyWords
-                                            ? packPayPrice(pack)
-                                            : packBrowsePrice(pack)
-                                    }
-                                    gst={
-                                        buyWords
-                                            ? gstUnderWords(
-                                                  pack.gst,
-                                                  pack.currency,
-                                              )
-                                            : null
-                                    }
-                                    lines={[
-                                        packPerClass(pack),
-                                        showDescriptions
-                                            ? said(pack.description)
-                                            : null,
-                                    ]}
-                                    rules={[
-                                        plansOnPage
-                                            ? "A membership is used before a pack."
-                                            : null,
-                                    ]}
-                                    action={action}
-                                />
-                            </li>
-                        );
-                    })}
-                </ul>
+            </>
+        );
+        if (bare) {
+            return (
+                <>
+                    {columns}
+                    {/* The row's own messages, across it, and Buy's sheets. */}
+                    <li className="contents [&>*]:col-span-full">
+                        {notes}
+                        {sheets}
+                    </li>
+                </>
+            );
+        }
+        return (
+            <PriceFrame content={content} look={look} title={title}>
+                {notes}
+                <ul className={priceList(look)}>{columns}</ul>
                 {sheets}
             </PriceFrame>
         );

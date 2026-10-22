@@ -155,8 +155,14 @@ export default function PlansSection({
     siteId,
     apiUrl = DEFAULT_API_URL,
     look,
+    beside = null,
 }: LookProps & {
     content: RenderedPlans;
+    /**
+     * Under a look, cards drawn first in the plans' own row: Live's class
+     * packs (VB01, `PageSections`). Absent: the plans alone.
+     */
+    beside?: React.ReactNode;
     /** The plans, read by the page that serves the site (live or preview). */
     feed?: PlansFeed;
     /**
@@ -218,6 +224,7 @@ export default function PlansSection({
                 prices={prices}
                 apiUrl={apiUrl}
                 look={look}
+                beside={beside}
             />
         );
     }
@@ -377,6 +384,7 @@ function PlanCards({
     canvas = false,
     apiUrl,
     look,
+    beside = null,
 }: {
     content: RenderedPlans;
     title: string;
@@ -388,6 +396,8 @@ function PlanCards({
     canvas?: boolean;
     /** The site's look (DEC-172, U7); absent is Classic. */
     look?: LookId;
+    /** Cards drawn first in the row (`PlansSection`'s `beside`). */
+    beside?: React.ReactNode;
 }) {
     // Not taking orders (#800): nothing to click that cannot work, not even
     // "Ask about joining".
@@ -462,6 +472,7 @@ function PlanCards({
                 ) : null}
                 {stopped ? <NotTakingOrders /> : null}
                 <ul className={priceList(look, content.layout === "list")}>
+                    {beside}
                     {feed.plans.map((plan, index) => {
                         const highlighted = highlightFirst && index === 0;
                         const classes = priceButton(look, highlighted);

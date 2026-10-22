@@ -1,6 +1,7 @@
 "use client";
 
 import type { LookId } from "@saroh/block-contract";
+import { resolveVariant } from "@saroh/block-contract";
 import type { KeyboardEvent } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -18,7 +19,7 @@ import {
     LookEyebrow,
     said,
 } from "./look-front";
-import { formatDuration, servicePriceWords } from "./service-words";
+import { formatDuration, lookPriceWords } from "./service-words";
 
 /**
  * The week's classes under a look (DEC-172, plan U7, #1096), as VA09,
@@ -89,7 +90,7 @@ export function waitlistHref(bookHref: string, s: TimetableSession): string {
 
 /** A class's price as the services list says it; null for none. */
 export function sessionPrice(s: TimetableSession): string | null {
-    return servicePriceWords({
+    return lookPriceWords({
         priceCents: s.priceCents ?? null,
         currency: s.currency ?? null,
         gst: s.gst ?? null,
@@ -219,24 +220,36 @@ export function LookTimetable({
                         {checked ?? ""}
                     </p>
                 </div>
-                <div className="max-[999px]:hidden">
-                    <WeekColumns
-                        look={look}
+                {look === "live" &&
+                resolveVariant("timetable", content) === "list" ? (
+                    <NextFreeRail
                         days={days}
                         byDay={byDay}
                         show={show}
                         paidWith={paidWith}
                     />
-                </div>
-                <div className="min-[1000px]:hidden">
-                    <DayTabs
-                        look={look}
-                        days={days}
-                        byDay={byDay}
-                        show={show}
-                        paidWith={paidWith}
-                    />
-                </div>
+                ) : (
+                    <>
+                        <div className="max-[999px]:hidden">
+                            <WeekColumns
+                                look={look}
+                                days={days}
+                                byDay={byDay}
+                                show={show}
+                                paidWith={paidWith}
+                            />
+                        </div>
+                        <div className="min-[1000px]:hidden">
+                            <DayTabs
+                                look={look}
+                                days={days}
+                                byDay={byDay}
+                                show={show}
+                                paidWith={paidWith}
+                            />
+                        </div>
+                    </>
+                )}
             </div>
         </section>
     );
@@ -357,6 +370,77 @@ function WeekColumns({ look, days, byDay, show, paidWith }: DayProps) {
                 );
             })}
         </div>
+    );
+}
+
+/**
+ * Live's list (VB01 "Next free"): the classes in one row of cards, in
+ * time order, sharing the row on a desk (188px at least) and 212px each
+ * on a phone, scrolling sideways when they run past the page. A card says the day ("Today" for the first), the
+ * time large, the class, who · how long · price, its places as a tag,
+ * and a full-width Book (or Join the waitlist).
+ */
+function NextFreeRail({ days, byDay, show, paidWith }: Omit<DayProps, "look">) {
+    const sessions = days.flatMap((date) => byDay(date));
+    if (sessions.length === 0) {
+        return <p className="text-site-muted text-[14px]">No classes</p>;
+    }
+    return (
+        <ul
+            data-timetable-rail=""
+            className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-0.5 [scrollbar-width:none]"
+        >
+            {sessions.map((s) => {
+                const words = wordsOf(s, show, paidWith[s.serviceId]);
+                const full = s.placesLeft <= 0;
+                return (
+                    <li
+                        key={`${s.serviceId}:${s.startAt}`}
+                        data-timetable-row=""
+                        data-timetable-full={full ? "" : undefined}
+                        className="bg-site-surface grid w-[212px] shrink-0 snap-start content-start gap-2 rounded-[20px] p-4 min-[1000px]:w-auto min-[1000px]:min-w-[188px] min-[1000px]:flex-1 min-[1000px]:basis-0"
+                    >
+                        <span className={FRONT_TYPE.live.eyebrow}>
+                            {s.date === days[0] ? "Today" : dayLabel(s.date)}
+                        </span>
+                        <BigTime
+                            look="live"
+                            time={s.time}
+                            className="text-[44px] [&>span:last-child]:text-[18px]"
+                        />
+                        <span className="text-site-fg font-bold leading-tight [overflow-wrap:anywhere]">
+                            {s.serviceName}
+                        </span>
+                        <LiveMeta session={s} words={words} />
+                        <span
+                            data-timetable-places={words.places?.tone ?? ""}
+                            className="min-h-[26px]"
+                        >
+                            {words.places ? (
+                                <span
+                                    className={cn(
+                                        "inline-flex rounded-[9px] px-[9px] py-1 text-[12.5px] font-bold",
+                                        full
+                                            ? "bg-site-bg text-site-fg"
+                                            : "bg-site-fg text-site-bg",
+                                    )}
+                                >
+                                    {full && s.capacity > 1
+                                        ? "Full · waitlist open"
+                                        : words.places.text}
+                                </span>
+                            ) : null}
+                        </span>
+                        <Action
+                            look="live"
+                            session={s}
+                            show={show}
+                            className="w-full"
+                        />
+                    </li>
+                );
+            })}
+        </ul>
     );
 }
 

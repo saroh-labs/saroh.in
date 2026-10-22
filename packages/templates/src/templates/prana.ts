@@ -17,7 +17,8 @@ import type { TemplateContext, TemplateManifest } from "../manifest";
  * One home page holds every board's sections in the boards' shared order;
  * each look keeps its own board's (`PRANA_LOOK_SECTIONS`) and its own words
  * where its board says them differently (`PRANA_LOOK_WORDS`). No section
- * names a variant, so each look draws its own defaults (KD2).
+ * names a variant but Live's Next free (a list), so each look draws its
+ * own defaults (KD2).
  */
 
 export const PRANA_TEMPLATE_ID = "prana";
@@ -337,6 +338,9 @@ export const PRANA_LOOK_WORDS: Readonly<
             secondaryCta: { label: S.live.second, href: "/book" },
             imageBrief: "Prana, a class in progress",
         },
+        // VB01's "Next free" is a row of cards: Live's list (its default,
+        // the week across, is VB09's timetable page).
+        timetable: { variant: "list" },
         servicesList: { eyebrow: undefined, heading: S.live.classes },
         person: { title: S.live.teachers },
         testimonials: {

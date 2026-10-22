@@ -37,6 +37,19 @@ export function servicePriceWords(
         : browsePriceWords(price, gstOnPriceOf(service.gst)?.mode === "ADDED");
 }
 
+/**
+ * A price as the looks say it (DEC-172, VD01, VA01): a free service is
+ * "Free", never "₹0". Classic keeps {@link servicePriceWords}.
+ */
+export function lookPriceWords(
+    service: Pick<PublicService, "priceCents" | "currency" | "gst">,
+    locale?: string,
+): string | null {
+    return service.priceCents === 0
+        ? "Free"
+        : servicePriceWords(service, locale);
+}
+
 /** "30 min", "1 hr", "1 hr 30 min". */
 export function formatDuration(minutes: number): string {
     const h = Math.floor(minutes / 60);

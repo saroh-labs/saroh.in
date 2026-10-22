@@ -3,6 +3,7 @@ import { BLOCK_META } from "@saroh/block-contract";
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { lookPriceWords } from "./service-words";
 import type { PublicService } from "./services-list";
 import ServicesListSection, {
     formatDuration,
@@ -230,5 +231,18 @@ describe("a service's price when GST comes on top", () => {
                 .map((h) => h.textContent),
         ).toEqual(["Cut and finish", "Colour"]);
         expect(container.textContent.match(/\+ GST/g)).toHaveLength(1);
+    });
+});
+
+describe("a free service under a look (DEC-172, VD01, VA01)", () => {
+    const free = { priceCents: 0, currency: "INR", gst: null };
+    it('says "Free" under a look, and Classic keeps its "₹0"', () => {
+        expect(lookPriceWords(free, "en-IN")).toBe("Free");
+        expect(servicePriceWords(free, "en-IN")).toBe("₹0");
+        // No price is still no price, never "Free".
+        expect(lookPriceWords({ ...free, priceCents: null })).toBeNull();
+        expect(lookPriceWords({ ...free, priceCents: 60_000 }, "en-IN")).toBe(
+            "₹600",
+        );
     });
 });

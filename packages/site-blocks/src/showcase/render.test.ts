@@ -679,5 +679,9 @@ describe("a look's Preview draws on its board's ground (DEC-172, 22 Oct)", () =>
         expect(vars["--site-bg"]).toBe(
             hexToHslTriple(LOOK_SHOWCASE_PALETTE[look].bg),
         );
+        // Its own accent too: Live's is VB01's orange, not the gym's lime.
+        expect(vars["--site-accent"]).toBe(
+            hexToHslTriple(LOOK_SHOWCASE_PALETTE[look].accent),
+        );
     });
 });

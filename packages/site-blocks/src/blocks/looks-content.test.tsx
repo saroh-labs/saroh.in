@@ -588,6 +588,45 @@ describe("Classic's timetable", () => {
     });
 });
 
+describe("Live's list: VB01's Next free", () => {
+    it("draws every class in one row of cards, not the week across", () => {
+        const { container } = page(
+            [
+                {
+                    ...timetable,
+                    content: { title: "Next free", variant: "list" },
+                },
+            ],
+            "live",
+            { fixtures: { timetable: WEEK } },
+        );
+        const rail = must(container.querySelector("[data-timetable-rail]"));
+        expect(container.querySelector(".grid-cols-7")).toBeNull();
+        expect(container.querySelector('[role="tablist"]')).toBeNull();
+        const cards = rail.querySelectorAll("[data-timetable-row]");
+        expect(cards).toHaveLength(WEEK.sessions.length);
+        expect(cards[0]).toHaveTextContent("Today");
+        expect(cards[0]).toHaveTextContent("Meera · 1 hr · ₹600");
+        expect(cards[2]).toHaveTextContent("Thu 22 Oct");
+        expect(cards[2]).toHaveTextContent("Full · waitlist open");
+        expect(cards[2]).toHaveTextContent("Join the waitlist");
+        // Folio and Quiet keep the week for the same section.
+        const folio = page(
+            [
+                {
+                    ...timetable,
+                    content: { title: "Next free", variant: "list" },
+                },
+            ],
+            "folio",
+            { fixtures: { timetable: WEEK } },
+        );
+        expect(
+            folio.container.querySelector("[data-timetable-rail]"),
+        ).toBeNull();
+    });
+});
+
 // ── Journal ─────────────────────────────────────────────────────────────
 
 const FEED: JournalFeed = {
@@ -775,6 +814,41 @@ describe.each(LOOKS)("%s: plans and packs", (look) => {
         expect(primary).toHaveLength(1);
         expect(primary[0]).toHaveAccessibleName(/10-class pack$/);
         expect(container).not.toHaveTextContent("membership");
+    });
+});
+
+describe("Live's plans and packs: one row (VB01)", () => {
+    const feeds = {
+        plans: { plans: PLANS.slice(0, 1), joinHref: "/contact#enquiry" },
+        packs: { packs: [TEN], payOnline: false, askHref: "/contact" },
+    };
+    it("draws the pack, then the ink membership, in the plans' one row", () => {
+        const { container } = page([plans, packs], "live", feeds);
+        const lists = container.querySelectorAll(
+            "[data-site-look-prices] ul:not([data-price-rules])",
+        );
+        expect(lists).toHaveLength(1);
+        const cards = lists[0].querySelectorAll(
+            "[data-pack-column], [data-plan-column]",
+        );
+        expect(cards[0]).toHaveAttribute("data-pack-column");
+        expect(cards[1]).toHaveAttribute("data-plan-column");
+        expect(cards[1].className).toContain("bg-site-cta-bg");
+        // Its one filled button stays the plan's Join.
+        expect(container.querySelectorAll("[data-site-primary]")).toHaveLength(
+            1,
+        );
+        expect(container).not.toHaveTextContent("Class packs");
+    });
+
+    it("keeps two sections under Folio and Quiet", () => {
+        for (const look of ["folio", "quiet"] as const) {
+            const { container, unmount } = page([plans, packs], look, feeds);
+            expect(
+                container.querySelectorAll("[data-site-look-prices]"),
+            ).toHaveLength(2);
+            unmount();
+        }
     });
 });
 

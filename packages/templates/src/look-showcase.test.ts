@@ -249,7 +249,7 @@ describe("withLookShowcase (DEC-182, amended 22 Oct)", () => {
     const made = instantiateTemplate(prana, business(prana));
 
     it.each(LOOK_IDS)(
-        "%s's home is its board's sections, in the boards' order, with no variant but the team",
+        "%s's home is its board's sections, in the boards' order, with no variant but the team and Live's Next free",
         (look) => {
             const home = withLookShowcase(look, made).pages.find(
                 (p) => p.isHome,
@@ -261,6 +261,14 @@ describe("withLookShowcase (DEC-182, amended 22 Oct)", () => {
                 // The team is the one: a Person block is one person unless
                 // it says so.
                 if (section.type === "person") continue;
+                // VB01's Next free is Live's list: a row of cards, not
+                // the week across (its default, VB09).
+                if (look === "live" && section.type === "timetable") {
+                    expect(
+                        (section.content as { variant?: unknown }).variant,
+                    ).toBe("list");
+                    continue;
+                }
                 expect(
                     (section.content as { variant?: unknown }).variant,
                     `${look} ${section.type}`,

@@ -590,7 +590,7 @@ describe("the hero's Next free", () => {
         }
     });
 
-    it("draws Live's Now strip: the time, a short count, open and checked", () => {
+    it("draws Live's Now strip as VB01's pills: the time, the count, open and checked", () => {
         vi.useFakeTimers({ now: NOW });
         try {
             render(
@@ -610,10 +610,17 @@ describe("the hero's Next free", () => {
                 />,
             );
             const box = theFact();
-            expect(box.textContent).toContain("6:00 pm Vinyasa flow");
+            expect(box.textContent).toContain("6:00 pm · Vinyasa flow");
+            // The desk's words, and the phone's short ones.
+            expect(box.textContent).toContain("3 places left");
             expect(box.textContent).toContain("3 left");
             expect(box.textContent).toContain("Open now · closes 9pm");
-            expect(box.textContent).toContain("Checked 5:20 pm");
+            expect(box.textContent).toContain("Now · checked 5:20 pm");
+            // Small pills on the page's ground, not one dark bar.
+            expect(box.querySelector(".bg-site-fg.rounded-full")).toBeNull();
+            expect(
+                box.querySelectorAll(".bg-site-surface.rounded-full"),
+            ).toHaveLength(2);
         } finally {
             vi.useRealTimers();
         }

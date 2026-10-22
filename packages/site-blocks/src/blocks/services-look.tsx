@@ -17,7 +17,7 @@ import {
     said,
 } from "./look-front";
 import type { PublicService } from "./service-words";
-import { formatDuration, servicePriceWords } from "./service-words";
+import { formatDuration, lookPriceWords } from "./service-words";
 
 /**
  * The services list under a look (DEC-172, plan U6, #1094), as each
@@ -224,7 +224,7 @@ function Rows({
             )}
         >
             {services.map((service, i) => {
-                const price = showPrices ? servicePriceWords(service) : null;
+                const price = showPrices ? lookPriceWords(service) : null;
                 const href = bookHref
                     ? withQrSource(
                           `${bookHref}?service=${encodeURIComponent(service.id)}`,

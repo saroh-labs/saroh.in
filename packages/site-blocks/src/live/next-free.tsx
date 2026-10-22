@@ -31,8 +31,8 @@ import { useLiveRead } from "./use-live-read";
  * - the hero's slot under Folio and Quiet (VA01, VD01): "Next free ·
  *   Hatha yoga · Wed 21 Oct, 7:00 am · 3 places left", and a link to book
  *   that time;
- * - Live's Now strip (VB00Live, VB01): "6:00 pm Vinyasa flow · 3 left",
- *   with "Open now · closes 9pm" and "Checked 5:20 pm" under it;
+ * - Live's Now strip (VB01): pills, "Now · checked 5:20 pm", "Open now ·
+ *   closes 9pm" and "6:00 pm · Vinyasa flow · 3 places left · Book";
  * - the phone's Book bar (VD01): "Next free: today, 6:00 pm".
  *
  * Until the read answers, and whenever it fails or finds nothing free, the
@@ -305,10 +305,15 @@ function PlacesLeft({ words }: { words: string }) {
 }
 
 /**
- * Live's Now strip (VB00Live "Now strip · fresh", VB01): the next free
- * time and what it is, its count while fresh, and under it whether the
- * place is open and when this was checked. Dark, as drawn; no pulse.
+ * Live's Now strip (VB01 `.now`): the board's small pills on the page's
+ * ground. On a desk "Now · checked 5:20 pm", whether the place is open
+ * (its dot only when it is), and the next free time and what it is, with
+ * its count while fresh and Book; on a phone the time first, "3 left", and
+ * the pills scroll sideways (`.pnow`). No pulse.
  */
+const PILL =
+    "bg-site-surface text-site-fg inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-semibold max-[699px]:gap-1.5 max-[699px]:px-3";
+
 function NowStrip({
     next,
     href,
@@ -321,7 +326,8 @@ function NowStrip({
     checkedAt?: number;
 }) {
     const { item, today } = next;
-    const places = count
+    const places = count ? placesLeftWords(item.placesLeft) : null;
+    const short = count
         ? placesLeftWords(item.placesLeft, { short: true })
         : null;
     const open = openState(
@@ -334,39 +340,49 @@ function NowStrip({
         item.date === today.date
             ? clockWords(item.time)
             : nextFreeWhen(item, today.date);
-    const under = [
-        open ? openStateText(open) : null,
-        checkedAt ? checkedWords(checkedAt, today.timezone) : null,
-    ].filter((part): part is string => part !== null);
+    const tag =
+        "bg-site-fg text-site-bg rounded-[9px] px-[9px] py-1 text-[12.5px] font-bold tabular-nums";
     return (
-        <>
+        <div className="flex w-full min-w-0 items-center gap-2 overflow-x-auto [scrollbar-width:none] min-[700px]:flex-wrap">
+            <span className="text-site-muted mr-1 shrink-0 whitespace-nowrap text-[13px] font-bold tracking-[0.02em] max-[699px]:hidden">
+                Now
+                {checkedAt ? (
+                    <span className="text-[12.5px] font-semibold tabular-nums">
+                        {" · "}
+                        {checkedWords(checkedAt, today.timezone).toLowerCase()}
+                    </span>
+                ) : null}
+            </span>
+            {open ? (
+                <span className={PILL}>
+                    {open.open ? (
+                        <span
+                            aria-hidden="true"
+                            className="bg-site-status size-[9px] shrink-0 rounded-full"
+                        />
+                    ) : null}
+                    {openStateText(open)}
+                </span>
+            ) : null}
             <Link
                 href={href}
                 aria-label={`Next free: ${item.serviceName}, ${nextFreeWhen(item, today.date)}${places ? `, ${places}` : ""}`}
-                className={cn(
-                    "bg-site-fg text-site-bg flex min-h-[54px] w-full min-w-0 items-center gap-3 rounded-full px-4 text-[14.5px] font-semibold",
-                    FRONT_RING,
-                )}
+                className={cn(PILL, "max-[699px]:order-first", FRONT_RING)}
             >
-                <span
-                    data-live-value=""
-                    className="min-w-0 flex-1 truncate tabular-nums"
-                >
-                    {when} {item.serviceName}
+                <span data-live-value="" className="tabular-nums">
+                    {when} · {item.serviceName}
                 </span>
                 {places ? (
-                    <span
-                        data-live-count=""
-                        className="bg-site-bg text-site-fg shrink-0 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[12.5px] font-bold tabular-nums"
-                    >
-                        {places}
+                    <span data-live-count="" className={tag}>
+                        <span className="max-[699px]:hidden">{places}</span>
+                        <span className="min-[700px]:hidden">{short}</span>
                     </span>
                 ) : null}
+                <span className="underline decoration-[1.5px] underline-offset-[3px] max-[699px]:hidden">
+                    Book
+                </span>
             </Link>
-            <p className="text-site-muted h-[18px] truncate px-1 text-[12.5px] leading-[18px]">
-                {under.join(" · ")}
-            </p>
-        </>
+        </div>
     );
 }
 

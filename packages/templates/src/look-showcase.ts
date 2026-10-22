@@ -79,28 +79,30 @@ export const LOOK_SHOWCASE_PALETTE: Readonly<Record<LookId, SitePalette>> = {
         footerBg: "#1E2420",
         footerFg: "#E3E7E0",
     },
+    // VB01's own Prana colours (`.th-prana`): the orange accent, not the
+    // Pulse gym's lime.
     live: {
-        bg: "#EDEEEA",
+        bg: "#F1F1EE",
         surface: "#FFFFFF",
-        fg: "#121410",
-        body: "#121410",
-        muted: "#55584F",
-        border: "#DEE0D8",
-        // Lime is only ever a fill with ink on it; as text the board uses
-        // its "signature as text on light" (`--site-accent-ink`).
-        accent: "#C6F432",
-        accentFg: "#121410",
-        accentText: "#4C6300",
+        fg: "#141414",
+        body: "#141414",
+        muted: "#5C5C56",
+        border: "#E3E3DD",
+        // The orange is only ever a fill with ink on it; as text the board
+        // uses its "signature as text on light" (`--site-accent-ink`).
+        accent: "#F2A93B",
+        accentFg: "#141414",
+        accentText: "#8A5A0B",
         // The board's live green (#2BB673), darkened to a dot's 3:1 on the
-        // page; lime over the ink.
+        // page; the board's own green over the ink.
         status: "#279961",
-        statusInverse: "#C6F432",
-        heroBg: "#EDEEEA",
-        heroFg: "#121410",
+        statusInverse: "#2BB673",
+        heroBg: "#F1F1EE",
+        heroFg: "#141414",
         // The board's ink cards and footer.
-        ctaBg: "#121410",
+        ctaBg: "#141414",
         ctaFg: "#FFFFFF",
-        footerBg: "#121410",
+        footerBg: "#141414",
         footerFg: "#FFFFFF",
     },
 };
