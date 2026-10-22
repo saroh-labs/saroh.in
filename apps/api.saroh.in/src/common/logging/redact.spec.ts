@@ -160,6 +160,18 @@ describe("redactUrl", () => {
         );
     });
 
+    it("blanks an invitation's token, read or accepted", () => {
+        expect(redactUrl("/public/organization-invitations/abc123")).toBe(
+            "/public/organization-invitations/[token]",
+        );
+        expect(redactUrl("/organization-invitations/abc123/accept")).toBe(
+            "/organization-invitations/[token]/accept",
+        );
+        expect(redactUrl("/invitations/abc123/accept")).toBe(
+            "/invitations/[token]/accept",
+        );
+    });
+
     it("leaves every other path alone", () => {
         expect(redactUrl("/organizations/org_1/orders")).toBe(
             "/organizations/org_1/orders",
