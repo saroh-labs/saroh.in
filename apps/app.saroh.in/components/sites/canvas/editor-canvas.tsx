@@ -123,6 +123,7 @@ export function EditorCanvas({
     pages,
     style,
     styleOptions,
+    trying = null,
     selectedIndex,
     setSelectedIndex,
     setRail,
@@ -158,6 +159,8 @@ export function EditorCanvas({
     pages: SitePage[];
     style: SiteStyle;
     styleOptions: SiteStyleOptions;
+    /** The typeface being tried on the page, unsaved (DEC-184). */
+    trying?: string | null;
     selectedIndex: number | null;
     setSelectedIndex: (index: number | null) => void;
     setRail: (next: EditorRailTab) => void;
@@ -244,6 +247,17 @@ export function EditorCanvas({
             data-previewing={previewing || undefined}
             className={`min-h-0 overflow-y-auto bg-background ${previewing ? "p-0" : narrow ? "px-3.5 py-[18px]" : "p-6"}`}
         >
+            {/* Over the page, taking no room: it moves nothing it covers. */}
+            {trying ? (
+                <div className="sticky top-3 z-20 flex h-0 justify-center">
+                    <p
+                        role="status"
+                        className="h-fit whitespace-nowrap rounded-full border bg-card px-3 py-1.5 text-xs font-medium shadow-md"
+                    >
+                        {`Trying ${trying}. Not saved until you press Enter.`}
+                    </p>
+                </div>
+            ) : null}
             {/*
              * Someone else saved this page while this editor was open
              * (#285). Loud, because everything typed since is now

@@ -24,6 +24,7 @@ vi.mock("@/lib/sites/actions", () => ({
 const showError = vi.fn<(...args: unknown[]) => void>();
 vi.mock("@saroh/ui/toast", () => ({
     showError: (...args: unknown[]) => showError(...args),
+    showSuccess: vi.fn(),
 }));
 vi.mock("@/components/billing/plan-refusal", () => ({
     showPlanRefusal: vi.fn(),
@@ -115,11 +116,20 @@ function render(
     );
 }
 
-const choice = (id: string) => {
-    const el = host.querySelector<HTMLElement>(`[data-look-choice="${id}"]`);
+/** Choose a look in the gallery behind the card's Change (DEC-184). */
+function pick(id: string) {
+    const change = host.querySelector<HTMLElement>("[data-look-change]");
+    if (!change) throw new Error("No Change");
+    act(() => change.click());
+    const el = document.querySelector<HTMLElement>(
+        `[data-brand-picker][data-state="open"] [data-look-choice="${id}"]`,
+    );
     if (!el) throw new Error(`No look "${id}"`);
-    return el;
-};
+    act(() => el.click());
+}
+/** The look the card says is in force. */
+const current = () =>
+    host.querySelector<HTMLElement>("[data-look-current]")?.dataset.lookCurrent;
 
 /** Past the autosave's wait, and the save's answer. */
 async function settle() {
@@ -133,8 +143,8 @@ describe("choosing a look", () => {
     it("saves Folio to the draft and says it isn't published yet", async () => {
         updateSiteStyle.mockResolvedValue({ ok: true, data: { id: "site-1" } });
         render();
-        act(() => choice("folio").click());
-        expect(choice("folio").getAttribute("aria-checked")).toBe("true");
+        pick("folio");
+        expect(current()).toBe("folio");
         await settle();
         expect(updateSiteStyle).toHaveBeenCalledTimes(1);
         expect(updateSiteStyle).toHaveBeenCalledWith(
@@ -149,7 +159,7 @@ describe("choosing a look", () => {
         updateSiteStyle.mockResolvedValue({ ok: true, data: { id: "site-1" } });
         render({ ...classic, look: "quiet" }, "quiet");
         expect(host.textContent).not.toContain("Not published yet");
-        act(() => choice("classic").click());
+        pick("classic");
         await settle();
         const sent = updateSiteStyle.mock.calls[0][1] as SiteStyle;
         expect(sent).not.toHaveProperty("look");
@@ -164,9 +174,9 @@ describe("choosing a look", () => {
             error: "Looks aren't available for this business yet",
         });
         render();
-        act(() => choice("live").click());
+        pick("live");
         await settle();
-        expect(choice("classic").getAttribute("aria-checked")).toBe("true");
+        expect(current()).toBe("classic");
         expect(seen.current?.style.look).toBeUndefined();
         expect(host.querySelector('[role="alert"]')?.textContent).toBe(
             "Looks aren't available for this business yet. The look stays Classic.",
@@ -178,9 +188,9 @@ describe("choosing a look", () => {
     it("keeps the previous look when Saroh can't be reached", async () => {
         updateSiteStyle.mockRejectedValue(new Error("offline"));
         render({ ...classic, look: "quiet" });
-        act(() => choice("folio").click());
+        pick("folio");
         await settle();
-        expect(choice("quiet").getAttribute("aria-checked")).toBe("true");
+        expect(current()).toBe("quiet");
         expect(host.querySelector('[role="alert"]')?.textContent).toBe(
             "Couldn't reach Saroh. The look stays Quiet.",
         );
@@ -189,10 +199,10 @@ describe("choosing a look", () => {
     it("clears the failure with the next choice", async () => {
         updateSiteStyle.mockResolvedValueOnce({ ok: false, error: "No." });
         render();
-        act(() => choice("live").click());
+        pick("live");
         await settle();
         expect(host.querySelector('[role="alert"]')).not.toBeNull();
-        act(() => choice("quiet").click());
+        pick("quiet");
         expect(host.querySelector('[role="alert"]')).toBeNull();
     });
 

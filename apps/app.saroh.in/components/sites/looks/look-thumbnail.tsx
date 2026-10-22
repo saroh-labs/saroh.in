@@ -23,15 +23,20 @@ export function LookThumbnail({
     style,
     options,
     image,
+    className,
 }: {
     look: LookId | null;
     style: SiteStyle;
     options: SiteStyleOptions;
     image?: LookThumbnailImage;
+    /** Its size where the default phone shape doesn't fit (the Brand tab). */
+    className?: string;
 }) {
     const faces = useSiteFaces();
-    const frame =
-        "relative h-[88px] w-[50px] shrink-0 overflow-hidden rounded-md border border-border-strong";
+    const frame = cn(
+        "relative h-[88px] w-[50px] shrink-0 overflow-hidden rounded-md border border-border-strong",
+        className,
+    );
     if (image) {
         return (
             // Decorative: the choice's name and line say what it is.
@@ -41,7 +46,7 @@ export function LookThumbnail({
                 aria-hidden
                 width={image.width}
                 height={image.height}
-                sizes="50px"
+                sizes={className ? "240px" : "50px"}
                 className={cn(frame, "object-cover object-top")}
             />
         );

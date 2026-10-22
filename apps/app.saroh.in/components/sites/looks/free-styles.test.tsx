@@ -200,21 +200,56 @@ function render({
     return { onChange, onChoose, looks };
 }
 
-const radio = (name: string) => {
-    const el = Array.from(
-        host.querySelectorAll<HTMLElement>('[role="radio"]'),
-    ).find((r) => r.textContent.includes(name));
-    if (!el) throw new Error(`No choice "${name}"`);
+/** A Brand tab picker (DEC-184), opened from its row if it isn't. */
+function picker(title: string, trigger: string): HTMLElement {
+    const find = () =>
+        document.querySelector<HTMLElement>(
+            `[data-brand-picker][data-state="open"][aria-label="${title}"]`,
+        );
+    if (!find()) {
+        const t = host.querySelector<HTMLElement>(trigger);
+        if (!t) throw new Error(`No ${trigger}`);
+        act(() => t.click());
+    }
+    const el = find();
+    if (!el) throw new Error(`No ${title} open`);
     return el;
+}
+const gallery = () => picker("Change look", "[data-look-change]");
+const typefaces = () => picker("Typeface", "[data-typeface-change]");
+const colourways = () => picker("Colourway", '[data-colour-row="Colourway"]');
+const within = (el: HTMLElement, selector: string, name: string) => {
+    const found = Array.from(el.querySelectorAll<HTMLElement>(selector)).find(
+        (r) => r.textContent.includes(name),
+    );
+    if (!found) throw new Error(`No choice "${name}"`);
+    return found;
 };
+/** A look's card in the gallery. */
+const look = (name: string) => within(gallery(), '[role="radio"]', name);
+/** A typeface in the search's list. */
+const face = (name: string) => within(typefaces(), "[data-typeface]", name);
+/** A colourway in its row's picker. */
+const colourway = (name: string) =>
+    within(colourways(), '[role="radio"]', name);
+const lookNow = () =>
+    host.querySelector<HTMLElement>("[data-look-current]")?.dataset.lookCurrent;
+const faceNow = () =>
+    host.querySelector<HTMLElement>("[data-typeface-current]")?.dataset
+        .typefaceCurrent;
+/** A look's Preview, from its card in the gallery. */
+const preview = (name: string) => button(gallery(), `Preview ${name}`);
 const press = (el: Element) =>
     act(() => {
         (el as HTMLElement).click();
     });
-const refusals = (within: ParentNode = host) =>
-    Array.from(within.querySelectorAll<HTMLElement>("[data-paid-refusal]"));
+const refusals = (inside: ParentNode = document) =>
+    Array.from(inside.querySelectorAll<HTMLElement>("[data-paid-refusal]"));
+// The look's Preview, not one of the Brand tab's popovers.
 const dialog = () =>
-    document.body.querySelector<HTMLElement>('[role="dialog"]');
+    document.body.querySelector<HTMLElement>(
+        '[role="dialog"]:not([data-brand-picker])',
+    );
 const shown = () => {
     const d = dialog();
     if (!d) throw new Error("No preview open");
@@ -231,23 +266,30 @@ const button = (within: ParentNode, name: string) => {
 describe("the Paid plans mark", () => {
     it("marks a paid look, typeface and colourway, and nothing free", () => {
         render();
-        expect(radio("Folio").textContent).toContain("Paid plans");
-        expect(radio("Quiet").textContent).toContain("Paid plans");
-        expect(radio("Live").textContent).toContain("Paid plans");
-        expect(radio("Classic").textContent).not.toContain("Paid plans");
-        expect(radio("Archivo").textContent).toContain("Paid plans");
-        expect(radio("Own pair").textContent).not.toContain("Paid plans");
-        expect(radio("Mauve").textContent).toContain("Paid plans");
-        expect(radio("Kesar").textContent).not.toContain("Paid plans");
+        // Looks: one mark for the group, in the gallery's foot.
+        expect(gallery().textContent).toContain(
+            "Paid plans Quiet, Folio and Live",
+        );
+        expect(look("Classic").textContent).not.toContain("Paid plans");
+        // Typefaces: the group's heading, once.
+        const group = (name: string) =>
+            face(name).closest("[cmdk-group]")?.textContent ?? "";
+        expect(group("Archivo")).toContain("Paid plans");
+        expect(group("Own pair")).toContain("On your plan");
+        expect(group("Own pair")).not.toContain("Paid plans");
+        expect(colourway("Mauve").textContent).toContain("Paid plans");
+        expect(colourway("Kesar").textContent).not.toContain("Paid plans");
     });
 });
 
 describe("a paid choice on a plan without themes", () => {
     it("keeps the typeface it had, and says why in one line with the way to plans", () => {
         const { onChange } = render();
-        press(radio("Archivo"));
+        press(face("Archivo"));
         expect(onChange).not.toHaveBeenCalled();
-        expect(radio("Own pair").getAttribute("aria-checked")).toBe("true");
+        expect(faceNow()).toBe("own");
+        // The search stays open, the line in its foot.
+        expect(refusals(typefaces())).toHaveLength(1);
         const [line, ...more] = refusals();
         expect(more).toHaveLength(0);
         expect(line.getAttribute("role")).toBe("alert");
@@ -260,25 +302,35 @@ describe("a paid choice on a plan without themes", () => {
 
     it("keeps the colourway it had", () => {
         const { onChange } = render();
-        press(radio("Mauve"));
+        press(colourway("Mauve"));
         expect(onChange).not.toHaveBeenCalled();
-        expect(radio("Kesar").getAttribute("aria-checked")).toBe("true");
+        expect(colourway("Kesar").getAttribute("aria-checked")).toBe("true");
         expect(refusals()[0]?.textContent).toContain("Mauve");
     });
 
     it("keeps the look it had, saying so under the Look row", () => {
         const { onChoose } = render();
-        press(radio("Folio"));
+        press(look("Folio"));
         expect(onChoose).not.toHaveBeenCalled();
-        expect(radio("Classic").getAttribute("aria-checked")).toBe("true");
-        expect(refusals()[0]?.textContent).toContain("Folio comes with");
+        expect(lookNow()).toBe("classic");
+        // Said in the gallery's foot while it is open...
+        expect(refusals(gallery())[0]?.textContent).toContain(
+            "Folio comes with",
+        );
+        // ...and under the Look card once it closes.
+        act(() => {
+            document.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+            );
+        });
+        expect(refusals(host)[0]?.textContent).toContain("Folio comes with");
     });
 
     it("refuses Quiet in place: Classic stays, one line says why", () => {
         const { onChoose } = render();
-        press(radio("Quiet"));
+        press(look("Quiet"));
         expect(onChoose).not.toHaveBeenCalled();
-        expect(radio("Classic").getAttribute("aria-checked")).toBe("true");
+        expect(lookNow()).toBe("classic");
         const [line, ...more] = refusals();
         expect(more).toHaveLength(0);
         expect(line.textContent).toContain("Quiet comes with a paid plan");
@@ -287,15 +339,15 @@ describe("a paid choice on a plan without themes", () => {
 
     it("lets a site in a look go back to Classic", () => {
         const { onChoose } = render({ at: inLook(style, "quiet") });
-        press(radio("Classic"));
+        press(look("Classic"));
         expect(onChoose).toHaveBeenCalledWith(null);
         expect(refusals()).toHaveLength(0);
     });
 
     it("takes a free one at once and clears the line", () => {
         const { onChange } = render();
-        press(radio("Archivo"));
-        press(radio("Your visitor's system font"));
+        press(face("Archivo"));
+        press(face("Your visitor's system font"));
         expect(onChange).toHaveBeenCalledTimes(1);
         expect(onChange.mock.calls[0]?.[0]).not.toHaveProperty("fontPair");
         expect(refusals()).toHaveLength(0);
@@ -303,9 +355,13 @@ describe("a paid choice on a plan without themes", () => {
 
     it("lets colours change: they're never paid", () => {
         const { onChange } = render();
-        const teal = host.querySelector<HTMLElement>('[aria-label="Teal"]');
-        if (!teal) throw new Error("No Teal swatch");
-        press(teal);
+        press(
+            within(
+                picker("Accent", '[data-colour-row="Accent"]'),
+                '[role="radio"]',
+                "Teal",
+            ),
+        );
         expect(onChange).toHaveBeenCalled();
         expect(refusals()).toHaveLength(0);
     });
@@ -314,15 +370,15 @@ describe("a paid choice on a plan without themes", () => {
 describe("a plan with themes", () => {
     it("takes a paid typeface, colourway and look", () => {
         const { onChange, onChoose } = render({ paidIncluded: true });
-        press(radio("Quiet"));
+        press(look("Quiet"));
         expect(onChoose).toHaveBeenCalledWith("quiet");
-        press(radio("Archivo"));
+        press(face("Archivo"));
         expect(onChange.mock.calls[0]?.[0]).toMatchObject({
             fontPair: "archivo",
         });
-        press(radio("Mauve"));
+        press(colourway("Mauve"));
         expect(onChange).toHaveBeenCalledTimes(2);
-        press(radio("Folio"));
+        press(look("Folio"));
         expect(onChoose).toHaveBeenCalledWith("folio");
         expect(refusals()).toHaveLength(0);
     });
@@ -331,15 +387,17 @@ describe("a plan with themes", () => {
 describe("Preview", () => {
     it("names each look's button, as a 44px target on touch", () => {
         render();
+        // On the card, for the look in force...
+        expect(preview("Classic").className).toContain("coarse:h-11");
+        // ...and on every card in the gallery.
         for (const name of ["Classic", "Quiet", "Folio", "Live"]) {
-            const b = button(host, `Preview ${name}`);
-            expect(b.className).toContain("coarse:min-h-11");
+            expect(preview(name).className).toContain("coarse:h-11");
         }
     });
 
     it("draws the look's showcase template with its sample words, and closing leaves the draft as it was", async () => {
         const { onChoose, onChange } = render();
-        const open = button(host, "Preview Folio");
+        const open = preview("Folio");
         act(() => open.focus());
         press(open);
 
@@ -363,16 +421,19 @@ describe("Preview", () => {
         expect(onChoose).not.toHaveBeenCalled();
         expect(onChange).not.toHaveBeenCalled();
         expect(actions.updateSiteStyle).not.toHaveBeenCalled();
-        // The row still shows Classic, and the keyboard is back on Preview
-        // (the dialog hands it back on the next tick, as Radix does).
-        expect(radio("Classic").getAttribute("aria-checked")).toBe("true");
+        // The card still shows Classic, and the keyboard is back on Change,
+        // the gallery having made way for the dialog (the dialog hands it
+        // back on the next tick, as Radix does).
+        expect(lookNow()).toBe("classic");
         await act(() => new Promise((r) => setTimeout(r, 0)));
-        expect(document.activeElement).toBe(open);
+        expect(document.activeElement).toBe(
+            host.querySelector("[data-look-change]"),
+        );
     });
 
     it("refuses Use this look for a paid look on this plan, and stays open", () => {
         const { onChoose } = render();
-        press(button(host, "Preview Folio"));
+        press(preview("Folio"));
         press(button(shown(), "Use this look"));
         expect(onChoose).not.toHaveBeenCalled();
         expect(dialog()).not.toBeNull();
@@ -383,7 +444,7 @@ describe("Preview", () => {
 
     it("chooses Classic from Use this look on any plan, and closes", () => {
         const { onChoose } = render({ at: inLook(style, "quiet") });
-        press(button(host, "Preview Classic"));
+        press(preview("Classic"));
         press(button(shown(), "Use this look"));
         expect(onChoose).toHaveBeenCalledWith(null);
         expect(dialog()).toBeNull();
@@ -391,7 +452,7 @@ describe("Preview", () => {
 
     it("chooses a paid look on a plan with themes", () => {
         const { onChoose } = render({ paidIncluded: true });
-        press(button(host, "Preview Folio"));
+        press(preview("Folio"));
         press(button(shown(), "Use this look"));
         expect(onChoose).toHaveBeenCalledWith("folio");
         expect(dialog()).toBeNull();
@@ -402,14 +463,14 @@ describe("Preview", () => {
 
     it("says the draft is in the look already, with nothing to use", () => {
         render({ at: inLook(style, "quiet") });
-        press(button(host, "Preview Quiet"));
+        press(preview("Quiet"));
         expect(shown().textContent).toContain("Your draft is in Quiet.");
         expect(() => button(shown(), "Use this look")).toThrow();
     });
 
     it("offers no starter content where the editor gives none", () => {
         render();
-        press(button(host, "Preview Live"));
+        press(preview("Live"));
         expect(() =>
             button(shown(), "Use this look with its starter content"),
         ).toThrow();
@@ -423,7 +484,7 @@ describe("a look's starter content (DEC-182)", () => {
             paidIncluded: true,
             preview: { starter: s },
         });
-        press(button(host, "Preview Live"));
+        press(preview("Live"));
         press(button(shown(), "Use this look with its starter content"));
 
         const confirm = shown().querySelector("[data-look-starter-confirm]");
@@ -450,7 +511,7 @@ describe("a look's starter content (DEC-182)", () => {
     it("goes back to the look without copying anything", () => {
         const s = starter();
         render({ paidIncluded: true, preview: { starter: s } });
-        press(button(host, "Preview Quiet"));
+        press(preview("Quiet"));
         press(button(shown(), "Use this look with its starter content"));
         press(button(shown(), "Back"));
         expect(shown().querySelector("[data-look-starter-confirm]")).toBeNull();
@@ -461,7 +522,7 @@ describe("a look's starter content (DEC-182)", () => {
     it("refuses a paid look's starter on this plan before the confirm", () => {
         const s = starter();
         render({ preview: { starter: s } });
-        press(button(host, "Preview Folio"));
+        press(preview("Folio"));
         press(button(shown(), "Use this look with its starter content"));
         expect(shown().querySelector("[data-look-starter-confirm]")).toBeNull();
         expect(refusals(shown())[0].textContent).toContain(
@@ -473,7 +534,7 @@ describe("a look's starter content (DEC-182)", () => {
     it("offers Classic's Bakery on any plan", async () => {
         const s = starter();
         render({ preview: { starter: s } });
-        press(button(host, "Preview Classic"));
+        press(preview("Classic"));
         press(button(shown(), "Use this look with its starter content"));
         expect(shown().textContent).toContain("the Bakery template's");
         await act(async () => {
@@ -486,7 +547,7 @@ describe("a look's starter content (DEC-182)", () => {
     it("copies the samples alone when Fill in my details is unticked", async () => {
         const s = starter();
         render({ paidIncluded: true, preview: { starter: s } });
-        press(button(host, "Preview Live"));
+        press(preview("Live"));
         press(button(shown(), "Use this look with its starter content"));
         const fill = shown().querySelector<HTMLElement>(
             "[data-look-starter-fill]",
@@ -505,7 +566,7 @@ describe("a look's starter content (DEC-182)", () => {
     it("waits while the editor has changes not saved yet", () => {
         const s = starter({ blocked: "Your last changes aren't saved yet." });
         render({ paidIncluded: true, preview: { starter: s } });
-        press(button(host, "Preview Live"));
+        press(preview("Live"));
         press(button(shown(), "Use this look with its starter content"));
         expect(shown().textContent).toContain(
             "Your last changes aren't saved yet.",
@@ -525,7 +586,7 @@ describe("a look's starter content (DEC-182)", () => {
             }),
         });
         render({ paidIncluded: true, preview: { starter: s } });
-        press(button(host, "Preview Live"));
+        press(preview("Live"));
         press(button(shown(), "Use this look with its starter content"));
         await act(async () => {
             press(button(shown(), "Use Live and its starter content"));
@@ -545,7 +606,7 @@ describe("a look's starter content (DEC-182)", () => {
             }),
         });
         render({ paidIncluded: true, preview: { starter: s } });
-        press(button(host, "Preview Quiet"));
+        press(preview("Quiet"));
         press(button(shown(), "Use this look with its starter content"));
         await act(async () => {
             press(button(shown(), "Use Quiet and its starter content"));

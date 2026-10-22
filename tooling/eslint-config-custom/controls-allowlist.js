@@ -218,6 +218,10 @@ export const RAW_ALLOWED = {
     "components/sites/canvas/editor-canvas.tsx": ["button"],
     // button: a choice in a list
     "components/sites/editor/editor-rail.tsx": ["button"],
+    // button: a Brand tab colour row, one line that opens its swatches (DEC-184)
+    "components/sites/looks/colour-picker.tsx": ["button"],
+    // button: the phone's Typeface row in the Brand sheet, one line (DEC-184)
+    "components/sites/looks/typeface-picker.tsx": ["button"],
     // button: a row or card that is one button, a row that opens
     "components/sites/editor/editor-top-bar.tsx": ["button"],
     // button: a tab of the editor's bottom bar

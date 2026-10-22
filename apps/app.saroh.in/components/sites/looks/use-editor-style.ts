@@ -36,6 +36,8 @@ export function useEditorStyle({
         initialStyle.look ?? null,
     );
     const [lookError, setLookError] = useState<string | null>(null);
+    // A style drawn on the page but not saved: a typeface being tried.
+    const [trying, tryStyle] = useState<SiteStyle | null>(null);
 
     /*
      * A style change that is unsaved or still saving counts as unpublished
@@ -170,6 +172,8 @@ export function useEditorStyle({
         chooseLook,
         lookError,
         savedLook,
+        trying,
+        tryStyle,
     };
 }
 

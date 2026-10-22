@@ -18,6 +18,7 @@ import {
 import { TestReleasesPanel } from "@/components/sites/test-releases/test-releases-panel";
 import { useTestReleases } from "@/components/sites/test-releases/use-test-releases";
 import { flagsByScreenPosition } from "@/lib/sites/editor-positions";
+import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { resolveStyleVariables } from "@/lib/sites/style";
 import { styleChoiceRules } from "@/lib/sites/style-access";
 import { publishOverScheduleWarning } from "@/lib/sites/test-releases";
@@ -336,9 +337,11 @@ export function SiteEditor({
                             pageId,
                             address,
                             pages,
-                            style,
                             styleOptions,
                         }}
+                        // A typeface being tried draws on the page unsaved.
+                        style={siteStyle.trying ?? style}
+                        trying={triedFace(siteStyle.trying, styleOptions)}
                         // Holds a page switch back (G-3).
                         dirty={unsaved}
                         neverPublished={publish.neverPublished}
@@ -445,4 +448,15 @@ export function SiteEditor({
             {leaveGuard.dialog}
         </div>
     );
+}
+
+/** The tried typeface's name, for the line over the page; null for none. */
+function triedFace(
+    trying: SiteStyle | null,
+    options: SiteStyleOptions,
+): string | null {
+    if (!trying) return null;
+    const pairs = options.fontPairs ?? [];
+    const key = trying.fontPair ?? pairs[0]?.key;
+    return pairs.find((p) => p.key === key)?.name ?? null;
 }

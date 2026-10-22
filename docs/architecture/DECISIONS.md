@@ -2379,3 +2379,17 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Consequences:
     - `components/organizations/` is reorganised in steps (pure moves first, then splits and fixes), each verified on its own. Other domain folders that meet the trigger are moved when next worked on, not in a sweep.
 - Rules: `docs/patterns/frontend-app-structure.md` → Rules, "A domain folder that grows mixed or big gets feature sub-folders" and "The UI layer is separate from the business layer".
+
+## DEC-184 The Brand tab shows what is chosen; every set of options opens on demand
+
+**Status: Accepted — 2026-10-22** · owner · signed off the Brand tab boards (`BRDesk`, `BRLookPicker`, `BRTypePicker`, `BRColourPicker`, `BRPhone`, `BRPhonePicker`, `BRStates`) after the Brand tab audit
+
+- Context:
+    - The Brand tab drew every option at once: four look cards, eleven typefaces, thirty swatches and five sliders. The colours sat below the fold, swatch names showed only on hover (so not on touch), and Reset changed everything with one press.
+- Decision:
+    - **The rail shows current choices.** Look is a card with a picture of the page, Preview and Change; "Bring in my details" and "Previous versions" stay right under it, same words, same actions. Typeface is its name set in its own face, with Change. Colour is six one-line rows (Page background, Text, Accent, Hero, Highlight band, Footer), each with its swatch and its name always written, plus a Colourway row when the site has colourways. The five sliders are unchanged.
+    - **Pickers on demand.** Change opens the looks as a 2×2 gallery (Preview on every card, the current one marked "Now", one "Paid plans" mark for the group in its foot). Typeface opens a search (Popover and Command, as Country and the ⌘K menu): "On your plan" and "Paid plans" groups, each row in its own face; the arrow keys try a face on the page without saving, Enter keeps it, Escape puts the page back. A colour row opens its five swatches with names; one the page can't be read in is faded, struck and says why in words. A refused paid choice keeps its picker open with the refusal in its foot, and the line sits under the row once it closes.
+    - **On a phone**, held: the owner found the first phone boards not good (22 Oct) and a revised phone spec is to come. Until then the phone keeps its sheet as it was (its own Page · Add · Brand tabs, 75% high) with the same rail, and the pickers open as popovers in it.
+    - **Reset style… asks, then offers Undo.** "Reset colours, typeface and spacing?" with "Keep my style" as the safe default; once reset, the house Undo toast "Colours, type and spacing reset." puts every colour, the typeface and the sliders back in one press. An allowed exception to "Undo or confirm, never both", as DEC-182's copy is: it moves the whole style at once.
+    - **The Hero row says when it does nothing:** on a Classic page whose heroes are all full-bleed (drawn in the text colour), "This hero uses your text colour. Change it in the hero block."
+- Rules: `apps/app.saroh.in/components/sites/looks/` (`style-panel.tsx`, `look-picker.tsx`, `typeface-picker.tsx`, `colour-picker.tsx`, `brand-picker.tsx`).

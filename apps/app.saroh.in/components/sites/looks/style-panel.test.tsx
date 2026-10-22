@@ -130,10 +130,19 @@ function renderPanel(style: SiteStyle, opts: SiteStyleOptions = options) {
     return onChange;
 }
 
-/** A radio by its accessible name: its label, else its words. */
+/** Open the picker behind a colour row (DEC-184), by the row's name. */
+function openRow(label: string) {
+    const row = host.querySelector<HTMLElement>(`[data-colour-row="${label}"]`);
+    if (!row) throw new Error(`No row "${label}"`);
+    act(() => row.click());
+}
+
+/** A radio in the open picker by its accessible name: its label, else its words. */
 function radio(name: string): HTMLElement {
     const found = Array.from(
-        host.querySelectorAll<HTMLElement>('[role="radio"]'),
+        document.querySelectorAll<HTMLElement>(
+            '[data-brand-picker][data-state="open"] [role="radio"]',
+        ),
     ).find(
         (el) =>
             el.getAttribute("aria-label") === name ||
@@ -144,7 +153,7 @@ function radio(name: string): HTMLElement {
 }
 
 const group = (name: string) =>
-    host.querySelector(`[role="radiogroup"][aria-label="${name}"]`);
+    document.querySelector(`[role="radiogroup"][aria-label="${name}"]`);
 
 function click(el: HTMLElement) {
     act(() => el.click());
@@ -153,6 +162,11 @@ function click(el: HTMLElement) {
 describe("StylePanel colourways", () => {
     it("offers the template's colourways by name, the current one chosen", () => {
         renderPanel(GREEN.style);
+        // The row says which is in force before anything opens.
+        expect(
+            host.querySelector('[data-colour-row="Colourway"]')?.textContent,
+        ).toContain("Green");
+        openRow("Colourway");
         const green = radio("Green");
         expect(group("Colourway")?.contains(green)).toBe(true);
         expect(green.getAttribute("aria-checked")).toBe("true");
@@ -168,6 +182,7 @@ describe("StylePanel colourways", () => {
             scalars: { gridGap: 4, pageMargin: 20 },
         };
         const onChange = renderPanel(moved);
+        openRow("Colourway");
         click(radio("Oxblood"));
         const next = onChange.mock.calls[0][0] as SiteStyle;
         expect(next.palette?.accent).toBe("#4F2927");
@@ -176,6 +191,7 @@ describe("StylePanel colourways", () => {
 
     it("leaves the palette when a swatch is chosen", () => {
         const onChange = renderPanel(GREEN.style);
+        openRow("Accent");
         click(radio("Teal"));
         const next = onChange.mock.calls[0][0] as SiteStyle;
         expect(next).not.toHaveProperty("palette");
@@ -184,6 +200,11 @@ describe("StylePanel colourways", () => {
 
     it("shows no row swatch as chosen while a palette is on", () => {
         renderPanel(GREEN.style);
+        // The row names the template's colour, not a swatch it isn't.
+        expect(
+            host.querySelector('[data-colour-row="Accent"]')?.textContent,
+        ).toContain("Template's own");
+        openRow("Accent");
         expect(radio("Clay").getAttribute("aria-checked")).toBe("false");
     });
 
@@ -198,6 +219,7 @@ describe("StylePanel colourways", () => {
     it("offers no colourways for a site without a template", () => {
         renderPanel({ colours, scalars }, { ...options, colourways: [] });
         expect(group("Colourway")).toBeNull();
+        expect(host.querySelector('[data-colour-row="Colourway"]')).toBeNull();
     });
 });
 

@@ -49,6 +49,10 @@ export interface LookPreviewSource {
     starter?: StarterContentActions;
 }
 
+/** Said once a look is taken into the draft, here or from the gallery. */
+export const lookTakenWords = (name: string) =>
+    `${name} is your site's look. Publish to put it live.`;
+
 type PreviewDevice = "desktop" | "phone";
 
 const CLASSIC_SUITS =
@@ -121,7 +125,7 @@ export function LookPreview({
         onUse();
         onClose();
         // The dialog covered the row's own status line, so it is said here.
-        showSuccess(`${name} is your site's look. Publish to put it live.`);
+        showSuccess(lookTakenWords(name));
     }
 
     function startStarter() {

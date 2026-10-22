@@ -665,12 +665,13 @@ describe("SiteEditor shell", () => {
         const { siteId } = render();
         click(button("Brand"));
         expect(button("Brand").getAttribute("aria-selected")).toBe("true");
-        // The typeface choice (KTD-2), the default chosen.
+        // The typeface in force (KTD-2), the default, named in the rail.
         expect(host.textContent).toContain("Typeface");
         expect(
-            host.querySelector('[role="radio"][aria-checked="true"]')
-                ?.textContent,
-        ).toBe("Your visitor's system font");
+            host.querySelector<HTMLElement>("[data-typeface-current]")?.dataset
+                .typefaceCurrent,
+        ).toBe("system");
+        expect(host.textContent).toContain("Your visitor's system font");
         expect(() => button("Header")).toThrow();
         // Remembered, so a reload comes back to it as it did to Style.
         expect(prefs.getPlace(siteId, SECTIONS.length).rail).toBe("style");
@@ -683,8 +684,20 @@ describe("SiteEditor shell", () => {
         actions.updateSiteStyle.mockResolvedValue({ ok: true });
         render();
         click(button("Brand"));
-        click(button("Newsreader"));
-        expect(button("Newsreader").getAttribute("aria-checked")).toBe("true");
+        const change = host.querySelector<HTMLElement>(
+            "[data-typeface-change]",
+        );
+        if (!change) throw new Error("No typeface Change");
+        click(change);
+        const face = document.querySelector<HTMLElement>(
+            '[data-typeface="newsreader"]',
+        );
+        if (!face) throw new Error("No Newsreader");
+        click(face);
+        expect(
+            host.querySelector<HTMLElement>("[data-typeface-current]")?.dataset
+                .typefaceCurrent,
+        ).toBe("newsreader");
         await wait(700);
         expect(actions.updateSiteStyle).toHaveBeenCalledWith(
             expect.any(String),

@@ -5,18 +5,25 @@ import { LOOKS, lookSuggestion } from "@saroh/block-contract";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import { Check } from "lucide-react";
+import { showSuccess } from "@saroh/ui/toast";
+import { ChevronDown, Eye } from "lucide-react";
 import type { KeyboardEvent } from "react";
-import { useId, useRef, useState } from "react";
+import { useContext, useId, useRef, useState } from "react";
 
 import { ChoiceGroup } from "@/components/shared/fields/choice-group";
 import { lookThumbnail } from "@/lib/sites/look-thumbnails";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import type { StyleChoiceRules } from "@/lib/sites/style-access";
 import { ALL_FREE } from "@/lib/sites/style-access";
+import {
+    BrandPicker,
+    PickerFoot,
+    PickerHeader,
+    PickerHost,
+} from "./brand-picker";
 import { DraftTools } from "./draft-tools";
 import type { LookPreviewSource } from "./look-preview";
-import { LookPreview } from "./look-preview";
+import { LookPreview, lookTakenWords } from "./look-preview";
 import { LookThumbnail } from "./look-thumbnail";
 import { PaidRefusal } from "./paid-refusal";
 
@@ -113,15 +120,21 @@ export interface LookChoices {
 }
 
 /**
- * Website › Style's Look row (DEC-172, plan U16): Classic, Quiet, Folio
- * and Live, each with a phone picture and one line on what it suits, the
- * site's industry default marked "Suggested for …". Choosing one changes
- * the draft (the preview shows it at once, and the style autosave keeps
- * it); Publish makes it live. Classic is always one choice away.
+ * The Brand tab's Look (DEC-172, plan U16; redesigned 22 Oct 2026): the
+ * look in force as a card, with a picture of the page in it, Preview and
+ * Change. Change opens the four looks as a gallery (a popover on a desk,
+ * the sheet itself on a phone), each with its picture, one line on what
+ * it suits and its own Preview, the site's industry default marked
+ * "Suggested for …", the one in force "Now". Choosing one changes the
+ * draft (the preview shows it at once, and the style autosave keeps it);
+ * Publish makes it live. Classic is always one choice away.
  *
- * This row is the only place an existing site is offered a look: no card
- * in the workspace (R11). A failed save is said here, and the previous
- * look comes back (`useEditorStyle`).
+ * A paid look refused on this plan keeps the gallery open with the one
+ * line in its foot; closed, the line sits under the card.
+ *
+ * This is the only place an existing site is offered a look: no card in
+ * the workspace (R11). A failed save is said here, and the previous look
+ * comes back (`useEditorStyle`).
  */
 export function LookPicker({
     style,
@@ -144,147 +157,265 @@ export function LookPicker({
     refused?: string | null;
 }) {
     const headingId = useId();
+    const galleryId = useId();
     const statusId = useId();
+    const inSheet = useContext(PickerHost) !== null;
+    const [picking, setPicking] = useState(false);
     const [previewing, setPreviewing] = useState<LookChoice | null>(null);
     // The look whose dialog is drawn: kept as it closes, so it fades out
     // on its own content.
     const [shown, setShown] = useState<LookChoice>("classic");
     // Each opening mounts the dialog afresh (its device and its line).
     const [opened, setOpened] = useState(0);
-    const previewButtons = useRef(new Map<LookChoice, HTMLButtonElement>());
+    // The Preview button that opened it, for the keyboard on the way back.
+    const opener = useRef<HTMLElement | null>(null);
+    const changeRef = useRef<HTMLButtonElement | null>(null);
     const draftLook = style.look ?? null;
     const choices = lookChoices({ available, draftLook, liveLook });
     if (choices.length === 0) return null;
 
+    const current: LookChoice = draftLook ?? "classic";
     const suggestion = lookSuggestion(templateId);
     const status = refused
         ? null
         : lookStatus({ draftLook, liveLook, published, error });
     const paid = (look: LookId | null) =>
         look !== null && rules.isPaid("look", look);
+    const paidNames = choices
+        .filter((c) => c !== "classic" && paid(c))
+        .map((c) => lookName(c as LookId));
     const shownLook = shown === "classic" ? null : shown;
+    const lineUnderCard = refused !== null && !picking;
+
+    function openPreview(choice: LookChoice, from: HTMLElement) {
+        opener.current = from;
+        setShown(choice);
+        setOpened((n) => n + 1);
+        setPreviewing(choice);
+        // On a desk the dialog takes the gallery's place; in the sheet the
+        // gallery is still there when the dialog closes.
+        if (!inSheet) setPicking(false);
+    }
+
+    function pick(choice: LookChoice) {
+        const look = choice === "classic" ? null : choice;
+        onChoose(look);
+        // Refused: the gallery stays open, its foot saying why.
+        if (look !== null && rules.refuses("look", look)) return;
+        setPicking(false);
+        if (look !== draftLook) showSuccess(lookTakenWords(lookName(look)));
+    }
+
+    const previewButton = (
+        choice: LookChoice,
+        className: string,
+        iconOnly = false,
+    ) =>
+        preview ? (
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                data-look-preview-open={choice}
+                aria-label={`Preview ${lookName(choice === "classic" ? null : choice)}`}
+                className={className}
+                // The gallery's arrows move the look; on this button they
+                // do nothing.
+                onKeyDown={stopArrows}
+                onClick={(e) => openPreview(choice, e.currentTarget)}
+            >
+                <Eye aria-hidden />
+                {iconOnly ? null : "Preview"}
+            </Button>
+        ) : null;
 
     return (
-        <section className="space-y-3" aria-labelledby={headingId}>
+        <section className="space-y-2" aria-labelledby={headingId}>
             <h3 id={headingId} className="label">
                 Look
             </h3>
-            <ChoiceGroup<LookChoice>
-                labelledBy={headingId}
-                describedBy={status || refused ? statusId : undefined}
-                className="space-y-1.5"
-                value={draftLook ?? "classic"}
-                onChange={(choice) =>
-                    onChoose(choice === "classic" ? null : choice)
-                }
-                // Each look with its Preview under it (DEC-177): a button
-                // of its own, never inside the radio.
-                layout={
-                    preview
-                        ? (item) =>
-                              choices.map((choice) => (
-                                  <div key={choice} className="space-y-0.5">
-                                      {item(choice)}
-                                      <Button
-                                          ref={(el) => {
-                                              if (el) {
-                                                  previewButtons.current.set(
-                                                      choice,
-                                                      el,
-                                                  );
-                                              } else {
-                                                  previewButtons.current.delete(
-                                                      choice,
-                                                  );
-                                              }
-                                          }}
-                                          type="button"
-                                          variant="ghost"
-                                          size="sm"
-                                          data-look-preview-open={choice}
-                                          aria-label={`Preview ${lookName(choice === "classic" ? null : choice)}`}
-                                          className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground coarse:min-h-11"
-                                          // The row's arrows move the look;
-                                          // on this button they do nothing.
-                                          onKeyDown={stopArrows}
-                                          onClick={() => {
-                                              setShown(choice);
-                                              setOpened((n) => n + 1);
-                                              setPreviewing(choice);
-                                          }}
-                                      >
-                                          Preview
-                                      </Button>
-                                  </div>
-                              ))
-                        : undefined
-                }
-                choices={choices.map((choice) => {
-                    const look = choice === "classic" ? null : choice;
-                    const name = lookName(look);
-                    const suggested =
-                        available && look === suggestion.look
-                            ? suggestion.industry
-                                ? `Suggested for ${suggestion.industry}`
-                                : "Suggested"
-                            : null;
-                    return {
-                        value: choice,
-                        data: { "data-look-choice": choice },
-                        label: (
-                            <>
-                                <LookThumbnail
-                                    look={look}
-                                    style={style}
-                                    options={options}
-                                    image={lookThumbnail(templateId, choice)}
-                                />
-                                <span className="min-w-0 flex-1 space-y-1">
-                                    <span className="flex items-center gap-2">
-                                        <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                                            {name}
-                                        </span>
-                                        {choice === (draftLook ?? "classic") ? (
-                                            <Check
-                                                aria-hidden
-                                                className="size-4 shrink-0"
-                                            />
-                                        ) : null}
-                                    </span>
-                                    <span className="block text-xs leading-snug text-muted-foreground">
-                                        {look
-                                            ? LOOKS[look].short
-                                            : CLASSIC.short}
-                                    </span>
-                                    {suggested || paid(look) ? (
-                                        <span className="flex flex-wrap gap-1">
-                                            {suggested ? (
-                                                <Badge variant="tag" size="sm">
-                                                    {suggested}
-                                                </Badge>
-                                            ) : null}
-                                            {paid(look) ? (
-                                                <Badge variant="tag" size="sm">
-                                                    Paid plans
-                                                </Badge>
-                                            ) : null}
-                                        </span>
-                                    ) : null}
-                                </span>
-                            </>
-                        ),
-                    };
-                })}
-                itemClassName={(active) =>
-                    cn(
-                        "flex w-full items-start gap-3 rounded border p-2 text-left focus-visible:ring-offset-1",
-                        active
-                            ? "border-foreground ring-1 ring-foreground"
-                            : "border-border hover:bg-muted",
-                    )
-                }
-            />
-            {refused ? (
+            <div
+                data-look-current={current}
+                className={cn(
+                    "rounded-[10px] border bg-card p-2",
+                    inSheet
+                        ? "flex items-center gap-2.5"
+                        : "flex flex-col gap-2",
+                )}
+            >
+                <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                    <LookThumbnail
+                        look={draftLook}
+                        style={style}
+                        options={options}
+                        image={lookThumbnail(templateId, current)}
+                        className="h-[54px] w-[72px]"
+                    />
+                    <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">
+                            {lookName(draftLook)}
+                        </p>
+                        <p className="text-xs leading-snug text-muted-foreground">
+                            {draftLook ? LOOKS[draftLook].short : CLASSIC.short}
+                        </p>
+                    </div>
+                </div>
+                <div className="flex shrink-0 gap-1.5">
+                    {/* The sheet has room for the eye alone (Brand tab, phone). */}
+                    {previewButton(
+                        current,
+                        inSheet ? "w-11 px-0" : "flex-1",
+                        inSheet,
+                    )}
+                    <BrandPicker
+                        open={picking}
+                        onOpenChange={setPicking}
+                        title="Change look"
+                        className="w-[480px] max-w-[calc(100vw-24px)]"
+                        header={
+                            <PickerHeader
+                                title="Change look"
+                                note={`${choices.length} looks · the page changes when you choose`}
+                                onClose={() => setPicking(false)}
+                            />
+                        }
+                        trigger={
+                            <Button
+                                ref={changeRef}
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                aria-haspopup="dialog"
+                                aria-expanded={picking}
+                                data-look-change=""
+                                className={inSheet ? undefined : "flex-1"}
+                            >
+                                Change
+                                <ChevronDown aria-hidden />
+                            </Button>
+                        }
+                    >
+                        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+                            <ChoiceGroup<LookChoice>
+                                label="Looks"
+                                describedBy={refused ? galleryId : undefined}
+                                className="grid grid-cols-2 gap-2.5"
+                                value={current}
+                                onChange={pick}
+                                // Each look with its Preview (DEC-177): a
+                                // button of its own, never inside the radio.
+                                layout={(item) =>
+                                    choices.map((choice) => (
+                                        <div
+                                            key={choice}
+                                            className="relative flex flex-col gap-1.5"
+                                        >
+                                            {item(choice)}
+                                            {/* Under the card on a phone,
+                                                where it is a thumb's width. */}
+                                            {previewButton(
+                                                choice,
+                                                inSheet
+                                                    ? "w-full"
+                                                    : "absolute bottom-2 right-2 h-[30px] gap-1 px-2.5 text-xs",
+                                            )}
+                                        </div>
+                                    ))
+                                }
+                                choices={choices.map((choice) => {
+                                    const look =
+                                        choice === "classic" ? null : choice;
+                                    const suggested =
+                                        available && look === suggestion.look
+                                            ? suggestion.industry
+                                                ? `Suggested for ${suggestion.industry}`
+                                                : "Suggested"
+                                            : null;
+                                    return {
+                                        value: choice,
+                                        data: { "data-look-choice": choice },
+                                        label: (
+                                            <>
+                                                <LookThumbnail
+                                                    look={look}
+                                                    style={style}
+                                                    options={options}
+                                                    image={lookThumbnail(
+                                                        templateId,
+                                                        choice,
+                                                    )}
+                                                    className={
+                                                        inSheet
+                                                            ? "h-[88px] w-full"
+                                                            : "h-[104px] w-full"
+                                                    }
+                                                />
+                                                <span
+                                                    className={cn(
+                                                        "block min-w-0 px-1 pb-0.5",
+                                                        preview &&
+                                                            !inSheet &&
+                                                            "pr-24",
+                                                    )}
+                                                >
+                                                    <span className="flex items-center gap-1.5 text-sm font-semibold">
+                                                        {lookName(look)}
+                                                        {choice === current ? (
+                                                            <span className="rounded-[5px] bg-foreground px-1.5 py-px text-[0.65625rem] font-semibold text-background">
+                                                                Now
+                                                            </span>
+                                                        ) : null}
+                                                    </span>
+                                                    <span className="block text-xs leading-snug text-muted-foreground">
+                                                        {look
+                                                            ? LOOKS[look].short
+                                                            : CLASSIC.short}
+                                                    </span>
+                                                    {suggested ? (
+                                                        <Badge
+                                                            variant="tag"
+                                                            size="sm"
+                                                            className="mt-1"
+                                                        >
+                                                            {suggested}
+                                                        </Badge>
+                                                    ) : null}
+                                                </span>
+                                            </>
+                                        ),
+                                    };
+                                })}
+                                itemClassName={(active) =>
+                                    cn(
+                                        "flex w-full flex-col gap-1.5 rounded-[10px] border bg-card p-1.5 text-left focus-visible:ring-offset-1",
+                                        active
+                                            ? "border-foreground ring-1 ring-foreground"
+                                            : "border-border hover:bg-muted",
+                                    )
+                                }
+                            />
+                        </div>
+                        {paidNames.length > 0 || refused ? (
+                            <PickerFoot>
+                                {paidNames.length > 0 ? (
+                                    <p>
+                                        <Badge variant="tag" size="sm">
+                                            Paid plans
+                                        </Badge>{" "}
+                                        {andList(paidNames)}
+                                    </p>
+                                ) : null}
+                                {refused ? (
+                                    <div id={galleryId}>
+                                        <PaidRefusal name={refused} />
+                                    </div>
+                                ) : null}
+                            </PickerFoot>
+                        ) : null}
+                    </BrandPicker>
+                </div>
+            </div>
+            {lineUnderCard ? (
                 <div id={statusId}>
                     <PaidRefusal name={refused} />
                 </div>
@@ -292,7 +423,7 @@ export function LookPicker({
                 <p
                     id={statusId}
                     // A failed save is announced; the notes are read with
-                    // the row they describe.
+                    // the card they describe.
                     role={status.tone === "error" ? "alert" : undefined}
                     data-look-status={status.tone}
                     className={cn(
@@ -322,7 +453,9 @@ export function LookPicker({
                     onUse={() => onChoose(shownLook)}
                     onClose={() => setPreviewing(null)}
                     returnFocus={() =>
-                        previewButtons.current.get(shown) ?? null
+                        opener.current?.isConnected
+                            ? opener.current
+                            : changeRef.current
                     }
                 />
             ) : null}
@@ -330,7 +463,14 @@ export function LookPicker({
     );
 }
 
-/** Arrow keys on a Preview button stay there, not the row's radios. */
+/** "Quiet, Folio and Live". */
+function andList(names: string[]): string {
+    return names.length < 2
+        ? (names[0] ?? "")
+        : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/** Arrow keys on a Preview button stay there, not the gallery's radios. */
 function stopArrows(e: KeyboardEvent<HTMLButtonElement>) {
     if (e.key.startsWith("Arrow")) e.stopPropagation();
 }

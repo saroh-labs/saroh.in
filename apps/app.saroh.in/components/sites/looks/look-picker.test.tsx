@@ -116,17 +116,30 @@ function renderPicker(
     return onChoose;
 }
 
-const choices = () =>
-    Array.from(host.querySelectorAll<HTMLElement>("[data-look-choice]")).map(
-        (el) => el.dataset.lookChoice,
+/** The gallery behind the card's Change (DEC-184), opened if it isn't. */
+function openGallery() {
+    if (document.querySelector('[data-brand-picker][data-state="open"]')) {
+        return;
+    }
+    const change = host.querySelector<HTMLElement>("[data-look-change]");
+    if (change) act(() => change.click());
+}
+const inGallery = () => {
+    openGallery();
+    return Array.from(
+        document.querySelectorAll<HTMLElement>(
+            '[data-brand-picker][data-state="open"] [data-look-choice]',
+        ),
     );
+};
+const choices = () => inGallery().map((el) => el.dataset.lookChoice);
 const choice = (id: string) => {
-    const el = host.querySelector<HTMLElement>(`[data-look-choice="${id}"]`);
+    const el = inGallery().find((e) => e.dataset.lookChoice === id);
     if (!el) throw new Error(`No look "${id}"`);
     return el;
 };
 const suggested = () =>
-    Array.from(host.querySelectorAll<HTMLElement>("[data-look-choice]"))
+    inGallery()
         .filter((el) => el.textContent.includes("Suggested"))
         .map((el) => el.dataset.lookChoice);
 
@@ -138,11 +151,13 @@ describe("the looks on offer", () => {
         // Each with a few words; the full line is in its Preview.
         expect(choice("live").textContent).toContain("Bold, like an app");
         expect(choice("quiet").textContent).toContain("Warm, airy, rounded");
-        // The chosen one is ticked, not only outlined.
+        // The one in force is marked Now, not only outlined.
+        expect(choice("classic").textContent).toContain("Now");
+        expect(choice("quiet").textContent).not.toContain("Now");
+        // The card says what is in force without opening anything.
         expect(
-            choice("classic").querySelector("svg.lucide-check"),
-        ).not.toBeNull();
-        expect(choice("quiet").querySelector("svg.lucide-check")).toBeNull();
+            host.querySelector("[data-look-current]")?.textContent,
+        ).toContain("Classic");
     });
 
     it.each([
@@ -167,6 +182,7 @@ describe("the looks on offer", () => {
     it("draws nothing for a Classic site while the flag is off", () => {
         renderPicker(classic, { available: false });
         expect(host.textContent).toBe("");
+        expect(host.querySelector("[data-look-change]")).toBeNull();
         expect(
             lookChoices({ available: false, draftLook: null, liveLook: null }),
         ).toEqual([]);
@@ -204,15 +220,20 @@ describe("the looks on offer", () => {
 describe("choosing", () => {
     it("chooses a look, and Classic as none", () => {
         const onChoose = renderPicker(inLook(classic, "quiet"));
-        act(() => choice("folio").click());
+        const folio = choice("folio");
+        act(() => folio.click());
         expect(onChoose).toHaveBeenLastCalledWith("folio");
-        act(() => choice("classic").click());
+        const back = choice("classic");
+        act(() => back.click());
         expect(onChoose).toHaveBeenLastCalledWith(null);
     });
 
     it("moves with the arrow keys, one tab stop", () => {
         const onChoose = renderPicker(classic);
-        const stops = host.querySelectorAll('[role="radio"][tabindex="0"]');
+        openGallery();
+        const stops = document.querySelectorAll(
+            '[data-brand-picker] [role="radio"][tabindex="0"]',
+        );
         expect(stops).toHaveLength(1);
         act(() => {
             choice("classic").dispatchEvent(
@@ -227,11 +248,12 @@ describe("choosing", () => {
 
     it("draws each look's phone in the business's colours and the look's corners", () => {
         renderPicker(classic);
-        const quiet = host.querySelector<HTMLElement>(
-            '[data-look-thumbnail="quiet"]',
+        openGallery();
+        const quiet = document.querySelector<HTMLElement>(
+            '[data-brand-picker] [data-look-thumbnail="quiet"]',
         );
-        const folio = host.querySelector<HTMLElement>(
-            '[data-look-thumbnail="folio"]',
+        const folio = document.querySelector<HTMLElement>(
+            '[data-brand-picker] [data-look-thumbnail="folio"]',
         );
         expect(quiet?.getAttribute("aria-hidden")).toBe("true");
         // Quiet's button is a pill, Folio's square.
@@ -319,7 +341,7 @@ describe("Website › Style with the Look row", () => {
             "Spacing and shape",
         ]);
         expect(host.querySelector("#style-cornerRadius")).not.toBeNull();
-        expect(host.textContent).toContain("Reset");
+        expect(host.textContent).toContain("Reset style…");
     });
 
     it("draws no Look row without one to offer", () => {

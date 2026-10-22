@@ -173,7 +173,7 @@ export function useUndo({
         resetStyle() {
             const before = style;
             resetStyle();
-            hold("Back to the starting look", "style", before, () =>
+            hold("Colours, type and spacing reset.", "style", before, () =>
                 setStyle(before),
             );
         },
