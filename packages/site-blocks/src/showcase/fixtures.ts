@@ -936,7 +936,7 @@ const prana: TemplateFixture = {
         {
             id: "prana-ten",
             name: "10-class pack",
-            description: "₹550 a class. Use any class within 3 months.",
+            description: "Any class, at the studio or live online.",
             credits: 10,
             validityDays: 90,
             price: "5500.00",

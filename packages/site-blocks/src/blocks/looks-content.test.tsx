@@ -609,7 +609,7 @@ describe("Live's list: VB01's Next free", () => {
         expect(cards).toHaveLength(WEEK.sessions.length);
         expect(cards[0]).toHaveTextContent("Today");
         expect(cards[0]).toHaveTextContent("Meera · 1 hr · ₹600");
-        expect(cards[2]).toHaveTextContent("Thu 22 Oct");
+        expect(cards[2]).toHaveTextContent("Tomorrow");
         expect(cards[2]).toHaveTextContent("Full · waitlist open");
         expect(cards[2]).toHaveTextContent("Join the waitlist");
         // Folio and Quiet keep the week for the same section.

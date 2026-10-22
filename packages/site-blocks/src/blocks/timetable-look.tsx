@@ -376,10 +376,20 @@ function WeekColumns({ look, days, byDay, show, paidWith }: DayProps) {
 /**
  * Live's list (VB01 "Next free"): the classes in one row of cards, in
  * time order, sharing the row on a desk (188px at least) and 212px each
- * on a phone, scrolling sideways when they run past the page. A card says the day ("Today" for the first), the
+ * on a phone, scrolling sideways when they run past the page. A card says the day ("Today", "Tomorrow", then the date), the
  * time large, the class, who · how long · price, its places as a tag,
  * and a full-width Book (or Join the waitlist).
  */
+/** "Today" for the week's first day (the read starts today), "Tomorrow" for the next, then the date. */
+function railDay(date: string, today: string | undefined): string {
+    if (date === today) return "Today";
+    const next = new Date(`${today}T12:00:00Z`);
+    next.setUTCDate(next.getUTCDate() + 1);
+    return date === next.toISOString().slice(0, 10)
+        ? "Tomorrow"
+        : dayLabel(date);
+}
+
 function NextFreeRail({ days, byDay, show, paidWith }: Omit<DayProps, "look">) {
     const sessions = days.flatMap((date) => byDay(date));
     if (sessions.length === 0) {
@@ -401,7 +411,7 @@ function NextFreeRail({ days, byDay, show, paidWith }: Omit<DayProps, "look">) {
                         className="bg-site-surface grid w-[212px] shrink-0 snap-start content-start gap-2 rounded-[20px] p-4 min-[1000px]:w-auto min-[1000px]:min-w-[188px] min-[1000px]:flex-1 min-[1000px]:basis-0"
                     >
                         <span className={FRONT_TYPE.live.eyebrow}>
-                            {s.date === days[0] ? "Today" : dayLabel(s.date)}
+                            {railDay(s.date, days[0])}
                         </span>
                         <BigTime
                             look="live"
