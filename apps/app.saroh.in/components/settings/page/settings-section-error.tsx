@@ -7,14 +7,11 @@ import { backTo, couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 import Link from "next/link";
 import { useEffect } from "react";
 
-import {
-    SettingsPanel,
-    SettingsPanelHeader,
-} from "@/components/settings/settings-panel";
 import { SectionError } from "@/components/shared/states/section-error";
 import { isDenial } from "@/lib/api/errors";
 import type { SettingsSection } from "@/lib/settings/section-failure";
 import { SECTION_FAILURE } from "@/lib/settings/section-failure";
+import { SettingsPanel, SettingsPanelHeader } from "./settings-panel";
 
 /**
  * One settings tab that couldn't be read ("Saroh Settings" design, F12): its

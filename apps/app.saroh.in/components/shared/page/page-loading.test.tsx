@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { SettingsLoading } from "@/components/settings/settings-loading";
-import { SETTINGS_ROWS } from "@/components/settings/settings-panel";
+import { SettingsLoading } from "@/components/settings/page/settings-loading";
+import { SETTINGS_ROWS } from "@/components/settings/page/settings-panel";
 
 import type { PageShape, PageWidth } from "./page-loading";
 import { ArrivalLoading, PageLoading } from "./page-loading";

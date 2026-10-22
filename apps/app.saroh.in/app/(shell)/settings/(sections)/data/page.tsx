@@ -1,10 +1,10 @@
 import { PermissionDeniedState } from "@saroh/ui/data-state";
 
-import { DataExportPanel } from "@/components/settings/data-export-panel";
+import { DataExportPanel } from "@/components/settings/data/data-export-panel";
 import {
     SettingsPanel,
     SettingsPanelHeader,
-} from "@/components/settings/settings-panel";
+} from "@/components/settings/page/settings-panel";
 import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { listDataExports } from "@/lib/data-export/service";
 import { dataExportLine } from "@/lib/data-export/words";

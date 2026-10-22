@@ -187,9 +187,9 @@ export const RAW_ALLOWED = {
     // button: a row that is one button (More details, a saved service's rows)
     "components/services/service-editor/service-rows.tsx": ["button"],
     // button: a row or card that is one button
-    "components/settings/activity-list.tsx": ["button"],
+    "components/settings/activity/activity-list.tsx": ["button"],
     // button: a control styled by its screen's own helper, an option in a list; input: a field its screen draws itself
-    "components/settings/settings-search.tsx": ["button", "input"],
+    "components/shared/navigation/settings-search.tsx": ["button", "input"],
     // button: a row or card that is one button
     "components/shared/shell/app-sidebar.tsx": ["button"],
     // button: the one hand-drawn radio, shared by every choice group

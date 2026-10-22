@@ -5,7 +5,6 @@ import { Search } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
 
-import { SettingsSearch } from "@/components/settings/settings-search";
 import {
     isApplePlatform,
     searchShortcut,
@@ -13,6 +12,7 @@ import {
 } from "@/lib/nav/shortcut";
 import type { SettingsActor } from "@/lib/settings/search";
 import { isSettingsScreen } from "@/lib/settings/search";
+import { SettingsSearch } from "./settings-search";
 
 import { Tip } from "@saroh/ui/tooltip";
 import { openCommandMenu } from "./command-menu";

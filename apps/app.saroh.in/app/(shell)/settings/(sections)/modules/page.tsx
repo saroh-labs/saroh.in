@@ -2,7 +2,7 @@ import { ModuleCatalog } from "@/components/modules/module-catalog";
 import {
     SettingsPanel,
     SettingsPanelHeader,
-} from "@/components/settings/settings-panel";
+} from "@/components/settings/page/settings-panel";
 import { readMyEmailSetup } from "@/lib/communications/email-setup-service";
 import { listModules } from "@/lib/modules/service";
 import { connectLocksOf } from "@/lib/providers/connect-lock";

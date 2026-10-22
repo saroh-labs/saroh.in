@@ -314,7 +314,7 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
   and its tabs: the tab component itself or just the labels, without
   counts) and greys only the body. A record's page leaves `title` out and a
   bar stands in its place. A Settings section returns `SettingsLoading`
-  (`components/settings/settings-loading.tsx`), so it loads inside the
+  (`components/settings/page/settings-loading.tsx`), so it loads inside the
   panel with the side list in place. A tab whose layout already drew the
   header passes `bare`. The two arrival screens use `ArrivalLoading`.
   One drawing (`Skeleton`'s sweep; never `animate-pulse`, a spinner, a bare
@@ -371,7 +371,7 @@ ownerOnly` on top ("Your role can read the plan but not change it. Only
   (`plan-billing/plan-owner-only.test.tsx`). Settings search offers
   "Change plan" to the Owner only.
   A setup checklist's plan row is row data: `planRow`
-  (`components/settings/ready-rows.tsx`) leaves the button out and puts
+  (`components/settings/ready/ready-rows.tsx`) leaves the button out and puts
   who can after the row's line, and `PlanAsides` wraps its button in
   `PlanWay`. The site editor's route group mounts `PlanAccessProvider` as
   the shell does.

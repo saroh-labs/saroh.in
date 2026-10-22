@@ -6,6 +6,10 @@ import { NOTHING_CHANGED, planLabel } from "@saroh/ui/lib/state-copy";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import {
+    SettingsPanel,
+    SettingsPanelHeader,
+} from "@/components/settings/page/settings-panel";
 import { AddonsCard } from "@/components/settings/plan-billing/addons-card";
 import { BillingProfilePanel } from "@/components/settings/plan-billing/billing-profile-panel";
 import { CurrentPlanCard } from "@/components/settings/plan-billing/current-plan-card";
@@ -15,10 +19,6 @@ import { SarohInvoices } from "@/components/settings/plan-billing/saroh-invoices
 import { PLANS_HREF } from "@/components/settings/plan-billing/styles";
 import type { YourPlanProps } from "@/components/settings/plan-billing/your-plan";
 import { YourPlan } from "@/components/settings/plan-billing/your-plan";
-import {
-    SettingsPanel,
-    SettingsPanelHeader,
-} from "@/components/settings/settings-panel";
 import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { mayChangePlan, mayOpenPlan } from "@/lib/billing/plan-access";

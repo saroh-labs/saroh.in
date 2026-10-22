@@ -9,7 +9,7 @@ import { ProviderList } from "@/components/providers/provider-list";
 import {
     SettingsPanel,
     SettingsPanelHeader,
-} from "@/components/settings/settings-panel";
+} from "@/components/settings/page/settings-panel";
 import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { readAccountUpdates } from "@/lib/communications/account-updates-service";
 import { readCustomerEmails } from "@/lib/communications/customer-emails-service";

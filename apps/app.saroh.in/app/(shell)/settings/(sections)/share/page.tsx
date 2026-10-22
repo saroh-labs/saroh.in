@@ -8,7 +8,7 @@ import { QrShare } from "@/components/qr/share/qr-share";
 import {
     SettingsPanel,
     SettingsPanelHeader,
-} from "@/components/settings/settings-panel";
+} from "@/components/settings/page/settings-panel";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { readQrScreen } from "@/lib/qr/screen";
 import { requireSession } from "@/lib/session";

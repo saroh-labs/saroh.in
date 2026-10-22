@@ -2,7 +2,7 @@
 
 import { PausedDiary } from "@/components/billing/paused-diary";
 import { RolesTab } from "@/components/organizations/roles/roles-tab";
-import { SettingsPanelHeader } from "@/components/settings/settings-panel";
+import { SettingsPanelHeader } from "@/components/settings/page/settings-panel";
 import type { PausedTeam } from "@/lib/billing/paused";
 import { NONE_PAUSED, teamOverLimit } from "@/lib/billing/paused";
 import { useTabParam } from "@/lib/hooks/use-tab-param";

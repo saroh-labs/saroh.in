@@ -35,7 +35,7 @@ import {
 import { StockTrackingOff } from "@/components/commerce/stock/stock-states";
 import { Empty, Failed } from "@/components/customers/detail/parts";
 import { InvitationProblemView } from "@/components/organizations/team/invitation-problem";
-import { SettingsSectionError } from "@/components/settings/settings-section-error";
+import { SettingsSectionError } from "@/components/settings/page/settings-section-error";
 import { ApiError } from "@/lib/api/errors";
 import type { PlanMeter } from "@/lib/billing/meter";
 import { FailedRead } from "./failed-read";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCanChangePlan } from "@/components/billing/plan-way";
-import { planRow } from "@/components/settings/ready-rows";
+import { planRow } from "@/components/settings/ready/ready-rows";
 import { SetupChecklist } from "@/components/shared/setup-checklist/setup-checklist";
 import type { ChecklistRow } from "@/lib/setup-checklist";
 import type {

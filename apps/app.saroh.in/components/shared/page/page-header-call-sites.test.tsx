@@ -8,7 +8,7 @@ import { ProductPageBar } from "@/components/commerce/product-page/page-state";
 import { ListHeading } from "@/components/customers/list/states";
 import { PublishBanner } from "@/components/editor-shell/publish-banner";
 import { HomeHeader } from "@/components/home/header/home-header";
-import { SettingsPanelHeader } from "@/components/settings/settings-panel";
+import { SettingsPanelHeader } from "@/components/settings/page/settings-panel";
 
 vi.mock("next/link", () => ({
     default: ({

@@ -3,13 +3,13 @@ import { PermissionDeniedState } from "@saroh/ui/data-state";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { CheckoutPending } from "@/components/settings/plan-billing/checkout-pending";
-import { PlanChooser } from "@/components/settings/plan-billing/plan-chooser";
-import { BILLING_HREF } from "@/components/settings/plan-billing/styles";
 import {
     SettingsPanel,
     SettingsPanelHeader,
-} from "@/components/settings/settings-panel";
+} from "@/components/settings/page/settings-panel";
+import { CheckoutPending } from "@/components/settings/plan-billing/checkout-pending";
+import { PlanChooser } from "@/components/settings/plan-billing/plan-chooser";
+import { BILLING_HREF } from "@/components/settings/plan-billing/styles";
 import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { mayChangePlan, mayOpenPlan } from "@/lib/billing/plan-access";
