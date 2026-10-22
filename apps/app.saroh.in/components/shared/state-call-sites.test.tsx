@@ -21,7 +21,7 @@ vi.mock("@/components/commerce/stock/turn-on-tracking", () => ({
 vi.mock("@/components/commerce/stock/stock-header", () => ({
     StockHeader: () => <h1>Stock</h1>,
 }));
-vi.mock("@/components/organizations/switch-account-button", () => ({
+vi.mock("@/components/organizations/team/switch-account-button", () => ({
     SwitchAccountButton: ({ label }: { label: string }) => (
         <button type="button">{label}</button>
     ),
@@ -34,7 +34,7 @@ import {
 } from "@/components/commerce/product-page/panel-state";
 import { StockTrackingOff } from "@/components/commerce/stock/stock-states";
 import { Empty, Failed } from "@/components/customers/detail/parts";
-import { InvitationProblemView } from "@/components/organizations/invitation-problem";
+import { InvitationProblemView } from "@/components/organizations/team/invitation-problem";
 import { SettingsSectionError } from "@/components/settings/settings-section-error";
 import { FailedRead } from "@/components/shared/failed-read";
 import { SectionError } from "@/components/shared/section-error";

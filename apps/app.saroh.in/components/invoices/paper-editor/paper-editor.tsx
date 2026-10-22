@@ -11,8 +11,8 @@ import { useWatch } from "react-hook-form";
 
 import { HeaderOverlay } from "@/components/bookings/calendar/header/header-overlay";
 import { usePhone } from "@/components/bookings/calendar/header/use-phone";
-import { BusinessLogoSheet } from "@/components/organizations/business-logo-sheet";
-import { PayInstructionsSheet } from "@/components/organizations/pay-instructions-sheet";
+import { BusinessLogoSheet } from "@/components/organizations/logo/business-logo-sheet";
+import { PayInstructionsSheet } from "@/components/organizations/pay-instructions/pay-instructions-sheet";
 import { runAction } from "@/lib/api/run-action";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import type {

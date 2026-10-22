@@ -1,5 +1,5 @@
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
-import { TeamScreen } from "@/components/organizations/team-screen";
+import { TeamScreen } from "@/components/organizations/team/team-screen";
 import { SettingsPanel } from "@/components/settings/settings-panel";
 import { rowNotice } from "@/lib/billing/access";
 import { pausedTeam, teamOverLimit } from "@/lib/billing/paused";

@@ -26,13 +26,16 @@ vi.mock("@/lib/invoices/product-actions", () => ({
     findInvoiceProducts: vi.fn(),
 }));
 vi.mock("@/lib/contacts/create", () => ({ createContact: vi.fn() }));
-vi.mock("@/components/organizations/use-business-details-step", () => ({
-    useBusinessDetailsStep: () => ({
-        run: vi.fn(),
-        ensure: vi.fn(),
-        step: null,
+vi.mock(
+    "@/components/organizations/business-details/use-business-details-step",
+    () => ({
+        useBusinessDetailsStep: () => ({
+            run: vi.fn(),
+            ensure: vi.fn(),
+            step: null,
+        }),
     }),
-}));
+);
 
 const CONTACTS = [{ id: "c_1", name: "Asha Rao", email: "asha@example.com" }];
 

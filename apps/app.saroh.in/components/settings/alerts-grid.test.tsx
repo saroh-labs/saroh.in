@@ -24,9 +24,12 @@ vi.mock("@/lib/notifications/actions", () => ({
 }));
 
 const offer = vi.fn();
-vi.mock("@/components/organizations/use-settings-undo", () => ({
-    useSettingsUndo: () => ({ offer, settle: vi.fn() }),
-}));
+vi.mock(
+    "@/components/organizations/business-settings/use-settings-undo",
+    () => ({
+        useSettingsUndo: () => ({ offer, settle: vi.fn() }),
+    }),
+);
 
 const showError = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({

@@ -173,9 +173,11 @@ export const RAW_ALLOWED = {
     // button: a line's remove button, drawn twice (phone and desk) in the table's own grid
     "components/invoices/new-invoice/lines-table.tsx": ["button"],
     // button: a row or card that is one button
-    "components/organizations/organization-switcher.tsx": ["button"],
+    "components/organizations/switcher/organization-switcher.tsx": ["button"],
     // button: a row that opens its role
-    "components/organizations/roles-tab.tsx": ["button"],
+    "components/organizations/roles/role-list.tsx": ["button"],
+    // button: the list's New role row
+    "components/organizations/roles/roles-tab.tsx": ["button"],
     // button: a control styled by its screen's own helper
     "components/qr/qr-add-logo.tsx": ["button"],
     // button: a row or card that is one button

@@ -184,7 +184,7 @@ vi.mock("@/lib/members/service", () => ({
         acceptLocation(...args) as unknown,
 }));
 vi.mock("@/lib/accounts", () => ({ inviteLandingFor: () => null }));
-vi.mock("@/components/organizations/invitation-problem", () => ({
+vi.mock("@/components/organizations/team/invitation-problem", () => ({
     InvitationProblemView: () => null,
 }));
 

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { InvitationProblemView } from "@/components/organizations/invitation-problem";
+import { InvitationProblemView } from "@/components/organizations/team/invitation-problem";
 import { inviteLandingFor } from "@/lib/accounts";
 import { invitationProblem } from "@/lib/invitations/outcome";
 import { joinDoor } from "@/lib/organizations/joined";

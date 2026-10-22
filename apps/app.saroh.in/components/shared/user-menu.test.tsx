@@ -36,7 +36,7 @@ vi.mock("./user-menu", async (actual) => {
         },
     };
 });
-vi.mock("@/components/organizations/organization-switcher", () => ({
+vi.mock("@/components/organizations/switcher/organization-switcher", () => ({
     OrganizationSwitcher: () => null,
 }));
 vi.mock("@/components/shared/command-trigger", () => ({

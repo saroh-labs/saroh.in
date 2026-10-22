@@ -184,18 +184,18 @@ not "Store Created!!!".
 
 ## 8. Do / Don't — pulled from real Saroh screens
 
-| #   | Do                                                                              | Don't                                                        | Source / rule                                                                  |
-| --- | ------------------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| 1   | "Your stores" as a single `h1`, one "New store" primary button.                 | Two primary buttons competing in the page header.            | `app/page.tsx` · [01 P2](./01_PRODUCT_DESIGN_PHILOSOPHY.md)                    |
-| 2   | Mark the active nav item with `aria-current="page"` + `bg-accent`.              | Style the active tab with a raw colour or leave it unmarked. | `components/stores/store-nav.tsx` · [06 §11](./06_DESIGN_TOKENS.md)            |
-| 3   | Pair icon-only controls with `aria-label` ("Switch organization").              | Ship a bare `ChevronsUpDown` with no accessible name.        | `components/organizations/organization-switcher.tsx` · [07 §3](#3-iconography) |
-| 4   | Show a guarded error via `toast.error(res.error)`.                              | Let an unauthorized org selection 403 silently downstream.   | org switcher · [07 §7](#7-feedback-toasts-loading-errors)                      |
-| 5   | Use `text-muted-foreground` for secondary text (`/{store.slug}`, helper lines). | Reach for a grey hex or `text-gray-500`.                     | store layout, empty state · [06 §1](./06_DESIGN_TOKENS.md)                     |
-| 6   | Tokenise status: `text-warning` for an amount that needs attention.             | `text-amber-700 dark:text-amber-400`.                        | `components/stores/order-payments.tsx` · [06 §2/§12](./06_DESIGN_TOKENS.md)    |
-| 7   | `text-xs` (12px) for a badge.                                                   | `text-[10px]` arbitrary size.                                | `components/stores/store-nav.tsx` · [06 §12](./06_DESIGN_TOKENS.md)            |
-| 8   | Render "Soon" as a `secondary` `Badge` on a disabled item with `aria-disabled`. | A dead link that 404s.                                       | `StoreNav` `comingSoon` pattern · [01 §4](./01_PRODUCT_DESIGN_PHILOSOPHY.md)   |
-| 9   | `tabular-nums` for money columns.                                               | Proportional figures that misalign in a table.               | `order-payments.tsx` · [07 §5](#5-numbers-dates--currency-formatting)          |
-| 10  | Sentence case labels ("Create organization").                                   | Title Case ("Create Organization").                          | org switcher · [07 §2](#2-capitalization)                                      |
+| #   | Do                                                                              | Don't                                                        | Source / rule                                                                           |
+| --- | ------------------------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| 1   | "Your stores" as a single `h1`, one "New store" primary button.                 | Two primary buttons competing in the page header.            | `app/page.tsx` · [01 P2](./01_PRODUCT_DESIGN_PHILOSOPHY.md)                             |
+| 2   | Mark the active nav item with `aria-current="page"` + `bg-accent`.              | Style the active tab with a raw colour or leave it unmarked. | `components/stores/store-nav.tsx` · [06 §11](./06_DESIGN_TOKENS.md)                     |
+| 3   | Pair icon-only controls with `aria-label` ("Switch organization").              | Ship a bare `ChevronsUpDown` with no accessible name.        | `components/organizations/switcher/organization-switcher.tsx` · [07 §3](#3-iconography) |
+| 4   | Show a guarded error via `toast.error(res.error)`.                              | Let an unauthorized org selection 403 silently downstream.   | org switcher · [07 §7](#7-feedback-toasts-loading-errors)                               |
+| 5   | Use `text-muted-foreground` for secondary text (`/{store.slug}`, helper lines). | Reach for a grey hex or `text-gray-500`.                     | store layout, empty state · [06 §1](./06_DESIGN_TOKENS.md)                              |
+| 6   | Tokenise status: `text-warning` for an amount that needs attention.             | `text-amber-700 dark:text-amber-400`.                        | `components/stores/order-payments.tsx` · [06 §2/§12](./06_DESIGN_TOKENS.md)             |
+| 7   | `text-xs` (12px) for a badge.                                                   | `text-[10px]` arbitrary size.                                | `components/stores/store-nav.tsx` · [06 §12](./06_DESIGN_TOKENS.md)                     |
+| 8   | Render "Soon" as a `secondary` `Badge` on a disabled item with `aria-disabled`. | A dead link that 404s.                                       | `StoreNav` `comingSoon` pattern · [01 §4](./01_PRODUCT_DESIGN_PHILOSOPHY.md)            |
+| 9   | `tabular-nums` for money columns.                                               | Proportional figures that misalign in a table.               | `order-payments.tsx` · [07 §5](#5-numbers-dates--currency-formatting)                   |
+| 10  | Sentence case labels ("Create organization").                                   | Title Case ("Create Organization").                          | org switcher · [07 §2](#2-capitalization)                                               |
 
 ---
 

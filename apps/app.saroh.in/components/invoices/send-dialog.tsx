@@ -8,7 +8,7 @@ import { useState } from "react";
 
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
 import type { InvoiceRef } from "@/components/invoices/invoice-actions";
-import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
+import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import type { HeldResult } from "@/components/shared/use-hold";

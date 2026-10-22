@@ -5,7 +5,7 @@ import { Switch } from "@saroh/ui/switch";
 import { showError } from "@saroh/ui/toast";
 import { useOptimistic, useTransition } from "react";
 
-import { useSettingsUndo } from "@/components/organizations/use-settings-undo";
+import { useSettingsUndo } from "@/components/organizations/business-settings/use-settings-undo";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
 import { saveAlert, undoAlert } from "@/lib/notifications/actions";

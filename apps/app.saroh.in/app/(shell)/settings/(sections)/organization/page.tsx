@@ -1,8 +1,8 @@
 import { FailedState } from "@saroh/ui/data-state";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
-import { OrganizationSettingsForm } from "@/components/organizations/organization-settings-form";
-import { WebAddressSection } from "@/components/organizations/web-address-section";
+import { OrganizationSettingsForm } from "@/components/organizations/business-settings/organization-settings-form";
+import { WebAddressSection } from "@/components/organizations/web-address/web-address-section";
 import {
     ReadyChecklist,
     readyHasCard,

@@ -24,7 +24,7 @@ import {
     NewLinkConfirm,
     UnseenLinkNote,
 } from "@/components/invoices/unseen-link";
-import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
+import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
 import { QrButton } from "@/components/qr/qr-button";
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { sayRefusal } from "@/components/shared/confirm-dialog";

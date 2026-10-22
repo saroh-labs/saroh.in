@@ -18,9 +18,12 @@ import { CustomerEmailsBlock } from "./customer-emails-row";
 vi.mock("@/lib/communications/customer-emails-actions", () => ({
     setCustomerEmail: vi.fn(),
 }));
-vi.mock("@/components/organizations/use-settings-undo", () => ({
-    useSettingsUndo: () => ({ offer: vi.fn(), settle: vi.fn() }),
-}));
+vi.mock(
+    "@/components/organizations/business-settings/use-settings-undo",
+    () => ({
+        useSettingsUndo: () => ({ offer: vi.fn(), settle: vi.fn() }),
+    }),
+);
 vi.mock("@saroh/ui/toast", () => ({ showError: vi.fn() }));
 vi.mock("@saroh/ui/sheet", async () =>
     (

@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
-import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
+import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { FormDialog } from "@/components/shared/form-dialog";

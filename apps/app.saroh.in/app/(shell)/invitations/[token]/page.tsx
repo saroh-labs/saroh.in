@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { InvitationProblemView } from "@/components/organizations/invitation-problem";
+import { InvitationProblemView } from "@/components/organizations/team/invitation-problem";
 import {
     invitationProblem,
     LOCATION_WRONG_EMAIL,

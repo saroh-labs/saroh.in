@@ -243,9 +243,9 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
             "Insights' answers: Overview, Money, What sells, Where customers come from",
         "components/leads/leads-tabs.tsx":
             "Leads and Follow-ups: the leads, and the tasks set on them",
-        "components/organizations/organization-settings-form.tsx":
+        "components/organizations/business-settings/organization-settings-form.tsx":
             "Settings › Business's sections on a phone",
-        "components/organizations/team-screen.tsx":
+        "components/organizations/team/team-screen.tsx":
             "People and Roles: who is here, and what each role can do",
         "components/sites/editor-chrome.tsx": "the site editor's panels",
         "components/sites/website-header.tsx":

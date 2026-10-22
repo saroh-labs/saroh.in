@@ -152,7 +152,7 @@ the mental model is identical across devices ([01 P6](./01_PRODUCT_DESIGN_PHILOS
 **Today.** Saroh is org-scoped. The active org is stored in an `active_org` cookie,
 resolved into an `x-organization-id` header on every API call
 (`lib/organizations/service.ts`, `lib/api/http.ts`). The `OrganizationSwitcher`
-(`components/organizations/organization-switcher.tsx`) is a `DropdownMenu` of the user's
+(`components/organizations/switcher/organization-switcher.tsx`) is a `DropdownMenu` of the user's
 orgs; selecting one calls the `setActiveOrganization` server action (guarded — picking an
 org you don't belong to is rejected, not silently 403'd downstream) and `router.refresh()`
 so every server component re-fetches under the new tenant. It's rendered in both

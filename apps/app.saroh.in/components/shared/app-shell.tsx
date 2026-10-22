@@ -5,7 +5,7 @@ import { PausedBanner } from "@/components/billing/paused-banner";
 import { PlanEndingBanner } from "@/components/billing/plan-ending-banner";
 import { PlanRefusalHost } from "@/components/billing/plan-refusal";
 import { PlanAccessProvider } from "@/components/billing/plan-way";
-import { ClosingBanner } from "@/components/organizations/closing-banner";
+import { ClosingBanner } from "@/components/organizations/closing/closing-banner";
 import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
 import { BusinessCountryProvider } from "@/components/shared/business-country";

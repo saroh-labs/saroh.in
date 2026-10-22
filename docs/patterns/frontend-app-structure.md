@@ -101,6 +101,37 @@ components/shared/             app shell, navigation, command menu
   drawing in panels there (`editor-top-bar`, `editor-rail`, `editor-canvas`,
   `inspector-host`). A new editor panel or piece of editor state goes there,
   not back into `site-editor.tsx`.
+- **Adopted** — **A domain folder that grows mixed or big gets feature
+  sub-folders** (DEC-183). Group `components/<domain>/` into
+  `components/<domain>/<feature>/` when it holds more than three files that
+  are unrelated (different screens or features that don't import each other,
+  such as a switcher, a closing banner and a setup step side by side), or more
+  than about 25 files. Name each folder in kebab-case after what the merchant
+  sees (`business-hours`, `pay-instructions`, `team`, `setup`), never after a
+  component type (`sheets`, `hooks`). Files keep their kebab-case names and
+  feature prefix (`team/team-screen.tsx`); tests and `*.test-kit.tsx` sit
+  beside the file they test, as `<subject>.test.tsx` or
+  `<subject>.<aspect>.test.tsx`. Pieces two features in the domain share go
+  in the folder of the screen that composes them; pieces another domain uses
+  go up to `components/shared/` or that domain. No `index.ts` barrels: import
+  the file. Inside a folder import with `./`; across folders with
+  `@/components/<domain>/<feature>/…`, never `../`. A move is its own
+  change, renames and import updates only, and that includes what the
+  compiler does not check: `vi.mock` strings, path lists in tests, and
+  `tooling/eslint-config-custom/controls-allowlist.js`.
+- **Adopted** — **The UI layer is separate from the business layer**
+  (DEC-183). A component file (`.tsx`) draws: layout, styling, the words on
+  screen, and wiring events to handlers. It holds no business rules. Rules
+  and derivations (who may do what, what a value works out to, plurals, the
+  words a status maps to) are pure functions in `.ts` files, in
+  `lib/<domain>/` when more than one component uses them, otherwise beside
+  the component (`team/role-book.ts`), each with unit tests that need no
+  render. State and actions (drafts, save, undo, refusals) live in a
+  `use-*.ts` hook that calls `lib/<domain>/actions.ts`. The component takes
+  data and callbacks and decides only how they look, so restyling or
+  rewording a screen never touches a `.ts` file and changing a rule never
+  touches a `.tsx` one. Every new component follows it; an existing one moves
+  to it when it is next changed, not in a sweep.
 - **Current** — **A QR beside a link is `QrButton`** (DEC-118,
   `components/qr/qr-button.tsx`, its panel `qr-panel.tsx`), never a second
   drawing. A page that stays (the website, the shop, the booking page, a
@@ -256,6 +287,8 @@ accounts and the operator console. `pnpm run check:titles` and
 
 ## Not adopted
 
-`modules/<feature>/index.tsx` exporting a `<Feature>Module`, and the
-hook → view → index split. Both assume client-side data fetching; Server
-Components already separate reading from rendering.
+`modules/<feature>/index.tsx` exporting a `<Feature>Module`, and a
+mandatory hook → view → index triple for every component. Both assume
+client-side data fetching; Server Components already separate reading from
+rendering, and the UI/business split above is done by moving rules into `.ts`
+files, not by a fixed three-file shape.

@@ -4,7 +4,7 @@ import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { BusinessLogoSheet } from "@/components/organizations/business-logo-sheet";
+import { BusinessLogoSheet } from "@/components/organizations/logo/business-logo-sheet";
 
 const ADD_LOGO_ID = "qr-add-logo";
 

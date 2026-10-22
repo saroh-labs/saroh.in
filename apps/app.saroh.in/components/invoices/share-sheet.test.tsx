@@ -39,12 +39,15 @@ vi.mock("@/lib/invoices/actions", () => ({
     setInvoiceLineRates: vi.fn(),
 }));
 vi.mock("@/lib/gst-rates/actions", () => ({ saveGstRates: vi.fn() }));
-vi.mock("@/components/organizations/use-business-details-step", () => ({
-    useBusinessDetailsStep: () => ({
-        run: <R,>(action: () => Promise<R>) => action(),
-        step: null,
+vi.mock(
+    "@/components/organizations/business-details/use-business-details-step",
+    () => ({
+        useBusinessDetailsStep: () => ({
+            run: <R,>(action: () => Promise<R>) => action(),
+            step: null,
+        }),
     }),
-}));
+);
 vi.mock("@/components/gst-rates/use-gst-rate-step", () => ({
     useGstRateStep: () => ({
         run: <R,>(action: () => Promise<R>) => action(),

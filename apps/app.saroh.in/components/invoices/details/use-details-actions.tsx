@@ -28,7 +28,7 @@ import {
 import { useInvoiceSend } from "@/components/invoices/send-dialog";
 import { NewLinkConfirm } from "@/components/invoices/unseen-link";
 import { useWriteAgain } from "@/components/invoices/use-write-again";
-import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
+import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
 import { QrButton } from "@/components/qr/qr-button";
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog, sayRefusal } from "@/components/shared/confirm-dialog";

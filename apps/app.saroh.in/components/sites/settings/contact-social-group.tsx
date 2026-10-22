@@ -6,12 +6,12 @@ import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { BusinessFieldSheet } from "@/components/organizations/business-field-sheet";
+import { BusinessFieldSheet } from "@/components/organizations/business-settings/business-field-sheet";
 import {
     addressText,
     valuesOf,
-} from "@/components/organizations/business-form";
-import { SocialLinksSheet } from "@/components/organizations/social-links-sheet";
+} from "@/components/organizations/business-settings/business-form";
+import { SocialLinksSheet } from "@/components/organizations/social-links/social-links-sheet";
 import { Absent, Group, Row, Section } from "@/components/sites/settings-rows";
 import { phoneLabel } from "@/lib/organizations/business-phone";
 import { savedWords } from "@/lib/organizations/business-sheet-words";

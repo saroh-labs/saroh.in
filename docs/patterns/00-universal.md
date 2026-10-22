@@ -155,14 +155,6 @@ each with why it stops there:
   geometry `lib/calendar/hour-layout.ts`; `business-week.tsx` (243) only
   chooses between it and the columns. The API's working hours are
   `calendar/working-hours.ts`, read beside the days off.
-- `organizations/team-screen.tsx` (1,377 after F16 and F17) — the Roles and
-  People tabs, the member drawer and the invite dialog share the screen's
-  roster and role state. Each piece is its own function already; moving them
-  is a file split with props threaded through, not yet done. F17 put a
-  person's extra permissions in `member-extras.tsx` (the column's chips, the
-  drawer's list and its draft hook) and `lib/organizations/extras.ts`, adding
-  only the calls, the drawer's two-step save and the column's grid; the
-  drawer is the next cut.
 - `shared/nav-items.tsx` (1,176; Sell › Stock and its Track stock rule, #527) — the nav's data (`NAV_GROUPS`,
   `SETTINGS_PAGES`) and every rule that filters it by role, module and
   site; half of it is the table itself. Splitting data from rules is a move,
@@ -323,12 +315,21 @@ each with why it stops there:
   module-level helpers (`windowInTx`, `viewsOf`, `summaryOf`) can move
   to their own file.
 
-Split rather than listed: `organizations/organization-settings-form.tsx`
+Split rather than listed: `organizations/team/team-screen.tsx` (1,486
+before; 334 now, 22 Oct, DEC-183): the screen only composes its tabs; the
+roster is `people-tab.tsx` with `pending-invites.tsx`, the drawer
+`member-drawer.tsx` (extras still in `member-extras.tsx`), the removal
+`remove-member.tsx`, the invite `invite-sheet.tsx`, and one answer to every
+role question `role-book.ts` over `roles/role-words.ts`. Its Roles tab,
+`organizations/roles/roles-tab.tsx` (836 before; 181 now), splits the same
+way: `role-list`, `role-detail`, `permissions`, `role-sheet`,
+`new-role-sheet`, and the viewer's reach in `role-reach.ts`. And
+`organizations/business-settings/organization-settings-form.tsx`
 (1,321 before; 219 now) when Settings › Business became rows with a sheet
 each (10 Oct): the page only composes. Its schema, draft and the patch a
-save sends are `business-form.ts`; the rows `business-detail-rows.tsx` and
-`business-tax-rows.tsx`; the sheet `business-field-sheet.tsx`, with its
-fields in `business-sheet-fields.tsx` and `business-tax-fields.tsx`; and
+save sends are `business-form.ts`; the rows `business-details/business-detail-rows.tsx` and
+`tax/business-tax-rows.tsx`; the sheet `business-field-sheet.tsx`, with its
+fields in `business-sheet-fields.tsx` and `tax/business-tax-fields.tsx`; and
 which sheet is open `use-business-sheets.ts` over
 `lib/organizations/business-rows.ts`. And `sites/site-editor.tsx` (2,160 before; under 300 since
 round-2 G1, #260) along its hooks and panels into `sites/editor/`. Of what it

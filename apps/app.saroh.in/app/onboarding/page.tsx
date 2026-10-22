@@ -4,9 +4,9 @@ import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { BusinessSetupForm } from "@/components/organizations/business-setup-form";
-import { SetupPanel } from "@/components/organizations/setup-panel";
-import { SetupStepProvider } from "@/components/organizations/setup-step-context";
+import { BusinessSetupForm } from "@/components/organizations/setup/business-setup-form";
+import { SetupPanel } from "@/components/organizations/setup/setup-panel";
+import { SetupStepProvider } from "@/components/organizations/setup/setup-step-context";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 import {
     listMyBillingProfiles,

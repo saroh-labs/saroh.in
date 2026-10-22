@@ -52,7 +52,7 @@ pattern files refer back here.
 - **Current** (DEC-130, amended 11 Oct 2026) — **The first run is four
   short steps, and it ends in the product.** Sign-up takes an email and a
   code (DEC-129). Setup is a stepper
-  (`components/organizations/business-setup-form.tsx`), one question to a
+  (`components/organizations/setup/business-setup-form.tsx`), one question to a
   screen with Back and Continue: "What are you setting up?", then the name
   step (your name if the account has none, the name, the web address, the
   country, India chosen), then "What will you do first?". The last step's

@@ -61,7 +61,7 @@ action answers "what next?" instantly and makes the screen self-explaining.
 
 **Saroh example.** On the home page the only primary button is "New store"; the org
 switcher and sign-out in `AppHeader` are deliberately `outline`/quiet
-(`components/shared/app-header.tsx`, `components/organizations/organization-switcher.tsx`
+(`components/shared/app-header.tsx`, `components/organizations/switcher/organization-switcher.tsx`
 uses `variant="outline" size="sm"`). Contrast this with the per-store layout
 (`app/stores/[storeId]/layout.tsx`), which currently offers a "← Dashboard" link, an org
 switcher, a title and a section nav with no single dominant CTA — a candidate for

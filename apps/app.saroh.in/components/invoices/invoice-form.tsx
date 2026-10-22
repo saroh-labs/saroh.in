@@ -11,7 +11,7 @@ import type { FieldErrors } from "react-hook-form";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 
 import type { AddedContact } from "@/components/contacts/add-contact-dialog";
-import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
+import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
 import {
     lostChanges,
     lostNew,

@@ -84,13 +84,16 @@ vi.mock("@/lib/invoices/product-actions", () => ({
 vi.mock("@/lib/invoices/actions", () => ({}));
 vi.mock("@/lib/invoices/link-actions", () => ({}));
 vi.mock("@/lib/contacts/create", () => ({}));
-vi.mock("@/components/organizations/use-business-details-step", () => ({
-    useBusinessDetailsStep: () => ({
-        run: vi.fn(),
-        ensure: vi.fn(),
-        step: null,
+vi.mock(
+    "@/components/organizations/business-details/use-business-details-step",
+    () => ({
+        useBusinessDetailsStep: () => ({
+            run: vi.fn(),
+            ensure: vi.fn(),
+            step: null,
+        }),
     }),
-}));
+);
 
 const org = (actions: string[], role = "MEMBER") =>
     ({

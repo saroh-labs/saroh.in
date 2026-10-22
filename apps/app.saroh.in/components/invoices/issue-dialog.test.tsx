@@ -36,12 +36,15 @@ vi.mock("@/lib/gst-rates/actions", () => ({
     saveGstRates: (...a: unknown[]) => saveGstRates(...a) as unknown,
 }));
 // The business's details are on file: that step passes the action through.
-vi.mock("@/components/organizations/use-business-details-step", () => ({
-    useBusinessDetailsStep: () => ({
-        run: <R,>(action: () => Promise<R>) => action(),
-        step: null,
+vi.mock(
+    "@/components/organizations/business-details/use-business-details-step",
+    () => ({
+        useBusinessDetailsStep: () => ({
+            run: <R,>(action: () => Promise<R>) => action(),
+            step: null,
+        }),
     }),
-}));
+);
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh, push: vi.fn(), replace: vi.fn() }),

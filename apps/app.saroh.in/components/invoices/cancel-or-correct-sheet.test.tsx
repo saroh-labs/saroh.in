@@ -55,12 +55,15 @@ vi.mock("@/lib/invoices/actions", () => ({
     setInvoiceLineRates: vi.fn(),
 }));
 vi.mock("@/lib/gst-rates/actions", () => ({ saveGstRates: vi.fn() }));
-vi.mock("@/components/organizations/use-business-details-step", () => ({
-    useBusinessDetailsStep: () => ({
-        run: <R,>(action: () => Promise<R>) => action(),
-        step: null,
+vi.mock(
+    "@/components/organizations/business-details/use-business-details-step",
+    () => ({
+        useBusinessDetailsStep: () => ({
+            run: <R,>(action: () => Promise<R>) => action(),
+            step: null,
+        }),
     }),
-}));
+);
 const router = { refresh: vi.fn(), push: vi.fn(), replace: vi.fn() };
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 const toast = { showError: vi.fn(), showSuccess: vi.fn() };

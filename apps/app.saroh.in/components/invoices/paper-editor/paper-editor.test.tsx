@@ -40,16 +40,19 @@ const step = vi.hoisted(() => ({
     options: [] as unknown[],
     ensure: vi.fn(() => Promise.resolve(true)),
 }));
-vi.mock("@/components/organizations/use-business-details-step", () => ({
-    useBusinessDetailsStep: (options: unknown) => {
-        step.options.push(options);
-        return {
-            run: (fn: () => unknown) => fn(),
-            ensure: step.ensure,
-            step: null,
-        };
-    },
-}));
+vi.mock(
+    "@/components/organizations/business-details/use-business-details-step",
+    () => ({
+        useBusinessDetailsStep: (options: unknown) => {
+            step.options.push(options);
+            return {
+                run: (fn: () => unknown) => fn(),
+                ensure: step.ensure,
+                step: null,
+            };
+        },
+    }),
+);
 const settings = vi.hoisted(() => ({
     saveOrganizationSettings: vi.fn(),
     saveOrganizationSettingsInPlace: vi.fn(),

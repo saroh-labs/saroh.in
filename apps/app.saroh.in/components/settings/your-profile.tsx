@@ -1,7 +1,7 @@
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 
-import { LeaveBusiness } from "@/components/organizations/leave-business";
+import { LeaveBusiness } from "@/components/organizations/team/leave-business";
 import type { AlertPreferencesRead } from "@/lib/notifications/preferences";
 
 import { AlertsGrid } from "./alerts-grid";

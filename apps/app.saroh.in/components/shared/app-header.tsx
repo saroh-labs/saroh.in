@@ -1,7 +1,7 @@
 import { SarohSymbol, Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 
-import { OrganizationSwitcher } from "@/components/organizations/organization-switcher";
+import { OrganizationSwitcher } from "@/components/organizations/switcher/organization-switcher";
 import { CommandTrigger } from "@/components/shared/command-trigger";
 import { NotificationsLink } from "@/components/shared/notifications-link";
 import { SkinSwitcher } from "@/components/shared/skin-switcher";

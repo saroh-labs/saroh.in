@@ -7,7 +7,7 @@ import { useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
-import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
+import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
 import { Chip } from "@/components/shared/chip";
 import {
     FormSheet,

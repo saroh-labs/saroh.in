@@ -44,13 +44,16 @@ vi.mock("@/lib/invoices/link-actions", () => ({ newPayLink: vi.fn() }));
 const products = vi.hoisted(() => ({ findInvoiceProducts: vi.fn() }));
 vi.mock("@/lib/invoices/product-actions", () => products);
 vi.mock("@/lib/contacts/create", () => ({ createContact: vi.fn() }));
-vi.mock("@/components/organizations/use-business-details-step", () => ({
-    useBusinessDetailsStep: () => ({
-        run: (fn: () => unknown) => fn(),
-        ensure: () => Promise.resolve(true),
-        step: null,
+vi.mock(
+    "@/components/organizations/business-details/use-business-details-step",
+    () => ({
+        useBusinessDetailsStep: () => ({
+            run: (fn: () => unknown) => fn(),
+            ensure: () => Promise.resolve(true),
+            step: null,
+        }),
     }),
-}));
+);
 const toast = vi.hoisted(() => ({
     showSuccess: vi.fn(),
     showError: vi.fn(),
