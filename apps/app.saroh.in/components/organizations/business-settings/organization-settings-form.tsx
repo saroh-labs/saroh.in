@@ -171,11 +171,12 @@ export function OrganizationSettingsForm({
 
                 {/* What is saved, as an invoice prints it. A sheet shows
                     its own draft the same way, under its fields. */}
-                <BusinessPrintPreview
-                    hidden={tab === "pay"}
-                    live={false}
-                    {...printOf(saved, settings)}
-                />
+                {tab === "pay" ? null : (
+                    <BusinessPrintPreview
+                        live={false}
+                        {...printOf(saved, settings)}
+                    />
+                )}
             </div>
 
             {/* The open sheet, a fresh draft each time it opens. */}

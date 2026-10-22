@@ -226,7 +226,7 @@ export function PayInstructionsSheet({
                     />
                 </div>
                 <PayPreview
-                    inSheet
+                    placement="in-sheet"
                     live={isDirty}
                     businessName={businessName}
                     preview={payPreviewOf(live)}

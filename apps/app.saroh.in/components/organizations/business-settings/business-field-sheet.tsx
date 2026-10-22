@@ -239,7 +239,7 @@ export function BusinessFieldSheet({
                     page's own preview sits under this sheet. */}
                 {PREVIEWED.includes(sheet) ? (
                     <BusinessPrintPreview
-                        inSheet
+                        placement="in-sheet"
                         live={isDirty}
                         {...printOf(v, settings)}
                     />

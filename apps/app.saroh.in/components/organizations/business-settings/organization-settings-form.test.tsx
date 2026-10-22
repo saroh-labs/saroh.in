@@ -423,11 +423,10 @@ describe("How to pay us (R32)", () => {
         const panel = host.querySelector<HTMLElement>("#business-pay-panel");
         expect(panel?.closest(".hidden")).toBeNull();
         expect(panel?.textContent).toContain("northwind.supply@okexample");
+        // Its own preview stands in for the invoice's.
         expect(
-            host
-                .querySelector('aside[aria-label="How it prints"]')
-                ?.classList.contains("hidden"),
-        ).toBe(true);
+            host.querySelector('aside[aria-label="How it prints"]'),
+        ).toBeNull();
         // Another tab's rows are not drawn.
         expect(host.querySelector("#business-panel")).toBeNull();
     });

@@ -1,17 +1,16 @@
-import { cn } from "@saroh/ui/lib/utils";
+import { PreviewPanel } from "@/components/organizations/business-settings/preview-panel";
 
 /**
  * "How it prints" ("Saroh Settings" design): the top of an invoice as the
  * business's details put it. Beside the rows it shows what is saved; under
- * a sheet's fields (`inSheet`) it follows the draft, so an edit is judged by
+ * a sheet's fields (`in-sheet`) it follows the draft, so an edit is judged by
  * what a customer will read rather than by the field it is in.
  *
  * Paper-coloured on purpose — it stands for a printed page, not a card — so
  * it keeps the design's fixed paper and ink in dark theme as well.
  */
 export function BusinessPrintPreview({
-    hidden = false,
-    inSheet = false,
+    placement = "beside",
     live,
     logoUrl,
     registered,
@@ -25,10 +24,8 @@ export function BusinessPrintPreview({
     deliverySac,
     deliveryRate,
 }: {
-    /** Another card shows its own preview (How to pay us). */
-    hidden?: boolean;
-    /** Under a sheet's fields, where it follows what is being typed. */
-    inSheet?: boolean;
+    /** Beside the rows, or under a sheet's fields following the draft. */
+    placement?: "beside" | "in-sheet";
     /** Drawn from a draft: say the preview shows the unsaved edit. */
     live: boolean;
     /** The logo printed above the legal name, when there is one. */
@@ -46,24 +43,12 @@ export function BusinessPrintPreview({
     deliveryRate: string;
 }) {
     return (
-        <aside
-            aria-label="How it prints"
-            className={cn(
-                "grid gap-2",
-                inSheet
-                    ? "mt-3 border-t border-border pt-4"
-                    : "min-w-[260px] flex-[0_1_320px] self-start min-[1100px]:sticky min-[1100px]:top-4",
-                hidden && "hidden",
-            )}
+        <PreviewPanel
+            label="How it prints"
+            live={live}
+            placement={placement}
+            className="flex-[0_1_320px]"
         >
-            <div className="flex items-baseline gap-2">
-                <span className="label">How it prints</span>
-                {live ? (
-                    <span className="text-[11.5px] text-foreground">
-                        Showing your unsaved edit
-                    </span>
-                ) : null}
-            </div>
             <div className="rounded-[10px] border border-border bg-[#FFFDF6] px-[18px] pb-4 pt-[18px] text-[12px] leading-normal text-[#1C1C1A] shadow-[0_1px_2px_rgba(28,28,26,0.06)]">
                 <div className="mb-2.5 flex items-baseline gap-2 border-b border-[rgba(28,28,26,0.12)] pb-2">
                     <span className="label">
@@ -119,6 +104,6 @@ export function BusinessPrintPreview({
                     ? `A sale inside ${stateName || "your state"} splits into CGST + SGST. To anywhere else it's IGST.`
                     : "Not GST-registered, so invoices carry no GSTIN and no tax split."}
             </p>
-        </aside>
+        </PreviewPanel>
     );
 }

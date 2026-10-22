@@ -1,24 +1,24 @@
 import { PayInstructionsCard, SiteThemeScope } from "@saroh/site-blocks";
-import { cn } from "@saroh/ui/lib/utils";
 
+import { PreviewPanel } from "@/components/organizations/business-settings/preview-panel";
 import type { PayInstructionsSettings } from "@/lib/organizations/pay-instructions";
 import { EmptyState } from "@saroh/ui/data-state";
 
 /**
  * "What customers see": the customer's card in a merchant site's default
  * colours, drawn by the same block their pages use. Beside the rows it
- * shows what is saved; under the sheet's fields (`inSheet`) it follows
+ * shows what is saved; under the sheet's fields (`in-sheet`) it follows
  * what is being typed.
  */
 export function PayPreview({
     live,
-    inSheet = false,
+    placement = "beside",
     businessName,
     preview,
 }: {
     /** Drawn from a draft: say the preview shows the unsaved edit. */
     live: boolean;
-    inSheet?: boolean;
+    placement?: "beside" | "in-sheet";
     businessName: string;
     preview: PayInstructionsSettings;
 }) {
@@ -27,25 +27,18 @@ export function PayPreview({
         !!(preview.bankAccountNumber && preview.bankIfsc) ||
         !!preview.note;
     return (
-        <aside
-            aria-label="What customers see"
-            className={cn(
-                "grid gap-2",
-                inSheet
-                    ? "mt-3 border-t border-border pt-4"
-                    : "min-w-[260px] flex-[0_1_340px] self-start min-[1100px]:sticky min-[1100px]:top-4",
-            )}
+        <PreviewPanel
+            label="What customers see"
+            live={live}
+            placement={placement}
+            className="flex-[0_1_340px]"
         >
-            <div className="flex items-baseline gap-2">
-                <span className="label">What customers see</span>
-                {live ? (
-                    <span className="text-[11.5px] text-foreground">
-                        Showing your unsaved edit
-                    </span>
-                ) : null}
-            </div>
             {any ? (
-                <SiteThemeScope name={inSheet ? "pay-draft" : "pay-preview"}>
+                <SiteThemeScope
+                    name={
+                        placement === "in-sheet" ? "pay-draft" : "pay-preview"
+                    }
+                >
                     <PayInstructionsCard
                         instructions={preview}
                         businessName={businessName}
@@ -62,6 +55,6 @@ export function PayPreview({
                     title={`Nothing set yet. Customers see “Pay ${businessName} the way they've asked you to.”`}
                 />
             )}
-        </aside>
+        </PreviewPanel>
     );
 }
