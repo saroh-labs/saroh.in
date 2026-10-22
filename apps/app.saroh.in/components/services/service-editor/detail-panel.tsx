@@ -17,8 +17,8 @@ import {
     PANEL_TITLE,
 } from "@/lib/services/service-panels";
 
-import type { PanelSetup } from "./panel-fields";
-import { PanelFields } from "./panel-fields";
+import type { PanelSetup } from "@/components/services/service-fields/panel-fields";
+import { PanelFields } from "@/components/services/service-fields/panel-fields";
 
 /**
  * One panel of the Service Editor (U16): a bottom sheet on a phone and a

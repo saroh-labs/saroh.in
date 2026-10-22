@@ -5,7 +5,10 @@ import { useId, useState } from "react";
 
 import { ChipGroup } from "@/components/shared/fields/choice-group";
 
-import { LABEL, NumberField } from "./fields";
+import {
+    LABEL,
+    NumberField,
+} from "@/components/services/service-editor/fields";
 
 /** The lengths most services run to, in minutes. */
 export const LENGTHS = ["15", "30", "45", "60", "90"] as const;

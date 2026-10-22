@@ -41,11 +41,11 @@ import type { PanelKey } from "@/lib/services/service-panels";
 import { detailRows, PANEL_FIELDS } from "@/lib/services/service-panels";
 import { zoneShortName } from "@/lib/services/time-picker";
 
+import { FiveQuestions } from "@/components/services/service-fields/questions";
 import { DetailPanel } from "./detail-panel";
 import type { EditorProps } from "./editor-props";
 import { BackToServices } from "./editor-props";
 import { NewServiceFoot, NewServiceSide } from "./new-service-side";
-import { FiveQuestions } from "./questions";
 import { useServiceSave } from "./use-service-save";
 
 /** The five questions' own fields: a problem in any keeps More closed. */

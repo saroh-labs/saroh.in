@@ -13,10 +13,10 @@ import { depositNote, depositPausedNote } from "@/lib/services/service-editor";
 import type { BookingPayment } from "@/lib/staff/types";
 
 import { PlanWay } from "@/components/billing/plan-way";
+import { HELP } from "@/components/services/service-editor/fields";
 import { isPlanHref } from "@/lib/billing/plan-access";
 import { Notice } from "@saroh/ui/notice";
 import { TextLink } from "@saroh/ui/text-link";
-import { HELP } from "./fields";
 
 const DEPOSITS: [DepositMode, string][] = [
     ["NONE", "Nothing, they pay at the visit"],

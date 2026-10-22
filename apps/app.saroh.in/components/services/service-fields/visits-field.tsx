@@ -2,8 +2,8 @@
 
 import { TREATMENT_NEEDS_STOREFRONT } from "@/lib/services/service-editor";
 
+import { HELP, NumberField } from "@/components/services/service-editor/fields";
 import { TextLink } from "@saroh/ui/text-link";
-import { HELP, NumberField } from "./fields";
 
 /** Where a business adds the storefront a treatment is sold from. */
 export const STOREFRONTS_HREF = "/commerce/locations";

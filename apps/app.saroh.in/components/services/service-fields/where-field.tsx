@@ -7,9 +7,9 @@ import { Eyebrow } from "@/components/bookings/calendar/parts";
 import type { LocationType } from "@/lib/services/service";
 import { needsMeetingLink, whereNote } from "@/lib/services/service-editor";
 
+import { HELP } from "@/components/services/service-editor/fields";
 import { ChipGroup } from "@/components/shared/fields/choice-group";
 import { Field } from "@saroh/ui/field";
-import { HELP } from "./fields";
 
 const WHERE: [LocationType, string][] = [
     ["IN_PERSON", "In person"],

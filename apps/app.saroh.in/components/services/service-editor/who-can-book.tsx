@@ -3,7 +3,7 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { useId } from "react";
 
-import { WhoTag } from "@/components/services/services-rows";
+import { WhoTag } from "@/components/services/list/services-rows";
 import { CheckRow } from "@/components/shared/fields/check-row";
 import type { Bookers } from "@/lib/services/service-form";
 import { bookerWords, mixOf, WHO_CAN_BOOK } from "@/lib/services/service-form";

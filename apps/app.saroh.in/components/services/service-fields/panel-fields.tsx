@@ -34,11 +34,15 @@ import type { PanelKey } from "@/lib/services/service-panels";
 import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
 import { TimezoneSelect } from "./timezone-select";
 
+import type { Edit } from "@/components/services/service-editor/fields";
+import {
+    HELP,
+    LABEL,
+    NumberField,
+} from "@/components/services/service-editor/fields";
+import { GstFields } from "@/components/services/service-editor/gst-fields";
 import { DepositField } from "./deposit-field";
 import { PriceFields } from "./editor-sections";
-import type { Edit } from "./fields";
-import { HELP, LABEL, NumberField } from "./fields";
-import { GstFields } from "./gst-fields";
 import { HoursField } from "./hours-field";
 import { LengthField } from "./length-field";
 import { NameQuestion, WhoComesQuestion, WhoDoesItQuestion } from "./questions";

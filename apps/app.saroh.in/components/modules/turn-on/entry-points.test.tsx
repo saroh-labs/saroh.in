@@ -11,7 +11,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FirstRunJobs } from "@/components/home/dashboard/first-run-jobs";
-import { AlsoSell } from "@/components/services/also-sell";
+import { AlsoSell } from "@/components/services/list/also-sell";
 import { firstRunJobs } from "@/lib/home/first-run";
 import type { ModuleView } from "@/lib/modules/schema";
 

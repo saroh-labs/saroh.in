@@ -19,8 +19,8 @@ import type { ServiceKind } from "@/lib/services/service-editor";
 import { sameNameLine } from "@/lib/services/service-form";
 import type { StaffView } from "@/lib/staff/types";
 
-import type { Edit } from "./fields";
-import { HELP, LABEL } from "./fields";
+import type { Edit } from "@/components/services/service-editor/fields";
+import { HELP, LABEL } from "@/components/services/service-editor/fields";
 import { LengthField } from "./length-field";
 
 /*

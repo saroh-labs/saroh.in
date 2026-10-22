@@ -17,14 +17,6 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { MissingRatesNotice } from "@/components/gst-rates/missing-rates-notice";
-import { AlsoSell } from "@/components/services/also-sell";
-import { BookingLinkRow } from "@/components/services/booking-link-row";
-import type { ServiceRowView } from "@/components/services/services-rows";
-import {
-    ServicesPhoneList,
-    ServicesTable,
-} from "@/components/services/services-rows";
-import { useTakingBookings } from "@/components/services/use-taking-bookings";
 import { ListToolbar } from "@/components/shared/lists/list-toolbar";
 import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import type { MissingRates } from "@/lib/gst-rates/missing";
@@ -46,6 +38,11 @@ import {
 } from "@/lib/services/service-cards";
 import type { ServiceUsage } from "@/lib/services/usage";
 import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
+import { AlsoSell } from "./also-sell";
+import { BookingLinkRow } from "./booking-link-row";
+import type { ServiceRowView } from "./services-rows";
+import { ServicesPhoneList, ServicesTable } from "./services-rows";
+import { useTakingBookings } from "./use-taking-bookings";
 
 const NEW_SERVICE_HREF = "/services/new";
 const NEW_COURSE_HREF = "/courses/new";

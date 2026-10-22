@@ -16,7 +16,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { useTakingBookings } from "@/components/services/use-taking-bookings";
+import { useTakingBookings } from "@/components/services/list/use-taking-bookings";
 import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { PriceHistoryList } from "@/components/shared/price-history/price-history";

@@ -16,10 +16,10 @@ import {
 } from "@/lib/services/service-editor";
 import type { BookingPaymentView } from "@/lib/staff/types";
 
+import type { Edit } from "@/components/services/service-editor/fields";
+import { Section } from "@/components/services/service-editor/fields";
+import { GstFields } from "@/components/services/service-editor/gst-fields";
 import { DepositField } from "./deposit-field";
-import type { Edit } from "./fields";
-import { Section } from "./fields";
-import { GstFields } from "./gst-fields";
 
 /**
  * Price, GST and "At booking, they pay" (E8, 12 Oct 2026): a saved

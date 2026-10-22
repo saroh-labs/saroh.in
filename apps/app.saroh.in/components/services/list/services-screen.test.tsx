@@ -52,10 +52,10 @@ vi.mock("next/link", () => ({
 vi.mock("@/components/gst-rates/missing-rates-notice", () => ({
     MissingRatesNotice: () => null,
 }));
-vi.mock("@/components/services/also-sell", () => ({
+vi.mock("./also-sell", () => ({
     AlsoSell: () => <div role="group" aria-label="Also sell" />,
 }));
-vi.mock("@/components/services/booking-link-row", () => ({
+vi.mock("./booking-link-row", () => ({
     BookingLinkRow: ({ view }: { view: { state: string } }) => (
         <div data-booking-link={view.state} />
     ),

@@ -2,7 +2,7 @@ import { PartialRead } from "@/components/shared/states/failed-read";
 import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 
-import { ServicesScreen } from "@/components/services/services-screen";
+import { ServicesScreen } from "@/components/services/list/services-screen";
 import { PageContainer } from "@/components/shared/page/page-container";
 import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { canWriteCourses } from "@/lib/courses/access";

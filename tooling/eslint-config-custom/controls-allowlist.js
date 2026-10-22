@@ -183,7 +183,7 @@ export const RAW_ALLOWED = {
     // button: a row or card that is one button
     "components/qr/maker/qr-target-picker.tsx": ["button"],
     // button: a row that is one button (a service's own hours, opening under itself)
-    "components/services/service-editor/hours-field.tsx": ["button"],
+    "components/services/service-fields/hours-field.tsx": ["button"],
     // button: a row that is one button (More details, a saved service's rows)
     "components/services/service-editor/service-rows.tsx": ["button"],
     // button: a row or card that is one button
