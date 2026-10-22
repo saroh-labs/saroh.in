@@ -283,14 +283,20 @@ test.describe("live facts on cached pages", { tag: "@serial" }, () => {
 
                 // Fresh: the time and a small true count.
                 const slot = page.locator(slotSelector);
+                // Folio says it as the board's sentence (VA01): no "on today".
                 await expect(slot).toContainText(
-                    id === "live" ? "6:00 pm" : "today, 6:00 pm",
+                    id === "live"
+                        ? "6:00 pm"
+                        : id === "folio"
+                          ? "with anyone free today at 6:00 pm."
+                          : "today, 6:00 pm",
                 );
                 await expect(slot).toContainText(
                     id === "live" ? "3 left" : "3 places left",
                 );
+                // VB01's strip: "Now · checked 5:20 pm".
                 if (id === "live")
-                    await expect(slot).toContainText(/Checked \d/);
+                    await expect(slot).toContainText(/Now · checked \d/);
                 await page.unroute(TODAY);
             } finally {
                 await look.restore();
@@ -319,18 +325,12 @@ test.describe("live facts on cached pages", { tag: "@serial" }, () => {
                     timeout: 15_000,
                 });
 
-                // 75.5 s on: the read at 60 s is still out, the answer is
-                // older than FRESH_FOR_MS (75 s, review #4), so the count
-                // hides and the time stays.
-                await page.clock.runFor(75_500);
-                await expect(slot.locator("[data-live-fact]")).toHaveAttribute(
-                    "data-live-state",
-                    "stale",
-                );
-                await expect(slot.locator("[data-live-count]")).toHaveCount(0);
-                await expect(slot).toContainText("6:00 pm");
-
-                // Hidden: no reads, however long.
+                // Hidden: no reads, however long. The answer turns stale
+                // by the clock alone (older than FRESH_FOR_MS, 75 s), so
+                // the count hides and the time stays. (In view, the read
+                // at 60 s times out at 68 s, READ_TIMEOUT_MS, and the fact
+                // fails back to See times at 75 s: stale is the hidden
+                // tab's, as the hook's own test has it.)
                 await page.evaluate(() => {
                     Object.defineProperty(document, "visibilityState", {
                         configurable: true,
@@ -339,6 +339,13 @@ test.describe("live facts on cached pages", { tag: "@serial" }, () => {
                     document.dispatchEvent(new Event("visibilitychange"));
                 });
                 const before = reads;
+                await page.clock.runFor(75_500);
+                await expect(slot.locator("[data-live-fact]")).toHaveAttribute(
+                    "data-live-state",
+                    "stale",
+                );
+                await expect(slot.locator("[data-live-count]")).toHaveCount(0);
+                await expect(slot).toContainText("6:00 pm");
                 await page.clock.runFor(5 * 60_000);
                 expect(reads).toBe(before);
             } finally {

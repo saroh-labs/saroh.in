@@ -11,9 +11,9 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  *
  * The Northwind owner, with `SITE_LOOKS` on for Northwind alone
  * (`fixtures/site-look.ts`), opens Live's Preview in Website › Style: it
- * draws the Gym template for its sample business, not Northwind's own
+ * draws Prana Yoga, its board's sample business, not Northwind's own
  * page. "Use this look with its starter content" says what it replaces
- * first; going on copies the Gym's pages into the draft and sets Live, the
+ * first; going on copies Prana's pages into the draft and sets Live, the
  * editor starts afresh on it, and the check before publishing names the
  * sample words left. Undo in the toast puts the draft back as it was.
  *
@@ -114,7 +114,7 @@ async function northwindAsItWas(
 }
 
 test.describe("a look's starter content", { tag: "@serial" }, () => {
-    test("previews Live's Gym, takes its starter content, and Undo puts the draft back", async ({
+    test("previews Live's Prana Yoga, takes its starter content, and Undo puts the draft back", async ({
         browser,
         page,
     }, testInfo) => {
@@ -138,10 +138,10 @@ test.describe("a look's starter content", { tag: "@serial" }, () => {
             await page.getByRole("button", { name: "Preview Live" }).click();
             const preview = page.getByRole("dialog", { name: "Live" });
             await expect(preview).toBeVisible();
-            // The Gym template for its sample business, not Northwind.
-            const showcase = preview.locator('[data-look-showcase="gym"]');
+            // Prana Yoga, the board's sample business, not Northwind (94399ac1d).
+            const showcase = preview.locator('[data-look-showcase="prana"]');
             await expect(showcase).toBeVisible({ timeout: 15_000 });
-            await expect(showcase).toContainText("Iron & Oak");
+            await expect(showcase).toContainText("Prana Yoga");
 
             // Said first: what it replaces, and that the words are a sample.
             await preview
@@ -151,7 +151,7 @@ test.describe("a look's starter content", { tag: "@serial" }, () => {
                 .click();
             const confirm = preview.locator("[data-look-starter-confirm]");
             await expect(confirm).toContainText(
-                "is replaced with the Gym template's.",
+                "is replaced with the Prana Yoga template's.",
             );
             await expect(confirm).toContainText("a sample business's");
             await confirm
@@ -164,7 +164,7 @@ test.describe("a look's starter content", { tag: "@serial" }, () => {
                 page.getByText("Starter content added to your draft."),
             ).toBeVisible();
 
-            // Live in the draft, the Gym's home page in it, and the check
+            // Live in the draft, Prana's home page in it, and the check
             // before publishing names its sample words.
             await expect
                 .poll(async () => (await nw.get<SiteView>(site)).style.look)
@@ -172,7 +172,9 @@ test.describe("a look's starter content", { tag: "@serial" }, () => {
             await expect
                 .poll(async () =>
                     (await nw.get<Flags>(`${site}/flags`)).flags.some((f) =>
-                        f.message.includes("sample words from the Gym starter"),
+                        f.message.includes(
+                            "sample words from the Prana Yoga starter",
+                        ),
                     ),
                 )
                 .toBe(true);
