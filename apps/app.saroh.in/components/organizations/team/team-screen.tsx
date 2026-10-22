@@ -1,6 +1,5 @@
 "use client";
 
-import { PausedDiary } from "@/components/billing/paused-diary";
 import { RolesTab } from "@/components/organizations/roles/roles-tab";
 import { SettingsPanelHeader } from "@/components/settings/page/settings-panel";
 import type { PausedTeam } from "@/lib/billing/paused";
@@ -36,6 +35,7 @@ import { useState } from "react";
 import type { ReviewableSite } from "./invite-sheet";
 import { InviteSheet } from "./invite-sheet";
 import { MemberDrawer } from "./member-drawer";
+import { PausedDiary } from "./paused-diary";
 import { PeopleTab } from "./people-tab";
 import { RemoveMember } from "./remove-member";
 import { roleBook } from "./role-book";
