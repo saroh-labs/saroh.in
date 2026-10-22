@@ -111,6 +111,8 @@ describe("a list draws the one table", () => {
                     "kitchen tickets as they print on paper: a ruled table per ticket, not a list on a screen",
                 "components/commerce/product-page/orders-tab.tsx":
                     "a real <table> for its caption and column headers, drawn with listTable's band and rows",
+                "components/insights/sources-table.tsx":
+                    "Insights' where visits came from: a real <table> so each count is read with its source and column, drawn with listTable's band and rows",
                 "components/insights/busiest-grid.tsx":
                     "Insights' busiest grid as a table (Show as a table): a real <table> so each number is read with its day and time, drawn with listTable's band and rows",
             },

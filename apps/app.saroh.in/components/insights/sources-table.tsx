@@ -1,4 +1,5 @@
 import { AbsentValue } from "@saroh/ui/absent-value";
+import { ListTable, listTable } from "@saroh/ui/list-table";
 import type { LucideIcon } from "lucide-react";
 import { Globe, Instagram, Link2, MessageCircle, Search } from "lucide-react";
 
@@ -13,6 +14,7 @@ import {
     SOURCE_NAME,
     sourcesAnswer,
 } from "@/lib/insights/sources-words";
+import { cn } from "@saroh/ui/lib/utils";
 
 /**
  * "Where do visitors come from?" (DEC-171, plan U16, #1101; `IBFromD`,
@@ -34,10 +36,10 @@ const ICON: Record<VisitSource, LucideIcon> = {
     other: Link2,
 };
 
-const TH =
-    "whitespace-nowrap border-b border-border py-2 pr-2 text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground last:pr-0";
-const TD =
-    "border-b border-border/70 py-2.5 pr-2 align-middle last:pr-0 group-last:border-b-0";
+/** Phone cells sit closer, so the four columns fit at 320px. */
+const CELL = "max-desk:px-2";
+const TH = cn(listTable.th, CELL);
+const TD = cn(listTable.td, CELL);
 
 export function SourcesTable({
     read,
@@ -74,10 +76,13 @@ export function SourcesTable({
                 {sourcesAnswer(read.sources, period)}
             </p>
             {read.sources.length > 0 ? (
-                <div className="w-full min-w-0">
-                    <table className="w-full border-collapse text-[13.5px]">
+                <ListTable className="w-full min-w-0">
+                    <table className="w-full text-[13.5px]">
+                        <caption className="sr-only">
+                            Where visits came from, and how many paid
+                        </caption>
                         <thead data-ph-unmask="">
-                            <tr>
+                            <tr className={listTable.headRow}>
                                 <th scope="col" className={TH}>
                                     From
                                 </th>
@@ -99,7 +104,7 @@ export function SourcesTable({
                                 return (
                                     <tr
                                         key={row.source}
-                                        className="group"
+                                        className={listTable.tr}
                                         data-source={row.source}
                                     >
                                         <th
@@ -143,7 +148,7 @@ export function SourcesTable({
                             })}
                         </tbody>
                     </table>
-                </div>
+                </ListTable>
             ) : null}
             {notes.length > 0 ? (
                 <p
