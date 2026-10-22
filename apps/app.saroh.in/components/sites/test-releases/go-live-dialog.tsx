@@ -11,7 +11,6 @@ import {
     FormDialog,
     FormDialogFoot,
 } from "@/components/shared/forms/form-dialog";
-import type { GoLiveTarget } from "@/components/sites/editor/use-test-releases";
 import { runAction } from "@/lib/api/run-action";
 import type {
     GoLiveGate,
@@ -31,6 +30,7 @@ import {
 } from "@/lib/sites/test-releases-actions";
 import { Notice } from "@saroh/ui/notice";
 import { Segmented } from "@saroh/ui/segmented";
+import type { GoLiveTarget } from "./use-test-releases";
 
 /** A calendar day picked in the browser, as the API reads it. */
 function dayOf(date: Date): string {

@@ -250,7 +250,7 @@ holds at most one note.
 **Current** — **A settings row is read first and edited in a side sheet**
 (owner, 10 Oct): a location's tabs (`components/stores/`) and every tab of
 Settings › Business (`components/organizations/`) draw `Row`s from
-`components/sites/settings-rows.tsx` — label, a sentence of what is saved,
+`components/shared/page/settings-rows.tsx` — label, a sentence of what is saved,
 Edit — and each Edit opens its own `FormSheet` with one Save
 (`PlaceSheetFrame` names it by a location's row): the fields scroll, Cancel
 then Save sit at the foot, nothing saves until Save, a refusal keeps the

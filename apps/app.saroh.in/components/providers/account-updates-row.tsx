@@ -9,7 +9,7 @@ import { useId, useState } from "react";
 import { RadioCards } from "@/components/shared/fields/choice-group";
 import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
-import { Row } from "@/components/sites/settings-rows";
+import { Row } from "@/components/shared/page/settings-rows";
 import { runAction } from "@/lib/api/run-action";
 import type {
     AccountUpdates,

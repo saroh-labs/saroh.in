@@ -11,7 +11,7 @@ import {
     EditRow,
 } from "@/components/organizations/business-settings/business-row-parts";
 import type { OfferUndo } from "@/components/organizations/business-settings/use-settings-undo";
-import { Absent, Row } from "@/components/sites/settings-rows";
+import { Absent, Row } from "@/components/shared/page/settings-rows";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { sameWeek } from "@/lib/organizations/opening-hours";
 import { newStorefrontHref } from "@/lib/stores/links";

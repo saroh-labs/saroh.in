@@ -50,7 +50,7 @@ vi.mock("next/navigation", () => ({
     useSearchParams: () => address.params,
     usePathname: () => "/settings/organization",
 }));
-vi.mock("@/components/sites/media-picker", () => ({
+vi.mock("@/components/shared/fields/media-picker", () => ({
     useImageUpload: () => ({ upload: vi.fn(), busy: false, error: null }),
 }));
 vi.mock("@/lib/stores/storefront-actions", () => ({

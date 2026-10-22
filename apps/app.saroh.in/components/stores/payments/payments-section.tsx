@@ -14,7 +14,7 @@ import { Lock } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
-import { Row, Section as Rows } from "@/components/sites/settings-rows";
+import { Row, Section as Rows } from "@/components/shared/page/settings-rows";
 import { providerName } from "@/lib/payments/providers";
 import {
     LOCATION_SECTIONS,

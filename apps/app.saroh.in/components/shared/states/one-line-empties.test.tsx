@@ -106,7 +106,7 @@ describe("no tab, sheet or picker prints a bare empty sentence", () => {
             "a review left without words: a value",
         "components/customers/detail/reviews-tab.tsx":
             "a review left without words: a value",
-        "components/sites/editor/editor-canvas.tsx":
+        "components/sites/canvas/editor-canvas.tsx":
             "what a failed save left as it was, and the canvas's own hint",
     };
 

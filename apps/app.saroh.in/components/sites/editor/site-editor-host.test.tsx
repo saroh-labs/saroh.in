@@ -22,7 +22,7 @@ const editor = vi.hoisted(() => ({
     reload: null as null | ((pageId?: string) => void),
     sections: [] as unknown[],
 }));
-vi.mock("@/components/sites/site-editor", async () => {
+vi.mock("./site-editor", async () => {
     const { useState } = await import("react");
     return {
         SiteEditor: (props: SiteEditorProps) => {

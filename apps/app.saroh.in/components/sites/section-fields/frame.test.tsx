@@ -10,16 +10,16 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { canvasChromeFor } from "@/components/sites/editor/editor-canvas";
+import { canvasChromeFor } from "@/components/sites/canvas/editor-canvas";
 import { withFooterLayout } from "@/components/sites/editor/use-site-chrome";
 import type { Section } from "@/lib/sites/service";
 
+import { HeroFields } from "@/components/sites/content-sections/hero";
 import { SectionFrameFields } from "./frame";
-import { HeroFields } from "./hero";
 
 // The media library (the hero's picker), the editor's server actions and
 // its router: what these modules import that reaches the API.
-vi.mock("@/components/sites/media-picker", () => ({
+vi.mock("@/components/shared/fields/media-picker", () => ({
     MediaPicker: () => null,
 }));
 vi.mock("@/lib/sites/actions", () => ({

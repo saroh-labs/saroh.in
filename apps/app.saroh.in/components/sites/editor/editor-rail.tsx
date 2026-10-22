@@ -5,24 +5,21 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Lock, PanelBottom, PanelTop } from "lucide-react";
 import { useId, useState } from "react";
 
-import { AddBlockPanel } from "@/components/sites/add-block-panel";
-import { SECTION_ICONS } from "@/components/sites/block-icons";
-import { EditorTabs, railRowState } from "@/components/sites/editor-chrome";
-import {
-    SECTION_LABELS,
-    sectionTitle,
-} from "@/components/sites/editor-constants";
+import { AddBlockPanel } from "@/components/sites/blocks/add-block-panel";
+import { SECTION_ICONS } from "@/components/sites/blocks/block-icons";
+import type { HeldBackSection } from "@/components/sites/blocks/saveable-sections";
 import type {
     EditorRailTab,
     FixedPart,
 } from "@/components/sites/editor/use-editor-selection";
-import type { LookChoices } from "@/components/sites/look-picker";
-import type { HeldBackSection } from "@/components/sites/saveable-sections";
-import { StylePanel } from "@/components/sites/style-panel";
+import type { LookChoices } from "@/components/sites/looks/look-picker";
+import { StylePanel } from "@/components/sites/looks/style-panel";
 import type { Flag, Section, SectionType } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import type { StyleChoiceRules } from "@/lib/sites/style-access";
 import { Tip } from "@saroh/ui/tooltip";
+import { EditorTabs, railRowState } from "./editor-chrome";
+import { SECTION_LABELS, sectionTitle } from "./editor-constants";
 
 export type RailTab = "page" | "add" | "brand";
 

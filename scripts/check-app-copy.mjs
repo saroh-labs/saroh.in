@@ -73,7 +73,7 @@ const ALLOWED = [
         why: "a stored role label, matched so it can be shown as Location team",
     },
     {
-        file: "components/sites/section-fields/contact.tsx",
+        file: "components/sites/content-sections/contact.tsx",
         rule: "en dash",
         why: "an example of hours a merchant types on their own page, in their words",
     },

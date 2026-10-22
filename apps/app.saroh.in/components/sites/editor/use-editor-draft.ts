@@ -2,15 +2,15 @@ import { blockExample } from "@saroh/block-contract";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { emptySection } from "@/components/sites/blocks/empty-section";
+import type { HeldBackSection } from "@/components/sites/blocks/saveable-sections";
+import { saveableSections } from "@/components/sites/blocks/saveable-sections";
+import { syncEnquiryForms } from "@/components/sites/blocks/sync-enquiry-forms";
 import {
     newFormIds,
     stampFormIds,
 } from "@/components/sites/editor/stamp-form-ids";
-import { emptySection } from "@/components/sites/empty-section";
-import type { HeldBackSection } from "@/components/sites/saveable-sections";
-import { saveableSections } from "@/components/sites/saveable-sections";
 import { withVariant } from "@/components/sites/section-fields/variant-field";
-import { syncEnquiryForms } from "@/components/sites/sync-enquiry-forms";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
 import { ensureFormForSection } from "@/lib/forms/actions";

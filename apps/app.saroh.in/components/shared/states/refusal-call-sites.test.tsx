@@ -17,7 +17,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { roleDeniedSentence } from "@/lib/api/role-denied";
 
-vi.mock("@/components/sites/media-picker", () => ({
+vi.mock("@/components/shared/fields/media-picker", () => ({
     useImageUpload: () => ({
         upload: vi.fn(),
         busy: false,
@@ -44,9 +44,9 @@ const MOVED = [
     "components/organizations/logo/business-logo-sheet.tsx",
     "components/organizations/social-links/social-links-sheet.tsx",
     "components/shared/fields/logo-upload.tsx",
-    "components/sites/add-domain-dialog.tsx",
-    "components/sites/media-picker.tsx",
-    "components/sites/settings/site-address-sheet.tsx",
+    "components/sites/domain/add-domain-dialog.tsx",
+    "components/shared/fields/media-picker.tsx",
+    "components/sites/contact/site-address-sheet.tsx",
     "components/stores/place/location-address-fields.tsx",
     "components/stores/place/location-details-sheet.tsx",
     "components/stores/place/place-sheets.tsx",

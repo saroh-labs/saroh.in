@@ -826,7 +826,7 @@ empty states, and every sentence a `lib/` function returns):
   be read.
     - **A Settings read row keeps its words.** Label on the left, value
       on the right, the row's Edit button beside it: "Not set" there is the
-      invitation to set it (`Absent` in `components/sites/settings-rows.tsx`,
+      invitation to set it (`Absent` in `components/shared/page/settings-rows.tsx`,
       `empty` on a Business row, Your profile, the pay-instructions and
       verification rows, an Activity change).
     - **A sentence is not a cell.** A line that reads as words keeps them

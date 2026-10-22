@@ -4,11 +4,11 @@ import { showSuccess } from "@saroh/ui/toast";
 import { useRef } from "react";
 
 import type { TestReleaseActions } from "@/components/sites/editor/top-bar-actions";
-import type { EditorTestReleases } from "@/components/sites/editor/use-test-releases";
 import { GoLiveDialog } from "@/components/sites/test-releases/go-live-dialog";
 import { MakeTestReleaseDialog } from "@/components/sites/test-releases/make-test-release-dialog";
 import type { SiteChangeKind } from "@/lib/sites/pending";
 import { goLiveGate, wentLiveToast, whenIn } from "@/lib/sites/test-releases";
+import type { EditorTestReleases } from "./use-test-releases";
 
 /**
  * The Test release split in the top bar (T11): Make (with `site:update`)

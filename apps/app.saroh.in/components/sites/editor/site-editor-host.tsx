@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import type { SiteEditorProps } from "@/components/sites/editor/site-editor-props";
-import { SiteEditor } from "@/components/sites/site-editor";
+import { SiteEditor } from "./site-editor";
 
 /**
  * The editor, started afresh when its draft was changed on the server by

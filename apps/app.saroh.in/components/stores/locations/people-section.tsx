@@ -13,8 +13,8 @@ import { useState } from "react";
 
 import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
+import { Section as Rows } from "@/components/shared/page/settings-rows";
 import { useHold } from "@/components/shared/undo/use-hold";
-import { Section as Rows } from "@/components/sites/settings-rows";
 import {
     removeMember,
     revokeInvitation,

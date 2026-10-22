@@ -96,11 +96,12 @@ components/shared/             app shell, navigation, command menu
 - **Current** — **Split big components along their panels.** The site
   editor is the worked example (#260): `site-editor.tsx` only composes, its
   state lives in hooks in `components/sites/editor/` (`use-editor-draft`,
-  `-style`, `-selection`, `-viewport`, `-review`, `use-publish`, and
-  `use-site-chrome` for the header's name and footer's line, G6) and its
-  drawing in panels there (`editor-top-bar`, `editor-rail`, `editor-canvas`,
-  `inspector-host`). A new editor panel or piece of editor state goes there,
-  not back into `site-editor.tsx`.
+  `-selection`, `-review`, and `use-site-chrome` for the header's name and
+  footer's line, G6; the style, viewport and publish hooks sit with their
+  features in `sites/looks/`, `sites/canvas/` and `sites/publish/`) and its
+  drawing in panels (`editor-top-bar`, `editor-rail`, `inspector-host`, and
+  `sites/canvas/editor-canvas`). A new editor panel or piece of editor state
+  goes there, not back into `site-editor.tsx`.
 - **Adopted** — **A domain folder that grows mixed or big gets feature
   sub-folders** (DEC-183). Group `components/<domain>/` into
   `components/<domain>/<feature>/` when it holds more than three files that
@@ -146,7 +147,7 @@ components/shared/             app shell, navigation, command menu
   (`app/api/qr-codes/…/print`, as an invoice's PDF does), so the session
   stays server-side.
 - **Current** — **The editor's page menu offers what the API lists** (round-2
-  G16): `components/sites/pages-panel.tsx` (the list), `page-settings.tsx`
+  G16): `components/sites/pages/pages-panel.tsx` (the list), `page-settings.tsx`
   (the open page's title, address, In the menu, On the site, Delete) and
   `add-page-panel.tsx` (the kinds in `getSite`'s `addablePageKinds`, then
   Blank page), with their words in `lib/sites/page-menu.ts`. It never
@@ -154,7 +155,7 @@ components/shared/             app shell, navigation, command menu
   the API's refusal and offers its `details.suggestion`. A list section's
   display options (Show as, Photos, Descriptions, Prices, Highlight,
   Button) go through `section-fields/display-options.tsx` and
-  `components/sites/choice-field.tsx`, and each option's default is stored
+  `components/sites/section-fields/choice-field.tsx`, and each option's default is stored
   as absent, so an untouched section publishes as before.
 
 ## Titles, and staying out of search

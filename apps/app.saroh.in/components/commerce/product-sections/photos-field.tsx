@@ -11,7 +11,7 @@ import { ArrowLeft, ArrowRight, ImagePlus, Link2, Star, X } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
 import { MediaThumb } from "@/components/commerce/product-sections/media-thumb";
-import { MediaPicker } from "@/components/sites/media-picker";
+import { MediaPicker } from "@/components/shared/fields/media-picker";
 import { listLibrary } from "@/lib/media/actions";
 import { mediaSrc } from "@/lib/media/media-src";
 import type { LibraryItem } from "@/lib/media/service";

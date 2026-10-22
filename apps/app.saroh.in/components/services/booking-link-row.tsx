@@ -13,7 +13,7 @@ import { useState } from "react";
 import { QrButton } from "@/components/qr/qr-button";
 import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
-import { Row } from "@/components/sites/settings-rows";
+import { Row } from "@/components/shared/page/settings-rows";
 import { runAction } from "@/lib/api/run-action";
 import type { BookingLinkView } from "@/lib/services/booking-link";
 import {

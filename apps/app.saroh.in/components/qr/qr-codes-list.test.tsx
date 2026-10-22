@@ -34,7 +34,7 @@ vi.mock("next/navigation", () => ({
 const showSuccess = vi.fn();
 const showError = vi.fn();
 // The logo's upload reaches the media library, which is server-only.
-vi.mock("@/components/sites/media-picker", () => ({
+vi.mock("@/components/shared/fields/media-picker", () => ({
     useImageUpload: () => ({ upload: vi.fn(), busy: false, error: null }),
 }));
 vi.mock("@/lib/organizations/settings-actions", () => ({

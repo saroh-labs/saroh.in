@@ -3,7 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { useState } from "react";
 
-import { Row, Section as Rows } from "@/components/sites/settings-rows";
+import { Row, Section as Rows } from "@/components/shared/page/settings-rows";
 import { waySummary } from "@/lib/stores/delivery-summary";
 import { STOREFRONT_FULFILMENT_TYPES } from "@/lib/stores/fulfilment-types";
 import { FULFILMENT_LABEL } from "@/lib/stores/late-after";

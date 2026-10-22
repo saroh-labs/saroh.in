@@ -4,7 +4,7 @@ import { Button } from "@saroh/ui/button";
 import { useId, useState } from "react";
 
 import { StatusBadge } from "@/components/shared/lists/status-badge";
-import { Row } from "@/components/sites/settings-rows";
+import { Row } from "@/components/shared/page/settings-rows";
 import type { CustomerEmails } from "@/lib/communications/customer-emails";
 import {
     CUSTOMER_EMAILS_ROW,

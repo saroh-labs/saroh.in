@@ -2,20 +2,18 @@
 
 import { useState } from "react";
 
-import { BlockFeedback } from "@/components/sites/block-feedback";
-import { BlockInspector } from "@/components/sites/block-inspector";
-import { EditorTabs } from "@/components/sites/editor-chrome";
-import { SECTION_LABELS } from "@/components/sites/editor-constants";
+import { BlockFeedback } from "@/components/sites/blocks/block-feedback";
+import { BlockInspector } from "@/components/sites/blocks/block-inspector";
+import type { FixedBlockText } from "@/components/sites/blocks/fixed-block-inspector";
+import { FixedBlockInspector } from "@/components/sites/blocks/fixed-block-inspector";
+import type { HeldBackSection } from "@/components/sites/blocks/saveable-sections";
+import { useServicesForPicker } from "@/components/sites/blocks/use-services-for-picker";
 import type {
     ActiveSection,
     EditorInspectorTab,
     FixedPart,
 } from "@/components/sites/editor/use-editor-selection";
-import type { FixedBlockText } from "@/components/sites/fixed-block-inspector";
-import { FixedBlockInspector } from "@/components/sites/fixed-block-inspector";
-import { ReviewPanel } from "@/components/sites/review-panel";
-import type { HeldBackSection } from "@/components/sites/saveable-sections";
-import { useServicesForPicker } from "@/components/sites/use-services-for-picker";
+import { ReviewPanel } from "@/components/sites/review/review-panel";
 import type {
     Flag,
     ReviewState,
@@ -25,6 +23,8 @@ import type {
 } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { Segmented } from "@saroh/ui/segmented";
+import { EditorTabs } from "./editor-chrome";
+import { SECTION_LABELS } from "./editor-constants";
 
 /**
  * The right column: the inspector (#340). Block is what can be changed about

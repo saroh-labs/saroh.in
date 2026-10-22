@@ -51,9 +51,9 @@ const NOT_FORMS: Record<string, string> = {
         "the one leave guard: Stay, Leave, and Save and leave",
     // Read-only quick looks, with their own header as their design draws.
     "components/shared/forms/quick-look.tsx": "a read-only quick look",
-    "components/sites/look-preview.tsx":
+    "components/sites/looks/look-preview.tsx":
         "a look's preview: the site drawn read-only, with Use this look and Close",
-    "components/sites/draft-tools.tsx":
+    "components/sites/looks/draft-tools.tsx":
         "the draft's previous versions, read-only, each with Roll back and Bring in",
     "components/stores/catalogue/quick-look.tsx": "a read-only quick look",
     "components/bookings/calendar/booking-quick-look.tsx":
@@ -94,7 +94,7 @@ const NOT_FORMS: Record<string, string> = {
     "components/home/phone/setup-sheet.tsx":
         "the setup checklist, each step its own link, in the phone Home's frame",
     "components/sites/editor/editor-sheet.tsx": "the site editor's panels",
-    "components/sites/add-section-dialog.tsx":
+    "components/sites/blocks/add-section-dialog.tsx":
         "a picker: choosing a section adds it",
     "components/commerce/orders/order-filters-sheet.tsx":
         "filters, applied as they are chosen",

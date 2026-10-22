@@ -18,7 +18,7 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ShareLinkButton } from "@/components/sites/share-link-button";
+import { ShareLinkButton } from "@/components/shared/share-link/share-link-button";
 import { code } from "@/lib/qr/fixtures.test-data";
 import type { QrLink, QrPanelRead } from "@/lib/qr/panel";
 import { findPanelCode, NOT_COUNTED, panelCodeInput } from "@/lib/qr/panel";

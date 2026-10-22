@@ -3,8 +3,12 @@
 import type { ReactNode, RefObject } from "react";
 import { useState } from "react";
 
-import { PanelDivider } from "@/components/sites/editor-chrome";
-import { queryCanvas } from "@/components/sites/editor/device-frame";
+import { queryCanvas } from "@/components/sites/canvas/device-frame";
+import type { EditorViewport } from "@/components/sites/canvas/use-editor-viewport";
+import {
+    editorColumns,
+    narrowColumns,
+} from "@/components/sites/canvas/use-editor-viewport";
 import {
     railTabFor,
     selectRailTab,
@@ -16,11 +20,6 @@ import type {
     EditorSheets,
 } from "@/components/sites/editor/use-editor-layout";
 import type { EditorSelection } from "@/components/sites/editor/use-editor-selection";
-import type { EditorViewport } from "@/components/sites/editor/use-editor-viewport";
-import {
-    editorColumns,
-    narrowColumns,
-} from "@/components/sites/editor/use-editor-viewport";
 import {
     PANEL_DEFAULT,
     PANEL_MAX,
@@ -29,6 +28,7 @@ import {
     RAIL_MAX,
     RAIL_MIN,
 } from "@/lib/sites/editor-prefs";
+import { PanelDivider } from "./editor-chrome";
 
 /**
  * Where the rail, the page and the inspector go (G4). On a desk they are three

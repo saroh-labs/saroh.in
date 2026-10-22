@@ -9,22 +9,21 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
-import type { Device, Zoom } from "@/components/sites/editor-constants";
-import {
-    publishTitle,
-    STATUS_BADGE,
-    statusReadout,
-} from "@/components/sites/editor/status-readout";
+import type { HeldBackSection } from "@/components/sites/blocks/saveable-sections";
 import type {
     TestReleaseActions,
     TopBarActionProps,
 } from "@/components/sites/editor/top-bar-actions";
 import { TopBarActions } from "@/components/sites/editor/top-bar-actions";
 import type { EditorLayout } from "@/components/sites/editor/use-editor-layout";
-import type { DraftReadiness } from "@/components/sites/editor/use-publish";
-import { unfinishedPhrase } from "@/components/sites/held-back-copy";
-import { PagesPanel } from "@/components/sites/pages-panel";
-import type { HeldBackSection } from "@/components/sites/saveable-sections";
+import { PagesPanel } from "@/components/sites/pages/pages-panel";
+import { unfinishedPhrase } from "@/components/sites/publish/held-back-copy";
+import {
+    publishTitle,
+    STATUS_BADGE,
+    statusReadout,
+} from "@/components/sites/publish/status-readout";
+import type { DraftReadiness } from "@/components/sites/publish/use-publish";
 import type { EditorStatus } from "@/lib/sites/editor-status";
 import type {
     ModulePageKind,
@@ -33,6 +32,7 @@ import type {
     SitePage,
 } from "@/lib/sites/service";
 import { Tip } from "@saroh/ui/tooltip";
+import type { Device, Zoom } from "./editor-constants";
 
 /**
  * The editor's top bar: where you are (Website, site, page, status), how the

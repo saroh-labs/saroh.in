@@ -10,7 +10,7 @@ import {
     rowActions,
     Saved,
 } from "@/components/organizations/business-settings/business-row-parts";
-import { Row } from "@/components/sites/settings-rows";
+import { Row } from "@/components/shared/page/settings-rows";
 import { PRICE_MODE_ROW, PRICE_MODE_SAYS } from "@/lib/gst/price-mode";
 import { rateOption } from "@/lib/invoices/gst";
 import { formatOf, RESTART_LABEL } from "@/lib/invoices/invoice-number";

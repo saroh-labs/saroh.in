@@ -45,7 +45,7 @@ vi.mock("@/lib/members/actions", () => ({
 // the picture this answers with.
 const upload = vi.fn();
 const uploading = vi.hoisted(() => ({ busy: false }));
-vi.mock("@/components/sites/media-picker", () => ({
+vi.mock("@/components/shared/fields/media-picker", () => ({
     useImageUpload: () => ({ upload, busy: uploading.busy, error: null }),
 }));
 const showError = vi.fn();

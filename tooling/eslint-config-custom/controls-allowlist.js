@@ -207,15 +207,15 @@ export const RAW_ALLOWED = {
     // button: a chip
     "components/shared/shell/user-menu.tsx": ["button"],
     // button: a row or card that is one button
-    "components/sites/add-block-panel.tsx": ["button"],
+    "components/sites/blocks/add-block-panel.tsx": ["button"],
     // button: a row or card that is one button
-    "components/sites/add-page-panel.tsx": ["button"],
+    "components/sites/pages/add-page-panel.tsx": ["button"],
     // button: a row or card that is one button
-    "components/sites/add-section-dialog.tsx": ["button"],
+    "components/sites/blocks/add-section-dialog.tsx": ["button"],
     // button: the site editor's own answer buttons
-    "components/sites/choice-field.tsx": ["button"],
+    "components/sites/section-fields/choice-field.tsx": ["button"],
     // button: a row or card that is one button
-    "components/sites/editor/editor-canvas.tsx": ["button"],
+    "components/sites/canvas/editor-canvas.tsx": ["button"],
     // button: a choice in a list
     "components/sites/editor/editor-rail.tsx": ["button"],
     // button: a row or card that is one button, a row that opens
@@ -225,21 +225,21 @@ export const RAW_ALLOWED = {
     // button: the preview width toggles, a row or card that is one button
     "components/sites/editor/top-bar-actions.tsx": ["button"],
     // input: a file picker
-    "components/sites/media-picker.tsx": ["input"],
+    "components/shared/fields/media-picker.tsx": ["input"],
     // button: a row or card that is one button, an option in a list
-    "components/sites/pages-panel.tsx": ["button"],
+    "components/sites/pages/pages-panel.tsx": ["button"],
     // input: a field its screen draws itself
-    "components/sites/post-editor.tsx": ["input"],
+    "components/sites/posts/post-editor.tsx": ["input"],
     // button: a row or card that is one button
-    "components/sites/pre-publish-check.tsx": ["button"],
+    "components/sites/publish/pre-publish-check.tsx": ["button"],
     // button: a colour swatch in the toolbar; input: a field its screen draws itself
-    "components/sites/rich-text-editor.tsx": ["button", "input"],
+    "components/sites/rich-text/rich-text-editor.tsx": ["button", "input"],
     // input: a slider
     "components/sites/section-fields/padding.tsx": ["input"],
     // button: a block's name tag on the canvas
-    "components/sites/section-preview.tsx": ["button"],
+    "components/sites/canvas/section-preview.tsx": ["button"],
     // input: a slider
-    "components/sites/style-panel.tsx": ["input"],
+    "components/sites/looks/style-panel.tsx": ["input"],
     // input: a file picker
     "components/stores/import/csv-import.tsx": ["input"],
     // input: a native radio inside its card; label: a radio card with a timeline in it

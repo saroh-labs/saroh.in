@@ -247,8 +247,8 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
             "Settings › Business's sections on a phone",
         "components/organizations/team/team-screen.tsx":
             "People and Roles: who is here, and what each role can do",
-        "components/sites/editor-chrome.tsx": "the site editor's panels",
-        "components/sites/website-header.tsx":
+        "components/sites/editor/editor-chrome.tsx": "the site editor's panels",
+        "components/sites/header/website-header.tsx":
             "Website's sub-pages: Pages, Posts, Forms, Review, Settings",
         "components/stores/catalogue/products-tabs.tsx":
             "All, Collections, Stock and Reviews: the catalogue, then three other panels",

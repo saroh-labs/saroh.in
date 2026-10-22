@@ -4,11 +4,11 @@ import { Refusal } from "@/components/shared/states/refusal";
 import { Button } from "@saroh/ui/button";
 import { useEffect, useRef, useState } from "react";
 
-import { useImageUpload } from "@/components/sites/media-picker";
 import {
     LOGO_ACCEPT,
     logoFileProblem,
 } from "@/lib/organizations/business-logo";
+import { useImageUpload } from "./media-picker";
 
 /** A logo as a form holds it: where it is served, and its library image. */
 export interface LogoValue {

@@ -13,8 +13,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SiteDetail } from "@/lib/sites/service";
 import type { SiteAddress } from "@/lib/sites/share-links";
 
-import { SiteSettings } from "../site-settings";
-import { SiteSettingsRead } from "../site-settings-read";
+import { SiteSettings } from "./site-settings";
+import { SiteSettingsRead } from "./site-settings-read";
 
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -51,11 +51,11 @@ vi.mock("@/lib/stores/storefront-actions", () => ({
 vi.mock("@/lib/organizations/settings-actions", () => ({
     saveOrganizationSettings: vi.fn(),
 }));
-vi.mock("@/components/sites/custom-domain", () => ({
+vi.mock("@/components/sites/domain/custom-domain", () => ({
     CustomDomain: () => null,
 }));
 // The uploader, as one button that hands back a picked picture.
-vi.mock("@/components/sites/media-picker", () => ({
+vi.mock("@/components/shared/fields/media-picker", () => ({
     MediaPicker: ({
         onPick,
     }: {

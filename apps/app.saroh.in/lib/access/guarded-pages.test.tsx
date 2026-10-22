@@ -80,7 +80,7 @@ vi.mock("@/components/stores/discounts/discount-form", () => ({
 vi.mock("@/components/customers/add-customer-form", () => ({
     AddCustomerForm: () => <form data-testid="add-customer-form" />,
 }));
-vi.mock("@/components/sites/post-editor", () => ({
+vi.mock("@/components/sites/posts/post-editor", () => ({
     PostEditor: () => <form data-testid="post-editor" />,
 }));
 

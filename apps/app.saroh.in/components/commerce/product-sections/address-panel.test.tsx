@@ -17,7 +17,7 @@ import { AddressPanel } from "./photos-field";
 // The panel's neighbours in the file reach the media library; not what is
 // tested here.
 vi.mock("@/lib/media/actions", () => ({ listLibrary: vi.fn() }));
-vi.mock("@/components/sites/media-picker", () => ({
+vi.mock("@/components/shared/fields/media-picker", () => ({
     MediaPicker: () => null,
 }));
 vi.mock("@saroh/ui/toast", () => ({ showUndo: vi.fn() }));

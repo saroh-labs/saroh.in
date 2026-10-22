@@ -7,7 +7,7 @@ import {
     rowActions,
 } from "@/components/organizations/business-settings/business-row-parts";
 import type { OfferUndo } from "@/components/organizations/business-settings/use-settings-undo";
-import { Absent, Row } from "@/components/sites/settings-rows";
+import { Absent, Row } from "@/components/shared/page/settings-rows";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import type { PayInstructionsSettings } from "@/lib/organizations/pay-instructions";
 import {

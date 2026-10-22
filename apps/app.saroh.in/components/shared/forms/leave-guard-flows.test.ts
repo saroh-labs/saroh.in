@@ -18,7 +18,7 @@ const FLOWS: [flow: string, file: string][] = [
     ["class pack", "components/editor-shell/editor-shell.tsx"],
     ["product", "components/commerce/product-editor-v2/editor-shell.tsx"],
     ["service (new)", "components/services/service-editor/new-service.tsx"],
-    ["post", "components/sites/post-editor.tsx"],
+    ["post", "components/sites/posts/post-editor.tsx"],
     ["site editor", "components/sites/editor/use-editor-leave.ts"],
     [
         "product settings",
@@ -29,7 +29,7 @@ const FLOWS: [flow: string, file: string][] = [
     ["discount", "components/stores/discounts/discount-form.tsx"],
     ["customer (new)", "components/customers/add-customer-form.tsx"],
     ["location (new)", "components/stores/locations/create-store-form.tsx"],
-    ["create site", "components/sites/create-site-form.tsx"],
+    ["create site", "components/sites/new-site/create-site-form.tsx"],
     ["CSV import review", "components/stores/import/csv-import.tsx"],
     ["stock count", "components/commerce/stock/stock-screen.tsx"],
 ];
@@ -51,7 +51,7 @@ describe("the leave guard is mounted in every create and edit flow", () => {
             // The site editor's hook hands the guard to `site-editor.tsx`.
             const drawn =
                 file === "components/sites/editor/use-editor-leave.ts"
-                    ? "components/sites/site-editor.tsx"
+                    ? "components/sites/editor/site-editor.tsx"
                     : file;
             expect(read(drawn), flow).toMatch(/[gG]uard\.dialog\}/);
         }

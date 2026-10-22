@@ -57,7 +57,7 @@ vi.mock("@/lib/organizations/settings-actions", () => ({
 // The logo's sheet uploads through the media library: a picked file
 // becomes the picture this answers with.
 const upload = vi.fn();
-vi.mock("@/components/sites/media-picker", () => ({
+vi.mock("@/components/shared/fields/media-picker", () => ({
     useImageUpload: () => ({ upload, busy: false, error: null }),
 }));
 vi.mock("next/link", () => ({

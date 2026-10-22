@@ -2,8 +2,8 @@ import { EmptyState } from "@saroh/ui/data-state";
 import { FileText } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 
-import type { ReleasesForReview } from "@/components/sites/site-review-view";
-import { SiteReviewView } from "@/components/sites/site-review-view";
+import type { ReleasesForReview } from "@/components/sites/review/site-review-view";
+import { SiteReviewView } from "@/components/sites/review/site-review-view";
 import { requireSession } from "@/lib/session";
 import {
     getPageForReview,

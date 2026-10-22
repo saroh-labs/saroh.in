@@ -2,14 +2,14 @@
 # Every label below was checked against the real screens on 6 Oct 2026
 # (R7), in the code and in the captured shots. Sources, from the repo root:
 #   NAV   apps/app.saroh.in/components/shared/navigation/nav-items.tsx (Presence ›
-#         Website); components/sites/website-header.tsx (tabs Pages, Posts,
+#         Website); components/sites/header/website-header.tsx (tabs Pages, Posts,
 #         Forms, Settings: /sites/‹site›/settings)
-#   SECT  apps/app.saroh.in/components/sites/site-settings.tsx ("Web
+#   SECT  apps/app.saroh.in/components/sites/settings/site-settings.tsx ("Web
 #         address": "Your own domain, below, is added alongside it, and this
 #         one keeps working."; "Your own domain": "Point a domain you own at
 #         this site. You prove you own it with one DNS record; nothing
 #         changes for visitors until it is verified.")
-#   ADD   apps/app.saroh.in/components/sites/custom-domain.tsx and
+#   ADD   apps/app.saroh.in/components/sites/domain/custom-domain.tsx and
 #         add-domain-dialog.tsx (placeholder "shop.example.com", "A domain
 #         you already own, like www.yourshop.in. Leave out www and Saroh
 #         adds it, then shows how to forward the rest.", "Add domain"; "Add
@@ -38,7 +38,7 @@
 # as in shot 5. Step 5 names the states in words and doesn't re-take the
 # shot, which shows the Verified screen.
 # BARE (DEC-140, 12 Oct) apps/app.saroh.in/lib/domains/bare-view.ts,
-# components/sites/bare-domain-step.tsx; the API's
+# components/sites/domain/bare-domain-step.tsx; the API's
 # domains/bare-domain-sync.ts and bare-forwarding.ts: a domain typed
 # without www is added as www.‹domain› ("Your site will live at
 # www.‹domain›. ‹domain› will forward to it, which is the last step

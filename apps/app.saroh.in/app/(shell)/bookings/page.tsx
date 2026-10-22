@@ -14,7 +14,7 @@ import {
     flowStaff,
 } from "@/components/bookings/new-booking/setup";
 import { PageContainer } from "@/components/shared/page/page-container";
-import { ShareLinkButton } from "@/components/sites/share-link-button";
+import { ShareLinkButton } from "@/components/shared/share-link/share-link-button";
 import { takesOnlinePayment } from "@/lib/billing/access";
 import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packsOn } from "@/lib/class-packs/switched-on";

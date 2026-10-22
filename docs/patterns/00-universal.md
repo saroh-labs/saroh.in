@@ -253,7 +253,7 @@ with why it stops there:
   `collection-fields.tsx`, `kind-choice.tsx` and `products-picker.tsx`;
   the load-save-delete flow, as a hook, is the next seam. One line over,
   and not yet cut.
-- `sites/media-picker.tsx` (509) — the media library dialog. Photos and
+- `shared/fields/media-picker.tsx` (509) — the media library dialog. Photos and
   videos (#517) added the video rules and the poster frame to its one
   upload state. Less means an upload hook, which is new logic.
 - `lib/products/editor-sections.ts` (762) — every editor section's schema,
@@ -271,7 +271,7 @@ with why it stops there:
   note and next steps to `editor-parts.tsx` (leaving asks through the one
   guard, `components/shared/forms/use-leave-guard.tsx`). A little over;
   what is left shares one component's state.
-- `sites/custom-domain.tsx` (417 after DEC-140's bare domains) — the
+- `sites/domain/custom-domain.tsx` (417 after DEC-140's bare domains) — the
   domains' read, add, check and remove share its list and busy state. The
   bare domain's step, standing and words went to `bare-domain-step.tsx`
   and `lib/domains/bare-view.ts`, leaving only the call and "Add ‹domain›"
@@ -331,7 +331,7 @@ save sends are `business-form.ts`; the rows `business-details/business-detail-ro
 `tax/business-tax-rows.tsx`; the sheet `business-field-sheet.tsx`, with its
 fields in `business-sheet-fields.tsx` and `tax/business-tax-fields.tsx`; and
 which sheet is open `use-business-sheets.ts` over
-`lib/organizations/business-rows.ts`. And `sites/site-editor.tsx` (2,160 before; under 300 since
+`lib/organizations/business-rows.ts`. And `sites/editor/site-editor.tsx` (2,160 before; under 300 since
 round-2 G1, #260) along its hooks and panels into `sites/editor/`. Of what it
 became, `editor/use-editor-draft.ts` (409) is a little over: the sections,
 what the server last accepted, the save and its autosave share one set of

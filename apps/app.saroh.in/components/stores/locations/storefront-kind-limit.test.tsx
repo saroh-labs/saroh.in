@@ -29,7 +29,7 @@ vi.mock("@/lib/stores/storefront-actions", () => ({
 }));
 vi.mock("@/lib/stores/actions", () => ({ updateStore: vi.fn() }));
 // The logo's upload reaches the media library, which is server-only.
-vi.mock("@/components/sites/media-picker", () => ({
+vi.mock("@/components/shared/fields/media-picker", () => ({
     useImageUpload: () => ({ upload: vi.fn(), busy: false, error: null }),
 }));
 vi.mock("@/lib/members/actions", () => ({

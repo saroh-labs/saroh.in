@@ -4,9 +4,9 @@ import { Suspense } from "react";
 import {
     SiteSearchTrackingLoading,
     SiteSearchTrackingSection,
-} from "@/components/sites/site-search-tracking-section";
-import { SiteSettings } from "@/components/sites/site-settings";
-import { SiteSettingsRead } from "@/components/sites/site-settings-read";
+} from "@/components/sites/search-tracking/site-search-tracking-section";
+import { SiteSettings } from "@/components/sites/settings/site-settings";
+import { SiteSettingsRead } from "@/components/sites/settings/site-settings-read";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import {
     readOrganizationSettings,
