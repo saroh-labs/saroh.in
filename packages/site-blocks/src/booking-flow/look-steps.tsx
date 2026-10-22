@@ -2,8 +2,11 @@
 
 import type { LookId } from "@saroh/block-contract";
 
+import type { ReactNode } from "react";
+
 import { InitialsPlate } from "../blocks/no-photo";
-import { lookDot, lookLink, lookRow } from "./look-styles";
+import { LookIcon } from "../look-icons";
+import { LOOK_CHOICE, lookLink } from "./look-styles";
 import { holdBeforeText, lookGstText } from "./look-words";
 import type {
     BookingPerson,
@@ -23,12 +26,46 @@ import type { Times } from "./use-times";
  * `look-words.ts`.
  */
 
-/** A row's dot: a ring, filled when chosen. */
-function Dot({ on }: { on: boolean }) {
+/**
+ * One choice, as the look's board draws it (`LOOK_CHOICE`): its mark (a
+ * radio first or last, or Folio's arrow), what it is, and what it costs.
+ */
+function Choice({
+    look,
+    on,
+    onPick,
+    lead,
+    children,
+    end,
+}: {
+    look: LookId;
+    on: boolean;
+    onPick: () => void;
+    /** Drawn before the words: a person's initials. */
+    lead?: ReactNode;
+    children: ReactNode;
+    /** The price or a tag, before an end mark. */
+    end?: ReactNode;
+}) {
+    const style = LOOK_CHOICE[look];
+    const dot = <span aria-hidden="true" className={style.dot(on)} />;
     return (
-        <span aria-hidden="true" className={lookDot(on)}>
-            {on ? <span className="bg-site-fg size-2.5 rounded-full" /> : null}
-        </span>
+        <button
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={onPick}
+            className={style.row(on)}
+        >
+            {style.mark === "start" ? dot : null}
+            {lead}
+            <span className="min-w-0 flex-1">{children}</span>
+            {end}
+            {style.mark === "end" ? dot : null}
+            {style.mark === "arrow" ? (
+                <LookIcon name="arrow" look={look} size={16} />
+            ) : null}
+        </button>
     );
 }
 
@@ -43,10 +80,12 @@ export function serviceShort(service: BookingService): string {
 // ── What ────────────────────────────────────────────────────────────────
 
 export function LookWhat({
+    look,
     services,
     serviceId,
     onPick,
 }: {
+    look: LookId;
     services: BookingService[];
     serviceId: string | null;
     onPick: (id: string) => void;
@@ -62,6 +101,7 @@ export function LookWhat({
         },
     ].filter((g) => g.list.length > 0);
     const titled = groups.length > 1;
+    const style = LOOK_CHOICE[look];
     return (
         <div
             role="radiogroup"
@@ -69,44 +109,37 @@ export function LookWhat({
             className="grid gap-5"
         >
             {groups.map((group) => (
-                <div key={group.title} className="grid gap-2">
+                <div key={group.title} className={style.list}>
                     {titled ? (
-                        <p className="text-site-muted text-[12.5px] font-semibold uppercase tracking-[0.1em]">
-                            {group.title}
-                        </p>
+                        <p className={style.label}>{group.title}</p>
                     ) : null}
                     {group.list.map((s) => {
                         const on = s.id === serviceId;
                         const price = servicePickPrice(s);
                         return (
-                            <button
+                            <Choice
                                 key={s.id}
-                                type="button"
-                                role="radio"
-                                aria-checked={on}
-                                onClick={() => onPick(s.id)}
-                                className={lookRow(on)}
-                            >
-                                <Dot on={on} />
-                                <span className="min-w-0 flex-1">
-                                    <span className="block text-[15.5px] font-semibold">
-                                        {s.name}
-                                    </span>
-                                    <span className="text-site-body mt-0.5 block text-[13.5px]">
-                                        {serviceShort(s)}
-                                    </span>
-                                    {on && s.description?.trim() ? (
-                                        <span className="text-site-body mt-1.5 block whitespace-pre-line text-sm leading-normal [overflow-wrap:anywhere]">
-                                            {s.description.trim()}
+                                look={look}
+                                on={on}
+                                onPick={() => onPick(s.id)}
+                                end={
+                                    price ? (
+                                        <span className={style.price}>
+                                            {price}
                                         </span>
-                                    ) : null}
+                                    ) : null
+                                }
+                            >
+                                <span className={style.name}>{s.name}</span>
+                                <span className={style.meta}>
+                                    {serviceShort(s)}
                                 </span>
-                                {price ? (
-                                    <span className="whitespace-nowrap text-[15px] font-semibold tabular-nums">
-                                        {price}
+                                {on && s.description?.trim() ? (
+                                    <span className="text-site-body mt-1.5 block whitespace-pre-line text-sm leading-normal [overflow-wrap:anywhere]">
+                                        {s.description.trim()}
                                     </span>
                                 ) : null}
-                            </button>
+                            </Choice>
                         );
                     })}
                 </div>
@@ -168,52 +201,40 @@ export function LookWho({
             </div>
         );
     }
+    const style = LOOK_CHOICE[look];
     return (
         <div
             role="radiogroup"
             aria-label="Who would you like?"
-            className="grid gap-2"
+            className={style.list}
         >
-            <button
-                type="button"
-                role="radio"
-                aria-checked={person === null}
-                onClick={() => onPick(null)}
-                className={lookRow(person === null)}
+            <Choice
+                look={look}
+                on={person === null}
+                onPick={() => onPick(null)}
             >
-                <Dot on={person === null} />
-                <span className="min-w-0 flex-1">
-                    <span className="block text-[15.5px] font-semibold">
-                        Anyone free
-                    </span>
-                    <span className="text-site-body mt-0.5 block text-[13.5px]">
-                        {earliest ?? "The earliest time with whoever is free"}
-                    </span>
+                <span className={style.name}>Anyone free</span>
+                <span className={style.meta}>
+                    {earliest ?? "The earliest time with whoever is free"}
                 </span>
-            </button>
-            {people.map((p) => {
-                const on = person === p.id;
-                return (
-                    <button
-                        key={p.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={on}
-                        onClick={() => onPick(p.id)}
-                        className={lookRow(on)}
-                    >
-                        <Dot on={on} />
+            </Choice>
+            {people.map((p) => (
+                <Choice
+                    key={p.id}
+                    look={look}
+                    on={person === p.id}
+                    onPick={() => onPick(p.id)}
+                    lead={
                         <InitialsPlate
                             name={p.name}
                             look={look}
                             className="size-10 text-[15px]"
                         />
-                        <span className="min-w-0 flex-1 text-[15.5px] font-semibold">
-                            {p.name}
-                        </span>
-                    </button>
-                );
-            })}
+                    }
+                >
+                    <span className={style.name}>{p.name}</span>
+                </Choice>
+            ))}
         </div>
     );
 }
@@ -221,6 +242,7 @@ export function LookWho({
 // ── How to pay ──────────────────────────────────────────────────────────
 
 export function LookPay({
+    look,
     choices,
     pay,
     onPick,
@@ -228,6 +250,7 @@ export function LookPay({
     time,
     rules,
 }: {
+    look: LookId;
     choices: PayChoice[];
     pay: BookPay;
     onPick: (pay: BookPay) => void;
@@ -241,45 +264,36 @@ export function LookPay({
         ? lookGstText(service)
         : null;
     const holds = choices.some((c) => c.pay === "NOW" || c.pay === "DEPOSIT");
+    const style = LOOK_CHOICE[look];
     return (
         <div>
             <div
                 role="radiogroup"
                 aria-label="How would you like to pay?"
-                className="grid gap-2"
+                className={style.list}
             >
-                {choices.map((choice) => {
-                    const on = choice.pay === pay;
-                    return (
-                        <button
-                            key={choice.pay}
-                            type="button"
-                            role="radio"
-                            aria-checked={on}
-                            onClick={() => onPick(choice.pay)}
-                            className={lookRow(on)}
-                        >
-                            <Dot on={on} />
-                            <span className="min-w-0 flex-1">
-                                <span className="block text-[15.5px] font-semibold">
-                                    {choice.label}
-                                </span>
-                                <span className="text-site-body mt-0.5 block text-[13.5px]">
-                                    {choice.sub}
-                                </span>
-                            </span>
-                            {choice.tag ? (
+                {choices.map((choice) => (
+                    <Choice
+                        key={choice.pay}
+                        look={look}
+                        on={choice.pay === pay}
+                        onPick={() => onPick(choice.pay)}
+                        end={
+                            choice.tag ? (
                                 <span className="bg-site-accent text-site-accent-fg rounded-full px-2.5 py-0.5 text-xs font-semibold">
                                     {choice.tag}
                                 </span>
                             ) : (
-                                <span className="whitespace-nowrap text-[15px] font-semibold tabular-nums">
+                                <span className={style.price}>
                                     {choice.amount}
                                 </span>
-                            )}
-                        </button>
-                    );
-                })}
+                            )
+                        }
+                    >
+                        <span className={style.name}>{choice.label}</span>
+                        <span className={style.meta}>{choice.sub}</span>
+                    </Choice>
+                ))}
             </div>
             {gst ? (
                 <p
