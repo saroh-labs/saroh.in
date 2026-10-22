@@ -89,7 +89,7 @@ export function SheetsFrame(props: FrameProps) {
                 {bar ? (
                     <aside
                         aria-label="Your booking"
-                        className="bg-site-surface border-site-border rounded-site-s sticky top-6 self-start border p-6 max-[699px]:hidden"
+                        className="bg-site-surface border-site-border rounded-site-photo sticky top-6 self-start border p-6 max-[699px]:hidden"
                     >
                         <p className="text-site-muted mb-3 text-[13px] font-semibold">
                             Your booking

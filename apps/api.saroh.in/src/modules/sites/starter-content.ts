@@ -12,6 +12,7 @@ import {
     lookShowcaseTemplate,
     starterCopyPlan,
     withGallerySamples,
+    withLookShowcase,
 } from "@saroh/templates";
 import { isDeepStrictEqual } from "node:util";
 
@@ -111,10 +112,15 @@ interface SnapshotBefore {
     created: string[];
 }
 
-/** Each touched page's draft revision just after the copy. */
-type SnapshotAfter = { style: Prisma.JsonValue | null } & {
+/**
+ * The style, the menu and each touched page's draft revision just after the
+ * change. `navigation` is absent on snapshots made before it was kept.
+ */
+interface SnapshotAfter {
+    style: Prisma.JsonValue | null;
+    navigation?: Prisma.JsonValue | null;
     revisions: Record<string, number>;
-};
+}
 
 type Tx = Prisma.TransactionClient;
 
@@ -138,12 +144,6 @@ function withLook(stored: unknown, look: LookId | null): SiteStyle {
     return parseSiteStyle(look ? { ...rest, look } : rest);
 }
 
-/**
- * A copied section's content: the sample laid over it if that is still
- * valid under its contract (it always is; `look-showcase.test.ts`), else
- * the template's own, and the contract's rich fields sanitized as a draft
- * save sanitizes them.
- */
 /** A section's type, contract and content, wherever it came from. */
 interface SectionParts {
     type: string;
@@ -151,6 +151,12 @@ interface SectionParts {
     content: unknown;
 }
 
+/**
+ * A copied section's content: the sample laid over it if that is still
+ * valid under its contract (it always is; `look-showcase.test.ts`), else
+ * the template's own, and the contract's rich fields sanitized as a draft
+ * save sanitizes them.
+ */
 function ready(
     copied: SectionParts,
     made: SectionParts | undefined,
@@ -243,7 +249,10 @@ export async function copyStarterContent(
             db: tx,
             siteId,
         });
-        const made = instantiateTemplate(template, context);
+        const made = withLookShowcase(
+            look,
+            instantiateTemplate(template, context),
+        );
         const copied = withGallerySamples(template.id, made);
         const facts = fill
             ? await businessFacts(tx, ctx.organizationId, context.area)
@@ -405,14 +414,15 @@ export async function copyStarterContent(
             await addToMenu(tx, siteId, menuAdditions);
         }
 
-        await tx.site.update({
+        const updated = await tx.site.update({
             where: { id: siteId },
             data: { style: style as unknown as Prisma.InputJsonValue },
-            select: { id: true },
+            select: { navigation: true },
         });
 
         const after: SnapshotAfter = {
             style: style as unknown as Prisma.JsonValue,
+            navigation: updated.navigation,
             revisions,
         };
         const snapshot = await tx.siteDraftSnapshot.create({
@@ -423,7 +433,7 @@ export async function copyStarterContent(
                 templateId: `${template.id}@${template.version}`,
                 look,
                 before: before as unknown as Prisma.InputJsonValue,
-                after: after,
+                after: after as unknown as Prisma.InputJsonValue,
                 createdByUserId: ctx.userId,
             },
             select: { id: true },
@@ -739,7 +749,11 @@ export async function fillDetails(
                 templateId: "",
                 look: lookIn(site.style),
                 before: before as unknown as Prisma.InputJsonValue,
-                after: { style: site.style, revisions },
+                after: {
+                    style: site.style,
+                    navigation: site.navigation,
+                    revisions,
+                },
                 createdByUserId: ctx.userId,
             },
             select: { id: true },
@@ -931,6 +945,7 @@ export async function rollbackDraft(
                 before: now as unknown as Prisma.InputJsonValue,
                 after: {
                     style: version.before.style,
+                    navigation: version.before.navigation,
                     revisions,
                 },
                 createdByUserId: ctx.userId,
@@ -1035,6 +1050,7 @@ export async function bringInSection(
                 before: before as unknown as Prisma.InputJsonValue,
                 after: {
                     style: site?.style ?? null,
+                    navigation: site?.navigation ?? null,
                     revisions: { [target.id]: bumped.revision },
                 },
                 createdByUserId: ctx.userId,
@@ -1097,11 +1113,13 @@ async function assertUntouched(
     }
     const site = await tx.site.findFirst({
         where: { id: siteId, organizationId: ctx.organizationId },
-        select: { style: true },
+        select: { style: true, navigation: true },
     });
     const moved =
         ids.some((id) => latest.get(id) !== after.revisions[id]) ||
-        !isDeepStrictEqual(site?.style ?? null, after.style);
+        !isDeepStrictEqual(site?.style ?? null, after.style) ||
+        (after.navigation !== undefined &&
+            !isDeepStrictEqual(site?.navigation ?? null, after.navigation));
     if (moved) {
         throw new ConflictException({
             message:

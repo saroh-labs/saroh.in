@@ -158,8 +158,8 @@ describe("the looks' pairs", () => {
     const PINNED = {
         folio: {
             name: "Newsreader and Hanken Grotesk",
-            heading: ["Newsreader", [300, 400], ["normal", "italic"]],
-            body: ["Hanken Grotesk", [400, 500, 600], undefined],
+            heading: ["Newsreader", [], ["normal", "italic"], ["opsz"]],
+            body: ["Hanken Grotesk", [400, 500, 600], undefined, undefined],
         },
         quiet: {
             name: "Cormorant Garamond and Jost",
@@ -168,13 +168,14 @@ describe("the looks' pairs", () => {
                 "Cormorant Garamond",
                 [300, 400, 500],
                 ["normal", "italic"],
+                undefined,
             ],
-            body: ["Jost", [400, 500], undefined],
+            body: ["Jost", [400, 500], undefined, undefined],
         },
         live: {
             name: "Bricolage Grotesque and Figtree",
-            heading: ["Bricolage Grotesque", [700, 800], undefined],
-            body: ["Figtree", [400, 500, 600, 700], undefined],
+            heading: ["Bricolage Grotesque", [], undefined, ["wdth"]],
+            body: ["Figtree", [400, 500, 600, 700], undefined, undefined],
         },
     } as const;
 
@@ -192,12 +193,14 @@ describe("the looks' pairs", () => {
             expect(pair?.mono).toBeUndefined();
             for (const role of ["heading", "body"] as const) {
                 const face = pair?.[role];
-                const [family, weights, styles] = pin[role];
+                const [family, weights, styles, axes] = pin[role];
                 expect(face?.family).toBe(family);
                 expect(face?.weights).toEqual(weights);
                 expect(face?.styles).toEqual(styles);
-                // Never empty: an empty list is a variable font's full range.
-                expect(face?.weights.length).toBeGreaterThan(0);
+                expect(face?.axes).toEqual(axes);
+                // Empty only for a face with an axis, which next/font loads
+                // as the full variable range.
+                expect(face?.weights.length === 0).toBe(axes !== undefined);
             }
             expect(new Set(pair && fontPairFamilies(pair)).size).toBe(2);
         },

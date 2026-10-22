@@ -62,6 +62,17 @@
   Loading shapes wait 300 ms
   (`HELD_AFTER_MS`, `look-theme.ts`), then stand still. The flag and its
   rollout: `docs/architecture/runbooks/SITE_LOOKS_ROLLOUT.md`.
+  **A look matches its boards** (DEC-172 amendment, 22 Oct 2026): Folio
+  board VA, Quiet VD, Live VB on the Website v2 canvas, on every page. Its
+  corners, spacing, weights and faces are the board's; **its width is
+  Classic's** (page margins and content width stay as they are). The
+  look's own CSS (`lookRules`) carries what a token can't: a hairline over
+  every section after the first under Folio and after the second under
+  Quiet, Quiet's bold drawn at 500 (its body face has no heavier weight),
+  and Live's Classic-markup cards at its 24px card radius
+  (`--site-radius-photo`). Folio keeps full padding between sections (no
+  halved neighbour gap, `rhythm` in `site-craft.ts`). Live tints the page,
+  not its cards: white cards on a grey ground (`safe-colours.ts`).
 - **Current** (20 Oct 2026, DEC-177) — **A paid style is refused in the
   Style panel, and every look can be previewed.** Website › Style takes
   `rules` (`styleChoiceRules` in `lib/sites/style-access.ts`, from the site
@@ -77,7 +88,9 @@
   height, on a phone (`useNarrow`). Inside, the look's showcase template
   drawn for its sample business with the gallery's sample words
   (`LookShowcase`, DEC-182: `LOOK_SHOWCASE_TEMPLATE`, the gallery's own
-  `templateRender`), inert, with a Desk and Phone switch, the look's name
+  `templateRender`) in its board's colours (`LOOK_SHOWCASE_PALETTE`; the
+  template's Classic colourways are untouched) and pages
+  (`withLookShowcase`: Live's opens on a hero), inert, with a Desk and Phone switch, the look's name
   and `suits`, Close, "Use this look", and, for someone who may change the
   site, "Use this look with its starter content". That one first says, in
   the dialog's foot, which pages it replaces and adds and that the words
@@ -862,7 +875,10 @@ results), mark it `data-ph-mask`; a picture inside it is left out too, and
   third, `mono` face (`archivo-narrow`: IBM Plex Mono; `geist`: JetBrains
   Mono), emitted as `--site-font-mono` only when it has one.
 - **Current** — **A look's pair (DEC-172, `folio`, `quiet`, `live`) names
-  its weights, styles and subsets**, and is marked `look: true`: it comes with
+  its weights, styles and subsets** (or, for a face its board sets on an
+  axis, its `axes` and the full variable range: Folio's Newsreader with
+  `opsz`, Live's Bricolage with `wdth` for its 80% width, 22 Oct), and is
+  marked `look: true`: it comes with
   its look, so the Typeface picker (`PICKABLE_FONT_PAIRS`) does not offer it.
   Each face has its own loader with exactly those options, filed in
   `SITE_FACES` under the face's `load` key (`quiet:heading`), never its family,

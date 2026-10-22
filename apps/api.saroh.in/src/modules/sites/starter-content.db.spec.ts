@@ -305,6 +305,23 @@ describe("starter content (DEC-182)", () => {
         );
     });
 
+    it("refuses Undo once the menu has been changed since", async () => {
+        const { owner, siteId } = await business("pro");
+        const { snapshotId } = await asOrg(owner, () =>
+            copyStarterContent(owner, siteId, "live"),
+        );
+        await prisma.site.update({
+            where: { id: siteId },
+            data: { navigation: { items: [] } },
+        });
+        await expect(
+            asOrg(owner, () => undoStarterContent(owner, siteId, snapshotId)),
+        ).rejects.toMatchObject({
+            status: 409,
+            response: { details: { code: "STARTER_CHANGED" } },
+        });
+    });
+
     it("refuses a MEMBER, and another business's Undo is not found", async () => {
         const { owner, siteId } = await business("pro");
         const member: OrganizationContext = { ...owner, role: "MEMBER" };

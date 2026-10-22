@@ -8,6 +8,7 @@ import {
     LOOK_SHOWCASE_TEMPLATE,
     lookShowcaseTemplate,
     starterCopyPlan,
+    withLookShowcase,
 } from "./look-showcase";
 import type { TemplateContext, TemplateManifest } from "./manifest";
 import { listTemplates } from "./registry";
@@ -225,5 +226,27 @@ describe("starterCopyPlan", () => {
             site,
         );
         expect(plan.replace.map((r) => r.pageId)).toEqual(["home"]);
+    });
+});
+
+describe("withLookShowcase (DEC-172 amendment, 22 Oct)", () => {
+    const gym = lookShowcaseTemplate("live");
+    const made = instantiateTemplate(gym, {
+        organizationName: "Iron & Oak",
+        modules: ["WEBSITE", ...(gym.uses ?? [])],
+    });
+
+    it("gives Live's showcase home a visible hero, in sample words the check lists", () => {
+        const home = withLookShowcase("live", made).pages.find((p) => p.isHome);
+        const hero = home?.sections.find((s) => s.type === "hero");
+        const content = hero?.content as Record<string, unknown>;
+        expect(content.variant).toBeUndefined();
+        expect(content.titleVisible).toBeUndefined();
+        expect(gallerySampleIn([String(content.heading)])).not.toBeNull();
+    });
+
+    it("leaves every other look's pages as they are", () => {
+        expect(withLookShowcase("quiet", made)).toBe(made);
+        expect(withLookShowcase(null, made)).toBe(made);
     });
 });

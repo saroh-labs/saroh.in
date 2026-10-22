@@ -93,7 +93,7 @@ const BUTTON: Record<LookId, Record<FrontButtonKind, string>> = {
     // VA01: square, the accent filled for the action, an ink or a control
     // edge for the rest; a link is ink underlined.
     folio: {
-        fill: "min-h-[52px] border border-site-accent bg-site-accent px-[26px] text-[15px] font-semibold tracking-[0.02em] text-site-accent-fg hover:opacity-90",
+        fill: "min-h-[52px] gap-[14px] border border-site-accent bg-site-accent px-[26px] text-[15px] font-semibold tracking-[0.02em] text-site-accent-fg hover:opacity-90",
         outline:
             "border border-site-fg bg-transparent px-[18px] text-[14px] font-semibold tracking-[0.02em] text-site-fg hover:bg-site-fg/5",
         quiet: "border border-site-rule bg-transparent px-[18px] text-[14px] font-semibold tracking-[0.02em] text-site-fg hover:border-site-fg",

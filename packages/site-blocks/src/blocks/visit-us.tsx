@@ -341,7 +341,7 @@ function LookVisitFrame({
                     className={cn(
                         "grid gap-6",
                         look === "live"
-                            ? "bg-site-surface rounded-site-s p-5 min-[700px]:p-8"
+                            ? "bg-site-surface rounded-site-photo p-5 min-[700px]:p-8"
                             : "border-site-border border-t pt-8",
                     )}
                 >
@@ -405,7 +405,7 @@ function LookVisit({
                     className={cn(
                         "grid gap-8 min-[1000px]:grid-cols-2 min-[1000px]:gap-16",
                         look === "live"
-                            ? "bg-site-surface rounded-site-s p-5 min-[700px]:p-8"
+                            ? "bg-site-surface rounded-site-photo p-5 min-[700px]:p-8"
                             : "border-site-border border-t pt-8",
                     )}
                 >

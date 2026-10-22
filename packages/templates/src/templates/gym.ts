@@ -472,6 +472,16 @@ export const gymTemplate: TemplateManifest = {
  */
 export const GYM_GALLERY_SAMPLE = {
     footer: "Bandra West, Mumbai",
+    /**
+     * The home hero Live's showcase draws (DEC-182; `withLookShowcase`):
+     * the template's own home has no visible hero, and Live's board leads
+     * with one.
+     */
+    liveHero: {
+        heading: "Strength, conditioning and boxing in Bandra West.",
+        subheading:
+            "Small classes with Devika, Arjun, Ritu and Sameer, six days a week. Your first class is free.",
+    },
     coaches: [
         {
             name: "Devika Rane",

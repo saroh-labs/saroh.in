@@ -100,7 +100,7 @@ export function priceColumn(look: LookId, highlighted: boolean): string {
             "border-site-border border-t pt-6 min-[700px]:text-center",
         look === "live" &&
             cn(
-                "bg-site-surface rounded-site-s p-5",
+                "bg-site-surface rounded-site-photo p-5",
                 highlighted && "ring-site-accent ring-2",
             ),
     );
@@ -159,7 +159,7 @@ export function PriceParts({
                     className={cn(
                         "font-site-heading text-site-fg text-[40px] tabular-nums leading-none [font-variant-numeric:lining-nums] min-[700px]:text-[52px]",
                         look === "live"
-                            ? "font-extrabold tracking-[-0.03em]"
+                            ? "font-extrabold tracking-[-0.03em] [font-stretch:80%]"
                             : "font-light tracking-[-0.02em]",
                     )}
                 >

@@ -46,6 +46,12 @@ export interface SiteFontFace {
     /** Character sets the renderer loads; absent for `latin` only. */
     subsets?: readonly FontSubset[];
     /**
+     * A variable font's extra axes, beyond weight (Live's width, Folio's
+     * optical size). A face with axes loads its full weight range, so its
+     * `weights` are empty: `next/font` takes an axis only that way.
+     */
+    axes?: readonly string[];
+    /**
      * The name the app's loaded faces file this face under, when it is not
      * the family's: a look loads its own copy of a family with only the
      * weights it sets (Newsreader for Folio beside the full `newsreader`
@@ -104,6 +110,7 @@ const lookFace = (
     more: {
         styles?: readonly FontStyleName[];
         subsets?: readonly FontSubset[];
+        axes?: readonly string[];
     } = {},
 ): SiteFontFace => ({ family, weights, fallback, load, ...more });
 
@@ -192,12 +199,12 @@ export const FONT_PAIRS = [
      * (`LOOKS[id].fontPair`). Each face loads only the weights its look's
      * type sets, upright unless it names italic:
      *
-     * - Folio: Newsreader 300 and 400 with italics, over Hanken Grotesk
-     *   400 to 600.
+     * - Folio: Newsreader, variable with its optical size, with italics,
+     *   over Hanken Grotesk 400 to 600.
      * - Quiet: Cormorant Garamond 400 and 500, Light (300) only at 48px and
      *   up, italic for its 400, over Jost 400 and 500.
-     * - Live: Bricolage Grotesque 700 and 800 at its normal width, over
-     *   Figtree 400 to 700.
+     * - Live: Bricolage Grotesque, variable with its width (set at 80%),
+     *   over Figtree 400 to 700.
      *
      * The display faces and Figtree draw the rupee sign in `latin-ext`, so
      * they load it; Hanken Grotesk and Jost have no rupee in any set, and a
@@ -211,10 +218,13 @@ export const FONT_PAIRS = [
             "folio:heading",
             "Newsreader",
             SERIF_FALLBACK,
-            [300, 400],
+            // Variable, with its optical size (board VA): the display cut at
+            // display sizes (DEC-172 amendment, 22 Oct).
+            [],
             {
                 styles: WITH_ITALIC,
                 subsets: WITH_RUPEE,
+                axes: ["opsz"],
             },
         ),
         body: lookFace(
@@ -245,9 +255,12 @@ export const FONT_PAIRS = [
             "live:heading",
             "Bricolage Grotesque",
             SYSTEM_FONT_STACK,
-            [700, 800],
+            // Variable, with its width (board VB sets it at 80%; DEC-172
+            // amendment, 22 Oct).
+            [],
             {
                 subsets: WITH_RUPEE,
+                axes: ["wdth"],
             },
         ),
         body: lookFace(

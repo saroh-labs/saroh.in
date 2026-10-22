@@ -271,9 +271,11 @@ export type { BusinessFacts, FillResult, FilledKind } from "./fill-details";
 // Each look's showcase template, and what copying it into a draft replaces
 // (DEC-182).
 export {
+    LOOK_SHOWCASE_PALETTE,
     LOOK_SHOWCASE_TEMPLATE,
     lookShowcaseTemplate,
     starterCopyPlan,
+    withLookShowcase,
 } from "./look-showcase";
 export type {
     ShowcaseLook,

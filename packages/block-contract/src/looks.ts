@@ -68,8 +68,9 @@ export interface LookMotion {
 /** What a look adds to the colours it is given (`safe-colours.ts`). */
 export interface LookColour {
     /**
-     * How far a card's surface sits from the page, toward the text (0: the
-     * page itself). Used only when the palette has no surface of its own.
+     * How far the page sits from its cards, toward the text (0: the page
+     * itself): the page is tinted and the cards keep the palette's ground.
+     * Used only when the palette has no surface of its own.
      */
     surfaceTint: number;
 }
@@ -115,7 +116,8 @@ export const LOOKS: Readonly<Record<LookId, SiteLook>> = {
             radiusSmall: 0,
             radiusPhoto: 0,
             pageMargin: { phone: 20, desk: 64 },
-            sectionPadding: { phone: 56, desk: 112 },
+            // Board VA: 136 a section, 72 on a phone.
+            sectionPadding: { phone: 72, desk: 136 },
             measure: 64,
         },
         fontPair: "folio",
@@ -142,10 +144,11 @@ export const LOOKS: Readonly<Record<LookId, SiteLook>> = {
         suits: "Warm white and airy, with rounded buttons and one question at a time. Suits salons, clinics, studios, bakeries, shops and makers.",
         tokens: {
             radius: 999,
-            radiusSmall: 12,
-            radiusPhoto: 16,
+            // Board VD: fields 14, photos 4.
+            radiusSmall: 14,
+            radiusPhoto: 4,
             pageMargin: { phone: 20, desk: 48 },
-            sectionPadding: { phone: 64, desk: 120 },
+            sectionPadding: { phone: 72, desk: 120 },
             measure: 60,
         },
         fontPair: "quiet",
@@ -166,11 +169,15 @@ export const LOOKS: Readonly<Record<LookId, SiteLook>> = {
         short: "Bold, like an app",
         suits: "Like an app, with cards and what's on now. Suits gyms and classes that fill up.",
         tokens: {
-            radius: 16,
-            radiusSmall: 10,
-            radiusPhoto: 20,
+            // Board VB: pill buttons, 24 cards (drawn in the photo radius),
+            // 16 chips.
+            radius: 999,
+            radiusSmall: 16,
+            radiusPhoto: 24,
             pageMargin: { phone: 16, desk: 40 },
-            sectionPadding: { phone: 40, desk: 80 },
+            // Board VB's `.sec`: 72 above and 8 below, about 80 between
+            // sections (48 + 8 on a phone); split evenly here.
+            sectionPadding: { phone: 28, desk: 40 },
             measure: 68,
         },
         fontPair: "live",

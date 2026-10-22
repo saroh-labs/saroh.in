@@ -286,7 +286,7 @@ function WeekColumns({ look, days, byDay, show, paidWith }: DayProps) {
                                 className={cn(
                                     "font-site-heading text-[34px] tabular-nums leading-tight",
                                     look === "live"
-                                        ? "font-extrabold"
+                                        ? "font-extrabold [font-stretch:80%]"
                                         : "font-light",
                                     i === 0 &&
                                         look !== "live" &&
@@ -351,7 +351,7 @@ function Cell({
             className={cn(
                 "grid min-w-0 gap-0.5 text-[13.5px] leading-[1.4]",
                 look === "live"
-                    ? "bg-site-surface rounded-site-s p-3"
+                    ? "bg-site-surface rounded-site-photo p-3"
                     : "border-site-border border-t px-1 py-4",
             )}
         >
@@ -522,7 +522,7 @@ function Row({
             className={cn(
                 "grid grid-cols-[64px_minmax(0,1fr)] items-start gap-x-3 gap-y-2",
                 look === "live"
-                    ? "bg-site-surface rounded-site-s p-3"
+                    ? "bg-site-surface rounded-site-photo p-3"
                     : "border-site-border border-b py-4",
             )}
         >

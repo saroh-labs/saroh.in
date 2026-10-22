@@ -141,18 +141,18 @@ describe("deriveSafeColours", () => {
         expect(parsePalette(safe.palette).ok).toBe(true);
     });
 
-    it("draws Live's cards a step off the page, and no other look's", () => {
+    it("tints Live's page a step off its white cards, and no other look's", () => {
         const palette = given({
             ...WHITE_PAGE,
             accent: "#1F5A3D",
             accentFg: "#FFFFFF",
         });
-        expect(deriveSafeColours(palette, "live").palette.surface).not.toBe(
-            "#FFFFFF",
-        );
-        expect(deriveSafeColours(palette, "quiet").palette.surface).toBe(
-            "#FFFFFF",
-        );
+        const live = deriveSafeColours(palette, "live").palette;
+        // Board VB: white cards on a grey ground.
+        expect(live.surface).toBe("#FFFFFF");
+        expect(live.bg).not.toBe("#FFFFFF");
+        expect(live.heroBg).toBe(live.bg);
+        expect(deriveSafeColours(palette, "quiet").palette.bg).toBe("#FFFFFF");
         // A palette's own surface is kept.
         expect(
             deriveSafeColours({ ...palette, surface: "#FAFAFA" }, "live")

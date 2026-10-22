@@ -98,8 +98,8 @@ const jetbrainsMono = JetBrains_Mono({
  */
 const folioHeading = Newsreader({
     subsets: ["latin", "latin-ext"],
-    weight: ["300", "400"],
     style: ["normal", "italic"],
+    axes: ["opsz"],
     display: "swap",
     preload: false,
 });
@@ -122,10 +122,10 @@ const quietBody = Jost({
     display: "swap",
     preload: false,
 });
-// One width (the default, 100): no `wdth` axis is asked for.
+// Variable with its width axis: Live sets its headings at 80% (board VB).
 const liveHeading = Bricolage_Grotesque({
     subsets: ["latin", "latin-ext"],
-    weight: ["700", "800"],
+    axes: ["wdth"],
     display: "swap",
     preload: false,
 });

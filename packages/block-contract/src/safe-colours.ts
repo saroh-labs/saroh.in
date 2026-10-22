@@ -141,11 +141,15 @@ export function deriveSafeColours(
 ): SafeColours {
     const p: Record<string, string> = { ...input };
 
-    // Live draws cards: a surface a step off the page, unless the
-    // palette already has its own.
+    // Live draws cards on a tinted page (board VB: white cards on a grey
+    // ground): the page moves a step toward the text, a hero on the page
+    // with it, and the cards keep the page's own colour. Unless the
+    // palette already has a surface of its own.
     const tint = LOOKS[look].colour.surfaceTint;
     if (tint > 0 && p.surface === p.bg) {
-        p.surface = mixHex(p.bg, p.fg, tint);
+        const ground = mixHex(p.bg, p.fg, tint);
+        if (p.heroBg === p.bg) p.heroBg = ground;
+        p.bg = ground;
     }
     const page = [p.bg, p.surface];
 

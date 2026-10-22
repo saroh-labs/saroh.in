@@ -178,7 +178,7 @@ export function LookPostCards({
                                 list
                                     ? "border-site-border grid-cols-[minmax(0,1fr)_auto] items-start gap-4 border-b py-5"
                                     : live
-                                      ? "bg-site-surface rounded-site-s content-start p-3 pb-4"
+                                      ? "bg-site-surface rounded-site-photo content-start p-3 pb-4"
                                       : "rounded-site-s content-start",
                                 // No photo: a text card under a hairline,
                                 // never an empty frame (VD06 "No photos").

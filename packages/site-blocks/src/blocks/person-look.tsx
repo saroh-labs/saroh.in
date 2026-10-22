@@ -213,7 +213,7 @@ export default function LookTeam({
                         {members.map((m, i) => (
                             <li
                                 key={i}
-                                className="bg-site-surface rounded-site-s grid w-[200px] shrink-0 snap-start content-start justify-items-start gap-3 p-6 min-[700px]:w-auto"
+                                className="bg-site-surface rounded-site-photo grid w-[200px] shrink-0 snap-start content-start justify-items-start gap-3 p-6 min-[700px]:w-auto"
                             >
                                 <PersonFace
                                     member={m}

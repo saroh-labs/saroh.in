@@ -4,6 +4,7 @@ import {
     DIETICIAN_GALLERY_SAMPLE,
     GALLERY_SAMPLES,
     instantiateTemplate,
+    LOOK_SHOWCASE_TEMPLATE,
     SALON_GALLERY_SAMPLE,
     templatePlaceholderIn,
 } from "@saroh/templates";
@@ -162,6 +163,33 @@ describe("templateRender", () => {
             }
         },
     );
+
+    it.each(["quiet", "folio", "live"] as const)(
+        "draws %s's own showcase in its board's colours, not the template's",
+        (look) => {
+            const id = LOOK_SHOWCASE_TEMPLATE[look];
+            const shown = templateRender(id, undefined, "/", look);
+            const theirs = templateRender(id, undefined, "/");
+            expect(shown?.styleVariables["--site-surface"]).not.toEqual(
+                theirs?.styleVariables["--site-surface"],
+            );
+        },
+    );
+
+    it("opens Live's showcase on a hero with the Gym's sample words", () => {
+        const render = templateRender(
+            LOOK_SHOWCASE_TEMPLATE.live,
+            undefined,
+            "/",
+            "live",
+        );
+        const hero = render?.sections.find((s) => s.type === "hero");
+        expect(hero?.content).toMatchObject({
+            heading: "Strength, conditioning and boxing in Bandra West.",
+        });
+        expect(hero?.content).not.toHaveProperty("variant");
+        expect(hero?.content).not.toHaveProperty("titleVisible");
+    });
 
     it("is null for what it cannot draw", () => {
         expect(templateRender("no-such-template", undefined, "/")).toBeNull();

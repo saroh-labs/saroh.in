@@ -10,12 +10,15 @@ import {
     getTemplate,
     instantiateTemplate,
     listTemplates,
+    LOOK_SHOWCASE_PALETTE,
+    LOOK_SHOWCASE_TEMPLATE,
     presetSiteStyle,
     STARTER_TEMPLATE_ID,
     templateFooterLineFor,
     templateModulePageKinds,
     templateStylePreset,
     withGallerySample,
+    withLookShowcase,
 } from "@saroh/templates";
 import type { JournalFeed } from "../blocks/journal";
 import type { PacksFeed } from "../blocks/packs";
@@ -255,12 +258,21 @@ export function templateRender(
     const preset = templateStylePreset(template, styleId);
     if (preset === null) return null;
 
-    const built = instantiateTemplate(template, context);
+    // A look's Preview draws its board's pages and colours (DEC-182, the
+    // DEC-172 amendment of 22 Oct), its showcase template's only.
+    const showcase =
+        look !== undefined && LOOK_SHOWCASE_TEMPLATE[look] === template.id;
+    const made = instantiateTemplate(template, context);
+    const built = showcase ? withLookShowcase(look, made) : made;
     const page = built.pages.find((p) => p.path === path);
     if (!page) return null;
     const home = built.pages.find((p) => p.isHome) ?? page;
 
-    const preStyle = presetSiteStyle(preset?.style ?? {});
+    const preStyle = presetSiteStyle(
+        showcase
+            ? { ...preset?.style, palette: LOOK_SHOWCASE_PALETTE[look] }
+            : (preset?.style ?? {}),
+    );
     const styleVariables = siteStyleVariables(
         look ? { ...preStyle, look } : preStyle,
     );

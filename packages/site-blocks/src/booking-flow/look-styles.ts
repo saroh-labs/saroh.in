@@ -94,7 +94,7 @@ export const STEP_HEADING: Record<LookId, string> = {
     // VA08: the display face, light, beside the sentence.
     folio: "font-site-heading text-[calc(1.5rem*var(--site-heading-scale,1))] font-light leading-tight tracking-[-0.015em]",
     // VD08: large, centred, the display face.
-    quiet: "font-site-heading text-center text-[calc(2.25rem*var(--site-heading-scale,1))] font-normal leading-[1.08] tracking-[-0.02em] min-[700px]:text-[calc(3rem*var(--site-heading-scale,1))]",
+    quiet: "font-site-heading text-center text-[calc(2.25rem*var(--site-heading-scale,1))] font-normal leading-[1.08] tracking-[-0.02em] min-[700px]:text-[calc(3.5rem*var(--site-heading-scale,1))] min-[700px]:font-light min-[700px]:leading-[1.05] min-[700px]:tracking-[-0.01em]",
     // VB08: heavy and tight.
-    live: "font-site-heading text-[calc(2rem*var(--site-heading-scale,1))] font-extrabold leading-[1.04] tracking-[-0.03em]",
+    live: "font-site-heading text-[calc(2rem*var(--site-heading-scale,1))] font-extrabold leading-[1.04] tracking-[-0.03em] [font-stretch:80%]",
 };

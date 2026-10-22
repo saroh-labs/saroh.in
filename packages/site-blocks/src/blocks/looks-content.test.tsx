@@ -825,13 +825,18 @@ describe.each(LOOKS)("%s: Visit us", (look) => {
 
 describe("the blocks a look restyles by tokens", () => {
     it.each(LOOKS)(
-        "%s: cards and photos take the look's small and photo radius",
+        "%s: cards and photos take the look's card and photo radius",
         (look) => {
             const css = lookRules(":root", look, null);
             expect(css).toContain(
                 '[class*="rounded-[calc(var(--site-radius)*1.4)]"]',
             );
-            expect(css).toContain("border-radius: var(--site-radius-s)");
+            // Live's cards are 24, its photo radius (board VB).
+            expect(css).toContain(
+                look === "live"
+                    ? "border-radius: var(--site-radius-photo)"
+                    : "border-radius: var(--site-radius-s)",
+            );
             expect(css).toContain('img[class*="rounded-[var(--site-radius)]"]');
             expect(css).toContain("border-radius: var(--site-radius-photo)");
         },

@@ -208,7 +208,7 @@ function Rows({
         <ul
             className={cn(
                 live
-                    ? "bg-site-surface rounded-site-s px-4 min-[700px]:px-6"
+                    ? "bg-site-surface rounded-site-photo px-4 min-[700px]:px-6"
                     : "border-site-border border-t",
             )}
         >
