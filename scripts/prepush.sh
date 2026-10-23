@@ -1002,6 +1002,15 @@ if echo "$CHANGED" | grep "^packages/database/prisma/" >/dev/null; then
     esac
 fi
 
+# A dependency or an app's Next, OpenNext or wrangler config changed: accounts'
+# sign-in pages must answer in the Workers runtime, where nothing else here
+# runs Next (23 Oct 2026: Next 16.4.2 on OpenNext 1.20.9, every Worker 500).
+# The same paths as CI's cf-runtime job (.github/workflows/ci.yml).
+CF_RUNTIME_RE='^(pnpm-lock\.yaml|pnpm-workspace\.yaml|apps/[^/]+/(package\.json|wrangler\.[^/]+|open-next\.config\.[^/]+|next\.config\.[^/]+))$'
+if echo "$CHANGED" | grep -E "$CF_RUNTIME_RE" >/dev/null; then
+    step cf-runtime bash scripts/check-cf-runtime.sh
+fi
+
 # ---------------------------------------------------------------------------
 # 3. API integration, in shards on parallel databases.
 #
