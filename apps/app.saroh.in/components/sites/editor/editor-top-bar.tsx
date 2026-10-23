@@ -5,7 +5,6 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { ChevronDown, ChevronLeft, MoreHorizontal } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
@@ -14,8 +13,14 @@ import type {
     TestReleaseActions,
     TopBarActionProps,
 } from "@/components/sites/editor/top-bar-actions";
-import { TopBarActions } from "@/components/sites/editor/top-bar-actions";
-import type { EditorLayout } from "@/components/sites/editor/use-editor-layout";
+import {
+    PublishButton,
+    TopBarActions,
+} from "@/components/sites/editor/top-bar-actions";
+import type {
+    EditorLayout,
+    EditorSheet as SheetName,
+} from "@/components/sites/editor/use-editor-layout";
 import { PagesPanel } from "@/components/sites/pages/pages-panel";
 import { unfinishedPhrase } from "@/components/sites/publish/held-back-copy";
 import {
@@ -33,6 +38,8 @@ import type {
 } from "@/lib/sites/service";
 import { Tip } from "@saroh/ui/tooltip";
 import type { Device, Zoom } from "./editor-constants";
+import { EditorSheet } from "./editor-sheet";
+import { MoreSheet } from "./more-actions";
 
 /**
  * The editor's top bar: where you are (Website, site, page, status), how the
@@ -45,8 +52,8 @@ import type { Device, Zoom } from "./editor-constants";
  * ONE line on a desk: the actions never shrink, the breadcrumb truncates
  * instead. Losing the end of a page name is a smaller loss than losing
  * Publish. Narrow (G4), the actions wrap to a second line rather than run off
- * the bar, as the design's bar does; on a phone, the status and every action
- * fold into one menu beside the page switcher.
+ * the bar, as the design's bar does. A phone (DEC-185) keeps ← Website, the
+ * page (its sheet), the status, ⋯ More (a sheet of the rest) and Publish.
  */
 export function EditorTopBar({
     siteId,
@@ -89,6 +96,9 @@ export function EditorTopBar({
     canOverride = false,
     scheduled = null,
     testRelease,
+    sheet = null,
+    setSheet,
+    sheetHost = null,
 }: {
     siteId: string;
     siteName: string;
@@ -140,6 +150,11 @@ export function EditorTopBar({
     scheduled?: string | null;
     /** The Test release split; absent while test releases are off. */
     testRelease?: TestReleaseActions;
+    /** A phone's open sheet: its Pages and ⋯ More are drawn here. */
+    sheet?: SheetName;
+    setSheet?: (next: SheetName) => void;
+    /** The editor's body, where a phone's sheets are laid. */
+    sheetHost?: HTMLElement | null;
 }) {
     /** The page switcher under the page name in the breadcrumb. */
     const zone = useBusinessZone();
@@ -202,6 +217,112 @@ export function EditorTopBar({
         />
     );
 
+    if (phone) {
+        const close = () => setSheet?.(null);
+        return (
+            <>
+                <header
+                    data-editor-bar=""
+                    className="flex h-14 shrink-0 items-center gap-1 border-b px-1.5"
+                >
+                    <Link
+                        href={`/sites/${siteId}/pages`}
+                        aria-label="Back to Website"
+                        className="grid size-11 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors duration-fast hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                        <ChevronLeft aria-hidden className="size-5" />
+                    </Link>
+                    <button
+                        type="button"
+                        aria-haspopup="dialog"
+                        aria-label={`Page: ${activePage?.title ?? "Page"}. Choose another page to edit`}
+                        onClick={() => setSheet?.("pages")}
+                        className="flex h-11 min-w-0 max-w-[40%] shrink-0 items-center gap-1.5 rounded-lg border bg-card px-2.5 text-sm font-semibold transition-colors duration-fast hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                        <span className="min-w-0 truncate">
+                            {activePage?.title ?? "Page"}
+                        </span>
+                        <ChevronDown
+                            aria-hidden
+                            className="size-[13px] shrink-0 text-muted-foreground"
+                        />
+                    </button>
+                    <Badge
+                        role="status"
+                        variant={STATUS_BADGE[status.tone]}
+                        size="sm"
+                        className="ml-0.5 min-w-0 shrink truncate"
+                    >
+                        <span className="truncate">{status.label}</span>
+                    </Badge>
+                    <span className="flex-1" />
+                    <button
+                        type="button"
+                        aria-label={
+                            openNotes > 0
+                                ? `More: preview, feedback (${openNotes} open), share and test releases`
+                                : "More: preview, feedback, share and test releases"
+                        }
+                        onClick={() => setSheet?.("more")}
+                        className="relative grid size-11 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors duration-fast hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                        <MoreHorizontal aria-hidden className="size-5" />
+                        {openNotes > 0 ? (
+                            <span
+                                aria-hidden
+                                data-notes-dot=""
+                                className="absolute right-2 top-2.5 size-2 rounded-full bg-destructive ring-2 ring-background"
+                            />
+                        ) : null}
+                    </button>
+                    <PublishButton {...actions} className="h-11 shrink-0" />
+                </header>
+                <EditorSheet
+                    open={sheet === "pages"}
+                    onClose={close}
+                    container={sheetHost}
+                    side="bottom"
+                    title="Pages"
+                    closeLabel="Close pages"
+                >
+                    <div className="min-h-0 flex-1 overflow-y-auto">
+                        <PagesPanel
+                            siteId={siteId}
+                            pages={pages}
+                            activePageId={pageId}
+                            dirty={dirty || saving || styleDirty}
+                            unfinished={
+                                onlyHeldBack
+                                    ? unfinishedPhrase(heldBack)
+                                    : undefined
+                            }
+                            canUpdate={canUpdateSite}
+                            addableKinds={addablePageKinds}
+                            flags={siteFlags.flags}
+                            onClose={close}
+                            phone
+                        />
+                    </div>
+                </EditorSheet>
+                <EditorSheet
+                    open={sheet === "more"}
+                    onClose={close}
+                    container={sheetHost}
+                    side="bottom"
+                    title="More"
+                    closeLabel="Close More"
+                >
+                    <MoreSheet
+                        {...actions}
+                        status={readout}
+                        done={close}
+                        onFeedback={openFeedback}
+                    />
+                </EditorSheet>
+            </>
+        );
+    }
+
     return (
         <header
             data-editor-bar=""
@@ -234,20 +355,15 @@ export function EditorTopBar({
                         Website
                     </Link>
                 </Tip>
-                {/* A phone keeps the way out and the page; the name goes. */}
-                {phone ? null : (
-                    <>
-                        <span
-                            aria-hidden
-                            className="px-px text-[0.9375rem] text-muted-foreground/70"
-                        >
-                            /
-                        </span>
-                        <span className="min-w-0 truncate text-[0.84375rem] font-medium text-muted-foreground">
-                            {siteName}
-                        </span>
-                    </>
-                )}
+                <span
+                    aria-hidden
+                    className="px-px text-[0.9375rem] text-muted-foreground/70"
+                >
+                    /
+                </span>
+                <span className="min-w-0 truncate text-[0.84375rem] font-medium text-muted-foreground">
+                    {siteName}
+                </span>
                 <span
                     aria-hidden
                     className="px-px text-[0.9375rem] text-muted-foreground/70"
@@ -268,10 +384,7 @@ export function EditorTopBar({
                             aria-haspopup="listbox"
                             aria-label={`Page: ${activePage?.title ?? "Page"}. Choose another page to edit`}
                             className={cn(
-                                "flex h-[30px] min-w-0 cursor-pointer items-center gap-[7px] rounded-lg border bg-card pl-[11px] pr-[9px] text-[0.84375rem] font-semibold text-foreground transition-colors duration-fast hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted data-[state=open]:bg-secondary coarse:h-11",
-                                // On a phone a long page name gives way
-                                // before the menu beside it does.
-                                !phone && "shrink-0",
+                                "flex h-[30px] min-w-0 shrink-0 cursor-pointer items-center gap-[7px] rounded-lg border bg-card pl-[11px] pr-[9px] text-[0.84375rem] font-semibold text-foreground transition-colors duration-fast hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted data-[state=open]:bg-secondary coarse:h-11",
                             )}
                         >
                             <span className="max-w-[12rem] truncate">
@@ -308,19 +421,15 @@ export function EditorTopBar({
                         />
                     </PopoverContent>
                 </Popover>
-                {phone ? null : readout}
+                {readout}
             </nav>
 
-            {phone ? (
-                <PhoneMenu status={readout} actions={actions} />
-            ) : (
-                <TopBarActions
-                    {...actions}
-                    // Tablet width (UX-035): the secondary actions fold into
-                    // "More" so Publish never runs off the bar.
-                    compact={layout === "narrow"}
-                />
-            )}
+            <TopBarActions
+                {...actions}
+                // Tablet width (UX-035): the secondary actions fold into
+                // "More" so Publish never runs off the bar.
+                compact={layout === "narrow"}
+            />
         </header>
     );
 }
@@ -365,87 +474,5 @@ function StatusReadout({
                 </span>
             ) : null}
         </>
-    );
-}
-
-/**
- * A phone's bar (G4): the status, the view and Publish folded into one menu,
- * so the page switcher keeps its room and every control keeps a thumb-sized
- * target. What the status says is written out inside it, since a phone has
- * no hover to read a title with.
- */
-function PhoneMenu({
-    status,
-    actions,
-}: {
-    status: ReactNode;
-    actions: TopBarActionProps;
-}) {
-    const [open, setOpen] = useState(false);
-    return (
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <button
-                    type="button"
-                    aria-label="Status, view and publish"
-                    className="ml-auto grid size-11 shrink-0 place-items-center rounded-[9px] border bg-card text-muted-foreground transition-colors duration-fast hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                    <MoreHorizontal aria-hidden className="size-5" />
-                </button>
-            </PopoverTrigger>
-            <PopoverContent
-                align="end"
-                className="flex w-[min(20rem,calc(100vw-2rem))] flex-col gap-3 p-3"
-            >
-                <div className="flex min-w-0 flex-wrap items-center gap-1">
-                    {status}
-                </div>
-                <TopBarActions
-                    stacked
-                    {...actions}
-                    // Preview and Publish end the visit to the menu.
-                    setPreviewing={(on) => {
-                        setOpen(false);
-                        actions.setPreviewing(on);
-                    }}
-                    onPublish={() => {
-                        setOpen(false);
-                        actions.onPublish();
-                    }}
-                    // Share's choices end the visit too (UX-068).
-                    askForReview={() => {
-                        setOpen(false);
-                        actions.askForReview();
-                    }}
-                    withdrawReview={() => {
-                        setOpen(false);
-                        actions.withdrawReview();
-                    }}
-                    onSharePreview={() => {
-                        setOpen(false);
-                        actions.onSharePreview();
-                    }}
-                    // A test release's sheets open over the editor, so
-                    // the menu goes away first.
-                    testRelease={
-                        actions.testRelease
-                            ? {
-                                  ...actions.testRelease,
-                                  onMake: actions.testRelease.onMake
-                                      ? () => {
-                                            setOpen(false);
-                                            actions.testRelease?.onMake?.();
-                                        }
-                                      : undefined,
-                                  onOpenList: () => {
-                                      setOpen(false);
-                                      actions.testRelease?.onOpenList();
-                                  },
-                              }
-                            : undefined
-                    }
-                />
-            </PopoverContent>
-        </Popover>
     );
 }

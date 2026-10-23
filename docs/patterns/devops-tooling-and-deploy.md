@@ -81,6 +81,7 @@ seconds). Shared setup is `.github/actions/setup`.
 | Migration replay from empty              | `packages/database` changed     | 1 min                    |
 | Browser E2E × 4 shards                   | `apps/ packages/ e2e/ scripts/` | 5–7 min (the long pole)  |
 | Permission states (production build)     | as E2E                          | 3 min                    |
+| Cloudflare runtime (accounts sign-in)    | lockfile, app deps or config    | about 2 min              |
 
 - **Current** — **Required checks keep their names.** The aggregates
   `Lint, typecheck, test & build` (`ci`) and `Browser E2E (seeded stack)`
@@ -134,6 +135,18 @@ seconds). Shared setup is `.github/actions/setup`.
 - **Current** — **Postgres services poll `pg_isready -h 127.0.0.1` every 2s.**
   The check goes over TCP because the image's init server listens on the
   socket only.
+- **Current** (2026-10-23) — **The Workers runtime is the only place a
+  Next.js and OpenNext mismatch shows.** `next build`, the unit tests and the
+  browser specs run Next under Node; Next 16.4.2 on OpenNext 1.20.9 passed
+  them all and returned 500 on every Worker page (DEV_LEARNINGS, 23 Oct).
+  `Cloudflare runtime (accounts sign-in)` runs `scripts/check-cf-runtime.sh`:
+  accounts built with `pnpm cf:build` as the dev deploy builds it, served by
+  `wrangler dev` (local, no Cloudflare login), and /login, /signup and
+  /forgot-password must answer 200. It runs when `pnpm-lock.yaml`,
+  `pnpm-workspace.yaml`, an app's `package.json` or an app's `next.config`,
+  `open-next.config` or `wrangler` config changed; `pnpm prepush` runs it on
+  the same paths (step `cf-runtime`). It is outside `ci`; a repo admin can
+  make it a required check.
 - **Current** — **Superseded PR runs are cancelled.** Runs on main and
   development never are, because each push there is checked against the one
   before it.

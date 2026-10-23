@@ -6,7 +6,7 @@ import type {
 } from "@/lib/sites/service";
 
 /**
- * The pre-publish check's words (`pre-publish-check.tsx`): the flag groups,
+ * The Publish sheet's words (`publish-sheet.tsx`, DEC-185): the flag groups,
  * the approval line and what publishing puts live. Moved out of the
  * component when "Publishing needs approval" (DEC-071, T11) grew it past
  * 400 lines (00-universal §6); the component keeps the drawing.
@@ -96,4 +96,50 @@ export function goesLive(
     }
     if (pendingSummary) return `Publishing puts live: ${pendingSummary}.`;
     return "Nothing has changed since the last publish. Publishing again makes a new version that matches the live one.";
+}
+
+/** The fix a flag's row offers in the Publish sheet (DEC-185), by type. */
+export const FIX_WORD: Record<FlagType, string> = {
+    emptyRequiredField: "Fill it in",
+    placeholderText: "Edit",
+    missingImage: "Add photos",
+    hiddenButLinked: "Show me",
+    pageNotInNavigation: "Show me",
+    unpublishedChanges: "Show me",
+    missingSeoDescription: "Add one",
+    brokenLink: "Fix link",
+    phoneWidth: "Show me",
+    storefrontUnchosen: "Show me",
+    reservedAddress: "Change path",
+    shopCantTakeOrders: "Show me",
+    productsNotOnSale: "Show me",
+    addressMissing: "Choose address",
+};
+
+/**
+ * Why Publish is greyed out, in the sheet's foot (DEC-185): the first
+ * blocker's own words, the web address in today's ("Choose a web address
+ * first"), else unsaved work. Null when Publish can be pressed.
+ */
+export function publishWaitsFor({
+    blockers,
+    unsaved,
+}: {
+    blockers: readonly { type: FlagType }[];
+    unsaved: boolean;
+}): string | null {
+    if (blockers.length > 0) {
+        return blockers[0].type === "addressMissing"
+            ? "Choose a web address first"
+            : "Fix what's marked first";
+    }
+    if (unsaved) return "Saving your changes. Publish is available in a moment";
+    return null;
+}
+
+/** "the style (look, colours and type)": one area, in a sentence. */
+export function oneAreaWords(summary: string): string {
+    return summary === "the style"
+        ? "the style (look, colours and type)"
+        : summary;
 }

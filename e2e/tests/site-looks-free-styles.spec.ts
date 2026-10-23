@@ -2,6 +2,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { lookGallery, openFromPill, typefaces } from "../fixtures/phone-editor";
 import { useSession } from "../fixtures/sessions";
 import {
     grantNorthwindThemes,
@@ -45,13 +46,8 @@ interface SiteView {
 
 async function openBrand(page: Page, phone: boolean) {
     if (phone) {
-        const brand = page
-            .getByRole("navigation", { name: "Edit this page" })
-            .getByRole("button", { name: "Brand" });
-        await expect(brand).toBeVisible({ timeout: 30_000 });
-        if ((await brand.getAttribute("aria-pressed")) !== "true") {
-            await brand.click();
-        }
+        // The pill's Brand, in its sheet (DEC-185).
+        await openFromPill(page, "Brand");
         return;
     }
     const brand = page.getByRole("tab", { name: "Brand" });
@@ -74,12 +70,12 @@ async function openEditor(page: Page, siteId: string, phone: boolean) {
 
 /** The looks' gallery behind the Look card's Change (DEC-184). */
 async function gallery(page: Page) {
-    const dialog = page.getByRole("dialog", { name: "Change look" });
-    if (!(await dialog.isVisible())) {
-        await page.locator("[data-look-change]").click();
-    }
-    await expect(dialog).toBeVisible();
-    return dialog;
+    const looks = await lookGallery(
+        page,
+        (page.viewportSize()?.width ?? 1440) < 760,
+    );
+    await expect(looks).toBeVisible();
+    return looks;
 }
 
 /** The look in force, as the Look card says it. */
@@ -206,8 +202,7 @@ test.describe("free and paid styles", { tag: "@serial" }, () => {
 
             // A paid typeface: under "Paid plans" in the search behind
             // Change, refused in place (the search stays open), nothing saved.
-            await page.locator("[data-typeface-change]").click();
-            const typeface = page.getByRole("dialog", { name: "Typeface" });
+            const typeface = await typefaces(page, phone);
             const option = typeface
                 .locator("[cmdk-group]", { hasText: "Paid plans" })
                 .locator(`[data-typeface="${paid.key}"]`);
@@ -258,8 +253,9 @@ test.describe("free and paid styles", { tag: "@serial" }, () => {
             // Still marked: a paid look is marked on every plan.
             await expect(looks).toContainText(/Paid plans.*Quiet/);
             await quiet.click();
-            // Taken: the gallery closes and the card says Quiet.
-            await expect(looks).toHaveCount(0);
+            // Taken: the card says Quiet. A desk's gallery closes; a phone's
+            // Look tab is the gallery, and stays (DEC-185).
+            if (!phone) await expect(looks).toHaveCount(0);
             await expect(lookCard(page)).toHaveAttribute(
                 "data-look-current",
                 "quiet",

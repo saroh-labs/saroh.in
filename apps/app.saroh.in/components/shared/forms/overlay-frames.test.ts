@@ -94,6 +94,10 @@ const NOT_FORMS: Record<string, string> = {
     "components/home/phone/setup-sheet.tsx":
         "the setup checklist, each step its own link, in the phone Home's frame",
     "components/sites/editor/editor-sheet.tsx": "the site editor's panels",
+    // Publish (DEC-185): what goes live and its fixes, then the result;
+    // the web address field inside it saves on its own button.
+    "components/sites/publish/publish-sheet.tsx":
+        "Publish: what goes live, its fixes and one button, then the result",
     "components/sites/blocks/add-section-dialog.tsx":
         "a picker: choosing a section adds it",
     "components/commerce/orders/order-filters-sheet.tsx":

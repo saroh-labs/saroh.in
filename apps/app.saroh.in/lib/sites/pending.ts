@@ -108,3 +108,38 @@ export function pendingChangeCount(
 ): number {
     return (sections ?? 0) + (site ?? []).filter(isKind).length;
 }
+
+/** Each site-level area as a row of the Publish sheet: its name, what changed. */
+const AREA_ROWS: Record<SiteChangeKind, { area: string; detail: string }> = {
+    name: { area: "Site name", detail: "Changed" },
+    search: { area: "Search", detail: "Search title or description changed" },
+    shareImage: { area: "Share image", detail: "Changed" },
+    icon: { area: "Site icon", detail: "Changed" },
+    posts: { area: "Blog address", detail: "Changed" },
+    style: { area: "Style", detail: "Look, colours and type" },
+    footer: { area: "Footer", detail: "Changed" },
+    menu: { area: "Menu", detail: "Changed" },
+    pages: { area: "Pages", detail: "Added, removed or renamed" },
+};
+
+/**
+ * What publishing puts live, one row per area (DEC-185): the blocks the
+ * server counted, then each site-level setting. The API counts blocks for
+ * the whole site, not per page, so blocks are one row.
+ */
+export function pendingAreas(
+    sections: number | null | undefined,
+    site: readonly string[] | null | undefined,
+): { area: string; detail: string }[] {
+    const rows: { area: string; detail: string }[] = [];
+    if (sections && sections > 0) {
+        rows.push({
+            area: "Blocks",
+            detail: `${count(sections, "block")} changed`,
+        });
+    }
+    for (const kind of site ?? []) {
+        if (isKind(kind)) rows.push(AREA_ROWS[kind]);
+    }
+    return rows;
+}

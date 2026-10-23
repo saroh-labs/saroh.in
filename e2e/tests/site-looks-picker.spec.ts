@@ -2,6 +2,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { brandTab, lookGallery, openFromPill } from "../fixtures/phone-editor";
 import { useSession } from "../fixtures/sessions";
 import { setNorthwindLook } from "../fixtures/site-look";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
@@ -28,16 +29,11 @@ interface SiteView {
     liveLook?: string | null;
 }
 
-/** Website › Style: the rail's Brand tab on a desk, its bar on a phone. */
+/** Website › Style: the rail's Brand tab on a desk, its pill on a phone. */
 async function openBrand(page: Page, phone: boolean) {
     if (phone) {
-        const brand = page
-            .getByRole("navigation", { name: "Edit this page" })
-            .getByRole("button", { name: "Brand" });
-        await expect(brand).toBeVisible({ timeout: 30_000 });
-        if ((await brand.getAttribute("aria-pressed")) !== "true") {
-            await brand.click();
-        }
+        // The pill's Brand, in its sheet (DEC-185).
+        await openFromPill(page, "Brand");
         return;
     }
     const brand = page.getByRole("tab", { name: "Brand" });
@@ -52,12 +48,12 @@ const lookCard = (page: Page) => page.locator("[data-look-current]");
 
 /** The looks' gallery behind the card's Change, opened if it isn't. */
 async function gallery(page: Page) {
-    const dialog = page.getByRole("dialog", { name: "Change look" });
-    if (!(await dialog.isVisible())) {
-        await page.locator("[data-look-change]").click();
-    }
-    await expect(dialog).toBeVisible();
-    return dialog;
+    const looks = await lookGallery(
+        page,
+        (page.viewportSize()?.width ?? 1440) < 760,
+    );
+    await expect(looks).toBeVisible();
+    return looks;
 }
 
 /**
@@ -112,8 +108,11 @@ test.describe("the Look row", { tag: "@serial" }, () => {
 
             // Quiet: drawn on the canvas at once, saved to the draft.
             await (await choice("quiet")).click();
-            // Every other control stays, the gallery having closed.
+            // Every other control stays: beside the card on a desk, the
+            // gallery having closed; in the Type tab on a phone (DEC-185).
+            if (phone) await brandTab(page, "Type");
             await expect(page.locator("[data-typeface-current]")).toBeVisible();
+            if (phone) await brandTab(page, "Look");
             await expect(lookCard(page)).toHaveAttribute(
                 "data-look-current",
                 "quiet",
@@ -220,8 +219,12 @@ test.describe("the Look row", { tag: "@serial" }, () => {
 
             await preview.getByRole("button", { name: "Close" }).last().click();
             await expect(preview).toHaveCount(0);
-            // The gallery made way for the dialog: back on Change.
-            await expect(page.locator("[data-look-change]")).toBeFocused();
+            // Back where it was opened: Change on a desk, where the gallery
+            // made way for the dialog; the look's own Preview in a phone's
+            // Look tab (DEC-185).
+            await expect(
+                phone ? open : page.locator("[data-look-change]"),
+            ).toBeFocused();
 
             // Nothing chosen and nothing saved: still Classic.
             await expect(lookCard(page)).toHaveAttribute(

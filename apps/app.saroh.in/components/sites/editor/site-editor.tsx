@@ -2,14 +2,16 @@
 
 import { AddSectionDialog } from "@/components/sites/blocks/add-section-dialog";
 import { useAddBlock } from "@/components/sites/blocks/use-add-block";
+import { queryCanvas } from "@/components/sites/canvas/device-frame";
 import {
     canvasChromeFor,
     EditorCanvas,
 } from "@/components/sites/canvas/editor-canvas";
 import { useEditorViewport } from "@/components/sites/canvas/use-editor-viewport";
 import { starterContentActions } from "@/components/sites/looks/starter-content-actions";
+import { BrandSheetActions } from "@/components/sites/looks/style-panel";
 import { useEditorStyle } from "@/components/sites/looks/use-editor-style";
-import { PrePublishCheck } from "@/components/sites/publish/pre-publish-check";
+import { PublishSheet } from "@/components/sites/publish/publish-sheet";
 import { usePublish } from "@/components/sites/publish/use-publish";
 import {
     testReleaseActions,
@@ -24,6 +26,8 @@ import { styleChoiceRules } from "@/lib/sites/style-access";
 import { publishOverScheduleWarning } from "@/lib/sites/test-releases";
 import type { LookId } from "@saroh/block-contract";
 import { useEffect, useRef, useState } from "react";
+import { BlockToolbar } from "./block-toolbar";
+import { SECTION_LABELS } from "./editor-constants";
 import { EditorPanels } from "./editor-panels";
 import { EditorRail } from "./editor-rail";
 import { EditorTopBar } from "./editor-top-bar";
@@ -81,6 +85,7 @@ export function SiteEditor({
     livePublishedAt = null,
     reloadDraft,
     initialSheet = null,
+    webAddressFix = null,
 }: SiteEditorProps) {
     const review = useEditorReview({
         siteId,
@@ -153,6 +158,8 @@ export function SiteEditor({
         initialSheet,
     );
     const { selection } = sheets;
+    // The editor's body, below the top bar: where its sheets are laid.
+    const [body, setBody] = useState<HTMLDivElement | null>(null);
     const { setSelectedIndex, setRail, setInspector } = selection;
     const draft = useEditorDraft({
         siteId,
@@ -214,6 +221,47 @@ export function SiteEditor({
     });
 
     const active = activeSection(selection.selectedIndex, sections);
+    /**
+     * Bring a block to the top of the canvas, after the render that moves
+     * it. The canvas alone scrolls: `scrollIntoView` would scroll the
+     * phone's whole window too, and the bar with it.
+     */
+    const scrollToBlock = (index: number) =>
+        requestAnimationFrame(() => {
+            const canvas = viewport.canvasRef.current;
+            if (!canvas) return;
+            const block = queryCanvas<HTMLElement>(
+                canvas,
+                `[data-block-index="${index}"]`,
+            );
+            if (!block) return;
+            // A block in the device frame is measured from the frame.
+            const frame = block.ownerDocument.defaultView?.frameElement;
+            const top =
+                block.getBoundingClientRect().top +
+                (frame ? frame.getBoundingClientRect().top : 0) -
+                canvas.getBoundingClientRect().top;
+            canvas.scrollTo({
+                top: canvas.scrollTop + top - 8,
+                behavior: "smooth",
+            });
+        });
+    // A tapped block's toolbar on a phone (DEC-185): each with Undo.
+    const blockTools =
+        layout === "phone"
+            ? (index: number) => (
+                  <BlockToolbar
+                      index={index}
+                      count={sections.length}
+                      onMove={(delta) => {
+                          edits.move(index, delta);
+                          setSelectedIndex(index + delta);
+                          scrollToBlock(index + delta);
+                      }}
+                      onRemove={() => edits.removeAt(index)}
+                  />
+              )
+            : undefined;
     // The site's flags for the open page, by section: the rail's dots.
     const flagsBySection = flagsByScreenPosition(
         publish.siteFlags.flags,
@@ -285,6 +333,9 @@ export function SiteEditor({
                 addablePageKinds={addablePageKinds}
                 scheduled={releases.scheduled}
                 testRelease={testReleaseActions(releases)}
+                sheet={sheets.sheet}
+                setSheet={sheets.setSheet}
+                sheetHost={body}
             />
 
             <EditorPanels
@@ -294,9 +345,32 @@ export function SiteEditor({
                 hasSubject={
                     active !== null || selection.selectedChrome !== null
                 }
-                openNotes={review.openNotes}
+                inspectorTitle={
+                    selection.selectedChrome === "header"
+                        ? "Header"
+                        : selection.selectedChrome === "footer"
+                          ? "Footer"
+                          : selection.inspector === "feedback" || !active
+                            ? "Feedback"
+                            : SECTION_LABELS[active.section.type]
+                }
+                pageTitle={
+                    pages.find((p) => p.id === pageId)?.title ?? "this page"
+                }
+                overlayOpen={publish.checking}
+                brandActions={
+                    <BrandSheetActions
+                        saving={siteStyle.styleSaving}
+                        dirty={siteStyle.styleDirty}
+                        onReset={() => edits.resetStyle()}
+                    />
+                }
+                body={body}
+                setBody={setBody}
                 rail={
                     <EditorRail
+                        phone={layout === "phone"}
+                        onPicked={scrollToBlock}
                         {...selection}
                         {...siteStyle}
                         {...draft}
@@ -339,6 +413,7 @@ export function SiteEditor({
                             pages,
                             styleOptions,
                         }}
+                        blockTools={blockTools}
                         // A typeface being tried draws on the page unsaved.
                         style={siteStyle.trying ?? style}
                         trying={triedFace(siteStyle.trying, styleOptions)}
@@ -390,10 +465,10 @@ export function SiteEditor({
             />
 
             {/*
-             * The pre-publish check (below) is rendered inside the editor
-             * rather than on its own route so nothing is torn down and rebuilt
-             * behind it — the merchant goes back to exactly the editing state
-             * they left, including unsaved selection and scroll.
+             * Publish (below) is a sheet over the editor rather than its own
+             * route, so nothing is torn down and rebuilt behind it: the
+             * merchant goes back to exactly the editing state they left
+             * (DEC-185).
              */}
             {/*
              * Choosing a look before the block goes in (#267). Keyed on the
@@ -416,35 +491,42 @@ export function SiteEditor({
                 packsOpen={packsOpen}
             />
 
-            {publish.checking ? (
-                <PrePublishCheck
-                    siteName={chrome.displayName}
-                    pages={pages}
-                    flags={publish.siteFlags.flags}
-                    awaitingNavigation={publish.siteFlags.awaitingNavigation}
-                    publishing={publish.publishing}
-                    unsaved={unsaved}
-                    neverPublished={publish.neverPublished}
-                    pendingSummary={publish.pendingSummary}
-                    pendingKnown={publish.pendingKnown}
-                    review={review.review}
-                    needsApproval={publish.needsApproval}
-                    canOverride={publish.canOverride}
-                    // KTD-14: a scheduled go-live won't run over this.
-                    scheduledWarning={
-                        releases.scheduledRelease
-                            ? publishOverScheduleWarning(
-                                  releases.scheduledRelease,
-                                  releases.zone,
-                              )
-                            : null
-                    }
-                    wentLive={publish.wentLive}
-                    onPublish={() => void publish.onPublish(chrome.displayName)}
-                    onClose={publish.closeCheck}
-                    onJump={jumpToFlag}
-                />
-            ) : null}
+            <PublishSheet
+                open={publish.checking}
+                phone={layout === "phone"}
+                pages={pages}
+                flags={publish.siteFlags.flags}
+                awaitingNavigation={publish.siteFlags.awaitingNavigation}
+                publishing={publish.publishing}
+                unsaved={unsaved}
+                neverPublished={publish.neverPublished}
+                pendingSummary={publish.pendingSummary}
+                pendingKnown={publish.pendingKnown}
+                pendingChanges={publish.pendingChanges}
+                pendingSiteChanges={publish.pendingSiteChanges}
+                review={review.review}
+                needsApproval={publish.needsApproval}
+                canOverride={publish.canOverride}
+                // KTD-14: a scheduled go-live won't run over this.
+                scheduledWarning={
+                    releases.scheduledRelease
+                        ? publishOverScheduleWarning(
+                              releases.scheduledRelease,
+                              releases.zone,
+                          )
+                        : null
+                }
+                wentLive={publish.wentLive}
+                error={publish.publishError}
+                addressFix={webAddressFix}
+                onAddressSaved={(host) => {
+                    publish.setSiteAddress(host);
+                    void publish.refreshFlags();
+                }}
+                onPublish={() => void publish.onPublish(chrome.displayName)}
+                onClose={publish.closeCheck}
+                onJump={jumpToFlag}
+            />
             {leaveGuard.dialog}
         </div>
     );

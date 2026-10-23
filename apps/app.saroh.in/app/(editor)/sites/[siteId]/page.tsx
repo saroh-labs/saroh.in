@@ -177,6 +177,17 @@ export default async function SiteEditorPage({
             publishNeedsApproval={site.publishNeedsApproval === true}
             canOverride={site.canOverride === true}
             livePublishedAt={site.currentPublication?.publishedAt ?? null}
+            // The address the Publish sheet offers when the site has none
+            // (DEC-185); only the owner, with changing on, may choose it.
+            webAddressFix={
+                webAddress
+                    ? {
+                          address: webAddress.address,
+                          platformOrigin: webAddress.platformOrigin,
+                          canChange: webAddress.canChange === true,
+                      }
+                    : null
+            }
         />
     );
 }

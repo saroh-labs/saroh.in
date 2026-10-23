@@ -71,25 +71,13 @@ async function siteId(page: Page): Promise<string> {
 /** The editor at a phone's width (G4), where the bar folds into a menu. */
 const onPhone = (page: Page) => (page.viewportSize()?.width ?? 1440) < 760;
 
-/**
- * The editor's Publish. On a phone it is in the "Status, view and publish"
- * menu, opened here if it isn't already.
- */
+/** The editor's Publish: on the bar, a phone's too (DEC-185). */
 async function publishButton(page: Page) {
-    const publish = page.getByRole("button", { name: /^Publish/ }).first();
-    if (onPhone(page)) {
-        // Pressed until it opens: a press before hydration (just after a
-        // load or a reload) does nothing.
-        await expect(async () => {
-            if (!(await publish.isVisible())) {
-                await page
-                    .getByRole("button", { name: "Status, view and publish" })
-                    .click();
-            }
-            await expect(publish).toBeVisible({ timeout: 2_000 });
-        }).toPass({ timeout: 30_000 });
-    }
-    await expect(publish).toBeVisible();
+    const publish = page
+        .getByRole("button", { name: /^Publish/ })
+        .filter({ visible: true })
+        .first();
+    await expect(publish).toBeVisible({ timeout: 30_000 });
     return publish;
 }
 
@@ -106,17 +94,17 @@ async function inspectorToggle(page: Page) {
         .first();
     if (onPhone(page) && !(await toggle.isVisible())) {
         await page
-            .getByRole("navigation", { name: "Edit this page" })
-            .getByRole("button", { name: "Page" })
+            .getByRole("toolbar", { name: "Edit page" })
+            .getByRole("button", { name: "Blocks" })
             .click();
-        // The rail lists every block, hidden or not: the header, then the
+        // The list has every block, hidden or not: the header, then the
         // page's own blocks.
         await page
             .getByRole("dialog")
             .getByRole("listitem")
             .nth(1)
             .getByRole("button")
-            .last()
+            .first()
             .click();
     }
     await expect(toggle).toBeVisible({ timeout: 30_000 });
@@ -133,8 +121,8 @@ async function closeOverlays(page: Page) {
 }
 
 /**
- * Publish from the editor, through the pre-publish check, and wait until it
- * has happened. Returns what the success toast said.
+ * Publish from the editor, through the Publish sheet, and wait until it
+ * has happened. Returns what the sheet's result said.
  *
  * Waited for, not counted: the check opens a beat after the click, so the
  * `if (await confirm.count())` this replaces read 0, skipped the publish, and
@@ -154,12 +142,14 @@ async function publishFromEditor(page: Page): Promise<string> {
         await expect(confirm).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 30_000 });
     await confirm.click();
-    const live = page
-        .getByText(/ is live/)
-        .locator("visible=true")
-        .first();
-    await expect(live).toBeVisible({ timeout: 30_000 });
-    return live.innerText();
+    // The Publish sheet turns into its result (DEC-185): the site is live,
+    // and what was recorded, if anything.
+    const live = page.locator("[data-publish-sheet] [role=status]");
+    await expect(live).toContainText(" is live", { timeout: 30_000 });
+    const said = await live.innerText();
+    await page.getByRole("button", { name: "Done" }).click();
+    await expect(page.locator("[data-publish-sheet]")).toHaveCount(0);
+    return said;
 }
 
 test.describe("publishing past a change request", { tag: "@serial" }, () => {
@@ -314,25 +304,11 @@ test.describe(
              * this file can leave a change request open, and a review outranks
              * "Not published" in the pill. The title always says what goes live.
              */
-            // Publish's title, opening the phone's menu to read it and
-            // putting it away again.
+            // Publish's title: on the bar on a phone too (DEC-185).
             const publishTitle = async () => {
                 const publish = await publishButton(page);
                 // Its hint is its description (`Tip`), not a `title`.
-                const title = await publish.getAttribute("aria-description");
-                if (onPhone(page)) {
-                    await page.keyboard.press("Escape");
-                    /*
-                     * Until the menu is gone. Read while it was still closing,
-                     * the next poll saw Publish visible, skipped opening the
-                     * menu, and asked for the title of a button that then left
-                     * the page: the read waited out the whole poll, which
-                     * reported the "Saving" it had read a moment after the
-                     * toggle (the phone's failure in CI after #687).
-                     */
-                    await expect(publish).toBeHidden();
-                }
-                return title;
+                return publish.getAttribute("aria-description");
             };
             const NOTHING = "Nothing has changed since the last publish";
 

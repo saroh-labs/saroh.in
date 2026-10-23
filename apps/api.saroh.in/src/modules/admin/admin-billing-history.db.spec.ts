@@ -491,7 +491,9 @@ describe("Admin › Billing › a subscription's history", () => {
         for (const show of ["everything", "provider", "saroh"]) {
             const { text } = await history(subs.a, `?show=${show}`);
             expect(text).not.toContain(SECRET);
-            expect(text).not.toContain("4242");
+            // The card's field, not its digits: "4242" is also a process id
+            // the ids above are built from (CI ran as pid 4242, 23 Oct).
+            expect(text).not.toContain("last4");
             expect(text).not.toContain("payload");
         }
         for (const p of [1, 2]) {

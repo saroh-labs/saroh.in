@@ -22,6 +22,7 @@ import type { StyleChoiceRules } from "@/lib/sites/style-access";
 import { Tip } from "@saroh/ui/tooltip";
 import { EditorTabs, railRowState } from "./editor-chrome";
 import { SECTION_LABELS, sectionTitle } from "./editor-constants";
+import { PhoneBlocks } from "./phone-blocks";
 
 export type RailTab = "page" | "add" | "brand";
 
@@ -68,7 +69,10 @@ export function EditorRail({
     packsOpen = false,
     looks,
     styleRules,
+    onPicked,
 }: {
+    /** A block was chosen from a phone's list: the page scrolls to it. */
+    onPicked?: (index: number) => void;
     /** The Brand tab's Look row (DEC-172, U16); absent draws none. */
     looks?: LookChoices;
     /** Which looks, typefaces and colourways are paid (DEC-177). */
@@ -84,9 +88,9 @@ export function EditorRail({
     /** Draw a style on the page unsaved (a typeface tried); null ends it. */
     tryStyle?: (next: SiteStyle | null) => void;
     /**
-     * In the phone's sheet: the bar at the foot carries Page · Add ·
-     * Brand, so the rail draws no tabs of its own, and the Brand tab's
-     * pickers open inside the sheet (DEC-184).
+     * In a phone's sheet (DEC-185): the pill opens Blocks, + or Brand, so
+     * the rail draws no tabs of its own; the blocks are a phone's list and
+     * Brand is its four tabs.
      */
     phone?: boolean;
     styleOptions: SiteStyleOptions;
@@ -149,12 +153,13 @@ export function EditorRail({
                     rules={styleRules}
                     onTry={tryStyle}
                     heroInText={heroDrawsInText(sections, style.look)}
-                    inline={phone}
+                    phoneTabs={phone}
                 />
             ) : (
                 <>
                     {adding ? (
                         <AddBlockPanel
+                            search={phone}
                             shopOpen={shopOpen}
                             packsOpen={packsOpen}
                             onBrowse={() => setBrowsing(true)}
@@ -162,6 +167,20 @@ export function EditorRail({
                                 if (looks > 1) setLookFor(type);
                                 else addSection(type);
                             }}
+                        />
+                    ) : phone ? (
+                        <PhoneBlocks
+                            sections={sections}
+                            selectedIndex={selectedIndex}
+                            selectedChrome={selectedChrome}
+                            onSelect={(index) => {
+                                setSelectedIndex(index);
+                                onPicked?.(index);
+                            }}
+                            onSelectChrome={selectChrome}
+                            moveTo={moveTo}
+                            flagsBySection={flagsBySection}
+                            notedKeys={notedKeys}
                         />
                     ) : (
                         <>

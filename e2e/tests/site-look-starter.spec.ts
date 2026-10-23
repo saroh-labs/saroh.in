@@ -2,6 +2,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { lookGallery, openFromPill } from "../fixtures/phone-editor";
 import { useSession } from "../fixtures/sessions";
 import { setNorthwindLook } from "../fixtures/site-look";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
@@ -55,16 +56,11 @@ interface Flags {
     flags: { type: string; message: string }[];
 }
 
-/** Website › Style: the rail's Brand tab on a desk, its bar on a phone. */
+/** Website › Style: the rail's Brand tab on a desk, its pill on a phone. */
 async function openBrand(page: Page, phone: boolean) {
     if (phone) {
-        const brand = page
-            .getByRole("navigation", { name: "Edit this page" })
-            .getByRole("button", { name: "Brand" });
-        await expect(brand).toBeVisible({ timeout: 30_000 });
-        if ((await brand.getAttribute("aria-pressed")) !== "true") {
-            await brand.click();
-        }
+        // The pill's Brand, in its sheet (DEC-185).
+        await openFromPill(page, "Brand");
         return;
     }
     const brand = page.getByRole("tab", { name: "Brand" });
@@ -136,10 +132,10 @@ test.describe("a look's starter content", { tag: "@serial" }, () => {
             await openBrand(page, phone);
 
             // Live's Preview is on its card in the gallery behind Change
-            // (DEC-184).
-            await page.locator("[data-look-change]").click();
-            await page
-                .getByRole("dialog", { name: "Change look" })
+            // (DEC-184), the Look tab itself on a phone (DEC-185).
+            await (
+                await lookGallery(page, phone)
+            )
                 .getByRole("button", { name: "Preview Live" })
                 .click();
             const preview = page.getByRole("dialog", { name: "Live" });
@@ -249,10 +245,10 @@ test.describe("a look's starter content", { tag: "@serial" }, () => {
             await openBrand(page, phone);
 
             // Live's Preview is on its card in the gallery behind Change
-            // (DEC-184).
-            await page.locator("[data-look-change]").click();
-            await page
-                .getByRole("dialog", { name: "Change look" })
+            // (DEC-184), the Look tab itself on a phone (DEC-185).
+            await (
+                await lookGallery(page, phone)
+            )
                 .getByRole("button", { name: "Preview Live" })
                 .click();
             const preview = page.getByRole("dialog", { name: "Live" });
