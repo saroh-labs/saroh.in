@@ -30,7 +30,6 @@ export function EditorSheet({
     title,
     closeLabel,
     returnFocus,
-    heading,
     actions,
     modal = true,
     className,
@@ -47,8 +46,6 @@ export function EditorSheet({
     closeLabel: string;
     /** Where focus goes when it closes: the thing it was about. */
     returnFocus?: () => HTMLElement | null;
-    /** A bottom sheet's head, when it says more than its title. */
-    heading?: ReactNode;
     /** Beside a bottom sheet's close: "Saved", a ⋯ menu. */
     actions?: ReactNode;
     /** False: no scrim, and the page stays in reach (a block's settings). */
@@ -174,7 +171,7 @@ export function EditorSheet({
                             </button>
                             <div className="flex items-center gap-1 pb-1 pl-4 pr-1.5">
                                 <Dialog.Title className="min-w-0 flex-1 truncate text-base font-semibold">
-                                    {heading ?? title}
+                                    {title}
                                 </Dialog.Title>
                                 {actions}
                                 {close}
