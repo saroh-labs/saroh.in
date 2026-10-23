@@ -304,25 +304,11 @@ test.describe(
              * this file can leave a change request open, and a review outranks
              * "Not published" in the pill. The title always says what goes live.
              */
-            // Publish's title, opening the phone's menu to read it and
-            // putting it away again.
+            // Publish's title: on the bar on a phone too (DEC-185).
             const publishTitle = async () => {
                 const publish = await publishButton(page);
                 // Its hint is its description (`Tip`), not a `title`.
-                const title = await publish.getAttribute("aria-description");
-                if (onPhone(page)) {
-                    await page.keyboard.press("Escape");
-                    /*
-                     * Until the menu is gone. Read while it was still closing,
-                     * the next poll saw Publish visible, skipped opening the
-                     * menu, and asked for the title of a button that then left
-                     * the page: the read waited out the whole poll, which
-                     * reported the "Saving" it had read a moment after the
-                     * toggle (the phone's failure in CI after #687).
-                     */
-                    await expect(publish).toBeHidden();
-                }
-                return title;
+                return publish.getAttribute("aria-description");
             };
             const NOTHING = "Nothing has changed since the last publish";
 

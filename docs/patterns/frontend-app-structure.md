@@ -146,6 +146,19 @@ components/shared/             app shell, navigation, command menu
   the API draws (a print PDF) comes through the app's own route
   (`app/api/qr-codes/…/print`, as an invoice's PDF does), so the session
   stays server-side.
+- **Current** — **In the site editor, choosing is a popover, committing is a
+  sheet** (DEC-185, 23 Oct 2026). Picking a look, a typeface or a colour on
+  a desk opens a popover beside its row (`looks/brand-picker.tsx`); what
+  commits or edits — Publish, Add a block, a block's settings, the page
+  list — is a sheet (`editor/editor-sheet.tsx`, `publish/publish-sheet.tsx`):
+  from the right on a desk, from the foot on a phone, opening at half
+  height with close at the top right. The same button always opens the
+  same surface, whatever the list's length. On a phone there are no bottom
+  tabs: one floating pill (`editor/edit-pill.tsx`, Blocks · + · Brand)
+  hides while a sheet is open, ⋯ More (`editor/more-sheet.tsx`) holds the
+  rest of the desk's bar, and a block's settings sheet has no scrim so its
+  toolbar (`editor/block-toolbar.tsx`) stays in reach. The Brand sheet's
+  pickers draw in place (`BrandInline`).
 - **Current** — **The editor's page menu offers what the API lists** (round-2
   G16): `components/sites/pages/pages-panel.tsx` (the list), `page-settings.tsx`
   (the open page's title, address, In the menu, On the site, Delete) and
