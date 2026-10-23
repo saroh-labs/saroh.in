@@ -89,6 +89,8 @@ const next = (sheet: Locator) =>
 /** More on a booking's page: "…" on a phone, a button at a desk. */
 const more = (page: Page) =>
     page
+        // In main: the phone's tab bar has a "More" of its own.
+        .getByRole("main")
         .getByRole("button", { name: "More", exact: true })
         .filter({ visible: true })
         .first();
