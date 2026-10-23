@@ -1,4 +1,5 @@
 import type { EditorSheet } from "@/components/sites/editor/use-editor-layout";
+import type { WebAddressFix } from "@/components/sites/publish/address-fix";
 import type { SiteChangeKind } from "@/lib/sites/pending";
 import type {
     ModulePageKind,
@@ -116,4 +117,9 @@ export interface SiteEditorProps {
     reloadDraft?: (pageId?: string, sheet?: EditorSheet) => void;
     /** The sheet open when the editor was last started afresh. */
     initialSheet?: EditorSheet;
+    /**
+     * The web address, for the Publish sheet to choose in place when the
+     * site has none (DEC-185). Null when it can't be read.
+     */
+    webAddressFix?: WebAddressFix | null;
 }

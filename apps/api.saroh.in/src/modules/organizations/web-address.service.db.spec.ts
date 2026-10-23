@@ -460,6 +460,20 @@ describe("changing the web address (DEC-069, L2)", () => {
         expect((await holds(b.id)).map((r) => r.address)).toEqual([slug]);
     });
 
+    it("gives a site with no address its setup address, holding nothing", async () => {
+        const slug = fresh("rye");
+        const b = await business(slug, { siteAt: null, draft: true });
+
+        await service.change(b.owner, slug);
+
+        const site = await prisma.site.findUnique({
+            where: { id: b.siteId! },
+            select: { subdomain: true },
+        });
+        expect(site?.subdomain).toBe(slug);
+        expect(await holds(b.id)).toEqual([]);
+    });
+
     it("uses a verified custom domain as the origin, and forwards there", async () => {
         const rye = fresh("rye");
         const b = await business(rye);

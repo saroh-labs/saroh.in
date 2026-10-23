@@ -1,7 +1,7 @@
 "use client";
 
+import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode, RefObject } from "react";
-import { useState } from "react";
 
 import { queryCanvas } from "@/components/sites/canvas/device-frame";
 import type { EditorViewport } from "@/components/sites/canvas/use-editor-viewport";
@@ -9,16 +9,15 @@ import {
     editorColumns,
     narrowColumns,
 } from "@/components/sites/canvas/use-editor-viewport";
-import {
-    railTabFor,
-    selectRailTab,
-} from "@/components/sites/editor/editor-rail";
+import { EditPill } from "@/components/sites/editor/edit-pill";
+import type { RailTab } from "@/components/sites/editor/editor-rail";
+import { selectRailTab } from "@/components/sites/editor/editor-rail";
 import { EditorSheet } from "@/components/sites/editor/editor-sheet";
-import { RailBottomBar } from "@/components/sites/editor/rail-bottom-bar";
 import type {
     EditorLayout,
     EditorSheets,
 } from "@/components/sites/editor/use-editor-layout";
+import { useLayoutKnown } from "@/components/sites/editor/use-editor-layout";
 import type { EditorSelection } from "@/components/sites/editor/use-editor-selection";
 import {
     PANEL_DEFAULT,
@@ -34,8 +33,9 @@ import { PanelDivider } from "./editor-chrome";
  * Where the rail, the page and the inspector go (G4). On a desk they are three
  * columns with a drag handle between each (#340). Narrow, the inspector leaves
  * its column and opens over the page as a sheet when something is chosen. On
- * a phone the page fills the width, and the rail opens as a sheet from a bar
- * at the foot of the screen.
+ * a phone the page fills the screen under one floating pill, Blocks · + ·
+ * Brand, each opening its sheet from the foot (DEC-185), and a block's
+ * settings rise in a sheet with no scrim, its toolbar still in reach.
  *
  * Preview (G5) puts the rail, the handles and the inspector away, kept
  * mounted where they are mounted, and the page takes the whole width.
@@ -45,28 +45,41 @@ export function EditorPanels({
     viewport,
     sheets,
     selection,
-    adding,
     setAdding,
     dialogOpen,
     hasSubject,
-    openNotes,
     rail,
     canvas,
     inspector,
+    inspectorTitle,
+    pageTitle,
+    overlayOpen = false,
+    brandActions,
+    body,
+    setBody,
     releases,
 }: {
     layout: EditorLayout;
     viewport: EditorViewport;
     sheets: EditorSheets;
     selection: EditorSelection;
-    adding: boolean;
     setAdding: (adding: boolean) => void;
     /** A dialog over the editor (choosing a look) stands in for the rail. */
     dialogOpen: boolean;
     /** A block, the header or the footer is selected. */
     hasSubject: boolean;
-    openNotes: number;
     rail: ReactNode;
+    /** A phone's settings sheet names what it is about: "Product grid". */
+    inspectorTitle: string;
+    /** The open page's title: "Blocks on Home". */
+    pageTitle: string;
+    /** The Brand sheet's head: Saved, and ⋯ with Reset style. */
+    brandActions?: ReactNode;
+    /** Something else is over the page (Publish): the pill stays away. */
+    overlayOpen?: boolean;
+    /** The editor's body, below the top bar, where sheets are laid. */
+    body: HTMLDivElement | null;
+    setBody: (el: HTMLDivElement | null) => void;
     canvas: ReactNode;
     inspector: ReactNode;
     /**
@@ -76,14 +89,21 @@ export function EditorPanels({
      */
     releases?: { open: boolean; onClose: () => void; content: ReactNode };
 }) {
-    // The sheets are drawn inside the body, below the top bar (the design).
-    const [body, setBody] = useState<HTMLDivElement | null>(null);
     const { previewing, railWidth, panelWidth } = viewport;
     const { sheet, setSheet } = sheets;
     const wide = layout === "wide";
     const phone = layout === "phone";
+    const known = useLayoutKnown();
     const tools = previewing ? { hidden: true } : { className: "contents" };
-    const railTab = railTabFor(selection.rail, adding);
+    /** Open the rail on one of its tabs, in its phone sheet. */
+    const openRail = (tab: RailTab) => {
+        selectRailTab(tab, selection.setRail, setAdding);
+        setSheet(tab === "page" ? "blocks" : tab);
+    };
+    const closeRail = () => {
+        setSheet(null);
+        setAdding(false);
+    };
 
     const columns = previewing
         ? "1fr"
@@ -98,8 +118,13 @@ export function EditorPanels({
         <>
             <div
                 ref={setBody}
-                data-layout={layout}
-                className="relative grid min-h-0 flex-1 grid-cols-[var(--editor-cols)]"
+                // The server can't know the window: nothing is drawn, nor
+                // named, until hydration has (useLayoutKnown).
+                data-layout={known ? layout : undefined}
+                className={cn(
+                    "relative grid min-h-0 flex-1 grid-cols-[var(--editor-cols)]",
+                    !known && "invisible",
+                )}
                 style={{ "--editor-cols": columns } as React.CSSProperties}
             >
                 {phone ? null : (
@@ -118,6 +143,20 @@ export function EditorPanels({
                 )}
 
                 {canvas}
+
+                {phone && !previewing ? (
+                    <EditPill
+                        hidden={
+                            sheet !== null ||
+                            dialogOpen ||
+                            overlayOpen ||
+                            releases?.open === true
+                        }
+                        onBlocks={() => openRail("page")}
+                        onAdd={() => openRail("add")}
+                        onBrand={() => openRail("brand")}
+                    />
+                ) : null}
 
                 {wide ? (
                     <div {...tools}>
@@ -145,8 +184,11 @@ export function EditorPanels({
                     onClose={() => setSheet(null)}
                     container={body}
                     side={phone ? "bottom" : "right"}
-                    title="Inspector"
+                    title={phone ? inspectorTitle : "Inspector"}
                     closeLabel="Close the block panel"
+                    // A phone keeps the page, and the block's toolbar, in
+                    // reach above the settings (DEC-185).
+                    modal={!phone}
                     returnFocus={() =>
                         subjectOnCanvas(viewport.canvasRef, selection)
                     }
@@ -156,38 +198,34 @@ export function EditorPanels({
             )}
 
             {phone && !previewing ? (
-                <>
-                    <EditorSheet
-                        open={sheet === "rail" && !dialogOpen}
-                        onClose={() => setSheet(null)}
-                        container={body}
-                        side="bottom"
-                        title="Blocks, adding and brand"
-                        closeLabel="Close the block list"
-                        className="h-[75%]"
-                    >
-                        {rail}
-                    </EditorSheet>
-                    <RailBottomBar
-                        tab={railTab}
-                        open={sheet === "rail"}
-                        feedbackOpen={
-                            sheet === "inspector" &&
-                            selection.inspector === "feedback"
-                        }
-                        openNotes={openNotes}
-                        onTab={(next) => {
-                            // The open tab again puts the sheet away.
-                            if (sheet === "rail" && next === railTab) {
-                                setSheet(null);
-                                return;
-                            }
-                            selectRailTab(next, selection.setRail, setAdding);
-                            setSheet("rail");
-                        }}
-                        onFeedback={() => selection.setInspector("feedback")}
-                    />
-                </>
+                <EditorSheet
+                    open={
+                        (sheet === "blocks" ||
+                            sheet === "add" ||
+                            sheet === "brand") &&
+                        !dialogOpen
+                    }
+                    onClose={closeRail}
+                    container={body}
+                    side="bottom"
+                    title={
+                        sheet === "add"
+                            ? "Add a block"
+                            : sheet === "brand"
+                              ? "Brand"
+                              : `Blocks on ${pageTitle}`
+                    }
+                    actions={sheet === "brand" ? brandActions : undefined}
+                    closeLabel={
+                        sheet === "add"
+                            ? "Close Add a block"
+                            : sheet === "brand"
+                              ? "Close Brand"
+                              : "Close the block list"
+                    }
+                >
+                    {rail}
+                </EditorSheet>
             ) : null}
 
             {releases ? (
@@ -200,7 +238,7 @@ export function EditorPanels({
                     closeLabel="Close test releases"
                     // Wider than the inspector: a release carries its links
                     // and five actions.
-                    className={phone ? "h-[85%]" : "w-[400px] max-w-[92%]"}
+                    className={phone ? undefined : "w-[400px] max-w-[92%]"}
                 >
                     {releases.content}
                 </EditorSheet>

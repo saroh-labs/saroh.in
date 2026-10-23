@@ -11,8 +11,8 @@ import type { EditorSelection } from "@/components/sites/editor/use-editor-selec
  *   hold their width here: at 924px the canvas was left with 344px, so the
  *   Desktop frame drew narrower than the Phone one (Saroh Site Editor.dc.html).
  * - `phone`, below 760px, where the workspace's tab bar starts too: the page
- *   fills the screen, the rail's tabs sit in a bar at the foot, and the top
- *   bar folds Publish, the status and the view into one menu.
+ *   fills the screen under one floating pill (Blocks · + · Brand), and the
+ *   top bar keeps the page, the status, ⋯ More and Publish (DEC-185).
  */
 export type EditorLayout = "wide" | "narrow" | "phone";
 
@@ -48,8 +48,37 @@ export function useEditorLayout(): EditorLayout {
     return useSyncExternalStore(subscribe, layoutNow, () => "wide");
 }
 
-/** Which overlay is open over the page when the layout is not wide. */
-export type EditorSheet = "inspector" | "rail" | null;
+const never = () => () => undefined;
+
+/**
+ * False in the server's markup and until hydration, true after. Until then
+ * the layout above is the server's guess (`wide`), so a phone would show
+ * the desk's columns, the inspector among them, and taps on them would do
+ * nothing; the editor's body is held back until the window is known.
+ */
+export function useLayoutKnown(): boolean {
+    return useSyncExternalStore(
+        never,
+        () => true,
+        () => false,
+    );
+}
+
+/**
+ * Which overlay is open over the page when the layout is not wide: the
+ * inspector (narrow or phone), or one of a phone's own (DEC-185).
+ */
+export type EditorSheet =
+    "inspector" | "blocks" | "add" | "pages" | "brand" | "more" | null;
+
+/** The sheets only a phone has. */
+const PHONE_ONLY: readonly EditorSheet[] = [
+    "blocks",
+    "add",
+    "pages",
+    "brand",
+    "more",
+];
 
 /**
  * The inspector and rail sheets (G4), and the selection that opens them.
@@ -62,9 +91,9 @@ export type EditorSheet = "inspector" | "rail" | null;
  * sheet closes, so turning a phone on its side keeps what was chosen.
  *
  * Nothing opens on its own: a selection remembered from last time stays on
- * the page, outlined, until the merchant chooses again. Only a phone's rail
- * sheet, open when the editor was started afresh (`initial`, DEC-182), is
- * open again on the fresh one.
+ * the page, outlined, until the merchant chooses again. Only a phone's own
+ * sheet (its Brand), open when the editor was started afresh (`initial`,
+ * DEC-182), is open again on the fresh one.
  */
 export function useEditorSheets(
     selection: EditorSelection,
@@ -74,12 +103,12 @@ export function useEditorSheets(
     initial: EditorSheet = null,
 ) {
     const [sheet, setSheet] = useState<EditorSheet>(
-        initial === "rail" && layout === "phone" ? "rail" : null,
+        PHONE_ONLY.includes(initial) && layout === "phone" ? initial : null,
     );
 
     /*
-     * Crossing a breakpoint: wide has no sheets, and the rail's sheet only
-     * exists on a phone. The inspector's stays open across narrow and phone,
+     * Crossing a breakpoint: wide has no sheets, and a phone's own sheets
+     * only exist on a phone. The inspector's stays open across narrow and phone,
      * so rotating mid-edit keeps the fields in hand. Adjusted while rendering,
      * from what the last render saw, rather than in an effect.
      */
@@ -89,7 +118,7 @@ export function useEditorSheets(
         if (
             previewing ||
             layout === "wide" ||
-            (sheet === "rail" && layout !== "phone")
+            (PHONE_ONLY.includes(sheet) && layout !== "phone")
         ) {
             setSheet(null);
         }

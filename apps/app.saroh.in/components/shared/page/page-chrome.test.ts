@@ -177,10 +177,6 @@ describe("a page's title is the page header's", () => {
     const ALLOWED = new Set([
         // The post as its readers see it: the article's own title.
         "components/sites/posts/post-read-view.tsx",
-        // A full-screen review over the editor, with its own bar.
-        "components/sites/publish/pre-publish-check.tsx",
-        // That review's finished state, in the same bar.
-        "components/sites/publish/went-live.tsx",
         // Setup, outside the workspace: each step's question is the
         // split screen's title, as `app/onboarding/page.tsx` drew it.
         "components/organizations/setup/setup-step-frame.tsx",

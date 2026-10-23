@@ -57,6 +57,7 @@ export function PagesPanel({
     addableKinds,
     flags,
     onClose,
+    phone = false,
 }: {
     siteId: string;
     pages: SitePage[];
@@ -77,6 +78,8 @@ export function PagesPanel({
     flags: readonly Flag[];
     /** Close the menu (after a switch, or once a page is added). */
     onClose: () => void;
+    /** In a phone's Pages sheet (DEC-185): each page with its address. */
+    phone?: boolean;
 }) {
     const router = useRouter();
     const [open, setOpen] = useState<Open>("pages");
@@ -169,13 +172,14 @@ export function PagesPanel({
                             onClick={() => openPage(page.id)}
                             className={cn(
                                 MENU_ROW,
-                                "h-[34px]",
+                                phone ? "min-h-11 py-1.5" : "h-[34px]",
                                 current && "bg-secondary font-semibold",
                             )}
                         >
                             <span
                                 className={cn(
                                     "min-w-0 flex-1 truncate",
+                                    phone && "grid",
                                     /*
                                      * Dimmed and struck through, the same
                                      * as a hidden block in the block list:
@@ -187,6 +191,11 @@ export function PagesPanel({
                                 )}
                             >
                                 {page.title}
+                                {phone ? (
+                                    <span className="font-mono text-xs font-normal text-muted-foreground">
+                                        {page.path}
+                                    </span>
+                                ) : null}
                             </span>
                             {marks.unseen ? (
                                 <span className="shrink-0 text-[0.6875rem] font-medium text-foreground">

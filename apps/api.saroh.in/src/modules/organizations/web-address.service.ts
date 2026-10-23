@@ -248,7 +248,9 @@ export class WebAddressService {
         });
         const site = await businessSite(tx, organizationId);
         const from = site?.subdomain ?? org.slug;
-        if (from === address) return;
+        // A site with no address yet takes the setup one it was shown
+        // (the editor's Publish sheet, DEC-185): that is not a no-op.
+        if (from === address && (!site || site.subdomain === address)) return;
 
         await releaseExpired(tx, address);
         if (await this.takenFor(tx, address, organizationId, site)) {

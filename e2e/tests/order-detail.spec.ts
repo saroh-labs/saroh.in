@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 
 import type { Fulfilment } from "../fixtures/own-data";
 import { ADDRESS, makeOrder } from "../fixtures/own-data";
+import { pressUntil } from "../fixtures/press";
 import { useSession } from "../fixtures/sessions";
 import {
     demoUser,
@@ -407,10 +408,12 @@ test.describe("shipping on order detail", () => {
         await expect(
             page.getByRole("button", { name: "Print packing slip" }),
         ).toBeVisible();
-        await page
-            .getByRole("button", { name: "Hand to courier", exact: true })
-            .click();
         const panel = page.getByRole("dialog", { name: "Hand to courier" });
+        // The first press after a load may land before hydration.
+        await pressUntil(
+            page.getByRole("button", { name: "Hand to courier", exact: true }),
+            panel,
+        );
         await expect(panel.getByText(/^To 14 Lake View Road/)).toBeVisible();
         await panel.getByRole("radio", { name: "Blue Dart" }).click();
         await panel.getByLabel("Tracking number").fill("BD 9920 1140");
@@ -438,12 +441,14 @@ test.describe("shipping on order detail", () => {
         const id = await readyOrder(page, "SHIPPING");
         await page.goto(`/commerce/orders/${id}`);
 
-        await page
-            .getByRole("button", { name: "Hand to courier", exact: true })
-            .click();
         const handover = page.getByRole("dialog", {
             name: "Hand to courier",
         });
+        // The first press after a load may land before hydration.
+        await pressUntil(
+            page.getByRole("button", { name: "Hand to courier", exact: true }),
+            handover,
+        );
         await handover
             .getByRole("button", { name: "Mark handed over" })
             .click();
@@ -483,10 +488,12 @@ test.describe("shipping on order detail", () => {
         const id = await readyOrder(page, "SHIPPING");
         await page.goto(`/commerce/orders/${id}`);
 
-        await page
-            .getByRole("button", { name: "Hand to courier", exact: true })
-            .click();
         const panel = page.getByRole("dialog", { name: "Hand to courier" });
+        // The first press after a load may land before hydration.
+        await pressUntil(
+            page.getByRole("button", { name: "Hand to courier", exact: true }),
+            panel,
+        );
         await panel.getByRole("radio", { name: "Other" }).click();
         const name = panel.getByLabel("Courier's name");
         await expect(name).toBeFocused();

@@ -83,10 +83,10 @@ describe("SiteEditorHost", () => {
     it("starts the fresh editor with the sheet that was open (a phone's Brand)", () => {
         act(() => root.render(<SiteEditorHost {...props("Ours")} />));
         expect(editor.sheet).toBeNull();
-        act(() => editor.reload?.(undefined, "rail"));
+        act(() => editor.reload?.(undefined, "brand"));
         act(() => root.render(<SiteEditorHost {...props("Sample")} />));
         expect(editor.mounts).toBe(2);
-        expect(editor.sheet).toBe("rail");
+        expect(editor.sheet).toBe("brand");
     });
 
     it("leaves the editor alone when new props arrive unasked", () => {

@@ -220,12 +220,16 @@ export const RAW_ALLOWED = {
     "components/sites/editor/editor-rail.tsx": ["button"],
     // button: a Brand tab colour row, one line that opens its swatches (DEC-184)
     "components/sites/looks/colour-picker.tsx": ["button"],
-    // button: the phone's Typeface row in the Brand sheet, one line (DEC-184)
-    "components/sites/looks/typeface-picker.tsx": ["button"],
     // button: a row or card that is one button, a row that opens
     "components/sites/editor/editor-top-bar.tsx": ["button"],
-    // button: a tab of the editor's bottom bar
-    "components/sites/editor/rail-bottom-bar.tsx": ["button"],
+    // button: a phone's floating pill, Blocks · + · Brand (DEC-185)
+    "components/sites/editor/edit-pill.tsx": ["button"],
+    // button: a bottom sheet's grip, pulled or pressed to make it taller
+    "components/sites/editor/editor-sheet.tsx": ["button"],
+    // button: a row of a phone's block list, one button, and its drag grip
+    "components/sites/editor/phone-blocks.tsx": ["button"],
+    // button: a row of a phone's ⋯ More sheet, one button (DEC-185)
+    "components/sites/editor/more-actions.tsx": ["button"],
     // button: the preview width toggles, a row or card that is one button
     "components/sites/editor/top-bar-actions.tsx": ["button"],
     // input: a file picker
@@ -234,8 +238,6 @@ export const RAW_ALLOWED = {
     "components/sites/pages/pages-panel.tsx": ["button"],
     // input: a field its screen draws itself
     "components/sites/posts/post-editor.tsx": ["input"],
-    // button: a row or card that is one button
-    "components/sites/publish/pre-publish-check.tsx": ["button"],
     // button: a colour swatch in the toolbar; input: a field its screen draws itself
     "components/sites/rich-text/rich-text-editor.tsx": ["button", "input"],
     // input: a slider

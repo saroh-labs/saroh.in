@@ -75,7 +75,11 @@ for a timer in the page (a ten-second hold, an Undo toast) install
 button pressed before React hydrates does nothing, and on CI a page's own
 content can hydrate well after the shell. It presses until `answer` (a
 Locator that shows, or a check such as `aria-pressed`) holds, and never
-presses again once it does (DEV_LEARNINGS, 19 Oct 2026).
+presses again once it does (DEV_LEARNINGS, 19 Oct 2026). A page's "More" is
+looked for inside `main`: the phone's tab bar has a "More" of its own, the
+only one showing while the page is a skeleton. After typing in a list's
+search, wait for the narrowed count ("1 of 9 plans", or "1 plan") before pressing a row:
+a row pressed as the list narrows moves under the press (23 Oct 2026).
 
 Never read the page once with `page.evaluate` and assert on the result: CI's
 runners are slower than this Mac, and a single look can land between two

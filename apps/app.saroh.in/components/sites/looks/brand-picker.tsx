@@ -3,30 +3,24 @@
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
-import { ChevronLeft, X } from "lucide-react";
+import { X } from "lucide-react";
 import type { ReactElement, ReactNode } from "react";
-import {
-    cloneElement,
-    createContext,
-    useContext,
-    useEffect,
-    useRef,
-} from "react";
-import { createPortal } from "react-dom";
+import { createContext, useContext } from "react";
 
 import { useNarrow } from "@/lib/hooks/use-narrow";
 
 /**
- * Where the Brand tab's pickers open on a phone: inside the rail's own
- * sheet, over the rail, never a second sheet (Brand tab, 22 Oct). Null on
- * a desk, where each opens as a popover beside its row.
+ * The phone's Brand sheet (DEC-185): its tabs show each set of options
+ * itself, so a picker draws its options in place, with no row to open it
+ * and no header of its own. False on a desk, where each opens as a
+ * popover beside its row.
  */
-export const PickerHost = createContext<HTMLElement | null>(null);
+export const BrandInline = createContext(false);
 
 /**
  * One of the Brand tab's pickers (look, typeface, a colour): opened from
- * its row's button, as a popover beside the rail on a desk, or pushed into
- * the phone's sheet with Back and its title. Escape closes it either way.
+ * its row's button as a popover beside the rail on a desk; in the phone's
+ * Brand sheet, its options drawn in place. Escape closes the popover.
  */
 export function BrandPicker({
     open,
@@ -39,73 +33,29 @@ export function BrandPicker({
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    /** Its name: the popover's label, the sheet's heading. */
+    /** Its name: the popover's label, the group's in the sheet. */
     title: string;
     /** The row's button that opens it. */
     trigger: ReactElement<{ onClick?: () => void }>;
-    /** A desk header, with its own Close; the sheet has Back instead. */
+    /** A desk header, with its own Close. */
     header?: ReactNode;
     className?: string;
     children: ReactNode;
 }) {
-    const host = useContext(PickerHost);
-    const opener = useRef<HTMLElement | null>(null);
+    const inline = useContext(BrandInline);
     // Beside the rail on a desk; under its row where there is no room beside.
     const narrow = useNarrow();
 
-    // In the sheet, the keyboard goes back to the row it came from.
-    useEffect(() => {
-        if (!host) return;
-        if (open) {
-            opener.current = document.activeElement as HTMLElement | null;
-            return;
-        }
-        if (opener.current?.isConnected) opener.current.focus();
-        opener.current = null;
-    }, [open, host]);
-
-    if (host) {
+    if (inline) {
         return (
-            <>
-                {cloneElement(trigger, { onClick: () => onOpenChange(true) })}
-                {open
-                    ? createPortal(
-                          <div
-                              role="dialog"
-                              aria-label={title}
-                              data-brand-picker=""
-                              onKeyDown={(e) => {
-                                  // Back, not the whole sheet.
-                                  if (e.key !== "Escape") return;
-                                  e.stopPropagation();
-                                  e.preventDefault();
-                                  onOpenChange(false);
-                              }}
-                              className="absolute inset-0 z-10 flex flex-col bg-background"
-                          >
-                              <div className="flex shrink-0 items-center px-2 py-1">
-                                  <Button
-                                      type="button"
-                                      variant="ghost"
-                                      autoFocus
-                                      className="h-11 gap-1 px-2"
-                                      onClick={() => onOpenChange(false)}
-                                  >
-                                      <ChevronLeft aria-hidden />
-                                      Back
-                                  </Button>
-                                  <h3 className="mr-[72px] flex-1 text-center text-base font-semibold">
-                                      {title}
-                                  </h3>
-                              </div>
-                              <div className="flex min-h-0 flex-1 flex-col">
-                                  {children}
-                              </div>
-                          </div>,
-                          host,
-                      )
-                    : null}
-            </>
+            <div
+                role="group"
+                aria-label={title}
+                data-brand-picker=""
+                className="flex min-h-0 flex-col"
+            >
+                {children}
+            </div>
         );
     }
 
@@ -151,9 +101,8 @@ export function PickerHeader({
     note?: string;
     onClose: () => void;
 }) {
-    const host = useContext(PickerHost);
-    // The sheet says the title beside Back.
-    if (host) return null;
+    // The sheet's tab names it.
+    if (useContext(BrandInline)) return null;
     return (
         <div className="flex shrink-0 items-center gap-2 border-b px-3.5 py-2.5">
             <b className="flex-1 text-sm font-semibold">{title}</b>

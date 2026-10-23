@@ -2,6 +2,7 @@
 import { expect, test } from "@playwright/test";
 
 import { bookOwn, makeContact, northwind, stamp } from "../fixtures/own-data";
+import { pressUntil } from "../fixtures/press";
 import type { MenuRow } from "../fixtures/roles";
 import {
     asOwner,
@@ -120,14 +121,16 @@ test.describe("someone who is Calendar only", () => {
             await expect(
                 page.getByRole("button", { name: "Move", exact: true }),
             ).toBeVisible();
-            await page
-                .getByRole("button", { name: "More", exact: true })
-                .filter({ visible: true })
-                .first()
-                .click();
-            await expect(
+            // The page's own More (the tab bar has one), pressed until it
+            // answers: the first press may land before hydration.
+            await pressUntil(
+                page
+                    .getByRole("main")
+                    .getByRole("button", { name: "More", exact: true })
+                    .filter({ visible: true })
+                    .first(),
                 page.getByRole("button", { name: "Cancel booking" }),
-            ).toBeVisible();
+            );
             await page.keyboard.press("Escape");
             await expect(
                 page.getByText(/^Your role can read this booking/),

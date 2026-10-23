@@ -69,6 +69,7 @@ jobs:
       api: ${{ steps.scan.outputs.api }}
       db: ${{ steps.scan.outputs.db }}
       e2e: ${{ steps.scan.outputs.e2e }}
+      cfruntime: ${{ steps.scan.outputs.cfruntime }}
       base: ${{ steps.scan.outputs.base }}
     steps:
       - uses: actions/checkout@v4
@@ -83,7 +84,7 @@ jobs:
           set -euo pipefail
           # Written to the step's outputs only; nothing is printed to the log.
           put() { echo "$1=$2" >> "$GITHUB_OUTPUT"; }
-          everything() { for k in full code api db e2e; do put "$k" true; done; put base ""; exit 0; }
+          everything() { for k in full code api db e2e cfruntime; do put "$k" true; done; put base ""; exit 0; }
           case "$EVENT" in
             pull_request) base=$(git merge-base "$PR_BASE" HEAD) ;;
             push)
@@ -114,6 +115,9 @@ jobs:
           if has '^(apps/api\.saroh\.in/|packages/)'; then put api true; else put api false; fi
           if has '^packages/database/'; then put db true; else put db false; fi
           if has '^(apps/|packages/|e2e/|scripts/)'; then put e2e true; else put e2e false; fi
+          # The same paths as CF_RUNTIME_RE in scripts/prepush.sh.
+          if has '^(pnpm-lock\.yaml|pnpm-workspace\.yaml|apps/[^/]+/(package\.json|wrangler\.[^/]+|open-next\.config\.[^/]+|next\.config\.[^/]+))$'; then
+            put cfruntime true; else put cfruntime false; fi
 
   static:
     name: Lint, typecheck and repo checks
@@ -449,6 +453,29 @@ jobs:
       - name: Integration tests
         working-directory: apps/api.saroh.in
         run: pnpm exec jest -c jest.integration.config.js --shard=${{ matrix.shard }}/4
+
+  # `next build`, the unit tests and the browser specs all run Next under
+  # Node; only the Workers runtime runs what OpenNext built. Next 16.4.2 on
+  # OpenNext 1.20.9 passed every other gate here and returned 500 on every
+  # Worker page (23 Oct 2026, DEV_LEARNINGS). This builds accounts as the dev
+  # deploy does, serves it in `wrangler dev` (local, no Cloudflare login) and
+  # asks for the sign-in pages. It runs when a dependency or an app's Next,
+  # OpenNext or wrangler config changed. Not part of `ci`: a repo admin can
+  # make "Cloudflare runtime (accounts sign-in)" a required check.
+  cf-runtime:
+    name: Cloudflare runtime (accounts sign-in)
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.cfruntime == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          prisma: "false"
+          turbo-cache: cf-runtime
+          next-cache: "true"
+      - name: Build for Cloudflare and serve the sign-in pages in workerd
+        run: bash scripts/check-cf-runtime.sh
 
   # Keeps the name branch rules and the PR page already know, and passes only
   # when every job above passed. A skipped or cancelled job counts as a fail.

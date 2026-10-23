@@ -7,6 +7,7 @@ import {
     northwind,
     stamp as ownStamp,
 } from "../fixtures/own-data";
+import { pressUntil } from "../fixtures/press";
 import { useSession } from "../fixtures/sessions";
 import { demoUser, NORTHWIND_ORG, urls } from "../playwright.config";
 
@@ -291,8 +292,12 @@ test.describe("plans, a tab of subscriptions (D3)", () => {
         const plan = await ownPlan(page, testInfo);
         await page.goto("/billing/subscriptions");
         const plansTab = page.getByRole("tab", { name: /^Plans/ });
-        await plansTab.click();
-        await expect(plansTab).toHaveAttribute("aria-selected", "true");
+        // The first press after a load may land before hydration.
+        await pressUntil(
+            plansTab,
+            async () =>
+                (await plansTab.getAttribute("aria-selected")) === "true",
+        );
         await expect(page).toHaveURL(/tab=plans/);
         // The sentence about price changes left the tab for the editor.
         await expect(
@@ -310,6 +315,10 @@ test.describe("plans, a tab of subscriptions (D3)", () => {
         await page
             .getByRole("searchbox", { name: "Search plans" })
             .fill(plan.name);
+        // The list narrows a beat after typing: a row pressed before it
+        // does moves up under the press, and the menu's Archive takes it.
+        // "1 plan" when it is Northwind's only one.
+        await expect(page.getByText(/^1 (of \d+ plans|plan)$/)).toBeVisible();
         // A table row at the desk, a list item on a phone.
         const row = page
             .locator("[data-list-table]")

@@ -1076,7 +1076,7 @@ describe("SiteEditor shell", () => {
         expect(actions.saveDraftSections).toHaveBeenCalledTimes(1);
     });
 
-    it("names what goes live in the check, and reads Published after", async () => {
+    it("names what goes live in the Publish sheet, and reads Published after", async () => {
         render({
             initialPendingChanges: 1,
             initialPendingSiteChanges: ["footer"],
@@ -1085,9 +1085,9 @@ describe("SiteEditor shell", () => {
             "Not published · 1 block, footer",
         );
         await press(button("Publish"));
-        expect(document.body.textContent).toContain(
-            "Publishing puts live: 1 section and the footer.",
-        );
+        // Two areas: one row each (DEC-185).
+        expect(document.body.textContent).toContain("Going live · 2 changes");
+        expect(document.body.textContent).toContain("1 block changed");
         const go = Array.from(
             document.querySelectorAll<HTMLButtonElement>("button"),
         ).filter((b) => b.textContent.startsWith("Publish"));
@@ -1114,12 +1114,14 @@ describe("SiteEditor shell", () => {
         await press(button("Publish"));
         await press(button("Publish without approval"));
         expect(actions.publishSite).toHaveBeenCalledTimes(1);
-        expect(toast.showSuccess).toHaveBeenCalledWith(
-            "Flour & Ferment is live at flour.saroh.app. Recorded as published without approval.",
+        // The sheet turns into the result, with the record (DEC-185).
+        expect(document.body.textContent).toContain("Flour & Ferment is live");
+        expect(document.body.textContent).toContain(
+            "Recorded as published without approval.",
         );
     });
 
-    it("publishes through the check and says where the site is live", async () => {
+    it("publishes through the sheet and says where the site is live", async () => {
         const { siteId } = render();
         await press(button("Publish"));
         expect(actions.getSiteFlags).toHaveBeenCalledWith(siteId);
@@ -1134,13 +1136,12 @@ describe("SiteEditor shell", () => {
         expect(go.length).toBeGreaterThan(1);
         await press(go[go.length - 1]);
         expect(actions.publishSite).toHaveBeenCalledTimes(1);
-        expect(toast.showSuccess).toHaveBeenCalledWith(
-            "Flour & Ferment is live at flour.saroh.app.",
-        );
+        expect(document.body.textContent).toContain("Flour & Ferment is live");
+        expect(document.body.textContent).toContain("flour.saroh.app");
         expect(actions.getReviewState).toHaveBeenCalled();
     });
 
-    it("keeps the check open on where the site is, the first time it goes live", async () => {
+    it("keeps the sheet open on where the site is, the first time it goes live", async () => {
         render({
             neverPublished: true,
             initialPendingChanges: null,
@@ -1149,17 +1150,17 @@ describe("SiteEditor shell", () => {
         await press(button("Publish"));
         await press(button("Publish site"));
         expect(actions.publishSite).toHaveBeenCalledTimes(1);
-        // The finished state says it, with the address as a link: no toast.
+        // The result says it, with Open site on the address: no toast.
         expect(toast.showSuccess).not.toHaveBeenCalled();
-        expect(document.body.textContent).toContain("Flour & Ferment is live.");
-        const address = document.querySelector<HTMLAnchorElement>(
+        expect(document.body.textContent).toContain("Anyone can open it now.");
+        const open = document.querySelector<HTMLAnchorElement>(
             'a[href="https://flour.saroh.app"]',
         );
-        expect(address?.textContent).toContain("flour.saroh.app");
-        // And it leaves like the check does.
-        await press(button("Back to editing"));
+        expect(open?.textContent).toContain("Open site");
+        // Done drops back on the page, still editing.
+        await press(button("Done"));
         expect(document.body.textContent).not.toContain(
-            "Flour & Ferment is live.",
+            "Anyone can open it now.",
         );
     });
 
@@ -1304,9 +1305,7 @@ describe("SiteEditor header and footer text (G6)", () => {
             document.querySelectorAll<HTMLButtonElement>("button"),
         ).filter((b) => b.textContent.startsWith("Publish"));
         await press(go[go.length - 1]);
-        expect(toast.showSuccess).toHaveBeenCalledWith(
-            "Rye & Co. is live at flour.saroh.app.",
-        );
+        expect(document.body.textContent).toContain("Rye & Co. is live");
     });
 
     it("never saves a blank name, and says why", async () => {
@@ -1683,49 +1682,63 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(canvas.className).not.toContain("p-6");
     });
 
-    it("folds the bar into one menu on a phone, and moves the rail to the foot", () => {
+    it("keeps the page, the status, More and Publish in a phone's bar, with no bottom tabs (DEC-185)", () => {
         atWidth(390);
         render();
         expect($("[data-layout]")?.dataset.layout).toBe("phone");
-        // The page switcher and the way out stay; the rest is in the menu.
         expect(button(/^Page: Home/)).toBeTruthy();
         expect($(`a[aria-label='Back to Website']`)).not.toBeNull();
-        expect(() => button("Publish")).toThrow();
-        expect($("[role=status]")).toBeNull();
-        expect($("[role=group][aria-label='Preview width']")).toBeNull();
-
-        click(button("Status, view and publish"));
-        expect(document.querySelector("[role=status]")?.textContent).toBe(
-            "Published",
-        );
         expect(button("Publish").disabled).toBe(false);
+        expect($("[role=status]")?.textContent).toBe("Published");
+        expect($("[role=group][aria-label='Preview width']")).toBeNull();
+        // No bottom tabs: one pill over the page.
+        expect($("nav[aria-label='Edit this page']")).toBeNull();
+        const pill = $("[role=toolbar][aria-label='Edit page']");
+        expect(
+            Array.from(pill?.querySelectorAll("button") ?? []).map(
+                (b) => b.getAttribute("aria-label") ?? b.textContent,
+            ),
+        ).toEqual(["Blocks", "Add a block", "Brand"]);
+        expect($("[aria-label='Resize the block list']")).toBeNull();
+
+        // ⋯ More: the rest of the desk's bar, in its words.
+        click(button(/^More: preview/));
+        expect(sheet()?.textContent).toContain("Check");
         // No hover on a phone: what Publish does is written out.
-        expect(document.body.textContent).toContain(
+        expect(sheet()?.textContent).toContain(
             "Nothing has changed since the last publish",
         );
         for (const d of ["desktop", "tablet", "phone"]) {
             expect(button(`Show at ${d} width`)).toBeTruthy();
         }
         expect(button(/^Ask a teammate to review/)).toBeTruthy();
-
-        // The rail is a bar at the foot, not a column.
-        expect($("[aria-label='Resize the block list']")).toBeNull();
-        expect($("[role=tablist][aria-label='Editor panels']")).toBeNull();
-        const bar = $("nav[aria-label='Edit this page']");
-        expect(
-            Array.from(bar?.querySelectorAll("button") ?? []).map(
-                (b) => b.textContent,
-            ),
-        ).toEqual(["Page", "Add", "Brand", "Feedback"]);
+        expect(button(/^Share a preview link/)).toBeTruthy();
+        // The pill makes way for a sheet.
+        expect($("[role=toolbar][aria-label='Edit page']")).toBeNull();
     });
 
-    it("opens the rail from the foot, and a block chosen there opens its fields", () => {
+    it("opens Feedback from More", () => {
+        atWidth(390);
+        render({
+            initialComments: [],
+            initialReview: { ...REVIEW, openNotes: 2 },
+        });
+        click(button(/^More: preview/));
+        click(button(/^Feedback/));
+        expect(
+            sheet()?.querySelector("aside[aria-label=Inspector]"),
+        ).not.toBeNull();
+    });
+
+    it("opens the block list from the pill, and a block chosen there opens its fields", () => {
         atWidth(390);
         render();
-        click(button("Page"));
-        expect(sheet()?.textContent).toContain("4 blocks");
-        click(button("Our story"));
-        // One sheet at a time: the rail makes way for the block's fields.
+        click(button("Blocks"));
+        expect(sheet()?.textContent).toContain("Blocks on Home");
+        // Each block with its first line; the header and footer Fixed.
+        expect(sheet()?.textContent).toContain("FooterOn every pageFixed");
+        click(button(/^HeroOur story/));
+        // One sheet at a time: the list makes way for the block's fields.
         expect($$("[role=dialog]")).toHaveLength(1);
         expect(
             sheet()?.querySelector("aside[aria-label=Inspector]"),
@@ -1733,10 +1746,11 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(button("Move block down").disabled).toBe(true);
     });
 
-    it("adds a block from the foot's Add, and opens it", () => {
+    it("adds a block from the pill's +, and opens it", () => {
         atWidth(390);
         render();
-        click(button("Add"));
+        click(button("Add a block"));
+        expect(sheet()?.textContent).toContain("Add a block");
         const tile = Array.from(
             sheet()?.querySelectorAll<HTMLButtonElement>("aside button") ?? [],
         ).find((b) => b.textContent.includes("Contact"));
@@ -1746,6 +1760,118 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(
             sheet()?.querySelector("aside[aria-label=Inspector]"),
         ).not.toBeNull();
+    });
+
+    it("moves a block from the list's grip, with Undo", () => {
+        atWidth(390);
+        render();
+        click(button("Blocks"));
+        act(() => {
+            button(/^Move Hero/).dispatchEvent(
+                new KeyboardEvent("keydown", {
+                    key: "ArrowDown",
+                    bubbles: true,
+                }),
+            );
+        });
+        expect(toast.showUndo).toHaveBeenLastCalledWith(
+            "Hero moved down",
+            expect.any(Function),
+            expect.anything(),
+        );
+    });
+
+    it("finds a block to add by searching", () => {
+        atWidth(390);
+        render();
+        click(button("Add a block"));
+        const search = sheet()?.querySelector<HTMLInputElement>(
+            "input[aria-label='Search blocks']",
+        );
+        if (!search) throw new Error("No search");
+        type(search, "contact");
+        // Enter settles the search at once (ListSearch).
+        act(() => {
+            search.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+            );
+        });
+        expect(sheet()?.textContent).toContain("Contact");
+        expect(sheet()?.textContent).not.toContain("Every page");
+        type(search, "zzzz");
+        // Enter settles the search at once (ListSearch).
+        act(() => {
+            search.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+            );
+        });
+        expect(sheet()?.textContent).toContain("No block matches");
+    });
+
+    it("gives a tapped block a toolbar: move and remove at once, each with Undo", () => {
+        atWidth(390);
+        render();
+        click(button(/^Hero block, 1 of 2/));
+        const tools = $("[role=toolbar][aria-label='Block actions']");
+        expect(tools).not.toBeNull();
+        // Its settings rise with no scrim, so the toolbar stays in reach.
+        expect($("[data-editor-scrim]")).toBeNull();
+        const inTools = (name: string) => {
+            const b = tools?.querySelector<HTMLButtonElement>(
+                `button[aria-label='${name}']`,
+            );
+            if (!b) throw new Error(`No ${name}`);
+            return b;
+        };
+        expect(inTools("Move up").disabled).toBe(true);
+        click(inTools("Move down"));
+        expect(toast.showUndo).toHaveBeenLastCalledWith(
+            "Hero moved down",
+            expect.any(Function),
+            expect.anything(),
+        );
+        // It moved, and stays selected in its new place.
+        expect(button(/^Hero block, 2 of 2, selected/)).toBeTruthy();
+        const after = $("[role=toolbar][aria-label='Block actions']");
+        const remove = after?.querySelector<HTMLButtonElement>(
+            "button[aria-label='Remove']",
+        );
+        if (!remove) throw new Error("No Remove");
+        click(remove);
+        expect($$("[data-block-index]")).toHaveLength(1);
+        expect(toast.showUndo).toHaveBeenLastCalledWith(
+            "Hero taken off this page",
+            expect.any(Function),
+            expect.anything(),
+        );
+    });
+
+    it("opens Brand as one sheet of tabs, with Reset behind its ⋯ (DEC-185)", () => {
+        atWidth(390);
+        render();
+        click(button("Brand"));
+        const tabs = Array.from(
+            sheet()?.querySelectorAll(
+                "[role=tablist][aria-label=Brand] [role=tab]",
+            ) ?? [],
+        ).map((t) => t.textContent);
+        // No look to offer here, so no Look tab.
+        expect(tabs).toEqual(["Type", "Colour", "Spacing"]);
+        // Type: each face itself, a tap is the choice; no search on a phone.
+        expect(sheet()?.textContent).toContain("Newsreader");
+        expect(
+            sheet()?.querySelector("input[aria-label='Search typefaces']"),
+        ).toBeNull();
+        expect(button("More: Reset style")).toBeTruthy();
+        expect(button("Close Brand")).toBeTruthy();
+    });
+
+    it("switches page from the page's sheet", () => {
+        atWidth(390);
+        render();
+        click(button(/^Page: Home/));
+        expect(sheet()?.textContent).toContain("Pages");
+        expect(sheet()?.textContent).toContain("/");
     });
 
     it("keeps the selection and the open fields when a phone turns on its side", () => {

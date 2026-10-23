@@ -100,7 +100,10 @@ export function DraftPreview({
     onOpenPage,
     onFormBlocked,
     page: current = null,
+    blockTools,
 }: {
+    /** A phone's toolbar on the selected block (DEC-185). */
+    blockTools?: (index: number) => ReactNode;
     /**
      * The page being drawn. A module page's title (DEC-073 #9) is drawn
      * above its blocks as the live site draws it, and its rich-text intro
@@ -263,6 +266,11 @@ export function DraftPreview({
                                 : (notesByKey?.get(section.key) ?? 0)
                         }
                         onOpenNotes={() => onOpenNotes?.(index)}
+                        tools={
+                            selectedIndex === index
+                                ? blockTools?.(index)
+                                : undefined
+                        }
                     >
                         {rendered}
                     </CanvasBlock>
@@ -414,8 +422,11 @@ function CanvasBlock({
     notes = 0,
     onSelect,
     onOpenNotes,
+    tools,
     children,
 }: {
+    /** Drawn on the block while it is selected: a phone's toolbar. */
+    tools?: ReactNode;
     /** Position in the page's block list, so the editor can scroll to it. */
     index?: number;
     label: string;
@@ -445,6 +456,7 @@ function CanvasBlock({
             }`}
         >
             {children}
+            {tools}
             <button
                 type="button"
                 aria-label={selected ? `${name}, selected` : name}
