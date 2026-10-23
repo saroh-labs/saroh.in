@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+
 import type { SiteFontFace } from "@saroh/site-blocks";
 import {
     findFontPair,
@@ -10,79 +12,74 @@ import { describe, expect, it, vi } from "vitest";
 
 import { SITE_FACES } from "./site-fonts";
 
-/** Every `next/font` call this module makes, with its literal options. */
-const calls = vi.hoisted(
-    () =>
-        [] as {
-            loader: string;
-            options: Record<string, unknown>;
-            family: string;
-        }[],
-);
+interface Src {
+    path: string;
+    weight: string;
+    style?: string;
+}
+interface Call {
+    options: {
+        src: string | Src[];
+        weight?: string;
+        display: string;
+        preload: boolean;
+        adjustFontFallback: string | false;
+        declarations: { prop: string; value: string }[];
+    };
+    family: string;
+}
+
+/** Every `localFont` call this module makes, with its literal options. */
+const calls = vi.hoisted(() => [] as Call[]);
 
 // Hoisted above the import: next/font only runs inside Next's compiler; here
-// each loader records its options and answers with a hashed-looking family,
-// one per call, as it does in a build.
-vi.mock("next/font/google", () => {
-    const loader = (name: string) => (options: Record<string, unknown>) => {
-        const n = calls.length + 1;
-        const family = `'__${name}_x${n}', '__${name}_Fallback_x${n}'`;
-        calls.push({ loader: name, options, family });
-        return {
-            className: `__className_${name}_x${n}`,
-            style: { fontFamily: family },
-        };
-    };
-    const names = [
-        "Archivo",
-        "Archivo_Narrow",
-        "Bricolage_Grotesque",
-        "Cormorant_Garamond",
-        "Figtree",
-        "Fraunces",
-        "Geist",
-        "Hanken_Grotesk",
-        "IBM_Plex_Mono",
-        "IBM_Plex_Sans",
-        "Inter",
-        "Inter_Tight",
-        "JetBrains_Mono",
-        "Jost",
-        "Newsreader",
-        "Source_Serif_4",
-    ];
-    return Object.fromEntries(names.map((n) => [n, loader(n)]));
-});
+// the loader records its options and answers with a family per call, and a
+// metric fallback only when it computes one, as it does in a build.
+vi.mock("next/font/local", () => ({
+    default: (options: Call["options"]) => {
+        const name = `f${calls.length + 1}`;
+        const family =
+            options.adjustFontFallback === false
+                ? `'${name}'`
+                : `'${name}', '${name} Fallback'`;
+        calls.push({ options, family });
+        return { className: `c_${name}`, style: { fontFamily: family } };
+    },
+}));
 
-/** The call that registered the family filed under `key`. */
-function callFor(key: string) {
-    const call = calls.find((c) => c.family === SITE_FACES[key]);
-    if (!call) throw new Error(`no loader registered ${key}`);
-    return call;
+const LATIN_EXT_RANGE = /U\+20AD-20C0/; // where ₹ (U+20B9) is
+
+/** The two calls behind the face filed under `key`: latin, latin-ext. */
+function callsFor(key: string): [Call, Call] {
+    const [latin, ext] = SITE_FACES[key].split(", ");
+    const a = calls.find((c) => c.family.startsWith(latin + ","));
+    const b = calls.find((c) => c.family === ext);
+    if (!a || !b) throw new Error(`no loader registered ${key}`);
+    return [a, b];
 }
 
-/** The loaded family filed under `key`, or the test fails here. */
-function loaded(key: string): string {
-    if (!(key in SITE_FACES)) throw new Error(`nothing loaded for ${key}`);
-    return SITE_FACES[key];
+const range = (c: Call) =>
+    c.options.declarations.find((d) => d.prop === "unicode-range")?.value;
+
+/** A call's files as `{ path, weight, style }`. */
+function files(c: Call): Src[] {
+    const { src, weight } = c.options;
+    return typeof src === "string"
+        ? [{ path: src, weight: weight ?? "" }]
+        : src;
 }
 
-/** The options a face's list entry says its loader takes. */
-function expectedOptions(face: SiteFontFace) {
-    return {
-        subsets: [...(face.subsets ?? ["latin"])],
-        ...(face.axes
-            ? { axes: [...face.axes] }
-            : { weight: face.weights.map(String) }),
-        ...(face.styles ? { style: [...face.styles] } : {}),
-        display: "swap",
-        preload: false,
-    };
+/** What a face's files must cover: its weights' span, and its styles. */
+function expectedFiles(face: SiteFontFace, full: string) {
+    const span =
+        face.weights.length === 0
+            ? full
+            : `${Math.min(...face.weights)} ${Math.max(...face.weights)}`;
+    return { span, styles: [...(face.styles ?? ["normal"])] };
 }
 
 describe("the renderer's faces (KTD-2)", () => {
     it("loads every face the font pairs name", () => {
-        // Mono faces included: a pair's third role loads like the others.
         for (const key of FONT_PAIRS.flatMap((p) => fontPairFaceKeys(p))) {
             expect(SITE_FACES).toHaveProperty([key]);
         }
@@ -93,30 +90,69 @@ describe("the renderer's faces (KTD-2)", () => {
         for (const key of Object.keys(SITE_FACES)) {
             expect(named.has(key)).toBe(true);
         }
-        // One call per face: nothing is loaded and left unused.
-        expect(calls).toHaveLength(Object.keys(SITE_FACES).length);
+        // Two calls per face, latin and latin-ext: nothing left unused.
+        expect(calls).toHaveLength(Object.keys(SITE_FACES).length * 2);
+    });
+
+    it("names a face's latin family, then its latin-ext one, then the fallback", () => {
+        for (const key of Object.keys(SITE_FACES)) {
+            const [latin, ext] = callsFor(key);
+            const [l, fallback] = latin.family.split(", ");
+            expect(SITE_FACES[key]).toBe(`${l}, ${ext.family}, ${fallback}`);
+        }
     });
 
     it("maps a pair's key to the loaded families", () => {
         const stacks = fontPairStacks("geist", SITE_FACES);
-        expect(stacks?.heading).toMatch(/^'__Geist_x\d+', '__Geist_Fallback_/);
+        expect(stacks?.heading.startsWith(SITE_FACES.Geist)).toBe(true);
         // Geist for the body too (U9): the design's mono is an accent,
         // never the paragraphs' face.
-        expect(stacks?.body).toMatch(/^'__Geist_x\d+', /);
+        expect(stacks?.body.startsWith(SITE_FACES.Geist)).toBe(true);
         // Its mono role is JetBrains Mono, for machine facts only.
-        expect(stacks?.mono).toMatch(/^'__JetBrains_Mono_x\d+', /);
+        expect(stacks?.mono?.startsWith(SITE_FACES["JetBrains Mono"])).toBe(
+            true,
+        );
     });
 
     it("preloads nothing, so no page fetches a face it is not set in", () => {
         // next/font preloads per layout file, not per request: one face
         // preloaded here would be preloaded on every site.
         for (const call of calls) {
-            expect(call.options.preload, call.loader).toBe(false);
-            expect(call.options.display, call.loader).toBe("swap");
+            expect(call.options.preload, call.family).toBe(false);
+            expect(call.options.display, call.family).toBe("swap");
+        }
+    });
+
+    it("splits each face at Google's ranges, the fallback metrics on the latin call", () => {
+        for (const key of Object.keys(SITE_FACES)) {
+            const [latin, ext] = callsFor(key);
+            expect(range(latin), key).toMatch(/^U\+0000-00FF,/);
+            expect(range(ext), key).toMatch(LATIN_EXT_RANGE);
             // The fallback metrics that keep text still while it swaps.
-            expect(call.options.adjustFontFallback, call.loader).not.toBe(
-                false,
+            expect(latin.options.adjustFontFallback, key).toMatch(
+                /^(Arial|Times New Roman)$/,
             );
+            expect(ext.options.adjustFontFallback, key).toBe(false);
+            // The same faces, cut at the other range.
+            expect(
+                files(ext).map((f) => ({
+                    ...f,
+                    path: f.path.replace("-latin-ext.", "-latin."),
+                })),
+                key,
+            ).toEqual(files(latin));
+        }
+    });
+
+    it("serves files that are in the repo, each with its licence beside it", () => {
+        for (const call of calls) {
+            for (const { path } of files(call)) {
+                const url = new URL(path, import.meta.url);
+                expect(existsSync(url), path).toBe(true);
+                expect(existsSync(new URL("OFL.txt", url)), path).toBe(true);
+                // One shared set of merchant files, never Saroh's own.
+                expect(path).toMatch(/\/packages\/site-blocks\/fonts\//);
+            }
         }
     });
 });
@@ -130,64 +166,41 @@ describe("the looks' faces", () => {
     const LOOK_FILES = {
         folio: {
             heading: {
-                loader: "Newsreader",
-                options: {
-                    subsets: ["latin", "latin-ext"],
-                    axes: ["opsz"],
-                    style: ["normal", "italic"],
-                    display: "swap",
-                    preload: false,
-                },
+                files: ["Newsreader-opsz-wght", "Newsreader-Italic-opsz-wght"],
+                weight: "200 800",
+                styles: ["normal", "italic"],
             },
             body: {
-                loader: "Hanken_Grotesk",
-                options: {
-                    subsets: ["latin"],
-                    weight: ["400", "500", "600"],
-                    display: "swap",
-                    preload: false,
-                },
+                files: ["HankenGrotesk-400-600"],
+                weight: "400 600",
+                styles: ["normal"],
             },
         },
         quiet: {
             heading: {
-                loader: "Cormorant_Garamond",
-                options: {
-                    subsets: ["latin", "latin-ext"],
-                    weight: ["300", "400", "500"],
-                    style: ["normal", "italic"],
-                    display: "swap",
-                    preload: false,
-                },
+                files: [
+                    "CormorantGaramond-300-500",
+                    "CormorantGaramond-Italic-300-500",
+                ],
+                weight: "300 500",
+                styles: ["normal", "italic"],
             },
             body: {
-                loader: "Jost",
-                options: {
-                    subsets: ["latin"],
-                    weight: ["400", "500"],
-                    display: "swap",
-                    preload: false,
-                },
+                files: ["Jost-400-500"],
+                weight: "400 500",
+                styles: ["normal"],
             },
         },
         live: {
             heading: {
-                loader: "Bricolage_Grotesque",
-                options: {
-                    subsets: ["latin", "latin-ext"],
-                    axes: ["wdth"],
-                    display: "swap",
-                    preload: false,
-                },
+                files: ["BricolageGrotesque-wdth-wght"],
+                weight: "200 800",
+                styles: ["normal"],
             },
             body: {
-                loader: "Figtree",
-                options: {
-                    subsets: ["latin", "latin-ext"],
-                    weight: ["400", "500", "600", "700"],
-                    display: "swap",
-                    preload: false,
-                },
+                files: ["Figtree-400-700"],
+                weight: "400 700",
+                styles: ["normal"],
             },
         },
     } as const;
@@ -202,25 +215,51 @@ describe("the looks' faces", () => {
             expect(keys).toEqual([`${look}:heading`, `${look}:body`]);
 
             for (const role of ["heading", "body"] as const) {
-                const call = callFor(`${look}:${role}`);
-                expect(call.loader).toBe(LOOK_FILES[look][role].loader);
-                expect(call.options).toEqual(LOOK_FILES[look][role].options);
+                const want = LOOK_FILES[look][role];
+                const [latin] = callsFor(`${look}:${role}`);
+                const got = files(latin);
+                expect(got.map((f) => f.path.split("/").pop())).toEqual(
+                    want.files.map((f) => `${f}-latin.woff2`),
+                );
+                expect(got.map((f) => f.weight)).toEqual(
+                    want.files.map(() => want.weight),
+                );
+                expect(got.map((f) => f.style ?? "normal")).toEqual(
+                    want.styles,
+                );
                 // And the list says the same, so the editor and the
                 // renderer can't disagree with it.
-                if (pair)
-                    expect(call.options).toEqual(expectedOptions(pair[role]));
+                if (pair) {
+                    const { span, styles } = expectedFiles(
+                        pair[role],
+                        want.weight,
+                    );
+                    expect(want.weight).toBe(span);
+                    expect([...want.styles]).toEqual(styles);
+                }
             }
         },
     );
+
+    it("lets Live's headings narrow: its faces declare the width range", () => {
+        for (const call of callsFor("live:heading")) {
+            expect(call.options.declarations).toContainEqual({
+                prop: "font-stretch",
+                value: "75% 100%",
+            });
+        }
+    });
 
     it.each(["folio", "quiet", "live"])(
         "%s is set in its own loaded faces",
         (look) => {
             const stacks = fontPairStacks(look, SITE_FACES);
-            expect(stacks?.heading.startsWith(loaded(`${look}:heading`))).toBe(
+            expect(
+                stacks?.heading.startsWith(SITE_FACES[`${look}:heading`]),
+            ).toBe(true);
+            expect(stacks?.body.startsWith(SITE_FACES[`${look}:body`])).toBe(
                 true,
             );
-            expect(stacks?.body.startsWith(loaded(`${look}:body`))).toBe(true);
             expect(stacks?.mono).toBeUndefined();
         },
     );
@@ -228,62 +267,40 @@ describe("the looks' faces", () => {
     it("keeps Folio's trimmed Newsreader apart from the newsreader pair's", () => {
         expect(SITE_FACES["folio:heading"]).not.toBe(SITE_FACES.Newsreader);
         const stacks = fontPairStacks("newsreader", SITE_FACES);
-        expect(stacks?.heading.startsWith(loaded("Newsreader"))).toBe(true);
+        expect(stacks?.heading.startsWith(SITE_FACES.Newsreader)).toBe(true);
     });
 });
 
 /**
- * A Classic site (no look) loads exactly what it did before looks: the same
- * eleven calls with the same options, and nothing for the system pair.
+ * A Classic site (no look) loads what it did before looks: each first
+ * pair's face, upright, its full variable range (Plex Mono's two weights).
  */
 describe("Classic sites are unchanged", () => {
-    const BEFORE_LOOKS: [string, Record<string, unknown>][] = [
-        ["Fraunces", { subsets: ["latin"], display: "swap", preload: false }],
-        [
-            "Inter_Tight",
-            { subsets: ["latin"], display: "swap", preload: false },
-        ],
-        ["Newsreader", { subsets: ["latin"], display: "swap", preload: false }],
-        [
-            "IBM_Plex_Sans",
-            { subsets: ["latin"], display: "swap", preload: false },
-        ],
-        [
-            "IBM_Plex_Mono",
-            {
-                subsets: ["latin"],
-                weight: ["400", "500"],
-                display: "swap",
-                preload: false,
-            },
-        ],
-        [
-            "Archivo_Narrow",
-            { subsets: ["latin"], display: "swap", preload: false },
-        ],
-        ["Archivo", { subsets: ["latin"], display: "swap", preload: false }],
-        [
-            "Source_Serif_4",
-            { subsets: ["latin"], display: "swap", preload: false },
-        ],
-        ["Inter", { subsets: ["latin"], display: "swap", preload: false }],
-        ["Geist", { subsets: ["latin"], display: "swap", preload: false }],
-        [
-            "JetBrains_Mono",
-            { subsets: ["latin"], display: "swap", preload: false },
-        ],
-    ];
+    const BEFORE_LOOKS: Record<string, string[]> = {
+        Fraunces: ["100 900"],
+        "Inter Tight": ["100 900"],
+        Newsreader: ["200 800"],
+        "IBM Plex Sans": ["100 700"],
+        "IBM Plex Mono": ["400", "500"],
+        "Archivo Narrow": ["400 700"],
+        Archivo: ["100 900"],
+        "Source Serif 4": ["200 900"],
+        Inter: ["100 900"],
+        Geist: ["100 900"],
+        "JetBrains Mono": ["100 800"],
+    };
 
-    it("calls the first pairs' loaders exactly as before", () => {
-        const lookFamilies = new Set(
-            FONT_PAIRS.filter((p) => "look" in p)
-                .flatMap((p) => fontPairFaceKeys(p))
-                .map((k) => SITE_FACES[k]),
-        );
-        const classic = calls
-            .filter((c) => !lookFamilies.has(c.family))
-            .map((c) => [c.loader, c.options]);
-        expect(classic).toEqual(BEFORE_LOOKS);
+    it("loads the first pairs' faces at the weights they always had", () => {
+        for (const [key, weights] of Object.entries(BEFORE_LOOKS)) {
+            const [latin] = callsFor(key);
+            expect(
+                files(latin).map((f) => f.weight),
+                key,
+            ).toEqual(weights);
+            expect(
+                files(latin).every((f) => !f.style || f.style === "normal"),
+            ).toBe(true);
+        }
     });
 
     it("files every first pair's face under its family name, as before", () => {

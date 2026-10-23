@@ -870,7 +870,10 @@ results), mark it `data-ph-mask`; a picture inside it is left out too, and
   KEY as `--site-font-heading/body` (nothing for the default `system` pair).
   `SiteTheme` turns the key into stacks from the list — a snapshot's value is
   never written into CSS — using the faces the app loaded (`faces` prop). The
-  faces are loaded with `next/font/google` (latin, swap, `preload: false`) in
+  faces are self-hosted with `next/font/local` from `packages/site-blocks/fonts`
+  (OFL files from google/fonts, each cut into a latin and a latin-ext woff2
+  at Google's `unicode-range`s, licence beside them; swap, `preload: false`;
+  no build or page ever calls Google) in
   `apps/saroh.app/lib/site-fonts.ts` and, for the editor's previews,
   `apps/app.saroh.in/lib/sites/site-fonts.ts` (`SiteFacesProvider`); a
   browser fetches only the pair the page is set in. A new pair is a list entry

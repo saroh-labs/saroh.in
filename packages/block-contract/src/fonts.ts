@@ -10,7 +10,7 @@
  * reaches it through `@saroh/templates`, the renderer and the editor through
  * `@saroh/site-blocks`. Pure data, no React and no `next/font`: loading is the
  * renderer's job (`apps/saroh.app/lib/site-fonts.ts`), which must call each
- * `next/font/google` loader with literal options and so cannot read this list.
+ * `next/font/local` loader with literal options and so cannot read this list.
  * A test there holds the two in step.
  *
  * Never Saroh's brand by default. `system` is the neutral stack every site has
@@ -43,7 +43,11 @@ export interface SiteFontFace {
     fallback: string;
     /** Styles the renderer loads; absent for upright only. */
     styles?: readonly FontStyleName[];
-    /** Character sets the renderer loads; absent for `latin` only. */
+    /**
+     * Character sets the face draws the site's text from; `latin-ext` marks
+     * one with a ₹ there. The renderer serves every face's latin and
+     * latin-ext files either way, each fetched only for a page that uses it.
+     */
     subsets?: readonly FontSubset[];
     /**
      * A variable font's extra axes, beyond weight (Live's width, Folio's
