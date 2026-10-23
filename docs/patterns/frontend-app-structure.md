@@ -155,7 +155,7 @@ components/shared/             app shell, navigation, command menu
   height with close at the top right. The same button always opens the
   same surface, whatever the list's length. On a phone there are no bottom
   tabs: one floating pill (`editor/edit-pill.tsx`, Blocks · + · Brand)
-  hides while a sheet is open, ⋯ More (`editor/more-sheet.tsx`) holds the
+  hides while a sheet is open, ⋯ More (`editor/more-actions.tsx`) holds the
   rest of the desk's bar, and a block's settings sheet has no scrim so its
   toolbar (`editor/block-toolbar.tsx`) stays in reach. The Brand sheet's
   pickers draw in place (`BrandInline`).

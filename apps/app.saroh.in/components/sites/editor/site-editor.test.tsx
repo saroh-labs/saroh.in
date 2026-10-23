@@ -1790,9 +1790,21 @@ describe("SiteEditor narrow and phone (G4)", () => {
         );
         if (!search) throw new Error("No search");
         type(search, "contact");
+        // Enter settles the search at once (ListSearch).
+        act(() => {
+            search.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+            );
+        });
         expect(sheet()?.textContent).toContain("Contact");
         expect(sheet()?.textContent).not.toContain("Every page");
         type(search, "zzzz");
+        // Enter settles the search at once (ListSearch).
+        act(() => {
+            search.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+            );
+        });
         expect(sheet()?.textContent).toContain("No block matches");
     });
 

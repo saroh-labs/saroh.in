@@ -229,7 +229,7 @@ export const RAW_ALLOWED = {
     // button: a row of a phone's block list, one button, and its drag grip
     "components/sites/editor/phone-blocks.tsx": ["button"],
     // button: a row of a phone's ⋯ More sheet, one button (DEC-185)
-    "components/sites/editor/more-sheet.tsx": ["button"],
+    "components/sites/editor/more-actions.tsx": ["button"],
     // button: the preview width toggles, a row or card that is one button
     "components/sites/editor/top-bar-actions.tsx": ["button"],
     // input: a file picker

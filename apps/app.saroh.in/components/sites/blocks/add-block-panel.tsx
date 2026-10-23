@@ -13,7 +13,7 @@ import {
     addableSections,
 } from "@/components/sites/editor/editor-constants";
 import type { SectionType } from "@/lib/sites/service";
-import { Input } from "@saroh/ui/input";
+import { ListSearch } from "@saroh/ui/list-search";
 import { SECTION_ICONS } from "./block-icons";
 import { addBlockGroups } from "./block-kinds";
 
@@ -65,12 +65,10 @@ export function AddBlockPanel({
     return (
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-2 pb-4 pt-4">
             {search ? (
-                <Input
-                    type="search"
-                    aria-label="Search blocks"
+                <ListSearch
                     placeholder="Search blocks"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
+                    onSearch={setQuery}
+                    shortcut={false}
                 />
             ) : null}
             <Button

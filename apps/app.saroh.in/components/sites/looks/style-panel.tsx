@@ -13,15 +13,19 @@ import { ALL_FREE } from "@/lib/sites/style-access";
 import { Label } from "@saroh/ui/label";
 import { TabStrip } from "@saroh/ui/tabs";
 import { BrandInline } from "./brand-picker";
-import type { ColourPart } from "./brand-sheet";
-import { PhoneColours, ResetStyle, useSavedNow } from "./brand-sheet";
+import type { ColourPart } from "./brand-sheet-parts";
+import { PhoneColours, ResetStyle, useSavedNow } from "./brand-sheet-parts";
 import { Chip, ColourRow, SwatchGrid, unreadableWords } from "./colour-picker";
 import type { LookChoices } from "./look-picker";
 import { lookChoices, lookName, LookPicker } from "./look-picker";
 import { PaidRefusal } from "./paid-refusal";
 import { TypefacePicker } from "./typeface-picker";
 
-export { BrandSheetActions, RESET_BODY, RESET_TITLE } from "./brand-sheet";
+export {
+    BrandSheetActions,
+    RESET_BODY,
+    RESET_TITLE,
+} from "./brand-sheet-parts";
 
 /** The rows' names in the Brand tab's words (22 Oct 2026), by row key. */
 const ROW_NAMES: Record<string, string> = {

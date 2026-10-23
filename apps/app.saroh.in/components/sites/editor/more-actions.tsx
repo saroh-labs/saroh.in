@@ -109,11 +109,8 @@ export function MoreSheet({
                     ) : null}
                     <Row
                         icon={<FlaskConical />}
-                        label={
-                            release.count > 0
-                                ? `Test releases · ${release.count}`
-                                : "Test releases"
-                        }
+                        label="Test releases"
+                        count={release.count}
                         onClick={then(release.onOpenList)}
                     />
                 </Group>

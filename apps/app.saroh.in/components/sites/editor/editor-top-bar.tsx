@@ -39,7 +39,7 @@ import type {
 import { Tip } from "@saroh/ui/tooltip";
 import type { Device, Zoom } from "./editor-constants";
 import { EditorSheet } from "./editor-sheet";
-import { MoreSheet } from "./more-sheet";
+import { MoreSheet } from "./more-actions";
 
 /**
  * The editor's top bar: where you are (Website, site, page, status), how the
