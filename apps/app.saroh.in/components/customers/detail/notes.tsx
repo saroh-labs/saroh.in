@@ -13,8 +13,8 @@ import {
     FormSheet,
     FormSheetBody,
     FormSheetFoot,
-} from "@/components/shared/form-sheet";
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
+} from "@/components/shared/forms/form-sheet";
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import {
     addNoteAction,
     deleteNoteAction,

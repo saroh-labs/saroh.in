@@ -11,6 +11,14 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+    pickRate,
+    rateGroup,
+    ratePicker,
+    rateShown,
+    ratesOffered,
+} from "@/components/shared/fields/gst-rate-picker.testing";
+
 import type { PackEditorRecord } from "@/lib/class-packs/pack-drafts";
 import type {
     PackServiceOption,
@@ -216,6 +224,12 @@ function input(label: string): HTMLInputElement {
 }
 
 /** A select by its label, as the GST fields draw them. */
+/** The GST rate's buttons (DEC-176), and their main row. */
+const rate = () => ratePicker("GST rate", host);
+const rateRow = () => rateGroup(rate());
+/** The chip the keyboard lands on in the rates: their one tab stop. */
+const rateStop = () => rateRow().querySelector('[tabindex="0"]');
+
 function select(label: string): HTMLSelectElement {
     const l = Array.from(host.querySelectorAll("label")).find((x) =>
         x.textContent.trim().startsWith(label),
@@ -448,8 +462,9 @@ describe("a pack's GST (12 Oct 2026)", () => {
 
     it("asks a registered business for the rate with the price, with the quiet select and the SAC code", () => {
         render(LIVE, 0, undefined, ASKED);
-        expect(select("GST rate").value).toBe("");
-        expect(select("GST rate").options[0].textContent).toBe("Choose a rate");
+        expect(rateShown(rate())).toBe("");
+        // The rates as buttons (DEC-176), with no "Not set" among them.
+        expect(ratesOffered(rate())).toEqual(["0", "5", "18", "40"]);
         expect(
             Array.from(select("GST on this price").options).map(
                 (o) => o.textContent,
@@ -503,12 +518,10 @@ describe("a pack's GST (12 Oct 2026)", () => {
         );
         expect(note?.getAttribute("data-slot")).toBe("field-hint");
         expect(
-            select("GST rate").getAttribute("aria-describedby")?.split(" "),
+            rateRow().getAttribute("aria-describedby")?.split(" "),
         ).toContain(note?.id);
         // No red field, no alert and no count beside Publish.
-        expect(select("GST rate").getAttribute("aria-invalid")).not.toBe(
-            "true",
-        );
+        expect(rateRow().getAttribute("aria-invalid")).not.toBe("true");
         expect(host.querySelector("[data-invalid]")).toBeNull();
         expect(host.querySelector("[role=alert]")).toBeNull();
         expect(text()).not.toContain("to fix before publishing");
@@ -521,8 +534,8 @@ describe("a pack's GST (12 Oct 2026)", () => {
 
     it("says it as an error once the rate box is left with nothing chosen", () => {
         render(LIVE, 0, undefined, ASKED);
-        leave(select("GST rate"));
-        expect(select("GST rate").getAttribute("aria-invalid")).toBe("true");
+        leave(rateRow());
+        expect(rateRow().getAttribute("aria-invalid")).toBe("true");
         expect(host.querySelector("[role=alert]")?.textContent).toBe(
             "Choose a GST rate. Pick 0% if it's exempt or nil-rated",
         );
@@ -532,7 +545,7 @@ describe("a pack's GST (12 Oct 2026)", () => {
 
     it("says a draft's missing rate at once when it is opened: it was never published", () => {
         render(rec(), 0, undefined, ASKED);
-        expect(select("GST rate").getAttribute("aria-invalid")).toBe("true");
+        expect(rateRow().getAttribute("aria-invalid")).toBe("true");
         expect(text()).toContain(RATE_COUNT);
         expect(text()).not.toContain("has no GST rate yet");
         expect(button("Publish").disabled).toBe(true);
@@ -547,7 +560,7 @@ describe("a pack's GST (12 Oct 2026)", () => {
 
         type(input("Name"), "Ten classes");
         type(input("Price"), "4500");
-        expect(select("GST rate").getAttribute("aria-invalid")).toBe("true");
+        expect(rateRow().getAttribute("aria-invalid")).toBe("true");
         expect(text()).not.toContain("has no GST rate yet");
     });
 
@@ -562,12 +575,12 @@ describe("a pack's GST (12 Oct 2026)", () => {
         await wait(20);
         // Nothing is sent: the pack can't be published without a rate.
         expect(actions.publishPack).not.toHaveBeenCalled();
-        expect(select("GST rate").getAttribute("aria-invalid")).toBe("true");
+        expect(rateRow().getAttribute("aria-invalid")).toBe("true");
         expect(button("Publish changes").disabled).toBe(true);
         expect(text()).toContain(RATE_COUNT);
         expect(text()).not.toContain("nil-rated..");
         expect(text()).not.toContain(NO_RATE_NOTE);
-        expect(document.activeElement).toBe(select("GST rate"));
+        expect(document.activeElement).toBe(rateStop());
 
         actions.savePackDraft.mockResolvedValue(
             ok(
@@ -581,7 +594,7 @@ describe("a pack's GST (12 Oct 2026)", () => {
                 }),
             ),
         );
-        pick(select("GST rate"), "18");
+        pickRate(rate(), "18");
         await wait(900);
         expect(actions.savePackDraft).toHaveBeenCalledWith(
             "pk-1",
@@ -592,9 +605,7 @@ describe("a pack's GST (12 Oct 2026)", () => {
             }),
             4,
         );
-        expect(select("GST rate").getAttribute("aria-invalid")).not.toBe(
-            "true",
-        );
+        expect(rateRow().getAttribute("aria-invalid")).not.toBe("true");
         expect(button("Publish changes").disabled).toBe(false);
         expect(text()).toContain("GST rate not set → 18%");
     });
@@ -618,7 +629,7 @@ describe("a pack's GST (12 Oct 2026)", () => {
                 }),
             ),
         );
-        pick(select("GST rate"), "0");
+        pickRate(rate(), "0");
         pick(select("GST on this price"), "INCLUDED");
         type(input("SAC code"), "9997 23");
         await wait(900);
@@ -647,7 +658,7 @@ describe("a pack's GST (12 Oct 2026)", () => {
             undefined,
             ASKED,
         );
-        expect(select("GST rate").value).toBe("18");
+        expect(rateShown(rate())).toBe("18");
         expect(select("GST on this price").value).toBe("INCLUDED");
         expect(text()).toContain(
             "The rate the price includes. It isn't added on top.",

@@ -11,6 +11,11 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+    pickRate,
+    ratePicker,
+} from "@/components/shared/fields/gst-rate-picker.testing";
+
 import type { MissingRates } from "@/lib/gst-rates/missing";
 
 import { MissingRatesNotice } from "./missing-rates-notice";
@@ -137,17 +142,7 @@ async function press(name: string) {
 }
 
 function choose(name: string, rate: string) {
-    const box = sheet()?.querySelector<HTMLSelectElement>(
-        `select[aria-label="GST rate for ${name}"]`,
-    );
-    if (!box) throw new Error(`No GST rate box for ${name}`);
-    act(() => {
-        Object.getOwnPropertyDescriptor(
-            HTMLSelectElement.prototype,
-            "value",
-        )?.set?.call(box, rate);
-        box.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    pickRate(ratePicker(`GST rate for ${name}`, sheet() ?? document), rate);
 }
 
 describe("the missing GST rates notice", () => {
@@ -311,9 +306,14 @@ describe("the missing GST rates notice", () => {
         expect(sheet()?.textContent).toContain(
             "Your role can't set some of these. An owner or admin can change this in Settings › Team.",
         );
-        const locked = sheet()?.querySelector<HTMLSelectElement>(
-            'select[aria-label="GST rate for Vitamin C serum"]',
+        const locked = ratePicker(
+            "GST rate for Vitamin C serum",
+            sheet() ?? document,
         );
-        expect(locked?.disabled).toBe(true);
+        expect(
+            Array.from(locked.querySelectorAll("button")).every(
+                (b) => b.disabled,
+            ),
+        ).toBe(true);
     });
 });

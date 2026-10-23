@@ -1,6 +1,12 @@
 import { formatInr } from "./price";
-import type { Catalog } from "./schema";
-import { addonPlanNames, autopayCharges, cellOf } from "./schema";
+import type { Catalog, FreeStyleKind } from "./schema";
+import {
+    addonPlanNames,
+    autopayCharges,
+    cellOf,
+    FREE_STYLE_KINDS,
+    freeStylesOf,
+} from "./schema";
 
 const PRICING_WORDS = {
     show: "shown",
@@ -112,7 +118,38 @@ export function diff(a: Catalog, b: Catalog): string[] {
             .join();
     if (order(a) !== order(b)) out.push("Rows reordered on the pricing page");
 
-    return out.concat(offersDiff(a, b));
+    return out.concat(offersDiff(a, b), freeStylesDiff(a, b));
+}
+
+const FREE_STYLE_WORDS: Record<FreeStyleKind, string> = {
+    looks: "Look",
+    fontPairs: "Typeface",
+    colourways: "Colourway",
+};
+
+/**
+ * Which looks, typefaces and colourways became free or paid (DEC-177), by
+ * their ids: the catalogue holds no names for them.
+ */
+function freeStylesDiff(a: Catalog, b: Catalog): string[] {
+    const out: string[] = [];
+    const fa = freeStylesOf(a);
+    const fb = freeStylesOf(b);
+    for (const kind of FREE_STYLE_KINDS) {
+        for (const id of fb[kind]) {
+            if (!fa[kind].includes(id)) {
+                out.push(`${FREE_STYLE_WORDS[kind]} ${id} made free`);
+            }
+        }
+        for (const id of fa[kind]) {
+            if (!fb[kind].includes(id)) {
+                out.push(
+                    `${FREE_STYLE_WORDS[kind]} ${id} now on paid plans only`,
+                );
+            }
+        }
+    }
+    return out;
 }
 
 /** The Offers tab's part of the change log: yearly, GST display, trials, add-ons. */

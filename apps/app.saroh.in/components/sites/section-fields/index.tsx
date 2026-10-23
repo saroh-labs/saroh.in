@@ -2,28 +2,28 @@
 
 import type { Section, SitePage } from "@/lib/sites/service";
 
-import { BookingFields } from "./booking";
-import { ContactFields } from "./contact";
-import { CtaFields } from "./cta";
-import { EnquiryFields } from "./enquiry";
-import { FaqFields } from "./faq";
-import { FeaturesFields } from "./features";
-import { GalleryFields } from "./gallery";
-import { HeroFields } from "./hero";
-import { HoursFields } from "./hours";
-import { JournalFields } from "./journal";
-import { PacksFields } from "./packs";
-import { PersonFields } from "./person";
-import { PlansFields } from "./plans";
-import { ProductGridFields } from "./product-grid";
-import { ProjectsFields } from "./projects";
-import { RichTextFields } from "./rich-text";
-import { ServicesListFields } from "./services-list";
-import { TestimonialsFields } from "./testimonials";
-import { TimetableFields } from "./timetable";
+import { ContactFields } from "@/components/sites/content-sections/contact";
+import { CtaFields } from "@/components/sites/content-sections/cta";
+import { EnquiryFields } from "@/components/sites/content-sections/enquiry";
+import { FaqFields } from "@/components/sites/content-sections/faq";
+import { FeaturesFields } from "@/components/sites/content-sections/features";
+import { GalleryFields } from "@/components/sites/content-sections/gallery";
+import { HeroFields } from "@/components/sites/content-sections/hero";
+import { HoursFields } from "@/components/sites/content-sections/hours";
+import { JournalFields } from "@/components/sites/content-sections/journal";
+import { PersonFields } from "@/components/sites/content-sections/person";
+import { ProjectsFields } from "@/components/sites/content-sections/projects";
+import { RichTextFields } from "@/components/sites/content-sections/rich-text";
+import { TestimonialsFields } from "@/components/sites/content-sections/testimonials";
+import { VisitUsFields } from "@/components/sites/content-sections/visit-us";
+import { BookingFields } from "@/components/sites/selling-sections/booking";
+import { PacksFields } from "@/components/sites/selling-sections/packs";
+import { PlansFields } from "@/components/sites/selling-sections/plans";
+import { ProductGridFields } from "@/components/sites/selling-sections/product-grid";
+import { ServicesListFields } from "@/components/sites/selling-sections/services-list";
+import { TimetableFields } from "@/components/sites/selling-sections/timetable";
 import type { ServicesLoad } from "./types";
 import { VariantField } from "./variant-field";
-import { VisitUsFields } from "./visit-us";
 
 /**
  * The per-type editor for one section.

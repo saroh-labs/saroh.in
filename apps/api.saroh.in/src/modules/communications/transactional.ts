@@ -26,12 +26,61 @@ export const NOTICE_TEMPLATES = [
     "BOOKING_CONFIRMED",
     "BOOKING_MOVED",
     "BOOKING_CANCELLED",
+    // An unpaid hold whose time ran out (#1137), with a way to book again.
+    "BOOKING_LAPSED",
     // A website order the customer placed (UX-042): paid, or to pay on
     // handover.
     "ORDER_PLACED",
     "ORDER_READY",
     "ORDER_HANDED_OVER",
     "WAITLIST_OFFER",
+    // "We got your message" to someone who sent an enquiry (DEC-174 U15,
+    // #1146): email only, behind the ENQUIRY_REPLY switch.
+    "ENQUIRY_RECEIVED",
+    // Delivery updates (DEC-174 U16, #1147), behind the ORDER_DELIVERY
+    // switch: a delivered order, a digital order sent, and tracking added
+    // or changed after the handover.
+    "ORDER_DELIVERED",
+    "ORDER_SENT",
+    "ORDER_TRACKING",
+    // A member's membership changed (DEC-174 U11, #1142), each keyed to its
+    // SubscriptionEvent, under the MEMBERSHIP switch.
+    "MEMBERSHIP_JOINED",
+    "MEMBERSHIP_PAUSED",
+    "MEMBERSHIP_RESUMED",
+    "MEMBERSHIP_PLAN_CHANGED",
+    "MEMBERSHIP_CANCELLED",
+    "MEMBERSHIP_KEPT",
+    // A membership set to end is a week away (DEC-174 U19, #1150).
+    "MEMBERSHIP_ENDING",
+    // A team reply in the customer's Messages thread (DEC-174 U14, #1145):
+    // email only, held a minute and coalesced, under the TEAM_REPLY switch.
+    "THREAD_REPLY",
+    // A renewal's autopay charge failed, with a fresh link to pay (U10).
+    "AUTOPAY_FAILED",
+    // "₹X will be taken from your bank account on ‹date›", a day before
+    // each eMandate debit (DEC-180, #1175): no switch, since without it
+    // the debit doesn't happen.
+    "AUTOPAY_PRE_DEBIT",
+    // "₹X is on its way back to how you paid" (DEC-174 U12, #1143): an
+    // online refund the provider took, behind the REFUND switch.
+    "REFUND_SENT",
+    // Courses and classes (DEC-174 U17, #1148): enrolled, with every
+    // session, and an enrolment cancelled, under the COURSE switch; and a
+    // class the business cancelled told to those waiting for it (no switch).
+    "COURSE_ENROLLED",
+    "COURSE_CANCELLED",
+    "WAITLIST_CLASS_CANCELLED",
+    // "‹Product› is back" to someone who asked on the site (DEC-174 U23,
+    // #1154): email only, behind the BACK_IN_STOCK switch.
+    "BACK_IN_STOCK",
+    // "We'll email you when ‹product› is back" with Stop waiting, right
+    // after a "Tell me" (DEC-178, #1170): email only, same switch.
+    "BACK_IN_STOCK_WAITING",
+    // Class packs (DEC-174 U22, #1153), behind the PACK_CREDITS switch:
+    // one credit left, and credits expiring in 7 days.
+    "PACK_LOW",
+    "PACK_EXPIRING",
 ] as const;
 export type NoticeTemplate = (typeof NOTICE_TEMPLATES)[number];
 
@@ -56,11 +105,20 @@ export type AutopayTemplate = (typeof AUTOPAY_TEMPLATES)[number];
 export const REVIEW_TEMPLATES = ["REVIEW_INVITATION"] as const;
 export type ReviewTemplate = (typeof REVIEW_TEMPLATES)[number];
 
+/**
+ * The receipt for a payment on an invoice (DEC-173, owner 20 Oct): sent
+ * automatically once the Undo window has passed, through the business's
+ * own provider only, never Saroh's (DEC-086 reversed).
+ */
+export const RECEIPT_TEMPLATES = ["INVOICE_PAYMENT_RECEIVED"] as const;
+export type ReceiptTemplate = (typeof RECEIPT_TEMPLATES)[number];
+
 export const TRANSACTIONAL_TEMPLATES = [
     ...INVOICE_TEMPLATES,
     ...NOTICE_TEMPLATES,
     ...AUTOPAY_TEMPLATES,
     ...REVIEW_TEMPLATES,
+    ...RECEIPT_TEMPLATES,
 ] as const;
 export type TransactionalTemplate = (typeof TRANSACTIONAL_TEMPLATES)[number];
 
@@ -70,6 +128,13 @@ export function isNoticeTemplate(value: unknown): value is NoticeTemplate {
 
 /** Where a secret link goes in a stored body; filled in at send time. */
 export const SECRET_LINK_SLOT = "{{secret_link}}";
+
+/**
+ * Where a renewal's "How to pay us" lines go in a stored body (DEC-178):
+ * filled in at send time from the job's sealed payload, as the secret
+ * link is, so a stored body never carries an account number.
+ */
+export const HOW_TO_PAY_SLOT = "{{how_to_pay}}";
 
 /** What an invoice email says. Money and dates arrive formatted. */
 export interface InvoiceMailVars {
@@ -96,6 +161,13 @@ export interface InvoiceMailVars {
      * they are there. Null or absent: the plain view-and-download line.
      */
     payWays?: string | null;
+    /**
+     * List the business's "How to pay us" lines above the view link
+     * (DEC-178: a renewal sent by itself that can't be paid online). Only
+     * with `payOnline: false`. The lines go into {@link HOW_TO_PAY_SLOT}
+     * at send time; the stored body keeps the slot.
+     */
+    howToPay?: boolean;
 }
 
 export interface RenderedMessage {
@@ -142,6 +214,9 @@ export function renderTransactional(
     const body = [
         `<p>${greeting}</p>`,
         `<p>${lead}</p>`,
+        vars.payOnline === false && vars.howToPay
+            ? `<p>How to pay ${business}:<br>${HOW_TO_PAY_SLOT}</p>`
+            : "",
         vars.payOnline === false && vars.payWays
             ? `<p>You can view it, download a copy and see how to pay ${business} ${escapeHtml(vars.payWays)} here:<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a></p>`
             : vars.payOnline === false
@@ -211,6 +286,12 @@ export interface AutopayCancelledVars {
     /** "Asha", or null when there's no name. */
     firstName: string | null;
     plan: string;
+    /**
+     * The business sends renewal invoices by itself ("Renewal invoices" on,
+     * automatic notices U10). Off, nobody sends one unless the team does,
+     * so the note doesn't promise it.
+     */
+    invoiceSent: boolean;
 }
 
 /**
@@ -218,7 +299,10 @@ export interface AutopayCancelledVars {
  * autopay (D14). Plain text: a thread message is never rendered as HTML.
  */
 export function autopayCancelledSentence(vars: AutopayCancelledVars): string {
-    return `${vars.business} turned off autopay for ${vars.plan}. Nothing more is taken automatically. Your next renewal comes as an invoice with a link to pay.`;
+    const next = vars.invoiceSent
+        ? "Your next renewal comes as an invoice with a link to pay."
+        : `${vars.business} will tell you how to pay your next renewal.`;
+    return `${vars.business} turned off autopay for ${vars.plan}. Nothing more is taken automatically. ${next}`;
 }
 
 /**
@@ -237,7 +321,9 @@ export function renderAutopayCancelled(
     const body = [
         `<p>${greeting}</p>`,
         `<p>${business} has turned off autopay for ${plan}. Nothing more will be taken automatically.</p>`,
-        `<p>Your plan carries on. From your next renewal, ${business} sends you an invoice with a link to pay it.</p>`,
+        vars.invoiceSent
+            ? `<p>Your plan carries on. From your next renewal, ${business} emails you an invoice with a link to pay.</p>`
+            : `<p>Your plan carries on. From your next renewal, ${business} will tell you how to pay.</p>`,
         `<p>${business}</p>`,
     ].join("\n");
     return {
@@ -272,7 +358,68 @@ export function renderReviewInvitation(
     return { subject: `How was your order from ${vars.store}?`, body };
 }
 
+/** What a payment receipt says. Money and dates arrive formatted. */
+export interface ReceiptMailVars {
+    business: string;
+    /** "Vivek", or null when the bill-to has no name. */
+    firstName: string | null;
+    number: string;
+    /** "₹4,000": this payment. */
+    amount: string;
+    /** "by UPI", or null when it isn't named (Other). */
+    method: string | null;
+    /** "12 Oct 2026": when it came in. */
+    receivedOn: string;
+    /** "₹4,000": every live payment on the invoice. */
+    paidSoFar: string;
+    /** "₹8,400". */
+    total: string;
+    /** "₹4,400"; "₹0" once paid in full. */
+    leftToPay: string;
+    paidInFull: boolean;
+    /**
+     * What a class pack's payment bought (DEC-174 U22): "10-class pack: 10
+     * classes, use them by 31 Dec 2026". Null or absent for anything else.
+     */
+    pack?: string | null;
+}
+
+/**
+ * The receipt email (DEC-173): the payment, then what is paid so far and
+ * what is left. No link: a link would retire the one the customer already
+ * has (DEC-110). The invoice's PDF is attached where the provider takes it.
+ */
+export function renderInvoiceReceipt(vars: ReceiptMailVars): RenderedMessage {
+    const business = escapeHtml(vars.business);
+    const number = escapeHtml(vars.number);
+    const amount = escapeHtml(vars.amount);
+    const greeting = vars.firstName
+        ? `Hi ${escapeHtml(vars.firstName)},`
+        : "Hello,";
+    const how = vars.method ? ` ${escapeHtml(vars.method)}` : "";
+    const body = [
+        `<p>${greeting}</p>`,
+        `<p>Thank you. ${business} has received your payment of ${amount}${how} on ${escapeHtml(vars.receivedOn)}, for invoice ${number}.</p>`,
+        vars.paidInFull
+            ? `<p>Invoice ${number} is now paid in full (${escapeHtml(vars.total)}).</p>`
+            : `<p>Paid so far: ${escapeHtml(vars.paidSoFar)} of ${escapeHtml(vars.total)}<br>Left to pay: ${escapeHtml(vars.leftToPay)}</p>`,
+        ...(vars.pack ? [`<p>${escapeHtml(vars.pack)}.</p>`] : []),
+        `<p>${business}</p>`,
+    ].join("\n");
+    return {
+        subject: `Receipt for ${vars.amount} from ${vars.business}`,
+        body,
+    };
+}
+
 /** The stored body with the link put back, for the provider only. */
 export function fillSecretLink(body: string, link: string): string {
     return body.split(SECRET_LINK_SLOT).join(escapeHtml(link));
+}
+
+/** Put the "How to pay us" lines into the body, one a line (DEC-178). */
+export function fillHowToPay(body: string, lines: readonly string[]): string {
+    return body
+        .split(HOW_TO_PAY_SLOT)
+        .join(lines.map((line) => escapeHtml(line)).join("<br>"));
 }

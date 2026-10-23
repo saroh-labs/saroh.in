@@ -24,7 +24,9 @@ import { toCents } from "../invoices/totals";
 import { siteTakingOrders, withPause } from "../orders/checkout-paused";
 import { AutopayService } from "../payments/autopay.service";
 import type { MandateMethod } from "../payments/providers/provider.port";
+import { PAUSE_WEEKS } from "./dto";
 import { PLANS_ON_SALE } from "./plan-on-sale";
+import { membersCanPause } from "./subscription-settings";
 
 /**
  * The plans a merchant's site lists (round-2 G9): what the Plans block reads
@@ -109,6 +111,13 @@ export interface PublicPlans {
      * ignores it (an empty list draws nothing).
      */
     offered: boolean;
+    /**
+     * How long a member may pause, in weeks, when the business lets members
+     * pause from their account (`membersCanPause`); empty when it doesn't.
+     * The site says it beside the plans (DEC-172 U7) rather than a template
+     * typing it. Added beside the rest, so an older site ignores it.
+     */
+    pauseWeeks: number[];
     /**
      * True on a website a move to a lower plan paused (#800): the plans
      * show, nobody joins online here, and the site says it isn't taking
@@ -222,7 +231,7 @@ export class PublicPlansService {
             // all, not even as "Ask about joining". Members already on one
             // keep renewing; the site just stops offering it.
             if (!(await planStartsSubscriptions(organizationId))) return null;
-            const [plans, takes, takingOrders] = await Promise.all([
+            const [plans, takes, takingOrders, pausing] = await Promise.all([
                 prisma.subscriptionPlan.findMany({
                     where: { organizationId, ...PLANS_ON_SALE },
                     take: MAX_PLANS,
@@ -251,11 +260,15 @@ export class PublicPlansService {
                 // A website a move to a lower plan paused takes no orders
                 // (#800): the plans show, Join doesn't.
                 siteTakingOrders(organizationId, siteId),
+                // Whether members may pause from their account, and so
+                // whether the site says for how long.
+                membersCanPause(organizationId),
             ]);
             return [
                 plans,
                 takes,
                 takingOrders,
+                pausing,
                 // How the business's prices carry GST, for each plan's
                 // words; read only when a plan has a rate.
                 await priceTermsFor(prisma, organizationId, plans),
@@ -267,9 +280,10 @@ export class PublicPlansService {
                 payOnline: false,
                 autopayMethods: [],
                 offered: false,
+                pauseWeeks: [],
             };
         }
-        const [rows, takesPayment, taking, terms] = read;
+        const [rows, takesPayment, taking, pausing, terms] = read;
         const payOnline = takesPayment && taking;
         // How the join sheet can offer autopay (D12): the provider's own
         // list, only where Join is paid online; a provider that can't say
@@ -288,6 +302,7 @@ export class PublicPlansService {
                 payOnline,
                 autopayMethods,
                 offered: true,
+                pauseWeeks: pausing ? [...PAUSE_WEEKS] : [],
                 plans: orderPlans(
                     rows.map(({ _count, ...row }) => ({
                         ...row,

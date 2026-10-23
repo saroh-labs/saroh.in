@@ -5,10 +5,15 @@ import { declaredNodeEnv, env } from "../env";
 import {
     codeSenderName,
     codeSubject,
+    siteAccountEmailFooter,
 } from "../modules/site-accounts/sender-name";
 import type { WelcomeMail } from "./email-welcome";
 import { welcomeEmail } from "./email-welcome";
-import { siteCodesFakeAllowed, writeSiteCodeOutbox } from "./site-code-outbox";
+import {
+    siteCodesFakeAllowed,
+    writeSiteCodeOutbox,
+    writeStaffInviteOutbox,
+} from "./site-code-outbox";
 import { dayWords } from "./words-format";
 
 const FROM =
@@ -315,6 +320,40 @@ export function sendChangeEmailConfirmationEmail(
         ),
     });
     return Promise.resolve();
+}
+
+/**
+ * Saroh staff changed this account's sign-in email (admin console U9). Sent
+ * to the OLD address, naming the new one only masked (`maskEmail`), so the
+ * mailbox's owner can tell it wasn't them without the notice handing out
+ * where the account went. The new address gets no code for 24 hours unless
+ * a second staff member confirms, so there is time to answer.
+ */
+export function sendSignInEmailChangedNotice(
+    to: string,
+    maskedNewEmail: string,
+): Promise<void> {
+    const html = signInEmailChangedEmail(maskedNewEmail);
+    if (!transporter) {
+        console.info(`[Sign-in email changed] (no SMTP) notice to ${to}`);
+        return Promise.resolve();
+    }
+    void transporter.sendMail({
+        from: FROM,
+        to,
+        subject: "Your Saroh sign-in email was changed",
+        html,
+    });
+    return Promise.resolve();
+}
+
+/** The notice's body; the masked address is escaped like any value. */
+export function signInEmailChangedEmail(maskedNewEmail: string): string {
+    return `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2>Your sign-in email was changed</h2>
+  <p>Saroh support changed the email you sign in to Saroh with, at your request, to ${esc(maskedNewEmail)}. This address won't sign you in any more.</p>
+  <p>If you didn't ask for this, reply to this email or write to Saroh support straight away. The new address can't sign in for 24 hours unless a second person at Saroh confirms the change, so there is time to stop it.</p>
+</div>`;
 }
 
 /** Confirm account deletion. Irreversible, so it always requires this link. */
@@ -693,6 +732,69 @@ export function launchInviteEmail(
 </div>`;
 }
 
+export const STAFF_INVITE_SUBJECT = "You're invited to join Saroh's team";
+
+/**
+ * An invitation to Saroh's team (admin console U24): a one-time link, valid
+ * for `validDays`, that works only with this email address. Awaited, and it
+ * says how it went, so the console can offer Resend when it didn't leave.
+ *
+ * With no SMTP it never reaches the network: where the fake transport is
+ * allowed (`siteCodesFakeAllowed`, never production) the link is left in
+ * the staff-invite outbox for the browser test and the log says only that
+ * one was sent, never the link (it is a credential); `fail` fails it.
+ */
+export async function sendStaffInviteEmail(
+    to: string,
+    details: {
+        url: string;
+        name: string;
+        invitedByName: string | null;
+        validDays: number;
+    },
+): Promise<EmailOutcome> {
+    if (!transporter) {
+        if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
+            if (env.SITE_CODES_EMAIL_FAKE === "fail") return "failed";
+            writeStaffInviteOutbox(to, details.url);
+            console.info(`[Staff invite] (no SMTP) to ${to}`);
+            return "sent";
+        }
+        return "not-configured";
+    }
+    try {
+        await transporter.sendMail({
+            from: FROM,
+            to,
+            subject: STAFF_INVITE_SUBJECT,
+            html: staffInviteEmail(details),
+        });
+        return "sent";
+    } catch {
+        return "failed";
+    }
+}
+
+/** The invite's body; every value in it is escaped. */
+export function staffInviteEmail(details: {
+    url: string;
+    name: string;
+    invitedByName: string | null;
+    validDays: number;
+}): string {
+    const href = esc(details.url);
+    const who = details.invitedByName
+        ? `${esc(details.invitedByName)} has invited you`
+        : "You've been invited";
+    return `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2>Hi ${esc(details.name)}, join Saroh's team</h2>
+  <p>${who} to work on Saroh's console, where the team looks after the businesses on Saroh.</p>
+  <p>Open the link, then sign in or create your Saroh account with this email address. You'll be asked to confirm it with a code.</p>
+  <p><a href="${href}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">Join the team</a></p>
+  <p style="color:#666;font-size:12px">The link is yours alone: it works once, with this email address, for ${details.validDays} days. Don't forward it. If you weren't expecting it, ignore this email. Or paste it: ${href}</p>
+</div>`;
+}
+
 // ---------------------------------------------------------------------------
 // Saroh's own billing mail (pricing catalogue U17)
 // ---------------------------------------------------------------------------
@@ -1017,7 +1119,7 @@ export function siteCodeEmail(
   <p>Enter this code on ${name}'s website to confirm it's you.</p>
   <p style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:32px;font-weight:700;letter-spacing:8px;padding:16px 0">${esc(code)}</p>
   <p style="color:#666;font-size:12px">This code expires in ${minutes} minutes. If you didn't ask for it, you can ignore this email.</p>
-  <p style="color:#666;font-size:12px">${name}'s website runs on Saroh. This address sends only sign-in codes, and a notice if your sign-in email changes.</p>
+  <p style="color:#666;font-size:12px">${siteAccountEmailFooter(name)}</p>
 </div>`;
 }
 
@@ -1063,6 +1165,48 @@ export async function sendSiteEmailChangedEmail(
     }
 }
 
+/**
+ * A notice to a customer about their own account on a business's site, from
+ * the code stream's sender in the business's name, as the code is: today
+ * the "Ask to remove my data" acknowledgement and its done or closed notice
+ * (DEC-172, which widens DEC-011's identity mail to them). The words are the
+ * caller's (`site-accounts/data-request-emails.ts`), already escaped;
+ * `businessName` must already be cleaned (`site-accounts/sender-name.ts`).
+ * With no SMTP, development logs that it went (the code's fake transport);
+ * `SITE_CODES_EMAIL_FAKE=fail` fails it. Nothing logged names the address
+ * outside development.
+ */
+export async function sendSiteAccountNoticeEmail(
+    to: string,
+    details: { businessName: string; subject: string; html: string },
+): Promise<EmailOutcome> {
+    const { businessName, subject, html } = details;
+    if (!siteCodesTransporter) {
+        if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
+            if (env.SITE_CODES_EMAIL_FAKE === "fail") return "failed";
+            console.info(
+                `[Site account notice] (no SMTP) "${subject}" to ${to} for ${businessName}`,
+            );
+            return "sent";
+        }
+        return "not-configured";
+    }
+    try {
+        await siteCodesTransporter.sendMail({
+            from: {
+                name: codeSenderName(businessName),
+                address: SITE_CODES_FROM_ADDRESS,
+            },
+            to,
+            subject,
+            html,
+        });
+        return "sent";
+    } catch {
+        return "failed";
+    }
+}
+
 /** "Your sign-in email for ‹Business› changed". */
 export function emailChangedSubject(businessName: string): string {
     return `Your sign-in email for ${businessName} changed`;
@@ -1075,6 +1219,6 @@ export function siteEmailChangedEmail(businessName: string): string {
   <h2>Your sign-in email changed</h2>
   <p>The email you use to sign in on ${name}'s website was changed to another address. This address won't sign you in there any more.</p>
   <p>If you didn't make this change, contact ${name} straight away.</p>
-  <p style="color:#666;font-size:12px">${name}'s website runs on Saroh. This address sends only sign-in codes, and a notice like this one if your sign-in email changes.</p>
+  <p style="color:#666;font-size:12px">${siteAccountEmailFooter(name)}</p>
 </div>`;
 }

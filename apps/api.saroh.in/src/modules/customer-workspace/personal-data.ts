@@ -86,7 +86,11 @@ export const PERSONAL_FIELDS: Readonly<Record<string, PersonalField>> = {
         why: "The courier company, not the person.",
     },
 
-    // Issued invoices are the law's paper (DEC-042).
+    // Issued invoices are the law's paper (DEC-042). Their payments
+    // (`InvoicePayment`, DEC-173: a cheque's number and bank, a reference,
+    // a note) are invoice records too (ADR-008) and are kept, by a removal
+    // and by the retention erase alike; none of their columns looks
+    // personal, so they need no entry here.
     "Invoice.billToName": {
         rule: "kept",
         why: "Printed on an issued invoice.",
@@ -174,6 +178,17 @@ export const PERSONAL_FIELDS: Readonly<Record<string, PersonalField>> = {
     "Activity.body": {
         rule: "kept",
         why: "A lead's activity: leads are CRM records, left as they are (DEC-041).",
+    },
+
+    // Their "Ask to remove my data" request (DEC-172): the record that they
+    // asked and that it was done, and where the done email goes.
+    "CustomerDataRequest.requesterEmail": {
+        rule: "cleared",
+        why: "Where Saroh tells them it's done (DEC-172): cleared once that email has gone (review #19). The business's list stops showing it once done.",
+    },
+    "CustomerDataRequest.requesterName": {
+        rule: "cleared",
+        why: "Their name as they asked: cleared when the removal marks the request done (review #19).",
     },
 };
 

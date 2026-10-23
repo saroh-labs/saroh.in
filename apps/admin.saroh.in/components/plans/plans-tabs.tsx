@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@saroh/ui/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@saroh/ui/tabs";
 import type { ComponentType } from "react";
 
@@ -12,6 +13,8 @@ import { TabOffers } from "./offers/tab-offers";
 import { usePlans } from "./plans-context";
 import { usePlansNav } from "./plans-nav";
 import { TabPlans } from "./plans/tab-plans";
+import { LivePreview } from "./preview/live-preview";
+import { usePreview } from "./preview/preview-state";
 import { TabPublish } from "./publish/tab-publish";
 import { TabVersions } from "./versions/tab-versions";
 
@@ -25,11 +28,29 @@ import { TabVersions } from "./versions/tab-versions";
  *
  * Each tab is its own file under `components/plans/<tab>/` (U7–U10), drawn
  * from `PANELS` below; a tab reads `usePlans()`, `useDraft()` and
- * `usePlansNav()` and needs nothing passed in.
+ * `usePlansNav()` and needs nothing passed in. The Plans tab has the live
+ * preview docked beside it (admin redesign U13), unless it is hidden.
  */
 
+function PlansWithPreview() {
+    const { shown } = usePreview();
+    return (
+        <div
+            className={cn(
+                "grid min-w-0 gap-4",
+                shown && "xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start",
+            )}
+        >
+            <div className="min-w-0">
+                <TabPlans />
+            </div>
+            <LivePreview />
+        </div>
+    );
+}
+
 const PANELS: Record<PlansTab, ComponentType> = {
-    plans: TabPlans,
+    plans: PlansWithPreview,
     modules: TabModules,
     offers: TabOffers,
     versions: TabVersions,
@@ -57,7 +78,7 @@ export function PlansTabs() {
             className="grid min-w-0 gap-4"
         >
             <TabsList
-                aria-label="Plans & modules"
+                aria-label="Plans and modules"
                 className="flex h-auto w-full justify-start gap-0.5 overflow-x-auto rounded-none border-b border-border bg-transparent p-0"
             >
                 {PLANS_TABS.map((key) => (
@@ -66,7 +87,22 @@ export function PlansTabs() {
                         value={key}
                         className="-mb-px shrink-0 rounded-none border-b-2 border-transparent px-3 py-[9px] text-[13px] font-medium text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-none"
                     >
-                        {labels[key]}
+                        {labels[key].label}
+                        {labels[key].badge && (
+                            <>
+                                {" "}
+                                <span
+                                    className={cn(
+                                        "ml-1.5 rounded-full px-2 py-px text-[11.5px] font-semibold",
+                                        key === "plans"
+                                            ? "bg-highlight-subtle text-highlight-subtle-foreground"
+                                            : "bg-secondary text-muted-foreground",
+                                    )}
+                                >
+                                    {labels[key].badge}
+                                </span>
+                            </>
+                        )}
                     </TabsTrigger>
                 ))}
             </TabsList>

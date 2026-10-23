@@ -2,9 +2,14 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
-import { fromMinor, toMinor } from "../../common/money";
+import { fromMinor } from "../../common/money";
+import { leftToPayCents } from "../invoices/invoice-state";
 import type { AutopayChargeTiming } from "../subscriptions/autopay-timing";
-import { chargePlan, keptPlan } from "../subscriptions/autopay-timing";
+import {
+    chargePlan,
+    keptPlan,
+    sarohSendsNotice,
+} from "../subscriptions/autopay-timing";
 import { chargeKey, enqueueChargeStepInTx } from "../subscriptions/charge-job";
 import { captureDiffers, describeMismatch } from "./capture-mismatch";
 import {
@@ -58,6 +63,13 @@ import {
 /** The earliest a debit can be asked for when the notice is sent `now`. */
 export function earliestDebitAt(now: Date = new Date()): Date {
     return new Date(now.getTime() + PRE_DEBIT_LEAD_HOURS * 60 * 60 * 1000);
+}
+
+/** The latest of `first` and every date given. */
+function latest(first: Date, others: readonly (Date | null | undefined)[]) {
+    let at = first;
+    for (const d of others) if (d && d > at) at = d;
+    return at;
 }
 
 export type ChargeRefusal =
@@ -193,6 +205,7 @@ export class MandateChargesService {
                 id: true,
                 status: true,
                 total: true,
+                paidCents: true,
                 currency: true,
                 subscriptionId: true,
             },
@@ -224,7 +237,8 @@ export class MandateChargesService {
             };
         }
 
-        const amountCents = toMinor(invoice.total);
+        // What is left to pay (DEC-173): part may have been paid by hand.
+        const amountCents = leftToPayCents(invoice);
         if (
             invoice.status !== "ISSUED" ||
             invoice.currency !== mandate.currency ||
@@ -304,11 +318,12 @@ export class MandateChargesService {
                 credentials: connection.credentials,
             });
             // A planned debit (D13B) holds for a card too, whose provider
-            // would take it at once.
-            const debitAfter =
-                input.notBefore && input.notBefore > prepared.debitAfter
-                    ? input.notBefore
-                    : prepared.debitAfter;
+            // would take it at once. An eMandate is never debited before
+            // `debitAt` (DEC-180): Saroh's own notice goes a day ahead of it.
+            const debitAfter = latest(prepared.debitAfter, [
+                input.notBefore,
+                sarohSendsNotice(mandate.method) ? input.debitAt : null,
+            ]);
             await prisma.paymentIntent.update({
                 where: { id: intent.id },
                 data: {
@@ -683,9 +698,15 @@ export class MandateChargesService {
         if (!mandate) return { status: "NONE" };
         const invoice = await tx.invoice.findFirst({
             where: { id: invoiceId, organizationId, subscriptionId },
-            select: { status: true, total: true, currency: true },
+            select: {
+                status: true,
+                total: true,
+                paidCents: true,
+                currency: true,
+            },
         });
-        const amountCents = invoice ? toMinor(invoice.total) : 0;
+        // What is left to pay (DEC-173): part may have been paid by hand.
+        const amountCents = invoice ? leftToPayCents(invoice) : 0;
         if (
             invoice?.status !== "ISSUED" ||
             invoice.currency !== mandate.currency ||
@@ -814,11 +835,16 @@ export class MandateChargesService {
                     { issuedAt: { sort: "desc", nulls: "last" } },
                     { id: "desc" },
                 ],
-                select: { id: true, total: true, currency: true },
+                select: {
+                    id: true,
+                    total: true,
+                    paidCents: true,
+                    currency: true,
+                },
             });
             if (
                 invoice?.currency === mandate.currency &&
-                toMinor(invoice.total) <= mandate.maxAmountCents
+                leftToPayCents(invoice) <= mandate.maxAmountCents
             ) {
                 candidates.set(subscriptionId, invoice.id);
             }

@@ -24,6 +24,7 @@ export * from "./notice";
 export * from "./option-select";
 export * from "./page-container";
 export * from "./page-header";
+export * from "./phone-input";
 export * from "./popover";
 export * from "./progress-bar";
 export * from "./radio-group";

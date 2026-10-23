@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ModuleView } from "./schema";
 import {
+    bookingPageLine,
     comesWithLines,
     draftFrom,
     finishSetupItems,
@@ -95,6 +96,50 @@ describe("what turns on, in order (DEC-068)", () => {
         expect(plan.order).toEqual(["COMMERCE", "WEBSITE"]);
         expect(plan.websiteForShop).toBe(true);
         expect(plan.comesWith).toEqual([]);
+    });
+
+    it("Website picked with Bookings goes first, so Bookings joins that site (DEC-175)", () => {
+        const plan = turnOnPlan({
+            picked: ["APPOINTMENTS", "WEBSITE"],
+            modules: allOff,
+        });
+        expect(plan.order).toEqual(["CRM", "WEBSITE", "APPOINTMENTS"]);
+        // Selling online too: the website still comes before Bookings.
+        const both = turnOnPlan({
+            picked: ["APPOINTMENTS", "COMMERCE"],
+            modules: allOff,
+            sellsOnline: true,
+        });
+        expect(both.order).toEqual([
+            "CRM",
+            "WEBSITE",
+            "APPOINTMENTS",
+            "COMMERCE",
+        ]);
+        expect(both.websiteForShop).toBe(true);
+    });
+
+    it("says the booking page comes with Bookings only when the API said so (DEC-175)", () => {
+        const bookings = turnOnPlan({
+            picked: ["APPOINTMENTS"],
+            modules: allOff,
+        });
+        expect(bookingPageLine(bookings, { address: "bend-physio" })).toBe(
+            "Your booking page comes with it, at bend-physio.saroh.app/book. Customers can open it once you publish it from Bookings › Services.",
+        );
+        // Nothing coming: a website already, or a role that can't make one.
+        expect(bookingPageLine(bookings, null)).toBeNull();
+        // Website in the same sheet: the site is the one its fields make.
+        const withSite = turnOnPlan({
+            picked: ["APPOINTMENTS", "WEBSITE"],
+            modules: allOff,
+        });
+        expect(
+            bookingPageLine(withSite, { address: "bend-physio" }),
+        ).toBeNull();
+        // Not Bookings: never.
+        const crm = turnOnPlan({ picked: ["CRM"], modules: allOff });
+        expect(bookingPageLine(crm, { address: "bend-physio" })).toBeNull();
     });
 
     it("pick-up only, or a website already on, brings no website", () => {
@@ -199,6 +244,22 @@ describe("the draft and what it sends", () => {
             hidden: false,
         }),
     ];
+
+    it("reads the booking page Bookings would make, and none when it isn't said (DEC-175)", () => {
+        const said = decodeSetupDefaults("APPOINTMENTS", {
+            data: {
+                setup: defaults[1]?.defaults,
+                alsoBookingPage: { address: "bend-physio" },
+            },
+        });
+        expect(said.bookingPage).toEqual({ address: "bend-physio" });
+        expect(defaults[1]?.bookingPage).toBeNull();
+        // An answer it can't read is no promise.
+        const garbled = decodeSetupDefaults("APPOINTMENTS", {
+            data: { alsoBookingPage: { address: 4 } },
+        });
+        expect(garbled.bookingPage).toBeNull();
+    });
 
     it("starts from the API's defaults", () => {
         const draft = draftFrom(defaults);

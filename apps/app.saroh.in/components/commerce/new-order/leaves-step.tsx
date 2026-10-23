@@ -1,9 +1,9 @@
 "use client";
 
-import { FailedRead } from "@/components/shared/failed-read";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { Input } from "@saroh/ui/input";
 
-import { Chip } from "@/components/shared/chip";
+import { Chip } from "@/components/shared/lists/chip";
 import type { AddressDraft, NewOrderWay } from "@/lib/orders/new-order";
 import { goesToAddress } from "@/lib/orders/new-order";
 

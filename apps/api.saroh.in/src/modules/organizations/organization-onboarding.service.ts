@@ -15,13 +15,18 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
-import { enqueueBillingCustomerSync } from "../billing/billing-customer-sync";
+import {
+    billingEmailRaceAsTaken,
+    chosenBillingProfileInTx,
+    firstBillingProfileInTx,
+} from "../billing/billing-profiles.service";
 import { FREE_PLAN_ID } from "../billing/catalogue-access.service";
 import {
     addressProblem,
     addressTaken,
     MAX_ADDRESS_LENGTH,
 } from "../sites/site-address";
+import { recordManagerInTx } from "./account-manager";
 import { businessTypeWrite } from "./business-type";
 import { startingZone } from "./business-zone";
 import type { OnboardOrganizationDto } from "./dto";
@@ -38,6 +43,13 @@ function addressFromName(name: string): string {
     let address = slugify(name).slice(0, MAX_ADDRESS_LENGTH);
     while (address.endsWith("-")) address = address.slice(0, -1);
     return address;
+}
+
+/** The same promise, with a lost billing-email race read as its 409. */
+function raceAsTaken<T>(made: Promise<T>): Promise<T> {
+    return made.catch((error: unknown) => {
+        throw billingEmailRaceAsTaken(error);
+    });
 }
 
 /** What onboarding returns to the caller: the new org's identity. */
@@ -113,7 +125,7 @@ export class OrganizationOnboardingService {
 
         const referredBy = await this.referredBy(userId, dto.referralCode);
 
-        const onboarded = await prisma.$transaction(async (tx) => {
+        const making = prisma.$transaction(async (tx) => {
             /*
              * Fail fast on a taken address with a clear 409 rather than a raw
              * unique-constraint error. "Taken" means another business
@@ -127,6 +139,20 @@ export class OrganizationOnboardingService {
                 });
             }
 
+            // Who Saroh bills for it (DEC-167, R7), decided before anything
+            // is written: one of the caller's profiles, or a new one made
+            // here, or, for an owner with none yet, their first from the
+            // business's details once it exists (below). An owner with
+            // profiles who chose none is refused, naming the choice.
+            const billingProfileId = await chosenBillingProfileInTx(
+                tx,
+                userId,
+                {
+                    billingProfileId: dto.billingProfileId,
+                    newBillingProfile: dto.newBillingProfile,
+                },
+            );
+
             // Who referred it (DEC-156), written here and nowhere else: no
             // later write names these two columns, so it is never changed.
             const organization = await tx.organization.create({
@@ -134,6 +160,7 @@ export class OrganizationOnboardingService {
                     name: dto.name,
                     slug,
                     kind,
+                    ...(billingProfileId ? { billingProfileId } : {}),
                     ...(referredBy
                         ? {
                               referredByOrganizationId: referredBy,
@@ -141,7 +168,7 @@ export class OrganizationOnboardingService {
                           }
                         : {}),
                 },
-                select: { id: true, slug: true },
+                select: { id: true, slug: true, createdAt: true },
             });
 
             // Every business gets a profile, if only for its time zone
@@ -166,6 +193,24 @@ export class OrganizationOnboardingService {
                 },
             });
 
+            // Who at Saroh brought it in (DEC-169): the `?am=` link, a
+            // typed code, or the owner's email on a manager's lead from
+            // before now. Under a savepoint: it never stops the setup.
+            const manager = await recordManagerInTx(tx, {
+                organizationId: organization.id,
+                ownerUserId: userId,
+                madeAt: organization.createdAt,
+                claim: {
+                    link: dto.managerLinkCode
+                        ? {
+                              code: dto.managerLinkCode,
+                              setAt: dto.managerLinkSetAt,
+                          }
+                        : null,
+                    code: dto.managerCode,
+                },
+            });
+
             // Every business starts on the catalogue's Free plan (OQ-2): a
             // subscription row on the live version, no provider. Nothing is
             // written where no version is live yet; the business then reads
@@ -174,16 +219,30 @@ export class OrganizationOnboardingService {
                 planId: FREE_PLAN_ID,
             });
 
-            // Its one customer at Saroh's billing provider (DEC-165), made
-            // by a job after the commit: never in the way of signing up.
-            await enqueueBillingCustomerSync(tx, organization.id);
+            // The owner's first business gets their first billing profile
+            // from its details (DEC-167, R6), whose customer at Saroh's
+            // billing provider is made by a job after the commit: never in
+            // the way of signing up. A later business chose one above.
+            if (!billingProfileId) {
+                await firstBillingProfileInTx(tx, {
+                    ownerUserId: userId,
+                    organizationId: organization.id,
+                });
+            }
 
             this.logger.log(
                 `Onboarded organization ${organization.id} (${organization.slug}) with OWNER ${userId}`,
             );
 
-            return { id: organization.id, slug: organization.slug };
+            return {
+                id: organization.id,
+                slug: organization.slug,
+                managerSource: manager?.source ?? null,
+            };
         });
+        // A new profile whose email lost a race to the database's
+        // one-email-per-owner index: the same 409 as asked, not a 500.
+        const { managerSource, ...onboarded } = await raceAsTaken(making);
 
         // Emit the audit event AFTER the transaction commits, so we only record
         // an org that actually exists. `record` never throws (it swallows and
@@ -196,7 +255,13 @@ export class OrganizationOnboardingService {
             targetType: "organization",
             targetId: onboarded.id,
             outcome: AuditOutcome.Success,
-            metadata: { slug: onboarded.slug, kind },
+            metadata: {
+                slug: onboarded.slug,
+                kind,
+                // How its account manager was proved, never who: the
+                // link itself is the record (DEC-169).
+                ...(managerSource ? { accountManager: managerSource } : {}),
+            },
         });
 
         // t0 of the activation funnel (#176). Same placement and same tradeoff

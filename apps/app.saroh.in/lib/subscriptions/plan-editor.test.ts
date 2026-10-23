@@ -269,10 +269,12 @@ describe("the autopay limit warning (D13)", () => {
 
 describe("how it's paid, and the side panel", () => {
     it("never promises autopay until the provider takes mandates (DEC-038)", () => {
-        expect(everyNote(form())).toBe("Invoiced each month with a pay link.");
+        expect(everyNote(form())).toBe(
+            "Invoiced each month with a payment link.",
+        );
         expect(everyNote(form(), true)).toMatch(/or by autopay/);
         expect(everyNote(form({ price: "12000", interval: "YEAR" }))).toBe(
-            "Works out to ₹1,000 a month. Invoiced each year with a pay link.",
+            "Works out to ₹1,000 a month. Invoiced each year with a payment link.",
         );
         expect(everyNote(form({ price: "" }))).toBe("");
     });

@@ -16,14 +16,14 @@ import { autopayLine, chargingText } from "./view";
  *
  * With the business not offering autopay (its provider can't, or the
  * rollout flag is off) nothing here offers or promises it: the line is
- * today's "Pays by…" or "Each renewal is invoiced with a pay link". A
+ * today's "Pays by…" or "Each renewal is invoiced with a payment link". A
  * mandate already made still shows, and can still be cancelled.
  */
 
 export interface AutopayPanel {
     /** "Autopay on · UPI · mo•••@okicici · limit ₹1,500", or how it's paid. */
     line: string;
-    /** "Set up by Asha from the pay link · 3 Sep"; null: nothing to add. */
+    /** "Set up by Asha from the payment link · 3 Sep"; null: nothing to add. */
     detail: string | null;
     /** What needs seeing: the limit too low, a charge under way, a cancel being confirmed. */
     notice: { text: string; tone: "warn" | "info" } | null;
@@ -34,7 +34,7 @@ export interface AutopayPanel {
 }
 
 const FROM: Record<string, string> = {
-    PAY_LINK: "from the pay link",
+    PAY_LINK: "from the payment link",
     PRICES: "from the Prices page",
     ACCOUNT: "from their account",
     SETUP_LINK: "from a set-up link",
@@ -59,7 +59,7 @@ export function autopayPanel(
     const first = sub.contact.name.split(" ")[0] || sub.contact.name;
     const fallback = opts.paysBy
         ? `Pays by ${opts.paysBy}`
-        : "Each renewal is invoiced with a pay link";
+        : "Each renewal is invoiced with a payment link";
     const provider = card?.provider ?? "your payment provider";
     const live =
         autopay?.state === "ON" ||
@@ -71,7 +71,7 @@ export function autopayPanel(
     if (!autopay && card?.ended) {
         const day = formatDate(card.ended.at, tz, { now });
         line = card.ended.confirmed
-            ? `Autopay cancelled ${day}. Renewals are invoiced with a pay link`
+            ? `Autopay cancelled ${day}. Renewals are invoiced with a payment link`
             : `Autopay cancelled ${day}, being confirmed with ${provider}`;
         if (!card.ended.confirmed) {
             notice = {
@@ -179,7 +179,7 @@ export function cancelledText(
             return {
                 title: "Autopay cancelled.",
                 detail: withTold(
-                    "The next renewal is invoiced with a pay link.",
+                    "The next renewal is invoiced with a payment link.",
                 ),
             };
         case "CONFIRMING":
@@ -226,7 +226,7 @@ export function toldText(
 /**
  * The words that say how a plan's renewals are paid (D14's honest copy):
  * autopay only where the business offers it; otherwise every renewal is an
- * invoice with a pay link, and nothing is charged.
+ * invoice with a payment link, and nothing is charged.
  */
 export function renewalWords(offered: boolean): {
     /** Under "New plan". */
@@ -238,7 +238,7 @@ export function renewalWords(offered: boolean): {
         ? {
               plan: "What you sell on repeat. It renews with an invoice each period, paid by autopay for members who turn it on.",
               subscribe:
-                  "It renews with an invoice each period, paid with a pay link until they turn on autopay. Nobody is contacted.",
+                  "It renews with an invoice each period, paid with a payment link until they turn on autopay. Nobody is contacted.",
           }
         : {
               plan: "What you sell on repeat. It renews with an invoice each period. Nothing is charged.",

@@ -45,8 +45,16 @@ const AUTOPAY_METHOD: Record<string, string> = {
 const SET_UP_FROM: Record<string, string> = {
     ACCOUNT: "from their account",
     PRICES: "from the Prices page",
-    PAY_LINK: "from the pay link",
+    PAY_LINK: "from the payment link",
     SETUP_LINK: "from a set-up link",
+};
+
+/** Why Saroh's pre-debit email didn't go (DEC-180), after "and". */
+const NO_NOTICE_WHY: Record<string, string> = {
+    NO_EMAIL_PROVIDER: "no email provider is connected",
+    NO_EMAIL_ADDRESS: "they have no email address",
+    EMAIL_OFF: "they turned email off",
+    NOT_SENT: "it didn't go",
 };
 
 const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
@@ -150,7 +158,10 @@ export function changeWhat(
                 ? "Renewed. Nothing charged, every collection skipped"
                 : `Renewed${invoice}`;
         case "RETRIED":
-            return `Made a new pay link${invoice}`;
+            return `Made a new payment link${invoice}`;
+        case "PAY_LINK_EMAILED":
+            // U10: after a failed autopay charge, Saroh told the customer.
+            return `Emailed them a new link to pay after autopay failed${invoice}`;
         case "RESUME_REFUSED":
             return "Couldn't resume on its own. Payments is off";
         case "RENEWAL_FAILED":
@@ -160,6 +171,9 @@ export function changeWhat(
                 : `Renewal payment failed${invoice}`;
         case "MANDATE_LIMIT_LOW":
             return "Not charged, above the autopay limit";
+        case "NOT_CHARGED_NO_NOTICE":
+            // DEC-180: a bank-account debit is emailed a day ahead, or not taken.
+            return `Autopay didn't charge${invoice}. A bank account debit needs an email to the customer a day before, and ${NO_NOTICE_WHY[str(data.reason) ?? ""] ?? NO_NOTICE_WHY.NOT_SENT}`;
         case "MANDATE_SET_UP": {
             // D12: the method the customer picked.
             const method = str(data.method);

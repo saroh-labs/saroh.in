@@ -75,7 +75,8 @@ export interface SignInSheetProps {
     onSignedIn: (customer: SignedInCustomer) => void;
 }
 
-type Problem =
+/** Why a code couldn't be sent or checked; the inline code says it too. */
+export type Problem =
     | Exclude<CodeRequestResult, { ok: true }>
     | Exclude<VerifyResult, { ok: true }>;
 
@@ -486,7 +487,12 @@ export function resendWait(resendAt: number | null, now: number): number {
     return Math.max(0, Math.ceil((resendAt - now) / 1_000));
 }
 
-function ProblemText({
+/**
+ * What went wrong, in the site's words. Shared with the code asked inside
+ * a look's Your details (`booking-flow/inline-code.tsx`, U10), which says
+ * a wrong code its own way.
+ */
+export function ProblemText({
     problem,
     businessName,
     phone,

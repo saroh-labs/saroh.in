@@ -12,12 +12,7 @@ import type {
     MoneyEntry,
 } from "./types";
 import { weekDates } from "./week";
-import {
-    COLUMN_CARDS,
-    dayCards,
-    weekColumns,
-    weekSummary,
-} from "./week-columns";
+import { COLUMN_CARDS, dayCards, weekColumns } from "./week-columns";
 
 /*
  * The Week's card columns (plan 005 E25), on the week of 14 September:
@@ -233,7 +228,7 @@ describe("dayCards", () => {
         expect(card).toMatchObject({
             at: "7:00 am",
             title: "Personal training",
-            flag: { label: "No-show", tone: "bad" },
+            flag: { label: "Didn't come", tone: "bad" },
             href: "/bookings/b1",
         });
     });
@@ -442,41 +437,5 @@ describe("weekColumns", () => {
 
         const neha = columns(pulse, { person: NEHA });
         expect(neha[5].off).toBeNull();
-    });
-});
-
-describe("weekSummary", () => {
-    const month = week([friday, saturday]);
-    const layers = layersFor(month);
-
-    it("counts each layer switched on for a role without money", () => {
-        expect(
-            weekSummary({ week: month, layers, off: {}, money: false }),
-        ).toBe("2 orders · 1 pick-up · 1 invoice");
-        expect(
-            weekSummary({
-                week: month,
-                layers,
-                off: { orders: true },
-                money: false,
-            }),
-        ).toBe("1 pick-up · 1 invoice");
-    });
-
-    it("leaves the line to the columns for a money role", () => {
-        expect(weekSummary({ week: month, layers, off: {}, money: true })).toBe(
-            "",
-        );
-    });
-
-    it("says every layer is off", () => {
-        expect(
-            weekSummary({
-                week: month,
-                layers,
-                off: { orders: true, collections: true, invoices: true },
-                money: true,
-            }),
-        ).toBe("Every layer is off");
     });
 });

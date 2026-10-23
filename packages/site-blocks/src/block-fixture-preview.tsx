@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 
 import type {
+    LookId,
     RenderedBooking,
     RenderedHours,
     RenderedJournal,
@@ -418,14 +419,29 @@ const LIVE_DATA_PREVIEWS: Partial<
 export function BlockFixturePreview({
     type,
     variant,
+    look,
 }: {
     type: SectionType;
     variant: string;
+    /**
+     * The site's look (DEC-172), for the editor's Add block pictures
+     * (U16): the block in that look's tokens and treatment, the
+     * owner's own view. Absent is Classic, as before.
+     */
+    look?: LookId;
 }) {
     const mounted = useMounted();
     const content = blockFixture(type, variant);
     if (!content) return null;
     const live = LIVE_DATA_PREVIEWS[type];
     if (live) return mounted ? live(content) : null;
-    return <SectionRenderer section={{ type, content }} />;
+    return look ? (
+        <SectionRenderer
+            section={{ type, content }}
+            look={look}
+            isOwnerPreview
+        />
+    ) : (
+        <SectionRenderer section={{ type, content }} />
+    );
 }

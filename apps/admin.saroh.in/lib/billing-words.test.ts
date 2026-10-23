@@ -174,3 +174,92 @@ describe("addresses", () => {
         );
     });
 });
+
+describe("a subscription row in words (R26)", () => {
+    const { autopayState, billedToLine, nextChargeLine, planNote } = words;
+    const base = {
+        status: "ACTIVE",
+        cancelAtPeriodEnd: false,
+        currentPeriodEnd: "2026-11-03T00:00:00.000Z",
+        pending: null,
+        termEndsAt: "2027-06-01T00:00:00.000Z",
+        termPayment: "AUTOPAY",
+        nextChargeAt: "2026-11-03T00:00:00.000Z",
+        nextChargeHow: "AUTOPAY",
+        autopayRunsOutSoon: false,
+        billingProfile: null,
+    } as unknown as Parameters<typeof nextChargeLine>[0];
+
+    it("says the next charge and how it is paid", () => {
+        expect(nextChargeLine(base)).toBe("3 Nov 2026 · autopay");
+        expect(
+            nextChargeLine({
+                ...base,
+                nextChargeHow: "PAID_FOR_YEAR",
+                nextChargeAt: null,
+                termPayment: "ONE_TIME",
+                termEndsAt: "2027-05-05T00:00:00.000Z",
+            }),
+        ).toBe("Paid for the year · ends 5 May 2027");
+        expect(
+            nextChargeLine({
+                ...base,
+                nextChargeHow: "NONE",
+                nextChargeAt: null,
+                cancelAtPeriodEnd: true,
+            }),
+        ).toBe("None · ends 3 Nov 2026");
+        expect(
+            nextChargeLine({
+                ...base,
+                status: "CANCELLED",
+                nextChargeHow: "NONE",
+                nextChargeAt: null,
+            }),
+        ).toBe("None · ended");
+    });
+
+    it("marks an autopay running out soon, and one declined", () => {
+        expect(autopayState(base)).toEqual({
+            label: "On until 1 Jun 2027",
+            warn: false,
+        });
+        expect(
+            autopayState({
+                ...base,
+                autopayRunsOutSoon: true,
+                termEndsAt: "2026-11-10T00:00:00.000Z",
+            }),
+        ).toEqual({ label: "Runs out 10 Nov 2026", warn: true });
+        expect(autopayState({ ...base, status: "PAST_DUE" })).toEqual({
+            label: "Declined",
+            warn: true,
+        });
+        expect(
+            autopayState({ ...base, nextChargeHow: "PAID_FOR_YEAR" }).label,
+        ).toBe("Not needed");
+    });
+
+    it("says who it is billed to, and when a profile bills two", () => {
+        expect(billedToLine(base)).toBeNull();
+        expect(
+            billedToLine({
+                ...base,
+                billingProfile: { name: "Example Holdings", businesses: 2 },
+            }),
+        ).toBe("Example Holdings · 2 businesses on one profile");
+        expect(
+            billedToLine({
+                ...base,
+                billingProfile: { name: "Example Holdings", businesses: 1 },
+            }),
+        ).toBe("Example Holdings");
+    });
+
+    it("notes a trial's end", () => {
+        expect(planNote({ ...base, status: "TRIALING" })).toBe(
+            "Trial until 3 Nov 2026",
+        );
+        expect(planNote(base)).toBeNull();
+    });
+});

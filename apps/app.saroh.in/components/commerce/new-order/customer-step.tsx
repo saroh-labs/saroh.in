@@ -2,10 +2,10 @@
 
 import { Button } from "@saroh/ui/button";
 
-import { CustomerPicker } from "@/components/customers/customer-picker";
 import type { CustomerPick } from "@/lib/customers/picker";
 import { pickName } from "@/lib/customers/picker";
 import { pickMeta } from "@/lib/orders/new-order";
+import { CustomerPicker } from "./customer-picker";
 
 import { Notice } from "@saroh/ui/notice";
 import { StepCard } from "./parts";

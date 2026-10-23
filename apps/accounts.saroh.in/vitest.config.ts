@@ -8,10 +8,10 @@ import { defineConfig } from "vitest/config";
  * them: where a sign-in lands, what a failure says, which state a failed
  * invitation read is, and that nothing a person reads says "Log in".
  *
- * `node`, not `jsdom`: what is covered here is logic and words, not
- * components. The shell these pages share is pinned in `@saroh/ui`, and the
- * pages themselves need a real browser against the running stack, which is
- * `e2e/`.
+ * `node` by default: most of what is covered is logic and words. The
+ * account area's screens (Billing profiles, DEC-167 step 2) are drawn in
+ * `jsdom`, which each of those tests asks for itself; the pages against
+ * the running stack are `e2e/`.
  */
 export default defineConfig({
     resolve: {
@@ -21,6 +21,17 @@ export default defineConfig({
     test: {
         environment: "node",
         globals: true,
-        include: ["lib/**/*.test.ts", "components/**/*.test.ts"],
+        // jsdom's gaps a drawn component meets (`:modal`, ResizeObserver,
+        // scrollIntoView), as app.saroh.in's.
+        setupFiles: ["./vitest.setup.ts"],
+        // A sheet's first open in jsdom loads the phone field's country
+        // picker (#1036); on a busy CI runner that alone passed 5s while
+        // the file took 1s locally.
+        testTimeout: 15_000,
+        include: [
+            "lib/**/*.test.ts",
+            "components/**/*.test.ts",
+            "components/**/*.test.tsx",
+        ],
     },
 });

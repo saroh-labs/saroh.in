@@ -37,9 +37,9 @@ export * from "./backfill/class-packs-module";
 // The D10 classes-a-month backfill, exported so the API's integration suite
 // can run it against the previous image's rows (twice) and check them.
 export * from "./backfill/classes-per-period";
-// The DEC-165 billing customers backfill, exported so the API's integration
+// The DEC-167 billing profiles backfill, exported so the API's integration
 // suite can run it twice and check what it queued.
-export * from "./backfill/billing-customers";
+export * from "./backfill/billing-profiles";
 // The F16 storefront-people-on-the-team backfill, exported so the API's
 // integration suite can run it twice, and for the API's storefront invite
 // accept, which runs its per-person rule (`joinTeamFromStorefront`).
@@ -58,6 +58,13 @@ export * from "./backfill/pricing-free-subscriptions";
 // The P3 order-number backfill (DEC-066), exported so the API's integration
 // suite can run it twice and check what it did.
 export * from "./backfill/order-numbers";
+// The invoice ledger backfill (DEC-173, #1113), exported so the API's
+// integration suite can run it twice and check what it wrote, and for the
+// showcase seed, which gives its paid invoices their payments with it.
+export * from "./backfill/invoice-payments";
+// The U15 privacy review's one-off (#1099): page views stored under a
+// private page, exported so the API's integration suite can run it twice.
+export * from "./backfill/private-path-views";
 // Pricing catalogue versions (plan 2026-09-29 U1): store a published
 // snapshot and its Plan rows, and read which one is live.
 export * from "./pricing-catalogue";

@@ -442,6 +442,10 @@ function home(
         // PAY-06's captures at the wrong amount: none.
         paymentAttempt: empty(),
         subscriptionEvent: empty(),
+        // U8: no bill reminded this week.
+        message: empty(),
+        customerThreadMessage: empty(),
+        invoiceShare: empty(),
         invoice: {
             ...empty(),
             findMany: jest.fn((args: { where: Record<string, unknown> }) =>

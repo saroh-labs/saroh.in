@@ -49,13 +49,14 @@
 
 ## Invariant checks — **Current**
 
-| Script             | Guards                                                                                                      |
-| ------------------ | ----------------------------------------------------------------------------------------------------------- |
-| `check:routes`     | Every emitted destination and static link resolves to a route                                               |
-| `check:blocks`     | G2 and G6: merchant sites stay merchant-coloured; one renderer                                              |
-| `check:cycles`     | No circular imports across workspaces                                                                       |
-| `check:deploy-env` | Every Worker's environment marker is set and its deploy build passes next.config's required-variables check |
-| `check:titles`     | Every page of the workspace, accounts and the console names its tab; each root layout says noindex          |
+| Script              | Guards                                                                                                            |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `check:routes`      | Every emitted destination and static link resolves to a route                                                     |
+| `check:blocks`      | G2 and G6: merchant sites stay merchant-coloured; one renderer                                                    |
+| `check:site-motion` | Site blocks move for 200 ms or less: no loop, no overshoot, nothing on scroll (DEC-172); delays are not durations |
+| `check:cycles`      | No circular imports across workspaces                                                                             |
+| `check:deploy-env`  | Every Worker's environment marker is set and its deploy build passes next.config's required-variables check       |
+| `check:titles`      | Every page of the workspace, accounts and the console names its tab; each root layout says noindex                |
 
 **Adopted** — a repo-wide rule that a lint rule cannot express becomes a
 `scripts/check-*.mjs` wired into CI and AGENTS.md → Before you finish, not a
@@ -193,11 +194,15 @@ and blocked real deploys. So work reaches GitHub in batches:
    `development`, in its own worktree under `.claude/worktrees/`. `n` counts
    from 1, and a day can have several batches.
 2. **One worktree per unit.** Each feature or unit gets its own worktree and
-   branch, cut from the batch, and several can run at once. Build and test
-   it there.
-3. **Land units locally.** Merge each finished unit into the batch branch
-   with `--no-ff` and a message naming the unit, then remove its worktree and
-   branch. **Never push a unit branch, and never open a PR per unit.**
+   branch, cut from the batch **by name** (`git worktree add -b unit/<x>
+<path> batch-…`), never from `main` or the repo's default branch, and
+   several can run at once. Build and test it there. `check:branch-base`
+   refuses a branch that holds a commit from `main` (DEV_LEARNINGS, 18 Oct).
+3. **Land units locally.** Squash each finished unit into the batch branch
+   (`git merge --squash`, one commit whose message says what the unit did and
+   the issue it closes), then remove its worktree and branch; never build on
+   a squashed unit branch again. **Never push a unit branch, and never open a
+   PR per unit.**
 4. **Run `pnpm prepush --all` on the batch** before it leaves the machine.
    It runs gitleaks, lint, typecheck, the `check:*` scripts, unit tests and
    vitest, then the API integration tests in shards (a full `test:int` run
@@ -211,6 +216,10 @@ and blocked real deploys. So work reaches GitHub in batches:
    with CI's placeholder env and `CI=1`. It tests committed work only. A spec
    run against `saroh-dev` fails on data drift, not code (DEV_LEARNINGS).
    Push only when it ends with ALL PASS.
+5. **Up the line, normal merges only.** The batch goes into `development`
+   by its PR (a merge commit), and a release is `development` into `main`
+   by a PR (a merge commit), never squashed. Work only flows that way:
+   `main` is never merged back into `development` (owner, 18 Oct 2026).
 
 ### How the gate stays fast — **Current** (2026-09-29)
 

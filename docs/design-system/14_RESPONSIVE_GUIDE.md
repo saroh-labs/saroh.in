@@ -13,7 +13,7 @@ stays readable and tappable on a 375px phone and a 1440px laptop without a
 second codebase.
 
 Grounded in: `tooling/tailwind-config/tailwind.config.ts`,
-`apps/app.saroh.in/components/shared/app-header.tsx`,
+`apps/app.saroh.in/components/shared/shell/app-header.tsx`,
 `apps/app.saroh.in/app/**`, `apps/accounts.saroh.in/app/(auth)/layout.tsx`,
 `apps/saroh.in/app/page.tsx`.
 
@@ -48,7 +48,7 @@ effectively single-breakpoint.** That is the headline of this document.
 
 ## 2. 🚨 Critical gap: the app header disappears on mobile
 
-`apps/app.saroh.in/components/shared/app-header.tsx` l.74:
+`apps/app.saroh.in/components/shared/shell/app-header.tsx` l.74:
 
 ```tsx
 <nav className="hidden items-center gap-4 text-sm lg:flex">

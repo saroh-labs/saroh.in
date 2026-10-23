@@ -138,6 +138,25 @@ describe("AnalyticsRetentionHandler", () => {
         expect(error).not.toHaveBeenCalled();
     });
 
+    it("reads the hold again for each batch, so a hold placed mid-run is kept (U15 privacy review)", async () => {
+        // No hold for the first batch; one by the second.
+        held.mockResolvedValueOnce([]);
+        held.mockResolvedValue([{ id: "org_held" }]);
+        findMany
+            .mockResolvedValueOnce(ids(ANALYTICS_RETENTION_BATCH))
+            .mockResolvedValueOnce(ids(1));
+        deleteMany
+            .mockResolvedValueOnce({ count: ANALYTICS_RETENTION_BATCH })
+            .mockResolvedValueOnce({ count: 1 });
+
+        await new AnalyticsRetentionHandler().handle(run());
+
+        expect(held).toHaveBeenCalledTimes(2);
+        expect(deleteMany.mock.calls[1][0].where.organizationId).toEqual({
+            notIn: ["org_held"],
+        });
+    });
+
     it("says nothing when nothing is due, and comes back in a day", async () => {
         findMany.mockResolvedValueOnce([]);
 

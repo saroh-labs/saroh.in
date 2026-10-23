@@ -8,6 +8,11 @@ import {
     TimeOffPreviewController,
 } from "./closures.controller";
 import { ClosuresService } from "./closures.service";
+import {
+    RuleRequestsController,
+    StaffRulesController,
+} from "./staff-rules.controller";
+import { StaffRulesService } from "./staff-rules.service";
 import { BookingRulesController, StaffController } from "./staff.controller";
 import { StaffService } from "./staff.service";
 
@@ -20,11 +25,18 @@ import { StaffService } from "./staff.service";
     imports: [forwardRef(() => OrganizationsModule), CapabilitiesModule],
     controllers: [
         StaffController,
+        StaffRulesController,
+        RuleRequestsController,
         BookingRulesController,
         ClosuresController,
         TimeOffPreviewController,
     ],
-    providers: [StaffService, ClosuresService, OrganizationGuard],
-    exports: [StaffService, ClosuresService],
+    providers: [
+        StaffService,
+        StaffRulesService,
+        ClosuresService,
+        OrganizationGuard,
+    ],
+    exports: [StaffService, StaffRulesService, ClosuresService],
 })
 export class StaffModule {}

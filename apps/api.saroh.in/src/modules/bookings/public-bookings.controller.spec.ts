@@ -2,8 +2,8 @@ import type { INestApplication } from "@nestjs/common";
 import { BadRequestException, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import type { Booking } from "@saroh/database";
-import { createHash } from "node:crypto";
 
+import { hashClientIp } from "../../common/client-ip";
 import { trustProxy } from "../../common/trust-proxy";
 import {
     PublicBookingsController,
@@ -154,7 +154,7 @@ describe("the anonymous booking route is closed (A9)", () => {
 });
 
 describe("the caller's address behind a proxy (#508)", () => {
-    const sha = (ip: string) => createHash("sha256").update(ip).digest("hex");
+    const sha = (ip: string) => hashClientIp(ip);
     let app: INestApplication | undefined;
 
     afterEach(async () => {

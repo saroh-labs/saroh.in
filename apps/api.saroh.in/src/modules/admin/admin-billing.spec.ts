@@ -7,6 +7,7 @@ import {
     istMonthRange,
     monthlyPaise,
     mrrPaise,
+    nextChargeOf,
     subscriptionViewWhere,
 } from "./admin-billing";
 
@@ -173,5 +174,75 @@ describe("monthly figure", () => {
                 { status: "ACTIVE", count: 40, plan: free },
             ]),
         ).toBe(4 * 22_200 + 2 * 2_775);
+    });
+});
+
+describe("nextChargeOf: when and how a subscription is charged next", () => {
+    const now = new Date("2026-10-18T00:00:00.000Z");
+    const day = 24 * 60 * 60 * 1000;
+    const periodEnd = new Date(now.getTime() + 10 * day);
+    const sub = (over: Partial<Parameters<typeof nextChargeOf>[0]> = {}) => ({
+        status: "ACTIVE",
+        cancelAtPeriodEnd: false,
+        currentPeriodEnd: periodEnd,
+        billingCycle: "month",
+        providerSubscriptionId: "sub_Test0001",
+        plan: { priceCents: 22_200 },
+        ...over,
+    });
+    const autopay = (days: number) => ({
+        payment: "AUTOPAY" as const,
+        endsAt: new Date(now.getTime() + days * day),
+    });
+
+    it("an autopay charges at the end of its period", () => {
+        expect(nextChargeOf(sub(), autopay(200), now)).toEqual({
+            nextChargeAt: periodEnd,
+            nextChargeHow: "AUTOPAY",
+            autopayRunsOutSoon: false,
+        });
+    });
+
+    it("an autopay running out within 30 days is marked", () => {
+        expect(nextChargeOf(sub(), autopay(25), now).autopayRunsOutSoon).toBe(
+            true,
+        );
+    });
+
+    it("an autopay that ends with this period charges nothing more", () => {
+        expect(nextChargeOf(sub(), autopay(10), now)).toEqual({
+            nextChargeAt: null,
+            nextChargeHow: "NONE",
+            autopayRunsOutSoon: true,
+        });
+    });
+
+    it("a year paid at once is paid for the year", () => {
+        const yearly = sub({
+            billingCycle: "year",
+            providerSubscriptionId: "order_Test0001",
+        });
+        const term = {
+            payment: "ONE_TIME" as const,
+            endsAt: new Date(now.getTime() + 300 * day),
+        };
+        expect(nextChargeOf(yearly, term, now).nextChargeHow).toBe(
+            "PAID_FOR_YEAR",
+        );
+        // Its checkout unread, its order id still says so.
+        expect(nextChargeOf(yearly, null, now).nextChargeHow).toBe(
+            "PAID_FOR_YEAR",
+        );
+    });
+
+    it("ended, ending, free or not on the checkout: no charge", () => {
+        for (const row of [
+            sub({ status: "CANCELLED" }),
+            sub({ cancelAtPeriodEnd: true }),
+            sub({ plan: { priceCents: 0 } }),
+            sub({ providerSubscriptionId: null }),
+        ]) {
+            expect(nextChargeOf(row, null, now).nextChargeHow).toBe("NONE");
+        }
     });
 });

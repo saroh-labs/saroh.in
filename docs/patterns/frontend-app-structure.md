@@ -26,7 +26,7 @@ components/shared/             app shell, navigation, command menu
 ## Rules
 
 - **Current** — **Every shell page renders inside `PageContainer`.**
-  `components/shared/page-container.tsx` owns the page's gutter and measure, so
+  `components/shared/page/page-container.tsx` owns the page's gutter and measure, so
   a screen cannot arrive with its own. Four widths: `full` (the whole work
   area, for lists, boards and dashboards), `form` (`max-w-2xl`, create and
   edit forms), the default (`max-w-5xl`, a record) and `wide` (`max-w-7xl`).
@@ -52,10 +52,10 @@ components/shared/             app shell, navigation, command menu
   `next/headers` and so can never reach a client component; the 20
   `lib/<domain>/actions.ts` files are what client components call.
 - **Current** — **One server fetcher for the chrome.**
-  `components/shared/app-shell.tsx` reads session, organizations, the active
+  `components/shared/shell/app-shell.tsx` reads session, organizations, the active
   organization, modules and counts once per render and passes props down.
 - **Current** — **Navigation has one source.**
-  `components/shared/nav-items.tsx` feeds the sidebar, the phone tab bar (below 760px) and the
+  `components/shared/navigation/nav-items.tsx` feeds the sidebar, the phone tab bar (below 760px) and the
   command menu, and lists only routes that exist; `pnpm run check:routes` fails
   on a link that would 404.
 - **Current** — **Capability gating in the UI is an aid, not a permission.** A
@@ -96,13 +96,45 @@ components/shared/             app shell, navigation, command menu
 - **Current** — **Split big components along their panels.** The site
   editor is the worked example (#260): `site-editor.tsx` only composes, its
   state lives in hooks in `components/sites/editor/` (`use-editor-draft`,
-  `-style`, `-selection`, `-viewport`, `-review`, `use-publish`, and
-  `use-site-chrome` for the header's name and footer's line, G6) and its
-  drawing in panels there (`editor-top-bar`, `editor-rail`, `editor-canvas`,
-  `inspector-host`). A new editor panel or piece of editor state goes there,
-  not back into `site-editor.tsx`.
+  `-selection`, `-review`, and `use-site-chrome` for the header's name and
+  footer's line, G6; the style, viewport and publish hooks sit with their
+  features in `sites/looks/`, `sites/canvas/` and `sites/publish/`) and its
+  drawing in panels (`editor-top-bar`, `editor-rail`, `inspector-host`, and
+  `sites/canvas/editor-canvas`). A new editor panel or piece of editor state
+  goes there, not back into `site-editor.tsx`.
+- **Adopted** — **A domain folder that grows mixed or big gets feature
+  sub-folders** (DEC-183). Group `components/<domain>/` into
+  `components/<domain>/<feature>/` when it holds more than three files that
+  are unrelated (different screens or features that don't import each other,
+  such as a switcher, a closing banner and a setup step side by side), or more
+  than about 25 files. Name each folder in kebab-case after what the merchant
+  sees (`business-hours`, `pay-instructions`, `team`, `setup`), never after a
+  component type (`sheets`, `hooks`). Files keep their kebab-case names and
+  feature prefix (`team/team-screen.tsx`); tests and `*.test-kit.tsx` sit
+  beside the file they test, as `<subject>.test.tsx` or
+  `<subject>.<aspect>.test.tsx`. Pieces two features in the domain share go
+  in the folder of the screen that composes them; pieces another domain uses
+  go up to `components/shared/` or that domain. No `index.ts` barrels: import
+  the file. Inside a folder import with `./`; across folders with
+  `@/components/<domain>/<feature>/…`, never `../`. A move is its own
+  change, renames and import updates only, and that includes what the
+  compiler does not check: `vi.mock` strings, path lists in tests, and
+  `tooling/eslint-config-custom/controls-allowlist.js`.
+- **Adopted** — **The UI layer is separate from the business layer**
+  (DEC-183). A component file (`.tsx`) draws: layout, styling, the words on
+  screen, and wiring events to handlers. It holds no business rules. Rules
+  and derivations (who may do what, what a value works out to, plurals, the
+  words a status maps to) are pure functions in `.ts` files, in
+  `lib/<domain>/` when more than one component uses them, otherwise beside
+  the component (`team/role-book.ts`), each with unit tests that need no
+  render. State and actions (drafts, save, undo, refusals) live in a
+  `use-*.ts` hook that calls `lib/<domain>/actions.ts`. The component takes
+  data and callbacks and decides only how they look, so restyling or
+  rewording a screen never touches a `.ts` file and changing a rule never
+  touches a `.tsx` one. Every new component follows it; an existing one moves
+  to it when it is next changed, not in a sweep.
 - **Current** — **A QR beside a link is `QrButton`** (DEC-118,
-  `components/qr/qr-button.tsx`, its panel `qr-panel.tsx`), never a second
+  `components/qr/link-qr/qr-button.tsx`, its panel `qr-panel.tsx`), never a second
   drawing. A page that stays (the website, the shop, the booking page, a
   product) takes `mode: "saved"`: the panel finds the target's code or
   offers "Make this code" as a press of its own, so opening it never
@@ -115,7 +147,7 @@ components/shared/             app shell, navigation, command menu
   (`app/api/qr-codes/…/print`, as an invoice's PDF does), so the session
   stays server-side.
 - **Current** — **The editor's page menu offers what the API lists** (round-2
-  G16): `components/sites/pages-panel.tsx` (the list), `page-settings.tsx`
+  G16): `components/sites/pages/pages-panel.tsx` (the list), `page-settings.tsx`
   (the open page's title, address, In the menu, On the site, Delete) and
   `add-page-panel.tsx` (the kinds in `getSite`'s `addablePageKinds`, then
   Blank page), with their words in `lib/sites/page-menu.ts`. It never
@@ -123,7 +155,7 @@ components/shared/             app shell, navigation, command menu
   the API's refusal and offers its `details.suggestion`. A list section's
   display options (Show as, Photos, Descriptions, Prices, Highlight,
   Button) go through `section-fields/display-options.tsx` and
-  `components/sites/choice-field.tsx`, and each option's default is stored
+  `components/sites/section-fields/choice-field.tsx`, and each option's default is stored
   as absent, so an untouched section publishes as before.
 
 ## Titles, and staying out of search
@@ -239,9 +271,25 @@ accounts and the operator console. `pnpm run check:titles` and
   filter the menu at publish. A draft preview gets the same `modules` from
   its read and passes them to `SiteHeader` and its `[slug]`. The main
   button follows the same modules through `lib/header-action.ts`.
+- **Current** (20 Oct 2026, DEC-172 U9) — **Booking is one route with the
+  step in the address**: `/book?service=…&step=what|who|when|details|pay|done`
+  (`site-blocks/src/booking-flow/step-url.ts`), in every look and in
+  Classic. A later step is a new history entry, so Back is the step before;
+  anything else replaces the entry (`use-step-history.ts`), with no server
+  render. A link with no step opens the furthest its choices reach, and a
+  step the page can't stand on falls back (`resolveStep`): `pay` from a
+  link or a reload goes back to `when`, because the hold is only in the
+  page's memory. Only what is safe to share rides the address (the service,
+  the person, the day and time in the business's zone, the booking being
+  moved, the booked reference); a note, a name, an email, a phone, a code
+  or a hold's or payment's token never does (`NEVER`), and other
+  parameters (a QR code's `src`) are left alone. A look frames the same
+  steps differently; it never adds a route.
 
 ## Not adopted
 
-`modules/<feature>/index.tsx` exporting a `<Feature>Module`, and the
-hook → view → index split. Both assume client-side data fetching; Server
-Components already separate reading from rendering.
+`modules/<feature>/index.tsx` exporting a `<Feature>Module`, and a
+mandatory hook → view → index triple for every component. Both assume
+client-side data fetching; Server Components already separate reading from
+rendering, and the UI/business split above is done by moving rules into `.ts`
+files, not by a fixed three-file shape.

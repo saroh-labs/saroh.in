@@ -4,9 +4,9 @@ import { Button } from "@saroh/ui/button";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
-import type { OrderMenuPending } from "@/components/commerce/order-actions";
-import { OrderActions } from "@/components/commerce/order-actions";
-import { useBusinessZone } from "@/components/shared/business-zone";
+import type { OrderMenuPending } from "@/components/commerce/order-payment/order-actions";
+import { OrderActions } from "@/components/commerce/order-payment/order-actions";
+import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { useClock } from "@/lib/hooks/use-clock";
 import { readyNoticeText } from "@/lib/messages/notice-reach";
@@ -39,22 +39,28 @@ import type { OrderPaymentsSummary } from "@/lib/payments/service";
 
 import { changeAccess } from "@/lib/orders/fulfilment-change";
 
-import { ChangeCard, PaymentBanner } from "./change-panels";
+import {
+    ChangeCard,
+    PaymentBanner,
+} from "@/components/commerce/order-changes/change-panels";
+import { useOrderPanel } from "@/components/commerce/order-changes/order-sheet";
+import { OrderSheets } from "@/components/commerce/order-changes/order-sheets";
+import { useOrderChanges } from "@/components/commerce/order-changes/use-order-changes";
+import { KitchenPaymentCard } from "@/components/commerce/order-payment/kitchen-payment-card";
+import { MoneyCard } from "@/components/commerce/order-payment/money-card";
+import {
+    PayLinkBlock,
+    usePayLink,
+} from "@/components/commerce/order-payment/pay-link";
 import { CustomerCard } from "./customer-card";
 import { HoldCard } from "./hold-card";
 import { AllergyBanner, OrderItems } from "./items";
-import { KitchenPaymentCard } from "./kitchen-payment-card";
-import { MoneyCard } from "./money-card";
 import { OrderHeading } from "./order-header";
-import { useOrderPanel } from "./order-sheet";
-import { OrderSheets } from "./order-sheets";
 import type { PillTone } from "./parts";
-import { PayLinkBlock, usePayLink } from "./pay-link";
 import { KitchenStepper } from "./stepper";
 import { OrderTimeline } from "./timeline";
 import { useArrival } from "./use-arrival";
 import { useKitchen } from "./use-kitchen";
-import { useOrderChanges } from "./use-order-changes";
 import { VisitsSection } from "./visits-card";
 import { VisitsNextAction } from "./visits-next";
 import { NoCustomerCard } from "./walk-in-card";
@@ -67,12 +73,12 @@ export interface OrderPermissions {
      * hand (`order:edit`, B16).
      */
     edit: boolean;
-    /** Make or replace its pay link (`order:create` or `order:edit`). */
+    /** Make or replace its payment link (`order:create` or `order:edit`). */
     payLink: boolean;
     /** Refund and cancel (`order:refund`, B16). */
     refund: boolean;
     /**
-     * A provider can open the checkout window, so a pay link can be made
+     * A provider can open the checkout window, so a payment link can be made
      * (B11, DEC-054). Making one also takes `payLink`.
      */
     payOnline?: boolean;
@@ -210,7 +216,7 @@ export function OrderDetail({
     });
     const { hold, busy } = kitchen;
 
-    // The pay link (B11): for an order still owed money, made by someone
+    // The payment link (B11): for an order still owed money, made by someone
     // who may change orders. Its address is shown once, to its maker.
     const madeAt = order.payLinkCreatedAt ?? null;
     const payLink = usePayLink({ orderId: order.id, first, madeAt });
@@ -451,7 +457,11 @@ export function OrderDetail({
                         hold={hold}
                         title={(s) => `Marking ready in ${s}s`}
                         note="Leave this page and it's marked ready straight away. Undo is only here."
-                        body={readyNoticeText(order.customerNotice, first)}
+                        body={readyNoticeText(
+                            order.customerNotice,
+                            first,
+                            order.customerNoticeTo,
+                        )}
                         nowLabel="Mark now"
                         onUndo={() =>
                             kitchen.cancelHold(

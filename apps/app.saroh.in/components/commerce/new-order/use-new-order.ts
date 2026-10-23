@@ -58,7 +58,7 @@ export function useNewOrder({
      * location role, DEC-106): there it is paid on collection.
      */
     noMoneyAt?: readonly string[];
-    /** May make a pay link (`order:create`, B16). */
+    /** May make a payment link (`order:create`, B16). */
     canLink: boolean;
     /** The plan takes payment online (R33); else no link is offered. */
     online?: boolean;

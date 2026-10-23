@@ -7,9 +7,13 @@
  * | Endpoint                                                   | Asks                          |
  * | ---------------------------------------------------------- | ----------------------------- |
  * | services, rules, availability, staff, closures, rules (GET) | `service:read`               |
- * | the same, changed; hours, time off, booking rules          | `service:write`               |
+ * | the same, changed; staff, their services, booking rules    | `service:write`               |
+ * | a person's hours, extra hours and time off (DEC-170)       | `hours:write`                 |
+ * | a person's own booking rules: theirs (#1038)               | `hours:write`                 |
+ * | approve or turn down a request to change them (#1038)      | `service:write`               |
  * | the diary, a booking, a class's waitlist                   | `booking:read`                |
  * | book, move, outcome, cancel, a treatment's visit           | `booking:write`               |
+ * | change who a booking is with, and who could take it (#1157) | `booking:write`              |
  * | a booking's pay link                                       | `booking:write`, `invoice:write` |
  * | packs, selling terms, Pack Detail's tabs, purchases        | `pack:read`                   |
  * | sell a pack                                                | `pack:sell`                   |
@@ -30,6 +34,7 @@ import { InvoicesService } from "../invoices/invoices.service";
 import type { OrgAction } from "../organizations/organization-policy";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import { ClosuresService } from "../staff/closures.service";
+import { StaffRulesService } from "../staff/staff-rules.service";
 import { StaffService } from "../staff/staff.service";
 import { BookingsService } from "./bookings.service";
 import { WaitlistService } from "./waitlist.service";
@@ -37,6 +42,7 @@ import { WaitlistService } from "./waitlist.service";
 const tag = `${process.pid}-${Date.now()}`;
 const bookings = new BookingsService();
 const staff = new StaffService();
+const staffRules = new StaffRulesService();
 const closures = new ClosuresService();
 const waitlist = new WaitlistService();
 const packs = new ClassPacksService(new InvoicesService());
@@ -53,6 +59,8 @@ const ROLES: Record<string, OrgAction[]> = {
     "pack-reader-e26": ["pack:read"],
     // Sets up services, hours and rules; saved without the read.
     "setup-e26": ["service:write"],
+    // Keeps people's hours and time off, and nothing else (DEC-170).
+    "hours-e170": ["hours:write"],
     // A practitioner: sees the diary.
     "diary-e26": ["booking:read", "service:read"],
     // Can send a booking's pay link.
@@ -74,7 +82,8 @@ const HOLDS: Record<RoleKey, OrgAction[]> = {
     "seller-e26": ["pack:sell", "pack:read"],
     "packs-lead-e26": ["pack:write", "pack:sell", "pack:read"],
     "pack-reader-e26": ["pack:read"],
-    "setup-e26": ["service:write", "service:read"],
+    "setup-e26": ["service:write", "service:read", "hours:write"],
+    "hours-e170": ["hours:write", "service:read"],
     "diary-e26": ["booking:read", "service:read"],
     "cashier-e26": ["booking:write", "booking:read", "invoice:write"],
     "site-e26": ["site:read"],
@@ -191,38 +200,76 @@ const ENDPOINTS: [
     ],
     [
         "PUT staff/:id/hours",
-        ["service:write"],
+        ["hours:write"],
         (c) => staff.replaceHours(c, MISSING, []),
     ],
     [
         "POST staff/:id/extra-hours",
-        ["service:write"],
+        ["hours:write"],
         (c) => staff.addExtraHours(c, MISSING, {} as never),
     ],
     [
         "DELETE staff/:id/extra-hours/:id",
-        ["service:write"],
+        ["hours:write"],
         (c) => staff.removeExtraHours(c, MISSING, MISSING),
     ],
     [
         "POST staff/:id/time-off",
-        ["service:write"],
+        ["hours:write"],
         (c) => staff.addTimeOff(c, MISSING, {} as never),
     ],
     [
         "POST staff/:id/time-off/remove",
-        ["service:write"],
+        ["hours:write"],
         (c) => staff.removeTimeOffMany(c, MISSING, []),
     ],
     [
         "DELETE staff/:id/time-off/:id",
-        ["service:write"],
+        ["hours:write"],
         (c) => staff.removeTimeOff(c, MISSING, MISSING),
     ],
     [
         "PUT booking-rules",
         ["service:write"],
         (c) => staff.updateBookingRules(c, {} as never),
+    ],
+    // — Each person's own booking rules, and requests (#1038) ——————
+    [
+        "GET staff/:id/booking-rules",
+        ["service:read"],
+        (c) => staffRules.read(c, MISSING),
+    ],
+    // One's own; anyone's with `service:write`, which implies it.
+    [
+        "PUT staff/:id/booking-rules",
+        ["hours:write"],
+        (c) => staffRules.update(c, MISSING, {}),
+    ],
+    [
+        "GET booking-rule-requests",
+        ["service:read"],
+        (c) => staffRules.waiting(c),
+    ],
+    [
+        "POST booking-rule-requests/:id/approve",
+        ["service:write"],
+        (c) => staffRules.approve(c, MISSING),
+    ],
+    [
+        "POST booking-rule-requests/:id/turn-down",
+        ["service:write"],
+        (c) => staffRules.turnDown(c, MISSING),
+    ],
+    // The person who asked, whatever their role: no power of its own.
+    [
+        "POST booking-rule-requests/:id/withdraw",
+        [],
+        (c) => staffRules.withdraw(c, MISSING),
+    ],
+    [
+        "POST booking-rule-requests/:id/dismiss",
+        [],
+        (c) => staffRules.dismiss(c, MISSING),
     ],
     ["POST closures", ["service:write"], (c) => closures.add(c, {} as never)],
     ["POST closures/remove", ["service:write"], (c) => closures.remove(c, [])],
@@ -265,6 +312,19 @@ const ENDPOINTS: [
             bookings.rescheduleBooking(c, MISSING, {
                 startAt: FROM,
             } as never),
+    ],
+    [
+        "POST services/bookings/:id/reassign",
+        ["booking:write"],
+        (c) =>
+            bookings.reassignBooking(c, MISSING, {
+                staffId: MISSING,
+            }),
+    ],
+    [
+        "GET services/bookings/:id/people",
+        ["booking:write"],
+        (c) => bookings.reassignCandidates(c, MISSING),
     ],
     [
         "POST services/bookings/:id/outcome",

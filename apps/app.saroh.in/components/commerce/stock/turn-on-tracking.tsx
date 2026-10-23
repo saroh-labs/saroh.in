@@ -6,7 +6,7 @@ import { PackageCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { setBusinessStockTracking } from "@/lib/stock/screen-actions";
 
 /**

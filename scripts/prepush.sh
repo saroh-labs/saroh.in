@@ -287,7 +287,26 @@ e2e_worktree() {
     fi
     cd "$dir"
     echo "--- worktree $dir at $(git rev-parse --short HEAD)"
+    # A kept .next built by another Next version breaks the build (16.3.8 →
+    # 16.4.2 couldn't resolve its own font loader), so a new lockfile clears it.
+    local lock
+    lock=$(git hash-object pnpm-lock.yaml)
+    if [ "$(cat .prepush-lock 2>/dev/null)" != "$lock" ]; then
+        rm -rf apps/*/.next
+        echo "$lock" >.prepush-lock
+    fi
     pnpm install --frozen-lockfile --prefer-offline
+}
+# Whether a spec of this run opens the operator console: an `admin:` key in
+# its @covers line (admin plan U23). Only then is admin.saroh.in built and
+# started, as the marketing site is for its specs. Spec paths are relative
+# to e2e/, read from the current directory's tree.
+specs_open_admin() {
+    local s
+    for s in $1; do
+        grep -qE '^// @covers.* admin:' "e2e/$s" 2>/dev/null && return 0
+    done
+    return 1
 }
 e2e_stack() {
     set -e
@@ -302,7 +321,7 @@ e2e_stack() {
     export DATABASE_URL="$url" DATABASE_TARGET_CONFIRM="$name"
     export BETTER_AUTH_SECRET=ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder)
     export BETTER_AUTH_URL=http://localhost:3333
-    export BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000,http://localhost:3003,http://localhost:3333
+    export BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000,http://localhost:3003,http://localhost:3006,http://localhost:3333
     export APP_URL=http://localhost:3003
     export NEXT_PUBLIC_ACCOUNTS_URL=http://localhost:3000
     # Where accounts sends a new account (onboarding); unset, a production
@@ -325,6 +344,10 @@ e2e_stack() {
     # this stack's API, and pricing reads the catalogue there (the
     # placeholder when there is none).
     export E2E_WEB_URL=http://localhost:3002
+    # The operator console (admin.saroh.in), built and started only when an
+    # `admin:` spec runs (specs_open_admin; admin plan U23), as CI does. The
+    # seed's staff login, a Platform owner by grant, signs in to it.
+    export E2E_ADMIN_URL=http://localhost:3006
     # Resources pages before their publish date, as CI: without it the Help
     # and Privacy specs skip themselves and test nothing.
     export RESOURCES_PREVIEW=1
@@ -333,12 +356,21 @@ e2e_stack() {
     export NEXT_PUBLIC_TEMPLATES=on
     local web_filter=""
     case " $(echo $specs) " in *marketing.spec.ts* | *link-preview.spec.ts* | *qr-code-maker.spec.ts* | *resources.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) web_filter=--filter=web ;; esac
+    local admin_filter=""
+    if specs_open_admin "$specs"; then admin_filter=--filter=admin; fi
     # The API's links to the renderer (pay links, DEC-069 L6): this stack's,
     # never production's saroh.app, which a redirect would otherwise leave for.
     export RENDERER_URL=http://localhost:3005
+    # Where the API's emails send someone to accounts: a staff invite's
+    # link (admin plan U24) opens this stack's, never production's.
+    export ACCOUNTS_URL=http://localhost:3000
     export SITE_RELAY_SECRET=saroh-dev-insecure-site-relay-secret-not-for-production
     export SITE_ACCOUNTS_CODE_SECRET=ci-placeholder-site-code-secret-at-least-32-chars # gitleaks:allow (CI placeholder)
     export SITE_CODES_EMAIL_FAKE=log
+    # Customers' accounts on merchant sites, as CI and production: the API,
+    # saroh.app and the runner all read it, so the account specs run instead
+    # of skipping themselves (review #25).
+    export SITE_ACCOUNT_AREA=on
     # The link preview tool's spec serves its pages on this machine, which
     # the API's SSRF guard refuses; this test-only list lets it reach them.
     # The API won't boot with it under NODE_ENV=production.
@@ -375,7 +407,7 @@ e2e_stack() {
         # shellcheck disable=SC2086
         pnpm turbo run build --log-order=grouped \
             --filter=@saroh/database --filter=@saroh/api --filter=auth \
-            --filter=application --filter=sites $web_filter
+            --filter=application --filter=sites $web_filter $admin_filter
     else
         echo "--- database: fresh, migrated and seeded (no template for key $key)"
         createdb --maintenance-db="$maint" "$name"
@@ -390,7 +422,7 @@ e2e_stack() {
         # shellcheck disable=SC2086
         pnpm turbo run db:seed:showcase build --log-order=grouped \
             --filter=@saroh/database --filter=@saroh/api --filter=auth \
-            --filter=application --filter=sites $web_filter
+            --filter=application --filter=sites $web_filter $admin_filter
         echo "    migrated, seeded and built in $(( $(date +%s) - s ))s"
 
         # Kept for the next run, before anything connects to this one.
@@ -416,11 +448,17 @@ e2e_stack() {
         API_URL=http://localhost:3333 pnpm --filter web exec next start -p 3002 >"$E2E_LOGS/web.log" 2>&1 &
         echo $! >>"$E2E_LOGS/pids"
     fi
+    if [ -n "$admin_filter" ]; then
+        pnpm --filter admin exec next start -p 3006 >"$E2E_LOGS/admin.log" 2>&1 &
+        echo $! >>"$E2E_LOGS/pids"
+    fi
     wait_up api http://localhost:3333/health "200 307"
     wait_up accounts http://localhost:3000/login "200 307"
     wait_up app http://localhost:3003/ "200 307"
     wait_up renderer http://localhost:3005/preview/not-a-token "200 307 404"
     [ -z "$web_filter" ] || wait_up web http://localhost:3002/ "200"
+    # 307: the console sends someone signed out to accounts' sign-in.
+    [ -z "$admin_filter" ] || wait_up admin http://localhost:3006/ "200 307"
 
     # The runner (e2e/run.mjs): sign in once, then desk and phone in
     # parallel on PW_WORKERS, then the @serial tests one at a time.
@@ -662,6 +700,8 @@ e2e_start() {
     # The marketing site, when its spec is in the run (e2e_stack).
     [ "$E2E_STATUS" = run ] && case " $(echo $specs) " in
         *marketing.spec.ts* | *link-preview.spec.ts* | *qr-code-maker.spec.ts* | *resources.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) ports="$ports 3002" ;; esac
+    # The operator console, when an `admin:` spec is in the run.
+    [ "$E2E_STATUS" = run ] && specs_open_admin "$specs" && ports="$ports 3006"
     [ "$PERM_STATUS" = run ] && ports="$ports 3004 3334"
     trap stop_stack EXIT
     # In the background: the lock first (waiting on another run, if one is
@@ -822,17 +862,24 @@ fi
 # that goes through turbo first waits for one build of what the affected
 # packages import (test_deps), then runs with --only, so no two turbo runs
 # ever build the same package at the same time.
+bg_step branch-base pnpm run check:branch-base
 bg_step routes pnpm run check:routes
 bg_step catalog-lock pnpm run check:catalog-lock
 bg_step edge-headers pnpm run check:edge-headers
 bg_step security-headers pnpm run check:security-headers
 bg_step deploy-env pnpm run check:deploy-env
 bg_step blocks pnpm run check:blocks
+bg_step site-motion pnpm run check:site-motion
 bg_step cycles pnpm run check:cycles
 bg_step e2e-covers pnpm run check:e2e-covers
 bg_step merchant-site-tracking pnpm run check:merchant-site-tracking
 bg_step migration-ids pnpm run check:migration-ids
+bg_step decision-ids pnpm run check:decision-ids
 bg_step mktemp pnpm run check:mktemp
+bg_step date-inputs pnpm run check:date-inputs
+bg_step history-state pnpm run check:history-state
+bg_step e2e-signed-in-request pnpm run check:e2e-signed-in-request
+bg_step client-calls pnpm run check:client-calls
 bg_step db-teardown pnpm run check:db-teardown
 bg_step icon-button-tips pnpm run check:icon-button-tips
 bg_step tag-strip pnpm run check:tag-strip
@@ -897,18 +944,33 @@ else
     bg_step "$API_UNIT" env SKIP_ENV_VALIDATION=1 $TURBO test:unit --only \
         --filter=@saroh/api $JEST_ARGS
 fi
+# CI's unit job sets these (.github/workflows/ci.yml, job "unit"); run the
+# same here, or a test that reads one passes locally and fails in CI
+# (seed/staff.test.ts and user-menu.test.tsx, 19 Oct 2026). Keep in step
+# with the job's env; its placeholder auth secret is left out on purpose.
+CI_UNIT_ENV=(
+    DATABASE_URL=postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
+    BETTER_AUTH_URL=http://localhost:3333
+    APP_URL=http://localhost:3003
+    CORS_ORIGIN=http://localhost:3000
+    NEXT_PUBLIC_ACCOUNTS_URL=http://localhost:3000
+    NEXT_PUBLIC_API_URL=http://localhost:3333
+    NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3333
+    NEXT_PUBLIC_ROOT_DOMAIN=saroh.app
+)
 # Every other package with a `test` script, as CI's unit job runs them, but
 # the database package: its demo-seed tests build 70 days of a business and
 # take most of a minute alone, so they run after this burst, not inside it.
 # shellcheck disable=SC2086
-bg_step "$VITEST" $GATE_TURBO test --only --filter="...[$MB]" --filter='!@saroh/api' \
+bg_step "$VITEST" env "${CI_UNIT_ENV[@]}" $GATE_TURBO test --only --filter="...[$MB]" --filter='!@saroh/api' \
     --filter='!@saroh/database' $VITEST_ARGS
 bg_report
 if cached "$SEEDS" seeds; then
     say "$SEEDS" "PASS (cached)"
 elif affected @saroh/database; then
     # shellcheck disable=SC2086
-    step "$SEEDS" $TURBO test --only --filter=@saroh/database $SEED_ARGS
+    step "$SEEDS" env "${CI_UNIT_ENV[@]}" $TURBO test --only \
+        --filter=@saroh/database $SEED_ARGS
 fi
 
 # A new migration must replay onto an empty database and match schema.prisma.
@@ -922,7 +984,11 @@ replay() {
     dropdb --if-exists --force --maintenance-db="$rmaint" "$rdb" &&
         createdb --maintenance-db="$rmaint" "$rdb" &&
         DATABASE_URL="$REPLAY_DATABASE_URL" DATABASE_TARGET_CONFIRM="$rdb" \
-            pnpm --filter @saroh/database db:verify:replay
+            pnpm --filter @saroh/database db:verify:replay &&
+        # Then, on the same database rebuilt to just before it, the billing
+        # profiles migration's data move against rows (DEC-167): the replay
+        # runs it on an empty database, where none of its rules meet a row.
+        MIGFOLD_DATABASE_URL="$REPLAY_DATABASE_URL" pnpm run check:migration-fold
 }
 if echo "$CHANGED" | grep "^packages/database/prisma/" >/dev/null; then
     case "${REPLAY_DATABASE_URL:-}" in

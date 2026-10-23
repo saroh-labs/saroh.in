@@ -5,7 +5,7 @@ import { dismissToasts, showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import type { ContactOption } from "@/components/shared/contact-picker";
+import type { ContactOption } from "@/components/shared/fields/contact-picker";
 import { setPackArchived } from "@/lib/class-packs/actions";
 import { usedEmptyText, usedRows } from "@/lib/class-packs/pack-activity";
 import { packKind, unitWord } from "@/lib/class-packs/pack-cards";
@@ -47,9 +47,9 @@ import type { HeldPack } from "@/lib/class-packs/sell-words";
 import type { GstAsk } from "@/lib/gst/item-words";
 import { invoicesHref } from "@/lib/invoices/links";
 
+import type { SellablePack } from "@/components/class-packs/list/sell-pack-dialog";
+import { SellPackDialog } from "@/components/class-packs/list/sell-pack-dialog";
 import { TabStrip } from "@saroh/ui/tabs";
-import type { SellablePack } from "../sell-pack-dialog";
-import { SellPackDialog } from "../sell-pack-dialog";
 import { ActivityTab } from "./activity-tab";
 import { CustomerView } from "./customer-view";
 

@@ -11,6 +11,7 @@ import { Prisma, prisma } from "@saroh/database";
 import { enquirySubmittedEvent } from "../analytics/enquiry-event";
 import type { FieldType, FormField } from "../forms/dto";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
+import { enqueueEnquiryReply } from "./enquiry-reply";
 import { fieldsFromSnapshot } from "./live-form-fields";
 import { FixedWindowRateLimiter } from "./rate-limiter";
 
@@ -91,7 +92,8 @@ export class EnquiryService {
      *  3. Idempotency: an existing Submission for `(formId, idempotencyKey)` is replayed, no new lead.
      *  4. Rate-limit by `${formId}:${ipHash}`; 429 on exceed.
      *  5. In ONE transaction: upsert Contact, ensure Pipeline+Stage, create Lead,
-     *     create immutable Submission, enqueue the `enquiry.notify` Job, log a CREATED Activity.
+     *     create immutable Submission, enqueue the `enquiry.notify` Job, the
+     *     auto-reply where it goes (`enquiry-reply.ts`), log a CREATED Activity.
      *
      * @param formId          the target Form's id (the only client-chosen routing input)
      * @param data            raw field name → value map as submitted
@@ -198,6 +200,16 @@ export class EnquiryService {
                             submissionId: submission.id,
                         },
                     },
+                });
+
+                // "We got your message" to the person who wrote (U15): its
+                // own job, queued only when the switch is on, the business's
+                // own email is connected and it isn't obvious spam.
+                await enqueueEnquiryReply(tx, {
+                    organizationId,
+                    submissionId: submission.id,
+                    fields,
+                    data,
                 });
 
                 // Transactional outbox: a committed NEW lead ALWAYS gets one
@@ -405,11 +417,13 @@ export class EnquiryService {
 
     /**
      * Upsert the Contact by `(organizationId, email)`: a repeat enquiry from the
-     * same address updates the existing person (only the fields actually
-     * supplied, so a sparse repeat never clobbers known values) rather than
-     * forking a duplicate.
+     * same address finds the existing person rather than forking a duplicate,
+     * and fills only what the business doesn't know yet. Anyone can type
+     * anyone's email into a public form, so a form never changes a name or
+     * phone the business already has: it would send their messages to a
+     * stranger's number.
      */
-    private upsertContact(
+    private async upsertContact(
         tx: Prisma.TransactionClient,
         organizationId: string,
         formId: string,
@@ -418,11 +432,21 @@ export class EnquiryService {
         const first = c.firstName ?? this.splitName(c.fullName).first;
         const last = c.lastName ?? this.splitName(c.fullName).last;
 
+        const known = await tx.contact.findUnique({
+            where: { organizationId_email: { organizationId, email: c.email } },
+            select: {
+                firstName: true,
+                lastName: true,
+                phone: true,
+                company: true,
+            },
+        });
         const update: Prisma.ContactUpdateInput = {};
-        if (first !== undefined) update.firstName = first;
-        if (last !== undefined) update.lastName = last;
-        if (c.phone !== undefined) update.phone = c.phone;
-        if (c.company !== undefined) update.company = c.company;
+        if (first !== undefined && !known?.firstName) update.firstName = first;
+        if (last !== undefined && !known?.lastName) update.lastName = last;
+        if (c.phone !== undefined && !known?.phone) update.phone = c.phone;
+        if (c.company !== undefined && !known?.company)
+            update.company = c.company;
 
         return tx.contact.upsert({
             where: {

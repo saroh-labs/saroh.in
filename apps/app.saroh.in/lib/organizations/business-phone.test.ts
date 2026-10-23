@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { phoneLabel, phoneProblem } from "./business-phone";
+import { phoneLabel, phoneProblem, phoneStored } from "./business-phone";
 
 describe("the business's public phone (DEC-053)", () => {
     it.each([
@@ -15,8 +15,17 @@ describe("the business's public phone (DEC-053)", () => {
         expect(phoneProblem(typed)).toBeNull();
     });
 
-    it("asks for the country code when there is no +", () => {
-        expect(phoneProblem("98450 12345")).toMatch(/country code/);
+    it.each([
+        ["98450 12345", "+919845012345"],
+        ["098450 12345", "+919845012345"],
+        ["91 98450 12345", "+919845012345"],
+    ])("takes %j, typed without the +, as Indian", (typed, stored) => {
+        expect(phoneProblem(typed)).toBeNull();
+        expect(phoneStored(typed)).toBe(stored);
+    });
+
+    it("asks for the country code when there is no + and it isn't Indian", () => {
+        expect(phoneProblem("1 415 555 0100")).toMatch(/country code/);
     });
 
     it.each(["+0 1234 5678", "+1234567", "+1234567890123456", "+91 9845x"])(
@@ -32,9 +41,9 @@ describe("the business's public phone (DEC-053)", () => {
         );
     });
 
-    it("reads an Indian number in groups, any other as stored", () => {
+    it("reads a saved number in groups (#1036)", () => {
         expect(phoneLabel("+919845012345")).toBe("+91 98450 12345");
-        expect(phoneLabel("+441134960000")).toBe("+441134960000");
+        expect(phoneLabel("+441134960000")).toBe("+44 113 496 0000");
         expect(phoneLabel(null)).toBe("");
         expect(phoneLabel(undefined)).toBe("");
     });

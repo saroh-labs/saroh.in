@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { AccountEntry, OrderConfirmation } from "@saroh/site-blocks";
+import {
+    AccountEntry,
+    lookOf,
+    LookOrderPlaced,
+    OrderConfirmation,
+} from "@saroh/site-blocks";
 
 import {
     loadSignInOptions,
@@ -9,6 +14,7 @@ import {
     verifySignInCode,
 } from "@/app/[domain]/account/actions";
 
+import { VisitStep } from "@/components/visit-step";
 import { accountAreaOn } from "@/lib/account-area";
 import { getSiteForHost } from "@/lib/publication";
 import { getOrderConfirmation } from "@/lib/shop-confirmation";
@@ -57,29 +63,46 @@ export default async function ShopOrderPage({
             : null;
 
     const businessName = resolved.snapshot.site.name;
+    // Folio, Quiet or Live (DEC-172, U11) draw the look's Order placed;
+    // absent, Classic's page, exactly as before.
+    const look = lookOf(resolved.snapshot.site.look);
+    const props = {
+        lookup,
+        businessName,
+        soldBy: soldByFor(facts, businessName, true),
+        ordersHref,
+        // Where a read that failed is asked for again.
+        retryHref: `/shop/order/${encodeURIComponent(orderId)}`,
+        signIn:
+            !lookup.ok && lookup.reason === "signed-out" ? (
+                <AccountEntry
+                    variant="page"
+                    customer={null}
+                    businessName={businessName}
+                    api={{
+                        requestCode: requestSignInCode,
+                        verifyCode: verifySignInCode,
+                    }}
+                    loadOptions={loadSignInOptions}
+                />
+            ) : null,
+    };
 
-    return (
-        <OrderConfirmation
-            lookup={lookup}
-            businessName={businessName}
-            soldBy={soldByFor(facts, businessName, true)}
-            ordersHref={ordersHref}
-            // Where a read that failed is asked for again.
-            retryHref={`/shop/order/${encodeURIComponent(orderId)}`}
-            signIn={
-                !lookup.ok && lookup.reason === "signed-out" ? (
-                    <AccountEntry
-                        variant="page"
-                        customer={null}
-                        businessName={businessName}
-                        api={{
-                            requestCode: requestSignInCode,
-                            verifyCode: verifySignInCode,
-                        }}
-                        loadOptions={loadSignInOptions}
-                    />
-                ) : null
-            }
-        />
+    // Paid online (DEC-181): the visit that paid says so, once, with its
+    // group and label only. This page is private, so it sends no page
+    // view; a visit begun on a public page still sends this step.
+    const paid =
+        lookup.ok && lookup.order.paidOnline ? <VisitStep step="paid" /> : null;
+
+    return look ? (
+        <>
+            {paid}
+            <LookOrderPlaced look={look} {...props} />
+        </>
+    ) : (
+        <>
+            {paid}
+            <OrderConfirmation {...props} />
+        </>
     );
 }

@@ -62,12 +62,14 @@ const READS = new Set([
     "savedDeliveryAddress",
     "creditFor",
     "waitlistFor",
+    "findMyBooking",
     "loadSignInOptions",
     "moveTimes",
     "visitTimes",
     "packPayment",
     "planJoinStanding",
     "readAutopay",
+    "backInStockOffer",
 ]);
 
 const LINE = { listingId: "lst_1", variantId: null, quantity: 1 };
@@ -78,6 +80,13 @@ const KEY = "key_1";
 const WRITES: Record<string, () => Promise<unknown>> = {
     startCheckout: () =>
         shop.startCheckout({ lines: [LINE], fulfilment: "PICKUP", key: KEY }),
+    watchBackInStock: () =>
+        shop.watchBackInStock({
+            productId: "prd_1",
+            variantId: null,
+            email: "asha@example.com",
+        }),
+    stopWaiting: () => shop.stopWaiting("v1.watch1abc.sig"),
     bookSignedIn: () =>
         book.bookSignedIn({
             serviceId: "svc_1",
@@ -104,6 +113,7 @@ const WRITES: Record<string, () => Promise<unknown>> = {
     addHealthNote: () => me.addHealthNote("Sore knee"),
     payInvoiceNow: () => me.payInvoiceNow("inv_1"),
     saveEmailChoice: () => me.saveEmailChoice(false),
+    askDataRemoval: () => me.askDataRemoval(),
     sendMessage: () => messages.sendMessage("Hello"),
     pausePlan: () => plan.pausePlan("sub_1", 2),
     resumePlan: () => plan.resumePlan("sub_1"),

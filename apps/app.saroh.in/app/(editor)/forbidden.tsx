@@ -1,4 +1,4 @@
-import { AccessDenied } from "@/components/shared/access-denied";
+import { AccessDenied } from "@/components/shared/states/access-denied";
 
 /**
  * A 403 inside the full-screen editor (#274).

@@ -5,6 +5,8 @@ import { recordOrderPaidInTx } from "../analytics/order-events";
 import { suggestFromBookingNoteInTx } from "../customer-workspace/attention-suggest";
 import { rateToBps } from "../invoices/gst";
 import type { GstPriceMode } from "../invoices/gst-price";
+import type { OnlinePayment } from "../invoices/invoice-ledger";
+import { payIssuedDraftOnlineInTx } from "../invoices/invoice-ledger";
 import { buildManualInvoice } from "../invoices/order-invoice";
 import {
     documentColumns,
@@ -13,7 +15,7 @@ import {
     writeDocumentLines,
 } from "../invoices/order-invoicing";
 import { mintPayToken } from "../invoices/pay-token";
-import { BookingEventType } from "./booking-event-type";
+import { BookingEventType, classCancelledData } from "./booking-event-type";
 import { seatsHeld } from "./held-seats";
 import { cancelUnsoldTreatmentInTx } from "./treatment-unsold";
 import { offerFreedPlaceInTx } from "./waitlist-queue";
@@ -43,6 +45,13 @@ type Tx = Prisma.TransactionClient;
 
 /** How long a pay-now booking holds its place. */
 export const HOLD_MINUTES = 15;
+
+/**
+ * Why a hold is let go (#1137): the booker or the team let it go
+ * (`let-go`, a cancel), its time ran out unpaid (`lapsed`), or its money
+ * came after its place was taken (`paid-late`, lapsed and owed back).
+ */
+export type HoldRelease = "let-go" | "lapsed" | "paid-late";
 
 /** The self-rescheduling job that releases holds whose time ran out. */
 export const RELEASE_HOLDS_TYPE = "booking.release-holds";
@@ -238,13 +247,30 @@ export async function lockBookingInTx(
  * The place it held is free again, so the class's waitlist is offered it
  * (A12) — unless the same person is booking the same session again this
  * moment (`freesPlace: false`, K-2), when nothing frees.
+ *
+ * `why` (#1137) is what the history says: `let-go` (the default) is a
+ * cancel — by the team member named, else by the booker; `lapsed` is a
+ * hold whose time ran out unpaid, recorded as LAPSED, nobody's choice, and
+ * the booker is told ({@link HoldRelease}); `paid-late` lapsed too, but the
+ * money came after someone else took the place, so it is owed back and the
+ * booker is not told it "wasn't paid".
  */
 export async function releaseHoldInTx(
     tx: Tx,
     bookingId: string,
     now: Date,
     actorUserId: string | null = null,
-    options: { freesPlace?: boolean } = {},
+    options: {
+        freesPlace?: boolean;
+        why?: HoldRelease;
+        /**
+         * The team let it go because the whole class is cancelled (U17):
+         * the booker is told "‹Business› cancelled this class".
+         */
+        classCancelled?: boolean;
+        /** Why, in the business's words (DEC-178, #1172). */
+        classReason?: string;
+    } = {},
 ): Promise<boolean> {
     await lockBookingInTx(tx, bookingId);
     const booking = await tx.booking.findUnique({
@@ -257,9 +283,13 @@ export async function releaseHoldInTx(
             startAt: true,
             holdExpiresAt: true,
             orderId: true,
+            contactId: true,
+            courseEnrollmentId: true,
         },
     });
     if (booking?.status !== "PENDING") return false;
+    const why = options.why ?? "let-go";
+    const lapsed = why !== "let-go";
     await tx.booking.update({
         where: { id: booking.id },
         data: {
@@ -268,18 +298,48 @@ export async function releaseHoldInTx(
             holdExpiresAt: booking.holdExpiresAt ?? now,
         },
     });
-    // The history reads "cancelled", and the booking's kept expiry says it
-    // was a hold that was let go — by the team when it names who.
-    await tx.bookingEvent.create({
+    // Let go, the history reads "cancelled", and the booking's kept expiry
+    // says it was a hold — by the team when it names who. Run out, it reads
+    // "Lapsed" (#1137): not a customer's cancel, so no count or bell takes
+    // it for one.
+    const event = await tx.bookingEvent.create({
         data: {
             bookingId: booking.id,
             organizationId: booking.organizationId,
-            type: "CANCELLED",
-            actorUserId,
+            type: lapsed ? BookingEventType.Lapsed : BookingEventType.Cancelled,
+            actorUserId: lapsed ? null : actorUserId,
             fromStartAt: booking.startAt,
+            ...(!lapsed && options.classCancelled === true
+                ? { data: { ...classCancelledData(options.classReason) } }
+                : {}),
         },
         select: { id: true },
     });
+    // The booker hears their hold lapsed, with a way to book again, or
+    // that the business cancelled the class (U17) — only when there is
+    // someone to tell: a contact, and not a course's session (told as the
+    // course). A late payment is not "wasn't paid".
+    const told =
+        (why === "lapsed" || (!lapsed && options.classCancelled === true)) &&
+        booking.contactId !== null &&
+        !booking.courseEnrollmentId;
+    if (told) {
+        await tx.job.create({
+            data: {
+                organizationId: booking.organizationId,
+                type: "booking.notify",
+                payload: {
+                    bookingId: booking.id,
+                    serviceId: booking.serviceId,
+                    contactId: booking.contactId,
+                    reason: lapsed ? "lapsed" : "cancelled",
+                    eventId: event.id,
+                    ...(lapsed ? {} : { classCancelled: true }),
+                },
+            },
+            select: { id: true },
+        });
+    }
     await tx.invoice.updateMany({
         where: {
             bookingId: booking.id,
@@ -367,7 +427,10 @@ async function placeStillFree(
 /**
  * Money arrived for a hold's draft invoice (the webhook, under the invoice's
  * row lock). The booking is confirmed — paid online — and the invoice takes
- * its number and is written PAID, its number and date those of the payment.
+ * its number and is issued, its number and date those of the payment, then
+ * paid through its ledger (`payIssuedDraftOnlineInTx`, DEC-173): one ONLINE
+ * payment for the intent. A treatment's hold invoice names its order, which
+ * is its ledger (ADR-008), and is stamped paid there instead.
  *
  * A payment after the hold ran out still confirms it when the place is free;
  * when someone else has it now, the hold is released and the caller records
@@ -379,11 +442,7 @@ export async function confirmHoldInTx(
         invoiceId: string;
         organizationId: string;
         now: Date;
-        payment: {
-            paymentMethod: string;
-            paymentReference: string | null;
-            paymentNote: string;
-        };
+        payment: OnlinePayment;
     },
 ): Promise<"confirmed" | "released"> {
     const { now } = input;
@@ -425,7 +484,7 @@ export async function confirmHoldInTx(
         !isExpiredHold(booking, now) ||
         (await placeStillFree(tx, booking, booking.service, now));
     if (!free) {
-        await releaseHoldInTx(tx, booking.id, now);
+        await releaseHoldInTx(tx, booking.id, now, null, { why: "paid-late" });
         return "released";
     }
 
@@ -466,15 +525,14 @@ export async function confirmHoldInTx(
     );
     await tx.invoice.update({
         where: { id: invoice.id },
-        data: {
-            status: "PAID",
-            number,
-            issuedAt: now,
-            dueAt: now,
-            paidAt: now,
-            ...input.payment,
-        },
+        data: { status: "ISSUED", number, issuedAt: now, dueAt: now },
     });
+    await payIssuedDraftOnlineInTx(
+        tx,
+        input.organizationId,
+        invoice.id,
+        input.payment,
+    );
     // A treatment paid in full at booking (E9): its order is paid. A
     // deposit leaves the rest due on the order.
     if (invoice.orderId) {

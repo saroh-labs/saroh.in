@@ -23,8 +23,14 @@ const PULSE = (() => {
     return `${renderer.protocol}//pulse-fitness.${renderer.host}`;
 })();
 
-/** Saroh's own faces, by file name, as `packages/ui/fonts` ships them. */
-const SAROH_FACE = /Geist|Bricolage|SpaceGrotesk|Space_Grotesk|JetBrainsMono/i;
+/**
+ * Saroh's own faces, by file name, as `packages/ui/fonts` ships them:
+ * Geist, Space Grotesk and JetBrains Mono. Bricolage Grotesque was Saroh's
+ * once and is not now; the Live look sets its headings in it on purpose
+ * (DEC-172), so it is a merchant's face like any other in `FONT_PAIRS`.
+ */
+const SAROH_FACE =
+    /Geist|SpaceGrotesk|Space_Grotesk|Space Grotesk|JetBrainsMono|JetBrains_Mono|JetBrains Mono/i;
 /** Where Saroh's font files live, and where Next serves a `localFont` from. */
 const SAROH_FONT_PATH = /packages\/ui\/fonts|\/_next\/static\/media\//;
 
@@ -84,6 +90,27 @@ test.describe("merchant sites load no Saroh font", () => {
         expect(body).toContain("system-ui");
     });
 
+    test("a Classic site on the system font fetches and preloads no font file", async ({
+        page,
+    }) => {
+        // The looks' faces (U3) are declared beside every other merchant
+        // face, preload off: a site that is set in none of them must fetch
+        // none, and no page may preload one.
+        const fonts = await fontRequests(page, async () => {
+            await page.goto(PULSE);
+        });
+        expect(fonts).toEqual([]);
+        await expect(
+            page.locator('link[rel="preload"][as="font"]'),
+        ).toHaveCount(0);
+        const loaded = await page.evaluate(() =>
+            [...document.fonts]
+                .filter((f) => f.status === "loaded")
+                .map((f) => f.family),
+        );
+        expect(loaded).toEqual([]);
+    });
+
     test("the booking page fetches no Saroh face, and its step heading is the system stack", async ({
         page,
     }) => {
@@ -133,15 +160,25 @@ test.describe("merchant sites load no Saroh font", () => {
         if ((await brand.getAttribute("aria-selected")) !== "true") {
             await brand.click();
         }
-        // The pairing picker (industry templates, KTD-2). Read-only here: a
-        // seeded site has chosen no pair, so the system font is checked.
-        const typeface = page.getByRole("radiogroup", { name: "Typeface" });
-        await expect(typeface).toBeVisible();
+        // The pairing picker (industry templates, KTD-2; DEC-184). Read-only
+        // here: a seeded site has chosen no pair, so the system font is the
+        // one in force, and the search behind Change offers the rest.
+        await expect(page.locator("[data-typeface-current]")).toHaveAttribute(
+            "data-typeface-current",
+            "system",
+        );
+        await page.locator("[data-typeface-change]").click();
+        const typeface = page.getByRole("dialog", { name: "Typeface" });
         await expect(
-            typeface.getByRole("radio", { name: "Your visitor's system font" }),
-        ).toHaveAttribute("aria-checked", "true");
+            typeface.getByRole("option", {
+                name: /Your visitor's system font/,
+            }),
+        ).toHaveAttribute("aria-selected", "true");
         await expect(
-            typeface.getByRole("radio", { name: "Fraunces and Inter Tight" }),
+            typeface.getByRole("option", { name: "Fraunces and Inter Tight" }),
         ).toBeVisible();
+        // Escape puts the search away, nothing chosen.
+        await page.keyboard.press("Escape");
+        await expect(typeface).toHaveCount(0);
     });
 });

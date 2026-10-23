@@ -1,5 +1,5 @@
-import { SettingsTabs } from "@/components/settings/settings-tabs";
-import { settingsPagesFor } from "@/components/shared/nav-items";
+import { SettingsTabs } from "@/components/settings/page/settings-tabs";
+import { settingsPagesFor } from "@/components/shared/navigation/nav-items";
 import { readEmailSetup } from "@/lib/communications/email-setup-service";
 import { listModules } from "@/lib/modules/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";

@@ -1,11 +1,13 @@
-import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-import { InvoiceForm } from "@/components/invoices/invoice-form";
-import { PageContainer } from "@/components/shared/page-container";
+import { InvoiceForm } from "@/components/invoices/new-invoice/invoice-form";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { requireCan } from "@/lib/access/require-can";
+import { canPickProducts } from "@/lib/invoices/can-pick-products";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
+import { newInvoiceBusiness } from "@/lib/invoices/new-invoice-business";
+import { mayUpdateBusiness } from "@/lib/invoices/paper-access";
 import { payLinkPossible } from "@/lib/invoices/payments-on";
 import { getInvoice } from "@/lib/invoices/service";
 import { detailsOnFileOf } from "@/lib/organizations/business-details";
@@ -34,48 +36,50 @@ export default async function EditInvoicePage({
         },
     });
     if (access.denied) return access.denied;
-    const [invoice, contacts, settings, provider, organization] =
+    const [invoice, contacts, settings, provider, organization, pickable] =
         await Promise.all([
             getInvoice(invoiceId),
             contactPickerOptions(),
             // GST standing, and the details Issue needs (#838), in one read.
             readOrganizationSettings(),
-            // A pay link needs Payments on too (DEC-070).
+            // A payment link needs Payments on too (DEC-070).
             payLinkPossible(),
             resolveActiveOrganization(),
+            canPickProducts(),
         ]);
     if (!invoice) notFound();
     if (invoice.status !== "DRAFT") redirect(`/billing/invoices/${invoice.id}`);
 
     return (
         <PageContainer width="full">
-            <div>
-                <PageHeader
-                    className="mb-4"
-                    breadcrumb={[
+            <InvoiceForm
+                header={{
+                    breadcrumb: [
                         "Payments",
                         <Link key="list" href="/billing/invoices">
                             Invoices
                         </Link>,
                         "Draft",
-                    ]}
-                    title="Edit the draft"
-                    description="It has no number yet, so everything on it can still change."
-                />
-                <InvoiceForm
-                    contacts={contacts}
-                    defaultCurrency={invoice.currency}
-                    draft={invoice}
-                    registered={
-                        invoice.gst != null ||
-                        (settings.ok &&
-                            (settings.data.tax?.registered ?? false))
-                    }
-                    businessName={organization?.name ?? "This business"}
-                    providerConnected={provider}
-                    detailsOnFile={detailsOnFileOf(settings)}
-                />
-            </div>
+                    ],
+                    title: "Edit the draft",
+                }}
+                contacts={contacts}
+                defaultCurrency={invoice.currency}
+                draft={invoice}
+                registered={
+                    invoice.gst != null ||
+                    (settings.ok && (settings.data.tax?.registered ?? false))
+                }
+                businessName={organization?.name ?? "This business"}
+                providerConnected={provider}
+                detailsOnFile={detailsOnFileOf(settings)}
+                business={newInvoiceBusiness(
+                    settings.ok ? settings.data : null,
+                )}
+                canPickProducts={pickable}
+                // Owner and Admin set the business's look from the paper.
+                canSetDefault={mayUpdateBusiness(organization)}
+            />
         </PageContainer>
     );
 }

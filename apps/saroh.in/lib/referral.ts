@@ -25,6 +25,22 @@ import { readAddress } from "@/lib/page-address";
  *   sends that itself. Only the API can tell the two apart, by table.
  * - **Only shaped like a code.** Anything else is left alone. Whether it
  *   names a business, and whether that counts, is the API's to say.
+ *
+ * An account manager's link (DEC-169), `saroh.in/?am=<code>`, is kept the
+ * same way in its own cookie, {@link MANAGER_COOKIE}, beside the referral:
+ * a sign-up can carry both, and both are recorded. Its differences:
+ *
+ * - **It holds when it was kept**, `<code>.<seconds since 1970>`, which the
+ *   API stores as the link's evidence. Opening another page of the same
+ *   link keeps the first time; a different manager's link replaces it (the
+ *   last link wins, as for a referral).
+ * - **It is kept from the waitlist page too.** `?am=` means one thing
+ *   everywhere; only `?ref=` is told apart there.
+ * - **Codes are capitals and digits** (`StaffProfile.managerCode`), read in
+ *   any case, with spaces or dashes, the way one is read out.
+ * - Like the referral, nothing about it is given to a tag: `am` is not on
+ *   the address allow-list (`lib/page-address.ts`), so it is cut before a
+ *   tag loads, and the cookie is never passed to one.
  */
 export const REFERRAL_COOKIE = "saroh_ref";
 
@@ -36,6 +52,12 @@ const WAITLIST_PATH = "/waitlist";
 
 /** A referral code's shape, the API's `REF_CODE_PATTERN`. */
 const CODE = /^[a-hj-km-np-z2-9]{8}$/;
+
+/** The account manager's link (DEC-169): `?am=` kept for setup. */
+export const MANAGER_COOKIE = "saroh_am";
+
+/** A manager code's shape, the API's `MANAGER_CODE_PATTERN`. */
+const MANAGER_CODE = /^[2-9A-HJKMNP-Z]{8}$/;
 
 /** The code in a page's query, or null when it holds none shaped like one. */
 export function referralFromSearch(search: string): string | null {
@@ -60,25 +82,74 @@ export function sharedDomain(
     return accounts === base || accounts.endsWith(`.${base}`) ? base : null;
 }
 
-/** The kept code in a `document.cookie` string, or null. */
-export function keptReferral(cookie: string): string | null {
+/** The manager code in a page's `?am=`, or null when there is none. */
+export function managerFromSearch(search: string): string | null {
+    const raw = new URLSearchParams(search).get("am");
+    if (!raw || raw.length > 64) return null;
+    const code = raw.replace(/[\s-]+/g, "").toUpperCase();
+    return MANAGER_CODE.test(code) ? code : null;
+}
+
+/** The value of cookie `name` in a `document.cookie` string, or null. */
+function cookieValue(cookie: string, name: string): string | null {
     for (const part of cookie.split(";")) {
-        const [name, value] = part.trim().split("=");
-        if (name === REFERRAL_COOKIE && value && CODE.test(value)) {
-            return value;
-        }
+        const [key, value] = part.trim().split("=");
+        if (key === name && value) return value;
     }
     return null;
 }
 
+/** The kept manager link, its code and when it was kept, or null. */
+export function keptManagerLink(
+    cookie: string,
+): { code: string; keptAt: Date } | null {
+    const value = cookieValue(cookie, MANAGER_COOKIE);
+    const [code, seconds] = value?.split(".") ?? [];
+    if (
+        !code ||
+        !MANAGER_CODE.test(code) ||
+        !seconds ||
+        !/^\d{9,11}$/.test(seconds)
+    ) {
+        return null;
+    }
+    return { code, keptAt: new Date(Number(seconds) * 1000) };
+}
+
+/** The kept code in a `document.cookie` string, or null. */
+export function keptReferral(cookie: string): string | null {
+    const value = cookieValue(cookie, REFERRAL_COOKIE);
+    return value && CODE.test(value) ? value : null;
+}
+
+interface CookieAt {
+    host: string;
+    accountsHost: string;
+    secure: boolean;
+}
+
 /** The cookie, as `document.cookie` is assigned it. */
-export function referralCookie(
+export function referralCookie(code: string, at: CookieAt): string {
+    return keptCookie(REFERRAL_COOKIE, code, at);
+}
+
+/** The manager link's cookie: the code and when it was kept, in seconds. */
+export function managerCookie(
     code: string,
-    at: { host: string; accountsHost: string; secure: boolean },
+    keptAt: Date,
+    at: CookieAt,
 ): string {
+    return keptCookie(
+        MANAGER_COOKIE,
+        `${code}.${Math.floor(keptAt.getTime() / 1000)}`,
+        at,
+    );
+}
+
+function keptCookie(name: string, value: string, at: CookieAt): string {
     const domain = sharedDomain(at.host, at.accountsHost);
     return [
-        `${REFERRAL_COOKIE}=${code}`,
+        `${name}=${value}`,
         `Max-Age=${REFERRAL_DAYS * 24 * 60 * 60}`,
         "Path=/",
         ...(domain ? [`Domain=${domain}`] : []),
@@ -88,20 +159,34 @@ export function referralCookie(
 }
 
 /**
- * Keeps the code this page was opened with, if it was opened with one. The
- * query is read through `readAddress`, so it is found whether or not the
- * address has been cut back for a tag yet.
+ * Keeps the referral code and the manager link this page was opened with,
+ * if it was opened with either. The query is read through `readAddress`,
+ * so it is found whether or not the address has been cut back for a tag
+ * yet.
  */
-export function keepReferral(accountsUrl: string, win: Window = window): void {
-    if (win.location.pathname === WAITLIST_PATH) return;
-    const code = referralFromSearch(readAddress(win));
-    if (!code) return;
+export function keepReferral(
+    accountsUrl: string,
+    win: Window = window,
+    now: () => Date = () => new Date(),
+): void {
+    const search = readAddress(win);
+    const code =
+        win.location.pathname === WAITLIST_PATH
+            ? null
+            : referralFromSearch(search);
+    const manager = managerFromSearch(search);
+    if (!code && !manager) return;
     try {
-        win.document.cookie = referralCookie(code, {
+        const at = {
             host: win.location.hostname,
             accountsHost: new URL(accountsUrl).hostname,
             secure: win.location.protocol === "https:",
-        });
+        };
+        if (code) win.document.cookie = referralCookie(code, at);
+        // The same link opened again keeps when it was first kept.
+        if (manager && keptManagerLink(win.document.cookie)?.code !== manager) {
+            win.document.cookie = managerCookie(manager, now(), at);
+        }
     } catch {
         // Cookies are blocked, or the accounts address isn't one: nothing kept.
     }

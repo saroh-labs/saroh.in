@@ -26,7 +26,10 @@ import {
 } from "@saroh/database";
 import { planRows } from "@saroh/pricing-catalog";
 
-import { giveBillingDetails } from "../../../test/business-details";
+import {
+    giveBillingDetails,
+    giveBillingProfile,
+} from "../../../test/business-details";
 import { fakeCatalog } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { BILLING_NOTE_AUTHOR } from "./billing-ops-notice";
@@ -122,6 +125,11 @@ async function business(): Promise<OrganizationContext> {
     return { organizationId: org.id, userId: "owner-user", role: "OWNER" };
 }
 
+/** The fake's customer of the billing profile the business is billed to. */
+async function customerOf(organizationId: string): Promise<string> {
+    return `fake_cus_${await giveBillingProfile(organizationId)}`;
+}
+
 async function sub(organizationId: string) {
     return prisma.subscription.findUniqueOrThrow({
         where: { organizationId },
@@ -195,7 +203,7 @@ const notesJobs = () =>
 describe("the business's provider customer on its subscription", () => {
     it("the return from paying: kept on the subscription and the invoice; the charge's webhook fills in the payment", async () => {
         const ctx = await business();
-        const customer = `fake_cus_${ctx.organizationId}`;
+        const customer = await customerOf(ctx.organizationId);
         const c = await start(ctx, "c");
         const end = new Date(Date.now() + 30 * DAY);
         // A subscription's lookup names no payment.
@@ -312,7 +320,7 @@ describe("the business's provider customer on its subscription", () => {
         });
         expect(await sub(ctx.organizationId)).toMatchObject({
             providerSubscriptionId: first.ref,
-            providerCustomerId: `fake_cus_${ctx.organizationId}`,
+            providerCustomerId: await customerOf(ctx.organizationId),
         });
     });
 
@@ -325,7 +333,7 @@ describe("the business's provider customer on its subscription", () => {
         });
         expect(await sub(ctx.organizationId)).toMatchObject({
             plan: { key: "catalog.c", interval: "year" },
-            providerCustomerId: `fake_cus_${ctx.organizationId}`,
+            providerCustomerId: await customerOf(ctx.organizationId),
         });
         expect(
             await prisma.sarohInvoice.findFirstOrThrow({
@@ -333,7 +341,7 @@ describe("the business's provider customer on its subscription", () => {
             }),
         ).toMatchObject({
             providerPaymentId: "pay_year",
-            providerCustomerId: `fake_cus_${ctx.organizationId}`,
+            providerCustomerId: await customerOf(ctx.organizationId),
         });
     });
 
@@ -352,7 +360,7 @@ describe("the business's provider customer on its subscription", () => {
         expect(await sub(ctx.organizationId)).toMatchObject({
             plan: { key: "catalog.free" },
             providerSubscriptionId: null,
-            providerCustomerId: `fake_cus_${ctx.organizationId}`,
+            providerCustomerId: await customerOf(ctx.organizationId),
         });
     });
 });

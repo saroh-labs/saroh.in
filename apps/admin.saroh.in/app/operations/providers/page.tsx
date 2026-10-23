@@ -30,7 +30,7 @@ export default async function ProvidersPage() {
         <AdminShell staff={staff}>
             <PageContainer>
                 <PageHeader
-                    breadcrumb={["Operations", "Providers"]}
+                    breadcrumb={["Keep it running", "Providers"]}
                     title="Providers"
                     description="The payment, messaging and domain connections businesses rely on."
                 />

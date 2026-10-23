@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 import { PageHeader } from "@saroh/ui/page-header";
 
 import { BookingsLocked } from "@/components/bookings/calendar/parts";
-import { ModuleGate } from "@/components/modules/module-gate";
-import { PageContainer } from "@/components/shared/page-container";
+import { ModuleGate } from "@/components/modules/gate/module-gate";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { canReadBookings } from "@/lib/services/access";

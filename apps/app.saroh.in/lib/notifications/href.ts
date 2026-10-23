@@ -28,8 +28,11 @@ export type NoticeKind =
     | "domain"
     | "providers"
     | "team"
+    | "hours"
     | "plan"
-    | "products";
+    | "products"
+    | "customer-request"
+    | "member";
 
 export interface NoticeTarget {
     kind: NoticeKind;
@@ -71,9 +74,22 @@ const HREF: Record<NoticeKind, (id: string | null, type: string) => string> = {
         id ? `/sites/${encodeURIComponent(id)}/settings` : "/sites",
     providers: () => "/settings/providers",
     team: () => "/settings/people",
+    // A booking rules request, or its answer (#1038): Hours and time off,
+    // on the person it is about when the row names them.
+    hours: (id) =>
+        id
+            ? `/bookings/availability?person=${encodeURIComponent(id)}`
+            : "/bookings/availability",
     // Home while plans aren't shown (DEC-136): the page isn't there.
     plan: () => (plansShown() ? "/settings/billing/plans" : "/"),
     products: () => "/commerce/products",
+    // A customer asked to remove their data (DEC-172): the customer, or
+    // the Customers requests list when no customer is linked.
+    "customer-request": (id) =>
+        id ? personHref(id) : "/commerce/customers?tab=requests",
+    // A member's own cancel or pause, or autopay off at their bank (#1150):
+    // the person's Memberships tab.
+    member: (id) => (id ? personHref(id, "sub") : "/billing/subscriptions"),
 };
 
 function isKind(kind: string): kind is NoticeKind {
@@ -89,8 +105,10 @@ const KIND_OF_PREFIX: Partial<Record<string, NoticeKind>> = {
     domain: "domain",
     provider: "providers",
     team: "team",
+    hours: "hours",
     plan: "plan",
     catalogue: "products",
+    member: "member",
 };
 
 /** The kind and record a notification opens, however the API said it. */

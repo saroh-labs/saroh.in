@@ -1,7 +1,16 @@
 import { apiFetch, getActiveOrgId } from "@/lib/api/http";
 
+import type { SiteLinksRead } from "@/lib/insights/link-maker";
+import type { InsightsPeriod } from "@/lib/insights/period";
+import type {
+    MoneyRead,
+    SellsRead,
+    SourcesRead,
+    SuggestionsRead,
+} from "@/lib/insights/reads";
+
 import type { AnalyticsAggregateRow } from "./summary";
-import type { SourceRead, TakingsRead } from "./takings";
+import type { SourceRead } from "./takings";
 
 /**
  * Analytics dashboard data access for app.saroh.in (S7-003). Backed by the
@@ -55,13 +64,85 @@ async function readSource<T>(path: string): Promise<SourceRead<T>> {
 }
 
 /**
- * Twelve whole weeks of takings for the active organization (DEC-075),
- * read by the Insights page beside the website's figures.
+ * Insights' Money for one period (DEC-171, #1079): money in against the
+ * same number of days before, the twelve weeks marked by window, and each
+ * day of the period. `payment:read`: a role without it reads `denied`.
  */
-export async function readTakings(): Promise<SourceRead<TakingsRead> | null> {
+export async function readMoney(
+    period: InsightsPeriod,
+): Promise<SourceRead<MoneyRead> | null> {
     const orgId = await getActiveOrgId();
     if (!orgId) return null;
-    return readSource<TakingsRead>(`/organizations/${orgId}/analytics/takings`);
+    return readSource<MoneyRead>(
+        `/organizations/${orgId}/analytics/money?period=${period}`,
+    );
+}
+
+/**
+ * Insights' What sells for one period (DEC-171, #1080): best sellers and
+ * what is booked most, counts for anyone with Insights, amounts only with
+ * `payment:read` (`money` says which).
+ */
+export async function readSells(
+    period: InsightsPeriod,
+): Promise<SourceRead<SellsRead> | null> {
+    const orgId = await getActiveOrgId();
+    if (!orgId) return null;
+    return readSource<SellsRead>(
+        `/organizations/${orgId}/analytics/sells?period=${period}`,
+    );
+}
+
+/**
+ * Insights' sources and the path from visit to paid for one period
+ * (DEC-171, #1101), for the website chosen or all of them. Counts only,
+ * so anyone with Insights reads it. A failure is `failed`, said where the
+ * two answers would be; the website's figures still show.
+ */
+export async function readSources(
+    period: InsightsPeriod,
+    siteId: string | null = null,
+): Promise<SourceRead<SourcesRead> | null> {
+    const orgId = await getActiveOrgId();
+    if (!orgId) return null;
+    const qs = new URLSearchParams({ period });
+    if (siteId) qs.set("siteId", siteId);
+    return readSource<SourcesRead>(
+        `/organizations/${orgId}/analytics/sources?${qs.toString()}`,
+    );
+}
+
+/**
+ * The business's own links (DEC-181, #1099), live and newest first, each
+ * with its visits and paid in the period; one website's when `siteId` is
+ * given. `analytics:read`; a failure is `failed`, said where they show.
+ */
+export async function readLinks(
+    period: InsightsPeriod,
+    siteId: string | null = null,
+): Promise<SourceRead<SiteLinksRead> | null> {
+    const orgId = await getActiveOrgId();
+    if (!orgId) return null;
+    const qs = new URLSearchParams({ period });
+    if (siteId) qs.set("siteId", siteId);
+    return readSource<SiteLinksRead>(
+        `/organizations/${orgId}/analytics/links?${qs.toString()}`,
+    );
+}
+
+/**
+ * Insights' suggestions for the person asking (DEC-171, #1087): ranked,
+ * less what they put off with Not now. A failure is `failed`, said on the
+ * card by name; the rest of the Overview still shows.
+ */
+export async function readSuggestions(
+    period: InsightsPeriod,
+): Promise<SourceRead<SuggestionsRead> | null> {
+    const orgId = await getActiveOrgId();
+    if (!orgId) return null;
+    return readSource<SuggestionsRead>(
+        `/organizations/${orgId}/analytics/suggestions?period=${period}`,
+    );
 }
 
 /**
@@ -83,4 +164,34 @@ export async function readTraffic(
     return readSource<AnalyticsAggregateRow[]>(
         `/organizations/${orgId}/analytics${query ? `?${query}` : ""}`,
     );
+}
+
+/** A website the Where customers come from tab can be narrowed to. */
+export interface SiteChoiceRead {
+    id: string;
+    name: string;
+    subdomain?: string | null;
+}
+
+/**
+ * The business's websites, for the tab's site picker (DEC-171, plan U14):
+ * the sites list (`site:read`). `denied` for a role without it (the tab
+ * then shows every website together, with no picker), `failed` said once
+ * on the tab, never as "one website".
+ */
+export async function readSiteChoices(): Promise<SourceRead<SiteChoiceRead[]>> {
+    const orgId = await getActiveOrgId();
+    if (!orgId) return { status: "ok", data: [] };
+    const read = await readSource<SiteChoiceRead[] | null>(
+        `/organizations/${orgId}/sites`,
+    );
+    if (read.status !== "ok") return read;
+    return {
+        status: "ok",
+        data: (read.data ?? []).map(({ id, name, subdomain }) => ({
+            id,
+            name,
+            subdomain: subdomain ?? null,
+        })),
+    };
 }

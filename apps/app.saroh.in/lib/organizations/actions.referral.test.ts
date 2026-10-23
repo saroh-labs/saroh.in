@@ -43,8 +43,10 @@ vi.mock("./service", () => api);
 import { createOrganization } from "./actions";
 
 const made = { ok: true, data: { id: "org_new", slug: "pulse" } } as const;
-const cleared = () =>
-    jar.set.mock.calls.filter(([name]) => name === "saroh_ref");
+const cleared = (cookie = "saroh_ref") =>
+    jar.set.mock.calls.filter(([name]) => name === cookie);
+const sent = () =>
+    (api.createOrganization.mock.calls[0] as [Record<string, unknown>])[0];
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -134,5 +136,64 @@ describe("createOrganization and a carried referral code", () => {
         await createOrganization({ name: "Pulse Studio" });
 
         expect(cleared()[0]?.[2]).toMatchObject({ domain: "saroh.localhost" });
+    });
+});
+
+describe("createOrganization and an account manager (DEC-169)", () => {
+    const AT = new Date("2026-11-29T09:00:00.000Z");
+    const kept = `ABCD2345.${AT.getTime() / 1000}`;
+
+    it("sends the link's code and when it was kept, beside a referral, then clears both", async () => {
+        jar.held.set("saroh_am", kept);
+        jar.held.set("saroh_ref", "abcd2345");
+
+        await createOrganization({ name: "Pulse Studio" });
+
+        expect(api.createOrganization).toHaveBeenCalledWith({
+            name: "Pulse Studio",
+            referralCode: "abcd2345",
+            managerLinkCode: "ABCD2345",
+            managerLinkSetAt: AT.toISOString(),
+        });
+        expect(cleared("saroh_am")).toEqual([
+            ["saroh_am", "", { path: "/", maxAge: 0, domain: "saroh.in" }],
+        ]);
+        expect(cleared("saroh_ref")).toHaveLength(1);
+    });
+
+    it("takes the link from the cookie alone, never from what the form sent", async () => {
+        await createOrganization({
+            name: "Pulse Studio",
+            managerLinkCode: "WXYZ6789",
+            managerLinkSetAt: AT.toISOString(),
+        });
+
+        expect(sent().managerLinkCode).toBeUndefined();
+        expect(sent().managerLinkSetAt).toBeUndefined();
+    });
+
+    it("sends a typed code as stored, and leaves out one that can't be a code", async () => {
+        await createOrganization({
+            name: "Pulse Studio",
+            managerCode: " wxyz-6789 ",
+        });
+        expect(sent().managerCode).toBe("WXYZ6789");
+
+        api.createOrganization.mockClear();
+        await createOrganization({ name: "Pulse Studio", managerCode: "nope" });
+        expect(sent().managerCode).toBeUndefined();
+    });
+
+    it("keeps the link's cookie when the business wasn't made", async () => {
+        jar.held.set("saroh_am", kept);
+        api.createOrganization.mockResolvedValue({
+            ok: false,
+            error: "pulse.saroh.app is taken. Try another address.",
+            field: "address",
+        });
+
+        await createOrganization({ name: "Pulse Studio" });
+
+        expect(cleared("saroh_am")).toEqual([]);
     });
 });

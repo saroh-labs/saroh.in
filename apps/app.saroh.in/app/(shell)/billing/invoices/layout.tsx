@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { PaymentsLocked } from "@/components/invoices/payments-locked";
+import { PaymentsLocked } from "@/components/invoices/locked/payments-locked";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 

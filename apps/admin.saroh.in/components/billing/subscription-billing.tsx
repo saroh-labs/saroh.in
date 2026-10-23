@@ -10,45 +10,118 @@ import type {
     SarohSubscriptionDetail,
 } from "@/lib/billing-words";
 import {
+    checkoutKindLabel,
+    checkoutStatusLabel,
+    cycleLabel,
     formatPaise,
     invoicePdfHref,
     istDate,
     istDateTime,
 } from "@/lib/billing-words";
 
-import { ActionList } from "./action-list";
-import { RecheckRefund, RecordRefund, SyncCustomer } from "./billing-controls";
+import { RecordRefund } from "./billing-controls";
 import { RazorpayId } from "./razorpay-id";
 
 /**
- * What a subscription sheet shows of the business's billing beyond its
- * plan (DEC-166), so the Billing role acts from here without opening the
- * business: its Razorpay customer, what needs action, double charges, its
- * last invoices with their refunds, and every refund and dispute.
+ * The subscription sheet's Invoices tab (U15, R27): the business's last
+ * invoices, each with its PDF, the provider's payment and its refunds,
+ * and, for operators with `saroh-billing:act`, Record a refund made by
+ * hand; the checkouts it started; then every refund and dispute, and
+ * double charges found. The
+ * billing profile and today's other actions are on Summary.
  */
-export function SubscriptionBilling({
+export function SubscriptionInvoices({
     detail,
     canAct,
+    onDone,
 }: {
     detail: SarohSubscriptionDetail;
     canAct: boolean;
+    /** A write went through: the sheet says so and lights the row. */
+    onDone?: (message: string) => void;
 }) {
-    const orgId = detail.subscription.organization.id;
     return (
-        <>
-            {detail.openActions.length > 0 ? (
-                <Section title="Needs action">
-                    <ActionList
-                        items={detail.openActions}
-                        canAct={canAct}
-                        showBusiness={false}
-                    />
-                </Section>
-            ) : null}
+        <div className="grid gap-6">
+            <Section title="Invoices">
+                {detail.invoices.length === 0 ? (
+                    <p className="text-muted-foreground">No invoice yet.</p>
+                ) : (
+                    <ul className="grid gap-2">
+                        {detail.invoices.map((invoice) => (
+                            <InvoiceItem
+                                key={invoice.id}
+                                invoice={invoice}
+                                canAct={canAct}
+                                onDone={onDone}
+                            />
+                        ))}
+                    </ul>
+                )}
+            </Section>
 
-            <Section title="Razorpay customer">
-                <CustomerFacts customer={detail.billingCustomer} />
-                {canAct ? <SyncCustomer organizationId={orgId} /> : null}
+            <Section title="Checkouts">
+                {detail.checkouts.length === 0 ? (
+                    <p className="text-muted-foreground">
+                        No checkout yet: this business has never started paying
+                        for a plan.
+                    </p>
+                ) : (
+                    <ul className="grid gap-2">
+                        {detail.checkouts.map((c) => (
+                            <li
+                                key={c.id}
+                                className="grid gap-1 rounded-lg border p-3"
+                            >
+                                <p className="font-medium">
+                                    {checkoutKindLabel(c.kind)} · {c.planName} ·{" "}
+                                    {cycleLabel(c.cycle)}
+                                </p>
+                                <p className="text-muted-foreground">
+                                    {checkoutStatusLabel(c.status)} · started{" "}
+                                    {istDateTime(c.createdAt)}
+                                    {c.completedAt
+                                        ? ` · done ${istDateTime(c.completedAt)}`
+                                        : ""}
+                                </p>
+                                <p className="text-muted-foreground">
+                                    {formatPaise(c.pricePaise)} before GST
+                                    {c.chargeNowPaise > 0
+                                        ? ` · ${formatPaise(c.chargeNowPaise)} charged at once`
+                                        : ""}
+                                    {c.startAt
+                                        ? ` · charges from ${istDate(c.startAt)}`
+                                        : ""}
+                                </p>
+                                {c.endedReason ? (
+                                    <p className="text-muted-foreground">
+                                        Ended: {c.endedReason}
+                                    </p>
+                                ) : null}
+                                <p className="text-muted-foreground">
+                                    {c.provider} ·{" "}
+                                    <RazorpayId
+                                        id={c.providerSubscriptionId}
+                                        provider={c.provider}
+                                    />
+                                </p>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </Section>
+
+            <Section title="Refunds and disputes">
+                {detail.refunds.length === 0 ? (
+                    <p className="text-muted-foreground">
+                        None recorded for this business.
+                    </p>
+                ) : (
+                    <ul className="grid gap-1.5">
+                        {detail.refunds.map((r) => (
+                            <RefundLine key={r.id} refund={r} />
+                        ))}
+                    </ul>
+                )}
             </Section>
 
             {detail.doubleCharges.length > 0 ? (
@@ -79,57 +152,18 @@ export function SubscriptionBilling({
                                         />
                                     </p>
                                 ) : (
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <p>Refund owed</p>
-                                        {canAct ? (
-                                            <RecheckRefund
-                                                providerPaymentId={
-                                                    d.providerPaymentId
-                                                }
-                                            />
-                                        ) : null}
-                                    </div>
+                                    <p>Refund owed: re-check it on Summary.</p>
                                 )}
                             </li>
                         ))}
                     </ul>
                 </Section>
             ) : null}
-
-            <Section title="Invoices">
-                {detail.invoices.length === 0 ? (
-                    <p className="text-muted-foreground">No invoice yet.</p>
-                ) : (
-                    <ul className="grid gap-2">
-                        {detail.invoices.map((invoice) => (
-                            <InvoiceItem
-                                key={invoice.id}
-                                invoice={invoice}
-                                canAct={canAct}
-                            />
-                        ))}
-                    </ul>
-                )}
-            </Section>
-
-            <Section title="Refunds and disputes">
-                {detail.refunds.length === 0 ? (
-                    <p className="text-muted-foreground">
-                        None recorded for this business.
-                    </p>
-                ) : (
-                    <ul className="grid gap-1.5">
-                        {detail.refunds.map((r) => (
-                            <RefundLine key={r.id} refund={r} />
-                        ))}
-                    </ul>
-                )}
-            </Section>
-        </>
+        </div>
     );
 }
 
-function Section({
+export function Section({
     title,
     children,
 }: {
@@ -144,54 +178,14 @@ function Section({
     );
 }
 
-function CustomerFacts({
-    customer,
-}: {
-    customer: SarohSubscriptionDetail["billingCustomer"];
-}) {
-    if (!customer) {
-        return (
-            <p className="text-muted-foreground">
-                Not made yet: Saroh makes it at sign-up, or with the first
-                checkout.
-            </p>
-        );
-    }
-    return (
-        <div className="grid gap-1">
-            {customer.providerCustomerId ? (
-                <RazorpayId
-                    id={customer.providerCustomerId}
-                    provider={customer.provider}
-                />
-            ) : (
-                <p className="text-muted-foreground">
-                    No customer id yet at {customer.provider}.
-                </p>
-            )}
-            <p className="text-muted-foreground">
-                {customer.syncedAt
-                    ? `Last synced ${istDateTime(customer.syncedAt)}`
-                    : "Never synced"}
-                {customer.contactWithheld
-                    ? " · made without the phone (another business of the same owner has it)"
-                    : ""}
-            </p>
-            {customer.lastError ? (
-                <p className="text-destructive">
-                    Last sync failed: {customer.lastError}
-                </p>
-            ) : null}
-        </div>
-    );
-}
-
 function InvoiceItem({
     invoice,
     canAct,
+    onDone,
 }: {
     invoice: SarohInvoiceRow;
     canAct: boolean;
+    onDone?: (message: string) => void;
 }) {
     return (
         <li className="grid gap-1 rounded-lg border p-3">
@@ -242,6 +236,9 @@ function InvoiceItem({
                     invoiceNumber={invoice.number}
                     providerPaymentId={invoice.providerPaymentId}
                     totalPaise={invoice.totalPaise}
+                    onDone={() =>
+                        onDone?.(`Refund recorded on ${invoice.number}.`)
+                    }
                 />
             ) : null}
         </li>

@@ -16,14 +16,17 @@ import { toMinor } from "../../common/money";
  *   treatment's payment at booking), never below zero. Money handed back
  *   because the order was edited down is not taken off twice: the total
  *   already fell. An order refunded in full (REFUNDED) counts nothing;
- * - **a paid invoice that is not an order's own** and not a credit note
- *   (bookings, plans, packs, courses, invoices written by hand), its total
- *   less its credit notes. An order's own invoice is the order's money,
- *   counted above.
+ * - **each payment on an invoice that is not an order's own** and not a
+ *   credit note (bookings, plans, packs, courses, invoices written by
+ *   hand), by the money-in rule the Invoices strip and Home read
+ *   (`invoices/money-in.ts`, DEC-173): every payment on its ledger that
+ *   counts, part payments included, less the invoice's credit notes
+ *   (taken off its latest payments first). An order's own invoice is the
+ *   order's money, counted above.
  *
  * Each sale falls in the week it was paid — the order's `paidAt` (its
  * `createdAt` for an order paid before `paidAt` was recorded), the
- * invoice's `paidAt` — in the business's own zone, weeks starting Monday
+ * payment's `receivedAt` — in the business's own zone, weeks starting Monday
  * (DEC-033). A refund lowers the week of the sale it gave money back on,
  * so no week reads below zero and a later refund corrects the week it
  * belongs to. Only the twelve whole weeks before this one are weeks; the
@@ -143,43 +146,10 @@ export interface TakingsWeek {
     orderTakingsMinor: number;
     /** Paid orders. */
     orders: number;
-    /** Paid orders and paid invoices. */
+    /** Paid orders and payments on invoices. */
     payments: number;
     /** What each place took, largest first; places that took nothing left out. */
     places: TakingsPlaceWeek[];
-}
-
-/** A place money came from, named. */
-export interface TakingsPlace {
-    key: string;
-    kind: PlaceKind;
-    /** The location's name; null for online and invoices. */
-    name: string | null;
-}
-
-/** `GET organizations/:organizationId/analytics/takings`. */
-export interface TakingsRead {
-    /** The business's zone the weeks are drawn in. */
-    zone: string;
-    /** The currency every figure is in; null before the business has one. */
-    currency: string | null;
-    /**
-     * Currencies money was also taken in during the twelve weeks, which the
-     * figures leave out (a business sells in one, DEC-030; older rows may not).
-     */
-    otherCurrencies: string[];
-    /** The business's date of the first money it ever took; null for none. */
-    firstSaleOn: string | null;
-    /** Monday of the week in progress, which the weeks stop short of. */
-    thisWeekStart: string;
-    /** The week in progress so far, beside the same days of last week. */
-    thisWeek: TakingsSoFar;
-    /** Open locations (storefronts) the business has. */
-    locations: number;
-    /** Every place named in `weeks`. */
-    places: TakingsPlace[];
-    /** The twelve whole weeks, oldest first. */
-    weeks: TakingsWeek[];
 }
 
 /**
@@ -211,7 +181,9 @@ function minusDays(date: string, days: number): string {
 
 /**
  * The week in progress so far, in `currency` only, and the same days of
- * the week before it from the same rows.
+ * the week before it from the same rows. The caller swaps last week's
+ * same weekday for that day read only so far (`withDaySoFar`), so part of
+ * today is never compared with a whole day.
  */
 export function foldSoFar(
     rows: readonly TakingsDayRow[],

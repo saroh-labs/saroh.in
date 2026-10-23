@@ -89,7 +89,7 @@ export interface OrderRow extends FulfilmentFields {
     productNames: string[];
     moreProducts: number;
     /**
-     * When the order's pay link was made (B11); null when it has none. Only
+     * When the order's payment link was made (B11); null when it has none. Only
      * with `order:read`, and absent from an API before B5. Never the link.
      */
     payLinkCreatedAt?: string | null;

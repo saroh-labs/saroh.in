@@ -7,7 +7,7 @@ import { dismissToasts, showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 
-import { useLeaveGuard } from "@/components/shared/use-leave-guard";
+import { useLeaveGuard } from "@/components/shared/forms/use-leave-guard";
 import { countSaved } from "@/lib/stock/levels";
 import type { StockHref, StockPages } from "@/lib/stock/list-query";
 import { stockHref } from "@/lib/stock/list-query";

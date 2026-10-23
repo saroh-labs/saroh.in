@@ -7,8 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SiteDetail } from "@/lib/sites/service";
 import type { SiteAddress } from "@/lib/sites/share-links";
 
-import { SiteSettings } from "../site-settings";
-import { SiteSettingsRead } from "../site-settings-read";
+import { SiteSettings } from "./site-settings";
+import { SiteSettingsRead } from "./site-settings-read";
 
 /**
  * Website › Settings, its groups from a side list (owner, 9 Oct): the open
@@ -38,10 +38,10 @@ vi.mock("@/lib/stores/storefront-actions", () => ({
 vi.mock("@/lib/organizations/settings-actions", () => ({
     saveOrganizationSettings: vi.fn(),
 }));
-vi.mock("@/components/sites/custom-domain", () => ({
+vi.mock("@/components/sites/domain/custom-domain", () => ({
     CustomDomain: () => null,
 }));
-vi.mock("@/components/sites/media-picker", () => ({
+vi.mock("@/components/shared/fields/media-picker", () => ({
     MediaPicker: () => null,
 }));
 

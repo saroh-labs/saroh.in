@@ -40,9 +40,9 @@ import {
     PlanLockedCard,
     PlanWay,
 } from "@/components/billing/plan-way";
-import { planRow } from "@/components/settings/ready-rows";
-import { settingsPagesFor } from "@/components/shared/nav-items";
-import { madeWithNote } from "@/components/sites/fixed-block-inspector";
+import { planRow } from "@/components/settings/ready/ready-rows";
+import { settingsPagesFor } from "@/components/shared/navigation/nav-items";
+import { madeWithNote } from "@/components/sites/blocks/fixed-block-inspector";
 import type { PausedView } from "@/lib/billing/paused";
 import { planRefusalOf } from "@/lib/billing/refusal";
 import {

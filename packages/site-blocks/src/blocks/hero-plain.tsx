@@ -118,7 +118,13 @@ export default function PlainHero({
                             alt={photo.alt ?? ""}
                             width={photo.width}
                             height={photo.height}
-                            {...siteImage(priority ? "first-hero" : "below")}
+                            {...siteImage(priority ? "first-hero" : "below", {
+                                src: photo.src,
+                                width: photo.width,
+                                sizes: hasImage
+                                    ? "(min-width: 1024px) 50vw, 100vw"
+                                    : "(min-width: 832px) 832px, 100vw",
+                            })}
                             className={
                                 hasImage
                                     ? "h-auto w-full rounded-[var(--site-radius)] object-cover"

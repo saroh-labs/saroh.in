@@ -113,7 +113,10 @@ function LineCard({
                     alt=""
                     width={48}
                     height={48}
-                    {...siteImage()}
+                    {...siteImage("below", {
+                        src: line.image,
+                        sizes: "48px",
+                    })}
                     className="size-12 shrink-0 rounded-md border border-site-border object-cover"
                 />
             ) : null}
@@ -190,7 +193,7 @@ function LineCard({
                                     aria-hidden
                                     className={cn(
                                         on
-                                            ? "text-site-accent"
+                                            ? "text-site-accent-text"
                                             : "text-site-border",
                                     )}
                                 >

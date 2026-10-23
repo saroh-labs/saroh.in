@@ -1,13 +1,17 @@
+import type { PaperColours } from "@saroh/block-contract";
+
 import type { PayInstructionsView } from "../organizations/business-pay-instructions";
 import { paperPrices, pricesSentence } from "./added-line";
 import { rateToBps } from "./gst";
 import { stateName } from "./gst-states";
 import type { InvoiceTitle } from "./invoice-title";
+import type { InvoicePaper, PaperStyle } from "./paper-styles";
+import { paperColours } from "./paper-styles";
 import type { InvoiceLineView, InvoiceViewModel } from "./serialize";
 
 /**
  * The invoice's paper as words, laid out the way Invoice Detail prints it
- * (`app.saroh.in` `components/invoices/invoice-paper.tsx`, after "Saroh
+ * (`app.saroh.in` `components/invoices/details/invoice-paper.tsx`, after "Saroh
  * Invoice Detail") — so the PDF (D16) and the printed paper agree line for
  * line. Pure: every figure is the one frozen on the invoice when it was
  * issued, formatted, never summed here.
@@ -75,7 +79,28 @@ export interface PaperLine {
     amount: string;
 }
 
+/**
+ * How the paper is drawn (DEC-173, #1118): its style and colour as frozen
+ * at issue, and the colours worked out from them — the colour as text on
+ * the paper, and on Band the band's fill and the tone of the text on it,
+ * each readable at 4.5:1 (`@saroh/block-contract` `invoice-paper.ts`).
+ */
+export interface PaperLook extends PaperColours {
+    style: PaperStyle;
+    colour: string | null;
+}
+
+/** The look a paper of `style` in `colour` is drawn in. */
+export function paperLook(paper: InvoicePaper): PaperLook {
+    return { ...paper, ...paperColours(paper.style, paper.colour) };
+}
+
 export interface PaperView {
+    /**
+     * Classic, Band or Compact, and its colours. Absent (Saroh's own
+     * invoices to businesses): Classic in ink.
+     */
+    look?: PaperLook;
     title: InvoiceTitle;
     number: string;
     /** "Issued 5 Sep 2026 · due 19 Sep 2026". */
@@ -341,7 +366,19 @@ export function howToPayLines(
     pay: PayInstructionsView | null | undefined,
 ): string[] | null {
     const owed = i.standing === "ISSUED" || i.standing === "OVERDUE";
-    if (!owed || i.kind === "CREDIT_NOTE" || !pay) return null;
+    if (!owed || i.kind === "CREDIT_NOTE") return null;
+    return payInstructionLines(pay);
+}
+
+/**
+ * The business's "How to pay us" as lines, whatever the invoice: the
+ * paper's lines (`howToPayLines`), and the same lines a renewal's email
+ * lists when it can't be paid online (DEC-178). Null when none is set.
+ */
+export function payInstructionLines(
+    pay: PayInstructionsView | null | undefined,
+): string[] | null {
+    if (!pay) return null;
     const lines: string[] = [];
     if (pay.upiId) lines.push(`UPI: ${pay.upiId}`);
     if (pay.bankAccountNumber && pay.bankIfsc && pay.bankAccountName) {
@@ -424,6 +461,9 @@ export function paperView(
           : [];
 
     return {
+        // Issued paper's frozen look (Classic in ink for a row without);
+        // a draft's own, else the business's default.
+        look: paperLook(i.paper),
         title: i.title,
         number: i.number,
         dates,

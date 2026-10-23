@@ -3,6 +3,7 @@ import { isSafeHref, resolveVariant } from "@saroh/block-contract";
 
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
+import type { LookProps } from "../look-context";
 import { listCard, listPhoto } from "./list-layout";
 import { RhythmGallery } from "./projects-rhythm";
 import { ProjectRows, projectsCount } from "./projects-rows";
@@ -43,7 +44,7 @@ const focusRing =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent focus-visible:ring-offset-2 focus-visible:ring-offset-site-bg";
 
 const linkClasses = cn(
-    "text-site-accent mx-4 mt-1 inline-flex cursor-pointer items-center gap-1 justify-self-start rounded-[var(--site-radius)] text-sm font-semibold underline-offset-4 transition-opacity hover:underline active:opacity-70",
+    "text-site-accent-text mx-4 mt-1 inline-flex cursor-pointer items-center gap-1 justify-self-start rounded-[var(--site-radius)] text-sm font-semibold underline-offset-4 transition-opacity hover:underline active:opacity-70",
     focusRing,
 );
 
@@ -63,7 +64,7 @@ function safeLink(value: string | undefined): string | null {
 
 export default function ProjectsSection({
     content,
-}: {
+}: LookProps & {
     content: RenderedProjects;
 }) {
     const items = Array.isArray(content.items)
@@ -158,7 +159,11 @@ function ProjectCard({ item, over }: { item: Project; over: boolean }) {
                 <img
                     src={src}
                     alt={item.image?.alt ?? ""}
-                    {...siteImage()}
+                    {...siteImage("below", {
+                        src,
+                        width: item.image?.width,
+                        sizes: "(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw",
+                    })}
                     className="mb-1.5 aspect-[4/3] w-full object-cover"
                 />
             ) : null}
@@ -176,7 +181,11 @@ function ProjectRow({ item }: { item: Project }) {
                 <img
                     src={src}
                     alt={item.image?.alt ?? ""}
-                    {...siteImage()}
+                    {...siteImage("below", {
+                        src,
+                        width: item.image?.width,
+                        sizes: "(min-width: 640px) 240px, 40vw",
+                    })}
                     className={listPhoto}
                 />
             ) : null}
@@ -203,7 +212,11 @@ function ProjectPlate({ item, src }: { item: Project; src: string }) {
                 <img
                     src={src}
                     alt={item.image?.alt ?? ""}
-                    {...siteImage()}
+                    {...siteImage("below", {
+                        src,
+                        width: item.image?.width,
+                        sizes: "(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw",
+                    })}
                     className="aspect-[4/3] w-full object-cover"
                 />
                 <div

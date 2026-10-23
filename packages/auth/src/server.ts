@@ -139,19 +139,37 @@ export interface CreateAuthOptions {
     /** Confirm account deletion via a one-time link, never a bare API call. */
     sendDeleteAccountVerification?: EmailSender;
     /**
+     * Told just before a user's row is deleted, once the deletion is
+     * allowed (they are no business's only owner), with their id only:
+     * the host's chance to record what the deletion takes with it (the
+     * API raises a billing notice for each business billed to one of
+     * their billing profiles, DEC-167). Whatever it throws is swallowed:
+     * it can't block a deletion.
+     */
+    onUserDeleting?: (user: { id: string }) => Promise<void> | void;
+    /**
      * Told once, after a user's row is first written (sign-up by password
      * or through a provider). Handed the id only, never the email or name.
      * Whatever it throws is swallowed: it can't fail a sign-up.
      */
     onUserCreated?: (user: { id: string }) => void;
     /**
-     * Told after a user's email has changed (Better Auth's change-email,
-     * once approved), so the host can bring what copies it up to date — the
-     * API re-sends the billing customer of every business the user owns.
-     * Handed the id only. Whatever it throws or rejects is swallowed: it
-     * can't fail the change.
+     * Asked before any session is made for a user, however they signed in
+     * (a code, a password, a provider). False refuses the session, and with
+     * it the sign-in. The API holds a person whose sign-in email Saroh staff
+     * just changed (admin console U9): nobody signs in to the new address
+     * until the hold ends or a second staff member confirms. A throw refuses
+     * too: a hold that can't be checked is not assumed lifted.
      */
-    onUserEmailChanged?: (user: { id: string }) => void | Promise<void>;
+    mayStartSession?: (user: { id: string }) => Promise<boolean> | boolean;
+    /**
+     * Told after a session starts because the person proved their mailbox
+     * with a code ({@link MAILBOX_PROOF_PATHS}), never a password or a
+     * provider. The API clears a staff-marked verification then: the
+     * address is now theirs by their own proof. Whatever it throws is
+     * swallowed: it can't fail a sign-in.
+     */
+    onMailboxProven?: (user: { id: string }) => Promise<void> | void;
     /**
      * Told when Better Auth answered a request 5xx: the thrown value and the
      * status, for the host's error reporter. Never told about an expected
@@ -160,6 +178,12 @@ export interface CreateAuthOptions {
      * See `server-errors.ts`.
      */
     onServerError?: OnAuthServerError;
+    /**
+     * The proxies in front, as address ranges: the sign-in rate limit reads
+     * the client from `X-Forwarded-For` past them, from the right, as the
+     * host's own `trust proxy` does. None: only a single-address header.
+     */
+    trustedProxies?: string[];
 }
 
 /**
@@ -332,15 +356,16 @@ export function createAuth(opts: CreateAuthOptions = {}): BetterAuthInstance {
  */
 /**
  * Better Auth's user hooks for what the host asked to be told: a user's
- * first write (`onUserCreated`) and a change of email
- * (`onUserEmailChanged`). An update's `before` sees only the fields being
- * written and its `after` only the row, so `before` marks the request's
- * context when `email` is among them and `after` tells the host once for
- * it. Exported for its test; nothing here can fail the write.
+ * first write (`onUserCreated`). Exported for its test; nothing here can
+ * fail the write.
  */
 export function userDatabaseHooks(
-    opts: Pick<CreateAuthOptions, "onUserCreated" | "onUserEmailChanged">,
+    opts: Pick<
+        CreateAuthOptions,
+        "onUserCreated" | "mayStartSession" | "onMailboxProven"
+    >,
 ): Pick<BetterAuthOptions, "databaseHooks"> {
+    const hooks: NonNullable<BetterAuthOptions["databaseHooks"]> = {};
     const user: NonNullable<
         NonNullable<BetterAuthOptions["databaseHooks"]>["user"]
     > = {};
@@ -357,37 +382,68 @@ export function userDatabaseHooks(
             },
         };
     }
-    if (opts.onUserEmailChanged) {
-        const told = opts.onUserEmailChanged;
-        const emailChanging = new WeakSet<object>();
-        user.update = {
-            before: (data: Record<string, unknown>, context: unknown) => {
-                if (
-                    typeof data.email === "string" &&
-                    context &&
-                    typeof context === "object"
-                ) {
-                    emailChanging.add(context);
-                }
-                return Promise.resolve();
-            },
-            after: async (row: { id: string }, context: unknown) => {
-                if (
-                    !context ||
-                    typeof context !== "object" ||
-                    !emailChanging.delete(context)
-                ) {
-                    return;
-                }
-                try {
-                    await told({ id: row.id });
-                } catch {
-                    // Never the email change's problem.
-                }
-            },
-        };
-    }
-    return Object.keys(user).length > 0 ? { databaseHooks: { user } } : {};
+    if (Object.keys(user).length > 0) hooks.user = user;
+    const session = sessionHooks(opts);
+    if (session) hooks.session = session;
+    return Object.keys(hooks).length > 0 ? { databaseHooks: hooks } : {};
+}
+
+/**
+ * The endpoints whose session is the person's own proof of their mailbox:
+ * signing in with an emailed code, and verifying an address with one.
+ * Never a password or a provider's sign-in.
+ */
+export const MAILBOX_PROOF_PATHS: readonly string[] = [
+    "/sign-in/email-otp",
+    "/email-otp/verify-email",
+];
+
+function sessionHooks(
+    opts: Pick<CreateAuthOptions, "mayStartSession" | "onMailboxProven">,
+): NonNullable<BetterAuthOptions["databaseHooks"]>["session"] | null {
+    const { mayStartSession, onMailboxProven } = opts;
+    if (!mayStartSession && !onMailboxProven) return null;
+    return {
+        create: {
+            ...(mayStartSession
+                ? {
+                      before: async (row: { userId: string }) => {
+                          try {
+                              if (await mayStartSession({ id: row.userId })) {
+                                  return;
+                              }
+                          } catch (error) {
+                              console.error(
+                                  "[auth] mayStartSession failed; the session is refused.",
+                                  error instanceof Error
+                                      ? error.name
+                                      : "unknown error",
+                              );
+                          }
+                          return false;
+                      },
+                  }
+                : {}),
+            ...(onMailboxProven
+                ? {
+                      after: async (
+                          row: { userId: string },
+                          context: { path?: string } | null,
+                      ) => {
+                          if (
+                              !MAILBOX_PROOF_PATHS.includes(context?.path ?? "")
+                          )
+                              return;
+                          try {
+                              await onMailboxProven({ id: row.userId });
+                          } catch {
+                              // Never a sign-in's problem.
+                          }
+                      },
+                  }
+                : {}),
+        },
+    };
 }
 
 export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
@@ -411,9 +467,12 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
         account: {
             accountLinking: {
                 enabled: true,
-                // Only link social accounts whose provider verifies the email,
-                // so a spoofed unverified email can't take over an account.
-                trustedProviders: ["github", "google"],
+                // Google only: every Google account's address is verified.
+                // GitHub lets an account keep an address it never verified,
+                // so a GitHub sign-in links only when GitHub says it is
+                // verified (Better Auth reads that flag), or anyone could add
+                // someone's address to GitHub and take their account.
+                trustedProviders: ["google"],
             },
         },
         emailAndPassword: {
@@ -498,6 +557,16 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
                 // assertNotSoleOwner). Runs before any row is deleted.
                 beforeDelete: async (user) => {
                     await assertNotSoleOwner(user.id);
+                    try {
+                        await opts.onUserDeleting?.({ id: user.id });
+                    } catch (error) {
+                        console.error(
+                            "[auth] onUserDeleting failed:",
+                            error instanceof Error
+                                ? error.name
+                                : "unknown error",
+                        );
+                    }
                 },
             },
         },
@@ -515,6 +584,7 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
             // The development environment names its cookie apart from
             // production's (`AUTH_COOKIE_PREFIX`, `constants.ts`).
             cookiePrefix: sessionCookiePrefix(),
+            ipAddress: { trustedProxies: opts.trustedProxies },
             crossSubDomainCookies: cookieDomain
                 ? { enabled: true, domain: cookieDomain }
                 : { enabled: false },

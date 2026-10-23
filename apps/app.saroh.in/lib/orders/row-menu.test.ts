@@ -120,7 +120,7 @@ describe("rowMenu", () => {
         });
     });
 
-    it("gives the kitchen no money items: no pay link, no refund, no cancel", () => {
+    it("gives the kitchen no money items: no payment link, no refund, no cancel", () => {
         const items = rowMenu(row(KITCHEN_ROW), KITCHEN);
         expect(kinds(items)).toEqual(["next", "print", "open"]);
         // Even a role that may refund gets none without the row's money.
@@ -206,7 +206,7 @@ describe("rowMenu", () => {
         );
     });
 
-    describe("the pay link (B11)", () => {
+    describe("the payment link (B11)", () => {
         const owed = {
             paymentStatus: "UNPAID",
             payment: "UNPAID" as const,
@@ -218,13 +218,13 @@ describe("rowMenu", () => {
         it("makes one for an order still owed money", () => {
             expect(item(rowMenu(row(owed), OWNER), "pay-link")).toEqual({
                 kind: "pay-link",
-                label: "Make a pay link",
+                label: "Make a payment link",
                 replaces: false,
                 disabled: null,
             });
         });
 
-        it("says New pay link, which replaces the old one, when one is out", () => {
+        it("says New payment link, which replaces the old one, when one is out", () => {
             expect(
                 item(
                     rowMenu(
@@ -236,7 +236,7 @@ describe("rowMenu", () => {
                     ),
                     "pay-link",
                 ),
-            ).toMatchObject({ label: "New pay link", replaces: true });
+            ).toMatchObject({ label: "New payment link", replaces: true });
         });
 
         it("is off, with why, when nothing is owed or no provider can take it", () => {

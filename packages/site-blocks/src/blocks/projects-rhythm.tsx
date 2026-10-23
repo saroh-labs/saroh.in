@@ -158,7 +158,11 @@ function Tile({
                 <img
                     src={src}
                     alt={item.image?.alt ?? ""}
-                    {...siteImage()}
+                    {...siteImage("below", {
+                        src,
+                        width: item.image?.width,
+                        sizes: "(min-width: 768px) 50vw, 100vw",
+                    })}
                     className="absolute inset-0 h-full w-full object-cover"
                 />
             ) : null}

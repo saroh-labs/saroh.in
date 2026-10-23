@@ -90,6 +90,12 @@ export interface CheckoutConfirmation {
      */
     toPay: string | null;
     /**
+     * Paid online at the checkout (not on handover) and not refunded: the
+     * page then tells this visit's source it paid (`site.paid`, DEC-181),
+     * once, with the group and label only.
+     */
+    paidOnline: boolean;
+    /**
      * How the customer hears about this order (A14's reach, for the
      * "order placed" notice): by email when the business's own provider
      * sends one, in their account, or not at all. The page says which,
@@ -221,6 +227,7 @@ export function confirmationView(row: ConfirmationRow): CheckoutConfirmation {
             row.payOnHandover && row.paymentStatus === "UNPAID"
                 ? (onHandoverLabel(type) ?? "Pay when it reaches you")
                 : null,
+        paidOnline: !row.payOnHandover && row.paymentStatus === "PAID",
     };
 }
 
@@ -314,8 +321,6 @@ export class CheckoutConfirmationService {
                         prisma,
                         customer.organizationId,
                         customer.contactId,
-                        undefined,
-                        "ORDER_PLACED",
                     ),
                     prisma.customerAccount.findFirst({
                         where: {

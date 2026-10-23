@@ -1,6 +1,6 @@
 "use client";
 
-import { PartialRead } from "@/components/shared/failed-read";
+import { PartialRead } from "@/components/shared/states/failed-read";
 import { Button } from "@saroh/ui/button";
 import {
     EmptyState,
@@ -14,7 +14,7 @@ import { Check, ListFilter, Receipt, RotateCcw, Search } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { ShareLinkButton } from "@/components/sites/share-link-button";
+import { ShareLinkButton } from "@/components/shared/share-link/share-link-button";
 import type { OrderFilterOptions } from "@/lib/orders/business-service";
 import { NO_FILTERS } from "@/lib/orders/list-filters";
 import type { OrdersQuery } from "@/lib/orders/list-query";

@@ -5,8 +5,8 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useState } from "react";
 
-import { FailedRead } from "@/components/shared/failed-read";
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { personHref } from "@/lib/contacts/person-href";
 import type { ChargeRow, CollectionRow } from "@/lib/subscriptions/view";
 import { chargeHref } from "@/lib/subscriptions/view";
@@ -263,7 +263,7 @@ export function PlanCard({
     );
 }
 
-/** A failed charge's new pay link, shown once: the API keeps only its hash. */
+/** A failed charge's new payment link, shown once: the API keeps only its hash. */
 export function PayLinkRow({ url, name }: { url: string; name: string }) {
     return (
         <div className="mt-2.5 flex flex-wrap items-center gap-2">

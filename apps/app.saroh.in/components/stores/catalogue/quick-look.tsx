@@ -1,6 +1,6 @@
 "use client";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import {
@@ -71,6 +71,7 @@ export function QuickLook({
     storeId,
     canWrite,
     canStock,
+    canOrders = false,
     need = null,
     focusAdd = false,
     atFirst,
@@ -101,6 +102,8 @@ export function QuickLook({
     canWrite: boolean;
     /** Count and move stock: "+N · Add". */
     canStock: boolean;
+    /** `order:read`: a short product links its open orders (U5). */
+    canOrders?: boolean;
     onStep: (by: 1 | -1) => void;
     onClose: () => void;
     onStatus: (row: CatalogueRow, status: ProductStatus) => void;
@@ -284,6 +287,7 @@ export function QuickLook({
                                     row={row}
                                     storeId={storeId}
                                     canStock={canStock}
+                                    canOrders={canOrders}
                                     need={need}
                                     onChanged={onChanged}
                                 />

@@ -1,10 +1,13 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { EmptyState, LoadingState } from "@saroh/ui/data-state";
+import { cn } from "@saroh/ui/lib/utils";
 import { OptionSelect } from "@saroh/ui/option-select";
+import { TextLink } from "@saroh/ui/text-link";
 import { useEffect, useId, useState } from "react";
 
-import { FailedRead } from "@/components/shared/failed-read";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { formatClock, formatDay } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
 import type { LocalDate } from "@/lib/services/diary";
@@ -13,16 +16,16 @@ import { readOffered } from "@/lib/staff/actions";
 import { pickOfferedDay } from "@/lib/staff/offered";
 import type { OfferedRead } from "@/lib/staff/types";
 
-const card = "rounded-[12px] border border-border bg-card px-4 py-[13px]";
-const cardTitle = "font-display text-[15px] font-semibold tracking-[-0.02em]";
-
 /**
- * "What customers see" on Availability: for a service this person takes
- * and a day the owner picks (today, or the next day with a time), the
- * times the booking page offers. It asks the booking page's own read
- * (`readOffered`), so it shows saved hours, less bookings, time off, the
- * gap after each and the booking rules, exactly as a customer gets them.
- * Unsaved changes aren't in it yet, and it says so.
+ * "What customers see" on Hours and time off (U17, More › What customers
+ * see): for a service this person takes and a day the owner picks (today,
+ * or the next day with a time), the times the booking page offers. It asks
+ * the booking page's own read (`readOffered`), so it shows saved hours,
+ * less bookings, time off, the gap after each and the booking rules,
+ * exactly as a customer gets them. Every change saves as it is made, so
+ * it is always up to date. With everyone shown it reads the business's
+ * times for the service, whoever takes it. Under the times, "Why isn't a
+ * time offered?" (`onWhy`).
  */
 export function BookablePreview({
     person,
@@ -30,17 +33,17 @@ export function BookablePreview({
     today,
     timezone,
     stamp,
-    dirty,
+    onWhy,
 }: {
-    person: { id: string; name: string };
+    /** Whose times; null for everyone's. */
+    person: { id: string; name: string } | null;
     /** The services they take that the booking page offers. */
     services: { id: string; name: string }[];
     today: LocalDate;
     timezone: string;
     /** Changes whenever what is saved does, so the times are read again. */
     stamp: string;
-    /** The page has changes waiting for Save. */
-    dirty: boolean;
+    onWhy: () => void;
 }) {
     const id = useId();
     const [chosen, setChosen] = useState<string | null>(null);
@@ -55,12 +58,13 @@ export function BookablePreview({
         read: OfferedRead;
     } | null>(null);
     const [again, setAgain] = useState(0);
-    const key = `${serviceId ?? ""}|${person.id}|${stamp}|${again}`;
+    const personId = person?.id;
+    const key = `${serviceId ?? ""}|${personId ?? ""}|${stamp}|${again}`;
 
     useEffect(() => {
         if (!serviceId) return;
         let live = true;
-        void readOffered(serviceId, person.id)
+        void readOffered(serviceId, personId)
             .catch((): OfferedRead => ({ ok: false, why: "failed" }))
             .then((read) => {
                 if (live) setLoaded({ key, read });
@@ -68,33 +72,35 @@ export function BookablePreview({
         return () => {
             live = false;
         };
-    }, [serviceId, person.id, key]);
+    }, [serviceId, personId, key]);
 
-    const head = (
-        <>
-            <h2 id={`${id}-title`} className={cardTitle}>
-                What customers see
-            </h2>
-            <p
-                data-ph-mask=""
-                className="mb-2.5 mt-0.5 text-[11.5px] text-muted-foreground"
-            >
-                The times your booking page offers with {person.name}.
-            </p>
-        </>
+    const why = (
+        <Button
+            type="button"
+            variant="link"
+            size="inline"
+            onClick={onWhy}
+            className="mt-1.5 min-h-11 text-[13.5px] font-semibold text-foreground underline decoration-border-strong"
+        >
+            Why isn&apos;t a time offered?
+        </Button>
     );
 
     if (!service) {
         return (
-            <section aria-labelledby={`${id}-title`} className={card}>
-                {head}
+            <div id={id}>
                 <EmptyState
                     data-ph-mask=""
                     size="inline"
-                    title={`${person.name} takes no service on the booking page`}
-                    description="Customers aren't offered these hours until a service on the booking page is theirs. Choose who takes each one in Services."
+                    title={
+                        person
+                            ? `${person.name} takes no service on the booking page`
+                            : "No service is on the booking page"
+                    }
+                    description="Customers aren't offered these hours until a service on the booking page is theirs. Choose who does each one in Services."
                 />
-            </section>
+                {why}
+            </div>
         );
     }
 
@@ -103,8 +109,7 @@ export function BookablePreview({
     const day = read?.ok ? pickOfferedDay(days, picked, today) : null;
 
     return (
-        <section aria-labelledby={`${id}-title`} className={card}>
-            {head}
+        <div id={id}>
             <div className="flex flex-wrap gap-2">
                 {services.length > 1 ? (
                     <OptionSelect
@@ -193,7 +198,7 @@ export function BookablePreview({
                         {day.starts.map((s) => (
                             <li
                                 key={s.startAt}
-                                className="inline-flex h-[30px] items-center rounded-full border border-border px-[11px] text-[12.5px] font-medium tabular-nums"
+                                className="inline-flex h-9 items-center rounded-full border border-border bg-card px-3 text-[13px] tabular-nums"
                             >
                                 {formatClock(
                                     localMinuteOf(s.startAt, timezone),
@@ -211,11 +216,59 @@ export function BookablePreview({
                     </ul>
                 )}
             </div>
-            {dirty ? (
-                <p className="mt-2.5 text-[11.5px] text-muted-foreground">
-                    This shows what is saved. Save to see your changes here.
-                </p>
-            ) : null}
-        </section>
+            {why}
+        </div>
+    );
+}
+
+/** Settings › Hours, where the business's opening hours are kept. */
+const OPENING_HOURS = "/settings/organization?section=hours";
+
+/**
+ * "Why isn't a time offered?" (U17): the five things a time needs to be on
+ * the booking page, one to a line, with the way to the opening hours —
+ * where the old page's note about in-person hours now lives.
+ */
+export function WhyNotOffered({ who }: { who: string }) {
+    const steps = [
+        <>
+            It&apos;s inside {who}&apos;s weekly hours or extra hours, and not
+            in time off.
+        </>,
+        <>
+            The business is open then, for in-person visits.{" "}
+            <TextLink href={OPENING_HOURS} className="font-semibold">
+                Opening hours
+            </TextLink>{" "}
+            are in Settings.
+        </>,
+        <>It&apos;s inside the service&apos;s own hours, if it has some.</>,
+        <>
+            Nobody has booked it, and the break after the last visit has passed.
+        </>,
+        <>It&apos;s not too soon or too far ahead (see Booking rules).</>,
+    ];
+    return (
+        <div>
+            <p className="text-[14px] leading-[1.55]">
+                A time shows on your booking page only when all of these are
+                true:
+            </p>
+            <ol>
+                {steps.map((step, i) => (
+                    <li
+                        // The steps never change order.
+                        key={i}
+                        className={cn(
+                            "flex min-h-14 items-center gap-2.5 py-2 text-[14px]",
+                            i > 0 && "border-t border-border",
+                        )}
+                    >
+                        <b className="w-6 shrink-0">{i + 1}</b>
+                        <span className="flex-1">{step}</span>
+                    </li>
+                ))}
+            </ol>
+        </div>
     );
 }

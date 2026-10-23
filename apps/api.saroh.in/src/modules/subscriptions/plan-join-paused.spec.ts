@@ -9,6 +9,8 @@ jest.mock("@saroh/database", () => ({
         subscriptionPlan: { findFirst: jest.fn(), findMany: jest.fn() },
         organizationModule: { findFirst: jest.fn() },
         site: { findFirst: jest.fn() },
+        // Members may pause unless the business says not (DEC-172 U7).
+        businessProfile: { findUnique: () => Promise.resolve(null) },
         $transaction: jest.fn(),
     },
     runInOrgContext: (_org: string, fn: () => unknown) => fn(),
@@ -110,6 +112,7 @@ describe("the site's plans read on a paused website (#800)", () => {
             payOnline: false,
             autopayMethods: [],
             offered: true,
+            pauseWeeks: [2, 4, 8],
             plans: [],
             notTakingOrders: true,
         });
@@ -122,6 +125,7 @@ describe("the site's plans read on a paused website (#800)", () => {
             payOnline: true,
             autopayMethods: [],
             offered: true,
+            pauseWeeks: [2, 4, 8],
             plans: [],
         });
     });

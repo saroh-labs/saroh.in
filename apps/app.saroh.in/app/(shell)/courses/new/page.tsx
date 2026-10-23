@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import type { CourseServiceOption } from "@/components/courses/course-form";
 import { CourseForm } from "@/components/courses/course-form";
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { requireCan } from "@/lib/access/require-can";
 import { listCourses } from "@/lib/courses/service";
 import { readMissingRates } from "@/lib/gst-rates/service";

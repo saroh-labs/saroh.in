@@ -25,7 +25,10 @@ import {
 import type { Catalog } from "@saroh/pricing-catalog";
 import { addMonthsUtc, planRows, withGstPaise } from "@saroh/pricing-catalog";
 
-import { giveBillingDetails } from "../../../test/business-details";
+import {
+    giveBillingDetails,
+    giveBillingProfile,
+} from "../../../test/business-details";
 import { fakeCatalog } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ONE_TIME_PAYMENT } from "./billing-term";
@@ -149,6 +152,11 @@ async function business(): Promise<OrganizationContext> {
     return { organizationId: org.id, userId: "owner-user", role: "OWNER" };
 }
 
+/** The fake's customer of the billing profile the business is billed to. */
+async function customerOf(organizationId: string): Promise<string> {
+    return `fake_cus_${await giveBillingProfile(organizationId)}`;
+}
+
 async function sub(organizationId: string) {
     return prisma.subscription.findUniqueOrThrow({
         where: { organizationId },
@@ -218,7 +226,7 @@ describe("monthly: autopay for a 12-charge term", () => {
         // the provider shows who it bills before it is paid.
         expect(fake.customers.created).toHaveLength(1);
         expect(fake.createCalls[0]).toMatchObject({
-            providerCustomerId: `fake_cus_${ctx.organizationId}`,
+            providerCustomerId: await customerOf(ctx.organizationId),
         });
     });
 
@@ -319,7 +327,7 @@ describe("yearly: one payment for the year", () => {
             providerPlanId: ONE_TIME_PAYMENT,
             providerSubscriptionId: `fake_order_${saved.id}`,
             // An order's window takes the business as the provider's customer.
-            providerCustomerId: `fake_cus_${ctx.organizationId}`,
+            providerCustomerId: await customerOf(ctx.organizationId),
         });
         expect(fake.customers.created).toHaveLength(1);
     });

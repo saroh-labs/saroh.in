@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import type { ReactElement } from "react";
 import { useId, useRef, useState } from "react";
 
-import { FormSheet } from "@/components/shared/form-sheet";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { count } from "@/lib/format/plural";
 import type { CatalogueView } from "@/lib/products/settings";
 import {

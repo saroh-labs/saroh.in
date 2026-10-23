@@ -2,7 +2,7 @@ jest.mock("@saroh/database", () => ({
     prisma: {
         featureFlag: { findMany: jest.fn() },
         featureFlagOverride: { findMany: jest.fn() },
-        featureFlagAudit: { findMany: jest.fn() },
+        featureFlagAudit: { findMany: jest.fn(), groupBy: jest.fn() },
         user: { findMany: jest.fn() },
         organization: { findMany: jest.fn() },
     },
@@ -14,6 +14,7 @@ import { FLAG_KEYS } from "../feature-flags/flags";
 import { AdminFlagsService } from "./admin-flags.service";
 
 const audit = prisma.featureFlagAudit.findMany as jest.Mock;
+const newest = prisma.featureFlagAudit.groupBy as jest.Mock;
 const users = prisma.user.findMany as jest.Mock;
 const orgs = prisma.organization.findMany as jest.Mock;
 
@@ -22,6 +23,7 @@ describe("AdminFlagsService", () => {
     beforeEach(() => jest.clearAllMocks());
 
     it("lists every flag with the name a business sees and its group", async () => {
+        newest.mockResolvedValue([]);
         (prisma.featureFlag.findMany as jest.Mock).mockResolvedValue([]);
         (prisma.featureFlagOverride.findMany as jest.Mock).mockResolvedValue(
             [],
@@ -31,6 +33,61 @@ describe("AdminFlagsService", () => {
         const payments = flags.find((flag) => flag.key === "MODULE_PAYMENTS");
         expect(payments?.metadata.shownAs).toBe("Payments");
         expect(payments?.metadata.group).toBe("module");
+        expect(payments?.lastChange).toBeNull();
+        expect(audit).not.toHaveBeenCalled();
+    });
+
+    it("ignores stored rows for a flag no longer registered (SAROH_BUSINESS_EMAIL, #1134)", async () => {
+        newest.mockResolvedValue([]);
+        (prisma.featureFlag.findMany as jest.Mock).mockResolvedValue([
+            { key: "SAROH_BUSINESS_EMAIL", enabledByDefault: false },
+        ]);
+        (prisma.featureFlagOverride.findMany as jest.Mock).mockResolvedValue([
+            {
+                flagKey: "SAROH_BUSINESS_EMAIL",
+                enabled: true,
+                organizationId: "org_1",
+                organization: { name: "Rye & Co." },
+            },
+        ]);
+        const flags = await service.list();
+        expect(flags).toHaveLength(FLAG_KEYS.length);
+        expect(flags.map((flag) => flag.key)).not.toContain(
+            "SAROH_BUSINESS_EMAIL",
+        );
+        expect(flags.every((flag) => flag.overrides.length === 0)).toBe(true);
+    });
+
+    it("gives each flag its newest change and who made it", async () => {
+        (prisma.featureFlag.findMany as jest.Mock).mockResolvedValue([]);
+        (prisma.featureFlagOverride.findMany as jest.Mock).mockResolvedValue(
+            [],
+        );
+        const at = new Date("2026-10-08T10:00:00Z");
+        newest.mockResolvedValue([
+            { flagKey: "MODULE_PAYMENTS", _max: { createdAt: at } },
+        ]);
+        audit.mockResolvedValue([
+            { flagKey: "MODULE_PAYMENTS", actorUserId: "u_1", createdAt: at },
+        ]);
+        users.mockResolvedValue([
+            { id: "u_1", name: " Asha ", email: "asha@example.com" },
+        ]);
+
+        const flags = await service.list();
+
+        expect(audit).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    OR: [{ flagKey: "MODULE_PAYMENTS", createdAt: at }],
+                },
+            }),
+        );
+        const payments = flags.find((flag) => flag.key === "MODULE_PAYMENTS");
+        expect(payments?.lastChange).toEqual({ at, actorName: "Asha" });
+        expect(flags.filter((flag) => flag.lastChange !== null)).toHaveLength(
+            1,
+        );
     });
 
     it("names who changed a flag and for which business, newest first", async () => {

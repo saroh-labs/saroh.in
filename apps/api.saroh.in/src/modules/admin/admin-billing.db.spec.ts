@@ -1,5 +1,5 @@
 /**
- * Admin › Billing over HTTP against a real Postgres (DEC-163): only Saroh
+ * Admin › Billing over HTTP against a real Postgres (DEC-179): only Saroh
  * staff holding `saroh-billing:read` (Platform Owners and Billing) see every
  * business's invoices, their PDFs, the month's export and the
  * subscriptions. The owner's rule (17 Oct): the API decides, and nobody
@@ -68,10 +68,15 @@ import { prisma } from "@saroh/database";
 import { AllExceptionsFilter } from "../../common/filters/all-exceptions.filter";
 import { PlatformAdminGuard } from "../../common/guards/platform-admin.guard";
 import { PlatformPermissionGuard } from "../../common/guards/platform-permission.guard";
+import { IdempotencyService } from "../../common/idempotency/idempotency.service";
 import { validationPipeOptions } from "../../common/validation";
+import { CheckoutService } from "../billing/checkout.service";
 import { SarohInvoicesService } from "../billing/saroh-invoices.service";
 import { AdminAccessService } from "./admin-access.service";
 import { AdminAuditService } from "./admin-audit.service";
+import { AdminBillingActionsService } from "./admin-billing-actions.service";
+import { AdminBillingControlsController } from "./admin-billing-controls.controller";
+import { AdminBillingControlsService } from "./admin-billing-controls.service";
 import { AdminBillingController } from "./admin-billing.controller";
 import { AdminBillingService } from "./admin-billing.service";
 import {
@@ -166,9 +171,14 @@ async function invoice(
 
 beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-        controllers: [AdminBillingController],
+        controllers: [AdminBillingController, AdminBillingControlsController],
         providers: [
             AdminBillingService,
+            AdminBillingActionsService,
+            AdminBillingControlsService,
+            IdempotencyService,
+            // The queue's reads never reach the checkout.
+            { provide: CheckoutService, useValue: {} },
             AdminAuditService,
             AdminAccessService,
             PlatformAdminGuard,
@@ -412,6 +422,443 @@ describe("Admin › Billing: who may read it", () => {
         ]) {
             expect(actions).toContain(action);
         }
+    });
+});
+
+/** A row of the subscriptions list, as much as these tests read. */
+interface SubRow {
+    id: string;
+    organization: { id: string };
+    status: string;
+    nextChargeAt: string | null;
+    nextChargeHow: string;
+    autopayRunsOutSoon: boolean;
+    termEndsAt: string | null;
+    termPayment: string | null;
+    billingProfile: { name: string; businesses: number } | null;
+}
+
+describe("Admin › Billing: one page (R25, R26)", () => {
+    // Provider ids take letters and digits only.
+    const idTag = tag.replace(/\D/g, "");
+    const ids = {
+        sub: `sub_${idTag}A`,
+        cust: `cust_${idTag}P`,
+        pay: `pay_${idTag}C`,
+        order: `order_${idTag}Y`,
+    };
+    const one = { autopay: "", yearly: "", trial: "", ended: "", ending: "" };
+    const now = Date.now();
+    const periodEnd = new Date(now + 20 * DAY);
+    const yearEnd = new Date(now + 200 * DAY);
+
+    async function org(name: string): Promise<string> {
+        return (
+            await prisma.organization.create({
+                data: { name, slug: `${name.toLowerCase()}-${tag}` },
+            })
+        ).id;
+    }
+
+    beforeAll(async () => {
+        const monthly = await prisma.plan.create({
+            data: {
+                key: `spec.${tag}.m`,
+                version: 1,
+                name: "Plan M",
+                priceCents: 11_100,
+                interval: "month",
+                entitlements: {},
+            },
+        });
+        const yearly = await prisma.plan.create({
+            data: {
+                key: `spec.${tag}.y`,
+                version: 1,
+                name: "Plan Y",
+                priceCents: 99_900,
+                interval: "year",
+                entitlements: {},
+            },
+        });
+        one.autopay = await org("Autopay");
+        one.yearly = await org("Yearly");
+        one.trial = await org("Trial");
+        one.ended = await org("Ended");
+        one.ending = await org("Ending");
+
+        // One owner's profile billing two businesses (DEC-167).
+        const profile = await prisma.billingProfile.create({
+            data: {
+                ownerUserId: people.owner,
+                legalName: "Example Holdings",
+                billingEmail: `holdings-${tag}@example.com`,
+                provider: "RAZORPAY",
+                providerCustomerId: ids.cust,
+            },
+        });
+        await prisma.organization.updateMany({
+            where: { id: { in: [one.autopay, one.trial] } },
+            data: { billingProfileId: profile.id },
+        });
+
+        // Monthly autopay: approved for twelve charges 340 days ago, so it
+        // runs out in about 25 days, after this period's charge.
+        await prisma.subscription.create({
+            data: {
+                organizationId: one.autopay,
+                planId: monthly.id,
+                status: "ACTIVE",
+                provider: "RAZORPAY",
+                providerSubscriptionId: ids.sub,
+                providerCustomerId: ids.cust,
+                currentPeriodEnd: periodEnd,
+            },
+        });
+        await prisma.billingCheckout.create({
+            data: {
+                organizationId: one.autopay,
+                planId: monthly.id,
+                cycle: "month",
+                kind: "NEW",
+                status: "COMPLETED",
+                provider: "RAZORPAY",
+                providerSubscriptionId: ids.sub,
+                providerPlanId: `plan_${idTag}`,
+                pricePaise: 11_100,
+                expiresAt: new Date(now - 335 * DAY),
+                completedAt: new Date(now - 340 * DAY),
+            },
+        });
+        await prisma.sarohInvoice.create({
+            data: {
+                organizationId: one.autopay,
+                number: `TST/${tag.slice(-6)}/9`,
+                series: `TST/${tag}`,
+                chargeKey: `spec:${tag}:9`,
+                source: "RENEWAL",
+                provider: "RAZORPAY",
+                providerEventId: `evt_${tag}_9`,
+                providerPaymentId: ids.pay,
+                planName: "Plan M",
+                cycle: "month",
+                issuedAt: new Date(now - 10 * DAY),
+                sellerName: "Example Labs",
+                billToName: "Example Holdings",
+                placeOfSupply: "29",
+                taxType: "INTRA",
+                subtotalPaise: 10_000,
+                taxablePaise: 10_000,
+                cgstPaise: 900,
+                sgstPaise: 900,
+                igstPaise: 0,
+                taxPaise: 1_800,
+                totalPaise: 11_800,
+            },
+        });
+
+        // A year paid at once (DEC-093): an order, no autopay.
+        await prisma.subscription.create({
+            data: {
+                organizationId: one.yearly,
+                planId: yearly.id,
+                status: "ACTIVE",
+                billingCycle: "year",
+                provider: "RAZORPAY",
+                providerSubscriptionId: ids.order,
+                currentPeriodEnd: yearEnd,
+            },
+        });
+        await prisma.billingCheckout.create({
+            data: {
+                organizationId: one.yearly,
+                planId: yearly.id,
+                cycle: "year",
+                kind: "NEW",
+                status: "COMPLETED",
+                provider: "RAZORPAY",
+                providerSubscriptionId: ids.order,
+                providerPlanId: "one-time",
+                pricePaise: 99_900,
+                expiresAt: new Date(now - 160 * DAY),
+                completedAt: new Date(now - 165 * DAY),
+            },
+        });
+
+        await prisma.subscription.create({
+            data: {
+                organizationId: one.trial,
+                planId: monthly.id,
+                status: "TRIALING",
+                currentPeriodEnd: periodEnd,
+            },
+        });
+        await prisma.subscription.create({
+            data: {
+                organizationId: one.ended,
+                planId: monthly.id,
+                status: "CANCELLED",
+            },
+        });
+        await prisma.subscription.create({
+            data: {
+                organizationId: one.ending,
+                planId: monthly.id,
+                status: "ACTIVE",
+                cancelAtPeriodEnd: true,
+                currentPeriodEnd: new Date(now + 5 * DAY),
+            },
+        });
+        await prisma.billingAction.create({
+            data: {
+                organizationId: one.autopay,
+                code: "refund_owed",
+                refs: { payment: ids.pay },
+                note: "A spec's open row",
+            },
+        });
+        await prisma.billingWebhookEvent.create({
+            data: {
+                provider: "RAZORPAY",
+                providerEventId: `evt_autopay_${tag}`,
+                type: "subscription.charged",
+                organizationId: one.autopay,
+                payload: {},
+            },
+        });
+    });
+
+    async function list(query: string): Promise<{
+        items: SubRow[];
+        summary: { endingSoon: number };
+    }> {
+        const res = await get(`/billing/subscriptions${query}`, people.billing);
+        expect(res.status).toBe(200);
+        return (await res.json()) as {
+            items: SubRow[];
+            summary: { endingSoon: number };
+        };
+    }
+
+    const orgsOf = (rows: { organization: { id: string } }[]) =>
+        rows.map((r) => r.organization.id);
+
+    it("an autopay row: its next charge, how, and that it runs out soon", async () => {
+        const { items } = await list(`?q=${ids.sub}`);
+        const row = items.find((r) => r.organization.id === one.autopay);
+        expect(row).toMatchObject({
+            nextChargeHow: "AUTOPAY",
+            nextChargeAt: periodEnd.toISOString(),
+            termPayment: "AUTOPAY",
+            autopayRunsOutSoon: true,
+        });
+    });
+
+    it("a year paid at once: paid for the year, ending when the year does", async () => {
+        const { items } = await list(`?q=yearly-${tag}`);
+        const row = items.find((r) => r.organization.id === one.yearly);
+        expect(row).toMatchObject({
+            nextChargeHow: "PAID_FOR_YEAR",
+            nextChargeAt: null,
+            termPayment: "ONE_TIME",
+            termEndsAt: yearEnd.toISOString(),
+            autopayRunsOutSoon: false,
+        });
+    });
+
+    it("two businesses on one profile: each row says so", async () => {
+        const { items } = await list(`?q=${ids.cust}`);
+        expect(new Set(orgsOf(items))).toEqual(
+            new Set([one.autopay, one.trial]),
+        );
+        for (const row of items) {
+            expect(row.billingProfile).toEqual({
+                name: "Example Holdings",
+                businesses: 2,
+            });
+        }
+        const { items: plain } = await list(`?q=ended-${tag}`);
+        expect(plain[0]?.billingProfile).toBeNull();
+    });
+
+    it("filters by status and by the ending-soon view", async () => {
+        const trial = orgsOf((await list("?status=TRIALING")).items);
+        expect(trial).toContain(one.trial);
+        expect(trial).not.toContain(one.autopay);
+
+        const ended = orgsOf((await list("?status=CANCELLED")).items);
+        expect(ended).toContain(one.ended);
+        expect(ended).not.toContain(one.ending);
+
+        const ending = await list("?view=ending-soon");
+        expect(orgsOf(ending.items)).toContain(one.ending);
+        expect(orgsOf(ending.items)).not.toContain(one.ended);
+        expect(ending.summary.endingSoon).toBeGreaterThanOrEqual(1);
+
+        // A plan and a search narrow together.
+        const both = orgsOf(
+            (await list(`?plan=spec.${tag}.m&q=trial-${tag}`)).items,
+        );
+        expect(both).toEqual([one.trial]);
+    });
+
+    it("finds the business by its pay_, sub_ and cust_ ids", async () => {
+        expect(orgsOf((await list(`?q=${ids.pay}`)).items)).toEqual([
+            one.autopay,
+        ]);
+        expect(orgsOf((await list(`?q=${ids.sub}`)).items)).toEqual([
+            one.autopay,
+        ]);
+        expect(orgsOf((await list(`?q=${ids.cust}`)).items)).toContain(
+            one.autopay,
+        );
+    });
+
+    it("the one search narrows Needs action and provider events too", async () => {
+        const actions = await get(
+            `/billing/actions?q=${ids.pay}`,
+            people.billing,
+        );
+        expect(actions.status).toBe(200);
+        const a = (await actions.json()) as {
+            items: { organization: { id: string } | null }[];
+        };
+        expect(a.items.map((r) => r.organization?.id)).toEqual([one.autopay]);
+
+        const events = await get(
+            `/billing/events?q=autopay-${tag}`,
+            people.billing,
+        );
+        const e = (await events.json()) as { items: { type: string }[] };
+        expect(e.items.map((r) => r.type)).toEqual(["subscription.charged"]);
+    });
+
+    it("counts each tab, for Billing only", async () => {
+        const res = await get("/billing/counts", people.billing);
+        expect(res.status).toBe(200);
+        const counts = (await res.json()) as Record<string, number>;
+        expect(counts.subscriptions).toBeGreaterThanOrEqual(7);
+        expect(counts.invoices).toBeGreaterThanOrEqual(3);
+        expect(counts.openActions).toBeGreaterThanOrEqual(1);
+        expect(counts.events).toBeGreaterThanOrEqual(2);
+        expect((await get("/billing/counts", people.support)).status).toBe(403);
+        expect((await get("/billing/counts")).status).toBe(401);
+    });
+});
+
+describe("Admin › Billing › Invoices: Paid, Unpaid, Refunded (R29)", () => {
+    const st = { org: "", refunded: "", short: "", lost: "", pending: "" };
+    const slug = `billing-c-${tag}`;
+
+    beforeAll(async () => {
+        st.org = (
+            await prisma.organization.create({
+                data: { name: "Billing C", slug },
+            })
+        ).id;
+        st.refunded = await invoice(st.org, 11, null);
+        st.short = await invoice(st.org, 12, null);
+        st.lost = await invoice(st.org, 13, null);
+        st.pending = await invoice(st.org, 14, null);
+        // Razorpay took less than invoice 12's total.
+        await prisma.sarohInvoice.update({
+            where: { id: st.short },
+            data: { providerAmountPaise: 100 },
+        });
+        const refund = (
+            invoiceId: string,
+            kind: string,
+            status: string,
+            n: number,
+        ) =>
+            prisma.billingRefund.create({
+                data: {
+                    organizationId: st.org,
+                    provider: "RAZORPAY",
+                    kind,
+                    providerRefundId: `rfnd_${tag}_${n}`,
+                    providerPaymentId: `pay_${tag}_${n}`,
+                    invoiceId,
+                    amountPaise: 500,
+                    status,
+                    source: "PROVIDER",
+                },
+            });
+        await refund(st.refunded, "REFUND", "PROCESSED", 11);
+        await refund(st.lost, "DISPUTE", "LOST", 13);
+        // A refund still pending gives nothing back yet.
+        await refund(st.pending, "REFUND", "PENDING", 14);
+    });
+
+    async function ids(query: string): Promise<{
+        ids: string[];
+        statusCounts: Record<string, number>;
+    }> {
+        const res = await get(`/billing/invoices${query}`, people.billing);
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as {
+            items: { id: string }[];
+            statusCounts: Record<string, number>;
+        };
+        return {
+            ids: body.items.map((i) => i.id),
+            statusCounts: body.statusCounts,
+        };
+    }
+
+    it("Unpaid is an invoice Razorpay took less for, and nothing else", async () => {
+        const { ids: unpaid } = await ids("?status=unpaid");
+        expect(unpaid).toContain(st.short);
+        for (const other of [st.refunded, st.lost, st.pending, invoices.a]) {
+            expect(unpaid).not.toContain(other);
+        }
+    });
+
+    it("Refunded is a processed refund or a lost dispute, never a pending refund", async () => {
+        const { ids: refunded } = await ids("?status=refunded");
+        expect(refunded).toEqual(
+            expect.arrayContaining([st.refunded, st.lost]),
+        );
+        expect(refunded).not.toContain(st.pending);
+        expect(refunded).not.toContain(st.short);
+    });
+
+    it("Paid is the rest", async () => {
+        const { ids: paid } = await ids("?status=paid");
+        expect(paid).toEqual(
+            expect.arrayContaining([invoices.a, invoices.b, st.pending]),
+        );
+        for (const other of [st.refunded, st.lost, st.short]) {
+            expect(paid).not.toContain(other);
+        }
+    });
+
+    it("counts each status under the other filters, whatever status is picked", async () => {
+        const all = await ids(`?q=${slug}`);
+        const picked = await ids(`?q=${slug}&status=unpaid`);
+        expect(all.statusCounts).toEqual({ paid: 1, unpaid: 1, refunded: 2 });
+        expect(picked.statusCounts).toEqual(all.statusCounts);
+        expect(picked.ids).toEqual([st.short]);
+    });
+
+    it("the export keeps the status filter", async () => {
+        const res = await get(
+            "/billing/invoices/export?month=2026-10&status=refunded",
+            people.billing,
+        );
+        expect(res.status).toBe(200);
+        const csv = await res.text();
+        expect(csv).toContain("Buyer 11");
+        expect(csv).toContain("Buyer 13");
+        expect(csv).not.toContain("Buyer 12");
+        expect(csv).not.toContain("Buyer 1,");
+    });
+
+    it("refuses a status it doesn't know", async () => {
+        expect(
+            (await get("/billing/invoices?status=overdue", people.billing))
+                .status,
+        ).toBe(400);
     });
 });
 

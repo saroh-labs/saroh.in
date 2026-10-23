@@ -1,11 +1,11 @@
 ---
 # Every label below was checked against the real screens on 6 Oct 2026
 # (R7), in the code and in the captured shots. Sources, from the repo root:
-#   NAV   apps/app.saroh.in/components/shared/nav-items.tsx (Bookings ›
-#         Services, /services); components/services/services-screen.tsx
+#   NAV   apps/app.saroh.in/components/shared/navigation/nav-items.tsx (Bookings ›
+#         Services, /services); components/services/list/services-screen.tsx
 #         (a row opens its service; rows since 12 Oct 2026, cards with an
 #         "Edit" button before)
-#   PRICE apps/app.saroh.in/components/services/service-editor/editor-sections.tsx
+#   PRICE apps/app.saroh.in/components/services/service-fields/editor-sections.tsx
 #         ("Price", "Price (₹)"); .../service-editor/deposit-field.tsx ("At
 #         booking, they pay": "Nothing, they pay at the visit", "25%
 #         deposit", "50% deposit", "The full price")
@@ -30,7 +30,7 @@
 #         checkout); MARKETING_CLAIMS BK1, BK8; DEC-051 (refunded once, by
 #         the free-cancel time fixed at booking), DEC-058 (Cancelled in time)
 #   DESK  apps/app.saroh.in/lib/services/booking-money.ts paidLine ("Deposit …
-#         paid · … due at the visit"); components/bookings/take-payment.tsx
+#         paid · … due at the visit"); components/bookings/booking-page/take-payment.tsx
 #         ("Take …", "What's left after the deposit … paid online.")
 #   PROV  nav-items.tsx (Settings › Providers)
 #   WARN  apps/app.saroh.in/lib/services/online-booking.ts ("Paid at the
@@ -79,7 +79,7 @@ steps:
       body: "Under Price, At booking, they pay has four choices: Nothing, they pay at the visit, a 25% deposit, a 50% deposit, or The full price. Under them, Saroh says what that means for this service: what they pay when booking, the rest at the visit, and that it's refunded if they cancel in time. A deposit is part of the price, so the service needs a price first. If it can't be taken online — no payment provider connected, Payments off, or your booking rules taking payment at the desk only — Saroh says right under it that it's paid at the desk instead, with a link to what fixes it. If your booking rules take payment online only, it says people can't book it online."
       shot: help-take-deposit-2
       caption: "The root canal's price at Kavi Dental (demo clinic), with a 50% deposit at booking, and the note that it's paid at the desk for now, as no payment provider is connected."
-      tip: "In time means before the free cancellation time in your booking rules, under Bookings › Availability. A late cancel keeps the deposit."
+      tip: "In time means before the free cancellation time in your booking rules, under Bookings › Hours and time off. A late cancel keeps the deposit."
       marker: 50% deposit
     # SAVE.
     - title: Save the service
@@ -95,7 +95,7 @@ steps:
       marker: Pay the deposit now
     # PAY, PROV.
     - title: Connect a payment provider
-      body: "A deposit is paid online, through your own Razorpay or Cashfree account, connected under Settings › Providers, with How people pay when they book, in your booking rules under Bookings › Availability, set to Online or Both. With Payments off, no provider connected, or At the desk chosen, the deposit isn't taken: the booking page books the time to pay at the desk, and the customer pays when they come. If your booking rules take payment online only, it can't do that: the booking page tells the customer to get in touch with you to book, and Bookings › Services marks the service Can't be booked online, with the way to fix it."
+      body: "A deposit is paid online, through your own Razorpay or Cashfree account, connected under Settings › Providers, with How people pay when they book, in your booking rules under Bookings › Hours and time off, set to Online or Both. With Payments off, no provider connected, or At the desk chosen, the deposit isn't taken: the booking page books the time to pay at the desk, and the customer pays when they come. If your booking rules take payment online only, it can't do that: the booking page tells the customer to get in touch with you to book, and Bookings › Services marks the service Can't be booked online, with the way to fix it."
       shot: help-take-deposit-5
       caption: "The booking page of Kavi Dental (demo clinic), with no payment provider connected: the root canal is paid at the desk."
       marker: Pay at the desk

@@ -9,8 +9,13 @@
 import { HttpException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import * as bookingPage from "./public-booking-page";
 import { publicDays } from "./public-booking-page";
-import { PublicTimetableService, TIMETABLE_DAYS } from "./public-timetable";
+import {
+    PublicTimetableService,
+    TIMETABLE_DAYS,
+    TIMETABLE_KEPT_MS,
+} from "./public-timetable";
 import { FixedWindowRateLimiter } from "./rate-limiter";
 
 // Generous: these tests read many times from one "visitor".
@@ -51,6 +56,7 @@ async function classOn(
     dayOfWeek: number,
     hour: number,
     capacity = 8,
+    priceCents: number | null = null,
 ) {
     return (
         await prisma.service.create({
@@ -59,6 +65,8 @@ async function classOn(
                 name,
                 durationMinutes: 60,
                 capacity,
+                priceCents,
+                currency: priceCents === null ? null : "INR",
                 timezone: "UTC",
                 availabilityRules: {
                     create: {
@@ -80,7 +88,14 @@ let pt: string;
 
 beforeAll(async () => {
     gym = await business("Iron Room");
-    strength = await classOn(gym.organizationId, "Strength", MONDAY, 7);
+    strength = await classOn(
+        gym.organizationId,
+        "Strength",
+        MONDAY,
+        7,
+        8,
+        70_000,
+    );
     yoga = await classOn(gym.organizationId, "Yoga", WEDNESDAY, 18);
     // A one-to-one: never on a timetable.
     pt = await classOn(gym.organizationId, "Personal training", MONDAY, 9, 1);
@@ -106,6 +121,24 @@ describe("Timetable (real database)", () => {
         const starts = read.sessions.map((s) => s.startAt);
         expect([...starts].sort()).toEqual(starts);
         expect(JSON.stringify(read)).not.toMatch(/organizationId|staffId/);
+    });
+
+    it("says each class's price as the services list does, and none as none (DEC-172 U7)", async () => {
+        const read = await timetable.read(
+            gym.siteId,
+            [],
+            "visitor",
+            nextMonday(5),
+        );
+        const priced = read.sessions.find((s) => s.serviceId === strength);
+        const free = read.sessions.find((s) => s.serviceId === yoga);
+        expect(priced).toMatchObject({
+            priceCents: 70_000,
+            currency: "INR",
+            gst: null,
+        });
+        // No price typed: null, never "0".
+        expect(free).toMatchObject({ priceCents: null, currency: null });
     });
 
     it("lists only sessions the booking page itself offers", async () => {
@@ -174,5 +207,44 @@ describe("Timetable (real database)", () => {
         await expect(
             strict.read(gym.siteId, [], "one-visitor", nextMonday(5)),
         ).rejects.toBeInstanceOf(HttpException);
+    });
+});
+
+describe("Timetable's cost per read (review #4)", () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    it("reads each class once, then shares the week inside the window, whatever order the classes are named in", async () => {
+        const days = jest.spyOn(bookingPage, "publicDays");
+        const fresh = new PublicTimetableService(
+            new FixedWindowRateLimiter(1_000),
+        );
+        const now = nextMonday(5);
+        const reads = await Promise.all(
+            Array.from({ length: 10 }, (_, i) =>
+                fresh.read(
+                    gym.siteId,
+                    i % 2 ? [yoga, strength] : [strength, yoga],
+                    `visitor-${i}`,
+                    now,
+                ),
+            ),
+        );
+        expect(reads[0]?.sessions.length).toBeGreaterThan(0);
+        expect(days).toHaveBeenCalledTimes(2);
+        // Still kept a moment before the window ends; read again after.
+        await fresh.read(
+            gym.siteId,
+            [yoga, strength],
+            "late",
+            new Date(now.getTime() + TIMETABLE_KEPT_MS - 1),
+        );
+        expect(days).toHaveBeenCalledTimes(2);
+        await fresh.read(
+            gym.siteId,
+            [yoga, strength],
+            "later",
+            new Date(now.getTime() + TIMETABLE_KEPT_MS),
+        );
+        expect(days).toHaveBeenCalledTimes(4);
     });
 });

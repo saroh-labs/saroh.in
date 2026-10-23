@@ -30,6 +30,9 @@
  * address (the test release bar) is untouched.
  */
 
+import type { LookId, LookMotion } from "@saroh/block-contract";
+import { LOOKS } from "@saroh/block-contract";
+
 /** A value read from the variables a publication carries. */
 type Variables = Record<string, string> | null | undefined;
 
@@ -58,15 +61,25 @@ const PADDED = '[class*="py-[var(--site-section-padding)]"]';
 const BAND_SPACE = 1.2;
 const NEIGHBOUR_SPACE = 0.5;
 
-export function craftRules(at: string, variables: Variables): string {
+/**
+ * The craft rules for a site. `look` (DEC-172) changes only how things
+ * move (`lookMotion`, KD5); with none, Classic's rules are written exactly
+ * as they always were (the `classic-pin` snapshots hold that).
+ */
+export function craftRules(
+    at: string,
+    variables: Variables,
+    look?: LookId,
+): string {
     const scope = `${at} :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])`;
     const base = `:where(${scope})`;
+    const moves = look ? LOOKS[look].motion : null;
     return [
         tokens(at),
         typography(at, base, variables),
-        rhythm(at),
-        states(at),
-        motion(at),
+        rhythm(at, look),
+        states(at, moves ? `${moves.base}ms` : "150ms"),
+        moves ? lookMotion(at, moves) : motion(at),
     ].join("");
 }
 
@@ -210,11 +223,14 @@ function typography(at: string, base: string, variables: Variables): string {
  *
  * A browser without `:has()` skips the second rule and keeps even gaps.
  */
-function rhythm(at: string): string {
-    return `
+function rhythm(at: string, look?: LookId): string {
+    const bands = `
             ${at} [data-site-section][data-site-band] {
                 --site-section-padding: calc(var(--site-section-space) * ${BAND_SPACE});
-            }
+            }`;
+    // Folio rules its sections apart at full padding (board VA).
+    if (look === "folio") return bands;
+    return `${bands}
             ${at} [data-site-section]:not([data-site-band]):not(:empty):not(:has(> [data-site-ground])) + [data-site-section]:not([data-site-band]) > ${PADDED}:not([data-site-ground]) {
                 padding-top: calc(var(--site-section-padding) * ${NEIGHBOUR_SPACE});
             }`;
@@ -239,7 +255,7 @@ function rhythm(at: string): string {
  * Hover and pressed looks belong to each control; the shared ones are
  * `ctaClasses` and the header's and footer's own.
  */
-function states(at: string): string {
+function states(at: string, duration: string): string {
     const within = (mark: string) =>
         `:where(${at} ${mark}) :where(a, button, summary):focus-visible`;
     return `
@@ -265,7 +281,7 @@ function states(at: string): string {
             }
             @media (prefers-reduced-motion: no-preference) {
                 :where(${at} :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :where(a, button, summary) {
-                    transition: color 150ms var(--site-ease), background-color 150ms var(--site-ease), border-color 150ms var(--site-ease), opacity 150ms var(--site-ease), text-decoration-color 150ms var(--site-ease);
+                    transition: color ${duration} var(--site-ease), background-color ${duration} var(--site-ease), border-color ${duration} var(--site-ease), opacity ${duration} var(--site-ease), text-decoration-color ${duration} var(--site-ease);
                 }
             }`;
 }
@@ -334,4 +350,71 @@ function motion(at: string): string {
                     animation: site-fade-in 180ms var(--site-ease) both;
                 }
             }${entrance}`;
+}
+
+/**
+ * MOTION UNDER A LOOK (DEC-172, KD5, R5): fade or rise, 200ms or less, no
+ * bounce, no loops, and reduced motion respected. The boards' longer
+ * moments (a hero unmasking, a frame drawing, a ticket springing) are cut
+ * or shortened to fit; where a board and DEC-172 disagree, DEC-172 wins.
+ *
+ * - NOTHING MOVES ON SCROLL. Classic's sections rise as they come into
+ *   view; under a look every section is visible at rest, never hidden
+ *   waiting for a scroll (WV2Motion, WV2Tech: screen readers and captures
+ *   met blanks). No parallax.
+ * - `site-rise` is a fade and a rise of the look's distance (8px) over
+ *   its slow step (200ms); `site-fade-in` is a fade alone. A block asks
+ *   for either by marking an element `data-site-rise` or `data-site-fade`
+ *   (a sheet, a step, the booked ticket): it plays once, as the element
+ *   appears, and lets go of it afterwards.
+ * - The phone menu and its scrim come in over the slow step.
+ * - Links and buttons ease their colours over the base step (140ms,
+ *   `states`).
+ * - REDUCED MOTION: every animation becomes a fade, over the fast step
+ *   plus a little (120ms): nothing moves across the screen.
+ *
+ * One curve, `--site-ease`, which never passes its mark (no value over 1).
+ */
+function lookMotion(at: string, m: LookMotion): string {
+    const fade = 120;
+    return `
+            @keyframes site-rise {
+                from {
+                    opacity: 0;
+                    transform: translateY(${m.rise}px);
+                }
+            }
+            @keyframes site-menu-in {
+                from {
+                    opacity: 0;
+                    transform: translateY(-${Math.min(m.rise, 6)}px);
+                }
+            }
+            @keyframes site-fade-in {
+                from {
+                    opacity: 0;
+                }
+            }
+            @media (prefers-reduced-motion: no-preference) {
+                ${at} [data-site-menu-panel] {
+                    animation: site-menu-in ${m.slow}ms var(--site-ease) both;
+                }
+                ${at} [data-site-menu-scrim] {
+                    animation: site-fade-in ${m.slow}ms var(--site-ease) both;
+                }
+                ${at} [data-site-rise] {
+                    animation: site-rise ${m.slow}ms var(--site-ease) backwards;
+                }
+                ${at} [data-site-fade] {
+                    animation: site-fade-in ${m.base}ms var(--site-ease) backwards;
+                }
+            }
+            @media (prefers-reduced-motion: reduce) {
+                ${at} :is([data-site-menu-panel], [data-site-menu-scrim]) {
+                    animation: site-fade-in ${fade}ms var(--site-ease) both;
+                }
+                ${at} :is([data-site-rise], [data-site-fade]) {
+                    animation: site-fade-in ${fade}ms var(--site-ease) backwards;
+                }
+            }`;
 }

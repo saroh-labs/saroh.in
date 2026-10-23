@@ -1,5 +1,7 @@
-import { createHash } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { isIP } from "node:net";
+
+import { visitorHashSecret } from "../modules/analytics/visitor-hash";
 
 /**
  * The address a public rate limit counts a caller by. IPv4 as it is — an
@@ -17,13 +19,21 @@ export function limitAddress(ip: string): string {
 }
 
 /**
- * The caller's address for a rate limit, hashed at once (sha256 of
- * {@link limitAddress}) — the raw IP never leaves the handler. `undefined`
- * when the platform gives no address.
+ * The caller's address for a rate limit, hashed at once — the raw IP never
+ * leaves the handler. `undefined` when the platform gives no address.
+ *
+ * Keyed with the server's secret (an HMAC of {@link limitAddress}), not a
+ * plain sha256: there are only four billion IPv4 addresses, so a plain hash
+ * in a stored row gives the address back to anyone who tries them all.
  */
-export function hashClientIp(ip: string | undefined): string | undefined {
+export function hashClientIp(
+    ip: string | undefined,
+    secret: string = visitorHashSecret(),
+): string | undefined {
     return ip
-        ? createHash("sha256").update(limitAddress(ip)).digest("hex")
+        ? createHmac("sha256", secret)
+              .update(`client-ip:${limitAddress(ip)}`)
+              .digest("hex")
         : undefined;
 }
 

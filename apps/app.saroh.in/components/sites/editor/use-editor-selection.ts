@@ -2,7 +2,7 @@ import { showError } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useMemo, useSyncExternalStore } from "react";
 
-import { carryPreview } from "@/components/sites/editor/use-editor-viewport";
+import { carryPreview } from "@/components/sites/canvas/use-editor-viewport";
 import {
     getPlace,
     placeOnServer,

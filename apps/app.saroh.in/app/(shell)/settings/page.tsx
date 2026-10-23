@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 
-import { AccessDenied } from "@/components/shared/access-denied";
-import { settingsPagesFor } from "@/components/shared/nav-items";
-import { PageContainer } from "@/components/shared/page-container";
-import { whoCanChange } from "@/components/shared/who-can-change";
+import { settingsPagesFor } from "@/components/shared/navigation/nav-items";
+import { PageContainer } from "@/components/shared/page/page-container";
+import { AccessDenied } from "@/components/shared/states/access-denied";
+import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";

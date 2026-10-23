@@ -559,7 +559,8 @@ describe("switches: custom roles, themes, site review (DB, U13)", () => {
                     slug: uniq("s"),
                 },
             });
-        const look = { colours: { accent: "teal" } };
+        // A paid typeface (DEC-177): colours and free looks need no row.
+        const look = { fontPair: "archivo" };
         const freeSite = await siteOf(free);
         expect(
             (await refused(sites.updateStyle(free.owner, freeSite.id, look)))

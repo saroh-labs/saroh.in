@@ -1,5 +1,6 @@
 import { Transform, Type } from "class-transformer";
 import {
+    IsBoolean,
     IsIn,
     IsInt,
     IsOptional,
@@ -106,6 +107,15 @@ export class ChangePlanDto {
     @IsString()
     @MaxLength(32, { message: "That isn't a coupon code." })
     coupon?: string;
+
+    /**
+     * The owner saw "This changes Saroh's invoices for N businesses." and
+     * went on (owner, 18 Oct 2026): a checkout that would change a billing
+     * profile billing more than one business is refused without it.
+     */
+    @IsOptional()
+    @IsBoolean()
+    confirmSharedProfile?: boolean;
 }
 
 /** `GET …/billing/change-plan?plan=&cycle=`: the same two, to quote. */

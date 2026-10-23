@@ -2,7 +2,7 @@ import type { BookingPageData } from "@saroh/site-blocks";
 import { describe, expect, it } from "vitest";
 
 import type { BookingPageLookup } from "./booking-page";
-import { headerAction } from "./header-action";
+import { headerAction, lookDock } from "./header-action";
 
 const PAGE: BookingPageData = {
     businessName: "Pulse Fitness",
@@ -164,5 +164,74 @@ describe("the site header's main button (G17)", () => {
                 headerAction({ booking: lookup, shopServes: false }),
             ).toBeNull();
         }
+    });
+});
+
+describe("Live's dock (DEC-172, U5)", () => {
+    const navigation = [
+        { label: "Home", href: "/" },
+        { label: "Timetable", href: "/timetable" },
+        { label: "Book a class", href: "/book", kind: "BOOK" },
+        { label: "Shop", href: "/shop", kind: "SHOP" },
+    ];
+    const book = { kind: "book" as const, label: "Book", href: "/book" };
+
+    it("is Live's only: the other looks have a Book bar instead", () => {
+        for (const look of ["folio", "quiet"] as const) {
+            expect(
+                lookDock({
+                    look,
+                    navigation,
+                    shopServes: true,
+                    action: book,
+                    accountArea: true,
+                }),
+            ).toEqual([]);
+        }
+    });
+
+    it("holds Home, the site's pages, Book, the shop and You", () => {
+        const tabs = lookDock({
+            look: "live",
+            navigation,
+            shopServes: true,
+            action: book,
+            accountArea: true,
+        });
+        expect(tabs.map((t) => [t.label, t.href])).toEqual([
+            ["Home", "/"],
+            ["Timetable", "/timetable"],
+            ["Book", "/book"],
+            ["Shop", "/shop"],
+            ["You", "/account"],
+        ]);
+    });
+
+    it("offers no shop that doesn't serve, and no You without accounts", () => {
+        const tabs = lookDock({
+            look: "live",
+            navigation,
+            shopServes: false,
+            action: book,
+            accountArea: false,
+        });
+        // The main action stands in the middle (board VB).
+        expect(tabs.map((t) => t.label)).toEqual(["Home", "Book", "Timetable"]);
+    });
+
+    it("doesn't repeat the shop when Order is the main action", () => {
+        const tabs = lookDock({
+            look: "live",
+            navigation,
+            shopServes: true,
+            action: { kind: "shop", label: "Order", href: "/shop" },
+            accountArea: false,
+        });
+        expect(tabs.map((t) => t.label)).toEqual([
+            "Home",
+            "Timetable",
+            "Order",
+            "Book a class",
+        ]);
     });
 });

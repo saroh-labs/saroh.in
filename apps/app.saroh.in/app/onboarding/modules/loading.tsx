@@ -1,6 +1,6 @@
 import { PageHeader } from "@saroh/ui/page-header";
 
-import { PageLoading } from "@/components/shared/page-loading";
+import { PageLoading } from "@/components/shared/page/page-loading";
 
 /**
  * The page's own frame and title, with only the choices grey: the same

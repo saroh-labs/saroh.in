@@ -23,7 +23,7 @@ export const SAROH_OLD_HELP_URL = "https://help.saroh.in";
 
 /** Each page's `publishOn` on the marketing site. */
 export const PUBLISHED_ON = {
-    privacy: "2026-10-17",
+    privacy: "2026-10-21",
     terms: "2026-10-14",
     help: "2026-10-17",
 } as const;

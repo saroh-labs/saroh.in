@@ -29,9 +29,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { usePayLink } from "@/components/commerce/order-detail/pay-link";
-import { QrButton } from "@/components/qr/qr-button";
-import { useHold } from "@/components/shared/use-hold";
+import { usePayLink } from "@/components/commerce/order-payment/pay-link";
+import { QrButton } from "@/components/qr/link-qr/qr-button";
+import { useHold } from "@/components/shared/undo/use-hold";
 import { cancelOrder } from "@/lib/orders/actions";
 import type { OrderRow } from "@/lib/orders/business-service";
 import type { OrderAbilities, RowMenuItem } from "@/lib/orders/row-menu";
@@ -50,14 +50,14 @@ const firstName = (row: OrderRow) =>
 
 /**
  * A row's "More actions" menu on the Orders list (plan B, B5), after the
- * design's row menu: the next step, Print ticket, the pay link (B11), Open
+ * design's row menu: the next step, Print ticket, the payment link (B11), Open
  * full page, and — apart — Refund, or Cancel for an order nothing was paid
  * on. What the caller can't use isn't drawn; what the order doesn't allow is
  * drawn off, with the reason under it (`row-menu.ts`).
  *
  * Steps that ask for more (a hand-over's courier) and refunds (lines, a
  * reason and the ten-second hold) open Order Detail with that panel up, so
- * there is one place each is done. A new pay link is shown once, here, and
+ * there is one place each is done. A new payment link is shown once, here, and
  * replacing one says the old one stops working first.
  *
  * Cancel tells the customer, so it asks nothing and waits ten seconds with
@@ -243,7 +243,7 @@ export function OrderRowMenu({
             >
                 <DialogContent size="sm">
                     <DialogHeader>
-                        <DialogTitle>Pay link for {ref}</DialogTitle>
+                        <DialogTitle>Payment link for {ref}</DialogTitle>
                         <DialogDescription>
                             Shown this once. Copy it now and send it to{" "}
                             {firstName(row)}. Saroh doesn&apos;t send it. Any
@@ -260,7 +260,7 @@ export function OrderRowMenu({
                                 link={{
                                     mode: "instant",
                                     url: payLink.url,
-                                    what: "this order's pay link",
+                                    what: "this order's payment link",
                                     opens: "pay",
                                     fileName: "pay-link-qr",
                                 }}

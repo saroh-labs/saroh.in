@@ -36,6 +36,11 @@ export interface PlanCardView {
     /** "Try it free for N days", or empty. */
     trial: string;
     lines: { t: string; soon: boolean }[];
+    /**
+     * What the staff draft preview marks as changed from live, with "Show
+     * what changed" on (`lib/pricing-marks.ts`); never set on the public page.
+     */
+    changed?: { name: boolean; price: boolean; lines: string[] };
 }
 
 /** A usage cell for a plan that leaves the row out: drawn as a dash. */
@@ -65,7 +70,12 @@ export type CompareRow =
           kind: "line";
           label: string;
           soon: boolean;
-          cells: ({ yes: true; t: string } | { yes: false })[];
+          cells: (({ yes: true; t: string } | { yes: false }) & {
+              /** The draft preview's "was …", when this cell changed. */
+              was?: string;
+          })[];
+          /** The draft preview: a row live doesn't have. */
+          added?: boolean;
       };
 
 export interface PricingView {

@@ -4,10 +4,14 @@ import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { BusinessSetupForm } from "@/components/organizations/business-setup-form";
-import { SetupPanel } from "@/components/organizations/setup-panel";
-import { SetupStepProvider } from "@/components/organizations/setup-step-context";
+import { BusinessSetupForm } from "@/components/organizations/setup/business-setup-form";
+import { SetupPanel } from "@/components/organizations/setup/setup-panel";
+import { SetupStepProvider } from "@/components/organizations/setup/setup-step-context";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
+import {
+    listMyBillingProfiles,
+    profileOptions,
+} from "@/lib/billing-profiles/service";
 import {
     ACTIVE_ORG_NAME_COOKIE,
     ACTIVE_ORG_USER_COOKIE,
@@ -63,6 +67,10 @@ export const metadata: Metadata = { title: "Set up Saroh" };
  *
  * While plans aren't shown (DEC-136) neither is read: no plan is named
  * under the heading, nothing goes on to a checkout, and no offer is taken.
+ *
+ * An owner who has a billing profile already (DEC-167, R7) is asked who
+ * Saroh bills for the new business, between its name and what to do
+ * first. Someone with none isn't: their first is made from the business.
  */
 export default async function OnboardingPage({
     searchParams,
@@ -70,12 +78,15 @@ export default async function OnboardingPage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     await requireSession();
-    const [session, organizations, query] = await Promise.all([
+    const [session, organizations, query, billingProfiles] = await Promise.all([
         getServerSession(await headers()),
         listOrganizations(),
         searchParams,
+        // Who Saroh bills (DEC-167, R7): asked when they have any.
+        listMyBillingProfiles(),
     ]);
     const hasOrgs = organizations.length > 0;
+    const asksBilling = billingProfiles.length > 0;
     const plans = plansShown();
     const invite = plans
         ? await readInviteIntent(query)
@@ -118,7 +129,11 @@ export default async function OnboardingPage({
                         <SplitPanel
                             eyebrow="Set up another"
                             heading="One more, beside the ones you have."
-                            body="Say what it is, name it and pick what to do first. The last step opens that thing, ready to fill in."
+                            body={
+                                asksBilling
+                                    ? "Say what it is, name it, choose who Saroh bills and pick what to do first. The last step opens that thing, ready to fill in."
+                                    : "Say what it is, name it and pick what to do first. The last step opens that thing, ready to fill in."
+                            }
                             points={[
                                 // True: name and country change in Business
                                 // settings, and the web address in its Web
@@ -141,6 +156,7 @@ export default async function OnboardingPage({
                     // An account made with an emailed code has no name yet.
                     needsName={!!session && !session.user.name?.trim()}
                     another={hasOrgs}
+                    billingProfiles={profileOptions(billingProfiles)}
                     backTo={hasOrgs ? "/" : undefined}
                     checkout={checkoutIntent(intent)}
                     invite={inviteToTake(invite)}

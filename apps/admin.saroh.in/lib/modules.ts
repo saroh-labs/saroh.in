@@ -7,7 +7,7 @@
 export const MODULE_OPTIONS = [
     { key: "WEBSITE", label: "Website" },
     { key: "CRM", label: "CRM" },
-    { key: "APPOINTMENTS", label: "Appointments" },
+    { key: "APPOINTMENTS", label: "Bookings" },
     { key: "COURSES", label: "Courses" },
     { key: "CLASS_PACKS", label: "Class packs" },
     { key: "COMMERCE", label: "Commerce" },

@@ -45,6 +45,7 @@ const CANT: Readonly<Record<string, string>> = {
     "booking:write": "Your role can't change bookings.",
     "service:write":
         "Your role can't change services, hours, time off or booking rules.",
+    "hours:write": "Your role can't change hours or time off.",
     // Orders
     "order:read": "Your role can't see orders.",
     "order:create": "Your role can't take orders.",

@@ -1,7 +1,9 @@
+import { EmptyPanel } from "@/components/states/empty-panel";
+import { FailedPanel } from "@/components/states/failed-panel";
 import type { FlagChange } from "@/lib/control-plane";
 import { formatDateTime } from "@/lib/format";
 
-/** "On for Rye & Co. (was off)", "Off for everyone (was never switched on)". */
+/** "On for Rye & Co. (was off)", "Off for everyone (was never turned on)". */
 export function describeEntry(entry: FlagChange): string {
     const who = entry.organizationId
         ? (entry.organizationName ?? "a business since removed")
@@ -9,35 +11,38 @@ export function describeEntry(entry: FlagChange): string {
     const was =
         entry.previousValue === null
             ? entry.organizationId
-                ? "had no setting of its own"
-                : "was never switched on"
+                ? "followed the default"
+                : "was never turned on"
             : `was ${entry.previousValue ? "on" : "off"}`;
     return `${entry.newValue ? "On" : "Off"} for ${who} (${was})`;
 }
 
 /**
- * The last changes to this release (R9): who, when, what and why, from the
+ * The last changes to this release: who, when, what and why, from the
  * release's own record, so the reason for its state is where it is changed.
+ * `limit` shows only the newest few (the Overview's recent changes).
  */
-export function ReleaseHistory({ history }: { history: FlagChange[] | null }) {
+export function ReleaseHistory({
+    history,
+    limit,
+}: {
+    history: FlagChange[] | null;
+    limit?: number;
+}) {
     if (history === null) {
-        return (
-            <p className="text-sm text-muted-foreground">
-                The history couldn't be loaded. Reload the page to try again.
-            </p>
-        );
+        return <FailedPanel things="this release's history" />;
     }
     if (history.length === 0) {
         return (
-            <p className="text-sm text-muted-foreground">
-                No changes yet. Every change will show here with who made it and
-                why.
-            </p>
+            <EmptyPanel
+                title="No changes yet"
+                description="Every change will show here with who made it and why."
+            />
         );
     }
     return (
         <ol className="divide-y rounded-md border">
-            {history.map((entry) => (
+            {history.slice(0, limit).map((entry) => (
                 <li key={entry.id} className="grid gap-0.5 px-3 py-2.5">
                     <p className="text-sm font-medium">
                         {describeEntry(entry)}

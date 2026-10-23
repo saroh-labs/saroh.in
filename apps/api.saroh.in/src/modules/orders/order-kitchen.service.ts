@@ -11,6 +11,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { businessTimezone } from "../bookings/staff-availability";
+import { noticeOn } from "../communications/notice-settings";
 import { soldColumns } from "../invoices/gst-price";
 import { gstInsideOrder } from "../invoices/order-invoice";
 import {
@@ -27,9 +28,10 @@ import {
 } from "../payments/intent-state";
 import type { CreateIntentResult } from "../payments/payments.service";
 import { PaymentsService } from "../payments/payments.service";
+import { enqueueOrderTrackingNotice } from "../site-accounts/customer-notify-queue";
 import { orderContactId } from "../site-accounts/customer-notify.handler";
 import type { NoticeReach } from "../site-accounts/notice-reach";
-import { contactReach } from "../site-accounts/notice-reach";
+import { contactNotice } from "../site-accounts/notice-reach";
 import { returnableUnits } from "../stock/reserve";
 import type {
     EditOrderDto,
@@ -149,7 +151,13 @@ export class OrderKitchenService {
     async read(
         ctx: OrganizationContext,
         orderId: string,
-    ): Promise<OrderReadDto & { customerNotice: NoticeReach | null }> {
+    ): Promise<
+        OrderReadDto & {
+            customerNotice: NoticeReach | null;
+            customerNoticeTo: string | null;
+            deliveryUpdates: boolean | null;
+        }
+    > {
         if (!allows(ctx, "order:read") && !allows(ctx, "order:stage")) {
             // The same refusal authorize() gives, naming the narrower action.
             authorize(ctx, "order:stage");
@@ -231,7 +239,9 @@ export class OrderKitchenService {
             ...read,
             // "Not collected for 4 days" in its pay-on-handover banner (R34).
             uncollectedDays: await this.uncollectedOf(ctx, order),
-            customerNotice: await this.noticeOf(ctx, order),
+            // How its notices reach the customer, the address an email
+            // goes to, and whether delivery updates are sent (U16).
+            ...(await this.noticeOf(ctx, order)),
             // A treatment's visits (B14), in their own file.
             ...(await visitsForRead(order, this.logger)),
             // "Payment failed", "Waiting for Razorpay" (#122).
@@ -266,23 +276,44 @@ export class OrderKitchenService {
         return markVisitAttended(ctx, orderId, visitNumber);
     }
 
-    /** How the order's notices reach its customer (A14); null if unknown. */
+    /**
+     * How the order's notices reach its customer (A14), the address they
+     * are emailed to ("Emailed to ‹email›"), and whether the business sends
+     * delivery updates (U16: Delivered, Sent, tracking added later). Each
+     * null when it couldn't be read: the screen then claims nothing.
+     */
     private async noticeOf(
         ctx: OrganizationContext,
         order: { customerId: string | null; customerAccountId: string | null },
-    ): Promise<NoticeReach | null> {
+    ): Promise<{
+        customerNotice: NoticeReach | null;
+        customerNoticeTo: string | null;
+        deliveryUpdates: boolean | null;
+    }> {
         try {
             const contactId = await orderContactId(
                 prisma,
                 ctx.organizationId,
                 order,
             );
-            return await contactReach(prisma, ctx.organizationId, contactId);
+            const [notice, deliveryUpdates] = await Promise.all([
+                contactNotice(prisma, ctx.organizationId, contactId),
+                noticeOn(prisma, ctx.organizationId, "ORDER_DELIVERY"),
+            ]);
+            return {
+                customerNotice: notice.reach,
+                customerNoticeTo: notice.to,
+                deliveryUpdates,
+            };
         } catch (error) {
             this.logger.warn(
                 `How an order's notices reach its customer couldn't be read: ${String(error)}`,
             );
-            return null;
+            return {
+                customerNotice: null,
+                customerNoticeTo: null,
+                deliveryUpdates: null,
+            };
         }
     }
 
@@ -395,6 +426,12 @@ export class OrderKitchenService {
             status: string;
         } | null;
         moneyError: string | null;
+        /**
+         * Tracking added or changed after the handover goes to the
+         * customer (U16): its own notice queued, or the handover's, still
+         * held, carries it. The toast says they're told.
+         */
+        trackingNotice: boolean;
     }> {
         const touchesItems =
             (dto.lines?.length ?? 0) > 0 || (dto.add?.length ?? 0) > 0;
@@ -929,6 +966,8 @@ export class OrderKitchenService {
             charge,
             refund,
             moneyError,
+            trackingNotice:
+                "trackingNotice" in result ? result.trackingNotice : false,
         };
     }
 
@@ -1044,7 +1083,13 @@ export class OrderKitchenService {
 async function saveCourier(
     tx: Prisma.TransactionClient,
     ctx: OrganizationContext,
-    order: { id: string; fulfilment: string; stage: OrderStage },
+    order: {
+        id: string;
+        fulfilment: string;
+        stage: OrderStage;
+        trackingNumber: string | null;
+        trackingUrl: string | null;
+    },
     dto: EditOrderDto,
     fields: readonly CourierField[],
     handedOver: boolean,
@@ -1054,6 +1099,7 @@ async function saveCourier(
     differenceCents: number;
     settleCents: number;
     handBackCents: number;
+    trackingNotice: boolean;
 }> {
     const field = fields[0];
     if (!goesByCourier(order.fulfilment, order.stage)) {
@@ -1102,13 +1148,44 @@ async function saveCourier(
         },
         select: { id: true },
     });
+    // Tracking added or changed while it is on its way tells the customer
+    // once (U16, #1147); the same tracking saved again, a removal or only
+    // the courier's name tells nobody.
+    const trackingNotice =
+        trackingChanged(order, data) &&
+        order.stage !== "DELIVERED" &&
+        (await enqueueOrderTrackingNotice(tx, {
+            organizationId: ctx.organizationId,
+            orderId: order.id,
+            orderEventId: event.id,
+        }));
     return {
         id: order.id,
         eventId: event.id,
         differenceCents: 0,
         settleCents: 0,
         handBackCents: 0,
+        trackingNotice,
     };
+}
+
+/**
+ * Whether a courier save gives the customer something new to track by: a
+ * tracking number or link that is there now and wasn't before.
+ */
+export function trackingChanged(
+    before: { trackingNumber: string | null; trackingUrl: string | null },
+    saved: Partial<Record<CourierField, string | null>>,
+): boolean {
+    const fresh = (f: "trackingNumber" | "trackingUrl") => {
+        const value = saved[f];
+        return (
+            typeof value === "string" &&
+            value.trim() !== "" &&
+            value.trim() !== (before[f] ?? "").trim()
+        );
+    };
+    return fresh("trackingNumber") || fresh("trackingUrl");
 }
 
 const CLEARED_ADDRESS = {

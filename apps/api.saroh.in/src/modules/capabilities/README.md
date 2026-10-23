@@ -57,11 +57,18 @@ itself: when an online way is chosen and `alsoWebsite` is true, the app sends
 Website with its setup right after (an already-on Website answers
 `alreadyEnabled: true`).
 
+Bookings is the other way round (DEC-175): the API makes its booking page
+itself. Once Bookings is on (with a setup or without) and again when a
+service customers can book online is added, a business with no website gets
+the starter site on its address, Website switched on with it, not
+published (`setup/booking-site.ts`, `ModuleSetupService.makeBookingSite`).
+So an app turning Website on in the same sheet sends it before Bookings.
+
 ## What the sheet prefills
 
 ```
 GET /organizations/:orgId/modules/:key/setup-defaults   (module:manage)
-→ { data: { moduleKey, hidden, dependencies, setup, existing, alsoWebsite? } }
+→ { data: { moduleKey, hidden, dependencies, setup, existing, alsoWebsite?, alsoBookingPage? } }
 ```
 
 - `setup` — the payload, prefilled: the storefront named after the business
@@ -76,6 +83,10 @@ GET /organizations/:orgId/modules/:key/setup-defaults   (module:manage)
   is made new.
 - `alsoWebsite` (COMMERCE) — no website yet, so choosing an online way means
   the app turns Website on with its setup too (DEC-069).
+- `alsoBookingPage` (APPOINTMENTS) — `{ address }`: no website yet, so
+  turning Bookings on makes the booking page at that address (DEC-175).
+  Absent when there is a website, Website isn't offered, or this person may
+  not make one.
 - `hidden` — never shown to this business (not rolled out, or hidden).
 
 ## Hidden modules

@@ -2,6 +2,7 @@ import type { RenderedFeatures } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 
 import { cn } from "../lib/utils";
+import type { LookProps } from "../look-context";
 
 /**
  * `features` v1 — a heading over a set of short, titled points (#255).
@@ -28,7 +29,7 @@ import { cn } from "../lib/utils";
  */
 export default function FeaturesSection({
     content,
-}: {
+}: LookProps & {
     content: RenderedFeatures;
 }) {
     const variant = resolveVariant("features", content);
@@ -83,7 +84,7 @@ export default function FeaturesSection({
                         {isSteps ? (
                             <span
                                 aria-hidden="true"
-                                className="font-site-heading text-site-accent text-[15px] tabular-nums"
+                                className="font-site-heading text-site-accent-text text-[15px] tabular-nums"
                             >
                                 {String(i + 1).padStart(2, "0")}
                             </span>

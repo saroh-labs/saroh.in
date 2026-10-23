@@ -75,6 +75,16 @@ const SITE_LAYER_RE =
     /(?:\b(?:bg|text|border|ring|divide|from|to|via)-site-[\w-]+\b)|(?:var\(--site-[\w-]+\))/;
 
 /**
+ * `--site-*` read by its name as a string key in a component
+ * (`vars["--site-bg"]`, `style={{ "--site-accent": … }}`): the look picker's
+ * thumbnails painted the resolved layer that way and the two forms above
+ * missed it (review #40). Only in `.tsx`, where things are drawn; a `.ts`
+ * module that names the variables (the palette, the type scale, the API's
+ * style read, seed data) produces names and draws nothing.
+ */
+const SITE_LAYER_KEY_RE = /["'`]--site-[\w-]+/;
+
+/**
  * Source with comments removed.
  *
  * The first run of this script failed on its own documentation: a comment in
@@ -156,6 +166,10 @@ const SITE_LAYER_ALLOWED = new Set([
     // Its "Pay and turn on autopay" (D12): part of the same pay page, whose
     // options are the package's own (PayOption, AutopayMethodChoice).
     "apps/saroh.app/components/invoice-autopay.tsx",
+    // Its receipt of what was paid (DEC-173, U16) and the page a link that
+    // no longer opens shows: parts of the same pay page, drawing no block.
+    "apps/saroh.app/components/invoice-paid-so-far.tsx",
+    "apps/saroh.app/components/pay-link-gone.tsx",
     // An order's pay link (plan B, B11): the invoice pay page's twin for an
     // order, the same category and drawing no block.
     "apps/saroh.app/app/pay/o/[token]/page.tsx",
@@ -205,31 +219,43 @@ const SITE_LAYER_ALLOWED = new Set([
     // The site editor's preview frame. Same category: it supplies the
     // merchant's page ground and the selection outlines around each block, and
     // delegates every block to @saroh/site-blocks rather than drawing one.
-    "apps/app.saroh.in/components/sites/section-preview.tsx",
+    "apps/app.saroh.in/components/sites/canvas/section-preview.tsx",
     // The Add-section picker's thumbnails (#267). Same category again: it
     // supplies the merchant's page ground inside a scaled frame and hands the
     // block to BlockFixturePreview from @saroh/site-blocks, which the catalog
     // uses too. It draws no block of its own.
-    "apps/app.saroh.in/components/sites/block-thumbnail.tsx",
+    "apps/app.saroh.in/components/sites/blocks/block-thumbnail.tsx",
+    // The Look row's drawn phone (DEC-172, U16; review #40): when no picture
+    // of the template in a look was captured, a 50px sketch of a page in the
+    // business's own resolved colours, the look's corners and heading face,
+    // so the four looks read apart at a glance. It reads the resolved
+    // `--site-*` values by name and draws no block; the real look is shown by
+    // Preview, which renders through @saroh/site-blocks.
+    "apps/app.saroh.in/components/sites/looks/look-thumbnail.tsx",
+    // A look's Preview (DEC-182): the look's showcase template drawn for its
+    // sample business, the editor's twin of the gallery's template renders
+    // above. It supplies the page ground and hands the header, every block
+    // and the footer to @saroh/site-blocks (`templateRender`, PageSections).
+    "apps/app.saroh.in/components/sites/looks/look-showcase.tsx",
     // Version history's preview of a past version (#283). The same category as
     // the editor's frame directly above: it supplies the merchant's page ground
     // — in the palette THAT version was published with, read from its snapshot —
     // and hands every section to PageSections. It draws no block of its own,
     // which is the point: a past version has to be shown by the renderer that
     // served it, or the preview is a second opinion about what went live.
-    "apps/app.saroh.in/components/sites/past-version-preview.tsx",
+    "apps/app.saroh.in/components/sites/versions/past-version-preview.tsx",
     // The reviewer's read of the draft (#275). Same category again: it gives
     // each section the merchant's page ground to sit on, in the merchant's
     // palette, and hands the section itself to PageSections. Drawing a block
     // here would put a reviewer's notes on a rendering the live site never
     // makes, which is the whole failure #189 was.
-    "apps/app.saroh.in/components/sites/section-review.tsx",
+    "apps/app.saroh.in/components/sites/review/section-review.tsx",
 ]);
 
 /**
  * Files that once held a second implementation of the blocks.
  *
- * `apps/app.saroh.in/components/sites/section-preview.tsx` was 362 lines, of
+ * `apps/app.saroh.in/components/sites/canvas/section-preview.tsx` was 362 lines, of
  * which 240 drew the same six designs `saroh.app` drew, in different code. #189
  * is the two of them disagreeing in production. #252 Step 4 deleted that half:
  * the editor previews with `@saroh/site-blocks` now, and what is left in the
@@ -252,7 +278,11 @@ for (const root of SEARCH_ROOTS) {
         // The style resolvers produce the variable NAMES; they draw nothing.
         if (/site-style\.ts$|lib\/sites\/style\.ts$/.test(rel)) continue;
         const source = await readFile(file, "utf8");
-        if (SITE_LAYER_RE.test(code(source))) {
+        const drawn = code(source);
+        if (
+            SITE_LAYER_RE.test(drawn) ||
+            (rel.endsWith(".tsx") && SITE_LAYER_KEY_RE.test(drawn))
+        ) {
             failures.push(
                 `G6  ${rel}  draws the --site-* layer outside packages/site-blocks. There is one renderer (#252); a second one drifts, and #189 is what that costs.`,
             );

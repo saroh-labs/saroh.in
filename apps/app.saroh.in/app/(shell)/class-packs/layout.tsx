@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { ModuleGate } from "@/components/modules/module-gate";
+import { ModuleGate } from "@/components/modules/gate/module-gate";
 
 /**
  * Capability gate for Class packs, its own module since E12 (it needs

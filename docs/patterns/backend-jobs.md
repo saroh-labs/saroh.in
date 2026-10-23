@@ -38,7 +38,10 @@
   and `deadLetter` update
   `WHERE id = … AND status = 'PROCESSING' AND lockedBy = <worker>` and report
   whether they won; a new write to a claimed `Job` carries the same condition.
-  Reclaim is anchored on `lockedAt` (the claim), never `createdAt`.
+  Reclaim is anchored on `lockedAt` (the claim), never `createdAt`. One claim
+  covers a batch of up to `JOB_WORKER_BATCH`, so the worker renews each
+  job's lease (`renew`, the same fence) just before running it, and skips
+  a job another worker reclaimed while an earlier one ran (22 Oct 2026).
 - **Current** (10 Oct 2026) — **Every inbox notice names what it opens.**
   A `Notification` is written with `noticeOf(type, target)`
   (`notifications/notice-target.ts`), which makes the target required for
@@ -69,10 +72,21 @@
   and never re-fetches an id it has tried, so a batch that always fails cannot
   starve the rest. Compare `runAt` in UTC: the columns are
   timestamp-without-timezone (`DEV_LEARNINGS.md`).
+  `account-managers.link-sweep` (U25) keeps its one waiting run with an
+  advisory lock around the count and the insert
+  (`job-chain:account-managers.link-sweep`) instead of the partial unique
+  index, so it needed no migration; the index stays the default for a new
+  chain.
 - **Current** — **Payloads carry ids, not data;** the handler re-reads current
   state and handles "it was deleted" (`enquiry-notify.handler.ts`).
 - **Current** — **Advisory locks have a registry** (below). A new
   `pg_advisory_xact_lock` adds its row in the same change.
+- **Current** (18 Oct 2026) — **A job written inside a business's transaction
+  carries that business's `organizationId`,** even when its work spans
+  businesses: the `Job` RLS policy refuses one with none there.
+  `billing.profile.sync` reads it from the transaction
+  (`scopedOrganizationId`, `billing/billing-profile-sync.ts`), and queues with
+  none only outside one.
 - **Current** (DEC-122) — **A job that deletes asks about the legal hold.**
   A business on legal hold (`organizations/legal-hold.ts`) keeps every row
   and file. A sweep reads the held ids once a run (`heldOrganizationIds`)
@@ -88,15 +102,25 @@ Each is a transaction lock on `hashtext(<key>)`, held until the
 transaction ends. Take it before the transaction's row locks, so it never
 waits while holding one.
 
-| Key                                       | Serialises                                                                                                                                                                                                                                                                                                                    | Where                                                                                                                                           |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `data-export:<organizationId>`            | Asking for a business's data download: one QUEUED or RUNNING at a time (DEC-120), with the partial unique index behind it                                                                                                                                                                                                     | `data-export/data-export.service.ts` (`request`)                                                                                                |
-| `first-pack:<organizationId>:<contactId>` | Selling a "first pack only" pack to one person                                                                                                                                                                                                                                                                                | `class-packs/first-pack.ts`                                                                                                                     |
-| `subscription-plan-name:<organizationId>` | Saving a subscription plan's name in one business                                                                                                                                                                                                                                                                             | `subscriptions/plans.ts` (`lockPlanNames`)                                                                                                      |
-| `domain-alert:<domainId>`                 | Telling one custom domain's down or back (#917), so a "Check now" and a run that both saw the change tell it once                                                                                                                                                                                                             | `notifications/domain-alerts.ts` (`wordDomain`)                                                                                                 |
-| `provider-alert:<providerId>`             | Telling the team one payment or email connection stopped or works again (#555)                                                                                                                                                                                                                                                | `notifications/provider-alerts.ts` (`wordProvider`)                                                                                             |
-| `billing-customer:<organizationId>`       | Making (or adopting) a business's one customer at Saroh's billing provider (DEC-165), so sign-up's job and a checkout make one. Held across up to three provider calls: `SET LOCAL lock_timeout = '30s'` first, and each id answered is stored at once on its own connection, so a transaction that ends badly never loses it | `billing/billing-customer.ts` (`create`)                                                                                                        |
-| `plan-meter:<organizationId>:<limitKey>`  | Writes that add to one plan limit (a product, a booking…); a booking notice Saroh will email takes `…:sarohEmailsPerMonth` before its first write (DEC-086)                                                                                                                                                                   | `billing/metering.service.ts` (`lockMeter`, U13); `customer-notify.handler.ts` (the one notice site; `booking.notify` writes nothing before it) |
+| Key                                       | Serialises                                                                                                                                                                                                                                                                                                                               | Where                                                                               |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `data-export:<organizationId>`            | Asking for a business's data download: one QUEUED or RUNNING at a time (DEC-120), with the partial unique index behind it                                                                                                                                                                                                                | `data-export/data-export.service.ts` (`request`)                                    |
+| `first-pack:<organizationId>:<contactId>` | Selling a "first pack only" pack to one person                                                                                                                                                                                                                                                                                           | `class-packs/first-pack.ts`                                                         |
+| `subscription-plan-name:<organizationId>` | Saving a subscription plan's name in one business                                                                                                                                                                                                                                                                                        | `subscriptions/plans.ts` (`lockPlanNames`)                                          |
+| `domain-alert:<domainId>`                 | Telling one custom domain's down or back (#917), so a "Check now" and a run that both saw the change tell it once                                                                                                                                                                                                                        | `notifications/domain-alerts.ts` (`wordDomain`)                                     |
+| `provider-alert:<providerId>`             | Telling the team one payment or email connection stopped or works again (#555)                                                                                                                                                                                                                                                           | `notifications/provider-alerts.ts` (`wordProvider`)                                 |
+| `billing-profile:<billingProfileId>`      | Making (or adopting) a billing profile's one customer at Saroh's billing provider (DEC-167), so the profile's job and a checkout make one. Held across up to three provider calls: `SET LOCAL lock_timeout = '30s'` first, and each id answered is stored at once on its own connection, so a transaction that ends badly never loses it | `billing/billing-customer.ts` (`create`)                                            |
+| `admin-sign-in-code:<userId>`             | Staff sending one person a sign-in code (admin console U9): the per-person and per-staff hourly counts and the send's ledger row, so two staff pressing at once can't both pass the limit                                                                                                                                                | `admin/admin-sign-in-help.service.ts` (`sendCode`)                                  |
+| `account-manager:<organizationId>`        | Staff changing who looks after one business (DEC-169, admin console U25): assign, move, end, and each business a share-out gives, so two at once can't both start a link                                                                                                                                                                 | `admin/admin-account-managers.service.ts` (`lockBusiness`)                          |
+| `account-managers:share-out`              | One Share out evenly at a time, so two can't plan from the same loads; taken before the per-business keys                                                                                                                                                                                                                                | `admin/admin-account-managers.service.ts` (`shareOut`)                              |
+| `job-chain:account-managers.link-sweep`   | Leaving one waiting run of the manager link sweep: "is one waiting? if not, add one" under the lock, in place of a `Job_one_pending_…` index                                                                                                                                                                                             | `admin/manager-link-sweep.job.ts` (`schedule`)                                      |
+| `commission-invoice:<sarohInvoiceId>`     | Writing and moving one payment's commission lines (DEC-169, admin console U21): the line job, the refund job, the sweep and a rate set all settle through it                                                                                                                                                                             | `commission/commission-settle.ts` (`settleInvoiceInTx`)                             |
+| `commission-payout:<platformAdminId>`     | Putting a line in a teammate's statement month against Mark paid locking that month, so a line never lands in a month already paid; taken after the invoice's key                                                                                                                                                                        | `commission/commission-settle.ts`; `admin/admin-commission.service.ts` (`markPaid`) |
+| `job-chain:membership.ending-notice`      | Leaving one waiting run of the membership-ending sweep (DEC-174 U19), as the manager link sweep does                                                                                                                                                                                                                                     | `subscriptions/membership-ending.handler.ts` (`schedule`)                           |
+| `job-chain:commission.sweep`              | Leaving one waiting run of the commission sweep, as the manager link sweep does                                                                                                                                                                                                                                                          | `commission/commission-sweep.job.ts` (`schedule`)                                   |
+| `job-chain:class-packs.expiring`          | Leaving one waiting run of the pack expiry sweep (DEC-174 U22), as the manager link sweep does                                                                                                                                                                                                                                           | `class-packs/pack-expiring.handler.ts` (`schedule`)                                 |
+| `job-chain:invoice.overdue-remind`        | Leaving one waiting run of the overdue reminder sweep (automatic notices U20), as the manager link sweep does                                                                                                                                                                                                                            | `invoices/overdue-remind.handler.ts` (`schedule`)                                   |
+| `plan-meter:<organizationId>:<limitKey>`  | Writes that add to one plan limit (a product, a booking…)                                                                                                                                                                                                                                                                                | `billing/metering.service.ts` (`lockMeter`, U13)                                    |
 
 Race tests wait on an advisory lock with `waitUntilAdvisoryBlockedBy`
 (`test/lock-wait.ts`).
@@ -280,6 +304,36 @@ the Privacy Policy states both.
   joins this sweep as a function it calls, counted and caught on its own,
   rather than starting a chain (and a partial unique index) of its own.
 
+## Account manager links — **Current** (DEC-169, admin console U25)
+
+- **`account-managers.link-sweep`** (`admin/manager-link-sweep.job.ts`) is
+  an hourly self-rescheduling job, restarted by the admin module's six-hour
+  check and at boot. It ends every open `AccountManagerLink` whose manager
+  doesn't hold the Account manager role now (an assignment that ran out, or
+  a revoke or amend that bypassed `AdminStaffService`, which ends them
+  itself), at the moment the role ended (`roleEnded`), with one ledger row
+  per business as `system:manager-link-sweep`. At most 200 managers a run;
+  a manager whose links fail to end is logged and the rest go on.
+
+## Commission — **Current** (DEC-169, admin console U21)
+
+- **`commission.line`** writes one payment's commission lines; queued by
+  the billing webhook **after** its transaction commits
+  (`CommissionQueue`, a failure only logged), only for an invoice whose
+  business had a manager when it was issued. **`commission.refund`**
+  re-settles a refunded or disputed payment's lines, only when its invoice
+  has some. Both are idempotent (one line per invoice and installment,
+  every move conditional on the status it leaves), retried 8 times; the
+  last try raises `commission_line_failed` in Needs action, once per
+  invoice, and ends.
+- **`commission.sweep`** is hourly and self-rescheduling (one waiting run
+  under `job-chain:commission.sweep`, restarted by the module's six-hour
+  check and at boot): payments of the last 60 days with no line whose
+  manager was on commission, open lines whose period ended or that are
+  HELD, NO_RATE or PAYABLE, and payments whose refund or dispute changed
+  in the last 3 days. Pages of 200 by id, never re-reading one it tried;
+  an invoice that fails is logged and the rest go on.
+
 ## Data export — **Current** (DEC-120)
 
 - **`data-export.build`** (one per ask, `data-export/data-export.handler.ts`)
@@ -392,9 +446,104 @@ the Privacy Policy states both.
   adds **a website order placed** (`ORDER_PLACED`, `order-placed:<orderId>`):
   queued with the order when it is to be paid on handover, and with the
   payment's hold when it is paid online (`enqueueOrderPlacedNotice`). It
-  goes through the same `emailRoute` as every notice, so Saroh never sends
-  it (DEC-086 is booking notices only): the thread, and the business's own
-  provider.
+  goes through the same `emailRoute` as every notice: the thread, and the
+  business's own provider.
+- **Delivery updates** (DEC-174 U16, #1147) share the `ORDER_DELIVERY`
+  switch (`notices/order-delivery.ts`): Delivered (a local delivery or a
+  shipment) and a digital order's Sent go through `enqueueOrderStepNotice`,
+  held 10 seconds like Ready so the step's Undo takes them back; Collected
+  and a treatment's Delivered (its visits, a STATUS event) tell nobody.
+  Tracking added or changed after the handover (`saveCourier`) queues
+  `ORDER_TRACKING` once per change (`order-tracking:<EDIT OrderEvent id>`),
+  not held, and not at all while the handover's own notice is still held
+  (that one reads the order when it goes). A switched kind is checked when
+  it is queued and again when it runs. "Order placed" promises only what
+  will reach them (`placedNext`: "We'll email you" only when an email goes).
+- **Membership emails** (DEC-174 U11, #1142, `notices/membership.ts`):
+  joined, paused, resumed, plan change booked / called off / taken effect,
+  cancelled (today or at the period end) and kept. Queued by
+  `recordSubscriptionEvent` itself (`subscriptions/membership-notices.ts`),
+  keyed `membership:<SubscriptionEvent id>`, so every path that writes the
+  event (desk, member's account, online join, a pause's end date, the
+  renewal applying a booked change) tells the member, and no caller adds
+  its own. Gated by `noticeOn(MEMBERSHIP)` when queued and when run. A
+  team member's change with an Undo is held 10 s; the Undo is the inverse
+  action (resume, Keep, cancel the plan change), which withdraws the
+  untold notice and queues none of its own. The run re-reads the
+  membership: a change undone since tells nobody.
+- **Membership ending in 7 days** (DEC-174 U19, #1150,
+  `notices/membership-ending.ts`): **`membership.ending-notice`** is a daily
+  self-rescheduling sweep (`subscriptions/membership-ending.handler.ts`,
+  one waiting run under `job-chain:membership.ending-notice`) over
+  memberships set to end with their period. Due when the end is 1 to 7
+  days away by the membership's own calendar and it was set to end before
+  that week began (a later cancel was just emailed the day). Queues
+  `MEMBERSHIP_ENDING` keyed `membership-ending:<subscriptionId>:<periodEnd>`
+  under `noticeOn(MEMBERSHIP)`, skipping one told or waiting; the
+  `customer.notify` claim makes it once whatever runs twice. The run
+  re-reads: kept since, ended, or a different end tells nobody. The email
+  links to the member's Messages (a member can't keep it themselves).
+- **Back in stock** (DEC-174 U23, #1154, `notices/back-in-stock.ts`): a
+  "Tell me" on a sold-out product (`stock/stock-watch.service.ts`, public,
+  rate-limited per visitor and per address) makes a `StockWatch`, never a
+  contact. Every stock writer that can make a product sellable calls
+  `onSellableAgain` (`stock/on-sellable-again.ts`; a source scan,
+  `on-sellable-again.guard.spec.ts`, fails a writer that doesn't), which
+  queues one `stock.back-in-stock` run held 10 minutes while anyone waits.
+  The run re-reads the stock as the site's shop does (`watchable.ts`),
+  marks up to 500 watches told and queues a `customer.notify`
+  BACK_IN_STOCK per watch (`back-in-stock:<watchId>`), re-queuing for the
+  rest. Email only, to the watch's own address (`STOCK_WATCH` recipient),
+  through the business's own provider, behind the BACK_IN_STOCK switch.
+  A "Tell me" that makes a watch also queues BACK_IN_STOCK_WAITING
+  (`back-in-stock-waiting:<watchId>`, DEC-178 #1170): "We'll email you
+  when ‹product› is back", unless that address already waits for something
+  at the business. The sign-up email carries "Stop waiting" as a secret link
+  (`secretLink`): the stored body holds the slot, the signed stop token is
+  sealed into the send job. A site with no web address: no stop link, and
+  no sign-up email. The back-in-stock email has no stop link: the watch is told by then, so nothing is left to stop (owner, 21 Oct).
+  The site side (U24, #1155): the product page asks whether "Tell me" is
+  offered for the option on screen in the browser, through a server
+  action (`backInStockOffer`), never on the server, so the cached page
+  holds nothing of it and a switch or count change needs no purge. A
+  refusal's reason travels as `details.reason`. Stopping is the private
+  page `/shop/stop-waiting/<token>` with a button (never a GET that
+  stops), or "Stop waiting" right after "Tell me". The workspace shows
+  the count only ("3 people waiting for it") on the product's Stock tab
+  and the quick look.
+- **Every cancel says what happened to the money** (DEC-174 U13, #1144,
+  `notices/cancel-money.ts`): one `CancelMoney` and one set of words for a
+  booking's BOOKING_CANCELLED (either side), a class the business
+  cancelled, and an order's cancel note. A booking's is read when the
+  notice runs (`bookingCancelMoney`: the cancel's refund row as the
+  provider stands now, else money kept, the pack's class back or used, or
+  no payment taken), never carried on the job. An order's comes from the
+  cancel's own outcome (`orderCancelMoney`), the one the sheet shows, and
+  names only the refunds not refused. Money nobody is handing back is
+  never said as refunded; desk money and a treatment visit's say nothing.
+- **Pack credits** (DEC-174 U22, #1153, `notices/pack.ts`), one
+  PACK_CREDITS switch, checked when queued and when run. **One credit
+  left** (`PACK_LOW`) is queued by `redeemPackInTx` on the booking's
+  transaction, under the purchase's row lock, when a spend leaves exactly
+  one; keyed `pack-low:<purchaseId>:<redemption rows>`, so a class given
+  back and the same booking paid again (its row reused) says nothing twice,
+  while a new booking that brings it to one again does. **Expiring in 7
+  days** (`PACK_EXPIRING`) is queued by the `class-packs.expiring` chain
+  (below), keyed `pack-expiring:<purchaseId>:<expiresAt>`, so an extension
+  is told again a week before the new date. Both re-read the purchase
+  when they run: back above one, nothing left, the date moved or already
+  past tells nobody. What a pack payment bought is a line on the payment's
+  receipt (DEC-173, `packReceiptLine` in `invoice-receipt.handler.ts`), not
+  a second email.
+- **`class-packs.expiring`** is self-rescheduling every 6 hours (one
+  waiting run under `job-chain:class-packs.expiring`, restarted by the
+  module's six-hour check and at boot). It reads purchases whose date is
+  within 8 days, in pages of 500 by id, and per business (its own
+  transaction and org context, after `noticeOn`) queues PACK_EXPIRING for
+  each whose use-by day is 7 days away in the business's zone (6 when a
+  day was missed), with classes left, and that was bought more than 7 days
+  before its date. A key already told or waiting is skipped. A business
+  that fails is logged and the rest go on.
 - **`customer-message.notify`** (UX-014) tells the team a customer wrote
   from their site account: one inbox notice (`message.new`, opening the
   customer's thread, unique on `(messageId, type)`) and an email to the
@@ -402,6 +551,19 @@ the Privacy Policy states both.
   queued — one after the team last answered or opened the thread
   (`notifications/customer-message-notify.ts`); follow-ups land in the
   thread the team is already pointed at.
+- **`customer.data-request.email`** (DEC-172, #1106) is Saroh's email to a
+  customer about their "Ask to remove my data" request, from the sign-in
+  code sender in the business's name (`site-accounts/data-request-email.handler.ts`,
+  words in `data-request-emails.ts`): "received", queued with the request;
+  "done", queued inside the privacy removal's last transaction
+  (`markRequestsDoneInTx`); "closed", queued with a close without removal
+  (never the business's reason). The run re-reads the request (its kept
+  email outlives the deleted account), sends, then records
+  `data-request:<id>:<step>` as a `CustomerNotice`; a run that finds the
+  record says nothing, and a failed send throws to be retried (at least
+  once). The request itself raises `team.alert` `{ event: "request" }`
+  (`notifications/data-request-alerts.ts`) on the "Data removal requests"
+  row, offered to `customer:remove`.
 - **Once per event.** Both claim a `CustomerNotice` row keyed to the event
   (`booking:<BookingEvent id>`, `order:<OrderEvent id>`) with
   `createMany({ skipDuplicates })` before writing anything: a Postgres
@@ -412,30 +574,105 @@ the Privacy Policy states both.
   is written; each line goes through `order-stage-write.ts`, so every
   moved order gets its own `customer.notify`, and Undo all takes each one
   back or reports `told`.
+- **One file per notice** (DEC-174, U2 #1133). Each kind `customer.notify`
+  carries is a `defineNotice` file under `site-accounts/notices/` (what it
+  is about, read fresh; its sentence, subject line and links; the U1
+  switch that stops it, or null) and one line in `notices/index.ts`, with
+  its kind in `NOTICE_TEMPLATES`. The handler and the email's layout are
+  the same for every kind; never add a `case` to the handler.
+  `notices/index.spec.ts` fails for a template with no entry. A kind with
+  a switch is asked `noticeOn` on the job's transaction before anything is
+  claimed. A notice naming a switch flips that kind's `NOTICE_SENDS` line
+  (`notice-settings.ts`) in the same commit, so the switches screen offers
+  it; `notices/index.spec.ts` fails otherwise.
+- **A notice that asks to be paid** (U10's AUTOPAY_FAILED) declares a
+  `secretLink` (`lead`, `make`): the handler passes `make` to
+  `queueTransactional`, so the link is minted only when the email really
+  goes and the stored body keeps `SECRET_LINK_SLOT`, never the token.
+- **Held for an Undo.** A notice whose change has an Undo is queued with
+  `enqueueHeldCustomerNotice` (ten seconds unless the Undo lasts longer)
+  and taken back with `cancelHeldCustomerNotice(eventKey)`, which says
+  whether the customer was already `told`. The order-step helpers call
+  them.
+- **To the contact's email** (DEC-174 D1). The email goes to the contact's
+  own address (`TransactionalRecipient` `CONTACT`, `contactNoticeAddress`):
+  a desk, phone or guest customer as much as a site account holder, whose
+  verified address wins when it differs (A2). A reserved placeholder is no
+  address. Consent is read as for every transactional send.
+- **A link back is never a sign-in.** An email's way back to what it is
+  about is built from the contact's site (`notice-link.ts`
+  `contactSiteOrigin`). A link that must open something without a session
+  is a signed token, never a stored secret: the waitlist offer's claim link
+  (#1149, `site-accounts/waitlist-claim.ts`) names the entry and its
+  `offeredUntil` under an HMAC with its own purpose line, opens only while
+  the entry is OFFERED (so it is spent once booked), is read for the site
+  it is opened on (another business's site is a 404), and is limited per
+  visitor and redacted from logs like the other token paths.
 - **Re-read, then decide.** A booking cancelled since isn't confirmed, an
   undone step isn't announced, and the contact goes through
   `resolveContact` (a merge lands on the survivor; a removed contact hears
   nothing).
-- **Saroh emails a booking notice when the business has no provider**
-  (DEC-086), when the one rule says so (`emailRoute` in
-  `communications/saroh-may-send.ts`, the provider read once:
-  the global stop, the business's `SAROH_BUSINESS_EMAIL`, `PLAN_ENFORCEMENT`,
-  a `saroh-emails` allowance with a number, the platform's daily ceiling).
-  The handler decides first, takes the plan-meter lock only for Saroh's
-  route, and hands the route (with the allowance row it read) to
-  `queueTransactional`, so nothing it refuses rolls the notice back and
-  nothing is read twice; the delivery is stamped `SAROH` and
-  `message.send` re-checks the switches (off: `STOPPED`, never retried).
-  Each one counts against `sarohEmailsPerMonth` under the plan-meter lock;
-  at the cap the Message is `ALLOWANCE_USED`, never thrown. A soft
-  `saroh-emails` cell is no allowance (`NO_ALLOWANCE`): it would never
-  refuse. At most `SAROH_EMAILS_PER_BOOKING_PER_DAY` (3) go about one
-  booking in any 24 hours, counted through its `CustomerNotice` rows;
-  past it the Message is `BOOKING_LIMIT` and not counted. A flag that
-  can't be read when the send job runs throws (retried, still `QUEUED`);
-  only a switch read as off stops it. A last attempt that leaves it
-  `QUEUED` logs `saroh_business_email_gave_up org=…` at WARN (it still
-  counts).
+- **Only the business's own provider emails a customer notice.** With no
+  connected EMAIL provider (`emailRoute` in `communications/email-route.ts`,
+  read once by the handler and handed to `queueTransactional`), the notice
+  goes to the account thread alone, or nowhere. Saroh never sends one from its own
+  address: DEC-086's route was reversed on 7 Oct 2026 and its code removed
+  (#1134), and `no-saroh-customer-mail.spec.ts` fails if a customer-notice
+  module imports one of Saroh's own senders. The `Message` statuses it
+  wrote (`ALLOWANCE_USED`, `NO_ALLOWANCE`, `BOOKING_LIMIT`, `STOPPED`,
+  `UNKNOWN`) stay readable for any old row.
+- **The enquiry auto-reply** (DEC-174 U15, #1146, `ENQUIRY_RECEIVED`,
+  `enquiry-received:<submissionId>`). The public submit queues it on its own
+  transaction beside the team's `enquiry.notify`, never inside it
+  (`enquiry/enquiry-reply.ts`), and only when the submission isn't obvious
+  spam (`enquiry/enquiry-words.ts`: markup, three links, a link in a name,
+  a wall of text), the business's own email is connected and
+  `ENQUIRY_REPLY` is on. A notice marked `emailOnly` never writes to the
+  account thread, and with no provider claims nothing. The job sends at
+  most one per address per business in 24 hours, counted from the
+  `ENQUIRY_RECEIVED` messages to that address (any case) under a
+  transaction lock on the address, so runs at once wait for each other;
+  none to an address with a `BOUNCED` delivery. Their message is quoted
+  back, cut to 500 characters, and never when it carries a link: the
+  business's email never carries a link a stranger chose.
+
+- **A team reply in Messages** (DEC-174 U14, #1145, `THREAD_REPLY`,
+  `thread-reply:<message id>`, `notices/thread-reply.ts`). The team's reply
+  (`ThreadsService.reply`) queues it on its own transaction, held 60 s,
+  only while the business's own email is connected and `TEAM_REPLY` is on
+  (`site-accounts/team-reply.ts`). Coalesced: every reply queues its own
+  job, and only the run for the thread's newest reply sends; its one email
+  quotes every reply not yet emailed (back to the last reply whose notice
+  has a message, at most 20 and a day before the newest), so replies a few
+  seconds apart are one email a minute after the last. Email only, with
+  the way back to `/account/messages` while the account area is on. A
+  message the customer wrote in between doesn't stop it. Messages has no
+  Undo on a reply; Home's Reply holds it before it is sent, so an undone
+  one is never written. The Messages tab and Home's Reply say where it is
+  emailed (`teamReplyEmailedTo`, the same reads as the send), or that
+  nothing is.
+
+- **Overdue reminders** (DEC-174 D3, U20 #1151, `OVERDUE_REMINDERS`, the
+  one switch off by default). `invoice.overdue-remind` is an hourly
+  self-rescheduling sweep (one waiting run under
+  `job-chain:invoice.overdue-remind`, restarted by the invoices module's
+  15-minute check and at boot; in `CANCEL_REFUSED`). For each business
+  with the switch on (and a lifecycle that bills), between 9 am and 8 pm
+  in its time zone, it reads the overdue bills (`overdueBillsWhere`, the
+  one definition: never an order's invoice, a credit note or a live
+  subscription's latest period invoice, so never one autopay will charge)
+  with something left to pay, and sends at most two automatic reminders:
+  the first in days 3 to 9 after the due date, the second in days 10 to
+  16, counted in whole days in the business's zone (`overdue-remind.ts`).
+  Each goes through `InvoiceSendService.remindAutomatic`, the one remind
+  path (its lock, one a day counting email, thread and WhatsApp shares,
+  the business's own provider only, what is left to pay, AUTO_REMINDED
+  with actor JOB), which writes the claim `invoice-overdue:<id>:<1|2>`
+  (`CustomerNotice` kind `INVOICE_OVERDUE`) and asks `noticeOn` on the
+  send's own transaction after every other check: a run that runs twice
+  sends once, and a 429 claims nothing, so a later run sends it. A
+  reminder that can't go (no provider, no address) is left quietly, never
+  written as SEND_FAILED every hour; the business still has Send reminder.
 
 ## Autopay charges — **Current** (D13)
 
@@ -450,6 +687,14 @@ the Privacy Policy states both.
   asked, so a run delivered twice debits once. A redelivery that finds the
   debit already claimed (`ALREADY`, PROCESSING) writes the `LOOK` step: the
   run before it may have died between the claim and its next step.
+- **An eMandate's debit waits on Saroh's own notice** (DEC-180). `PREPARE`
+  queues `AUTOPAY_PRE_DEBIT` with the `DEBIT` step, on one transaction
+  (`enqueuePreDebitNoticeInTx` skips a notice already queued or handled),
+  26 h before the debit; `DEBIT` reads `preDebitNoticeState` first and,
+  with no email gone, lets the charge go (`notTold`: CANCELLED, the
+  waiting notice deleted, NOT_CHARGED_NO_NOTICE, the renewal invoice's
+  auto-send) instead of asking for it. Rules in `backend-integrations.md`
+  → "eMandate: Saroh's notice, or no debit".
 - **A charge that stands aside comes back on its own** (review 3). When a
   step refuses for a pay-link checkout the customer has open
   (CHECKOUT_OPEN), `stoodAside` writes, on the same transaction as its
@@ -508,6 +753,16 @@ the Privacy Policy states both.
   to the bell and the Website row (`site.review.*`), and the person who
   asked is emailed whatever they chose. A note by someone who can publish
   queues nothing.
+- **Permission requests and their answers** (`team.alert`
+  `{ event: "ask" }`, `notifications/ask-alerts.ts`, DEC-170): the request's
+  write puts its notice in the inbox — the business's for whoever may
+  answer it, the asker's own (`userId`) for the answer — and queues the
+  email on the same transaction with that notice's id. The run re-reads
+  the request (withdrawn, replaced or decided since says nothing), claims
+  `team:ask:<about>:<id>:<asked|answered>`, and emails exactly the people
+  the wording names (`emailUserIds`: everyone with `service:write` but the
+  asker; or the asker), whatever their alert choices, with the alert's own
+  footer. A booking rules request (#1038) is the only kind today.
 - **Order alerts live on the New order row** (`event: "order"` in
   `alert-preferences.ts`, notice types `order.new` and `order.uncollected`).
   A new order type of alert adds its notice type there, so the bell switch
@@ -524,6 +779,53 @@ the Privacy Policy states both.
   read live (`home/home-uncollected.ts`), not from the alert. Known gap: a
   pay-on-handover order placed before this shipped has no alert queued;
   Home still shows it.
+- **Money alerts** (#1139, DEC-174, `notifications/money-alerts.ts`):
+  an order's online payment that didn't go through (`order-failed`, queued
+  by the webhook's `applyFailure` once per attempt that failed, never for a
+  site checkout not yet paid; `order.payment_failed`), and money captured at
+  an amount Saroh didn't ask for (`mismatch`, queued by
+  `recordCaptureMismatchInTx` with the owed-back record, so the webhook, a
+  look-up and an autopay charge all tell it once; both figures;
+  `payment.mismatch` on an order, `payment.mismatch.invoice` on an invoice)
+  are on the Payment failed row. A team-made order paid online by the
+  customer (`paid-by-link`, queued by `applySuccess` when it moves to PAID;
+  `order.paid_by_link`) is on the New order row. Each re-reads first: paid,
+  cancelled, credited or refunded since says nothing, and a payment taken at
+  the wrong amount says only the mismatch, never "didn't go through" as
+  well. Keyed `team:<event>:<paymentIntentId>` (a mismatch adds the
+  captured payment's attempt). A failed pay-link payment never says "the
+  same link": a link is shown once (DEC-110), so the words say a new one is
+  needed and where to share it.
+- **Members alerts** (DEC-174 U19, #1150, `notifications/member-alerts.ts`),
+  on the Members row (bell on, email off; `subscription:read`, Payments
+  on): a member's own cancel or pause from their account (`member`,
+  `cancelled` / `paused`, queued by `recordSubscriptionEvent` only for a
+  `CUSTOMER` actor, keyed `team:member:<SubscriptionEvent id>`) and autopay
+  cancelled at their bank (`autopay_off`, queued by `applyMandateChangeInTx`
+  on the `PROVIDER` cancel, keyed `team:member:autopay_off:<mandateId>`).
+  Nothing the team did is told. Each re-reads: a pause started again, a
+  cancel kept, autopay set up again or a membership ended says nothing.
+  The bell opens the person's Memberships (`member.*`, `contactId`).
+- **Refunds told** (#1143, DEC-174, `payments/refund-notices.ts`): an
+  online refund the provider took tells the customer "₹X for your order …
+  is on its way back to how you paid" (`customer.notify` `REFUND_SENT`,
+  behind the REFUND switch), keyed `refund:<PaymentRefund id>` and queued
+  by whichever write records the provider took it: the refund call
+  attaching the provider's id (`settleFromProvider`), or the refund
+  webhook settling Saroh's row. A refund by hand (cash at the counter) is no
+  `PaymentRefund` and tells nobody; one made in the provider's dashboard, or
+  the ₹1 autopay check's, isn't sent from here. No money back tells the team
+  on the Payment failed row (`team.alert` `refund`): "refused" from the
+  write that moved the row to FAILED on the provider's no (`failRefund`,
+  which skips whoever asked and saw it on screen; a booking's automatic
+  refund tells everyone), "failed" from the webhook's `failProviderRefund`.
+  Only the write that moved the row to FAILED queues it, so a redelivered
+  webhook tells nobody twice; keyed `team:refund:<change>:<id>`. The alert
+  re-reads first: a refund the provider says went back after all, or money
+  handed back since by another refund, says nothing; it says when the
+  customer had already been told it was on its way. Types
+  `refund.refused|failed` open the order, `.booking` the booking, `.invoice`
+  the invoice.
 
 ## Scheduled go-live — **Current** (DEC-071, T10)
 
@@ -677,15 +979,17 @@ overrideId, reason }`. Re-read, then decide
   before it asks the provider and before it queues itself again, and
   stands down when the business is billed through that subscription again
   (live, not ending, the business not closing).
-- **`billing.customer.sync`** (DEC-165) makes the business's one customer
-  at Saroh's billing provider, or sends its details as they are now:
-  queued in the sign-up's transaction, by a Settings › Business save that
-  touches billing details and by every checkout, at most one waiting per
-  business (`enqueueBillingCustomerSync`), and by an owner's change of
-  email. Skips with no provider keys (a warning in production); retried
-  by the queue (10 tries); a refusal is logged, left as an admin note once,
-  and dropped (`billing-customer.ts`). Businesses from before are queued
-  by `backfill/billing-customers.cli.ts`.
+- **`billing.profile.sync`** (DEC-167) makes a billing profile's one
+  customer at Saroh's billing provider, or sends its details as they are
+  now: queued in the transaction that made or saved the profile (sign-up,
+  a profile's edit, a checkout's details step) and by an operator's Sync
+  again, at most one waiting per profile (`enqueueBillingProfileSync`).
+  Skips with no provider keys (a warning in production); retried by the
+  queue (10 tries); a refusal is logged, left as an admin note once, and
+  dropped (`billing-customer.ts`). Profiles from before are queued by
+  `backfill/billing-profiles.cli.ts`. DEC-165's **`billing.customer.sync`**
+  stays registered for jobs already queued: it syncs the business's
+  profile, and does nothing for a business without one.
 - **`billing.payment.notes`** (17 Oct 2026) puts Saroh's invoice number,
   business and checkout on the provider's payment once Saroh's invoice
   has its payment id: queued on the invoice's transaction, retried by the
@@ -742,7 +1046,11 @@ overrideId, reason }`. Re-read, then decide
   charge, queued with the rows (a purchase, a renewal, a change of
   provider subscription). Each row goes under its own id as the reference
   and only a QUEUED row becomes SENT; a refusal is logged and the row
-  waits for the next charge; anything unanswered is retried.
+  waits for the next charge; anything unanswered is retried. Razorpay
+  keeps no reference, so its adapter first looks for an add-on on the
+  subscription whose description is `saroh_ref:<row id>` and posts only
+  when there is none: a retry after a lost answer or a failed SENT mark
+  never adds the item twice (22 Oct 2026).
 - **`billing.moves.apply`** is the hourly self-rescheduling sweep (one
   PENDING run, a partial unique index): due pending moves that are ready
   (`plan-moves.ts`) and OPEN checkouts past `expiresAt`. A paid

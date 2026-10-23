@@ -6,7 +6,7 @@ import { ChevronLeft, Printer } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 
-import { BusinessDate } from "@/components/shared/business-zone";
+import { BusinessDate } from "@/components/shared/dates/business-zone";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { goesToAddress } from "@/lib/orders/lifecycle";
 import type { OrderRead } from "@/lib/orders/read";

@@ -71,12 +71,14 @@ describe("form controls on a merchant's site are 16px or more", () => {
                 onNote={() => undefined}
             />,
         );
-        expectBigEnough(3);
-        const [name, phone] = controls();
+        // The phone is two controls: its country code and the number.
+        expectBigEnough(4);
+        const [name, code, phone] = controls();
         expect(name).toHaveAttribute("autocomplete", "name");
+        expect(code.tagName).toBe("SELECT");
         expect(phone).toHaveAttribute("type", "tel");
         expect(phone).toHaveAttribute("inputmode", "tel");
-        expect(phone).toHaveAttribute("autocomplete", "tel");
+        expect(phone).toHaveAttribute("autocomplete", "tel-national");
     });
 
     it("the bag's discount code", () => {
@@ -98,12 +100,13 @@ describe("form controls on a merchant's site are 16px or more", () => {
 
     it("the enquiry form, which fills a name, an email and a phone", () => {
         render(<EnquirySection apiUrl="https://api.test" content={ENQUIRY} />);
-        expectBigEnough(5);
-        const [name, email, phone, company, message] = controls();
+        expectBigEnough(6);
+        const [name, email, code, phone, company, message] = controls();
+        expect(code.tagName).toBe("SELECT");
         expect(name).toHaveAttribute("autocomplete", "name");
         expect(email).toHaveAttribute("autocomplete", "email");
         expect(email).toHaveAttribute("type", "email");
-        expect(phone).toHaveAttribute("autocomplete", "tel");
+        expect(phone).toHaveAttribute("autocomplete", "tel-national");
         expect(phone).toHaveAttribute("type", "tel");
         // Nothing is guessed for a field the form doesn't explain.
         expect(company).not.toHaveAttribute("autocomplete");
@@ -153,10 +156,10 @@ describe("form controls on a merchant's site are 16px or more", () => {
                 onSaved={() => undefined}
             />,
         );
-        expectBigEnough(2);
-        const [name, phone] = controls();
+        expectBigEnough(3);
+        const [name, , phone] = controls();
         expect(name).toHaveAttribute("autocomplete", "name");
-        expect(phone).toHaveAttribute("autocomplete", "tel");
+        expect(phone).toHaveAttribute("autocomplete", "tel-national");
         unmount();
         render(
             <NoteSheet

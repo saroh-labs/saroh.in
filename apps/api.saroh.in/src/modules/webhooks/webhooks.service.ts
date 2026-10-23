@@ -1,11 +1,12 @@
 import {
     BadRequestException,
+    HttpException,
     Inject,
     Injectable,
     Logger,
     UnauthorizedException,
 } from "@nestjs/common";
-import type { Prisma, PrismaClient } from "@saroh/database";
+import type { Job, Prisma, PrismaClient } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { toMinor } from "../../common/money";
@@ -13,13 +14,18 @@ import {
     recordOrderPaidInTx,
     recordOrderRefundedInTx,
 } from "../analytics/order-events";
+import { raiseBillingOpsNoticeInTx } from "../billing/billing-ops-notice";
 import { confirmHoldInTx } from "../bookings/booking-hold";
 import { markBookingPaidInTx } from "../bookings/booking-pay-link";
 import { completePackDraftInTx } from "../class-packs/pack-checkout";
 import {
-    CAPTURED_NEEDS_REFUND,
-    ONLINE_PAYMENT_METHOD,
-} from "../invoices/invoice-state";
+    CUSTOMER_ACTOR,
+    JOB_ACTOR,
+    recordInvoiceEvent,
+} from "../invoices/invoice-events";
+import type { OnlinePayment } from "../invoices/invoice-ledger";
+import { recordOnlinePaymentInTx } from "../invoices/invoice-ledger";
+import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
 import {
     creditNoteForRefund,
     creditRestOfOrder,
@@ -27,12 +33,17 @@ import {
     invoiceSupersededPayment,
     settleSupplementaryInvoices,
 } from "../invoices/order-invoicing";
+import { RETRY_SCHEDULES } from "../jobs/job-queue.port";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import type { PaymentStatus } from "../orders/dto";
 import { leftToRefundCents } from "../orders/hand-payments";
 import { holdsOnPayment } from "../orders/online-checkout";
 import { finishCancelInTx } from "../orders/order-cancel";
-import { RETIRED_PAY_LINK } from "../orders/order-pay-link";
+import {
+    dueCentsOf,
+    PAY_LINK_ORDER_SELECT,
+    RETIRED_PAY_LINK,
+} from "../orders/order-pay-link";
 import { assertPaymentTransition } from "../orders/order-state";
 import { orderMoneyIntents } from "../orders/treatment-ledger";
 import {
@@ -40,6 +51,7 @@ import {
     captureCheckInTx,
     failCheckInTx,
 } from "../payments/authorisation-check";
+import { recordBookingRefundInTx } from "../payments/booking-refund";
 import type { CapturedAmount } from "../payments/capture-mismatch";
 import {
     AMOUNT_MISMATCH,
@@ -59,8 +71,13 @@ import {
 } from "../payments/mandate-events";
 import { settleMismatchRefundInTx } from "../payments/mismatch-refund";
 import { PaymentsService } from "../payments/payments.service";
+import {
+    enqueueRefundAlert,
+    enqueueRefundSentNotice,
+} from "../payments/refund-notices";
 import { enqueueRefundSendInTx } from "../payments/send-refund.handler";
 import { enqueueOrderPlacedNotice } from "../site-accounts/customer-notify-queue";
+import { enqueueAutopayFailedNotice } from "../site-accounts/notices/autopay-failed";
 import { lockOrderShelves, settleRefundStock } from "../stock/reserve";
 import { completePlanJoinInTx } from "../subscriptions/plan-join";
 import { linkMandateInTx } from "./mandate-link";
@@ -78,6 +95,14 @@ import { WEBHOOK_PROVIDER_FACTORY } from "./providers/webhook-provider.port";
 /** A Prisma transaction client (the `$transaction(async (tx) => …)` argument). */
 type Tx = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
 
+/** The job that retries a stored delivery the request could not apply. */
+export const WEBHOOK_PROCESS_TYPE = "webhook.process";
+/** The first run, then one per entry of its retry schedule: about 16 hours. */
+const WEBHOOK_PROCESS_ATTEMPTS =
+    (RETRY_SCHEDULES[WEBHOOK_PROCESS_TYPE]?.length ?? 0) + 1;
+/** The request's own try goes first; the job waits this long behind it. */
+const WEBHOOK_RETRY_AFTER_MS = 60_000;
+
 /** The outcome of handling one inbound webhook. Never carries secret material. */
 export interface WebhookResult {
     /**
@@ -86,8 +111,9 @@ export interface WebhookResult {
      *   `providerEventId`); no-op.
      * - `ignored`   — verified but not a money event / no matching intent.
      * - `failed`    — verified but reconciliation errored (recorded for replay).
+     * - `queued`    — stored, and an unexpected error left it to its retry job.
      */
-    status: "processed" | "duplicate" | "ignored" | "failed";
+    status: "processed" | "duplicate" | "ignored" | "failed" | "queued";
     /** Whether this call changed any payment/refund/order state. */
     changed: boolean;
 }
@@ -141,13 +167,15 @@ const PROVIDER_LABEL: Record<string, string> = {
  *     same→same target is a guard-free no-op, so money state moves at most once
  *     even if the same event somehow reaches reconcile twice.
  *
- * ERROR POLICY (documented, deliberate): a reconciliation error marks the
- * durably-stored event `FAILED` (+ `error`) and returns **200**, NOT a 5xx. The
- * event is retained for inspection/replay by an internal job; returning 5xx
- * would invite the provider to hammer a poison event into an endless retry loop,
- * which is the more dangerous failure mode. Transient infra failures (e.g. the
- * inbox write itself throwing something other than P2002) still propagate as
- * 5xx so the provider retries a delivery we never durably accepted.
+ * ERROR POLICY (documented, deliberate): store, answer 200, then apply. The
+ * inbox row commits with a `webhook.process` job; the request tries the event
+ * once, and an unexpected error (a lost connection, a lock timeout) is left to
+ * that job's retries with backoff. A refusal that would fail again (a 4xx
+ * `HttpException`: an illegal state move, a validation error), or the job's
+ * last try, keeps the row `FAILED` (+ `error`) for staff to replay. Only an
+ * inbox row that could not be stored is a 5xx: a provider that keeps getting
+ * non-2xx answers switches the webhook off (DEV_LEARNINGS, merchant webhook
+ * FAILED for good).
  */
 @Injectable()
 export class WebhooksService {
@@ -200,23 +228,38 @@ export class WebhooksService {
 
         const event = provider.parseEvent({ payload, headers });
 
-        // Idempotent inbox. A duplicate `(organizationId, provider,
-        // providerEventId)` → P2002 → 200 no-op: the exactly-once guarantee,
-        // per business (PAY-05). Any OTHER error propagates.
+        // Store, answer, then apply. The inbox row and its retry job commit
+        // together: a duplicate `(organizationId, provider, providerEventId)`
+        // → P2002 → 200 no-op, per business (PAY-05). Only a row that could
+        // not be stored is a 5xx: nothing is kept, and the redelivery is
+        // wanted. After this every answer is 200, because Razorpay and
+        // Cashfree switch off a webhook that keeps failing.
         let inboxId: string;
         try {
-            const row = await prisma.webhookEvent.create({
-                data: {
-                    organizationId,
-                    provider: name,
-                    providerEventId: event.providerEventId,
-                    eventType: event.eventType,
-                    payload: payload as Prisma.InputJsonValue,
-                    signature: provider.signatureHeader(headers) ?? null,
-                    status: "RECEIVED",
-                },
+            inboxId = await prisma.$transaction(async (tx) => {
+                const row = await tx.webhookEvent.create({
+                    data: {
+                        organizationId,
+                        provider: name,
+                        providerEventId: event.providerEventId,
+                        eventType: event.eventType,
+                        payload: payload as Prisma.InputJsonValue,
+                        signature: provider.signatureHeader(headers) ?? null,
+                        status: "RECEIVED",
+                    },
+                });
+                await tx.job.create({
+                    data: {
+                        type: WEBHOOK_PROCESS_TYPE,
+                        organizationId,
+                        payload: { webhookEventId: row.id },
+                        maxAttempts: WEBHOOK_PROCESS_ATTEMPTS,
+                        // The answer below tries first; the job is the retry.
+                        runAt: new Date(Date.now() + WEBHOOK_RETRY_AFTER_MS),
+                    },
+                });
+                return row.id;
             });
-            inboxId = row.id;
         } catch (err) {
             if (isUniqueViolation(err)) {
                 return { status: "duplicate", changed: false };
@@ -224,35 +267,128 @@ export class WebhooksService {
             throw err;
         }
 
-        // Reconcile. On error, record FAILED and return 200 (see class docs).
         try {
-            const { applied } = await prisma.$transaction((tx) =>
-                this.reconcile(tx, name, organizationId, event),
-            );
-            await prisma.webhookEvent.update({
-                where: { id: inboxId },
-                data: {
-                    status: applied ? "PROCESSED" : "IGNORED",
-                    processedAt: new Date(),
+            return await this.processInbox(
+                inboxId,
+                name,
+                organizationId,
+                event,
+                {
+                    lastTry: false,
                 },
+            );
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            this.logger.warn(
+                `Webhook ${name}/${event.providerEventId} reconcile errored; its job retries it: ${message}`,
+            );
+            return { status: "queued", changed: false };
+        }
+    }
+
+    /**
+     * The retry job of a stored delivery (`webhook.process`): applies it if
+     * it is still RECEIVED, throws on an error worth another try so the queue
+     * backs off, and on the last attempt keeps it FAILED for staff to replay.
+     */
+    readonly processJob = async (job: Job): Promise<void> => {
+        const { webhookEventId } = job.payload as { webhookEventId: string };
+        const stored = await prisma.webhookEvent.findUnique({
+            where: { id: webhookEventId },
+            select: {
+                provider: true,
+                organizationId: true,
+                payload: true,
+                status: true,
+            },
+        });
+        if (stored?.status !== "RECEIVED" || !stored.organizationId) return;
+        const provider = this.factory.get(stored.provider);
+        await this.processInbox(
+            webhookEventId,
+            provider.name,
+            stored.organizationId,
+            provider.parseEvent({ payload: stored.payload, headers: {} }),
+            { lastTry: job.attempts + 1 >= job.maxAttempts },
+        );
+    };
+
+    /**
+     * Apply one stored delivery. The RECEIVED row is claimed by an update in
+     * the reconcile's transaction, so the answer's try and the job's never
+     * both apply it: the second waits on the row, then finds it settled. An
+     * error that would fail again (a 4xx: an illegal state move, a
+     * validation error), or any error on the last try, keeps the row FAILED
+     * for replay; any other error rolls back and is thrown for a retry.
+     */
+    private async processInbox(
+        id: string,
+        name: string,
+        organizationId: string,
+        event: NormalizedWebhookEvent,
+        { lastTry }: { lastTry: boolean },
+    ): Promise<WebhookResult> {
+        try {
+            const applied = await prisma.$transaction(async (tx) => {
+                const claim = await tx.webhookEvent.updateMany({
+                    where: { id, status: "RECEIVED" },
+                    data: { processedAt: new Date() },
+                });
+                if (claim.count === 0) return null;
+                const { applied } = await this.reconcile(
+                    tx,
+                    name,
+                    organizationId,
+                    event,
+                );
+                await tx.webhookEvent.update({
+                    where: { id },
+                    data: {
+                        status: applied ? "PROCESSED" : "IGNORED",
+                        processedAt: new Date(),
+                    },
+                });
+                return applied;
             });
+            if (applied === null)
+                return { status: "duplicate", changed: false };
             return {
                 status: applied ? "processed" : "ignored",
                 changed: applied,
             };
         } catch (err) {
+            if (!lastTry && !wouldFailAgain(err)) throw err;
             const message = err instanceof Error ? err.message : String(err);
-            await prisma.webhookEvent.update({
-                where: { id: inboxId },
-                data: {
-                    status: "FAILED",
-                    error: message,
-                    processedAt: new Date(),
-                },
+            await prisma.$transaction(async (tx) => {
+                const marked = await tx.webhookEvent.updateMany({
+                    where: { id, status: "RECEIVED" },
+                    data: {
+                        status: "FAILED",
+                        error: message,
+                        processedAt: new Date(),
+                    },
+                });
+                if (marked.count === 0) return;
+                // Nothing retries it now: an operator replays it or
+                // settles the payment by hand.
+                await raiseBillingOpsNoticeInTx(tx, this.logger, {
+                    code: "merchant_webhook_failed",
+                    organizationId,
+                    refs: {
+                        webhookEvent: id,
+                        provider: name,
+                        providerEvent: event.providerEventId,
+                        eventType: event.eventType,
+                    },
+                    note: `A ${name} ${event.eventType} event for this business could not be applied after its tries (${message.slice(0, 200)}). Its payment, refund or mandate may be out of step until it is replayed in Operations › Webhooks.`,
+                    dedupeKey: `merchant_webhook_failed:${id}`,
+                });
+                // The team, so nobody acts on a record that is out of step.
+                await enqueueTeamAlert(tx, organizationId, {
+                    event: "webhook",
+                    webhookEventId: id,
+                });
             });
-            this.logger.warn(
-                `Webhook ${name}/${event.providerEventId} reconcile failed: ${message}`,
-            );
             return { status: "failed", changed: false };
         }
     }
@@ -706,6 +842,26 @@ export class WebhooksService {
             return { applied: online.applied };
         }
 
+        // A second capture on an order with nothing left to take (two tabs
+        // on the pay page, each with its own intent) is not the order's
+        // money: it is settled as a superseded charge, owed back, never
+        // counted. A balance or an edit's difference still has money due.
+        if (
+            intent.status !== "SUCCEEDED" &&
+            (await nothingLeftToTake(tx, orderId))
+        ) {
+            await tx.paymentIntent.update({
+                where: { id: intent.id },
+                data: { status: SUPERSEDED_INTENT },
+            });
+            return this.applySupersededSuccess(
+                tx,
+                { ...intent, status: SUPERSEDED_INTENT },
+                orderId,
+                event,
+            );
+        }
+
         // Read before the move: money arriving on an order cancelled in the
         // meantime is owed back (plan B, B11), recorded below.
         const cancelled =
@@ -727,6 +883,15 @@ export class WebhooksService {
                 reference:
                     event.providerPaymentRef ?? intent.providerIntentId ?? null,
             });
+            // An order the team made, paid by the customer online (#1139):
+            // the New order row's bell. A site order has its own alert.
+            if (placed && !placed.placedOnline) {
+                await enqueueTeamAlert(tx, intent.organizationId, {
+                    event: "paid-by-link",
+                    orderId,
+                    paymentIntentId: intent.id,
+                });
+            }
         } else if (intent.status !== "SUCCEEDED") {
             // A second payment on a paid order — an edit's difference —
             // settles the supplementary invoice that edit wrote, and its pay
@@ -834,7 +999,8 @@ export class WebhooksService {
         intent: IntentRow,
         orderId: string,
     ): Promise<{ applied: boolean }> {
-        let { applied } = await this.applyIntentFailure(tx, intent);
+        const failedNow = (await this.applyIntentFailure(tx, intent)).applied;
+        let applied = failedNow;
         // Move Order UNPAID→FAILED only. A stray failure after a capture (PAID)
         // is IGNORED rather than forced through an illegal transition.
         const order = await tx.order.findUnique({
@@ -852,6 +1018,16 @@ export class WebhooksService {
             const changed = await this.moveOrderPayment(tx, orderId, "FAILED");
             applied = applied || changed;
         }
+        // The team hears an order's payment failed (#1139), once per
+        // attempt that actually failed. Not a site checkout's: until it is
+        // paid it is no order (G13). The alert re-reads it when it runs.
+        if (failedNow && order && !holdsOnPayment(order)) {
+            await enqueueTeamAlert(tx, intent.organizationId, {
+                event: "order-failed",
+                orderId,
+                paymentIntentId: intent.id,
+            });
+        }
         return { applied };
     }
 
@@ -868,6 +1044,15 @@ export class WebhooksService {
     ): Promise<{ applied: boolean }> {
         const result = await this.applyIntentFailure(tx, intent);
         if (result.applied) {
+            // On the invoice's history (U9 #1140): the customer's attempt
+            // on the pay page, or the autopay charge Saroh asked for.
+            await recordInvoiceEvent(tx, {
+                organizationId: intent.organizationId,
+                invoiceId,
+                kind: "PAY_ATTEMPT_FAILED",
+                actor: intent.viaMandateId ? JOB_ACTOR : CUSTOMER_ACTOR,
+                data: { reason, autopay: !!intent.viaMandateId },
+            });
             // A renewal's autopay charge declined (D13): RENEWAL_FAILED,
             // which Home reads as "Payment failed"; the pay link opens again.
             if (intent.viaMandateId) {
@@ -878,6 +1063,12 @@ export class WebhooksService {
                     "RENEWAL_FAILED",
                     { reason },
                 );
+                // The customer is told too, with a link to pay (U10).
+                await enqueueAutopayFailedNotice(tx, intent.organizationId, {
+                    invoiceId,
+                    paymentIntentId: intent.id,
+                    reason,
+                });
             }
             await enqueueTeamAlert(tx, intent.organizationId, {
                 event: "failed",
@@ -890,7 +1081,7 @@ export class WebhooksService {
 
     /**
      * A failed attempt moves the intent only. An invoice stays as it was —
-     * the customer can try again from the same link.
+     * the customer pays again from a new link (DEC-110: a link is shown once).
      */
     private async applyIntentFailure(
         tx: Tx,
@@ -1179,6 +1370,18 @@ export class WebhooksService {
                     },
                 });
             }
+            // A booking's refund in its history (#1137), unless the cancel
+            // already wrote it so.
+            await recordBookingRefundInTx(tx, existing.id, "SETTLED");
+            // The customer hears it is on its way (U12), if the refund
+            // call's answer didn't tell them already: keyed to the refund,
+            // so once. A FAILED row the provider says went back after all
+            // is told now, truthfully.
+            await enqueueRefundSentNotice(
+                tx,
+                intent.organizationId,
+                existing.id,
+            );
             return { applied: true, refundId: existing.id, settledNow: true };
         }
         // Made outside Saroh (the provider's dashboard): recorded at what the
@@ -1204,6 +1407,9 @@ export class WebhooksService {
                 providerRefundId: event.providerRefundId,
             },
         });
+        // A refund of a booking's payment made in the provider's own
+        // dashboard is in the booking's history too (#1137).
+        await recordBookingRefundInTx(tx, created.id, "SETTLED");
         return { applied: true, refundId: created.id, settledNow: true };
     }
 
@@ -1238,6 +1444,19 @@ export class WebhooksService {
                     existing.providerRefundId ?? event.providerRefundId ?? null,
             },
         });
+        // A booking's refund that never went back (#1137): "Refund failed"
+        // in its history, after the "Refunded" its cancel wrote.
+        await recordBookingRefundInTx(tx, existing.id, "FAILED");
+        // The team hears no money went back (U12): queued only by the write
+        // that moved it to FAILED, so a redelivered webhook, which finds
+        // the row FAILED, tells nobody again. The customer may have been
+        // told it was on its way; the team chooses what to say.
+        await enqueueRefundAlert(
+            tx,
+            intent.organizationId,
+            existing.id,
+            "failed",
+        );
         return { applied: true };
     }
 
@@ -1318,19 +1537,25 @@ export class WebhooksService {
      * Money arrived for an invoice's pay link (U13).
      *
      * Under the invoice's row lock — so a hand-recorded payment or a void
-     * racing this webhook is seen, not overwritten — an ISSUED invoice
-     * becomes PAID, recorded as paid online through the provider. An invoice
-     * that is already PAID (cash at the counter, a second tab) or VOID is
-     * left exactly as it is: the intent still SUCCEEDED, because the money
-     * was taken, and the capture is recorded as needing a refund, which the
-     * workspace surfaces on Home and on the invoice.
+     * racing this webhook is seen, not overwritten — the payment is written
+     * to the invoice's ledger (DEC-173, `recordOnlinePaymentInTx`): one
+     * ONLINE row for the intent's amount, linked by its intent, so a replay
+     * never doubles it. The invoice is PAID once that settles what was
+     * left, and stays ISSUED (partly paid) when it doesn't. An invoice that
+     * is already PAID (cash at the counter, a second tab), VOID, or has less
+     * left to pay than this payment brought (part paid by hand while the
+     * checkout was open) is left exactly as it is: the intent still
+     * SUCCEEDED, because the money was taken, and the capture is recorded
+     * as needing a refund, which the workspace surfaces on Home and on the
+     * invoice.
      *
      * An intent already SUCCEEDED means this payment was settled by an
      * earlier event (Razorpay sends `payment.captured` and `order.paid` for
      * one payment), so it is a no-op — never a second "needs a refund".
      *
-     * A pay-now hold's invoice (U19) arrives here as a DRAFT: the payment
-     * confirms its booking and numbers the invoice (`booking-hold.ts`).
+     * A pay-now hold's invoice (U19), a pack bought online (A11) and a plan
+     * joined online (G20) arrive here as a DRAFT: each is numbered, issued
+     * and paid through the same ledger write by its own module.
      */
     private async applyInvoiceSuccess(
         tx: Tx,
@@ -1361,12 +1586,14 @@ export class WebhooksService {
         });
 
         const providerRef = event.providerPaymentRef ?? null;
-        const payment = {
-            paymentMethod: ONLINE_PAYMENT_METHOD,
-            paymentReference: providerRef ?? intent.providerIntentId ?? null,
-            paymentNote: `Paid online through ${
+        const payment: OnlinePayment = {
+            paymentIntentId: intent.id,
+            amountCents: intent.amountCents,
+            reference: providerRef ?? intent.providerIntentId ?? null,
+            note: `Paid online through ${
                 PROVIDER_LABEL[intent.provider] ?? intent.provider
             }`,
+            receivedAt: new Date(),
         };
         // A pay-now hold's draft (U19): the booking is confirmed and the
         // invoice numbered and paid — unless its place went to someone else
@@ -1376,7 +1603,7 @@ export class WebhooksService {
                 ? await confirmHoldInTx(tx, {
                       invoiceId,
                       organizationId: intent.organizationId,
-                      now: new Date(),
+                      now: payment.receivedAt,
                       payment,
                   })
                 : null;
@@ -1389,7 +1616,7 @@ export class WebhooksService {
                 ? await completePackDraftInTx(tx, {
                       invoiceId,
                       organizationId: intent.organizationId,
-                      now: new Date(),
+                      now: payment.receivedAt,
                       payment,
                   })
                 : null;
@@ -1402,7 +1629,7 @@ export class WebhooksService {
                 ? await completePlanJoinInTx(tx, {
                       invoiceId,
                       organizationId: intent.organizationId,
-                      now: new Date(),
+                      now: payment.receivedAt,
                       payment,
                       // Autopay chosen at join starts with it (D12).
                       providerIntentId: intent.providerIntentId,
@@ -1420,17 +1647,24 @@ export class WebhooksService {
             invoice.bookingId
                 ? await isBookingCancelledInTx(tx, invoice.bookingId)
                 : false;
+        // An issued invoice: the payment goes on its ledger, unless it was
+        // paid, voided or part paid by hand past this payment meanwhile.
+        const recorded =
+            invoice?.status === "ISSUED" && !cancelledBooking
+                ? await recordOnlinePaymentInTx(
+                      tx,
+                      intent.organizationId,
+                      invoiceId,
+                      payment,
+                  )
+                : null;
         if (
-            (invoice?.status === "ISSUED" && !cancelledBooking) ||
+            recorded?.applied ||
             held === "confirmed" ||
             bought === "bought" ||
             joined === "joined"
         ) {
-            if (invoice?.status === "ISSUED") {
-                await tx.invoice.update({
-                    where: { id: invoiceId },
-                    data: { status: "PAID", paidAt: new Date(), ...payment },
-                });
+            if (recorded?.applied && !recorded.replayed) {
                 // Paid by autopay (D13): CHARGED on the subscription's log.
                 if (intent.viaMandateId) {
                     await recordChargeEventInTx(
@@ -1441,8 +1675,13 @@ export class WebhooksService {
                     );
                 }
                 // A booking's pay link (E4): the booking reads as paid
-                // online. The invoice's lock is held, then the booking's.
-                if (invoice.source === "BOOKING" && invoice.bookingId) {
+                // online once its invoice is paid in full. The invoice's
+                // lock is held, then the booking's.
+                if (
+                    recorded.paid &&
+                    invoice?.source === "BOOKING" &&
+                    invoice.bookingId
+                ) {
                     await markBookingPaidInTx(tx, invoice.bookingId);
                 }
             }
@@ -1469,7 +1708,9 @@ export class WebhooksService {
                     ? "PLAN_NOT_JOINED"
                     : cancelledBooking
                       ? "CANCELLED_BOOKING"
-                      : (invoice?.status ?? "MISSING");
+                      : recorded
+                        ? recorded.found
+                        : (invoice?.status ?? "MISSING");
         await tx.paymentAttempt.create({
             data: {
                 organizationId: intent.organizationId,
@@ -1542,6 +1783,24 @@ function capturedOf(event: NormalizedWebhookEvent): CapturedAmount {
     };
 }
 
+/**
+ * Whether a paid order has nothing left to take, read under the order's
+ * lock (after the intent's, as reserve.ts orders them) so two captures
+ * settling at once see each other.
+ */
+async function nothingLeftToTake(tx: Tx, orderId: string): Promise<boolean> {
+    await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
+    const order = await tx.order.findUnique({
+        where: { id: orderId },
+        select: PAY_LINK_ORDER_SELECT,
+    });
+    return (
+        order?.paymentStatus === "PAID" &&
+        order.status !== "CANCELLED" &&
+        dueCentsOf(order) <= 0
+    );
+}
+
 async function lockIntent(tx: Tx, intent: IntentRow): Promise<string> {
     const rows = await tx.$queryRaw<{ status: string }[]>`
         SELECT status FROM "PaymentIntent" WHERE id = ${intent.id} FOR NO KEY UPDATE`;
@@ -1602,4 +1861,9 @@ function isUniqueViolation(err: unknown): boolean {
         "code" in err &&
         (err as { code?: string }).code === "P2002"
     );
+}
+
+/** A refusal redelivery can't change: a 4xx from the state machine or a check. */
+function wouldFailAgain(err: unknown): boolean {
+    return err instanceof HttpException && err.getStatus() < 500;
 }

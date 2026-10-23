@@ -127,8 +127,11 @@ seed):
   paused, cancelled or ending, one changing plan at renewal. Packs of 5
   (₹2,200 / 60 days) and 10 (₹4,000 / 90 days) classes and a retired "First 3
   classes" (₹999): about 30 sold, one about to run out, one run out unused. One
-  open course, a few invoices written by hand, notes on three people. About
-  770 invoices. `checkPulse` stops the run if any of these states is missing.
+  open course, a few invoices written by hand (one void and written again),
+  notes on three people. About 770 invoices; part payments on two renewals,
+  reminders by email and on WhatsApp, a receipt shared, and Compact paper in
+  its green as the default (#1129). `checkPulse` stops the run if any of
+  these states is missing.
   Commerce is on (the gym sells at its counter, `pulse-shop.ts`): a "Front
   desk" storefront with 30 products — house-labelled supplements by flavour
   or size (whey 1 kg and 2 kg, isolate, plant protein, creatine, pre-workout,
@@ -189,11 +192,17 @@ seed):
   preparing (one edited before preparing, with a supplementary invoice),
   ready, collected, one with the courier and a tracking link, one whose
   payment failed — plus one partly refunded by line with its credit note
-  (RCCN/26-27/0001). A Sourdough plan (₹480 a week) and a monthly one
+  (RCCN/26-27/…). A Sourdough plan (₹480 a week) and a monthly one
   (₹1,800), eight subscribers collecting on Saturdays: one renewal failed, one
   paused, one changing plan at renewal, skips to come; renewals are tax
   invoices with the loaf at 0% (plans carry no GST rate). Four trade cafés
-  billed by hand — paid, due, overdue, a draft, and one in Goa in IGST.
+  billed by hand — paid, due, overdue a week, a fortnight, a month and two,
+  a draft, and one in Goa in IGST — with every state the rebuilt invoice
+  screens draw (#1129, `invoice-states.ts`): partly paid ₹1,000 of ₹2,500,
+  two cheques not in the bank (₹8,400 and ₹5,600), one in the bank, one that
+  bounced and is owed again, shared and reminded on WhatsApp and by email,
+  receipts shared, one credited and written again, and Classic, Band and
+  Compact paper, Band in its brown (`#6B3F1D`) the default.
   Subscribers' contacts are linked to their store customers; Rohan Das is a
   contact and a customer with the same email, left unlinked (a possible
   match). Priya Raman's Needs attention names sesame and today's order holds a loaf that

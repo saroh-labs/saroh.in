@@ -2,18 +2,21 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { pressInvoiceAction } from "../fixtures/invoice-actions";
 import { makeContact, northwind, stamp } from "../fixtures/own-data";
+import { pressUntil } from "../fixtures/press";
 import { useSession } from "../fixtures/sessions";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
  * Invoices without Payments (DEC-070, K7), on Northwind with Payments
  * switched off for the test: Invoices get a rail row of their own (in the
- * phone's More), an invoice is written, issued and marked paid, Send reads
- * "Send invoice" where there is a channel, there's no "Copy pay link", and
- * the customer's link shows the invoice with no Pay button.
+ * phone's More), an invoice is written, issued and marked paid, a draft
+ * that can be sent reads "Issue and share" (no payment link promised),
+ * there's no "Copy payment link", and the customer's link shows the
+ * invoice with no Pay button.
  *
- * The pay link is made while Payments is still on — with it off the
+ * The payment link is made while Payments is still on — with it off the
  * workspace offers none, and a Send's link goes only to the customer —
  * which is also the case DEC-070 names: a link already shared opens as a
  * view link once Payments goes off.
@@ -111,14 +114,10 @@ test.describe("invoices without Payments (DEC-070)", { tag: "@serial" }, () => {
                     .getByRole("button", { name: /^More/ });
                 // Pressed until it opens: a press before hydration
                 // does nothing.
-                await expect(async () => {
-                    await more.click();
-                    await expect(
-                        page.getByRole("dialog", {
-                            name: "Everything else",
-                        }),
-                    ).toBeVisible({ timeout: 2_000 });
-                }).toPass({ timeout: 20_000 });
+                await pressUntil(
+                    more,
+                    page.getByRole("dialog", { name: "Everything else" }),
+                );
                 await page
                     .getByRole("dialog", { name: "Everything else" })
                     .getByRole("link", { name: /^Invoices/ })
@@ -151,14 +150,16 @@ test.describe("invoices without Payments (DEC-070)", { tag: "@serial" }, () => {
                 page.getByRole("heading", { level: 1, name: "Draft" }),
             ).toBeVisible();
             if ((read.send?.channels.length ?? 0) > 0) {
-                await expect(action(page, "Send invoice")).toBeVisible();
+                await expect(action(page, "Issue and share")).toBeVisible();
             }
             await expect(
-                page.getByRole("button", { name: "Send with pay link" }),
+                page.getByRole("button", { name: "Send with payment link" }),
             ).toHaveCount(0);
-            await action(page, "Issue it").click();
+            // "Issue it" is the main button, or in More beside "Issue and
+            // share" (DEC-173, U9).
+            await pressInvoiceAction(page, "Issue it");
             const confirm = page.getByRole("alertdialog");
-            await expect(confirm).not.toContainText("pay link");
+            await expect(confirm).not.toContainText("payment link");
             await confirm
                 .getByRole("button", { name: "Issue invoice" })
                 .click();
@@ -170,12 +171,12 @@ test.describe("invoices without Payments (DEC-070)", { tag: "@serial" }, () => {
                 )
                 .toBe("ISSUED");
 
-            // Unpaid: no pay link to copy, and Mark paid is there.
-            const pay = action(page, "Mark paid");
+            // Unpaid: no payment link to copy, and Record payment is there.
+            const pay = action(page, "Record payment");
             await expect(pay).toBeVisible();
             await expect(pay).toHaveCSS("cursor", "pointer");
             await expect(
-                page.getByRole("button", { name: "Copy pay link" }),
+                page.getByRole("button", { name: "Copy payment link" }),
             ).toHaveCount(0);
             await expect(
                 page.getByText("Its link shows the invoice with no Pay"),
@@ -184,15 +185,10 @@ test.describe("invoices without Payments (DEC-070)", { tag: "@serial" }, () => {
             // Money taken in cash.
             await pay.click();
             const dialog = page.getByRole("dialog", {
-                name: "Record a payment",
+                name: "Record payment",
             });
-            await dialog
-                .getByRole("combobox", { name: "How it was paid" })
-                .click();
-            await page.getByRole("option", { name: "Cash" }).click();
-            await dialog
-                .getByRole("button", { name: "Record payment" })
-                .click();
+            await dialog.getByRole("radio", { name: "Cash" }).click();
+            await dialog.getByRole("button", { name: /^Record ₹/ }).click();
             await expect
                 .poll(
                     async () =>

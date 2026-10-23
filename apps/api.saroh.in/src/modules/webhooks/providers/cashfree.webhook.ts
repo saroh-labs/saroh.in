@@ -101,8 +101,11 @@ export class CashfreeWebhookProvider implements WebhookProvider {
             providerEventId,
             eventType,
             outcome: outcomeFor(eventType, refund?.refund_status),
-            // Cashfree webhooks carry the MERCHANT order id (== our Order.id we
-            // submitted at create), so reconcile matches on the order ref.
+            // Cashfree webhooks carry the MERCHANT order id Saroh sent: since
+            // 22 Oct 2026 one per intent, kept as its `providerIntentId`, so
+            // it names the intent itself. An older intent's was its Order's or
+            // Invoice's id, which reconcile matches as the order ref.
+            providerIntentId: orderRef,
             orderRef,
             providerPaymentRef,
             feeCents: feeOf(

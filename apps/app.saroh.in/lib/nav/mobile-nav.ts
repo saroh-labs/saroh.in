@@ -2,13 +2,13 @@ import type {
     NavCounts,
     NavGroup,
     NavItem,
-} from "@/components/shared/nav-items";
+} from "@/components/shared/navigation/nav-items";
 import {
     isNavChildCurrent,
     isNavItemActive,
     isNavSectionActive,
     navCountFor,
-} from "@/components/shared/nav-items";
+} from "@/components/shared/navigation/nav-items";
 
 /**
  * The phone's navigation: four tabs, then More (the "Saroh Tab Bar" design,
@@ -28,7 +28,7 @@ export const TAB_SEATS = 4;
 export const DEFAULT_PREFERENCE = [
     "Home",
     "Sell",
-    "Overview",
+    "Calendar",
     "Insights",
 ] as const;
 
@@ -95,9 +95,9 @@ const pagesOf = (item: NavItem) =>
  * Which rows get the four seats.
  *
  * By a named preference first, then in rail order skipping sections. On a
- * page inside a section — or on Overview, which the design seats the same
+ * page inside a section — or on Calendar, which the design seats the same
  * way — that place takes the second seat, so where you are is always one tap
- * away. Overview comes after Sell; Sell gives up its seat to Overview when it
+ * away. Calendar comes after Sell; Sell gives up its seat to Calendar when it
  * is the section you are in, since it is already seated.
  */
 export function seatPreference(currentSection: string | null): string[] {
@@ -108,8 +108,8 @@ export function seatPreference(currentSection: string | null): string[] {
         new Set([
             "Home",
             currentSection,
-            currentSection === "Sell" ? "Overview" : "Sell",
-            "Overview",
+            currentSection === "Sell" ? "Calendar" : "Sell",
+            "Calendar",
             "Insights",
         ]),
     );

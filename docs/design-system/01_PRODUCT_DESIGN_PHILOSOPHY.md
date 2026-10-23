@@ -61,7 +61,7 @@ action answers "what next?" instantly and makes the screen self-explaining.
 
 **Saroh example.** On the home page the only primary button is "New store"; the org
 switcher and sign-out in `AppHeader` are deliberately `outline`/quiet
-(`components/shared/app-header.tsx`, `components/organizations/organization-switcher.tsx`
+(`components/shared/shell/app-header.tsx`, `components/organizations/switcher/organization-switcher.tsx`
 uses `variant="outline" size="sm"`). Contrast this with the per-store layout
 (`app/stores/[storeId]/layout.tsx`), which currently offers a "← Dashboard" link, an org
 switcher, a title and a section nav with no single dominant CTA — a candidate for
@@ -128,7 +128,7 @@ features compose existing `@saroh/ui` primitives and the shared
 in the same place with the same behaviour everywhere, a skill learned in Commerce
 transfers for free to Appointments. It also slashes maintenance: one shell to fix, not 35.
 
-**Saroh example.** The recent `AppHeader` (`components/shared/app-header.tsx`) is the
+**Saroh example.** The recent `AppHeader` (`components/shared/shell/app-header.tsx`) is the
 right instinct — its own doc comment says it exists "so the brand, org switcher, primary
 nav, and sign-out are present on EVERY authenticated page… New pages inherit the full
 chrome for free." The gap: the per-store layout re-implements its own mini-shell
@@ -152,7 +152,7 @@ one-product debt to retire.
 
 **Grounded risk to watch:** the app already carries small colour-discipline leaks —
 `components/crm/activity-timeline.tsx` uses raw `border-amber-400` / `border-blue-400` /
-`border-emerald-400`, and `components/stores/order-payments.tsx` uses
+`border-emerald-400`, and `components/commerce/order-payment/order-payments.tsx` uses
 `text-amber-700 dark:text-amber-400`. These are exactly the "rainbow creep" this section
 guards against, and are why [06 Design Tokens](./06_DESIGN_TOKENS.md) defines semantic
 `success` / `warning` / `info` tokens to replace them.

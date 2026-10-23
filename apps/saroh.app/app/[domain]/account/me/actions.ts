@@ -2,6 +2,7 @@
 
 import type {
     CodeRequestResult,
+    DataRequestResult,
     DetailsResult,
     NoteResult,
     NoticesResult,
@@ -10,7 +11,7 @@ import type {
 } from "@saroh/site-blocks";
 
 import { accountAreaOn } from "@/lib/account-area";
-import { noticesResult } from "@/lib/account-details-shape";
+import { dataRequestResult, noticesResult } from "@/lib/account-details-shape";
 import {
     emailChangeAnswer,
     isAccountView,
@@ -209,4 +210,31 @@ export async function saveEmailChoice(email: boolean): Promise<NoticesResult> {
               ok: false,
               message: refusalMessage(call.res.status, body, OFFLINE),
           };
+}
+
+/**
+ * "Ask to remove my data" (DEC-172, #1107): asks the business to remove
+ * the customer's details. Nothing is sent but the session: the API makes
+ * the request for the signed-in customer only, answers with the open one
+ * if there already is one, and limits how often a new one can be made
+ * (its 429's own words are passed on). On a test release it refuses, as
+ * every write on a site does (DEC-071, T6): nobody can sign in there, so
+ * no customer could reach it anyway, though the API would allow it.
+ */
+export async function askDataRemoval(): Promise<DataRequestResult> {
+    if (!(await siteOrigin())) return { ok: false, message: OFFLINE };
+    if (await testMode()) return TEST_RELEASE_REFUSAL;
+    if (!accountAreaOn()) return { ok: false, message: OFFLINE };
+    const call = await accountFetch("me/data-request", {
+        method: "POST",
+        body: {},
+    });
+    if (!call?.ok) return { ok: false, message: OFFLINE };
+    const body: unknown = await call.res.json().catch(() => null);
+    const request = call.res.ok ? dataRequestResult(body) : undefined;
+    if (request) return { ok: true, request };
+    return {
+        ok: false,
+        message: refusalMessage(call.res.status, body, OFFLINE),
+    };
 }

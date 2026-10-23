@@ -2,6 +2,7 @@ import { Transform, Type } from "class-transformer";
 import {
     ArrayMaxSize,
     ArrayMinSize,
+    Equals,
     IsArray,
     IsBoolean,
     IsIn,
@@ -20,8 +21,12 @@ import {
 
 import type { BookingPayment } from "../bookings/booking-rules";
 import { BOOKING_PAYMENTS } from "../bookings/booking-rules";
+import { PERSON_FREE_CANCEL_REFUSAL } from "../bookings/person-rules";
 
 /** A person on the diary takes new bookings while ACTIVE (U3). */
+/** The longest gap between bookings a business or a person may keep. */
+export const MAX_GAP_MINUTES = 240;
+
 export const STAFF_STATUSES = ["ACTIVE", "ARCHIVED"] as const;
 export type StaffStatus = (typeof STAFF_STATUSES)[number];
 
@@ -305,4 +310,73 @@ export class UpdateBookingRulesDto {
     @IsOptional()
     @IsIn(BOOKING_PAYMENTS)
     bookingPayment?: BookingPayment;
+
+    /**
+     * "Gap between bookings" (DEC-170, #1038): minutes kept clear either
+     * side of a person's bookings. 0 is no gap, the default; never null.
+     */
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(MAX_GAP_MINUTES)
+    gapMinutes?: number;
+
+    /**
+     * "Members' rule changes need approval" (DEC-170, #1038): on, a change
+     * someone makes to their own booking rules without `service:write`
+     * waits for an owner or admin. Never null.
+     */
+    @IsOptional()
+    @IsBoolean()
+    memberRuleChangesNeedApproval?: boolean;
+}
+
+/**
+ * A person's own booking rules (DEC-170, #1038). Each is optional in the
+ * body (absent: left as it is); `null` is "same as the business". The
+ * ranges are the business rules' own. Free cancelling is not one of them:
+ * it follows the business's refund policy (owner, 20 Oct 2026).
+ */
+export class UpdatePersonRulesDto {
+    /** How far ahead a customer may book them, in days. */
+    @IsOptional()
+    @ValidateIf((_, value) => value !== null)
+    @IsInt()
+    @Min(1)
+    @Max(365)
+    bookAheadDays?: number | null;
+
+    /** The notice they need before a start, in minutes; 0 is up to the start. */
+    @IsOptional()
+    @ValidateIf((_, value) => value !== null)
+    @IsInt()
+    @Min(0)
+    @Max(10080)
+    latestBookingMinutes?: number | null;
+
+    /**
+     * Refused whatever it holds, null included, with words saying why
+     * (DEC-170, owner 20 Oct 2026): declared only so the refusal is that
+     * rather than "property freeCancelHours should not exist".
+     */
+    @ValidateIf((_, value) => value !== undefined)
+    @Equals(undefined, { message: PERSON_FREE_CANCEL_REFUSAL })
+    freeCancelHours?: never;
+
+    /** Minutes kept clear between their bookings; 0 is no gap. */
+    @IsOptional()
+    @ValidateIf((_, value) => value !== null)
+    @IsInt()
+    @Min(0)
+    @Max(MAX_GAP_MINUTES)
+    gapMinutes?: number | null;
+}
+
+/** Turning down a request to change someone's booking rules. */
+export class TurnDownRuleRequestDto {
+    /** Why, in the owner's words: what the person reads. Optional. */
+    @IsOptional()
+    @IsString()
+    @MaxLength(300)
+    reason?: string;
 }

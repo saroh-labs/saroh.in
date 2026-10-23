@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import type { HomeToday, HomeTodayItem } from "./service";
-import { arrivedLabel, todayView } from "./today";
+import {
+    arrivedLabel,
+    dayCountLabel,
+    laterTodayLabel,
+    todayView,
+} from "./today";
 
 // 09:30 in Mumbai on 18 Sep 2026.
 const NOW = new Date("2026-09-18T09:30:00+05:30");
@@ -46,7 +51,7 @@ describe("todayView", () => {
         expect(view.empty).toBe(false);
     });
 
-    it("tags a booking marked Arrived with the time it was marked", () => {
+    it("tags a booking marked Came with the time it was marked", () => {
         const view = todayView(
             day([
                 item("09:00", { outcome: "ATTENDED", outcomeTime: "09:32" }),
@@ -54,14 +59,15 @@ describe("todayView", () => {
             ]),
             NOW,
         );
-        expect(view.rows[0].state).toBe("Arrived 9:32 am");
+        expect(view.rows[0].state).toBe("Came at 9:32 am");
         expect(view.rows[0].canArrive).toBe(false);
-        expect(view.count).toBe("1 still to come · 1 arrived");
+        expect(view.count).toBe("1 still to come · 1 came");
     });
 
-    it("keeps the last ninety minutes to be marked, and drops what's older", () => {
+    it("keeps the last ninety minutes, and an earlier booking nobody marked; drops what's older and marked", () => {
         const view = todayView(
             day([
+                item("07:00", { outcome: "ATTENDED", outcomeTime: "07:02" }),
                 item("07:30"),
                 item("08:15"),
                 item("09:00", { outcome: "NO_SHOW" }),
@@ -70,11 +76,12 @@ describe("todayView", () => {
             NOW,
         );
         expect(view.rows.map((r) => [r.time, r.state])).toEqual([
+            ["07:30", "Not here yet"],
             ["08:15", "Not here yet"],
             ["09:00", "Didn't come"],
             ["10:00", "Next"],
         ]);
-        expect(view.count).toBe("1 still to come · 1 not here yet");
+        expect(view.count).toBe("1 still to come · 2 not here yet");
     });
 
     it("shows five still to come; the rest are the calendar's", () => {
@@ -84,7 +91,7 @@ describe("todayView", () => {
         expect(view.count).toBe("6 still to come");
     });
 
-    it("offers Arrived from an hour before, and No-show once it has started", () => {
+    it("offers Mark arrived from an hour before, and Didn't come once it has started", () => {
         const view = todayView(
             day([item("09:00"), item("10:15"), item("10:45")]),
             NOW,
@@ -156,20 +163,78 @@ describe("todayView", () => {
             count: "",
             visible: false,
             empty: false,
+            dayDone: false,
+            laterToday: 0,
+            dayCount: "",
         });
     });
 
-    it("says nothing is left when the day is over", () => {
-        const view = todayView(day([item("07:00")]), NOW);
+    it('leaves the rest of the day to the calendar: "3 more later today" (Home A)', () => {
+        const view = todayView(
+            day(
+                [
+                    "10:00",
+                    "11:00",
+                    "12:00",
+                    "13:00",
+                    "14:00",
+                    "15:00",
+                    "16:00",
+                    "17:00",
+                ].map((t) => item(t)),
+            ),
+            NOW,
+        );
+        expect(view.rows).toHaveLength(5);
+        expect(view.laterToday).toBe(3);
+        expect(laterTodayLabel(view.laterToday)).toBe("3 more later today");
+        expect(laterTodayLabel(0)).toBe("");
+    });
+
+    it("counts the whole day for Home A's heading", () => {
+        const view = todayView(
+            day([
+                item("09:00"),
+                item("10:00", { kind: "CLASS" }),
+                item("11:00", { kind: "PICKUP" }),
+            ]),
+            NOW,
+        );
+        expect(view.dayCount).toBe("2 bookings, 1 pick-up");
+        expect(dayCountLabel([])).toBe("");
+        expect(dayCountLabel([item("09:00", { kind: "PICKUP" })])).toBe(
+            "1 pick-up",
+        );
+    });
+
+    it("says nothing is left when the day is over, never that nothing was booked", () => {
+        const view = todayView(
+            day([item("07:00", { outcome: "ATTENDED", outcomeTime: "07:02" })]),
+            NOW,
+        );
         expect(view.rows).toEqual([]);
-        expect(view.empty).toBe(true);
+        expect(view.empty).toBe(false);
+        expect(view.dayDone).toBe(true);
         expect(view.count).toBe("");
+    });
+
+    it("still offers an unmarked morning booking in the evening", () => {
+        const evening = new Date("2026-09-18T19:30:00+05:30");
+        const view = todayView(day([item("10:00")]), evening);
+        expect(view.rows.map((r) => [r.time, r.state])).toEqual([
+            ["10:00", "Not here yet"],
+        ]);
+        expect(view.rows[0]).toMatchObject({
+            canArrive: true,
+            canNoShow: true,
+        });
+        expect(view.dayDone).toBe(false);
     });
 });
 
 describe("arrivedLabel", () => {
     it("adds the time when there is one", () => {
-        expect(arrivedLabel("09:32")).toBe("Arrived 9:32 am");
-        expect(arrivedLabel(null)).toBe("Arrived");
+        expect(arrivedLabel("09:32")).toBe("Came at 9:32 am");
+        expect(arrivedLabel(null)).toBe("Came");
     });
 });

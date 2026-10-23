@@ -29,6 +29,21 @@ export function ownAddress(prefix: string, testInfo: TestInfo): string {
     return `${prefix}-${stamp(testInfo)}`.toLowerCase().replace(/-{2,}/g, "-");
 }
 
+/**
+ * Who Saroh bills for a business set up through the API (DEC-167, R7): an
+ * owner with a billing profile must choose one, so this is the first of
+ * the signed-in person's, or nothing for someone with none (their first
+ * is made from the business).
+ */
+export async function billingChoice(
+    page: Page,
+): Promise<{ billingProfileId: string } | Record<string, never>> {
+    const res = await page.request.get(`${urls.API_URL}/billing-profiles`);
+    expect(res.ok(), `billing profiles: ${await res.text()}`).toBe(true);
+    const first = ((await res.json()) as { id: string }[]).at(0);
+    return first ? { billingProfileId: first.id } : {};
+}
+
 export async function makeBusiness(
     page: Page,
     testInfo: TestInfo,
@@ -44,6 +59,7 @@ export async function makeBusiness(
             kind: "BUSINESS",
             address,
             profile: { country: "IN", timezone: "Asia/Kolkata" },
+            ...(await billingChoice(page)),
         },
     });
     expect(res.ok(), `set up ${name}: ${await res.text()}`).toBe(true);

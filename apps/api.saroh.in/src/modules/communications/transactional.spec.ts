@@ -3,7 +3,9 @@
 // a slot in the stored body. Pure.
 import {
     autopayCancelledSentence,
+    fillHowToPay,
     fillSecretLink,
+    HOW_TO_PAY_SLOT,
     renderAutopayCancelled,
     renderAutopaySetupLink,
     renderReviewInvitation,
@@ -125,6 +127,53 @@ describe("fillSecretLink", () => {
     });
 });
 
+describe("a renewal's How to pay us lines (DEC-178)", () => {
+    it("go above the view link, as a slot filled when it is sent", () => {
+        const { body } = renderTransactional("INVOICE_SENT", {
+            ...vars,
+            payOnline: false,
+            payWays: "by UPI",
+            howToPay: true,
+        });
+        expect(body).toContain(
+            `How to pay Rye &amp; Co.:<br>${HOW_TO_PAY_SLOT}`,
+        );
+        expect(body.indexOf(HOW_TO_PAY_SLOT)).toBeLessThan(
+            body.indexOf(`href="${SECRET_LINK_SLOT}"`),
+        );
+    });
+
+    it("are never asked for on a pay link, or when not asked", () => {
+        expect(
+            renderTransactional("INVOICE_SENT", {
+                ...vars,
+                payOnline: true,
+                howToPay: true,
+            }).body,
+        ).not.toContain(HOW_TO_PAY_SLOT);
+        expect(
+            renderTransactional("INVOICE_SENT", { ...vars, payOnline: false })
+                .body,
+        ).not.toContain(HOW_TO_PAY_SLOT);
+    });
+
+    it("are filled one a line, escaped", () => {
+        const { body } = renderTransactional("INVOICE_SENT", {
+            ...vars,
+            payOnline: false,
+            howToPay: true,
+        });
+        const filled = fillHowToPay(body, [
+            "UPI: rye@okhdfc",
+            "Pay <b>cash</b> at the desk",
+        ]);
+        expect(filled).not.toContain(HOW_TO_PAY_SLOT);
+        expect(filled).toContain(
+            "UPI: rye@okhdfc<br>Pay &lt;b&gt;cash&lt;/b&gt; at the desk",
+        );
+    });
+});
+
 describe("renderAutopaySetupLink (D14)", () => {
     const link = {
         business: "Pulse & Co.",
@@ -172,6 +221,7 @@ describe("the autopay-cancelled note (D14)", () => {
         business: "Pulse & Co.",
         firstName: "Meera",
         plan: "Monthly unlimited",
+        invoiceSent: true,
     };
 
     it("says it stopped, the plan carries on, and how the next renewal is paid", () => {
@@ -181,7 +231,9 @@ describe("the autopay-cancelled note (D14)", () => {
         expect(body).toContain(
             "Pulse &amp; Co. has turned off autopay for Monthly unlimited. Nothing more will be taken automatically.",
         );
-        expect(body).toContain("an invoice with a link to pay it");
+        expect(body).toContain(
+            "From your next renewal, Pulse &amp; Co. emails you an invoice with a link to pay.",
+        );
         // Nothing secret: no link slot at all.
         expect(body).not.toContain(SECRET_LINK_SLOT);
     });
@@ -200,6 +252,18 @@ describe("the autopay-cancelled note (D14)", () => {
     it("the thread line is plain text, never HTML", () => {
         expect(autopayCancelledSentence(vars)).toBe(
             "Pulse & Co. turned off autopay for Monthly unlimited. Nothing more is taken automatically. Your next renewal comes as an invoice with a link to pay.",
+        );
+    });
+
+    it("with renewal invoices turned off (U10), it promises no invoice", () => {
+        const off = { ...vars, invoiceSent: false };
+        const { body } = renderAutopayCancelled(off);
+        expect(body).toContain(
+            "From your next renewal, Pulse &amp; Co. will tell you how to pay.",
+        );
+        expect(body).not.toContain("link to pay");
+        expect(autopayCancelledSentence(off)).toBe(
+            "Pulse & Co. turned off autopay for Monthly unlimited. Nothing more is taken automatically. Pulse & Co. will tell you how to pay your next renewal.",
         );
     });
 });

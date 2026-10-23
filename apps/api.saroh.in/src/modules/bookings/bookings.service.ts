@@ -20,9 +20,10 @@ import {
     serviceFacts,
 } from "../audit/price-history";
 import { assertPlanTakesOnlinePayment } from "../billing/online-payments-plan";
+import { ModuleSetupService } from "../capabilities/setup/module-setup.service";
 import { redeemPackInTx } from "../class-packs/redeem-pack";
 import { assertBusinessDetails } from "../invoices/business-details";
-import { isGstRate } from "../invoices/gst";
+import { isGstRate, notGstRateMessage } from "../invoices/gst";
 import { loadPriceTerms } from "../invoices/price-terms";
 import { allows } from "../organizations/organization-policy";
 import { PaymentsService } from "../payments/payments.service";
@@ -43,10 +44,16 @@ import { isExpiredHold } from "./booking-hold";
 import type { WithoutIntakeNote } from "./booking-intake";
 import { intakeNoteFor } from "./booking-intake";
 import type { BookingMoney } from "./booking-money";
-import { bookingMoney } from "./booking-money";
+import { bookingMoney, bookingPrice } from "./booking-money";
 import { moveFoundBooking } from "./booking-move";
 import { lockVisitOrderInTx, writeOutcomeInTx } from "./booking-outcome";
 import { bookingPayLinkInTx } from "./booking-pay-link";
+import type { ReassignCandidate } from "./booking-reassign";
+import {
+    assertMayReassign,
+    reassignCandidates as reassignCandidatesFor,
+    requireTeamPerson,
+} from "./booking-reassign";
 import { loadBookingRules } from "./booking-rules";
 import type { AvailableSlot } from "./booking-slots";
 import {
@@ -56,9 +63,11 @@ import {
     refuseIfClosed,
     resolvePerson,
     toAvailabilityService,
+    withPlacesLeft,
 } from "./booking-slots";
 import { assertDepositOnPlan } from "./deposit-plan";
 import type { TakeDeskPaymentDto } from "./desk-pay.dto";
+import type { DeskMethod } from "./desk-take";
 import {
     BOOKING_PAPER,
     BOOKING_PAPER_PAYMENTS,
@@ -66,12 +75,18 @@ import {
 } from "./desk-take";
 import type {
     AvailabilityRuleDto,
+    BookingLocationType,
     BookingOutcome,
     CreateServiceDto,
     LocationType,
     PaidWith,
     UpdateServiceDto,
 } from "./dto";
+import {
+    assertBookableByTeam,
+    assertHandPayment,
+    handBooker,
+} from "./hand-booker";
 import { openingFor, refuseOutsideOpening } from "./opening-hours";
 import {
     assertOwnBooking,
@@ -112,7 +127,12 @@ const bookingDetailInclude = {
     },
     events: {
         orderBy: { createdAt: "asc" },
-        include: { actor: { select: { name: true } } },
+        include: {
+            actor: { select: { name: true } },
+            // Who it was handed from and to, on REASSIGNED (#1157).
+            fromStaff: { select: { name: true } },
+            toStaff: { select: { name: true } },
+        },
     },
     // How it is paid, when a class pack pays for it (ADR-007). A pack taken
     // back off leaves its row with `reversedAt` set: that booking is no
@@ -230,7 +250,7 @@ function serviceGstRate(rate: string | null | undefined): string | null {
     if (rate === undefined || rate === null) return null;
     if (!isGstRate(rate)) {
         throw new BadRequestException({
-            message: `${rate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
+            message: notGstRateMessage(rate),
             details: { field: "gstRate" },
         });
     }
@@ -272,7 +292,34 @@ export class BookingsService {
         // Sends a cancel's refund after it commits (E8). Optional so the
         // specs that never refund need not build one.
         @Optional() private readonly payments?: PaymentsService,
+        // Makes the booking page when the first service customers can
+        // book online is added (DEC-175). Optional so the specs that never
+        // add one need not build it.
+        @Optional() private readonly setup?: ModuleSetupService,
     ) {}
+
+    /**
+     * A service customers can book online was added or opened to them:
+     * with no website, the booking page is made (DEC-175). After the
+     * commit, and it never refuses: the service is saved either way.
+     */
+    private async bookingPageFor(
+        ctx: OrganizationContext,
+        service: Pick<
+            Service,
+            "status" | "showOnBookingPage" | "siteId" | "deletedAt"
+        >,
+    ): Promise<void> {
+        if (
+            service.status !== "ACTIVE" ||
+            !service.showOnBookingPage ||
+            service.siteId !== null ||
+            service.deletedAt !== null
+        ) {
+            return;
+        }
+        await this.setup?.makeBookingSite(ctx, "service");
+    }
 
     // ── Service CRUD ───────────────────────────────────────────────────────
 
@@ -334,6 +381,7 @@ export class BookingsService {
                     visits: dto.visits ?? 1,
                     depositMode,
                     showOnBookingPage: dto.showOnBookingPage ?? true,
+                    bookableByTeam: dto.bookableByTeam ?? true,
                 },
             });
             await recordPrices(
@@ -351,6 +399,7 @@ export class BookingsService {
             ctx.organizationId,
             created.id,
         );
+        await this.bookingPageFor(ctx, created);
         return toServiceView(
             created,
             await loadPriceTerms(prisma, ctx.organizationId),
@@ -477,6 +526,9 @@ export class BookingsService {
         if (dto.showOnBookingPage !== undefined) {
             data.showOnBookingPage = dto.showOnBookingPage;
         }
+        if (dto.bookableByTeam !== undefined) {
+            data.bookableByTeam = dto.bookableByTeam;
+        }
         if (dto.depositMode !== undefined || dto.priceCents !== undefined) {
             // Checked as the service will be: a price cleared under a deposit
             // is refused as surely as a deposit set on no price. (A null
@@ -515,6 +567,11 @@ export class BookingsService {
             );
             return next;
         });
+        // Opened to customers by this save (ticked for the booking page,
+        // or taking bookings again): the booking page, if it is missing.
+        const wasOnline =
+            service.status === "ACTIVE" && service.showOnBookingPage;
+        if (!wasOnline) await this.bookingPageFor(ctx, saved);
         return toServiceView(
             saved,
             await loadPriceTerms(prisma, ctx.organizationId),
@@ -648,7 +705,11 @@ export class BookingsService {
         const rules = await prisma.availabilityRule.findMany({
             where: { serviceId },
         });
-        return openSlots(service, rules, from, to, staffId);
+        // A class says how many places each start has left (U8).
+        return withPlacesLeft(
+            service,
+            await openSlots(service, rules, from, to, staffId),
+        );
     }
 
     // ── Bookings (management) ──────────────────────────────────────────────
@@ -833,7 +894,13 @@ export class BookingsService {
         ctx: OrganizationContext,
         bookingId: string,
         now: Date = new Date(),
-        options: { returnCredit?: boolean; closesClass?: boolean } = {},
+        options: {
+            returnCredit?: boolean;
+            closesClass?: boolean;
+            ifUnpaid?: boolean;
+            /** Why the whole class is cancelled (DEC-178, #1172). */
+            classReason?: string;
+        } = {},
     ): Promise<CancelledBooking> {
         requireBookingPower(ctx, "booking:write");
         const found = await this.requireOwnedBooking(ctx, bookingId);
@@ -1021,6 +1088,129 @@ export class BookingsService {
     }
 
     /**
+     * Change who a booking is with, or give one that has nobody a person
+     * (#1157), and optionally its time in the same step. The move's own
+     * write (`moveFoundBooking` with `reassign`), so the money, pack
+     * credit, waitlist place and series stay; see `booking-reassign.ts`
+     * for who may and who is told. Another business's booking or person
+     * is a 404; the same person at the same time changes nothing.
+     */
+    async reassignBooking(
+        ctx: OrganizationContext,
+        bookingId: string,
+        input: { staffId: string; startAt?: string },
+    ): Promise<Booking> {
+        requireBookingPower(ctx, "booking:write");
+        const booking = await this.requireOwnedBooking(ctx, bookingId);
+        const person = await requireTeamPerson(
+            ctx.organizationId,
+            input.staffId,
+        );
+        await assertMayReassign(ctx, booking, person.id);
+        const service = await this.requireMovableBooking(ctx, booking);
+        const startAt = input.startAt
+            ? new Date(input.startAt)
+            : booking.startAt;
+        if (Number.isNaN(startAt.getTime())) {
+            throw new BadRequestException("startAt is not a valid instant");
+        }
+        if (
+            booking.staffId === person.id &&
+            startAt.getTime() === booking.startAt.getTime()
+        ) {
+            // Already with them then: no event, no notice.
+            return booking;
+        }
+        if (booking.staffId === person.id) {
+            // Only the time changes: that is a move.
+            return moveFoundBooking(
+                booking,
+                service,
+                startAt,
+                { organizationId: ctx.organizationId, userId: ctx.userId },
+                { audience: "team" },
+            );
+        }
+        return moveFoundBooking(
+            booking,
+            service,
+            startAt,
+            { organizationId: ctx.organizationId, userId: ctx.userId },
+            {
+                audience: "team",
+                reassign: { staffId: person.id, name: person.name },
+            },
+        );
+    }
+
+    /**
+     * Who this booking could be given to at `startAt` (its own start when
+     * left out): everyone who takes the service, each free, busy (saying
+     * when) or not working then (#1157's picker). Asks what the change
+     * does: `booking:write`.
+     */
+    async reassignCandidates(
+        ctx: OrganizationContext,
+        bookingId: string,
+        at?: string,
+    ): Promise<{ startAt: string; people: ReassignCandidate[] }> {
+        requireBookingPower(ctx, "booking:write");
+        const booking = await this.requireOwnedBooking(ctx, bookingId);
+        const service = await this.requireOwnedService(ctx, booking.serviceId);
+        const startAt = at ? new Date(at) : booking.startAt;
+        if (Number.isNaN(startAt.getTime())) {
+            throw new BadRequestException("startAt is not a valid instant");
+        }
+        const [rules, staffing, opening] = await Promise.all([
+            prisma.availabilityRule.findMany({
+                where: { serviceId: service.id },
+            }),
+            loadStaffing(service),
+            openingFor(
+                service,
+                booking.locationType as BookingLocationType | null,
+            ),
+        ]);
+        const people = await reassignCandidatesFor(
+            booking,
+            service,
+            rules,
+            staffing,
+            startAt,
+            opening,
+        );
+        return { startAt: startAt.toISOString(), people };
+    }
+
+    /**
+     * The service of a booking that can still be changed: not cancelled,
+     * not a course's session, on a service that is still offered. Said as
+     * a move says it.
+     */
+    private async requireMovableBooking(
+        ctx: OrganizationContext,
+        booking: Booking,
+    ): Promise<Service> {
+        if (booking.status === "CANCELLED") {
+            throw new ConflictException(
+                "This booking was cancelled. Book a new time instead of changing it.",
+            );
+        }
+        if (booking.courseEnrollmentId) {
+            throw new ConflictException(
+                "This is a course session. Change the course's sessions instead of one booking.",
+            );
+        }
+        const service = await this.requireOwnedService(ctx, booking.serviceId);
+        if (service.status !== "ACTIVE") {
+            throw new ConflictException(
+                "This service is archived, so its bookings cannot be changed. Make it active again first, or cancel the booking.",
+            );
+        }
+        return service;
+    }
+
+    /**
      * A booking the merchant makes for someone — on the phone, at the
      * counter — rather than one the booker makes on the booking page (#384).
      *
@@ -1032,9 +1222,14 @@ export class BookingsService {
      * records the person who made it.
      *
      * The booker is someone already in the contacts (`contactId`, whose name
-     * and email are used as they stand) or someone new (`bookerEmail`, and
-     * optionally a name and phone), who becomes a contact the way a booking
-     * page booker does.
+     * and email are used as they stand), someone by their email
+     * (`bookerEmail`, and optionally a name and phone), or a caller who gave
+     * only a name and phone (DEC-170), kept by that phone as a walk-in is
+     * for orders (`hand-booker.ts`). A service the team can't book (its
+     * "Your team" tick, Q5) is refused here and still offered on the
+     * booking page. "Paid now" needs payment permission (DEC-098); with how
+     * it was paid (`paidBy`), the booking and its desk payment are written
+     * in one transaction, so a refused payment leaves no booking.
      */
     async bookByHand(
         ctx: OrganizationContext,
@@ -1050,10 +1245,13 @@ export class BookingsService {
             packPurchaseId?: string;
             staffId?: string;
             paidWith?: PaidWith;
+            paidBy?: DeskMethod;
             subscriptionId?: string;
         },
     ): Promise<Booking> {
         requireBookingPower(ctx, "booking:write");
+        // Money stays with payment permission (DEC-098).
+        assertHandPayment(ctx, dto);
         const withPack =
             dto.useClassPack === true ||
             !!dto.packPurchaseId ||
@@ -1088,10 +1286,13 @@ export class BookingsService {
         if (service.organizationId !== ctx.organizationId) {
             throw new NotFoundException("Service not found");
         }
+        // Who can book it: "Your team" (Q5). The booking page reads only
+        // its own tick.
+        assertBookableByTeam(service);
         // A treatment is sold as one order (E9, DEC-050), paid on it: never
         // with a pack or a membership, and never without a storefront.
         const treatment = isTreatment(service);
-        if (treatment && (withPack || withMembership)) {
+        if (treatment && (withPack || withMembership || dto.paidBy)) {
             throw new BadRequestException({
                 message:
                     "A treatment is paid for on its order, not with a pack or a membership.",
@@ -1129,76 +1330,8 @@ export class BookingsService {
             );
         }
 
-        let booker: BookInput;
-        if (dto.contactId) {
-            let contact = await prisma.contact.findUnique({
-                where: { id: dto.contactId },
-            });
-            // A page loaded before a merge can still name the merged-away
-            // contact (C9): book the survivor it points at. The booking is
-            // then made by the survivor's email, never the tombstone's
-            // placeholder.
-            if (
-                contact?.mergedIntoId &&
-                contact.organizationId === ctx.organizationId
-            ) {
-                contact = await prisma.contact.findUnique({
-                    where: { id: contact.mergedIntoId },
-                });
-            }
-            if (contact?.organizationId !== ctx.organizationId) {
-                throw new NotFoundException("Contact not found");
-            }
-            const name = [contact.firstName, contact.lastName]
-                .filter(Boolean)
-                .join(" ")
-                .trim();
-            booker = {
-                startAt: dto.startAt,
-                bookerEmail: contact.email,
-                bookerName: name || undefined,
-                bookerPhone: contact.phone ?? undefined,
-            };
-        } else if (dto.bookerEmail) {
-            // An email that is already someone's picks that someone (E4),
-            // as they stand: booking them never renames them or forks a
-            // second contact.
-            const known = await prisma.contact.findUnique({
-                where: {
-                    organizationId_email: {
-                        organizationId: ctx.organizationId,
-                        email: dto.bookerEmail.trim().toLowerCase(),
-                    },
-                },
-            });
-            booker = known
-                ? {
-                      startAt: dto.startAt,
-                      bookerEmail: known.email,
-                      bookerName:
-                          [known.firstName, known.lastName]
-                              .filter(Boolean)
-                              .join(" ")
-                              .trim() || undefined,
-                      bookerPhone: known.phone ?? undefined,
-                  }
-                : {
-                      startAt: dto.startAt,
-                      bookerEmail: dto.bookerEmail,
-                      // A field left blank is not given, rather than "".
-                      bookerName: dto.bookerName?.trim()
-                          ? dto.bookerName
-                          : undefined,
-                      bookerPhone: dto.bookerPhone?.trim()
-                          ? dto.bookerPhone
-                          : undefined,
-                  };
-        } else {
-            throw new BadRequestException({
-                message: "Choose someone from your contacts, or give an email.",
-                field: "bookerEmail",
-            });
-        }
+        // A customer, an email, or a name and phone (DEC-170).
+        const booker = await handBooker(ctx, dto);
 
         // Its bill goes to an email (DEC-050): a contact with none is asked
         // for one.
@@ -1228,9 +1361,14 @@ export class BookingsService {
             undefined,
             opening,
         );
+        // Paid now with how (DEC-170): written unpaid, then paid at the
+        // desk on the same transaction, which marks it paid.
+        const paidBy = dto.paidBy ?? null;
         const paidWith: PaidWith | null = withPack
             ? "PACK"
-            : (dto.paidWith ?? null);
+            : paidBy
+              ? null
+              : (dto.paidWith ?? null);
 
         if (treatmentStore) {
             // The treatment's order, with this booking its visit 1.
@@ -1262,16 +1400,41 @@ export class BookingsService {
             });
         }
 
-        return reserve(
+        // Someone new kept by their phone is made under the phone's lock:
+        // a race lost there is retried, so a second booking for the same
+        // new number books the first one's customer.
+        const byNewPhone = !booker.bookerEmail && !!booker.phoneKey;
+        const booked = await reserve(
             this.activation,
             service,
             startAt,
             endAt,
             booker,
             { source: "manual", actorUserId: ctx.userId },
-            withPack || withMembership
+            withPack || withMembership || paidBy || byNewPhone
                 ? {
                       inTx: async (tx, booking) => {
+                          if (paidBy) {
+                              await takeDeskPaymentInTx(tx, {
+                                  organizationId: ctx.organizationId,
+                                  bookingId: booking.id,
+                                  actorUserId: ctx.userId,
+                                  method: paidBy,
+                                  // The whole price, as it was just fixed
+                                  // on the booking.
+                                  amountCents:
+                                      bookingPrice(booking.snapshot)
+                                          .priceCents ?? 0,
+                                  now: new Date(),
+                              });
+                              await tx.booking.update({
+                                  where: { id: booking.id },
+                                  data: { paidWith: "PAID" },
+                                  select: { id: true },
+                              });
+                              return;
+                          }
+                          if (!withPack && !withMembership) return;
                           if (withMembership) {
                               await useMembershipInTx(tx, {
                                   organizationId: ctx.organizationId,
@@ -1294,9 +1457,11 @@ export class BookingsService {
                           });
                       },
                       // It may have been the pack's (or the month's) last
-                      // class rather than the slot, so this says only that
-                      // something changed.
+                      // class, the invoice's number or the phone's new
+                      // customer rather than the slot, so this says only
+                      // that something changed.
                       onRace: "That changed while you were booking. Try again.",
+                      retryOnce: byNewPhone || !!paidBy,
                   }
                 : undefined,
             {
@@ -1307,6 +1472,10 @@ export class BookingsService {
                     : null,
             },
         );
+        // Paid at the desk on the way in: read again, paid.
+        return paidBy
+            ? prisma.booking.findUniqueOrThrow({ where: { id: booked.id } })
+            : booked;
     }
 
     /**

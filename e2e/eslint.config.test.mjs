@@ -62,3 +62,28 @@ tester.run(
         ],
     },
 );
+
+// No sleeps in a spec (review #24): the rule's own message.
+const SLEEP = options.at(-1).message;
+tester.run(
+    "no-restricted-syntax (no waitForTimeout)",
+    builtinRules.get("no-restricted-syntax"),
+    {
+        valid: [
+            good("await page.clock.runFor(11_000)"),
+            good("await expect(row).toBeVisible({ timeout: 11_000 })"),
+        ],
+        invalid: [
+            {
+                code: "await page.waitForTimeout(11_000)",
+                options,
+                errors: [{ message: SLEEP }],
+            },
+            {
+                code: "await sheet.page().waitForTimeout(250)",
+                options,
+                errors: [{ message: SLEEP }],
+            },
+        ],
+    },
+);

@@ -10,8 +10,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import type { ContactOption } from "@/components/shared/contact-picker";
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import type { ContactOption } from "@/components/shared/fields/contact-picker";
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { autopayPanel } from "@/lib/subscriptions/autopay";
 import { pauseNote, pauseOptions } from "@/lib/subscriptions/pause";
 import type {
@@ -40,9 +40,9 @@ import {
     subscriptionPay,
 } from "@/lib/subscriptions/view";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
+import { SubscribeDialog } from "@/components/subscriptions/list/subscribe-dialog";
 import { Notice } from "@saroh/ui/notice";
-import { SubscribeDialog } from "../subscribe-dialog";
 import type { Step } from "./action-dialogs";
 import { ActionDialog } from "./action-dialogs";
 import { AutopayActions } from "./autopay-panel";
@@ -97,7 +97,7 @@ export function SubscriptionDetail({
     ran: { text: string; late: boolean } | null;
     bizName: string | null;
     canWrite: boolean;
-    /** A new pay link needs `invoice:write` as well. */
+    /** A new payment link needs `invoice:write` as well. */
     canPayLink: boolean;
     /** `?do=` from the list's quick look. */
     initialStep: Step | "restart" | null;
@@ -354,7 +354,7 @@ export function SubscriptionDetail({
                         </div>
                         <div className="mt-[3px] text-[12.5px] leading-[1.5] text-foreground/75">
                             {charging
-                                ? `${charging}. The pay link is held until their bank answers, so ${first} isn't charged twice.`
+                                ? `${charging}. The payment link is held until their bank answers, so ${first} isn't charged twice.`
                                 : sub.retryVia === "MANDATE"
                                   ? `Their autopay didn't collect it, and Saroh doesn't try again on its own. Charge autopay again, send a new link, record a payment you took, pause or cancel.`
                                   : `Saroh doesn't charge a card or try again on its own. ${first} pays through the invoice's link. Send a new link, record a payment you took, pause or cancel.`}

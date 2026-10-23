@@ -36,7 +36,9 @@ import { businessClosedOn } from "./closed-days";
 import { nobodyTaking, pausedDiaryIds, splitPaused } from "./diary-paused";
 import type { BookingLocationType, LocationType } from "./dto";
 import { openingFor } from "./opening-hours";
-import { loadBookableService } from "./reservation";
+import { bookableStarts, furthestAhead, loadDiaryRules } from "./person-rules";
+import type { OnceRead } from "./reservation";
+import { loadBookableService, readNow } from "./reservation";
 import { depositCents } from "./service-fields";
 import { serviceCharge } from "./service-price";
 import {
@@ -90,6 +92,12 @@ export interface PublicDaysAsk {
      * own, is the same as none: whoever is free.
      */
     staffId?: string | null;
+    /**
+     * Several services read together (On today, the Timetable) share the
+     * business's own reads through this: whether it is online and taking
+     * bookings, its zone, rules, closures and opening hours (review #4).
+     */
+    once?: OnceRead;
 }
 
 /** A start on the booking page (U19). `placesLeft` is a class's only. */
@@ -215,14 +223,26 @@ export async function publicDays(
     span: number = PUBLIC_DAYS,
     ask: PublicDaysAsk = {},
 ): Promise<PublicDays> {
+    const once = ask.once ?? readNow;
     const { service, rules } = await loadBookableService(serviceId, {
         bookingPage: true,
+        once,
     });
-    const [bookingRules, zone, staffing] = await Promise.all([
-        loadBookingRules(prisma, service.organizationId),
-        businessTimezone(prisma, service.organizationId),
+    const org = service.organizationId;
+    const [zone, staffing] = await Promise.all([
+        once(`${org}:zone`, () => businessTimezone(prisma, org)),
         loadStaffing(service),
     ]);
+    // The business's rules, and each person's own for a one-to-one
+    // (DEC-170, #1038).
+    const diary = staffing.perPerson
+        ? await loadDiaryRules(
+              prisma,
+              org,
+              staffing.people.map((p) => p.id),
+          )
+        : await once(`${org}:rules`, () => loadDiaryRules(prisma, org, []));
+    const bookingRules = diary.business;
     const skip = Math.min(
         MAX_DAYS_SKIP,
         Math.max(0, Math.floor(ask.skip ?? 0)),
@@ -234,7 +254,8 @@ export async function publicDays(
     const to = first.plus({ days: span }).toJSDate();
     const names = new Map(staffing.people.map((p) => [p.id, p.name]));
     const availService = toAvailabilityService(service);
-    // Never a start that has begun; then the business's own rules.
+    // Never a start that has begun; then the business's own rules. A
+    // one-to-one keeps each person's own instead (DEC-170, #1038).
     const bookable = (startAt: Date) =>
         startAt > now && withinBookingWindow(startAt, now, bookingRules);
     const kind: PublicDays["kind"] = service.capacity > 1 ? "class" : "one";
@@ -242,7 +263,10 @@ export async function publicDays(
     // What the hours alone offer (open days), and what is free now.
     // A day the business is closed is closed on the page, not Full (E3):
     // closures are public, unlike a person's time off.
-    const closed = await loadClosures(prisma, service.organizationId, from, to);
+    const closed = await once(
+        `${org}:closures:${from.toISOString()}:${to.toISOString()}`,
+        () => loadClosures(prisma, org, from, to),
+    );
     // Each has their own times: the booker may ask for one of them.
     const ownTimes = staffing.perPerson && staffing.zone !== null;
     const asked =
@@ -285,28 +309,29 @@ export async function publicDays(
                 ),
                 closed,
             );
-            const starts = staffSlots(
-                availService,
-                rules,
-                people,
-                staffing.zone,
-                from,
-                to,
-                opening,
-            )
-                .filter((slot) => bookable(slot.startAt))
-                .map((slot) => {
-                    const staffId = slot.staffIds[0] ?? null;
-                    return {
-                        startAt: slot.startAt.toISOString(),
-                        endAt: slot.endAt.toISOString(),
-                        staffId,
-                        staffName: staffId
-                            ? (names.get(staffId) ?? null)
-                            : null,
-                        placesLeft: null,
-                    };
-                });
+            const starts = bookableStarts(
+                staffSlots(
+                    availService,
+                    rules,
+                    people,
+                    staffing.zone,
+                    from,
+                    to,
+                    opening,
+                ).filter((slot) => slot.startAt > now),
+                now,
+                diary,
+                true,
+            ).map((slot) => {
+                const staffId = slot.staffIds[0] ?? null;
+                return {
+                    startAt: slot.startAt.toISOString(),
+                    endAt: slot.endAt.toISOString(),
+                    staffId,
+                    staffName: staffId ? (names.get(staffId) ?? null) : null,
+                    placesLeft: null,
+                };
+            });
             return { hours, starts };
         }
         const hours = insideOpening(
@@ -342,16 +367,22 @@ export async function publicDays(
 
     // In person keeps to opening hours (DEC-087). A service offered either
     // way lists both, and a start only one way can have says which.
-    const opening = await openingFor(service, "IN_PERSON");
+    const opening = await once(`${org}:opening:${service.locationType}`, () =>
+        openingFor(service, "IN_PERSON"),
+    );
     const { hours, starts } =
         service.locationType === "EITHER" && opening
             ? eitherWay(offer(opening), offer(null))
             : offer(opening);
 
-    const aheadEnd =
-        bookingRules.bookAheadDays === null
-            ? null
-            : now.getTime() + bookingRules.bookAheadDays * 86_400_000;
+    // The furthest anyone asked about may be booked (DEC-170, #1038).
+    const ahead = ownTimes
+        ? furthestAhead(
+              diary,
+              people.map((p) => p.id),
+          )
+        : bookingRules.bookAheadDays;
+    const aheadEnd = ahead === null ? null : now.getTime() + ahead * 86_400_000;
     const days: PublicDay[] = [];
     for (let i = 0; i < span; i += 1) {
         const day = first.plus({ days: i });

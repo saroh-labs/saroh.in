@@ -38,11 +38,25 @@ const NOT_TENANT_OWNED: Record<string, string> = {
         "The count behind Saroh's own invoice series (U17); Saroh's, shared by every organization it bills.",
     PlatformAdmin: "Saroh staff, not a business.",
     PlatformAdminRoleAssignment: "Saroh staff roles, not a business.",
+    StaffProfile:
+        "A Saroh teammate's record on the console's Team (DEC-169): job, contact, manager code, sealed tax id. Saroh's staff, not a business.",
+    StaffInvite:
+        "An invitation to join Saroh's team (DEC-169, admin console U24), for someone who may have no account yet. Saroh's staff, not a business.",
+    SarohLead:
+        "Saroh's own sales lead (DEC-169, U20): someone who may become a business, from a saroh.in enquiry, the waitlist or a manager. Saroh's, not a business; the business it became is a plain wonOrganizationId.",
+    CommissionRate:
+        "A commission rate for one kind of account-manager link (DEC-169, U21), set in the console; Saroh's own terms with its team, the same for every business.",
+    CommissionPayout:
+        "A month's commission paid to one teammate (DEC-169, U21); Saroh paying its staff, across the businesses they look after, so no one organization owns it.",
+    SignInEmailChange:
+        "A sign-in email change Saroh staff made for a person (admin console U9); a person spans businesses, so no organization.",
     AdminOperation:
         "A staff bulk operation (jobs retry, webhook replay) across organizations; no organization of its own.",
     AdminOperationItem: "Child of AdminOperation; no organization.",
     WaitlistSignup:
         "A marketing-site waitlist entry, before any organization exists.",
+    BillingProfile:
+        "Who Saroh bills (DEC-167): owned by one person and used by any of their businesses, so no one organization owns it; the API reads and writes it only for its owner.",
     ContactMessage:
         "A message sent from saroh.in/contact (DEC-137); the writer need not have an account, and it belongs to no organization.",
 };

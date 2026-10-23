@@ -2,7 +2,7 @@ import { packCrumbs } from "@/components/class-packs/pack-editor/pack-crumbs";
 import { NotFound } from "@saroh/ui/not-found";
 import { PageHeader } from "@saroh/ui/page-header";
 
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 
 export const metadata = { title: "Class pack not found" };
 

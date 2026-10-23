@@ -149,7 +149,7 @@ describe("AdminPeopleService", () => {
 
     it("needs two characters to search", async () => {
         const { service } = build();
-        await expect(service.search("a")).rejects.toBeInstanceOf(
+        await expect(service.search({ q: "a" })).rejects.toBeInstanceOf(
             BadRequestException,
         );
     });

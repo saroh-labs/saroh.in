@@ -52,7 +52,7 @@ pattern files refer back here.
 - **Current** (DEC-130, amended 11 Oct 2026) — **The first run is four
   short steps, and it ends in the product.** Sign-up takes an email and a
   code (DEC-129). Setup is a stepper
-  (`components/organizations/business-setup-form.tsx`), one question to a
+  (`components/organizations/setup/business-setup-form.tsx`), one question to a
   screen with Back and Continue: "What are you setting up?", then the name
   step (your name if the account has none, the name, the web address, the
   country, India chosen), then "What will you do first?". The last step's
@@ -70,6 +70,16 @@ pattern files refer back here.
       from it (each with the fields its gate checks), and the form, the
       panel beside it, the count above the heading and the progress bar
       all read that. A test in each app pins the same four strings.
+    - **One step only some are asked** (DEC-167, R7): "Who does Saroh
+      bill for this business?", between the name and what to do first,
+      for an owner who has a billing profile already (the page reads
+      `GET /billing-profiles`). Their profiles (legal name, GSTIN or "No
+      GSTIN", address, billing email), then "New billing profile" with
+      its fields inline; none is chosen for them, and Continue asks until
+      one is. Someone with none isn't asked: their first profile is made
+      from the business. Every step function takes `billing`; the plan's
+      own three steps and their strings are unchanged. Its answers stay
+      out of the tab's draft.
     - **One form.** Every step's answers live in one react-hook-form, and
       only the step on show is drawn. Back and Continue lose nothing, and
       Back never asks.
@@ -163,7 +173,7 @@ pattern files refer back here.
 - **Current** (10 Oct 2026) — **A moment is one calm line where the product
   marks that something good happened for the business**, in the right place,
   once, with the real fact in it and at most one thing worth doing next. The
-  shared piece is `Moment` (`apps/app.saroh.in/components/shared/moment.tsx`):
+  shared piece is `Moment` (`apps/app.saroh.in/components/shared/notices/moment.tsx`):
   a `Notice` in the success tone with a title, one fact line, one optional
   action and Dismiss, announced politely (`role="status"`), entering on the
   motion tokens and still under reduced motion.
@@ -289,9 +299,11 @@ organizations/:org/customers`: everyone who has paid (an order through a
   brings a spreadsheet in at one storefront.
 - **Current** (round 2, C14, default 20) — **Spent is what they paid and kept
   paid**: paid orders (delivery included) less every refund that has not
-  failed, and paid invoices that aren't an order's own less their issued
-  credit notes; an edit's money back is not taken off twice, since the
-  order's total already fell. The list and Customer Detail read one rule
+  failed, and what came in on invoices that aren't an order's own (their
+  ledger, by the money-in rule, DEC-173: part of a bill counts, a bounced
+  cheque doesn't) less their issued credit notes; an edit's money back is
+  not taken off twice, since the order's total already fell. The list,
+  Customer Detail and Insights' best customers read one rule
   (`customer-workspace/spent.sql.ts`).
 - **Adopted** — Never silently merge uncertain identities: normalise email and
   phone, and keep links reversible and auditable (§14).
@@ -501,8 +513,10 @@ organizations/:org/customers`: everyone who has paid (an order through a
   billing, the waitlist, alerts to a business's own team (enquiries, and
   the team alerts — new order, booking, failed payment, someone joining, a
   go-live, a custom domain that stopped working (#917) — for every business, provider or not, in fixed words with the
-  business's names cleaned; built, #849), a site's customer sign-in codes and the email-changed notice
-  with Saroh's built-in customer accounts (ADR-011), and a template test
+  business's names cleaned; built, #849), a site's customer sign-in codes, the email-changed notice
+  and the "Ask to remove my data" acknowledgement and its done or closed email
+  with Saroh's built-in customer accounts (ADR-011; DEC-172, #1106), all under one footer that names
+  them (`siteAccountEmailFooter`, #1156), and a template test
   sent to the signed-in user's own verified address. A business that brings
   its own login system sends its own codes (not built). With no email
   provider, owners and admins who can act are asked to connect one — "Your
@@ -517,14 +531,18 @@ organizations/:org/customers`: everyone who has paid (an order through a
   customer's own order, booking or invoice goes into their account on the
   business's site, unless the business has turned those updates off (below).
   It goes out by email, SMS or WhatsApp only through the business's connected
-  provider. Saroh's own email sends a site's sign-in codes and nothing else.
+  provider. Saroh's own email sends a site's sign-in codes and notices about
+  the customer's own account there (a changed email, a request to remove
+  their data), and nothing else.
   Until those messages ship, the honest copy ("Saroh doesn't send this") stays.
   Invoices went first (D17): see Money above.
 - **Current** (round-2 A14) — A booking confirmed, moved or cancelled, and
   an order's Ready and handover, are told to the customer: in their account
   thread while it is live (`SITE_ACCOUNT_AREA`, the `ACCOUNT_THREAD`
-  flag, and the business's own choice, below), and by email to a verified
-  site account through the business's own provider. Nothing by SMS or
+  flag, and the business's own choice, below), and by email to the
+  contact's email through the business's own provider (DEC-174 D1: a desk,
+  phone or guest customer too; a site account's verified address wins
+  when it differs, A2). The peek names it: "emailed to ‹email›". Nothing by SMS or
   WhatsApp. **Copy names what is sent, from
   the API's reach** (`EMAIL_AND_ACCOUNT` | `EMAIL` | `ACCOUNT` |
   `ON_SIGN_IN` | `NONE`, `lib/messages/notice-reach.ts`): "Saroh doesn't
@@ -553,6 +571,51 @@ organizations/:org/customers`: everyone who has paid (an order through a
   while the first two hold (`offered`), so nobody is offered a switch that
   does nothing, and it says what a business with no email provider is left
   with: no other way to tell a customer their order is ready.
+- **Current** (DEC-174, U1 #1132) — **Every automatic customer notice
+  added by DEC-174 has a switch the business can turn off.** The kinds,
+  their defaults, the module each belongs to and their words are one pure
+  module, `communications/notice-settings.ts`: renewal invoices, failed
+  autopay charges, membership emails, refunds, team replies, enquiry
+  replies, delivery updates, course emails, pack credits and back in stock
+  start on; overdue reminders start off (D3 is opt-in). A business's choice
+  is a `CustomerNoticeSetting` row only while it differs from the default,
+  as `NotificationPreference` is; a write equal to the default deletes it.
+  **Every sender asks `noticeOn(tx, organizationId, kind)` inside its own
+  transaction, and only that**: never a gate of its own. `noticeOn` says
+  only whether the business sends the kind; the provider, consent and the
+  account thread stay the send path's. `GET` and
+  `PATCH …/customer-notices/settings`: anyone in the business reads them
+  (`canChange` says whether they may change them), a change needs
+  `comms:manage` and writes `customer-notices.setting` to the audit stream.
+  A kind whose module is off is not listed (DEC-057); the enquiry reply is
+  listed but not offered without a connected email provider ("Connect your
+  email first"), and a change to a kind not offered is refused (409).
+  Booking and order notices, and the fixes, have no switch here.
+  **A kind is not listed until Saroh sends it** (`NOTICE_SENDS`, U4
+  #1135): every kind starts false, and the unit that ships a kind's sender
+  flips its own line in the same commit, so no switch ever does nothing.
+- **Current** (DEC-174, U4 #1135) — **Settings › Providers' "Emails to
+  your customers"**, under "Updates in Messages"
+  (`components/providers/customer-emails/customer-emails-row.tsx`, words in
+  `lib/communications/customer-emails.ts`): a read row ("9 on, 1 off",
+  "Not sent: Overdue reminders.") and at most one quiet line under it (no
+  email provider: "None of these go out until your email is connected";
+  else, for someone without `comms:manage`, why they can only read them).
+  The page's own email prompt carries Connect, so the row never repeats
+  it. Edit (View, read-only) opens a side sheet of switches, one per kind
+  offered with what the customer gets; each saves as it is flipped, with
+  Undo (`useSettingsUndo`), and Done closes it. The sheet holds one note at
+  most. No row at all while the business is offered none. A change is told
+  in Settings › Activity ("turned Membership emails off for customers").
+
+- **Current** (DEC-174, U14 #1145) — **A team reply in a customer's
+  Messages is emailed to them** through the business's own email, a minute
+  after it is sent; replies inside that minute go as one email, quoting
+  each. The line under the reply box (and Home's Reply) names the address
+  ("Emailed to ‹email› a minute after you send"), and says "Nothing is
+  emailed or texted" only when nothing is: no email connected, "Your
+  replies in Messages" turned off, no address, or email turned off by the
+  customer.
 
 ## Analytics
 
@@ -562,20 +625,25 @@ organizations/:org/customers`: everyone who has paid (an order through a
   (`onboarding.completed`, `first.*.created`) are instrumented, but there is no
   usage history to cite yet. Nothing tracks a merchant's own customers, and
   nothing should.
-- **Current** (DEC-075) — **Insights answers questions about the takings
-  first**: twelve whole weeks (Monday to Sunday in the business's zone) of
-  money actually taken, written as sentences (`lib/analytics/takings-words.ts`)
-  from the same figures the bars draw (`takings-figures.ts`), then the
-  website's views. **Takings** are paid orders (net of refunds that have
+- **Current** (DEC-075, DEC-171) — **Insights answers questions about the
+  money first**: on the Money tab (#1093), money actually taken for the
+  page's period against the same length before, written as sentences
+  (`lib/insights/money-words.ts`) from the same figures the bars draw. The
+  weekly bars are **rolling weeks ending today** (`moneyBuckets`,
+  `modules/analytics/period.ts`), so a period's bars hold exactly its days
+  and add up to its money in; never a calendar week straddling the period's
+  first day. **Takings** are paid orders (net of refunds that have
   not failed, an edit's money back not taken twice, a REFUNDED order not at
   all) plus paid invoices that are not an order's own (net of their credit
   notes) — ADR-008's each-rupee-once and Customers' Spent rule
   (`analytics/takings.ts`, `takings.sql.ts` reuses `spent.sql.ts`). A sale
-  falls in the week it was paid, and a refund lowers that week. Where it was
+  falls on the day it was paid, and a refund lowers that day. Where it was
   sold is the Orders list's notion: `placedOnline` is online, otherwise the
   order's location; other invoices are "by invoice". Every figure states its
-  window; a change needs the four weeks before to be on record with three
-  payments, else it says why ("N/A"); flat is "level". The read needs
+  window; a change needs the period before to be on record with three
+  payments, else it says why; a change of 2% or less is "about the same"
+  (Comparisons, below). The read (`GET analytics/money`; the old
+  `analytics/takings` is retired) needs
   `analytics:read` and `payment:read`, and answers before Insights' setup
   is done (`@IgnoreModuleReadiness`).
 - **Current** — Insights' website figures reflect real events. The hourly
@@ -583,12 +651,101 @@ organizations/:org/customers`: everyone who has paid (an order through a
   every hour"); a live site sends one cookieless `site.view` per page
   (`apps/saroh.app/lib/site-view.ts`: path only, the referrer's origin only,
   nothing when the browser sends Do Not Track or Global Privacy Control,
-  nothing from the account area, never on a test release or preview), and an
+  nothing from a private page — the account area, a checkout, a pay link, an
+  order's page, a waitlist claim (`lib/private-paths.ts`, U15) — never on a
+  test release or preview), and an
   enquiry writes `enquiry.submitted` in its own transaction (UX-032). Its
   Orders tile (#919) counts `order.paid` less `order.refunded` (#867) over the
   range's days; nothing before #867 is back-filled (DEC-012), so a line under
   the tiles says so while the range reaches back before
   `ORDERS_RECORDED_FROM` (`lib/analytics/website-words.ts`).
+- **Current** — where a site visit came from (U15, #1099, A13), first party,
+  for "Where customers come from". The visit lives in the visitor's tab
+  memory only (`@saroh/site-blocks/visit-source`: no cookie, no storage, no
+  id; it ends on a reload, a closed tab or 30 minutes without a page). Its
+  source is one of five groups (`instagram`, `google`, `whatsapp`, `direct`
+  = "Typed your address", `other`) from the referrer's host and an allowed
+  `ref` / `utm_source` value, plus at most one merchant link label of the
+  allowed shape (`analytics/visit-source.ts`: lower-case letters, digits,
+  hyphens, 32 at most, no run of six digits, no more than six digits in all,
+  never an id's shape `c` + 24); nothing else in the address is read, and
+  `ref` is never read on `/book` (or under it) or beside the booking flow's
+  `step=`, where it is a booking's id. **Totals only, from links made in
+  Saroh (DEC-181):** the intake keeps a step's label only when it is one
+  of that site's live `SiteLink` labels (`analytics/site-link-labels.ts`,
+  a minute's cache per site, dropped on every link write); any other `ref`
+  counts under its group with no label. Each step is sent once a visit,
+  with the source only and no visitor hash: `site.visit`, `site.looked` (a
+  product or the booking page), `site.started` (a checkout: `/checkout`
+  sends no page view, being private, but does send this step) and
+  `site.paid` (the order's own confirmation page, `/shop/order/<id>`, also
+  private, after a successful online payment there and then: exactly this
+  step, with the group and label only, never the order or its amount).
+  Nothing about a visit is kept on an order or a customer: no
+  `Order.visitSource` / `visitRef`, no "came from" on the order, and
+  `order.paid` / `order.refunded` carry no source. A payment made later
+  another way (a pay link, at the counter, at pick-up) isn't counted to a
+  source, and a refund isn't taken off one. The rollup adds `source` and
+  `ref` dimensions; `analytics/visit-sources.ts` is the read (counted from
+  the first day a source was recorded; paid per site from `site.paid`;
+  labels with fewer than 3 visits in the range fold into one
+  `OTHER_LINKS_REF` row, "Other links").
+- **Current** — **the links a business makes to share its site**
+  (DEC-181, #1099): `SiteLink` (site, name, label, made by, when,
+  archived), made, listed and archived with Undo on Insights › Where
+  customers come from under the sources ("Links made in Saroh",
+  `components/insights/where-from/site-links.tsx`). Make a link takes a name ("Name
+  the post, not the person." under it), proposes the label from it, shows
+  it editable with the whole link, and copies
+  `https://<site's real address>/?ref=<label>` once made (the address is
+  `siteAddressOf`, as every share link). Each link shows its visits and
+  paid in the period, or "Fewer than 3 visits". Reading is
+  `analytics:read`; making and archiving is `site:update`, each written to
+  Activity (`site-link.created`, `.archived`, `.restored`). A label is
+  unique per site among live links and passes the label checks; an
+  archived label is free again.
+- **Current** — **what visit tracking collects, where, for how long and who
+  sees it** (U15 privacy review, 21 Oct). The browser's word is never
+  trusted: each promise below is kept by the API too.
+
+    | What                                                                                                                                                   | Where it is kept                                                                                                                                                                                       | For how long                                                     | Who sees it                                                         |
+    | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------- |
+    | A page view: its path (cut at `?` and `#`), the referrer's origin, no title                                                                            | `AnalyticsEvent` `site.view`                                                                                                                                                                           | 400 days, then the retention sweep deletes it                    | Nobody row by row; counted into Insights for `analytics:read`       |
+    | A visitor hash on a page view: `sha256(daily salt : site : address)`, the salt an HMAC of `ANALYTICS_IP_SALT` and the UTC day, never stored            | `AnalyticsEvent.visitorHash`                                                                                                                                                                           | With the view (400 days); a new hash every day and on every site | Nobody; only "unique visitors a day"                                |
+    | A visit's steps (`site.visit`, `site.looked`, `site.started`, `site.paid`): a group and a label made in Saroh, no visitor, time to the hour, random id | `AnalyticsEvent`                                                                                                                                                                                       | 400 days                                                         | Counted into Insights for `analytics:read`                          |
+    | Daily counts by path, source and label                                                                                                                 | `AnalyticsDailyAggregate`                                                                                                                                                                              | Kept (they name no one)                                          | `analytics:read`; labels under 3 visits only as "Other links"       |
+    | The links a business made to share its site: name, label, who made it, when                                                                            | `SiteLink`                                                                                                                                                                                             | Kept; archived, never deleted                                    | `analytics:read`; made and archived with `site:update`, in Activity |
+    | Nothing at all                                                                                                                                         | Private pages (`PRIVATE_PATH_PREFIXES` in `@saroh/block-contract`, one list for the site and the API, which refuses a view of one), Do Not Track or Global Privacy Control, previews and test releases |                                                                  |                                                                     |
+
+    Never kept: anything about a visit on an order or a customer (DEC-181),
+    a label that isn't one of the site's links made in Saroh, the address,
+    a cookie or browser storage, the query string beyond one allowed label,
+    the referrer's path, a page title, a consent
+    value, a time or a dedupe key the browser sent (a public event is stored
+    `anonymous`, at the server's time). Views stored before the review under
+    a private path are removed by the one-off
+    `packages/database/src/backfill/private-path-views.cli.ts` (dry run
+    first).
+
+- **Current** — "From visit to paid" and "Where do visitors come from?"
+  (U16, #1101) on Where customers come from, between the figures and the
+  visits each day, and the Overview's third answer, read from
+  `GET analytics/sources?period=&siteId=` (`analytics/sources.ts`,
+  `analytics:read`, counts only). The path's four steps (visited, looked,
+  started, paid) are each held to at most the one before, so it never goes
+  up. A share is said as a count reads ("1 in 7", "3 in 4", "about half",
+  `lib/insights/sources-words.ts` `oneIn`), never a percentage, and what
+  is counted is called visits, never people (no visitor is kept); the
+  website figure of unique visitors a day is "Visitors", never "People"
+  (owner, 21 Oct: one who comes back another day is counted again, and How
+  these are counted says so). A source
+  with fewer than 5 visits is counted in Other sites and the line under the
+  table names it; the merchant's own `?ref=` links are listed under the
+  table when any were visited. Counting that began inside the period says
+  from when; before anything is counted one message says it starts with
+  the next visit. With a website chosen, all four steps are that
+  website's, paid included (DEC-181: paid is the visit's own `site.paid`).
+  Where customers come from is no longer marked Next.
 
 ## One word each
 
@@ -596,7 +753,8 @@ organizations/:org/customers`: everyone who has paid (an order through a
 on merchant sites, in emails and in Help. Code identifiers, routes, enum
 values and module keys keep their names (`APPOINTMENTS`, `/appointments`,
 `RESCHEDULED`, `BANK` and `BANK_TRANSFER`); only the words shown change.
-`pnpm check:words` fails on the three that crept back most.
+`pnpm check:words` fails on the three that crept back most, and on
+Bookings' retired words below.
 
 - **Booking**, never "appointment" or "reservation". The `APPOINTMENTS`
   module is **Bookings**; its name lives in `lib/modules/names.ts` (and the
@@ -604,10 +762,34 @@ values and module keys keep their names (`APPOINTMENTS`, `/appointments`,
 - **Move** a booking, never "Reschedule".
 - **Booked** for a confirmed booking still to come, never "Confirmed" — the
   pill and the confirmation email ("You're booked with …"). A `PENDING`
-  booking's pill and filter read **To confirm** (`bookingStatus` in
-  `lib/format/status.ts`). Open question for the owner: the diary and the
-  month calendar still say **Awaiting payment** for the same pay-now hold,
-  the word the payment-provider Help pages use too.
+  booking, held while the customer pays, reads **Awaiting payment**
+  everywhere: pill, filter, diary, month calendar, quick look (DEC-170
+  replaced DEC-113's "To confirm"; `bookingStatus` in `lib/format/status.ts`).
+- **Bookings' words** (DEC-170, bookings plan U18, #1034). Each lives once
+  in `apps/app.saroh.in/lib/services/booking-words.ts` (`BOOKING_WORDS`,
+  `outcomeWord`), and `pnpm check:words` fails on the retired one in the
+  workspace:
+
+    | Say                                   | Not                                                                |
+    | ------------------------------------- | ------------------------------------------------------------------ |
+    | Awaiting payment                      | To confirm, Waiting for payment, unpaid                            |
+    | Mark arrived (button), Came (status)  | Check in, They came, Attended, Checked in                          |
+    | Didn't come                           | No-show, They didn't                                               |
+    | Not marked yet                        | Not said yet, Nobody has said how this went                        |
+    | Pays at the visit                     | Pays at the session                                                |
+    | Payment link, Send a payment link     | Pay link, Send a pay link (invoices, orders and subscriptions too) |
+    | Book                                  | Create booking                                                     |
+    | Day · Week · List                     | Day by person, Agenda                                              |
+    | Hours and time off                    | Availability                                                       |
+    | Extra opening hours                   | One-off extra hours                                                |
+    | Break after, Break before             | Gap after, Buffer before                                           |
+    | Who comes: One person · A group class | Kind: One-to-one · Class                                           |
+    | Who does it                           | Who takes it                                                       |
+    | Calendar (Home's month of everything) | Overview                                                           |
+
+    "Booking rules" stays. Code identifiers, routes (`/bookings/availability`,
+    `/calendar`) and stored values (`NO_SHOW`, `ATTENDED`) keep their names.
+
 - **Cash, UPI, Card, Bank transfer, Other** — every payment picker and
   label, from `lib/payments/method-words.ts`. Where it is taken ("at the
   counter", "the card machine") is a hint under the choice, never the label.
@@ -644,7 +826,7 @@ empty states, and every sentence a `lib/` function returns):
   be read.
     - **A Settings read row keeps its words.** Label on the left, value
       on the right, the row's Edit button beside it: "Not set" there is the
-      invitation to set it (`Absent` in `components/sites/settings-rows.tsx`,
+      invitation to set it (`Absent` in `components/shared/page/settings-rows.tsx`,
       `empty` on a Business row, Your profile, the pay-instructions and
       verification rows, an Activity change).
     - **A sentence is not a cell.** A line that reads as words keeps them
@@ -671,6 +853,41 @@ empty states, and every sentence a `lib/` function returns):
   "Workspace"; Settings search still finds the web address by it, a
   synonym that is matched and never shown (the check's one "workspace"
   entry). The docs still call the app itself "the workspace".
+
+## Comparisons
+
+**Current** (DEC-171, Home and Insights plan U4, #1081) — how Home and
+Insights say one figure against another. Every comparison sentence comes
+from `apps/app.saroh.in/lib/insights/compare-words.ts`; Insights' Money
+answers (`lib/insights/money-words.ts`, `overview-words.ts`) follow the same
+rules.
+
+- **The last 7 days against the 7 days before**, never a week that just
+  started against a whole one. Insights' longer periods say theirs: "the
+  4 weeks before", "the 3 months before".
+- **A period is named with its days**: "13 to 19 Oct", "28 Sep to 4 Oct",
+  and with years only when it crosses one.
+- **Money says a percent, counts say the difference**: "Up 12% on the 7
+  days before", "4 more than the 7 days before", "3 fewer than the 7 days
+  before". A change of 2% or less is "About the same as the 7 days before".
+- **Zero is said in words.** "Nothing came in", "No bookings", "None in the
+  7 days before". A drop to nothing is "Down from ₹4,000 in the 7 days
+  before", never "down 100%" or "about 100% below". While anything came in,
+  down stops at 99%.
+- **No change without something to compare with.** Nothing before: "Nothing
+  came in the 7 days before". Too little before: "Too little came in the 7
+  days before to compare". Never 0% or N/A as a sentence.
+- **No percent bigger than is useful**: three times as much is "About 3
+  times the 7 days before", not "Up 200%".
+- **No 0% places**: a place whose share rounds under 1% isn't named.
+- **One thing, many things**: "1 booking", "22 bookings", through `count()`.
+- **Money only for those who may read it** (DEC-098). The phone's one
+  sentence says money with `payment:read` ("Last 7 days: ₹48,250, up 12% on
+  the 7 days before.") and counts without it ("Last 7 days: 22 bookings and
+  41 orders, both up on the 7 days before."). Several currencies are each
+  said once, with no change, since they can't be added.
+- **A week marked high or low** says it once: "₹1,090 last week, your lowest
+  in 12 weeks", only with at least two weeks to set it against.
 
 ## Saying what is true
 

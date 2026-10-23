@@ -1,4 +1,8 @@
+import type { LookId } from "@saroh/block-contract";
 import Link from "next/link";
+
+import { frontButton } from "./blocks/look-front";
+import { SitePageMessage } from "./site-page-message";
 
 /**
  * A module page's address while its module is off (G15): Book with
@@ -16,11 +20,37 @@ import Link from "next/link";
 export function ModulePageUnavailable({
     business,
     homeHref = "/",
+    look,
 }: {
     business: string;
     /** Where "Go to the home page" leads; a preview passes its own. */
     homeHref?: string;
+    /**
+     * Folio, Quiet or Live (DEC-172, U15; VA27 "Page taken off"): the same
+     * words and way home as a look's state page. Absent is Classic.
+     */
+    look?: LookId;
 }) {
+    if (look) {
+        return (
+            <SitePageMessage
+                look={look}
+                eyebrow="Not on the site right now"
+                title={<>This isn&apos;t available right now</>}
+                actions={
+                    <Link
+                        href={homeHref}
+                        data-site-primary=""
+                        className={frontButton(look, "fill")}
+                    >
+                        Go to the home page
+                    </Link>
+                }
+            >
+                {business} isn&apos;t offering this on their site at the moment.
+            </SitePageMessage>
+        );
+    }
     return (
         <div className="bg-site-bg mx-auto max-w-[1060px] px-5 py-16">
             <div className="border-site-border bg-site-surface max-w-xl rounded-[14px] border p-5">

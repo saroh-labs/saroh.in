@@ -43,6 +43,14 @@ export const AuditAction = {
     // metadata: the add-on, and its quantity before and after. One a plan
     // change ended (DEC-157) says so: `reason: "plan-change"`.
     PlanAddonChange: "organization.plan.addon.changed",
+    // Billing profiles from Plan & billing (DEC-167, U5): one made, one
+    // edited (it applies to every business on it; `businesses` says how
+    // many), and the business billed to another. Field names and ids
+    // only, never a value: a profile is its owner's, and an Admin may read
+    // the business's activity (R2). Not on Settings › Activity.
+    BillingProfileCreate: "billing.profile.created",
+    BillingProfileUpdate: "billing.profile.updated",
+    BillingProfileChoose: "organization.billing_profile.chosen",
     StorefrontHoursUpdate: "storefront.hours.update",
     // How a storefront's orders leave, or when they count as late (B17);
     // metadata names the storefront and each change as words.
@@ -79,10 +87,23 @@ export const AuditAction = {
     // A privacy removal refused because the business is on legal hold
     // (DEC-122): the contact as the target, DENIED, the reason as a code.
     CustomerRemovalRefused: "customer.removal.refused",
+    // A customer's "Ask to remove my data" request (DEC-172, #1106): made
+    // from their site account (the actor is `system:site-account`; the
+    // account and contact in metadata), closed without removal by someone
+    // on the team (the reason stays on the request, never here), or marked
+    // done by a privacy removal, in its transaction. The request as the
+    // target; ids only, never a name or an email.
+    CustomerDataRequestCreated: "customer.data_request.created",
+    CustomerDataRequestClosed: "customer.data_request.closed",
+    CustomerDataRequestDone: "customer.data_request.done",
     // Someone changed one of their own alerts (F14): which alert, which
     // channel, and on or off as it was and became. Their own choice, about
     // no one else, so it carries the value.
     MemberAlertsUpdate: "member.alerts.update",
+    // The business turned one of its automatic customer notices on or off
+    // (DEC-174, U1 #1132): which kind, and on or off as it was and became.
+    // The business's own setting, about no person, so it carries the value.
+    CustomerNoticesSetting: "customer-notices.setting",
     // The owner changed the business's web address (DEC-069, plan L2),
     // written in the change's own transaction. Metadata: `from` and `to`,
     // the addresses — public by nature, never a person's detail.
@@ -126,6 +147,57 @@ export const AuditAction = {
     // export; metadata is counts and sizes, never a link or a key.
     DataExportRequested: "organization.data_export.requested",
     DataExportDownloaded: "organization.data_export.downloaded",
+    // Booking rules (DEC-170, #1038), each written in the transaction of
+    // the change. The business's: `changes` (each field before and after,
+    // the approval switch and the gap included). A person's own, with the
+    // staff member as the target and their name in `staff`: applied at
+    // once (`via: "direct"`) or by an approval (`via: "approved"`), with
+    // `changes`; and a request's moves — asked (`asked`, the values),
+    // approved, turned down (with `reason` when given), withdrawn
+    // (`replaced` when a new ask took its place), and replaced by a newer
+    // change (`because`: "rules-changed" when the person's rules were
+    // changed directly, "approval-off" when the switch went off; owner,
+    // 20 Oct 2026).
+    BookingRulesUpdate: "booking-rules.update",
+    StaffRulesUpdate: "staff.booking-rules.update",
+    StaffRulesRequested: "staff.booking-rules.requested",
+    StaffRulesApproved: "staff.booking-rules.approved",
+    StaffRulesTurnedDown: "staff.booking-rules.turned-down",
+    StaffRulesWithdrawn: "staff.booking-rules.withdrawn",
+    StaffRulesReplaced: "staff.booking-rules.replaced",
+    // The invoice ledger (DEC-173, #1114), each written in the ledger
+    // write's own transaction (`invoices/invoice-payment-events.ts`) with
+    // the invoice as the target: a payment recorded (the event U5's receipt
+    // hangs from), removed by mistake, a cheque in the bank, or bounced.
+    // Metadata: the payment's id, amount, currency and method, and whether
+    // the invoice is paid in full after it; never a reference, a note or a
+    // cheque's number or bank.
+    InvoicePaymentRecorded: "invoice.payment.recorded",
+    InvoicePaymentRemoved: "invoice.payment.removed",
+    InvoiceChequeCleared: "invoice.payment.cheque_cleared",
+    InvoiceChequeBounced: "invoice.payment.cheque_bounced",
+    // A link to share a site made, archived or brought back on Insights ›
+    // Where customers come from (DEC-181, #1099), each in the write's own
+    // transaction with the link as the target. Metadata: the site, and the
+    // link's name and label, the business's own words for a post.
+    SiteLinkCreated: "site-link.created",
+    SiteLinkArchived: "site-link.archived",
+    SiteLinkRestored: "site-link.restored",
+    // "Use this look with its starter content" (DEC-182): a look's showcase
+    // template copied into a site's draft, sample words and all, and that
+    // copy undone. Each in the write's own transaction with the site as the
+    // target. Metadata: the site, the template, the look and counts of the
+    // pages replaced and made (or restored and removed); never a line of
+    // the site's text.
+    SiteStarterContentCopied: "site.starter_content.copied",
+    SiteStarterContentUndone: "site.starter_content.undone",
+    // DEC-182 amended (22 Oct 2026): "Bring in my details" filling sample
+    // words with the business's own, a roll back to a previous version of
+    // the draft, and a section brought in from one. Metadata: the site, the
+    // snapshot, counts and kinds; never a line of the site's text.
+    SiteDetailsFilled: "site.starter_content.filled",
+    SiteDraftRolledBack: "site.draft.rolled_back",
+    SiteSectionBroughtIn: "site.draft.section_brought_in",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

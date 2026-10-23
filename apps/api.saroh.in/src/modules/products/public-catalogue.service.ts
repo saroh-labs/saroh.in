@@ -7,6 +7,7 @@ import {
 import type { Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { LiveReadCache } from "../../common/live-read-cache";
 import { toMinor } from "../../common/money";
 import { keptByCut } from "../billing/over-limit";
 import { overLimit } from "../billing/over-limit.service";
@@ -31,6 +32,7 @@ import type {
     PublicCatalogueCard,
     PublicImage,
     PublicProduct,
+    PublicShopStock,
     ShelfRow,
 } from "./public-catalogue.serialize";
 import {
@@ -73,6 +75,13 @@ import {
 /** Page views per visitor per minute: a busy browse is fine, a scraper not. */
 const READS_PER_WINDOW = 120;
 const READ_WINDOW_MS = 60_000;
+
+/**
+ * How long one shop's counts are kept and shared by every visitor (review
+ * #21), as On today's are: a count may lag a sale by this much, and the
+ * checkout refuses what is no longer there.
+ */
+export const SHOP_STOCK_KEPT_MS = 30_000;
 
 /** The most `/shop` lists; a small business's shop is well under it. */
 const MAX_PRODUCTS = 200;
@@ -168,20 +177,92 @@ type CardListing = Prisma.ProductListingGetPayload<{
     select: typeof CARD_SELECT;
 }>;
 
+/** What the shop's live counts need of a listing (review #21). */
+const STOCK_SELECT = {
+    id: true,
+    soldOutAt: true,
+    variants: { select: { variantId: true } },
+    product: {
+        select: {
+            id: true,
+            slug: true,
+            stockTracked: true,
+            variants: {
+                orderBy: [{ position: "asc" }, { id: "asc" }],
+                select: { id: true },
+            },
+        },
+    },
+} satisfies Prisma.ProductListingSelect;
+
+/** The least of a listing that says what it offers and how much is left. */
+interface StockListing {
+    id: string;
+    soldOutAt: Date | null;
+    variants: { variantId: string }[];
+    product: { id: string; stockTracked: boolean; variants: { id: string }[] };
+}
+
 /** A listing with the variants it offers here. */
-interface OfferedListing {
-    listing: CardListing;
-    offered: CardListing["product"]["variants"];
+interface OfferedListing<L extends StockListing = CardListing> {
+    listing: L;
+    offered: L["product"]["variants"];
     /** For `inGridOrder`. */
     product: { id: string };
+}
+
+/**
+ * A card's stock: whether it is sold out, the option its Add to bag adds
+ * (the first that can be sold now, or null for a product without options),
+ * and how many of that can go in the bag when the page would say "Only N
+ * left" (UX-058, #874; null: not counted out). One rule for `/shop`'s cards
+ * and the Live look's counts (review #21).
+ */
+function cardStock(
+    listing: StockListing,
+    offered: readonly { id: string }[],
+    rows: readonly ShelfRow[],
+    businessTracks: boolean,
+): { soldOut: boolean; bagVariantId: string | null; bagLeft: number | null } {
+    const p = listing.product;
+    const tracked = p.stockTracked && businessTracks;
+    const markedSoldOut = listing.soldOutAt !== null;
+    const stocks =
+        offered.length > 0
+            ? offered.map((v) =>
+                  publicStock({
+                      tracked,
+                      markedSoldOut,
+                      row: shelfFor(rows, p.id, v.id),
+                  }),
+              )
+            : [
+                  publicStock({
+                      tracked,
+                      markedSoldOut,
+                      row: shelfFor(rows, p.id, null),
+                  }),
+              ];
+    const words = stocks.map((s) => s.word);
+    const bagAt = words.findIndex((w) => w !== "SOLD_OUT");
+    return {
+        soldOut: words.every((w) => w === "SOLD_OUT"),
+        bagVariantId:
+            bagAt >= 0 && offered.length > 0
+                ? (offered[bagAt]?.id ?? null)
+                : null,
+        bagLeft: bagAt >= 0 ? (stocks[bagAt]?.left ?? null) : null,
+    };
 }
 
 /**
  * The listings with something to offer here: a product with variants, none
  * of them sold at this storefront, has nothing to sell and is left out.
  */
-function offeredOnly(listings: readonly CardListing[]): OfferedListing[] {
-    const out: OfferedListing[] = [];
+function offeredOnly<L extends StockListing>(
+    listings: readonly L[],
+): OfferedListing<L>[] {
+    const out: OfferedListing<L>[] = [];
     for (const listing of listings) {
         const listed = new Set(listing.variants.map((v) => v.variantId));
         const p = listing.product;
@@ -214,6 +295,11 @@ export class PublicCatalogueService {
         private readonly limiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(
             READS_PER_WINDOW,
             READ_WINDOW_MS,
+        ),
+        // Not a DI provider either: one per process, replaceable in tests.
+        @Optional()
+        private readonly kept: LiveReadCache<PublicShopStock> = new LiveReadCache(
+            SHOP_STOCK_KEPT_MS,
         ),
     ) {}
 
@@ -249,6 +335,69 @@ export class PublicCatalogueService {
             if (products.length === 0) notFound();
             return { storefront: { name: scope.storefront.name }, products };
         });
+    }
+
+    /**
+     * The shop's live counts (review #21): `/shop`'s cards, the same ones
+     * in the same order, with only what the Live look's "N left" needs.
+     * One answer per site, kept {@link SHOP_STOCK_KEPT_MS} and shared by
+     * every visitor: a count may lag a sale by that much, and the bag's
+     * checkout refuses what is no longer there. Limited per visitor like
+     * the list.
+     */
+    async stock(
+        siteId: string,
+        callerHash: string | undefined,
+        now: number = Date.now(),
+    ): Promise<PublicShopStock> {
+        this.limit(siteId, callerHash);
+        // The gates are inside what is kept, so a poll costs no query at
+        // all while the answer is fresh.
+        return this.kept.get(
+            siteId,
+            () => this.scoped(siteId, (scope) => this.stockOf(scope)),
+            now,
+        );
+    }
+
+    /** How much longer a shared cache may keep this shop's counts. */
+    stockSecondsLeft(siteId: string, now: number = Date.now()): number {
+        return this.kept.secondsLeft(siteId, now);
+    }
+
+    private async stockOf(scope: ShopScope): Promise<PublicShopStock> {
+        const listings = offeredOnly(
+            await prisma.productListing.findMany({
+                where: {
+                    organizationId: scope.organizationId,
+                    storeId: scope.storefront.id,
+                    product: { status: "PUBLISHED", ...scope.kept },
+                },
+                orderBy: [{ product: { name: "asc" } }, { id: "asc" }],
+                take: MAX_PRODUCTS,
+                select: STOCK_SELECT,
+            }),
+        );
+        if (listings.length === 0) return { items: [] };
+        const [rows, businessTracks] = await Promise.all([
+            this.shelves(
+                scope,
+                listings.map((l) => l.product.id),
+            ),
+            businessTracksStock(prisma, scope.organizationId),
+        ]);
+        return {
+            items: listings.map(({ listing, offered }) => {
+                const stock = cardStock(listing, offered, rows, businessTracks);
+                return {
+                    slug: listing.product.slug,
+                    listingId: listing.id,
+                    variantId: stock.bagVariantId,
+                    left: stock.bagLeft,
+                    soldOut: stock.soldOut,
+                };
+            }),
+        };
     }
 
     /**
@@ -321,28 +470,7 @@ export class PublicCatalogueService {
         ]);
         return listings.map(({ listing, offered }) => {
             const p = listing.product;
-            const tracked = p.stockTracked && businessTracks;
-            const markedSoldOut = listing.soldOutAt !== null;
-            const stocks =
-                offered.length > 0
-                    ? offered.map((v) =>
-                          publicStock({
-                              tracked,
-                              markedSoldOut,
-                              row: shelfFor(rows, p.id, v.id),
-                          }),
-                      )
-                    : [
-                          publicStock({
-                              tracked,
-                              markedSoldOut,
-                              row: shelfFor(rows, p.id, null),
-                          }),
-                      ];
-            const words = stocks.map((s) => s.word);
-            // The option the card's Add to bag adds: the first that can be
-            // sold now (or the product itself, without options).
-            const bagAt = words.findIndex((w) => w !== "SOLD_OUT");
+            const stock = cardStock(listing, offered, rows, businessTracks);
             const base = {
                 price: money(p.price) ?? "0.00",
                 mrp: money(p.mrp),
@@ -381,19 +509,10 @@ export class PublicCatalogueService {
                 categoryName: p.category?.name.trim()
                     ? p.category.name.trim()
                     : null,
-                soldOut: words.every((w) => w === "SOLD_OUT"),
+                soldOut: stock.soldOut,
                 listingId: listing.id,
-                // What the card's Add to bag puts in the bag (the design's
-                // shop card): the first option on offer that can be sold
-                // now, or null for a product without options.
-                bagVariantId:
-                    bagAt >= 0 && offered.length > 0
-                        ? (offered[bagAt]?.id ?? null)
-                        : null,
-                // How many of it can go in the bag, when the page would say
-                // "Only N left" (UX-058, #874): the card's Add another stops
-                // there, as the product page's does. Null: not counted out.
-                bagLeft: bagAt >= 0 ? (stocks[bagAt]?.left ?? null) : null,
+                bagVariantId: stock.bagVariantId,
+                bagLeft: stock.bagLeft,
             };
         });
     }
@@ -586,6 +705,12 @@ export class PublicCatalogueService {
         callerHash: string | undefined,
         fn: (scope: ShopScope) => Promise<T>,
     ): Promise<T> {
+        this.limit(siteId, callerHash);
+        return this.scoped(siteId, fn);
+    }
+
+    /** The per-visitor limit: a 429 past it. */
+    private limit(siteId: string, callerHash: string | undefined): void {
         // A caller the platform gives no address for shares one bucket per
         // site, as the other public reads do.
         if (!this.limiter.take(callerHash ?? `site:${siteId}`)) {
@@ -594,6 +719,13 @@ export class PublicCatalogueService {
                 429,
             );
         }
+    }
+
+    /** The site, its business and every gate, then `fn` in its context. */
+    private async scoped<T>(
+        siteId: string,
+        fn: (scope: ShopScope) => Promise<T>,
+    ): Promise<T> {
         const site = await prisma.site.findFirst({
             where: { id: siteId, deletedAt: null },
             select: { organizationId: true, storefrontId: true },

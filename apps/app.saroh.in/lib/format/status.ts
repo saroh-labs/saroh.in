@@ -1,3 +1,5 @@
+import { BOOKING_WORDS } from "@/lib/services/booking-words";
+
 /**
  * An API status as the words a pill says: `NO_SHOW` → "No show".
  *
@@ -11,12 +13,13 @@ export function formatStatus(status: string): string {
 }
 
 /**
- * A booking's status as its pill says it (UX-078, owner 9 Oct): a confirmed
- * booking is "Booked" and a pending one "To confirm" — one word each, never
- * "Confirmed" or "Pending". Any other status reads as `formatStatus` does.
+ * A booking's status as its pill says it (UX-078, owner 9 Oct; DEC-170,
+ * 19 Oct): a confirmed booking is "Booked" and a pending one, held while the
+ * customer pays, "Awaiting payment" — one word each, never "Confirmed",
+ * "Pending" or "To confirm". Any other status reads as `formatStatus` does.
  */
 export function bookingStatus(status: string): string {
     if (status === "CONFIRMED") return "Booked";
-    if (status === "PENDING") return "To confirm";
+    if (status === "PENDING") return BOOKING_WORDS.awaitingPayment;
     return formatStatus(status);
 }

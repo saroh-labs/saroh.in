@@ -42,12 +42,8 @@ import {
     refuseDisallowedPay,
 } from "./booking-payment";
 import type { BookingRulesValue } from "./booking-rules";
-import {
-    bookingWindowRefusal,
-    loadBookingRules,
-    withinBookingWindow,
-} from "./booking-rules";
-import type { AvailableSlot } from "./booking-slots";
+import { bookingWindowRefusal, loadBookingRules } from "./booking-rules";
+import type { AvailableSlot, Staffing } from "./booking-slots";
 import {
     loadStaffing,
     openSlots,
@@ -59,6 +55,7 @@ import {
 import { pausedDiaryIds, splitPaused } from "./diary-paused";
 import type { BookPay } from "./dto";
 import { openingFor, refuseOutsideOpening } from "./opening-hours";
+import { bookableStarts, loadDiaryRules, windowFor } from "./person-rules";
 import type {
     PublicBooking,
     PublicBookingPage,
@@ -191,13 +188,17 @@ export class PublicBookingsService {
             bookingPage: true,
         });
         const { from, to } = parseRange(fromISO, toISO);
-        const [slots, bookingRules] = await Promise.all([
-            openSlots(service, rules, from, to, staffId),
-            loadBookingRules(prisma, service.organizationId),
-        ]);
-        return slots.filter((slot) =>
-            withinBookingWindow(slot.startAt, now, bookingRules),
+        const slots = await openSlots(service, rules, from, to, staffId);
+        // Each person's own window, else the business's (DEC-170, #1038).
+        const perPerson = service.capacity === 1;
+        const diary = await loadDiaryRules(
+            prisma,
+            service.organizationId,
+            perPerson
+                ? [...new Set(slots.flatMap((s) => s.staffIds ?? []))]
+                : [],
         );
+        return bookableStarts(slots, now, diary, perPerson);
     }
 
     /**
@@ -236,6 +237,49 @@ export class PublicBookingsService {
     /** The website's services list (#255) — see {@link publicServices}. */
     publicServices(ids: string[]): Promise<PublicService[]> {
         return publicServices(ids);
+    }
+
+    /**
+     * `staffing` narrowed to the people a customer may book at `startAt`
+     * under their own rules, or refused in words. A class, or a service
+     * nobody takes, keeps to the business's rules.
+     */
+    private async inWindow(
+        service: Service,
+        staffing: Staffing,
+        startAt: Date,
+        now: Date,
+        business: BookingRulesValue,
+        named: string | undefined,
+    ): Promise<Staffing> {
+        if (!staffing.perPerson || staffing.people.length === 0) {
+            const refusal = bookingWindowRefusal(startAt, now, business);
+            if (refusal) throw new BadRequestException(refusal);
+            return staffing;
+        }
+        const asked = named
+            ? staffing.people.filter((p) => p.id === named)
+            : staffing.people;
+        // Someone not taking it is resolvePerson's to refuse, in its words.
+        if (asked.length === 0) return staffing;
+        const diary = await loadDiaryRules(
+            prisma,
+            service.organizationId,
+            asked.map((p) => p.id),
+        );
+        const { kept, refusal } = windowFor(
+            startAt,
+            now,
+            { ...diary, business },
+            asked.map((p) => p.id),
+        );
+        if (refusal) throw new BadRequestException(refusal);
+        return {
+            ...staffing,
+            people: staffing.people.filter(
+                (p) => named !== undefined || kept.includes(p.id),
+            ),
+        };
     }
 
     /**
@@ -449,17 +493,27 @@ export class PublicBookingsService {
             service.locationType === "EITHER",
         );
         const availService = toAvailabilityService(service);
-        const staffing = await loadStaffing(service);
+        const everyone = await loadStaffing(service);
         if (
-            !staffing.perPerson &&
+            !everyone.perPerson &&
             !isValidSlotStart(availService, rules, startAt)
         ) {
             throw new BadRequestException(
                 "That isn't a time this service can be booked.",
             );
         }
-        const refusal = bookingWindowRefusal(startAt, now, bookingRules);
-        if (refusal) throw new BadRequestException(refusal);
+        // Inside the booking rules: for a one-to-one, each person's own,
+        // else the business's (DEC-170, #1038). Only the people whose
+        // window takes the start are asked who is free; the one named, or
+        // the first, says why when nobody's does.
+        const staffing = await this.inWindow(
+            service,
+            everyone,
+            startAt,
+            now,
+            bookingRules,
+            input.staffId,
+        );
         const endAt = new Date(
             startAt.getTime() + service.durationMinutes * 60_000,
         );
@@ -568,7 +622,17 @@ export class PublicBookingsService {
             onRace: credit
                 ? "That changed while you were booking. Try again."
                 : "That time is fully booked.",
-            retryOnce: credit !== null || treatmentStore !== null,
+            // Up to three tries, 20 to 80 ms apart (review #33): Postgres
+            // aborts the loser of any overlap in the serializable
+            // reservation, a booking of another time too, so a visitor was
+            // told a free time was fully booked when several bookings
+            // landed at once. Tried again, the capacity check gives the
+            // true answer; if every try still loses, the page says it is
+            // busy, never that the time is full.
+            tries: 3,
+            busy: credit
+                ? "That changed while you were booking. Try again."
+                : "Lots of people are booking right now. Try again.",
             inTx: async (tx: Prisma.TransactionClient, booking: Booking) => {
                 made.bookingId = booking.id;
                 // A note on a booking confirmed now waits on the customer's
@@ -821,7 +885,7 @@ export class PublicBookingsService {
                     : undefined;
         if (
             (existing.bookerEmail ?? "").toLowerCase() !==
-                input.bookerEmail.trim().toLowerCase() ||
+                (input.bookerEmail ?? "").trim().toLowerCase() ||
             existing.startAt.getTime() !== new Date(input.startAt).getTime() ||
             (input.staffId !== undefined &&
                 existing.staffId !== input.staffId) ||

@@ -27,7 +27,14 @@ model User {
 
   // Better Auth stores the email/password credential on the Account row,
   // so the User table no longer carries a password column.
-  emailVerified Boolean @default(false)
+  emailVerified          Boolean   @default(false)
+  // When Saroh staff marked this address verified from the console (admin
+  // console U9, "Mark verified"). Null: the person proved it themselves, by
+  // a code, or it is not verified. Staff-marked verification never counts as
+  // the person's own (attribution, staff invites): read it through
+  // `emailVerifiedBySelf` (api `common/auth/email-verification.ts`). Cleared
+  // when they next prove the mailbox with a code, and on a change of address.
+  emailVerifiedByStaffAt DateTime?
 
   // "Help improve Saroh": whether this person shares how they use the
   // workspace, as masked session recordings (DEC-125). Null: never chosen,
@@ -75,7 +82,50 @@ model User {
   // What this person chose to hear about, per business (round-2 F14).
   notificationPreferences NotificationPreference[]
 
+  // Billing profiles this person owns: who Saroh bills for their
+  // businesses (DEC-167).
+  billingProfiles BillingProfile[] @relation("BillingProfileOwner")
+
+  // Sign-in email changes staff made for them (admin console U9).
+  signInEmailChanges SignInEmailChange[]
+
+  // Insights suggestions this person put off with Not now (DEC-171).
+  insightSuggestionsNotNow InsightSuggestionNotNow[]
+
   @@index([email])
+}
+
+// SignInEmailChange — Saroh staff changed a person's sign-in email from the
+// console (admin console U9, "Change sign-in email…"). Saroh's record, not a
+// business's: no organizationId and no row-level policy (rls-coverage.test.ts
+// lists it in NOT_TENANT_OWNED).
+//
+// The takeover safeguard: the new address gets no sign-in code, and the
+// person can start no session, until `codeHeldUntil` (24 hours after the
+// change) — unless a second, different staff member confirms first
+// (`confirmedByUserId`, CHECKed apart from `requestedByUserId`). A row only
+// holds while it is the person's latest and its `newEmail` is still their
+// address. `codeSentAt` is when the held code went out, by the confirm or by
+// the `people.sign-in-email.release` job.
+model SignInEmailChange {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  oldEmail          String
+  newEmail          String
+  // Staff user ids, not foreign keys: the record outlives a staff account.
+  requestedByUserId String
+  reason            String
+  codeHeldUntil     DateTime
+  confirmedByUserId String?
+  confirmedAt       DateTime?
+  codeSentAt        DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([newEmail])
 }
 
 // Organization: the sole tenant root (DEC-005 / ADR-001). Owns Stores and
@@ -127,6 +177,10 @@ model Organization {
   stores              Store[]
   memberships         Membership[]
   adminAccessSessions AdminAccessSession[]
+  // Calls and visits Saroh's team logged with this business (DEC-169).
+  sarohContactLogs    SarohContactLog[]
+  // Who at Saroh looks after it, and who did before (DEC-169).
+  accountManagerLinks AccountManagerLink[]
 
   // Optional groupings beneath the org (S1-010). Projects and Teams are NEVER
   // a tenant/ownership/billing root — always org-scoped (ADR-001).
@@ -210,6 +264,8 @@ model Organization {
   siteTrackingSettings SiteTrackingSettings[]
   // A site's QR codes and their daily scan counts.
   qrCodes              QrCode[]
+  siteLinks            SiteLink[]
+  siteDraftSnapshots   SiteDraftSnapshot[]
   qrScanDays           QrScanDay[]
   // What customers reported about this business at saroh.in/customers.
   businessReports      BusinessReport[]
@@ -277,6 +333,7 @@ model Organization {
   // Stage 7 — analytics (S7-001)
   analyticsEvents          AnalyticsEvent[]
   analyticsDailyAggregates AnalyticsDailyAggregate[]
+  insightSuggestionsNotNow InsightSuggestionNotNow[]
 
   // Stage 7 — SaaS billing (S7-005). One current subscription per org.
   subscription Subscription?
@@ -296,6 +353,9 @@ model Organization {
   invoices              Invoice[]
   invoiceLines          InvoiceLine[]
   invoiceSequences      InvoiceSequence[]
+  invoicePayments       InvoicePayment[]
+  invoiceShares         InvoiceShare[]
+  invoiceEvents         InvoiceEvent[]
   courses               Course[]
   courseSessions        CourseSession[]
   courseEnrollments     CourseEnrollment[]
@@ -306,12 +366,14 @@ model Organization {
 
   // Staff who take bookings, their hours and the business's booking rules
   // (ADR-008, U3).
-  staffMembers    StaffMember[]
-  staffServices   StaffService[]
-  staffHours      StaffHours[]
-  staffTimeOff    StaffTimeOff[]
-  staffExtraHours StaffExtraHours[]
-  bookingRules    BookingRules?
+  staffMembers      StaffMember[]
+  staffServices     StaffService[]
+  staffHours        StaffHours[]
+  staffTimeOff      StaffTimeOff[]
+  staffExtraHours   StaffExtraHours[]
+  bookingRules      BookingRules?
+  // A Member's own booking rules waiting for approval, and decided (#1038).
+  staffRuleRequests StaffRuleRequest[]
 
   // A business's own customers who sign in on its site (ADR-011, DEC-037).
   customerAccounts    CustomerAccount[]
@@ -369,8 +431,16 @@ model Organization {
   packExtensions           PackExtension[]
   // The notices told about a customer's bookings and orders (round-2 A14).
   customerNotices          CustomerNotice[]
+  // Which automatic customer notices it has turned off or on, where that
+  // differs from the default in code (DEC-174, U1 #1132).
+  customerNoticeSettings   CustomerNoticeSetting[]
+  overdueReminderTiming    OverdueReminderTiming?
+  // "Tell me when it's back" (DEC-174 U23).
+  stockWatches             StockWatch[]
   // Places in line for full classes (round-2 A12).
   classWaitlistEntries     ClassWaitlistEntry[]
+  // Customers' "Ask to remove my data" requests (DEC-172, #1106).
+  customerDataRequests     CustomerDataRequest[]
   // Bulk kitchen moves held on the server, then committed (round-2 B6).
   orderStageBatches        OrderStageBatch[]
   // Each person's alert choices here (round-2 F14).
@@ -385,11 +455,18 @@ model Organization {
   // Saroh billing: checkouts for a plan change (pricing catalogue U15).
   billingCheckouts         BillingCheckout[]
   billingCustomers         BillingCustomer[]
+  // Who Saroh bills for this business (DEC-167): one of its owner's
+  // billing profiles. Null only for a business made before the profile in
+  // the same transaction, or whose profile's owner was deleted; a checkout
+  // then makes one for the paying owner.
+  billingProfileId         String?
+  billingProfile           BillingProfile?           @relation("OrganizationBillingProfile", fields: [billingProfileId], references: [id], onDelete: SetNull)
   sarohInvoices            SarohInvoice[]
   // Saroh billing: add-ons owed on the next charge (pricing catalogue U16).
   subscriptionAddonCharges SubscriptionAddonCharge[]
 
   @@index([referredByOrganizationId])
+  @@index([billingProfileId])
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -460,6 +537,15 @@ model BusinessProfile {
   logoMediaId String?
   logoMedia   Media?  @relation("BusinessLogo", fields: [logoMediaId], references: [id], onDelete: SetNull)
   logoUrl     String?
+
+  // How the business's invoices look by default (DEC-173, #1118): the
+  // style, CLASSIC, BAND or COMPACT, and its colour, "#RRGGBB" from its
+  // brand. Null style is Classic and null colour is ink, so paper from
+  // before the choice reads as it always did. A draft may choose its own;
+  // issuing freezes both on the invoice (`Invoice.paperStyle`). The words
+  // and contrast rules are `invoices/paper-styles.ts`.
+  invoiceStyle  String?
+  invoiceColour String?
 
   // Products (#484, the business's since #529): how the editor suggests a
   // SKU. Null = the built-in pattern; suggestions off leave the SKU empty.
@@ -1028,6 +1114,9 @@ model Product {
   fieldValues ProductFieldValue[]
   allergens   ProductAllergen[]
 
+  // Customers waiting for it to be back (DEC-174 U23).
+  stockWatches StockWatch[]
+
   // How it can be fulfilled (B12, DEC-045): PICKUP, LOCAL_DELIVERY, SHIPPING
   // or DIGITAL (never an appointment type). Empty: every way its storefronts offer
   // (StoreSettings.fulfilmentTypes). An order offers only the types every
@@ -1073,6 +1162,7 @@ model ProductVariant {
   listings     ProductListingVariant[]
   stockLevels  StockLevel[]
   stockEntries StockEntry[]
+  stockWatches StockWatch[]
 
   createdAt DateTime @default(now())
 
@@ -1586,6 +1676,49 @@ model StockEntry {
   @@index([variantId])
   @@index([orderId])
   @@index([pairId])
+}
+
+// "Tell me when it's back" (DEC-174 U23, #1154): someone who found a product,
+// or one option of it, sold out on the business's site and left their email
+// to hear once when it can be bought again. The opt-in is consent for that one
+// email only: the address never becomes a contact or a marketing subscriber,
+// and `contactId` is set only when a contact with that email already exists
+// (so a revoked email consent still stops it). Told once (`toldAt`), or
+// stopped from the email's link (`cancelledAt`); a new sell-out needs a new
+// "Tell me". One open watch per address per product or option, by two
+// partial unique indexes (a NULL variant would otherwise never collide).
+model StockWatch {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product         @relation(fields: [productId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  // One option of it; null: the product, whichever option comes back.
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId, productId], references: [id, productId], onDelete: Cascade)
+  // The site it was asked on: its storefront says whether it sells, and the
+  // email links back to it.
+  siteId    String
+  site      Site            @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  // Trimmed and lower-cased when written.
+  email     String
+  // A contact that already had this email; informational, no FK, as
+  // CustomerNotice's: a merge or removal is resolved when it is told.
+  contactId String?
+  // When they ticked the opt-in: consent to this one email.
+  consentAt DateTime
+
+  createdAt   DateTime  @default(now())
+  toldAt      DateTime?
+  cancelledAt DateTime?
+
+  @@unique([organizationId, productId, email], map: "StockWatch_open_product_key", where: raw("\"variantId\" IS NULL AND \"toldAt\" IS NULL AND \"cancelledAt\" IS NULL"))
+  @@unique([organizationId, productId, variantId, email], map: "StockWatch_open_variant_key", where: raw("\"variantId\" IS NOT NULL AND \"toldAt\" IS NULL AND \"cancelledAt\" IS NULL"))
+  @@index([organizationId, productId])
+  @@index([siteId])
+  @@index([variantId])
 }
 
 // ============================================================================
@@ -2567,6 +2700,15 @@ model PlatformAdmin {
   roleAssignments PlatformAdminRoleAssignment[]
   accessSessions  AdminAccessSession[]
 
+  // DEC-169: the teammate's own record, and whom they report to.
+  staffProfile StaffProfile?  @relation("StaffProfileOf")
+  reports      StaffProfile[] @relation("StaffProfileReportsTo")
+
+  // DEC-169, U20: Saroh's own sales leads this teammate owns, and the calls
+  // and visits they logged.
+  sarohLeads       SarohLead[]       @relation("SarohLeadOwner")
+  sarohContactLogs SarohContactLog[] @relation("SarohContactLogAuthor")
+
   grantedByUserId String?
   grantedBy       User?   @relation("PlatformAdminGrantedBy", fields: [grantedByUserId], references: [id], onDelete: SetNull)
 
@@ -2632,6 +2774,398 @@ model PlatformAdminRoleAssignment {
 
   @@index([platformAdminId, revokedAt, expiresAt])
   @@index([role, revokedAt])
+}
+
+// A teammate's record on the console's Team (DEC-169, admin console U18):
+// their job, contact, reporting line, capacity and how they are paid. One per
+// PlatformAdmin, kept apart from the access grant so revoking access never
+// loses who they were. Not a tenant row: it belongs to Saroh, not a business.
+//
+// `worksAs` is the job, separate from the console role: ACCOUNT_MANAGER_JOB,
+// FINDS_BUSINESSES or OTHER. `engagement` is FULL_TIME, PART_TIME or
+// FREELANCE. Both are CHECKed in the migration (`staff-profile.ts` holds the
+// lists). `managerCode` is generated by the API, never typed, and is what an
+// owner enters at sign-up to name the manager who brought them in.
+//
+// The tax id is sealed with AES-256-GCM under `STAFF_PII_ENC_KEY` (never the
+// payments key); all three parts are set together or not at all. It is never
+// returned whole: Platform owner and Billing see its last 4 characters.
+model StaffProfile {
+  id String @id @default(cuid())
+
+  platformAdminId String        @unique
+  platformAdmin   PlatformAdmin @relation("StaffProfileOf", fields: [platformAdminId], references: [id], onDelete: Cascade)
+
+  worksAs   String
+  workEmail String?
+  phone     String?
+  city      String?
+  languages String[]  @default([])
+  joinedOn  DateTime? @db.Date
+
+  reportsToPlatformAdminId String?
+  reportsTo                PlatformAdmin? @relation("StaffProfileReportsTo", fields: [reportsToPlatformAdminId], references: [id], onDelete: SetNull)
+
+  engagement String?
+  /// How many businesses they can look after at once; null when not set.
+  capacity   Int?
+
+  managerCode  String  @unique
+  onCommission Boolean @default(false)
+
+  taxIdCiphertext String?
+  taxIdIv         String?
+  taxIdAuthTag    String?
+
+  emergencyContact String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([reportsToPlatformAdminId])
+}
+
+// An invitation to Saroh's team (DEC-169, admin console U24), for someone
+// who may have no Saroh account yet. Sent by a holder of `staff:grant`, and
+// never for a role that can do more than the sender can.
+//
+// Only a sha256 of the token is stored: the token itself exists only in the
+// email. A resend draws a new token over the old hash, so the earlier link
+// stops working. Accepting needs the person's own verified email to be
+// `email` (never one staff marked verified), and the last sender to still
+// hold `staff:grant` and reach every role on the invite. It then makes the
+// grant, the roles and the profile (`worksAs`, `onCommission`) in one
+// transaction.
+//
+// Staff and user ids are bare, not foreign keys, as on the role
+// assignments: the record outlives the accounts it names. Saroh's, not a
+// business's, so it has no organizationId and no row-level policy.
+model StaffInvite {
+  id String @id @default(cuid())
+
+  /// Lower-cased: the address the link was sent to, and the only one that may accept.
+  email        String
+  name         String
+  roles        String[]
+  worksAs      String
+  onCommission Boolean  @default(false)
+  reason       String
+
+  tokenHash String   @unique
+  expiresAt DateTime
+
+  /// Who sent the link last: the first sender, or whoever resent it.
+  invitedByUserId String
+  sentAt          DateTime @default(now())
+  sendCount       Int      @default(1)
+
+  acceptedAt       DateTime?
+  acceptedByUserId String?
+  platformAdminId  String?
+
+  withdrawnAt       DateTime?
+  withdrawnByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+}
+
+// Saroh's own sales lead (DEC-169, admin console U20): someone who may
+// become a paying business, not a business's own Leads (the merchant CRM).
+// It comes from a saroh.in enquiry ("A question before signing up"), the
+// waitlist, or a manager who added it; one lead per person, merged by the
+// normalised email (`emailKey`, the waitlist's rule).
+//
+// `source` is WEBSITE, WAITLIST or ADDED: where it first came from. `stage`
+// is NEW, TALKED, DEMO, TRIAL, WON or LOST. Won names the business it became
+// (`wonOrganizationId`, a plain id like `referredByOrganizationId`: read back
+// through the business's own rules); Lost carries why. All CHECKed in the
+// migration (`saroh-leads/lead-rules.ts` holds the lists).
+//
+// The owner is the one manager working it: the first to record its email
+// (ADDED), or the one Support or a Platform owner gave it to (ASSIGNED).
+// Unowned leads are seen only by staff with every lead in scope. When each
+// email was recorded is kept, so a business counts as brought in by a lead
+// only if the lead had its email before the business was made (U19).
+//
+// Retention: a lead that came from the website and never became a business
+// goes 12 months after the website last saw it, once no waitlist entry with
+// its email is left (`saroh-leads/lead-retention.ts`, the enquiry purge).
+// Not a tenant row: it belongs to Saroh.
+model SarohLead {
+  id String @id @default(cuid())
+
+  /// Who: the business's or the person's name, as known.
+  name     String
+  email    String?
+  emailKey String?   @unique
+  /// When this email was first put on the lead.
+  emailAt  DateTime?
+
+  /// The email the business signed up with, when it isn't `email`.
+  signUpEmail    String?
+  signUpEmailKey String?   @unique
+  signUpEmailAt  DateTime?
+
+  phone String?
+  city  String?
+  /// One of the waitlist's kinds of business (`WAITLIST_KINDS`), if known.
+  kind  String?
+
+  source   String
+  stage    String   @default("NEW")
+  stagedAt DateTime @default(now())
+
+  /// The day to follow up, as the day reads in India.
+  followUpOn DateTime? @db.Date
+  notes      String?
+
+  wonOrganizationId String?
+  wonAt             DateTime?
+  lostReason        String?
+
+  ownerPlatformAdminId String?
+  owner                PlatformAdmin? @relation("SarohLeadOwner", fields: [ownerPlatformAdminId], references: [id], onDelete: SetNull)
+  ownerSince           DateTime?
+  ownedHow             String?
+
+  /// When an enquiry or a waitlist entry last brought this lead in.
+  websiteSeenAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  log SarohContactLog[]
+
+  @@index([ownerPlatformAdminId, stage])
+  @@index([stage, followUpOn])
+  @@index([websiteSeenAt])
+}
+
+// A call, visit or message Saroh's team logged (DEC-169, U20): on a lead, or
+// on a business a manager looks after, with what was said about the product.
+// At least one of `leadId` and `organizationId` (CHECKed). A business's rows
+// carry its organizationId and the org-isolation policy; a lead's have none
+// and are written and read only by the admin console, with no org context.
+model SarohContactLog {
+  id String @id @default(cuid())
+
+  leadId String?
+  lead   SarohLead? @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Who logged it; null if their team record is gone.
+  platformAdminId String?
+  author          PlatformAdmin? @relation("SarohContactLogAuthor", fields: [platformAdminId], references: [id], onDelete: SetNull)
+  actorUserId     String
+
+  /// CALL, VISIT or MESSAGE (CHECKed).
+  kind       String
+  happenedAt DateTime
+  minutes    Int?
+  summary    String
+  /// What they said about Saroh itself.
+  feedback   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([leadId, happenedAt])
+  @@index([organizationId, happenedAt])
+  @@index([platformAdminId, happenedAt])
+}
+
+// Who at Saroh looks after a business (DEC-169, admin console U19): one
+// account manager at a time, with every earlier one kept. Append-only: a
+// link is written once and only ever ended (`endedAt`, why, by whom); a
+// move to another manager ends the old link and starts a new one. A
+// trigger in the migration refuses any other change, and a partial unique
+// index allows one open link per business.
+//
+// `source` is how it started: LINK (the sign-up carried the manager's
+// `?am=` link), CODE (the owner typed the manager's code), LEAD_EMAIL (the
+// owner's own verified email was on the manager's lead before the business
+// was made) or ASSIGNED (staff gave it). The first three are BROUGHT_IN,
+// the last ASSIGNED (`kind`). All CHECKed (`organizations/account-manager.ts`
+// holds the lists). `evidence` is the proof as it was when the link started:
+// the code, when the link's cookie was set, the lead and when its email was
+// recorded. Never a person's email.
+//
+// The manager is a bare `platformAdminId`, not a foreign key, as on staff
+// invites and role assignments: who looked after a business outlives the
+// teammate's account. A business's row, so it carries the org-isolation
+// policy.
+model AccountManagerLink {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  platformAdminId String
+
+  source   String
+  kind     String
+  evidence Json   @default("{}")
+
+  startedAt       DateTime @default(now())
+  /// Who gave it, for ASSIGNED; null when the business's own sign-up started it.
+  startedByUserId String?
+
+  endedAt       DateTime?
+  endedByUserId String?
+  endedReason   String?
+
+  @@unique([organizationId], map: "AccountManagerLink_one_open_per_business", where: raw("\"endedAt\" IS NULL"))
+  @@index([organizationId, startedAt])
+  @@index([platformAdminId, endedAt])
+}
+
+// A commission rate (DEC-169, admin console U21): what share of a payment
+// before GST a manager earns, for one link kind (BROUGHT_IN or ASSIGNED),
+// from `effectiveFrom` on. Set in the console by a holder of
+// `commission:rates`; never written in code, tests, seeds or docs (the repo
+// is public). Append-only: a change is a new row, and a line copies the
+// rate it was worked out with, so a later change never moves it. Saroh's,
+// not a business's.
+model CommissionRate {
+  id String @id @default(cuid())
+
+  /// BROUGHT_IN | ASSIGNED, as `AccountManagerLink.kind`.
+  kind          String
+  /// Hundredths of a percent, 0..10000 (CHECKed).
+  basisPoints   Int
+  effectiveFrom DateTime
+  setByUserId   String
+  reason        String
+
+  createdAt DateTime @default(now())
+
+  @@index([kind, effectiveFrom])
+}
+
+// What one cleared Saroh payment earns its business's manager (DEC-169,
+// admin console U21): written by the `commission.line` job after the
+// payment's transaction has committed, never inside it, so a commission
+// failure can never touch a payment. One line per invoice, or twelve for a
+// year paid at once (one twelfth each month, owner 19 Oct): `installment`
+// of `installments`.
+//
+// - PENDING until the period it pays for (`periodEnd`) ends with no refund
+//   or dispute; then PAYABLE in `statementMonth` (the month the period
+//   ended in India, or the next month not yet paid).
+// - HELD while the provider took a different amount from the invoice.
+// - NO_RATE when no rate was set for the link's kind as it paid: it earns
+//   nothing, for good (no back-pay, owner 19 Oct).
+// - CANCELLED by a refund, or a dispute lost, before it was paid.
+// - PAID with its month's payout; a refund after that is a Needs action
+//   for the owner, and the line stays as it was.
+//
+// Relation-free, like BillingAction: the invoice, the business and the
+// manager are plain ids, so what the team was paid outlives them. A
+// business's row, so it carries the org-isolation policy.
+model CommissionLine {
+  id String @id @default(cuid())
+
+  organizationId  String
+  platformAdminId String
+  linkId          String
+  sarohInvoiceId  String
+  installment     Int    @default(1)
+  installments    Int    @default(1)
+
+  /// The link's kind when the payment cleared: BROUGHT_IN | ASSIGNED.
+  kind            String
+  /// This line's share of the invoice's amount before GST, in paise.
+  baseAmountPaise Int
+  /// The rate copied from `CommissionRate` (`rateId`), or from the
+  /// business's own rate (`businessRateId`, #1035); both null while NO_RATE.
+  rateId          String?
+  businessRateId  String?
+  basisPoints     Int?
+  /// What it earns, in paise; null while NO_RATE.
+  amountPaise     Int?
+  /// When it can become payable: the end of the period (or month) it pays for.
+  periodEnd       DateTime
+
+  /// PENDING | HELD | NO_RATE | PAYABLE | CANCELLED | PAID
+  status         String
+  /// "2026-12": the statement it is paid in, once PAYABLE.
+  statementMonth String?
+  payoutId       String?
+  /// Why it is held or was cancelled, in Saroh's words.
+  note           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sarohInvoiceId, installment])
+  @@index([platformAdminId, statementMonth])
+  @@index([platformAdminId, status])
+  @@index([status, periodEnd])
+  @@index([organizationId])
+  @@index([businessRateId])
+}
+
+// A business's own commission rate for its account manager (DEC-169, #1035):
+// set by a holder of `commission:rates` for the manager who looks after it,
+// it prices that manager's payments from this business made on or after
+// `earnsFrom` (and before `until`) instead of the general rate for the
+// link's kind. `earnsFrom` is never before the business's first paid plan
+// (its first cleared Saroh invoice with an amount before GST). Saving one
+// is the only way a NO_RATE line is ever priced (back-pay, once). One in
+// force per business: a new one ends the one before at its `earnsFrom`.
+// Written once except its end: `until` may only move earlier (End…, or
+// replaced), with who and why. Never a rate in code, tests or docs.
+// Relation-free, like CommissionLine; a business's row, so it carries the
+// org-isolation policy.
+model BusinessCommissionRate {
+  id String @id @default(cuid())
+
+  organizationId  String
+  /// The manager it was set for; only their lines are priced by it.
+  platformAdminId String
+  /// Hundredths of a percent, 0..10000 (CHECKed).
+  basisPoints     Int
+  /// The start of its first day in India.
+  earnsFrom       DateTime
+  /// Exclusive: the start of the day after its last; null while open.
+  until           DateTime?
+  setByUserId     String
+  reason          String
+
+  endedAt       DateTime?
+  endedByUserId String?
+  endedReason   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, earnsFrom])
+}
+
+// A month's commission paid to one teammate (DEC-169, admin console U21):
+// marked paid in the console with the bank's reference by someone else
+// with `team:pay`. It locks the month: a line that becomes payable later
+// goes to the next month's statement. Saroh's, not a business's.
+model CommissionPayout {
+  id String @id @default(cuid())
+
+  platformAdminId String
+  /// "2026-12"
+  month           String
+  amountPaise     Int
+  lineCount       Int
+  reference       String
+  reason          String
+  paidAt          DateTime
+  paidByUserId    String
+
+  createdAt DateTime @default(now())
+
+  @@unique([platformAdminId, month])
+  @@index([month])
 }
 
 // Global, append-only history of staff activity in the Saroh control plane.
@@ -3215,6 +3749,11 @@ model Site {
   trackingSettings SiteTrackingSettings?
   // The site's QR codes: short links at `/q/<code>` on its Saroh address.
   qrCodes          QrCode[]
+  siteLinks        SiteLink[]
+  // What Undo puts back after starter content was copied in (DEC-182).
+  draftSnapshots   SiteDraftSnapshot[]
+  // "Tell me when it's back" asked on this site (DEC-174 U23).
+  stockWatches     StockWatch[]
 
   // "Publishing needs approval" (DEC-071, amends DEC-047). Off: approval is
   // advisory and a bypass is recorded. On: Publish, restore and Go live
@@ -3841,6 +4380,66 @@ model SiteTrackingSettings {
   @@index([organizationId])
 }
 
+/// A link a business made in Saroh to share its site (DEC-181, #1099):
+/// `<site address>/?ref=<label>`. Only these labels are counted on
+/// Insights › Where customers come from; any other `ref` a visit carries
+/// counts under its group with no label. Archived, never deleted, so the
+/// figures a label already counted keep their name.
+model SiteLink {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // The `ref` in the link: lower-case letters, digits and hyphens, the
+  // shape `analytics/visit-source.ts` keeps (no record id, under seven
+  // digits). Unique per site among live links.
+  label String
+  // What the team calls it ("Diwali post"). Never sent to the site.
+  name  String
+
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  archivedAt      DateTime?
+
+  // One live link per label on a site; an archived one frees its label.
+  @@unique([siteId, label], map: "SiteLink_siteId_label_live_key", where: raw("\"archivedAt\" IS NULL"))
+  @@index([organizationId, siteId])
+}
+
+/// A site's draft as it was before "Use this look with its starter content"
+/// (DEC-182) replaced some of its pages: what Undo puts back. One row per
+/// copy; `undoneAt` is set when Undo has put it back, and a second Undo of
+/// the same copy is refused. The pages' own sections are in `before` (JSON:
+/// the style, the menu, each replaced page's draft sections and the pages
+/// the copy made), and `after` holds each page's draft revision just after
+/// the copy, so Undo is refused once anyone has saved over it.
+model SiteDraftSnapshot {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Why it was taken: "starter-content" is the only reason today.
+  reason     String
+  // The template copied in (`salon@1`) and the look chosen with it.
+  templateId String
+  look       String?
+
+  before Json
+  after  Json
+
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  undoneAt        DateTime?
+
+  @@index([organizationId, siteId, createdAt])
+}
+
 /// A QR code a business made for its site. The printed code holds a short
 /// link, `<address>.saroh.app/q/<code>`, never the target itself: the target
 /// is resolved when the code is scanned, so paper keeps working when a page
@@ -4045,6 +4644,8 @@ model Contact {
   // Accounts staff said "This isn't them" about this contact (A4), so the
   // pair is never suggested again.
   unlinkedCustomerAccounts CustomerAccount[] @relation("CustomerAccountUnlinkedFrom")
+  // Their "Ask to remove my data" requests (DEC-172): kept after a removal.
+  dataRequests             CustomerDataRequest[]
 
   // Needs attention: one shared list of what the team must know (DEC-040, C1).
   attention ContactAttention[]
@@ -4360,8 +4961,11 @@ model Notification {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  // Recipient. Null = an org-wide notice any member/owner may see; set = a
-  // specific user's inbox item. Informational (no FK cascade wiring needed).
+  // Recipient. Null = the business's notice, read with `notification:read`
+  // (owners and admins); set = one person's alone (DEC-170, #1038: the
+  // answer to their booking rules request), read with
+  // `notification:read-own` and never shown to anyone else, owners
+  // included. Informational (no FK cascade wiring needed).
   userId String?
 
   type  String // "enquiry.new" | ...
@@ -4385,6 +4989,9 @@ model Notification {
   bookingId String?
   invoiceId String?
   siteId    String?
+  // Or someone on the diary (#1038): a booking rules request opens Hours
+  // and time off on that person. Informational, no FK, like leadId.
+  staffId   String?
 
   readAt DateTime? // null = unread
 
@@ -4512,9 +5119,14 @@ model Service {
   // What is paid at booking: NONE | PERCENT_25 | PERCENT_50 | FULL, of
   // `priceCents`, worked out on the server. Only a priced service has one.
   depositMode       String  @default("NONE")
-  // Whether the business's booking page and services lists offer it. A
-  // hidden service is still booked by staff.
+  // Whether the business's booking page and services lists offer it: the
+  // "Customers" tick of Who can book it. A hidden service is still booked
+  // by staff unless `bookableByTeam` says otherwise.
   showOnBookingPage Boolean @default(true)
+  // Whether the team books it by hand, from Bookings: the "Your team" tick
+  // of Who can book it (DEC-170, Q5 of 19 Oct). Neither tick reads as
+  // paused in the app; bookings already made stay.
+  bookableByTeam    Boolean @default(true)
 
   // The order lines that bill it: a treatment sold as an order (E9).
   orderItems OrderItem[]
@@ -4719,13 +5331,26 @@ model StaffMember {
   status     String    @default("ACTIVE") // ACTIVE | ARCHIVED — archived take no new bookings
   archivedAt DateTime?
 
-  services    StaffService[]
-  hours       StaffHours[]
-  timeOff     StaffTimeOff[]
-  extraHours  StaffExtraHours[]
-  bookings    Booking[]
+  services          StaffService[]
+  hours             StaffHours[]
+  timeOff           StaffTimeOff[]
+  extraHours        StaffExtraHours[]
+  bookings          Booking[]
+  // The history lines that handed a booking from or to them (#1157).
+  bookingEventsFrom BookingEvent[]           @relation("BookingEventFromStaff")
+  bookingEventsTo   BookingEvent[]           @relation("BookingEventToStaff")
   // Invites that would give them a login (#868).
-  invitations OrganizationInvitation[]
+  invitations       OrganizationInvitation[]
+
+  // Their own timing rules for their diary (DEC-170, #1038), each one
+  // falling back to the business's (`BookingRules`) when null — "same as
+  // the business". Paying, refunds and the free-cancel window stay
+  // business-wide: free cancelling follows the business's refund policy
+  // (owner, 20 Oct 2026). CHECKed to the business rules' own ranges.
+  bookAheadDays        Int? // how far ahead a customer may book them, in days
+  latestBookingMinutes Int? // the notice they need before a start
+  gapMinutes           Int? // kept clear between their bookings
+  ruleRequests         StaffRuleRequest[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -4844,6 +5469,18 @@ model BookingRules {
   latestBookingMinutes Int? // the latest a customer may book before a start
   freeCancelHours      Int? // cancel at least this long before to get a class back
 
+  /// "Gap between bookings" (DEC-170, #1038): minutes kept clear either
+  /// side of a person's bookings, on top of a service's buffers. None by
+  /// default; each person's own `StaffMember.gapMinutes` falls back to it.
+  gapMinutes Int @default(0)
+
+  /// "Members' rule changes need approval" (DEC-170, #1038): on, a change
+  /// someone makes to their own booking rules without `service:write`
+  /// waits as a `StaffRuleRequest` for an owner or admin. On for every
+  /// business, new and existing (the column's default, and no row reads
+  /// as on).
+  memberRuleChangesNeedApproval Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -4862,6 +5499,43 @@ model BookingRules {
   bookingPayment String @default("BOTH")
 }
 
+/// A change someone asked for to their own booking rules while "Members'
+/// rule changes need approval" is on (DEC-170, #1038). It changes nothing
+/// until an owner or admin approves it. WAITING → APPROVED | TURNED_DOWN |
+/// WITHDRAWN | REPLACED, CHECKed; one WAITING per person (a new ask
+/// replaces it, as WITHDRAWN). REPLACED is "Replaced by a newer change":
+/// the person's rules changed directly, or approval switched off (owner,
+/// 20 Oct 2026); `decidedByUserId` is who made that change.
+model StaffRuleRequest {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  staffId        String
+  staff          StaffMember  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  // Who asked: the person's own login.
+  requestedByUserId String
+  // The asked values, by field: only the fields that change, a null being
+  // "same as the business" (`bookings/person-rules.ts`).
+  changes           Json
+
+  status String @default("WAITING") // WAITING | APPROVED | TURNED_DOWN | WITHDRAWN | REPLACED
+
+  // Turned down: the optional words the person reads.
+  reason          String?
+  decidedByUserId String?
+  decidedAt       DateTime?
+  // When the person said OK to the outcome; until then their rules show it.
+  dismissedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([staffId], map: "StaffRuleRequest_one_waiting", where: raw("status = 'WAITING'"))
+  @@index([organizationId, status])
+  @@index([staffId, createdAt])
+}
+
 /// What has happened to a Booking, in order (#121).
 ///
 /// Append-only. A reschedule must not silently overwrite the time a customer
@@ -4876,7 +5550,10 @@ model BookingEvent {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  type String // BOOKED | RESCHEDULED | CANCELLED | ATTENDED | NO_SHOW
+  // BOOKED | RESCHEDULED | CANCELLED | ATTENDED | NO_SHOW | PAID_AT_DESK |
+  // REASSIGNED | LAPSED (an unpaid hold whose time ran out: nobody's
+  // choice) | REFUNDED | REFUND_FAILED (#1137)
+  type String
 
   // Who did it. Null when the booker did it themselves through the public
   // form, which is exactly the difference between "they booked it" and "we
@@ -4891,10 +5568,28 @@ model BookingEvent {
   fromStartAt DateTime?
   toStartAt   DateTime?
 
+  // Who it was with, and who it is with now, on REASSIGNED (#1157): the
+  // booking given to someone else, or to someone when it had nobody
+  // (`fromStaffId` null). SetNull keeps the line if a person goes; the
+  // history then reads "someone".
+  fromStaffId String?
+  fromStaff   StaffMember? @relation("BookingEventFromStaff", fields: [fromStaffId], references: [id], onDelete: SetNull)
+  toStaffId   String?
+  toStaff     StaffMember? @relation("BookingEventToStaff", fields: [toStaffId], references: [id], onDelete: SetNull)
+
+  // What a money line says (#1137): on REFUNDED and REFUND_FAILED,
+  // `{ amountCents, currency, refundId, outcome }` — the refund it is about
+  // and where it stood when written. On the CANCELLED of a place in a class
+  // the business cancelled as a whole, `{ classCancelled: true, reason? }`:
+  // the reason it gave, in its own words (DEC-178, #1172). Null otherwise.
+  data Json?
+
   createdAt DateTime @default(now())
 
   @@index([bookingId, createdAt])
   @@index([organizationId])
+  @@index([fromStaffId])
+  @@index([toStaffId])
 }
 
 // ============================================================================
@@ -4972,6 +5667,9 @@ model PaymentIntent {
 
   attempts PaymentAttempt[]
   refunds  PaymentRefund[]
+
+  // The invoice ledger row this payment wrote (DEC-173), if any.
+  invoicePayment InvoicePayment?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -5397,6 +6095,27 @@ model AnalyticsDailyAggregate {
 
   @@unique([organizationId, siteId, date, type, dimension, dimensionValue])
   @@index([organizationId, type, date])
+}
+
+/// Insights' "Not now" on a suggestion (DEC-171, #1087): one person put off
+/// one suggestion in one business until `hiddenUntil`, 7 days on. Per
+/// person, kept on the server so it holds on every device; one row per key,
+/// written again (not added) each time. Past `hiddenUntil` the suggestion
+/// comes back. `key` names the rule and its subject, `class-full:<serviceId>`,
+/// `late-bill:<invoiceId>` or `selling-less:<productId>` (`suggestions.ts`).
+model InsightSuggestionNotNow {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key            String
+  hiddenUntil    DateTime
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, userId, key])
+  @@index([userId])
 }
 
 // Plan — the VERSIONED catalog of Saroh subscription plans sold to
@@ -6194,6 +6913,14 @@ model Invoice {
   sellerName      String?
   sellerLegalName String?
   sellerEmail     String?
+  // How the paper looks (DEC-173, #1118): CLASSIC, BAND or COMPACT, and
+  // its colour ("#RRGGBB"). On a draft, its own choice, null following the
+  // business's default (`BusinessProfile.invoiceStyle`); issuing freezes
+  // the one it went out in, so a later change of default never redraws
+  // issued paper. Null on issued paper is Classic in ink. The logo stays
+  // live (DEC-082).
+  paperStyle      String?
+  paperColour     String?
   placeOfSupply   String?
   taxType         String?
   cgst            Decimal @default(0) @db.Decimal(12, 2)
@@ -6246,6 +6973,22 @@ model Invoice {
   lines          InvoiceLine[]
   paymentIntents PaymentIntent[]
 
+  // The payments on it (DEC-173): one row per payment, in integer paise. The
+  // order is the ledger for an order's invoice (ADR-008), which has none.
+  // `paidCents` is a cache of the live payments (not removed, not bounced),
+  // recomputed from them in the same transaction as every ledger write and
+  // never written anywhere else. "Partly paid" is ISSUED with paidCents > 0,
+  // derived like Overdue, never stored as a status.
+  payments  InvoicePayment[]
+  paidCents Int              @default(0)
+
+  // How it was shared by hand (DEC-173, U5): on WhatsApp, as a link, a PDF
+  // or printed. Emails are the Message rows; this is everything else.
+  shares InvoiceShare[]
+
+  // Who issued, sent, reminded, voided or credited it, and when (U9 #1140).
+  events InvoiceEvent[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -6280,6 +7023,9 @@ model Invoice {
   // the payment reconciliation. Corrections are other kinds.
   @@unique([orderId], map: "Invoice_one_per_order", where: raw("kind = 'INVOICE'"))
   @@unique([bookingId], map: "Invoice_one_per_booking", where: raw("kind = 'INVOICE'"))
+  // The ledger's composite key: a payment can't name another business's
+  // invoice.
+  @@unique([id, organizationId])
   @@index([organizationId, status])
   @@index([contactId])
   @@index([subscriptionId])
@@ -6296,6 +7042,129 @@ model Invoice {
   @@index([createdAt], map: "Invoice_open_pack_drafts_idx", where: raw("status = 'DRAFT' AND source = 'PACK'"))
   // The sweep that discards online plan joins nobody paid (G20).
   @@index([createdAt], map: "Invoice_open_plan_joins_idx", where: raw("status = 'DRAFT' AND source = 'SUBSCRIPTION'"))
+}
+
+/// One payment on an invoice (DEC-173): the ledger the invoice's status and
+/// `paidCents` are worked out from. Never deleted: a payment recorded by
+/// mistake is removed softly (`removedAt`) and stays in the history.
+model InvoicePayment {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoiceId      String
+  invoice        Invoice      @relation(fields: [invoiceId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // Integer paise: the ledger's exception to "never Int for currency"
+  // (DEC-173), as `PaymentIntent.amountCents` is. Always more than 0.
+  amountCents Int
+  currency    String
+  // CASH | UPI | BANK_TRANSFER | CARD | OTHER | CHEQUE, or ONLINE (written
+  // only for money that came through the pay link).
+  method      String
+  reference   String?
+  note        String?
+  receivedAt  DateTime
+
+  // A cheque: its number and bank, and where it is. `bankStatus` is WAITING,
+  // then CLEARED (`clearedAt`) or BOUNCED (`bouncedAt`, an optional
+  // reason); null for anything but a cheque. A waiting cheque counts as
+  // received; a bounced one doesn't count.
+  chequeNumber String?
+  chequeBank   String?
+  bankStatus   String?
+  clearedAt    DateTime?
+  bouncedAt    DateTime?
+  bounceReason String?
+
+  // Removed by mistake: when, by whom and why. A removed payment doesn't
+  // count, and the row stays.
+  removedAt     DateTime?
+  removedById   String?
+  removedReason String?
+
+  // Who recorded it; null when Saroh did (the webhook, a backfill).
+  recordedById    String?
+  // The online payment it came from, if any: one row per intent.
+  paymentIntentId String?        @unique
+  paymentIntent   PaymentIntent? @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
+
+  // The receipt emailed for it (DEC-173, owner 20 Oct): the Message the
+  // `invoice.receipt` job queued, set in the same transaction under this
+  // row's lock, so a job run twice emails it once. Null until it goes, and
+  // forever when there was no email provider or the payment was removed.
+  receiptMessageId String?
+
+  // The Record payment sheet's key, one per opening (#6 review, 20 Oct): a
+  // retry of the same record answers with this row instead of writing a
+  // second, while two real payments of the same amount both count. Null
+  // for every other writer (the webhook, the desk, a backfill, Undo's put
+  // back).
+  idempotencyKey String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([invoiceId, idempotencyKey])
+  @@index([invoiceId])
+  @@index([organizationId, receivedAt])
+  @@index([organizationId, bankStatus])
+}
+
+/// One time an invoice was shared by hand (DEC-173, U5 #1117): opened on
+/// WhatsApp (click-to-chat; Saroh sends nothing and can't know it went), its
+/// link copied, its PDF downloaded or the paper printed. The one-reminder-a-
+/// day rule reads the WhatsApp ones beside the email Messages.
+model InvoiceShare {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoiceId      String
+  invoice        Invoice      @relation(fields: [invoiceId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // WHATSAPP | LINK | PDF | PRINT
+  channel   String
+  // NEW | REMINDER | RECEIPT: what the message said.
+  kind      String
+  // Who shared it; null if the person was since deleted.
+  byUserId  String?
+  createdAt DateTime @default(now())
+
+  @@index([invoiceId, createdAt])
+}
+
+/// One thing that happened to an invoice, with who did it (U9 #1140,
+/// DEC-174): issued, sent, reminded, sent or reminded automatically, a send
+/// that failed, voided, credited, written again, a failed pay attempt, a
+/// new link. Written in the change's own transaction. Payments are the
+/// ledger's audit rows and hand shares are `InvoiceShare`; the history
+/// read merges them, so nothing is written twice. Older invoices have no
+/// rows: their history comes from their own dates.
+model InvoiceEvent {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoiceId      String
+  invoice        Invoice      @relation(fields: [invoiceId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // ISSUED | SENT | REMINDED | AUTO_SENT | AUTO_REMINDED | SEND_FAILED |
+  // VOIDED | CREDITED | REISSUED | PAY_ATTEMPT_FAILED | LINK_MADE
+  kind        String
+  // USER (a person; `actorUserId`) | JOB (Saroh, on the business's
+  // behalf) | CUSTOMER (on the pay page)
+  actorKind   String
+  // Not a foreign key: someone who leaves keeps their lines.
+  actorUserId String?
+  // EMAIL | THREAD, for a send.
+  channel     String?
+  // The email it was, for a send or a failed one.
+  messageId   String?
+  // Small context: the address, a reason, a credit note's id. Never a
+  // token, and no amounts beyond what the invoice already shows.
+  data        Json?
+  createdAt   DateTime @default(now())
+
+  @@index([invoiceId, createdAt])
+  // A failed send is told once per email, however often its job retries.
+  @@unique([messageId, kind], map: "InvoiceEvent_message_kind_key", where: raw("\"messageId\" IS NOT NULL"))
 }
 
 model InvoiceLine {
@@ -6735,6 +7604,9 @@ model CustomerAccount {
   // Messages the customer wrote to the business from this account (A13).
   threadMessages CustomerThreadMessage[]
 
+  // "Ask to remove my data" requests made from this account (DEC-172).
+  dataRequests CustomerDataRequest[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -6750,6 +7622,65 @@ model CustomerAccount {
   @@index([contactId])
   @@index([mergedIntoId])
   @@index([unlinkedFromContactId])
+}
+
+/// A customer's request to the business, made from their site account
+/// (DEC-172, #1106): today only "Ask to remove my data". Nothing is deleted
+/// when they ask. The business acts through the existing privacy removal
+/// (`customer-workspace/privacy-removal.service.ts`), which marks the open
+/// request DONE in its own transaction, or closes it without removal, with
+/// a reason.
+///
+/// The row is the record of the request and outlives what it is about: the
+/// removal deletes the account and anonymises the contact, so both links are
+/// nullable single-column keys that clear (SET NULL) rather than cascade,
+/// and the requester's name and email are kept as they were when asked, for
+/// the merchant's list and the "done" email. Single-column keys as
+/// `Booking.customerAccountId`: a composite SET NULL would null the required
+/// organization; row-level security keeps the row in its business.
+model CustomerDataRequest {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  customerAccountId String?
+  customerAccount   CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
+  contactId         String?
+  contact           Contact?         @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  // Who asked, as they were when they asked. Once their details are removed
+  // (DONE) the name is cleared, and the email too once the "done" email has
+  // gone (review #19); a CHECK keeps the email until then.
+  requesterName  String?
+  requesterEmail String?
+
+  kind   CustomerDataRequestKind   @default(REMOVAL)
+  status CustomerDataRequestStatus @default(OPEN)
+  // Why it was closed without removal. Never in Saroh's email to the customer.
+  reason String?
+
+  // Who marked it DONE (the removal) or closed it, and when.
+  handledByUserId String?
+  handledAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // At most one OPEN request per account: asking again returns it.
+  @@unique([customerAccountId], map: "CustomerDataRequest_one_open_per_account", where: raw("status = 'OPEN'"))
+  @@index([organizationId, status, createdAt])
+  @@index([contactId])
+  @@index([customerAccountId, createdAt])
+}
+
+enum CustomerDataRequestKind {
+  REMOVAL
+}
+
+enum CustomerDataRequestStatus {
+  OPEN
+  DONE
+  CLOSED_WITHOUT_REMOVAL
 }
 
 /// A six-digit code sent to a destination to sign in on a business's site.
@@ -7005,6 +7936,55 @@ model CustomerNotice {
   @@index([messageId])
   // One booking's notices: Saroh's cap of emails per booking a day (DEC-086).
   @@index([organizationId, bookingId, createdAt])
+}
+
+// A business's choice about one kind of automatic customer notice (DEC-174,
+// U1 #1132): renewal invoices, membership emails, refunds and so on. The
+// kinds and their defaults are code (`communications/notice-settings.ts`);
+// a row is kept only while the business's choice differs from the default,
+// as NotificationPreference does, so a switch put back removes it.
+model CustomerNoticeSetting {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // A NoticeKind: RENEWAL_INVOICE | AUTOPAY_FAILED | MEMBERSHIP | ... .
+  kind    String
+  enabled Boolean
+
+  // Who made the choice. Informational, no FK: the choice outlives them.
+  updatedByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, kind])
+}
+
+// When the business's overdue reminders go (DEC-178, #1169): the days after
+// the due date for the first and the second, and the hours of the day they
+// may go in, in the business's time zone. One row per business, kept only
+// while it differs from the defaults in code
+// (`communications/overdue-timing.ts`: days 3 and 10, 9:00 to 20:00), so a
+// business that never chose has none. Kept apart from the switch's row, so
+// turning reminders off and on again keeps the timing.
+model OverdueReminderTiming {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Whole days after the due date: 1..30, and the second after the first.
+  firstDay  Int
+  secondDay Int
+  // Hours of the day: from 0..23, until 1..24 and after from.
+  fromHour  Int
+  untilHour Int
+
+  // Who made the choice. Informational, no FK: the choice outlives them.
+  updatedByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ============================================================================
@@ -7379,6 +8359,48 @@ model BillingCustomer {
   @@unique([organizationId, provider])
 }
 
+// Who Saroh bills (DEC-167): a GST entity with its own legal name, GSTIN,
+// billing address and billing email, owned by one person and used by any of
+// their businesses. One customer at Saroh's billing provider per profile.
+// Owned by a user, not a business, so it has no org policy: the API reads
+// and writes it only for its owner (`billing-profiles.service.ts`).
+model BillingProfile {
+  id          String @id @default(cuid())
+  ownerUserId String
+  owner       User   @relation("BillingProfileOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  legalName    String
+  // GSTIN, when the entity is registered.
+  gstin        String?
+  // Two-digit GST state code: the billing address's state (and the GSTIN's).
+  gstState     String?
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  postalCode   String?
+  // Lower-case (a CHECK holds it); unique per owner, as the provider refuses
+  // a second customer with the same email and phone.
+  billingEmail String
+  phone        String?
+
+  provider           String
+  // Razorpay's `cust_…`; null until the provider has made it.
+  providerCustomerId String?
+  // Made without the phone: the provider already has a customer with this
+  // email and phone. The phone stays in Saroh.
+  contactWithheld    Boolean   @default(false)
+  syncedAt           DateTime?
+  lastError          String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  organizations Organization[] @relation("OrganizationBillingProfile")
+
+  @@unique([ownerUserId, billingEmail])
+  @@unique([provider, providerCustomerId])
+  @@index([ownerUserId])
+}
+
 // Something about Saroh's billing an operator must act on by hand (DEC-166,
 // owner 17 Oct 2026): a refund owed, a cancel the provider keeps refusing,
 // a payment Saroh never matched, an invoice whose total isn't what the
@@ -7486,6 +8508,9 @@ model BillingCheckout {
   providerSubscriptionId String
   providerPlanId         String
   providerCustomerId     String?
+  // The billing profile this checkout bills (DEC-167): the business's own
+  // at the time, or the one a scheduled switch moves it to.
+  billingProfileId       String?
 
   // The plan's recurring price before GST, in paise, as it was quoted.
   pricePaise        Int
@@ -7563,6 +8588,9 @@ model SarohInvoice {
   // payment, its customer and Saroh's invoice can be followed either way
   // (17 Oct 2026). Null on invoices written before it was kept.
   providerCustomerId     String?
+  // The billing profile the invoice is addressed to (DEC-167); its bill-to
+  // fields above are the profile's at issue time. Null before profiles.
+  billingProfileId       String?
   checkoutId             String?
   planId                 String?
   planName               String

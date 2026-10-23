@@ -92,3 +92,33 @@ export async function recordRefundAction(
         "Could not record the refund.",
     );
 }
+
+/**
+ * Run a failed billing job again (R28), through the console's one job
+ * retry (`POST /admin/jobs/retry`, `jobs:retry`): the API checks the job
+ * again, queues it, and records the reason. Billing's own pages are not
+ * refreshed, so the row stays where it is and says it was queued.
+ */
+export async function retryBillingJobAction(
+    input: OperatorInput & { jobId: string },
+) {
+    const { jobId, ...body } = input;
+    const result = await adminWrite<{
+        items: { targetId: string; status: string; detail: string | null }[];
+    }>(
+        "/jobs/retry",
+        "POST",
+        { ids: [jobId], ...body },
+        "Could not run the job again.",
+    );
+    if (!result.ok) return result;
+    revalidatePath("/operations/jobs");
+    const item = result.data.items.find((i) => i.targetId === jobId);
+    return {
+        ok: true as const,
+        data: {
+            status: item?.status ?? "PENDING",
+            detail: item?.detail ?? null,
+        },
+    };
+}

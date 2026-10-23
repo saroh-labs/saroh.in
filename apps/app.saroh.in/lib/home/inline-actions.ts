@@ -15,15 +15,22 @@ import type { HomeInline, HomeNeed } from "./service";
  *   Undo. When the step tells the customer, A14 holds that notice ten
  *   seconds too, so Undo is offered only for the hold; when nothing is
  *   sent, the row keeps its Undo for the stage's own window.
- * - **once** (Retry by pay link, or by autopay; Refund): made at once, and
+ * - **once** (Retry by payment link, or by autopay; Refund): made at once, and
  *   nothing to take back — a new link replaces the old one; an autopay
  *   charge is told to the customer by their bank; a refund can't be undone
  *   — so the confirm says so first.
+ *
+ * A booking awaiting payment's two (DEC-171, Home plan U7) are always
+ * **held**, whether or not a message leaves: Turn down cancels the booking
+ * (or lets a hold go) and Send payment link stops the link sent before,
+ * and neither can be taken back once made.
  */
 export type InlineRun = "held" | "undo" | "once";
 
 export function runOf(inline: HomeInline): InlineRun {
     if (inline.kind === "MARK_SENT") return "undo";
+    if (inline.kind === "TURN_DOWN" || inline.kind === "SEND_PAY_LINK")
+        return "held";
     if (inline.kind === "RETRY" || !inline.sends) return "once";
     return "held";
 }
@@ -76,9 +83,29 @@ export function undoneText(inline: HomeInline, told: boolean): string {
             return "Not sent. Your reply is still in the box.";
         case "REVIEW_REPLY":
             return "Not posted. Your reply is still in the box.";
+        case "TURN_DOWN":
+            return "Not turned down. The booking stands.";
+        case "SEND_PAY_LINK":
+            return "No new link was made. The one sent before still works.";
         case "RETRY":
         case "REFUND":
             return "Undone.";
+    }
+}
+
+/**
+ * What the row says while a held action waits its ten seconds. A message
+ * "is sent" only once it has gone, so a held send or a turn down says it is
+ * about to happen, never that it has.
+ */
+export function heldText(inline: HomeInline): string {
+    switch (inline.kind) {
+        case "TURN_DOWN":
+            return "Turning down in 10 seconds";
+        case "SEND_PAY_LINK":
+            return "Making the link in 10 seconds";
+        default:
+            return inline.done;
     }
 }
 
@@ -90,7 +117,7 @@ export function failedText(inline: HomeInline): string {
         case "RETRY":
             return inline.via === "MANDATE"
                 ? "Autopay wasn't charged."
-                : "No new pay link was made.";
+                : "No new payment link was made.";
         case "SEND_REMINDER":
             return "The reminder wasn't sent.";
         case "REPLY":
@@ -99,6 +126,10 @@ export function failedText(inline: HomeInline): string {
             return "Your reply wasn't posted.";
         case "REFUND":
             return "Nothing was refunded.";
+        case "TURN_DOWN":
+            return "The booking wasn't turned down.";
+        case "SEND_PAY_LINK":
+            return "No payment link was made.";
     }
 }
 

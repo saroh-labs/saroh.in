@@ -2,6 +2,8 @@ import { Injectable, Logger, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { moneyWordsMinor } from "../../common/words-format";
+import type { NoticeKind } from "../communications/notice-settings";
+import { defaultOn, noticeOn } from "../communications/notice-settings";
 import { InvoiceSendService } from "../invoices/invoice-send.service";
 import type { OrderStage } from "../orders/dto";
 import { nextStages } from "../orders/order-stage";
@@ -14,7 +16,9 @@ import { accountAreaOn } from "../site-accounts/account-area";
 import { orderContactId } from "../site-accounts/customer-notify.handler";
 import type { NoticeReach } from "../site-accounts/notice-reach";
 import { contactReach, hasLiveAccount } from "../site-accounts/notice-reach";
+import { orderNoticeSetting } from "../site-accounts/notices/order";
 import { orderNoticeKind } from "../site-accounts/notify-templates";
+import { teamReplyEmailedTo } from "../site-accounts/team-reply";
 import {
     firstNameOf,
     markSentWords,
@@ -70,8 +74,21 @@ export interface InlinePorts {
         organizationId: string,
         order: { customerId: string | null; customerAccountId: string | null },
     ) => Promise<NoticeReach | null>;
+    /**
+     * Whether the business sends a switched notice kind (U1's switches).
+     * Absent (a spec's ports): the default, on.
+     */
+    noticeOn?: (organizationId: string, kind: NoticeKind) => Promise<boolean>;
     /** Whether a contact has a live site account (A13's "signs in"). */
     signsIn: (organizationId: string, contactId: string) => Promise<boolean>;
+    /**
+     * Where a reply to a contact is emailed (DEC-174 U14), or null: it
+     * isn't. Absent (a spec's ports): never said to be emailed.
+     */
+    replyEmailedTo?: (
+        organizationId: string,
+        contactId: string,
+    ) => Promise<string | null>;
     /**
      * Each failed renewal's autopay (D13), by subscription: `CHARGING`, a
      * charge under way (no Retry); `MANDATE`, it can be charged again.
@@ -187,7 +204,17 @@ export class HomeInlineService {
                 if (!order) return;
                 const stage = handoverOf(order);
                 if (!stage) return;
-                const notifies = orderNoticeKind(stage) !== null;
+                // A step's notice behind a switch the business turned off
+                // (a digital order's Sent, U16) tells nobody.
+                const kind = orderNoticeKind(stage);
+                const setting = kind ? orderNoticeSetting(kind) : null;
+                const notifies =
+                    kind !== null &&
+                    (setting === null ||
+                        (await (this.ports.noticeOn ?? switchedOn)(
+                            input.organizationId,
+                            setting,
+                        )));
                 const reach = notifies
                     ? await this.ports
                           .orderReach(input.organizationId, order)
@@ -197,7 +224,7 @@ export class HomeInlineService {
                 // row opens the order, which says it for itself.
                 if (reach === null) return;
                 const person = firstNameOf(ev.subtitle);
-                const words = markSentWords(person, notifies, reach);
+                const words = markSentWords(person, notifies, reach, stage);
                 ev.inline = {
                     kind: "MARK_SENT",
                     ...words,
@@ -454,14 +481,15 @@ export class HomeInlineService {
         if (!holds(input, "message:write")) return;
         await Promise.all(
             evidence.map(async (ev) => {
-                const signsIn = await this.ports.signsIn(
-                    input.organizationId,
-                    ev.id,
-                );
+                const [signsIn, emailedTo] = await Promise.all([
+                    this.ports.signsIn(input.organizationId, ev.id),
+                    this.ports.replyEmailedTo?.(input.organizationId, ev.id) ??
+                        null,
+                ]);
                 const person = firstNameOf(ev.subtitle);
                 ev.inline = {
                     kind: "REPLY",
-                    ...replyWords(person, signsIn),
+                    ...replyWords(person, signsIn, emailedTo),
                     undoable: true,
                     target: ev.id,
                     person,
@@ -541,5 +569,12 @@ function defaultPorts(db: Db): InlinePorts {
         },
         signsIn: (organizationId, contactId) =>
             hasLiveAccount(db, organizationId, contactId),
+        noticeOn: (organizationId, kind) => noticeOn(db, organizationId, kind),
+        replyEmailedTo: (organizationId, contactId) =>
+            teamReplyEmailedTo(db, organizationId, contactId),
     };
 }
+
+/** A switch read with no port: its default. */
+const switchedOn = (_organizationId: string, kind: NoticeKind) =>
+    Promise.resolve(defaultOn(kind));

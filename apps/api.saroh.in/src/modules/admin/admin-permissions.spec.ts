@@ -3,6 +3,7 @@ import {
     AdminRole,
     ALL_ADMIN_PERMISSIONS,
     isAdminRole,
+    OWN_SCOPED_ROLES,
     permissionsFor,
 } from "./admin-permissions";
 
@@ -126,5 +127,116 @@ describe("admin permission policy", () => {
 
         expect(repeated).toEqual(once);
         expect(new Set(repeated).size).toBe(repeated.length);
+    });
+
+    it("rejects tenant roles named like the Account manager's job", () => {
+        expect(isAdminRole("ACCOUNT_MANAGER")).toBe(true);
+        expect(isAdminRole("ACCOUNT_MANAGER_JOB")).toBe(false);
+    });
+});
+
+/**
+ * The Team permissions (DEC-169), exactly as the admin console redesign
+ * plan's "Roles and the new permissions" table sets them. Each row lists
+ * every role that holds the permission; a role added to or dropped from a
+ * row fails here.
+ */
+describe("Team permissions (DEC-169)", () => {
+    const holders = (permission: AdminPermission) =>
+        Object.values(AdminRole)
+            .filter((role) => permissionsFor([role]).includes(permission))
+            .sort();
+    const { PlatformOwner, Support, Billing, Auditor, AccountManager } =
+        AdminRole;
+
+    it.each([
+        [AdminPermission.TeamRead, [PlatformOwner, Support, Billing, Auditor]],
+        [AdminPermission.TeamWrite, [PlatformOwner]],
+        [
+            AdminPermission.AccountsRead,
+            [PlatformOwner, Support, Billing, Auditor, AccountManager],
+        ],
+        [AdminPermission.AccountsAssign, [PlatformOwner, Support]],
+        [
+            AdminPermission.SarohLeadsRead,
+            [PlatformOwner, Support, AccountManager],
+        ],
+        [
+            AdminPermission.SarohLeadsWrite,
+            [PlatformOwner, Support, AccountManager],
+        ],
+        [AdminPermission.TeamPay, [PlatformOwner, Billing]],
+        [AdminPermission.CommissionRates, [PlatformOwner]],
+        [AdminPermission.PeopleSignInHelp, [PlatformOwner, Support]],
+    ] as const)("%s is held by exactly its row", (permission, roles) => {
+        expect(holders(permission)).toEqual([...roles].sort());
+    });
+
+    it("spells the new permissions as the console mirrors them", () => {
+        expect([
+            AdminPermission.TeamRead,
+            AdminPermission.TeamWrite,
+            AdminPermission.AccountsRead,
+            AdminPermission.AccountsAssign,
+            AdminPermission.SarohLeadsRead,
+            AdminPermission.SarohLeadsWrite,
+            AdminPermission.TeamPay,
+            AdminPermission.CommissionRates,
+            AdminPermission.PeopleSignInHelp,
+        ]).toEqual([
+            "team:read",
+            "team:write",
+            "accounts:read",
+            "accounts:assign",
+            "saroh-leads:read",
+            "saroh-leads:write",
+            "team:pay",
+            "commission:rates",
+            "people:sign-in-help",
+        ]);
+    });
+
+    it("gives the Account manager its three scoped permissions and nothing else", () => {
+        expect(permissionsFor([AdminRole.AccountManager])).toEqual([
+            AdminPermission.AccountsRead,
+            AdminPermission.SarohLeadsRead,
+            AdminPermission.SarohLeadsWrite,
+        ]);
+    });
+
+    it.each([
+        AdminPermission.OrganizationRead,
+        AdminPermission.AccountsAssign,
+        AdminPermission.TeamWrite,
+        AdminPermission.StaffGrant,
+        AdminPermission.TeamPay,
+        AdminPermission.PlatformRead,
+    ])("never gives the Account manager %s", (permission) => {
+        expect(permissionsFor([AdminRole.AccountManager])).not.toContain(
+            permission,
+        );
+    });
+
+    it("scopes only the Account manager to its own", () => {
+        expect(OWN_SCOPED_ROLES).toEqual([AdminRole.AccountManager]);
+    });
+
+    it("leaves Operations and Release manager out of the Team entirely", () => {
+        const team = [
+            AdminPermission.TeamRead,
+            AdminPermission.TeamWrite,
+            AdminPermission.AccountsRead,
+            AdminPermission.AccountsAssign,
+            AdminPermission.SarohLeadsRead,
+            AdminPermission.SarohLeadsWrite,
+            AdminPermission.TeamPay,
+            AdminPermission.CommissionRates,
+            AdminPermission.PeopleSignInHelp,
+        ];
+        for (const role of [AdminRole.Operations, AdminRole.ReleaseManager]) {
+            for (const permission of team) {
+                expect(permissionsFor([role])).not.toContain(permission);
+            }
+        }
     });
 });

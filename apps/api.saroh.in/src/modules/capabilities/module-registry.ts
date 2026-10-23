@@ -30,21 +30,11 @@ import { FlagKey, isKnownFlagKey } from "../feature-flags/flags";
 import type { OrgAction } from "../organizations/organization-policy";
 import { ORG_ACTIONS } from "../organizations/organization-policy";
 
-/** The optional-module set. AI is excluded under DEC-015. */
-export const MODULE_KEYS = [
-    "WEBSITE",
-    "CRM",
-    "APPOINTMENTS",
-    "COURSES",
-    "CLASS_PACKS",
-    "COMMERCE",
-    "PAYMENTS",
-    "COMMUNICATIONS",
-    "AUTOMATIONS",
-    "INSIGHTS",
-] as const;
+import type { ModuleKey } from "./module-keys";
+import { MODULE_KEYS } from "./module-keys";
 
-export type ModuleKey = (typeof MODULE_KEYS)[number];
+export { MODULE_KEYS } from "./module-keys";
+export type { ModuleKey } from "./module-keys";
 
 /** Persisted lifecycle values (Task 2 stores these; readiness is NOT one). */
 export type ModuleLifecycle = "DISABLED" | "ENABLED" | "ARCHIVED";
@@ -431,6 +421,15 @@ export const MODULE_BY_KEY: ReadonlyMap<ModuleKey, ModuleDescriptor> = new Map(
 );
 
 /**
+ * Hidden from every business (DEC-068), whatever its rollout flag says. The
+ * one reader of `hidden`: {@link moduleRolledOut} and the admin console's
+ * module state (which leaves these out) both ask here.
+ */
+export function moduleHidden(moduleKey: ModuleKey): boolean {
+    return MODULE_BY_KEY.get(moduleKey)?.hidden === true;
+}
+
+/**
  * Whether Saroh has rolled a module out to a business (DEC-057): its rollout
  * flag is on and it isn't hidden (DEC-068). Every reader of the rollout
  * gate — availability, enable, impact — asks here, so a hidden module reads
@@ -446,7 +445,7 @@ export async function moduleRolledOut(
     organizationId: string,
 ): Promise<boolean> {
     const descriptor = MODULE_BY_KEY.get(moduleKey);
-    if (!descriptor || descriptor.hidden) return false;
+    if (!descriptor || moduleHidden(moduleKey)) return false;
     if (!flags) return true;
     return flags.isEnabled(descriptor.rolloutFlag, organizationId);
 }

@@ -64,6 +64,20 @@ describe("what a reply does", () => {
         );
     });
 
+    it("names the address where the business's own email sends the reply (U14)", () => {
+        expect(replyNote(true, "Farah", "farah@example.com")).toBe(
+            "Emailed to farah@example.com a minute after you send. Farah also sees it in Messages on your site.",
+        );
+        expect(replyNote(false, "Farah", "farah@example.com")).toBe(
+            "Emailed to farah@example.com a minute after you send. Farah can also read it when they sign in on your site.",
+        );
+        // Not emailed: never says it is.
+        expect(replyNote(true, "Farah", null)).toContain(
+            "Nothing is emailed or texted.",
+        );
+        expect(replyNote(false, "Farah", null)).not.toContain("Emailed");
+    });
+
     it("waits for someone who doesn't sign in yet", () => {
         expect(replyNote(false, "Farah")).toBe(
             "Farah doesn't sign in on your site yet. They'll see it when they sign in on your site.",

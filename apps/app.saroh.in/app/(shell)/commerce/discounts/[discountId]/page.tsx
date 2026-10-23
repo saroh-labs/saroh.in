@@ -1,9 +1,9 @@
 import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
 
-import { PageContainer } from "@/components/shared/page-container";
-import { DiscountForm } from "@/components/stores/discount-form";
-import { DiscountReadView } from "@/components/stores/discount-read-view";
+import { PageContainer } from "@/components/shared/page/page-container";
+import { DiscountForm } from "@/components/stores/discounts/discount-form";
+import { DiscountReadView } from "@/components/stores/discounts/discount-read-view";
 import { canOrUnknown } from "@/lib/access/require-can";
 import { loadReachOptions } from "@/lib/discounts/options";
 import { getDiscount } from "@/lib/discounts/service";

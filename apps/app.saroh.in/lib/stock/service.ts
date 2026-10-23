@@ -1,8 +1,12 @@
+import { unstable_rethrow } from "next/navigation";
+
 import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getJson, orgBase } from "@/lib/api/http";
 
 import type { StockCell, StockEntryKind } from "./levels";
+import type { WaitingCount } from "./waiting";
+import { waitingCountOf } from "./waiting";
 
 /**
  * Stock data access for app.saroh.in (#514): the levels, the log and the
@@ -381,4 +385,32 @@ export function resolveStockCheck(
         `/checks/${encodeURIComponent(key)}/resolve`,
         input,
     );
+}
+
+// ---- Waiting for it to be back (DEC-174, U24) ----
+
+/**
+ * How many customers wait for a product to be back, and for which option
+ * (`GET organizations/:org/stock-watches?productId=`, `store:read`; counts
+ * only, never an address). Null when it can't be said: no business, a
+ * role or a business without the shop, or a read that failed. The count is
+ * extra on the screen, so it never fails the page; the screen shows
+ * nothing rather than a zero.
+ */
+export async function getWaitingCount(
+    productId: string,
+): Promise<WaitingCount | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    try {
+        const res = await apiFetch(
+            `${base}/stock-watches${query({ productId })}`,
+        );
+        if (!res.ok) return null;
+        return waitingCountOf(await res.json().catch(() => null));
+    } catch (error) {
+        // Next's own interrupts are not a failed read.
+        unstable_rethrow(error);
+        return null;
+    }
 }

@@ -36,6 +36,11 @@
   enforcement is on and a context is active. (Store slugs had the same
   check until L14 stopped writing them.) Never a `tx.<model>.findUnique`
   on a globally unique column. Prove it under `TEST_RLS=on`.
+  The same goes for any read that spans one person's businesses — the
+  businesses a billing profile's owner owns (`ownedBusinessIds`,
+  `billing/billing-customer.ts`): Membership is isolated per business, so
+  in a checkout's context only that business's membership is seen. A job
+  runs with no context, so prove it on a path scoped to one business.
 - **Current** — **Read a lost serializable race with `isSerializationFailure()`**
   (or `prismaErrorCode()`, `apps/api.saroh.in/src/common/prisma-errors.ts`),
   never `code === "P2034"`. Through the pg driver adapter it can arrive with no
@@ -231,6 +236,20 @@
   (`mergedIntoId: null`). Every relation to `Contact` needs a rule in
   `merge-plan.ts` `MERGE_RULES`; `merge.relations.spec.ts` fails a new one
   without.
+- **Current** — **A write that can race is guarded where it lands, and
+  its spec runs the race.** Read-then-write by id at Read Committed
+  re-checks only the id after a lock wait: lock the row first
+  (`FOR UPDATE`), or guard the write on the state read (`updateMany where
+{ id, status: "WAITING" }`) and act on `count`. A save re-reads its row
+  under the lock and writes only the columns it changes; an Undo answer
+  (`previous`) carries only those. A replace (deleteMany + create) takes a
+  `pg_advisory_xact_lock` on its key. In a Serializable transaction the
+  snapshot predates any lock taken inside it, so a Read Committed writer's
+  commit stays invisible: read again on a connection of its own
+  (`outsideOrgContext`, since the ambient client joins the transaction)
+  and retry (`bookings/phone-booker.ts`). Specs hold one writer on the
+  lock in a test transaction, or `Promise.allSettled` the two
+  (DEV_LEARNINGS, 19 Oct 2026).
 - **Current** — **A privacy removal anonymises in place; a new personal
   field needs a rule** (DEC-042, round-2 C11). "Remove their details"
   (`customer-workspace/privacy-removal.service.ts`) keeps the contact row
@@ -268,6 +287,28 @@
 
 - `Decimal` with explicit precision (`@db.Decimal(10, 2)`, `@db.Decimal(12, 2)`);
   never `Float` or `Int` for currency.
+- **The invoice ledger counts in integer paise** (DEC-173, #1113): the one
+  exception to "never `Int` for currency", as `PaymentIntent.amountCents`
+  already was. `InvoicePayment.amountCents` is one payment;
+  `Invoice.paidCents` caches the sum of the live ones (not removed, not
+  bounced), is recomputed from the rows in the same transaction as every
+  ledger write, and is written nowhere else (the showcase check pins it).
+  The invoice's own money columns stay `Decimal(12,2)` and amounts still
+  travel as strings. What is left to pay is `leftToPayCents`
+  (`invoices/invoice-state.ts`), the one place it is worked out. A payment
+  is never deleted: one recorded by mistake is removed softly
+  (`removedAt`). An order's invoice has no rows; the order is its ledger
+  (ADR-008). **Money in is one rule** (`invoices/money-in.ts`, DEC-173):
+  the ledger's payments that count, on the day each was received, and an
+  order's paper on the day it was paid. Every figure of money that came in
+  (the Invoices strip, Home, Insights) reads it; never an invoice's total
+  on its `paidAt`, which moves part payments, bounced cheques and
+  back-dated payments to the wrong day (`backend-billing-and-classes.md`
+  → Money in is one rule). What a booking's paper has been paid is its
+  ledger too (`paidOnPaperCents`), never its last payment's method. The migration's CHECKs hold the shape (an amount above 0, a
+  known method, a bank status only and always on a cheque); they exist
+  only where migrations ran, so prove them under `TEST_RLS=on`
+  (`rls/invoice-payments-rls.db.spec.ts`).
 - **Strings across the wire.** Frontend types say `price: string`, and
   `common/money.ts` `toMoneyString` formats with string operations only.
 - **The API computes.** Order totals are summed in integer cents server-side

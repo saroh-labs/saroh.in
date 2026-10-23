@@ -1,8 +1,8 @@
 import { getServerSession } from "@saroh/auth/next";
 import { headers } from "next/headers";
 
-import { AppHeader } from "@/components/shared/app-header";
-import { UsageRecording } from "@/components/shared/usage-recording";
+import { AppHeader } from "@/components/shared/shell/app-header";
+import { UsageRecording } from "@/components/shared/shell/usage-recording";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 
 /**

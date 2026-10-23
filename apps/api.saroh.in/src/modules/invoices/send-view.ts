@@ -38,6 +38,11 @@ export interface InvoiceSendView {
     payOnline: boolean;
     /** A send or reminder went in the last day: the next reminder can go from here. */
     nextReminderAt: string | null;
+    /**
+     * The contact's phone (E.164), for Share's WhatsApp tab and its "To"
+     * line (DEC-173, U11). Left out when there is none.
+     */
+    phone?: string;
 }
 
 /** One send or reminder, for "What happened". */
@@ -49,4 +54,20 @@ export interface InvoiceSentView {
     reminder: boolean;
     /** QUEUED | SENT | FAILED | SUPPRESSED (the customer turned email off). */
     status: string;
+}
+
+/**
+ * One time the invoice was shared by hand (DEC-173): opened on WhatsApp,
+ * its link copied, its PDF downloaded or printed. On WhatsApp Saroh only
+ * knows it was opened, never that it was sent: "shared on WhatsApp".
+ */
+export interface InvoiceSharedView {
+    id: string;
+    channel: "WHATSAPP" | "LINK" | "PDF" | "PRINT";
+    kind: "NEW" | "REMINDER" | "RECEIPT";
+    /** Who shared it; null if they have since been removed. */
+    byUserId: string | null;
+    /** Their name, for "Shared on WhatsApp by Ravi"; null when unknown. */
+    byName: string | null;
+    at: string;
 }

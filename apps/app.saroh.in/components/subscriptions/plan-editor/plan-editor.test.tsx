@@ -11,6 +11,14 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+    pickRate,
+    rateGroup,
+    ratePicker,
+    rateShown,
+    ratesOffered,
+} from "@/components/shared/fields/gst-rate-picker.testing";
+
 import type { PlanEditorRecord } from "@/lib/subscriptions/plan-drafts";
 
 const push = vi.fn();
@@ -186,6 +194,12 @@ function field(label: string): HTMLInputElement {
 }
 
 /** A select by its label, as the GST fields draw them. */
+/** The GST rate's buttons (DEC-176), and their main row. */
+const rate = () => ratePicker("GST rate", host);
+const rateRow = () => rateGroup(rate());
+/** The chip the keyboard lands on in the rates: their one tab stop. */
+const rateStop = () => rateRow().querySelector('[tabindex="0"]');
+
 function select(label: string): HTMLSelectElement {
     const l = Array.from(host.querySelectorAll("label")).find((x) =>
         x.textContent.trim().startsWith(label),
@@ -487,14 +501,14 @@ describe("the Plan Editor", () => {
 
     it("says how it's paid without promising autopay", () => {
         render(record());
-        expect(text()).toContain("Invoiced each month with a pay link.");
+        expect(text()).toContain("Invoiced each month with a payment link.");
         expect(text()).not.toMatch(/autopay/i);
     });
 
     it("mentions autopay only when the business offers it (D14)", () => {
         render(record(), { autopayOffered: true });
         expect(text()).toContain(
-            "Invoiced each month with a pay link, or by autopay for members who set it up.",
+            "Invoiced each month with a payment link, or by autopay for members who set it up.",
         );
     });
 });
@@ -541,19 +555,10 @@ describe("a plan's GST (12 Oct 2026)", () => {
 
     it("asks a registered business for the rate beside the price, with the quiet select and the SAC code", () => {
         render(record({ gst: ASKED }));
-        const rate = select("GST rate");
-        expect(rate.value).toBe("");
-        expect(Array.from(rate.options).map((o) => o.textContent)).toEqual([
-            "Choose a rate",
-            "0%, nil-rated or exempt",
-            "0.25%",
-            "3%",
-            "5%",
-            "12%",
-            "18%",
-            "28%",
-            "40%",
-        ]);
+        // The rates as buttons (DEC-176): none pressed, no "Not set", and
+        // the rest behind Other rate.
+        expect(rateShown(rate())).toBe("");
+        expect(ratesOffered(rate())).toEqual(["0", "5", "18", "40"]);
         expect(
             Array.from(select("GST on this price").options).map(
                 (o) => o.textContent,
@@ -575,12 +580,10 @@ describe("a plan's GST (12 Oct 2026)", () => {
         );
         expect(note?.getAttribute("data-slot")).toBe("field-hint");
         expect(
-            select("GST rate").getAttribute("aria-describedby")?.split(" "),
+            rateRow().getAttribute("aria-describedby")?.split(" "),
         ).toContain(note?.id);
         // No red field, no alert, no count, and the header still says so.
-        expect(select("GST rate").getAttribute("aria-invalid")).not.toBe(
-            "true",
-        );
+        expect(rateRow().getAttribute("aria-invalid")).not.toBe("true");
         expect(host.querySelector("[data-invalid]")).toBeNull();
         expect(host.querySelector("[role=alert]")).toBeNull();
         expect(text()).not.toContain("to fix before publishing");
@@ -610,9 +613,7 @@ describe("a plan's GST (12 Oct 2026)", () => {
         // Before anything is pressed: the note, and a Publish to press.
         expect(text()).toContain(NO_RATE_NOTE);
         expect(text()).not.toContain("to fix before publishing");
-        expect(select("GST rate").getAttribute("aria-invalid")).not.toBe(
-            "true",
-        );
+        expect(rateRow().getAttribute("aria-invalid")).not.toBe("true");
         expect(button("Publish changes").disabled).toBe(false);
 
         click(button("Publish changes"));
@@ -620,14 +621,14 @@ describe("a plan's GST (12 Oct 2026)", () => {
         // Nothing is sent: the plan can't be published without a rate.
         expect(actions.publishPlan).not.toHaveBeenCalled();
         expect(button("Publish changes").disabled).toBe(true);
-        expect(select("GST rate").getAttribute("aria-invalid")).toBe("true");
+        expect(rateRow().getAttribute("aria-invalid")).toBe("true");
         expect(host.querySelector("[role=alert]")?.textContent).toBe(
             "Choose a GST rate. Pick 0% if it's exempt or nil-rated",
         );
         expect(text()).toContain(RATE_COUNT);
         expect(text()).not.toContain("nil-rated..");
         expect(text()).not.toContain(NO_RATE_NOTE);
-        expect(document.activeElement).toBe(select("GST rate"));
+        expect(document.activeElement).toBe(rateStop());
 
         actions.savePlanDraft.mockResolvedValue({
             ok: true,
@@ -638,7 +639,7 @@ describe("a plan's GST (12 Oct 2026)", () => {
                 values: { ...values, price: "1500.00", gstRate: "18" },
             }),
         });
-        pick(select("GST rate"), "18");
+        pickRate(rate(), "18");
         await wait(800);
         expect(actions.savePlanDraft).toHaveBeenCalledWith(
             "plan_1",
@@ -649,9 +650,7 @@ describe("a plan's GST (12 Oct 2026)", () => {
             }),
             4,
         );
-        expect(select("GST rate").getAttribute("aria-invalid")).not.toBe(
-            "true",
-        );
+        expect(rateRow().getAttribute("aria-invalid")).not.toBe("true");
         expect(button("Publish changes").disabled).toBe(false);
         expect(text()).toContain("GST rate not set → 18%");
 
@@ -671,8 +670,8 @@ describe("a plan's GST (12 Oct 2026)", () => {
 
     it("says it as an error once the rate box is left with nothing chosen", () => {
         render(record({ gst: ASKED }));
-        leave(select("GST rate"));
-        expect(select("GST rate").getAttribute("aria-invalid")).toBe("true");
+        leave(rateRow());
+        expect(rateRow().getAttribute("aria-invalid")).toBe("true");
         expect(host.querySelector("[role=alert]")?.textContent).toBe(
             "Choose a GST rate. Pick 0% if it's exempt or nil-rated",
         );
@@ -696,9 +695,7 @@ describe("a plan's GST (12 Oct 2026)", () => {
         await wait(800);
         expect(text()).toContain(NO_RATE_NOTE);
         expect(text()).not.toContain("to fix before publishing");
-        expect(select("GST rate").getAttribute("aria-invalid")).not.toBe(
-            "true",
-        );
+        expect(rateRow().getAttribute("aria-invalid")).not.toBe("true");
         expect(button("Publish changes").disabled).toBe(false);
     });
 
@@ -721,7 +718,7 @@ describe("a plan's GST (12 Oct 2026)", () => {
 
         type(field("Name"), "Monthly");
         type(field("Price"), "1200");
-        expect(select("GST rate").getAttribute("aria-invalid")).toBe("true");
+        expect(rateRow().getAttribute("aria-invalid")).toBe("true");
         expect(text()).not.toContain("has no GST rate yet");
         await wait(800);
         expect(button("Publish").disabled).toBe(true);
@@ -737,7 +734,7 @@ describe("a plan's GST (12 Oct 2026)", () => {
                 canDelete: true,
             }),
         );
-        expect(select("GST rate").getAttribute("aria-invalid")).toBe("true");
+        expect(rateRow().getAttribute("aria-invalid")).toBe("true");
         expect(text()).toContain(RATE_COUNT);
         expect(text()).not.toContain("has no GST rate yet");
         expect(button("Publish").disabled).toBe(true);
@@ -759,7 +756,7 @@ describe("a plan's GST (12 Oct 2026)", () => {
                 },
             }),
         });
-        pick(select("GST rate"), "0");
+        pickRate(rate(), "0");
         pick(select("GST on this price"), "ADDED");
         type(field("SAC code"), "9997 23");
         await wait(800);
@@ -777,7 +774,7 @@ describe("a plan's GST (12 Oct 2026)", () => {
 
     it("asks on a new plan when the page says the business is registered", () => {
         render(null, { gst: { asked: true, priceMode: "ADDED" } });
-        expect(select("GST rate")).toBeTruthy();
+        expect(rate()).toBeTruthy();
         expect(select("GST on this price").options[0].textContent).toBe(
             "Same as the business (GST is added)",
         );
@@ -809,7 +806,7 @@ describe("a plan's GST (12 Oct 2026)", () => {
             "12 members' next renewal changes from ₹1,200 to ₹1,416.",
         );
         expect(text()).toContain(
-            "3 of them pay by autopay with a limit below the new amount. Their renewal goes out as an invoice with a pay link.",
+            "3 of them pay by autopay with a limit below the new amount. Their renewal goes out as an invoice with a payment link.",
         );
         // The note after "When you publish" no longer says nobody's price
         // changes.

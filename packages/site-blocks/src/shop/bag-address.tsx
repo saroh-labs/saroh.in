@@ -1,8 +1,11 @@
 "use client";
 
+import { phoneNumberProblem } from "@saroh/block-contract";
+
 import { focusRing, inputFill } from "../booking-flow/styles";
-import { phoneOk } from "../lib/phone";
+import { phoneOk, phoneText } from "../lib/phone";
 import { cn } from "../lib/utils";
+import { SitePhoneInput } from "../phone-input";
 import type { DeliveryAddress, ShopWay } from "./api";
 import { INDIA_STATES, stateIn } from "./india-states";
 
@@ -52,8 +55,18 @@ export function addressLeft(a: DeliveryAddress): string | null {
     }
     const phone = a.phone?.trim() ?? "";
     if (phone === "") return "Add a phone number for the delivery.";
-    if (!phoneOk(phone)) return "Check the phone number.";
+    if (!deliveryPhoneOk(phone)) return "Check the phone number.";
     return null;
+}
+
+/**
+ * A delivery's phone: the field sends it with its country code (#1036),
+ * held to the one rule; one from an older saved address, typed before the
+ * field had a code, to the API's looser one it was saved by.
+ */
+export function deliveryPhoneOk(phone: string): boolean {
+    if (!phoneOk(phone)) return false;
+    return !phone.trim().startsWith("+") || phoneNumberProblem(phone) === null;
 }
 
 export function addressReady(a: DeliveryAddress): boolean {
@@ -83,7 +96,7 @@ export function addressLines(a: DeliveryAddress): string[] {
         a.line1.trim(),
         a.line2?.trim() ?? "",
         [town, a.postalCode.trim()].filter(Boolean).join(" "),
-        a.phone?.trim() ?? "",
+        phoneText(a.phone?.trim() ?? ""),
     ].filter((line) => line !== "");
 }
 
@@ -147,7 +160,7 @@ export function AddressFields({
     const phone = address.phone?.trim() ?? "";
     // Only once something is typed: an empty required field is said beside
     // the button, never as an error before the customer has started.
-    const phoneNote = phone !== "" && !phoneOk(phone);
+    const phoneNote = phone !== "" && !deliveryPhoneOk(phone);
     const input = (
         name: keyof DeliveryAddress,
         label: string,
@@ -158,27 +171,15 @@ export function AddressFields({
             {label}
             {required ? <span aria-hidden="true"> *</span> : null}
             <input
-                type={name === "phone" ? "tel" : "text"}
-                // The keyboard each needs: digits for a PIN code (six of
-                // them), the phone pad for a phone.
-                inputMode={
-                    name === "postalCode"
-                        ? "numeric"
-                        : name === "phone"
-                          ? "tel"
-                          : undefined
-                }
+                type="text"
+                // Digits for a PIN code (six of them). The phone is its own
+                // field, below.
+                inputMode={name === "postalCode" ? "numeric" : undefined}
                 maxLength={name === "postalCode" ? 6 : undefined}
                 autoComplete={auto}
                 required={required}
                 value={address[name] ?? ""}
                 onChange={(e) => onChange(name)(e.target.value)}
-                aria-invalid={name === "phone" && phoneNote ? true : undefined}
-                aria-describedby={
-                    name === "phone" && phoneNote
-                        ? `${site}-phone-note`
-                        : undefined
-                }
                 className={field}
             />
         </label>
@@ -187,7 +188,24 @@ export function AddressFields({
         <div className="grid gap-2.5">
             {input("name", "Name", "name")}
             <div>
-                {input("phone", "Phone", "tel", true)}
+                <label
+                    htmlFor={`${site}-phone`}
+                    className="block text-[13.5px] font-medium"
+                >
+                    Phone
+                    <span aria-hidden="true"> *</span>
+                </label>
+                <SitePhoneInput
+                    id={`${site}-phone`}
+                    className="mt-1"
+                    box={field}
+                    required
+                    autoComplete="tel-national"
+                    value={address.phone ?? ""}
+                    onValueChange={onChange("phone")}
+                    invalid={phoneNote}
+                    describedBy={phoneNote ? `${site}-phone-note` : undefined}
+                />
                 {phoneNote ? (
                     <p
                         id={`${site}-phone-note`}

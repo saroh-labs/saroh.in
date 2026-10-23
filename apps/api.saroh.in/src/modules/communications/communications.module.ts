@@ -2,6 +2,7 @@ import type { OnModuleInit } from "@nestjs/common";
 import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
+import { AuditModule } from "../audit/audit.module";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { InvoicePdfModule } from "../invoices/invoice-pdf.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
@@ -10,6 +11,7 @@ import { OrganizationsModule } from "../organizations/organizations.module";
 import { CommunicationsController } from "./communications.controller";
 import { CommunicationsService } from "./communications.service";
 import { MESSAGE_SEND_TYPE, MessageSendHandler } from "./message-send.handler";
+import { NoticeSettingsService } from "./notice-settings.service";
 import { commsProviderFactoryProvider } from "./providers/provider.factory";
 
 /**
@@ -33,12 +35,16 @@ import { commsProviderFactoryProvider } from "./providers/provider.factory";
         JobsModule,
         forwardRef(() => OrganizationsModule),
         CapabilitiesModule,
+        // The settings-audit entry for a customer notice switched (DEC-174).
+        AuditModule,
         // The invoice PDF the send job attaches to an invoice email (DEC-083).
         InvoicePdfModule,
     ],
     controllers: [CommunicationsController],
     providers: [
         CommunicationsService,
+        // The business's switches for its automatic notices (DEC-174, U1).
+        NoticeSettingsService,
         MessageSendHandler,
         commsProviderFactoryProvider,
         OrganizationGuard,

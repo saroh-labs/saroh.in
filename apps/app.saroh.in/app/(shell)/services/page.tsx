@@ -1,10 +1,10 @@
-import { PartialRead } from "@/components/shared/failed-read";
+import { PartialRead } from "@/components/shared/states/failed-read";
 import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 
-import { ServicesScreen } from "@/components/services/services-screen";
-import { PageContainer } from "@/components/shared/page-container";
-import { whoCanChange } from "@/components/shared/who-can-change";
+import { ServicesScreen } from "@/components/services/list/services-screen";
+import { PageContainer } from "@/components/shared/page/page-container";
+import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { canWriteCourses } from "@/lib/courses/access";
 import { readMissingRates } from "@/lib/gst-rates/service";
 import { modulesOrUnknown } from "@/lib/modules/guard";
@@ -12,6 +12,7 @@ import { rolledOut } from "@/lib/modules/rollout";
 import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { alsoSellFeatures } from "@/lib/services/also-sell";
+import { readBookingLink } from "@/lib/services/booking-link-read";
 import {
     businessCurrencyOf,
     readCanEditServices,
@@ -25,7 +26,7 @@ import { readBookingPayment } from "@/lib/staff/service";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
- * Bookings › Services (U16, E2): what people can book, as rows. The
+ * Bookings › Services (U16, E2; U15, #1031): what people can book. The
  * services read is the page; the staff read (who takes each), the
  * bookings read (how each is used) and the sites read (whether there is
  * a booking page) degrade on their own and say so. The module list, for
@@ -58,6 +59,7 @@ export default async function ServicesPage() {
         payment,
         missingRates,
         organization,
+        bookingLink,
     ] = await Promise.all([
         readServices(),
         readStaffOrNull(),
@@ -68,6 +70,8 @@ export default async function ServicesPage() {
         // What is on sale with no GST rate; null draws no notice.
         readMissingRates(),
         resolveActiveOrganization(),
+        // "Your booking page" (DEC-175); null leaves the row out.
+        readBookingLink(),
     ]);
     // New course joins New service only while Courses is on here and this
     // role may add one: the same answers the Courses screen gives.
@@ -92,7 +96,7 @@ export default async function ServicesPage() {
                         <PermissionDeniedState {...await servicesDenied()} />
                     ) : (
                         <FailedState
-                            title={couldntLoad("services")}
+                            title={couldntLoad("your services")}
                             retryHref="/services"
                         />
                     )}
@@ -136,6 +140,7 @@ export default async function ServicesPage() {
                     modules={modules ?? []}
                     missingRates={missingRates}
                     canNewCourse={canNewCourse}
+                    bookingLink={bookingLink}
                 />
             </div>
         </PageContainer>

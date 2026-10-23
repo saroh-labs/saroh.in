@@ -35,6 +35,19 @@ const WRITTEN: {
         href: "/commerce/orders/o1",
     },
     { type: "booking.new", kind: "booking", id: "b1", href: "/bookings/b1" },
+    // Bookings with you (#1138), in that person's own alerts.
+    {
+        type: "booking.mine.new",
+        kind: "booking",
+        id: "b1",
+        href: "/bookings/b1",
+    },
+    {
+        type: "booking.mine.cancelled",
+        kind: "booking",
+        id: "b1",
+        href: "/bookings/b1",
+    },
     {
         type: "booking.moved",
         kind: "booking",
@@ -103,6 +116,26 @@ const WRITTEN: {
         href: "/settings/providers",
     },
     { type: "team.joined", kind: "team", id: null, href: "/settings/people" },
+    // A booking rules request and its answer open Hours and time off on
+    // the person (#1038); a row written before it named them, the page.
+    {
+        type: "hours.rule-request",
+        kind: "hours",
+        id: "st_1",
+        href: "/bookings/availability?person=st_1",
+    },
+    {
+        type: "hours.rule-answer",
+        kind: "hours",
+        id: "st_1",
+        href: "/bookings/availability?person=st_1",
+    },
+    {
+        type: "hours.rule-request",
+        kind: "hours",
+        id: null,
+        href: "/bookings/availability",
+    },
     {
         type: "plan.limit",
         kind: "plan",
@@ -132,6 +165,33 @@ const WRITTEN: {
         kind: "products",
         id: null,
         href: "/commerce/products",
+    },
+    // DEC-172: a customer asked to remove their data.
+    {
+        type: "customer.data-request",
+        kind: "customer-request",
+        id: "con_1",
+        href: "/contacts/con_1",
+    },
+    {
+        type: "customer.data-request",
+        kind: "customer-request",
+        id: null,
+        href: "/commerce/customers?tab=requests",
+    },
+    // #1150: a member's own cancel or pause, or autopay off at their bank,
+    // opens the person's Memberships.
+    {
+        type: "member.cancelled",
+        kind: "member",
+        id: "con_1",
+        href: "/contacts/con_1?tab=sub",
+    },
+    {
+        type: "member.autopay_off",
+        kind: "member",
+        id: null,
+        href: "/billing/subscriptions",
     },
 ];
 

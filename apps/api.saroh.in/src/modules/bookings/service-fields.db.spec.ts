@@ -187,6 +187,30 @@ describe("service fields (E1, real database)", () => {
         expect(again.services.map((s) => s.id)).toContain(hidden.id);
     });
 
+    // Who can book it (DEC-170, Q5): customers only. The team is refused
+    // by hand (`book-by-hand.db.spec.ts`); the booking page still offers it.
+    it("still offers a service only customers book on the booking page", async () => {
+        const online = await bookings.createService(owner, {
+            name: "Online-only consult",
+            durationMinutes: 15,
+            timezone: "Asia/Kolkata",
+            bookableByTeam: false,
+        });
+        expect(online).toMatchObject({
+            bookableByTeam: false,
+            showOnBookingPage: true,
+        });
+        await withHours(online.id);
+        const page = await publicBookings.publicBookingPage(siteId);
+        expect(page.services.map((s) => s.id)).toContain(online.id);
+        await expect(
+            publicBookings.publicServices([online.id]),
+        ).resolves.toEqual([expect.objectContaining({ id: online.id })]);
+        await expect(
+            publicBookings.publicDays(online.id),
+        ).resolves.toBeTruthy();
+    });
+
     it("404s another business's service and changes nothing", async () => {
         await expect(
             bookings.updateService(other, existing, {

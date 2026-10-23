@@ -42,7 +42,11 @@ const CLASS_LEVEL: Record<string, string> = {
     "staff/staff.controller.ts": "APPOINTMENTS",
     // E3: business closures and the time-off preview.
     "staff/closures.controller.ts": "APPOINTMENTS",
+    // Each person's own booking rules and their requests (#1038).
+    "staff/staff-rules.controller.ts": "APPOINTMENTS",
     "sites/sites.controller.ts": "WEBSITE",
+    // "Your booking page" in Bookings (DEC-175): published from Bookings.
+    "sites/booking-page.controller.ts": "APPOINTMENTS",
     // DEC-071 T2: a site's test releases and their links.
     "sites/test-releases.controller.ts": "WEBSITE",
     // A site's Search and tracking section (DEC-108).
@@ -51,6 +55,8 @@ const CLASS_LEVEL: Record<string, string> = {
     "sites/site-icon.controller.ts": "WEBSITE",
     // A site's QR codes (Settings › Share).
     "sites/qr-codes.controller.ts": "WEBSITE",
+    // A look's starter content copied into the draft, and its Undo (DEC-182).
+    "sites/starter-content.controller.ts": "WEBSITE",
     "forms/forms.controller.ts": "WEBSITE",
     "domains/domains.controller.ts": "WEBSITE",
     "content/posts.controller.ts": "WEBSITE",
@@ -74,6 +80,8 @@ const CLASS_LEVEL: Record<string, string> = {
     "collections/collections.controller.ts": "COMMERCE",
     // #514: stock levels, the log, counts, moves and checks.
     "stock/stock.controller.ts": "COMMERCE",
+    // U23: who waits for a product to be back, for the workspace.
+    "stock/stock-watches.controller.ts": "COMMERCE",
     "imports/imports.controller.ts": "COMMERCE",
 };
 
@@ -134,6 +142,10 @@ const NEVER: Record<string, string> = {
         "spans every dated module, and drops a layer whose module is off itself",
     "customer-workspace/customer-workspace.controller.ts":
         "spans CRM, Commerce and Appointments at once",
+    // DEC-172: a customer's "Ask to remove my data", acted on with the
+    // customer removal, which is no module's.
+    "customer-workspace/data-requests.controller.ts":
+        "a customer's data removal request: the law's, whichever modules are on",
     "contacts/contact-search.controller.ts":
         "the customer picker in New booking and New order (B13) works whichever of CRM, Appointments and Commerce is on",
     "notifications/notifications.controller.ts": "cross-cutting",
@@ -158,12 +170,18 @@ const NEVER: Record<string, string> = {
     "members/members.controller.ts": "tenancy",
     "stores/stores.controller.ts": "tenancy",
     "billing/billing.controller.ts": "billing is not a capability module",
+    "billing/billing-profiles.controller.ts":
+        "the caller's own billing profiles, no business (DEC-167)",
+    "billing/business-billing-profile.controller.ts":
+        "who Saroh bills for the business: billing, not a capability module",
     "waitlist/launch-offer.controller.ts":
         "taking an opening-day invite's plan offer at onboarding — billing, not a capability module",
     "admin/admin.controller.ts": "staff control plane, not a tenant surface",
     "admin/admin-machinery.controller.ts":
         "staff control plane, not a tenant surface",
     "admin/admin-organizations.controller.ts":
+        "staff control plane, not a tenant surface",
+    "admin/admin-organization-overview.controller.ts":
         "staff control plane, not a tenant surface",
     "admin/admin-people.controller.ts":
         "staff control plane, not a tenant surface",
@@ -174,6 +192,12 @@ const NEVER: Record<string, string> = {
     "admin/admin-deployments.controller.ts":
         "staff control plane, not a tenant surface",
     "admin/admin-usage.controller.ts":
+        "staff control plane, not a tenant surface",
+    "admin/admin-console.controller.ts":
+        "staff control plane, not a tenant surface",
+    "admin/admin-account-managers.controller.ts":
+        "staff control plane, not a tenant surface",
+    "admin/admin-commission.controller.ts":
         "staff control plane, not a tenant surface",
     "organizations/organization-members.controller.ts": "tenancy",
     "health/health.controller.ts": "liveness",
@@ -210,6 +234,13 @@ const NEVER: Record<string, string> = {
         "a signed-in customer booking on a published site — Appointments checked per service",
     // A12: joining a full class's waitlist from the booking page, checked
     // per service like booking (`loadBookableService`).
+    // DEC-172: "Ask to remove my data" in the account's Your details.
+    "site-accounts/account-data-request.controller.ts":
+        "a signed-in customer asking to remove their own data — no module may hide it",
+    // U18 (#1149): a waitlist offer's claim link, read with no session;
+    // Appointments off reads as "This spot has gone".
+    "site-accounts/waitlist-claim.controller.ts":
+        "a waitlist offer's claim link on a published site — Appointments checked by the read",
     "site-accounts/account-waitlist.controller.ts":
         "a signed-in customer joining a class's waitlist on a published site — Appointments checked per service",
     // A5: the customer's account area. It lists only the modules the
@@ -263,6 +294,9 @@ const NEVER: Record<string, string> = {
     // (`commerceOpen`), which answers 404, as a site with no shop does.
     "products/public-catalogue.controller.ts":
         "a published site's shop and product pages — Commerce checked by the service",
+    // U23: "Tell me when it's back" and its stop page on a published site.
+    "stock/stock-watch.controller.ts":
+        "a published site's back-in-stock sign-up and stop page — Commerce checked by the service",
     // G13: a site's bag and checkout. Never module-gated off mid-payment;
     // the service asks `commerceOpen` before it starts a checkout, and a
     // payment already made still lands through the webhook.
@@ -318,12 +352,19 @@ const NEVER: Record<string, string> = {
         "saroh.in's contact form, not a tenant surface",
     "admin/admin-contact-messages.controller.ts":
         "staff control plane (messages from saroh.in/contact), not a tenant surface",
-    // DEC-163, DEC-166: Saroh's own invoices, subscriptions and the billing
+    // DEC-179, DEC-166: Saroh's own invoices, subscriptions and the billing
     // queue and controls, across businesses.
     "admin/admin-billing.controller.ts":
         "staff control plane (Saroh's own billing), not a tenant surface",
     "admin/admin-billing-controls.controller.ts":
         "staff control plane (Saroh's billing queue and controls), not a tenant surface",
+    // Admin plan U24: a staff invite's preview and accept, for someone who
+    // is not staff yet and may belong to no business.
+    "staff-invites/staff-invites.controller.ts":
+        "joining Saroh's own team, not a tenant surface",
+    // DEC-169, U20: Saroh's own sales leads, which belong to no business.
+    "saroh-leads/saroh-leads.controller.ts":
+        "staff control plane (Saroh's own sales leads), not a tenant surface",
     // DEC-120: an owner takes the business's data whatever it has switched
     // off, and while it is closing or suspended.
     "data-export/data-export.controller.ts":

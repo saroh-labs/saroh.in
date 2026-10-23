@@ -84,7 +84,7 @@ export function canReadOrders(organization: Org): boolean {
 
 /**
  * `booking:write` and `invoice:write`: may take payment at the desk (P2),
- * the pair a booking's pay link needs too (permission matrix) — the
+ * the pair a booking's payment link needs too (permission matrix) — the
  * booking is the desk's, the invoice it marks paid is paper. Asked of the
  * role's permissions only, never its name (DEC-098); a role without them
  * is shown Take payment disabled, with `CANT_TAKE_PAYMENTS`.
@@ -146,8 +146,11 @@ export function deadlineText(iso: string, timeZone: string): string {
     return formatDateTime(iso, timeZone, { weekday: "short" });
 }
 
-/** What a cancel could hand back: never more than was received. */
-function refundable(m: BookingMoney): number {
+/**
+ * What a cancel could hand back: never more than was received. The one
+ * rule; the cancel sheet's choice (`cancel-choice.ts`) reads it too.
+ */
+export function refundable(m: BookingMoney): number {
     return m.refundableCents ?? m.paidOnlineCents;
 }
 

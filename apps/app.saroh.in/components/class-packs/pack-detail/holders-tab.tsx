@@ -11,8 +11,8 @@ import { Users } from "lucide-react";
 import Link from "next/link";
 import { useId, useState } from "react";
 
-import { ListFilter } from "@/components/shared/list-toolbar";
-import { whoCanChange } from "@/components/shared/who-can-change";
+import { ListFilter } from "@/components/shared/lists/list-toolbar";
+import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { MAX_EXTEND_DAYS } from "@/lib/class-packs/pack-detail";
 import type { HolderRow } from "@/lib/class-packs/pack-holders";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";

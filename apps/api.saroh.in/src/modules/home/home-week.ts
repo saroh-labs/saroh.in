@@ -2,11 +2,16 @@ import type { Prisma, prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
 import { toMinor } from "../../common/money";
+import type { UnpaidBillsRead } from "../analytics/unpaid-bills";
 import {
-    NOT_A_BOOKING_HOLD,
+    isPastDue,
+    leftToPayCents,
+    OWED_VIEW_WHERE,
     OWED_WHERE,
     refundedBetweenWhere,
 } from "../invoices/invoice-state";
+import type { MoneyIn } from "../invoices/money-in";
+import { readMoneyIn } from "../invoices/money-in";
 import { realOrderWhere } from "../orders/open-orders";
 import { MONEY_ON_THE_CALENDAR, sinceHref } from "./home-last-day";
 import type {
@@ -25,16 +30,22 @@ import { onOneStore, seesBusinessBookings, storeWhere } from "./home-staff";
  *
  * - **Takings so far** (`payment:read`, as the Last 24 hours' money; its
  *   link opens the invoices counted for someone who also holds
- *   `invoice:read`, else the Calendar's money — F11): what came in since Monday, net of refunds, against the
- *   same days last week. Each rupee once: an order's money is its invoice
- *   (ADR-008, every order has one), so paid invoices alone count it; a
- *   refund is its credit note, taken off on the day it was issued.
+ *   `invoice:read`, else the Calendar's money — F11): what came in since
+ *   Monday, net of refunds, against the same days last week. Money in is
+ *   the one rule the Invoices strip and Insights read (`money-in.ts`,
+ *   DEC-173): each payment on its ledger on the day it came in, an order's
+ *   paper on the day it was paid; a refund is its credit note, taken off on
+ *   the day it was issued.
  * - **Bookings this week** (`booking:read`): confirmed bookings starting
  *   Monday to Sunday, against the whole of last week.
  * - **Orders this week** (`order:read` or `order:stage`): real orders
  *   placed since Monday.
  * - **Owed to you** (`invoice:read`): issued, unpaid invoices that aren't an
  *   order's own (`OWED_WHERE`), with how many are overdue.
+ * - **Cheques not in the bank** (`payment:read` and `invoice:read`,
+ *   DEC-173): `chequesWaiting`, null while none waits. Read on its own by
+ *   `HomeService` (`home-cheques.ts`), not here, so a failure there is
+ *   named "Cheques" and takes nothing else of the week down.
  *
  * No payout figure (default 52). The week is the business's (DEC-033): it
  * starts Monday at midnight in the business's zone. The words are the
@@ -64,6 +75,15 @@ export interface WeekScope {
     orders: boolean;
     owed: boolean;
     /**
+     * Cheques not in the bank (DEC-173): an amount, so `payment:read`'s
+     * (DEC-098), and on invoices, so `invoice:read`'s too: the line opens
+     * the invoices list. Hand-recorded, so not behind Payments (DEC-070).
+     * It never makes a week on its own: a viewer with no other figure has
+     * no "This week" to put the line in. `HomeService` reads it, on its
+     * own (`home-cheques.ts`), never `readWeek`.
+     */
+    cheques?: boolean;
+    /**
      * Takings read by someone who may not open the invoices behind them:
      * the figure links to the Calendar's money instead (F11).
      */
@@ -90,7 +110,11 @@ export function weekScope(
             ? { takingsIn: "calendar" as const }
             : {}),
     };
-    return Object.values(scope).some(Boolean) ? scope : null;
+    if (!Object.values(scope).some(Boolean)) return null;
+    return {
+        ...scope,
+        cheques: holds(input, "payment:read") && holds(input, "invoice:read"),
+    };
 }
 
 /** The instants the week's figures are measured between. */
@@ -153,22 +177,8 @@ export function compareTakings(
 export interface WindowMoney {
     /** Paid in, less refunds, per currency. */
     net: Map<string, number>;
-    /** How many invoices were paid, per currency. */
+    /** How many payments brought it, per currency. */
     payments: Map<string, number>;
-}
-
-/** The where for invoices paid in `[from, to)`; credit notes never. */
-export function paidBetweenWhere(
-    organizationId: string,
-    from: Date,
-    to: Date,
-): Prisma.InvoiceWhereInput {
-    return {
-        organizationId,
-        paidAt: { gte: from, lt: to },
-        kind: { not: "CREDIT_NOTE" },
-        ...NOT_A_BOOKING_HOLD,
-    };
 }
 
 // The where for money handed back lives with the invoice rules, which
@@ -178,30 +188,21 @@ export { refundedBetweenWhere };
 interface SumRow {
     currency: string;
     _sum: { total: { toString(): string } | null };
-    _count: { _all: number };
 }
 
-/** Paid in less handed back, per currency, from two grouped reads. */
-export function windowMoney(paid: SumRow[], refunded: SumRow[]): WindowMoney {
-    const net = new Map<string, number>();
-    const payments = new Map<string, number>();
-    for (const row of paid) {
-        net.set(
-            row.currency,
-            (net.get(row.currency) ?? 0) + toMinor(row._sum.total ?? 0),
-        );
-        payments.set(
-            row.currency,
-            (payments.get(row.currency) ?? 0) + row._count._all,
-        );
-    }
+/** Money in (`money-in.ts`) less what was handed back, per currency. */
+export function windowMoney(
+    paid: Pick<MoneyIn, "totals" | "payments">,
+    refunded: readonly SumRow[],
+): WindowMoney {
+    const net = new Map(paid.totals);
     for (const row of refunded) {
         net.set(
             row.currency,
             (net.get(row.currency) ?? 0) - toMinor(row._sum.total ?? 0),
         );
     }
-    return { net, payments };
+    return { net, payments: new Map(paid.payments) };
 }
 
 /**
@@ -243,60 +244,78 @@ export const WEEK_PATHS = {
     OVERDUE: "/billing/invoices?view=overdue",
 } as const;
 
-async function readMoney(
+/**
+ * Money in (`money-in.ts`, the rule the strip and Insights read) less what
+ * was handed back, in `[from, to)`, per currency.
+ */
+export async function readMoney(
     db: Db,
     organizationId: string,
     from: Date,
     to: Date,
 ): Promise<WindowMoney> {
-    const sums = (where: Prisma.InvoiceWhereInput) =>
+    const [paid, refunded] = await Promise.all([
+        readMoneyIn(db, organizationId, from, to),
         db.invoice.groupBy({
             by: ["currency"],
-            where,
+            where: refundedBetweenWhere(organizationId, from, to),
             _sum: { total: true },
-            _count: { _all: true },
             orderBy: { currency: "asc" },
-        });
-    const [paid, refunded] = await Promise.all([
-        sums(paidBetweenWhere(organizationId, from, to)),
-        sums(refundedBetweenWhere(organizationId, from, to)),
+        }),
     ]);
     return windowMoney(paid, refunded);
 }
 
-async function readOwed(
+export async function readOwed(
     db: Db,
     organizationId: string,
     now: Date,
+    // A full Home build reads the unpaid bills once and hands this and
+    // How it's going the same read (review #16).
+    shared?: UnpaidBillsRead,
 ): Promise<HomeWeekOwed | null> {
     const unpaid = {
         organizationId,
-        ...OWED_WHERE,
-        status: "ISSUED",
+        ...OWED_VIEW_WHERE,
     } satisfies Prisma.InvoiceWhereInput;
-    const [sums, overdue, ever] = await Promise.all([
-        db.invoice.groupBy({
-            by: ["currency"],
-            where: unpaid,
-            _sum: { total: true },
-            _count: { _all: true },
-            orderBy: { currency: "asc" },
-        }),
-        db.invoice.count({ where: { ...unpaid, dueAt: { lt: now } } }),
-        // A business that has never billed anyone outside an order has
-        // nothing to be owed: no "₹0" row for a shop.
-        db.invoice.findFirst({
-            where: { organizationId, ...OWED_WHERE },
-            select: { id: true },
-        }),
-    ]);
+    // What is left to pay on each bill (DEC-173), folded through
+    // `leftToPayCents`, the one place it is worked out, as Insights'
+    // owed-by-age does.
+    const [bills, ever] = shared
+        ? await shared().then((u) => [u.bills, u.ever] as const)
+        : await Promise.all([
+              db.invoice.findMany({
+                  where: unpaid,
+                  select: {
+                      currency: true,
+                      status: true,
+                      total: true,
+                      paidCents: true,
+                      dueAt: true,
+                  },
+              }),
+              // A business that has never billed anyone outside an order has
+              // nothing to be owed: no "₹0" row for a shop.
+              db.invoice.findFirst({
+                  where: { organizationId, ...OWED_WHERE },
+                  select: { id: true },
+              }),
+          ]);
     if (!ever) return null;
+    const byCurrency = new Map<string, number>();
+    let overdue = 0;
+    for (const bill of bills) {
+        byCurrency.set(
+            bill.currency,
+            (byCurrency.get(bill.currency) ?? 0) + leftToPayCents(bill),
+        );
+        if (isPastDue(bill, now)) overdue += 1;
+    }
     return {
-        totals: sums.map((row) => ({
-            currency: row.currency,
-            amountMinor: toMinor(row._sum.total ?? 0),
-        })),
-        bills: sums.reduce((n, row) => n + row._count._all, 0),
+        totals: [...byCurrency.entries()]
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([currency, amountMinor]) => ({ currency, amountMinor })),
+        bills: bills.length,
         overdue,
         href: overdue > 0 ? WEEK_PATHS.OVERDUE : WEEK_PATHS.OWED,
     };
@@ -305,7 +324,8 @@ async function readOwed(
 /**
  * The whole block for one viewer: only the figures their reads allow, the
  * rest absent (never zero). Throws when a read fails; `HomeService` names
- * "This week" and sends none. A staff member's orders are their
+ * "This week" and sends none. The cheques line is not read here
+ * (`readHomeCheques`, its own guarded read). A staff member's orders are their
  * storefronts' (F11, `storeIds`); the money is the business's, and isn't
  * narrowed.
  */
@@ -315,6 +335,7 @@ export async function readWeek(
     scope: WeekScope,
     clock: { now: Date; zone: string },
     storeIds: readonly string[] | null = null,
+    unpaid?: UnpaidBillsRead,
 ): Promise<HomeWeek> {
     const w = weekWindows(clock.now, clock.zone);
     const monday = w.start.toISOString();
@@ -349,7 +370,7 @@ export async function readWeek(
                       },
                   })
                 : null,
-            scope.owed ? readOwed(db, organizationId, clock.now) : null,
+            scope.owed ? readOwed(db, organizationId, clock.now, unpaid) : null,
         ]);
 
     const week: HomeWeek = { zone: clock.zone, startDate: w.startDate };

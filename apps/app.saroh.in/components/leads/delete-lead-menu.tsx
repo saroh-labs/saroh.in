@@ -1,6 +1,6 @@
 "use client";
 
-import { DeleteMenu } from "@/components/shared/delete-menu";
+import { DeleteMenu } from "@/components/shared/confirm/delete-menu";
 import { deleteLead } from "@/lib/leads/actions";
 
 /** Delete a lead from its page: its timeline goes, the person stays. */

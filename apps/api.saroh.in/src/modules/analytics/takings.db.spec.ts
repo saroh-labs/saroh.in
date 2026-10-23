@@ -1,22 +1,26 @@
 /**
- * Insights' takings (DEC-075) against a real Postgres: each sale counted
- * once, in the week it was paid in the business's own zone, net of what
- * went back; where it was sold; a business with no sales; one location
- * against two; and another business's money never in the figures. Runs
- * in the integration project (TEST_DATABASE_URL), plain and under
- * TEST_RLS=on, where `read` runs in the business's own RLS context.
+ * Insights' takings rule (DEC-075, `takings.sql.ts`) against a real
+ * Postgres, read through Money's bars (`GET analytics/money`, DEC-171; the
+ * old `GET analytics/takings` is retired): each sale counted once, on the
+ * day it was paid in the business's own zone, net of what went back; where
+ * it was sold; a business with no sales; one location against two; and
+ * another business's money never in the figures. Runs in the integration
+ * project (TEST_DATABASE_URL), plain and under TEST_RLS=on, where the read
+ * runs in the business's own RLS context.
  */
 import { ForbiddenException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { onTheLedger } from "../../../test/ledger-paid";
 import type { OrganizationContext } from "../../common/types/organization-context";
-import type { TakingsRead } from "./takings";
+import type { MoneyRead } from "./money";
 import { INVOICES_PLACE, locationPlace, ONLINE_PLACE } from "./takings";
 import { TakingsService } from "./takings.service";
 
 const tag = `${process.pid}-${Date.now()}`;
 const ZONE = "Asia/Kolkata";
-// Sunday 4 Oct 2026, 15:30 in Mumbai: the twelve weeks are 6 Jul – 27 Sep.
+// Sunday 4 Oct 2026, 15:30 in Mumbai. The last 4 weeks end today, so the
+// rolling bars are 13 Jul – 4 Oct, Monday to Sunday.
 const NOW = new Date("2026-10-04T10:00:00.000Z");
 
 const service = new TakingsService();
@@ -74,18 +78,20 @@ async function order(
 
 async function invoice(organizationId: string, data: Record<string, unknown>) {
     n += 1;
-    return prisma.invoice.create({
-        data: {
-            organizationId,
-            number: `TK-INV-${n}-${tag}`,
-            status: "PAID",
-            currency: "INR",
-            subtotal: "0",
-            total: "0",
-            issuedAt: new Date("2026-08-01T06:00:00.000Z"),
-            ...data,
-        },
-    });
+    return onTheLedger(
+        await prisma.invoice.create({
+            data: {
+                organizationId,
+                number: `TK-INV-${n}-${tag}`,
+                status: "PAID",
+                currency: "INR",
+                subtotal: "0",
+                total: "0",
+                issuedAt: new Date("2026-08-01T06:00:00.000Z"),
+                ...data,
+            },
+        }),
+    );
 }
 
 async function refund(
@@ -116,11 +122,13 @@ async function refund(
     });
 }
 
-function week(read: TakingsRead, start: string) {
+function week(read: MoneyRead, start: string) {
     const found = read.weeks.find((w) => w.start === start);
     if (!found) throw new Error(`no week ${start}`);
     return found;
 }
+
+const fourWeeks = (c: OrganizationContext) => service.money(c, "4w", NOW);
 
 describe("Insights takings (DB)", () => {
     let rye = { id: "", stores: [] as string[] };
@@ -241,15 +249,14 @@ describe("Insights takings (DB)", () => {
     });
 
     it("counts each sale in the week it was paid, in the business's zone", async () => {
-        const read = await service.read(ctx(rye.id), NOW);
+        const read = await fourWeeks(ctx(rye.id));
         expect(read.zone).toBe(ZONE);
         expect(read.currency).toBe("INR");
-        expect(read.thisWeekStart).toBe("2026-09-28");
         expect(read.weeks).toHaveLength(12);
-        expect(read.weeks[0].start).toBe("2026-07-06");
+        expect(read.weeks[0].start).toBe("2026-07-13");
         expect(read.weeks[11]).toMatchObject({
-            start: "2026-09-21",
-            end: "2026-09-27",
+            start: "2026-09-28",
+            end: "2026-10-04",
         });
         expect(week(read, "2026-09-14")).toMatchObject({
             takingsMinor: 10_000,
@@ -265,7 +272,7 @@ describe("Insights takings (DB)", () => {
     });
 
     it("splits a week by location, online and invoices, the Orders list's places", async () => {
-        const read = await service.read(ctx(rye.id), NOW);
+        const read = await fourWeeks(ctx(rye.id));
         const [hill, bandra] = rye.stores;
         expect(week(read, "2026-09-21").places).toEqual([
             { key: locationPlace(bandra), takingsMinor: 70_000 },
@@ -275,7 +282,9 @@ describe("Insights takings (DB)", () => {
             { key: locationPlace(hill), takingsMinor: 25_000 },
         ]);
         expect(read.locations).toBe(2);
-        expect(read.places).toEqual(
+        expect(
+            read.places.map(({ key, kind, name }) => ({ key, kind, name })),
+        ).toEqual(
             expect.arrayContaining([
                 {
                     key: locationPlace(hill),
@@ -294,7 +303,7 @@ describe("Insights takings (DB)", () => {
     });
 
     it("reads the week in progress so far, beside the same days of last week", async () => {
-        const read = await service.read(ctx(rye.id), NOW);
+        const read = await fourWeeks(ctx(rye.id));
         // Sunday 4 Oct: Monday to Sunday so far, against all of last week.
         expect(read.thisWeek).toEqual({
             start: "2026-09-28",
@@ -305,32 +314,33 @@ describe("Insights takings (DB)", () => {
             sameDaysLastWeekMinor: 195_000,
             sameDaysLastWeekPayments: 5,
         });
-        // Never one of the twelve whole weeks.
-        expect(read.weeks.map((w) => w.start)).not.toContain("2026-09-28");
+        // The last rolling bar ends today, so it holds the same money.
+        expect(week(read, "2026-09-28").takingsMinor).toBe(99_900);
     });
 
     it("dates the first money the business ever took", async () => {
-        const read = await service.read(ctx(rye.id), NOW);
+        const read = await fourWeeks(ctx(rye.id));
         expect(read.firstSaleOn).toBe("2026-05-04");
     });
 
     it("gives a business with one location one place", async () => {
-        const read = await service.read(ctx(kettle.id), NOW);
+        const read = await fourWeeks(ctx(kettle.id));
         expect(read.locations).toBe(1);
         expect(read.places).toEqual([
-            {
+            expect.objectContaining({
                 key: locationPlace(kettle.stores[0]),
                 kind: "LOCATION",
                 name: "Kettle Lane",
-            },
+                amountMinor: 75_000,
+            }),
         ]);
         expect(week(read, "2026-09-14").takingsMinor).toBe(30_000);
         expect(week(read, "2026-09-21").takingsMinor).toBe(45_000);
         expect(read.firstSaleOn).toBe("2026-09-15");
     });
 
-    it("gives a business with no sales twelve empty weeks and no first sale", async () => {
-        const read = await service.read(ctx(quiet.id), NOW);
+    it("gives a business with no sales twelve empty bars and no first sale", async () => {
+        const read = await fourWeeks(ctx(quiet.id));
         expect(read.weeks).toHaveLength(12);
         expect(
             read.weeks.every((w) => w.takingsMinor === 0 && w.orders === 0),
@@ -341,12 +351,12 @@ describe("Insights takings (DB)", () => {
     });
 
     it("never counts another business's money", async () => {
-        const read = await service.read(ctx(rye.id), NOW);
+        const read = await fourWeeks(ctx(rye.id));
         const all = read.weeks.reduce((sum, w) => sum + w.takingsMinor, 0);
-        expect(all).toBe(10_000 + 195_000);
+        expect(all).toBe(10_000 + 195_000 + 99_900);
         expect(read.places.map((p) => p.name)).not.toContain("Elsewhere");
 
-        const theirs = await service.read(ctx(elsewhere.id), NOW);
+        const theirs = await fourWeeks(ctx(elsewhere.id));
         expect(week(theirs, "2026-09-21").takingsMinor).toBe(460_000 + 700_000);
     });
 
@@ -356,11 +366,11 @@ describe("Insights takings (DB)", () => {
             role: "MEMBER",
             actions: new Set(["analytics:read"]),
         };
-        await expect(service.read(noPayments, NOW)).rejects.toBeInstanceOf(
+        await expect(fourWeeks(noPayments)).rejects.toBeInstanceOf(
             ForbiddenException,
         );
         await expect(
-            service.read({ ...ctx(rye.id), role: "MEMBER" }, NOW),
+            fourWeeks({ ...ctx(rye.id), role: "MEMBER" }),
         ).rejects.toBeInstanceOf(ForbiddenException);
     });
 });

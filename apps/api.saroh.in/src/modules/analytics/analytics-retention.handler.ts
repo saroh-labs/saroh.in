@@ -88,11 +88,13 @@ export class AnalyticsRetentionHandler {
     /** Delete events whose retention ended before `now`, up to the run's cap. */
     async sweep(now: Date): Promise<RetentionSweep> {
         let deleted = 0;
-        // On legal hold: read once a run; there are few.
-        const held = await heldOrganizationIds(prisma);
-        const notHeld =
-            held.length > 0 ? { organizationId: { notIn: held } } : {};
         for (let batch = 0; batch < ANALYTICS_RETENTION_MAX_BATCHES; batch++) {
+            // On legal hold: read again each batch, and checked again by the
+            // delete itself (U15 privacy review), so a hold placed while a
+            // run is under way is never swept past. There are few.
+            const held = await heldOrganizationIds(prisma);
+            const notHeld =
+                held.length > 0 ? { organizationId: { notIn: held } } : {};
             const due = await prisma.analyticsEvent.findMany({
                 where: { expiresAt: { lt: now }, ...notHeld },
                 select: { id: true },

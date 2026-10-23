@@ -21,6 +21,7 @@ import type { InvoiceStanding } from "../invoices/invoice-state";
 import {
     invoiceStanding,
     isPastDue,
+    leftToPayCents,
     NOT_A_BOOKING_HOLD,
     OWED_WHERE,
 } from "../invoices/invoice-state";
@@ -94,9 +95,9 @@ export type {
  * both `order:read` and `invoice:read` (`money`); it is left OUT for anyone
  * else, not sent for the screen to hide.
  *
- * "Spent" counts each rupee once: paid orders plus paid invoices that are not
- * an order's own invoice (ADR-008), each net of what went back to them
- * (`spent.sql.ts`, C14). Owed is unpaid issued invoices, again
+ * "Spent" counts each rupee once: paid orders plus what came in on the
+ * ledger of invoices that are not an order's own (ADR-008, the money-in
+ * rule, DEC-173), each net of what went back to them (`spent.sql.ts`, C14). Owed is unpaid issued invoices, again
  * leaving order invoices out — the order is the ledger for its own payment.
  */
 
@@ -448,6 +449,13 @@ class Purse {
         this.byCurrency.set(
             currency,
             (this.byCurrency.get(currency) ?? 0) + toMinor(amount),
+        );
+    }
+
+    addMinor(currency: string, minor: number): void {
+        this.byCurrency.set(
+            currency,
+            (this.byCurrency.get(currency) ?? 0) + minor,
         );
     }
 
@@ -1222,6 +1230,7 @@ export class CustomerDetailService {
                     status: true,
                     dueAt: true,
                     total: true,
+                    paidCents: true,
                     currency: true,
                 },
             }),
@@ -1231,7 +1240,8 @@ export class CustomerDetailService {
         const owed = new Purse();
         let overdueCount = 0;
         for (const r of unpaid) {
-            owed.add(r.currency, r.total);
+            // What is left to pay on it (DEC-173).
+            owed.addMinor(r.currency, leftToPayCents(r));
             if (isPastDue(r, now)) overdueCount += 1;
         }
         return {

@@ -12,6 +12,8 @@ import {
     isAutopayMethod,
 } from "@saroh/site-blocks";
 
+import type { PayPayment } from "./invoice-paid-shape";
+
 /**
  * The public invoice a pay link shows, and the checks that narrow it. Kept
  * apart from `invoice-pay.ts`, which reads the app's env, so they can be
@@ -54,6 +56,18 @@ export interface PayInvoice {
     lines: PayInvoiceLine[];
     tax: string;
     total: string;
+    /**
+     * Paid so far and what is left to pay (DEC-173), as money strings. A
+     * pay link charges what is left. Absent from an older API: nothing
+     * said paid, and an owed invoice owes its total.
+     */
+    paidSoFar?: string;
+    leftToPay?: string;
+    /**
+     * What has been received, oldest first (U16 #1128), checked where it
+     * is read (`payPaymentsOf`). Absent from an older API: none said.
+     */
+    payments?: PayPayment[];
     currency: string;
     status: PayStatus;
     billedTo: string | null;

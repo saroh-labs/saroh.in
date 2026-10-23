@@ -7,7 +7,7 @@
  * location and the website's share list. One wrote "1 of 4 done" and
  * another "2 of 4", one struck done steps through and another hid them, one
  * vanished at 100% and another folded. `SetupChecklist`
- * (`components/shared/setup-checklist.tsx`) draws all four from this file.
+ * (`components/shared/setup-checklist/setup-checklist.tsx`) draws all four from this file.
  */
 
 /** One step of a checklist. */

@@ -37,6 +37,8 @@ jest.mock("@saroh/database", () => {
         },
         staffService: { findMany: jest.fn().mockResolvedValue([]) },
         bookingRules: { findUnique: jest.fn().mockResolvedValue(null) },
+        // Each person's own booking rules and gap (#1038): none.
+        staffMember: { findMany: jest.fn().mockResolvedValue([]) },
         staffHours: { findMany: jest.fn().mockResolvedValue([]) },
         staffExtraHours: { findMany: jest.fn().mockResolvedValue([]) },
         staffTimeOff: { findMany: jest.fn().mockResolvedValue([]) },

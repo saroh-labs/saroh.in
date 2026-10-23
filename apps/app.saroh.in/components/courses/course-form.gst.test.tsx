@@ -11,6 +11,14 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+    pickRate,
+    rateGroup,
+    ratePicker,
+    rateShown,
+    ratesOffered,
+} from "@/components/shared/fields/gst-rate-picker.testing";
+
 import type { CourseDetail } from "@/lib/courses/service";
 
 import { CourseForm } from "./course-form";
@@ -147,6 +155,10 @@ function control(label: string): HTMLElement {
     return el;
 }
 
+/** The GST rate's buttons (DEC-176), and their main row. */
+const rate = () => ratePicker("GST rate", host);
+const rateRow = () => rateGroup(rate());
+
 function pick(label: string, value: string) {
     const box = control(label);
     act(() => {
@@ -203,9 +215,9 @@ describe("the course form's GST", () => {
 
     it("asks a registered business for the rate, with the quiet select and the SAC code", () => {
         render(COURSE, ASKED);
-        const rate = control("GST rate") as HTMLSelectElement;
-        expect(rate.value).toBe("");
-        expect(rate.options[0].textContent).toBe("Choose a rate");
+        // The rates as buttons (DEC-176): none pressed, no "Not set".
+        expect(rateShown(rate())).toBe("");
+        expect(ratesOffered(rate())).toEqual(["0", "5", "18", "40"]);
         expect(
             Array.from(
                 (control("GST on this price") as HTMLSelectElement).options,
@@ -222,7 +234,7 @@ describe("the course form's GST", () => {
         render(COURSE, ASKED);
         await save();
         expect(actions.updateCourse).not.toHaveBeenCalled();
-        expect(control("GST rate").getAttribute("aria-invalid")).toBe("true");
+        expect(rateRow().getAttribute("aria-invalid")).toBe("true");
         expect(text()).toContain(
             "Choose a GST rate. Pick 0% if it's exempt or nil-rated.",
         );
@@ -241,7 +253,7 @@ describe("the course form's GST", () => {
 
     it("saves the rate, the way and the SAC code as the API takes them", async () => {
         render(COURSE, ASKED);
-        pick("GST rate", "18");
+        pickRate(rate(), "18");
         pick("GST on this price", "ADDED");
         type("SAC code", "9992 93");
         await save();
@@ -259,7 +271,7 @@ describe("the course form's GST", () => {
 
     it("takes exempt (0%), and sends null for the same as the business and no SAC code", async () => {
         render(COURSE, ASKED);
-        pick("GST rate", "0");
+        pickRate(rate(), "0");
         await save();
         expect(actions.updateCourse).toHaveBeenCalledWith(
             "crs_1",
@@ -273,7 +285,7 @@ describe("the course form's GST", () => {
 
     it("won't save a SAC code that isn't four to eight digits", async () => {
         render(COURSE, ASKED);
-        pick("GST rate", "18");
+        pickRate(rate(), "18");
         type("SAC code", "99");
         await save();
         expect(actions.updateCourse).not.toHaveBeenCalled();
@@ -290,7 +302,7 @@ describe("the course form's GST", () => {
             },
             ASKED,
         );
-        expect((control("GST rate") as HTMLSelectElement).value).toBe("18");
+        expect(rateShown(rate())).toBe("18");
         expect((control("GST on this price") as HTMLSelectElement).value).toBe(
             "ADDED",
         );
@@ -301,16 +313,14 @@ describe("the course form's GST", () => {
     it("clears a rate's problem as soon as one is chosen", async () => {
         render(COURSE, ASKED);
         await save();
-        expect(control("GST rate").getAttribute("aria-invalid")).toBe("true");
-        pick("GST rate", "5");
+        expect(rateRow().getAttribute("aria-invalid")).toBe("true");
+        pickRate(rate(), "5");
         for (let i = 0; i < 6; i++) {
             await act(async () => {
                 await new Promise((r) => setTimeout(r, 0));
             });
         }
-        expect(control("GST rate").getAttribute("aria-invalid")).not.toBe(
-            "true",
-        );
+        expect(rateRow().getAttribute("aria-invalid")).not.toBe("true");
         expect(text()).not.toContain("Choose a GST rate");
     });
 });

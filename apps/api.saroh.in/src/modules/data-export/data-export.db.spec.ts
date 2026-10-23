@@ -130,6 +130,7 @@ describe("Download your data (DEC-120)", () => {
             "orders.csv",
             "order-lines.csv",
             "invoices-and-credit-notes.csv",
+            "invoice-history.csv",
             "bookings.csv",
             "products.csv",
             "product-variants.csv",

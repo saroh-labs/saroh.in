@@ -37,10 +37,10 @@ export function ordersAccess(
  * never offers what the API would refuse:
  *
  * - `stage`: move it through its steps and print (`order:stage`);
- * - `create`: take a new order and make its pay link (`order:create`);
- * - `edit`: change it after it's placed, and make a new pay link
+ * - `create`: take a new order and make its payment link (`order:create`);
+ * - `edit`: change it after it's placed, and make a new payment link
  *   (`order:edit`);
- * - `payLink`: make or replace a pay link — `create` or `edit`;
+ * - `payLink`: make or replace a payment link — `create` or `edit`;
  * - `refund`: refund and cancel (`order:refund`);
  * - `export`: the CSV (`order:export`).
  *

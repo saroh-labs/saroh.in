@@ -3,24 +3,24 @@ import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
 import { OnlinePaymentsLockNotice } from "@/components/billing/online-payments-lock";
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { EmailPromptBlock } from "@/components/communications/email-prompt";
-import { AccountUpdatesBlock } from "@/components/providers/account-updates-row";
-import { ProviderList } from "@/components/providers/provider-list";
+import { AccountUpdatesBlock } from "@/components/providers/account-updates/account-updates-row";
+import { ProviderList } from "@/components/providers/connections/provider-list";
+import { CustomerEmailsBlock } from "@/components/providers/customer-emails/customer-emails-row";
 import {
     SettingsPanel,
     SettingsPanelHeader,
-} from "@/components/settings/settings-panel";
-import { whoCanChange } from "@/components/shared/who-can-change";
+} from "@/components/settings/page/settings-panel";
+import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { readAccountUpdates } from "@/lib/communications/account-updates-service";
+import { readCustomerEmails } from "@/lib/communications/customer-emails-service";
 import { emailPrompt } from "@/lib/communications/email-setup";
 import { readEmailSetup } from "@/lib/communications/email-setup-service";
 import { listOrgDomains } from "@/lib/domains/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listProviderHealth } from "@/lib/provider-health/service";
-import { CONNECT_EMAIL_ANCHOR } from "@/lib/providers/booking-emails";
 import { connectLocksOf } from "@/lib/providers/connect-lock";
-import { buildProvidersView } from "@/lib/providers/rows";
+import { buildProvidersView, CONNECT_EMAIL_ANCHOR } from "@/lib/providers/rows";
 import {
-    getSarohEmail,
     listCommsProviders,
     listPaymentProviders,
     listPaymentWebhooks,
@@ -42,6 +42,10 @@ export const metadata = { title: "Providers · Settings" };
 
 export default async function ProvidersSettingsPage() {
     await requireSession();
+    // The business's automatic emails to its customers (DEC-174, U4),
+    // read beside everything else. Anyone in the business may read them;
+    // never throws, and null draws no row.
+    const customerEmailsRead = readCustomerEmails();
     const [result, org] = await Promise.all([
         listProviderHealth(),
         resolveActiveOrganization(),
@@ -62,13 +66,12 @@ export default async function ProvidersSettingsPage() {
         domains,
         checkout,
         webhooks,
-        sarohEmail,
         access,
         emailSetup,
         accountUpdates,
     ] =
         result.status === "denied"
-            ? [null, null, null, [], null, null, null, null, null]
+            ? [null, null, null, [], null, null, null, null]
             : await Promise.all([
                   listPaymentProviders(),
                   listCommsProviders(),
@@ -77,9 +80,6 @@ export default async function ProvidersSettingsPage() {
                   // The address to register and the last payment update
                   // (DEC-063). Best-effort: it never fails the page.
                   listPaymentWebhooks(),
-                  // Saroh sending booking emails (DEC-086). Never throws:
-                  // a failed read is UNREAD, said in its own notice.
-                  getSarohEmail(),
                   // What the plan lets the business connect (DEC-091):
                   // locked payment rows offer See plans in place of
                   // Connect, before any key form opens. Best-effort.
@@ -93,6 +93,8 @@ export default async function ProvidersSettingsPage() {
                   // when unread or not this person's: no row is drawn.
                   readAccountUpdates(),
               ]);
+    const customerEmails =
+        result.status === "denied" ? null : await customerEmailsRead;
     const view =
         result.status === "denied"
             ? null
@@ -103,7 +105,6 @@ export default async function ProvidersSettingsPage() {
                   domains,
                   checkout,
                   webhooks,
-                  sarohEmail,
                   locks: connectLocksOf(access, emailSetup),
               });
     // Connect jumps to the first email provider to connect on this page.
@@ -126,7 +127,7 @@ export default async function ProvidersSettingsPage() {
             {prompt ? <EmailPromptBlock prompt={prompt} /> : null}
             <PlanLimitNotice moduleId="integrations" />
             {/* A plan without online payments: no first connection, no
-                pay links, no checkout — said here, before Connect. */}
+                payment links, no checkout — said here, before Connect. */}
             <OnlinePaymentsLockNotice what="payments" />
             {/* Three outcomes, three states. "Nothing to show" was previously
                 rendered for both a denial and an empty list, which are
@@ -153,6 +154,11 @@ export default async function ProvidersSettingsPage() {
                 customers' Messages: drawn only while it can have an effect. */}
             {accountUpdates?.offered ? (
                 <AccountUpdatesBlock state={accountUpdates} />
+            ) : null}
+            {/* The automatic emails Saroh sends its customers from its own
+                email, one switch each: drawn only while one is offered. */}
+            {customerEmails ? (
+                <CustomerEmailsBlock state={customerEmails} />
             ) : null}
         </SettingsPanel>
     );

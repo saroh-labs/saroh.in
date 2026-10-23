@@ -3,7 +3,7 @@
  * sends the stored key ("RAZORPAY"); nothing on screen should shout it.
  *
  * Promoted from the storefronts screen when Order Detail became its third
- * reader (`components/invoices/pay-link.tsx` still keeps its own copy).
+ * reader (`components/invoices/details/pay-link.tsx` still keeps its own copy).
  */
 const PROVIDER_NAME: Record<string, string> = {
     STRIPE: "Stripe",
@@ -29,7 +29,7 @@ export interface ProviderConnection {
 /**
  * A connection a customer's checkout window can open with (DEC-054): a
  * Razorpay one needs its public key id, so one still missing it counts as
- * none wherever a pay link is offered — the link could only fail on the
+ * none wherever a payment link is offered — the link could only fail on the
  * customer's phone. The API refuses the same (`OPENS_CHECKOUT`).
  */
 export function opensCheckout(row: ProviderConnection): boolean {

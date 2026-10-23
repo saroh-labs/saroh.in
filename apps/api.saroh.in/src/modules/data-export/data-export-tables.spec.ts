@@ -27,6 +27,7 @@ describe("the export's tables", () => {
                 "orders.csv",
                 "order-lines.csv",
                 "invoices-and-credit-notes.csv",
+                "invoice-history.csv",
                 "bookings.csv",
                 "products.csv",
                 "product-variants.csv",

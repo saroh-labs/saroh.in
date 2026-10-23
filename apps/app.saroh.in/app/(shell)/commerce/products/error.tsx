@@ -1,6 +1,6 @@
 "use client";
 
-import { SectionError } from "@/components/shared/section-error";
+import { SectionError } from "@/components/shared/states/section-error";
 
 /**
  * The Products list couldn't be read (#519, the design's failed state):

@@ -959,13 +959,6 @@ export function looksLikeEmail(value: string): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
-/** Ten digits or more, if a phone is given at all. */
-export function phoneProblem(value: string): string | null {
-    const digits = value.replace(/\D/g, "");
-    if (value.trim() === "") return null;
-    return digits.length >= 10 ? null : "A phone number needs 10 digits.";
-}
-
 /**
  * The booking as a calendar file the booker can add. Times in UTC, so any
  * calendar puts it at the right hour wherever the phone is.
@@ -1029,4 +1022,20 @@ export function googleCalendarHref(input: {
     });
     if (input.location?.trim()) params.set("location", input.location.trim());
     return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+/**
+ * How many sessions are on show: what "Show more" has opened, and never
+ * fewer than reach the chosen one, so a session chosen by the address (a
+ * waitlist claim link, #1149) is always in the list it is chosen from.
+ */
+export function sessionsOnShow(
+    sessions: readonly { startAt: string }[],
+    shown: number,
+    chosenStartAt: string | null | undefined,
+): number {
+    const at = chosenStartAt
+        ? sessions.findIndex((s) => s.startAt === chosenStartAt)
+        : -1;
+    return Math.max(shown, at + 1);
 }

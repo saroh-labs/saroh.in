@@ -7,8 +7,11 @@ import { showWarning } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { FormSheetBody, FormSheetFoot } from "@/components/shared/form-sheet";
-import { useHold } from "@/components/shared/use-hold";
+import {
+    FormSheetBody,
+    FormSheetFoot,
+} from "@/components/shared/forms/form-sheet";
+import { useHold } from "@/components/shared/undo/use-hold";
 import { sendMessage } from "@/lib/messages/actions";
 import type { ComposerGate } from "@/lib/messages/composer-gate";
 import { sendFailureWords } from "@/lib/messages/composer-gate";

@@ -1,101 +1,20 @@
 import { count } from "@/lib/format/plural";
-import type { OffLine } from "@/lib/staff/time-off";
-import { offLines } from "@/lib/staff/time-off";
+import type { LocalDate } from "@/lib/services/diary";
 import type {
     BookingPayment,
     BookingRules,
-    Closure,
-    ExtraHours,
     OnlineBlocker,
-    StaffView,
     WeeklyRange,
 } from "@/lib/staff/types";
 
 /**
- * The Availability editor's rules (U16, the design's `?view=avail`): hours,
- * time off and extra hours are a draft until "Save", ranges refuse overlap
- * and an end before the start, Monday copies to the weekdays, and a draft
- * turns into the writes the API takes. The business's booking rules are not
- * part of that draft: each is a sentence in a row, changed in its own sheet
- * (`ruleRows`). Pure, so the editor and its tests agree.
+ * Hours and time off's rules (U16; V2 in U17, DEC-170): whether two weeks
+ * are the same, which bookings fall outside a person's hours, and the
+ * business's booking rules as sentences in rows, each with the choices it
+ * saves on a pick (`ruleRows`). Hours, time off and extra hours save as
+ * they are changed, so nothing here is a draft; a day's own rules are
+ * `lib/staff/day-plan.ts`. Pure, so the screen and its tests agree.
  */
-
-/** Monday first, as the design lists the week; values are 0 = Sunday. */
-export const WEEK = [
-    { day: 1, name: "Monday" },
-    { day: 2, name: "Tuesday" },
-    { day: 3, name: "Wednesday" },
-    { day: 4, name: "Thursday" },
-    { day: 5, name: "Friday" },
-    { day: 6, name: "Saturday" },
-    { day: 0, name: "Sunday" },
-] as const;
-
-type Range = Pick<WeeklyRange, "startMinute" | "endMinute">;
-
-/** Why a new range cannot go on a day, or null when it can. */
-export function rangeRefusal(
-    existing: readonly Range[],
-    add: Range,
-): string | null {
-    if (add.endMinute <= add.startMinute) {
-        return "The end has to be after the start.";
-    }
-    if (
-        existing.some(
-            (r) =>
-                add.startMinute < r.endMinute && r.startMinute < add.endMinute,
-        )
-    ) {
-        return "That overlaps hours already set.";
-    }
-    return null;
-}
-
-/** A day's ranges in order. */
-export function dayRanges(
-    hours: readonly WeeklyRange[],
-    day: number,
-): WeeklyRange[] {
-    return hours
-        .filter((h) => h.dayOfWeek === day)
-        .sort((a, b) => a.startMinute - b.startMinute);
-}
-
-/** Tuesday to Friday become Monday; the weekend is left alone. */
-export function copyMondayToWeekdays(
-    hours: readonly WeeklyRange[],
-): WeeklyRange[] {
-    const monday = dayRanges(hours, 1);
-    return [
-        ...hours.filter((h) => h.dayOfWeek < 2 || h.dayOfWeek > 5),
-        ...[2, 3, 4, 5].flatMap((day) =>
-            monday.map((r) => ({ ...r, dayOfWeek: day })),
-        ),
-    ];
-}
-
-/**
- * One day's hours given to other days, replacing what those days had. A
- * day off copies as a day off; the day itself is left alone.
- */
-export function copyDay(
-    hours: readonly WeeklyRange[],
-    from: number,
-    to: readonly number[],
-): WeeklyRange[] {
-    const days = to.filter((day) => day !== from);
-    const source = dayRanges(hours, from);
-    return [
-        ...hours.filter((h) => !days.includes(h.dayOfWeek)),
-        ...days.flatMap((day) => source.map((r) => ({ ...r, dayOfWeek: day }))),
-    ];
-}
-
-/** Hours a week, e.g. 44 or 27.5. */
-export function weeklyHours(hours: readonly WeeklyRange[]): number {
-    return hours.reduce((n, h) => n + (h.endMinute - h.startMinute), 0) / 60;
-}
 
 function key(hours: readonly WeeklyRange[]): string {
     return hours
@@ -120,6 +39,10 @@ export interface KeptBooking {
     /** Minutes from local midnight it starts at. */
     start: number;
     who: string;
+    /** The local day it is on, for "booked on Sat 24 Oct". */
+    date?: LocalDate;
+    /** Where "See it" goes: the booking, or its day on the calendar. */
+    href?: string;
 }
 
 /**
@@ -132,7 +55,7 @@ export function outsideHours(
     hours: readonly WeeklyRange[],
     day: number,
 ): KeptBooking[] {
-    const ranges = dayRanges(hours, day);
+    const ranges = hours.filter((h) => h.dayOfWeek === day);
     return bookings.filter(
         (b) =>
             b.staffId === staffId &&
@@ -142,62 +65,6 @@ export function outsideHours(
             ),
     );
 }
-
-/**
- * Time off added in the editor, not yet saved (E3): a range of days, all
- * day or the same hours on each, for one person or — `staffId` null — the
- * whole business closed.
- */
-export interface NewOff {
-    key: string;
-    staffId: string | null;
-    fromDate: string;
-    toDate: string;
-    /** Part of each day; both null for all day. */
-    startMinute: number | null;
-    endMinute: number | null;
-    reason: string;
-}
-
-/** Everything the page's draft holds until "Save". */
-export interface AvailabilityDraft {
-    hours: Record<string, WeeklyRange[]>;
-    offAdded: NewOff[];
-    /** Rows of time off or closure taken away — a line's rows together. */
-    offRemoved: string[];
-    extraRemoved: string[];
-}
-
-export function draftFrom(staff: readonly StaffView[]): AvailabilityDraft {
-    return {
-        hours: Object.fromEntries(
-            staff.map((p) => [
-                p.id,
-                p.hours.map((h) => ({
-                    dayOfWeek: h.dayOfWeek,
-                    startMinute: h.startMinute,
-                    endMinute: h.endMinute,
-                })),
-            ]),
-        ),
-        offAdded: [],
-        offRemoved: [],
-        extraRemoved: [],
-    };
-}
-
-/** One write the draft turns into, with what to put back for Undo. */
-export type SaveOp =
-    | {
-          kind: "hours";
-          staffId: string;
-          hours: WeeklyRange[];
-          before: WeeklyRange[];
-      }
-    | { kind: "addOff"; off: NewOff }
-    | { kind: "removeOff"; staffId: string; before: OffLine }
-    | { kind: "removeClosure"; before: OffLine }
-    | { kind: "removeExtra"; staffId: string; before: ExtraHours };
 
 /** How people pay when they book; both unless it was set (DEC-088). */
 export function payWayOf(rules: BookingRules): BookingPayment {
@@ -274,47 +141,6 @@ export const REFUND_POLICY = {
     ],
     hint: "A late cancel is never refunded automatically. Someone who can refund payments can still give money back when they cancel. You can change this any time.",
 } as const;
-
-/**
- * The writes that make the saved state the draft; empty when unchanged. A
- * line of time off or closure is removed whole, in one write.
- */
-export function saveOps(
-    staff: readonly StaffView[],
-    draft: AvailabilityDraft,
-    closures: readonly Closure[] = [],
-    timeZone = "UTC",
-): SaveOp[] {
-    const ops: SaveOp[] = [];
-    const removed = (line: OffLine) =>
-        line.ids.some((id) => draft.offRemoved.includes(id));
-    for (const line of offLines(closures, timeZone, true)) {
-        if (removed(line)) ops.push({ kind: "removeClosure", before: line });
-    }
-    for (const p of staff) {
-        const next = draft.hours[p.id] as WeeklyRange[] | undefined;
-        if (next && !sameHours(next, p.hours)) {
-            ops.push({
-                kind: "hours",
-                staffId: p.id,
-                hours: next,
-                before: p.hours,
-            });
-        }
-        for (const line of offLines(p.timeOff, timeZone, false)) {
-            if (removed(line)) {
-                ops.push({ kind: "removeOff", staffId: p.id, before: line });
-            }
-        }
-        for (const x of p.extraHours) {
-            if (draft.extraRemoved.includes(x.id)) {
-                ops.push({ kind: "removeExtra", staffId: p.id, before: x });
-            }
-        }
-    }
-    for (const off of draft.offAdded) ops.push({ kind: "addOff", off });
-    return ops;
-}
 
 export interface RuleOption {
     value: string;
@@ -409,6 +235,7 @@ export function ruleChoices(rules: BookingRules) {
 export type RuleKey =
     | "bookAheadDays"
     | "latestBookingMinutes"
+    | "gapMinutes"
     | "freeCancelHours"
     | "bookingPayment"
     | "refundInTimeCancels";
@@ -468,7 +295,7 @@ export function ruleRows(
             sentence:
                 rules.bookAheadDays === null
                     ? "No limit on how far ahead"
-                    : `Book up to ${aheadLabel(rules.bookAheadDays)} ahead`,
+                    : `Up to ${aheadLabel(rules.bookAheadDays)} ahead`,
             value: String(rules.bookAheadDays ?? ""),
             options: ahead.options,
         },
@@ -478,11 +305,13 @@ export function ruleRows(
             title: latest.label,
             sentence:
                 rules.latestBookingMinutes === null
-                    ? "Book up to the start time"
-                    : `Book up to ${latestLabel(rules.latestBookingMinutes)} the start`,
+                    ? "Up to the start time"
+                    : `Up to ${latestLabel(rules.latestBookingMinutes)} the start`,
             value: String(rules.latestBookingMinutes ?? ""),
             options: latest.options,
         },
+        // "Gap between bookings" (DEC-170, #1038), from an API that has it.
+        ...(rules.gapMinutes === undefined ? [] : [gapRow(rules.gapMinutes)]),
         {
             key: "freeCancelHours",
             label: "Cancelling",
@@ -517,8 +346,32 @@ export function ruleRows(
     ];
 }
 
+/** "No gap needed", or "15 min between bookings". */
+export function gapLabel(minutes: number): string {
+    return minutes ? `${minutes} min between bookings` : "No gap needed";
+}
+
+function gapRow(minutes: number): RuleRow {
+    return {
+        key: "gapMinutes",
+        label: "Gap between bookings",
+        title: "Gap between bookings",
+        sentence: gapLabel(minutes),
+        value: String(minutes),
+        options: withCurrent(
+            [0, 10, 15, 30].map((n) => ({
+                value: String(n),
+                label: gapLabel(n),
+            })),
+            minutes,
+            gapLabel,
+        ),
+    };
+}
+
 /** A sheet's choice as the one field of the rules it changes. */
 export function rulePatch(key: RuleKey, value: string): Partial<BookingRules> {
+    if (key === "gapMinutes") return { gapMinutes: Number(value) || 0 };
     if (key === "bookingPayment") {
         return { bookingPayment: value as BookingPayment };
     }
@@ -534,6 +387,7 @@ export function ruleBefore(
     rules: BookingRules,
 ): Partial<BookingRules> {
     if (key === "bookingPayment") return { bookingPayment: payWayOf(rules) };
+    if (key === "gapMinutes") return { gapMinutes: rules.gapMinutes ?? 0 };
     if (key === "refundInTimeCancels") {
         return { refundInTimeCancels: refundsInTime(rules) };
     }

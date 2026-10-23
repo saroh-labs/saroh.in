@@ -8,13 +8,13 @@ import { Textarea } from "@saroh/ui/textarea";
 import {
     REPLY_MAX,
     useReviewActions,
-} from "@/components/commerce/product-page/use-review-actions";
-import { ViewerDate } from "@/components/shared/viewer-date";
+} from "@/components/commerce/product-reviews/use-review-actions";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { stars } from "@/lib/product-reviews/describe";
 import type { Review } from "@/lib/product-reviews/service";
 import { productHref } from "@/lib/products/links";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { TextLink } from "@saroh/ui/text-link";
 import { Empty } from "./parts";
 /**

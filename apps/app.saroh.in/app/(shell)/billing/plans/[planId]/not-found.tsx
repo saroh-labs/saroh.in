@@ -2,7 +2,7 @@ import { NotFound } from "@saroh/ui/not-found";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 
 import { PLANS_HREF } from "@/lib/subscriptions/plan-detail";
 

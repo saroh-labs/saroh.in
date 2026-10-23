@@ -14,6 +14,8 @@ import { BookingsService } from "../bookings/bookings.service";
 import { PublicBookingsService } from "../bookings/public-bookings.service";
 import { ContactsService } from "../contacts/contacts.service";
 import { InvoicesService } from "../invoices/invoices.service";
+import { loadSubject } from "../site-accounts/customer-notify.handler";
+import { noticeSentence, renderNotice } from "../site-accounts/notices";
 import { CoursesService } from "./courses.service";
 
 const bookings = new BookingsService();
@@ -356,5 +358,134 @@ describe("courses (real database)", () => {
                 where: { id: { in: ids }, status: "CANCELLED" },
             }),
         ).toBe(3);
+    });
+});
+
+// U17 (#1148): enrolling and cancelling tell the student, once each, under
+// the COURSE switch; the sessions are not told one by one.
+describe("course notices (real database)", () => {
+    const courseJobs = (enrollmentId: string) =>
+        prisma.job.findMany({
+            where: {
+                organizationId: org.organizationId,
+                type: "customer.notify",
+                payload: {
+                    path: ["courseEnrollmentId"],
+                    equals: enrollmentId,
+                },
+            },
+            orderBy: { createdAt: "asc" },
+        });
+
+    const load = (kind: "COURSE_ENROLLED" | "COURSE_CANCELLED", id: string) =>
+        runInOrgContext(org.organizationId, () =>
+            prisma.$transaction((tx) =>
+                loadSubject(tx, org.organizationId, {
+                    kind,
+                    eventKey: `${kind}:${id}`,
+                    courseEnrollmentId: id,
+                }),
+            ),
+        );
+
+    it("enrolling in an 8-session course queues one notice that lists all 8", async () => {
+        const serviceId = await makeService(10);
+        const courseId = await openCourse(serviceId, 4, WEEKS);
+        const contactId = await person();
+        const enrolled = await courses.enrol(org, courseId, { contactId });
+
+        const jobs = await courseJobs(enrolled.id);
+        expect(jobs.map((j) => j.payload)).toEqual([
+            {
+                kind: "COURSE_ENROLLED",
+                eventKey: `course-enrolled:${enrolled.id}`,
+                courseEnrollmentId: enrolled.id,
+            },
+        ]);
+        // No session is told on its own.
+        const sessionIds = (await bookingsOf(enrolled.id)).map((b) => b.id);
+        expect(
+            await prisma.job.count({
+                where: {
+                    type: "booking.notify",
+                    OR: sessionIds.map((id) => ({
+                        payload: { path: ["bookingId"], equals: id },
+                    })),
+                },
+            }),
+        ).toBe(0);
+
+        const subject = await load("COURSE_ENROLLED", enrolled.id);
+        expect(subject?.contactId).toBe(contactId);
+        if (subject?.vars.kind !== "COURSE_ENROLLED") throw new Error("kind");
+        expect(subject.vars.course.sessions).toHaveLength(8);
+        expect(noticeSentence(subject.vars)).toMatch(
+            /^You're enrolled in Beginners' wheel: 8 sessions, from /,
+        );
+        const email = renderNotice(subject.vars);
+        expect(email.subject).toBe(
+            "You're enrolled in Beginners' wheel at Courses Org",
+        );
+        expect(email.body.match(/<li>/g)).toHaveLength(8);
+    });
+
+    it("cancelling tells them, with the invoice as it stands, and an enrolment told it is cancelled is not told it is enrolled", async () => {
+        const serviceId = await makeService(10);
+        const courseId = await openCourse(serviceId, 4, WEEKS.slice(0, 3));
+        const enrolled = await courses.enrol(org, courseId, {
+            contactId: await person(),
+        });
+        await courses.cancelEnrollment(org, courseId, enrolled.id);
+
+        expect(
+            (await courseJobs(enrolled.id)).map(
+                (j) => (j.payload as { kind: string }).kind,
+            ),
+        ).toEqual(["COURSE_ENROLLED", "COURSE_CANCELLED"]);
+        expect(await load("COURSE_ENROLLED", enrolled.id)).toBeNull();
+
+        const open = await load("COURSE_CANCELLED", enrolled.id);
+        if (open?.vars.kind !== "COURSE_CANCELLED") throw new Error("kind");
+        expect(open.vars.course.sessions).toHaveLength(3);
+        expect(open.vars.course.money).toMatchObject({ state: "OPEN" });
+        expect(noticeSentence(open.vars)).toContain(
+            "Its 3 sessions still to come are cancelled.",
+        );
+        expect(noticeSentence(open.vars)).toContain("invoice is still open");
+
+        // Paid before the cancel: what they paid is not refunded by it.
+        await prisma.invoice.updateMany({
+            where: { courseEnrollmentId: enrolled.id },
+            data: { status: "PAID", paidAt: new Date() },
+        });
+        const paid = await load("COURSE_CANCELLED", enrolled.id);
+        if (paid?.vars.kind !== "COURSE_CANCELLED") throw new Error("kind");
+        expect(paid.vars.course.money).toMatchObject({ state: "PAID" });
+        expect(noticeSentence(paid.vars)).toMatch(
+            /The ₹[\d,.]+ you paid hasn't been refunded\. Ask Courses Org/,
+        );
+    });
+
+    it("with Course emails off, nothing is queued", async () => {
+        await prisma.customerNoticeSetting.create({
+            data: {
+                organizationId: org.organizationId,
+                kind: "COURSE",
+                enabled: false,
+            },
+        });
+        try {
+            const serviceId = await makeService(10);
+            const courseId = await openCourse(serviceId, 4, WEEKS.slice(0, 2));
+            const enrolled = await courses.enrol(org, courseId, {
+                contactId: await person(),
+            });
+            await courses.cancelEnrollment(org, courseId, enrolled.id);
+            expect(await courseJobs(enrolled.id)).toHaveLength(0);
+        } finally {
+            await prisma.customerNoticeSetting.deleteMany({
+                where: { organizationId: org.organizationId },
+            });
+        }
     });
 });

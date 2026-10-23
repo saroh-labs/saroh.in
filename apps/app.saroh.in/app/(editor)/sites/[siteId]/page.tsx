@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 
-import { SiteEditor } from "@/components/sites/site-editor";
+import { SiteEditorHost } from "@/components/sites/editor/site-editor-host";
 import { requireSession } from "@/lib/session";
 import { parseSectionContent } from "@saroh/block-contract";
 
@@ -115,7 +115,7 @@ export default async function SiteEditorPage({
     // centred measure would leave the preview narrower than the phone it is
     // meant to simulate.
     return (
-        <SiteEditor
+        <SiteEditorHost
             // Keyed on the page so switching pages remounts the editor with
             // that page's sections. Without it the new sections would arrive as
             // props into state seeded from the old ones, and the merchant would
@@ -151,6 +151,13 @@ export default async function SiteEditorPage({
             canUpdateSite={site.can.manageSettings}
             initialStyle={site.style}
             styleOptions={site.styleOptions}
+            // The Look row (DEC-172, U16): offered while `SITE_LOOKS` is on,
+            // or kept with Classic for a site that has a look already.
+            looksAvailable={site.looksAvailable === true}
+            liveLook={site.liveLook ?? null}
+            // Which looks, typefaces and colourways are free (DEC-177).
+            styleAccess={site.styleAccess ?? null}
+            templateId={site.template?.id ?? null}
             address={
                 siteAddressOf(site, webAddress, RENDERER_APEX)?.host ?? null
             }

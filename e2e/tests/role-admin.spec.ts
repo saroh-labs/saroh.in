@@ -30,7 +30,7 @@ import { people } from "../fixtures/sessions";
  */
 
 /**
- * Every row of `NAV_GROUPS` (`components/shared/nav-items.tsx`) whose module
+ * Every row of `NAV_GROUPS` (`components/shared/navigation/nav-items.tsx`) whose module
  * Northwind runs. Sell › Stock is drawn only while the business tracks stock,
  * which a product spec may have turned off, so it is allowed and not asked.
  * Class packs is not in it: the module is not offered on any plan (DEC-099),
@@ -38,7 +38,7 @@ import { people } from "../fixtures/sessions";
  */
 const MENU: readonly MenuRow[] = [
     { label: "Home", href: "/" },
-    { label: "Overview", href: "/calendar" },
+    { label: "Calendar", href: "/calendar" },
     { label: "Website", href: "/sites" },
     {
         label: "Sell",
@@ -56,9 +56,9 @@ const MENU: readonly MenuRow[] = [
         label: "Bookings",
         href: "/bookings",
         pages: [
-            { label: "Calendar", href: "/bookings" },
+            { label: "Bookings", href: "/bookings" },
             { label: "Services", href: "/services" },
-            { label: "Availability", href: "/bookings/availability" },
+            { label: "Hours and time off", href: "/bookings/availability" },
             { label: "Courses", href: "/courses" },
         ],
     },

@@ -292,6 +292,13 @@ describe("safeDestination — where to land after sign-in (#222)", () => {
             "https://app.saroh.in,https://admin.saroh.in";
     });
 
+    it("refuses a path the browser would read as another site", () => {
+        expect(safeDestination("/\\evil.example")).toBeNull();
+        expect(safeDestination("/\t/evil.example")).toBeNull();
+        expect(safeDestination("/\n/evil.example")).toBeNull();
+        expect(safeDestination("/sites/abc")).toBe("/sites/abc");
+    });
+
     it("follows a full URL on a trusted origin, keeping its path and query", () => {
         expect(
             safeDestination("https://app.saroh.in/sites/abc?tab=pages"),
@@ -548,50 +555,31 @@ describe("existingUserSignUpHook: a sign-up for an address that has an account",
     });
 });
 
-describe("userDatabaseHooks: telling the host of a user's change of email", () => {
-    type Hook = (row: unknown, context: unknown) => Promise<unknown>;
-    const hooksOf = (told: (u: { id: string }) => void) => {
-        const user = userDatabaseHooks({ onUserEmailChanged: told })
-            .databaseHooks?.user;
-        return {
-            before: user?.update?.before as unknown as Hook,
-            after: user?.update?.after as unknown as Hook,
-        };
-    };
+describe("userDatabaseHooks: telling the host of a new user", () => {
+    type Hook = (row: unknown) => Promise<unknown>;
 
-    it("tells the host once, after an update that wrote the email", async () => {
+    it("tells the host the new user's id once it is written", async () => {
         const told = vi.fn();
-        const { before, after } = hooksOf(told);
-        const request = {};
-        await before({ email: "new@example.com" }, request);
-        await after({ id: "user_1", email: "new@example.com" }, request);
-        await after({ id: "user_1" }, request);
-        expect(told).toHaveBeenCalledTimes(1);
+        const after = userDatabaseHooks({ onUserCreated: told }).databaseHooks
+            ?.user?.create?.after as unknown as Hook;
+        await after({ id: "user_1", email: "asha@example.com" });
         expect(told).toHaveBeenCalledWith({ id: "user_1" });
     });
 
-    it("says nothing for an update that left the email alone, or another request's", async () => {
-        const told = vi.fn();
-        const { before, after } = hooksOf(told);
-        const a = {};
-        const b = {};
-        await before({ name: "Asha" }, a);
-        await after({ id: "user_1" }, a);
-        await before({ email: "new@example.com" }, b);
-        await after({ id: "user_2" }, a);
-        expect(told).not.toHaveBeenCalled();
+    it("never fails the sign-up when the host throws", async () => {
+        const after = userDatabaseHooks({
+            onUserCreated: () => {
+                throw new Error("analytics down");
+            },
+        }).databaseHooks?.user?.create?.after as unknown as Hook;
+        await expect(after({ id: "user_1" })).resolves.toBeUndefined();
     });
 
-    it("never fails the change when the host throws", async () => {
-        const { before, after } = hooksOf(() => {
-            throw new Error("queue down");
-        });
-        const request = {};
-        await before({ email: "new@example.com" }, request);
-        await expect(after({ id: "user_1" }, request)).resolves.toBeUndefined();
-    });
-
-    it("adds no hook the host didn't ask for", () => {
+    it("adds no hook the host didn't ask for, and none for an update", () => {
         expect(userDatabaseHooks({})).toEqual({});
+        expect(
+            userDatabaseHooks({ onUserCreated: vi.fn() }).databaseHooks?.user
+                ?.update,
+        ).toBeUndefined();
     });
 });

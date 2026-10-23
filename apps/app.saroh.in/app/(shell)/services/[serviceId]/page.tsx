@@ -73,6 +73,7 @@ export default async function ServiceEditorPage({
     }
     const service = read.service;
     const {
+        services,
         staff,
         hasPage,
         hasStorefront,
@@ -103,6 +104,8 @@ export default async function ServiceEditorPage({
             payment={payment}
             gstRegistered={gstRegistered}
             businessPriceMode={businessPriceMode}
+            // A name another service already has says so, with the way to it.
+            others={services.map((s) => ({ id: s.id, name: s.name }))}
             priceHistory={priceHistory}
         />
     );

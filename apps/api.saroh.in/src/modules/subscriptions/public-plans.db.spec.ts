@@ -182,9 +182,24 @@ describe("GET public/sites/:siteId/plans (G9, real database)", () => {
             "autopayMethods",
             // Whether memberships are on the business's plan at all (R31).
             "offered",
+            "pauseWeeks",
             "payOnline",
             "plans",
         ]);
+    });
+
+    it("says how long a member may pause only while the business lets members pause (DEC-172 U7)", async () => {
+        const { organizationId, siteId } = await business();
+        await plan(organizationId, "Monthly", "1200");
+        expect((await service.list(siteId, "visitor")).pauseWeeks).toEqual([
+            2, 4, 8,
+        ]);
+        await prisma.businessProfile.upsert({
+            where: { organizationId },
+            create: { organizationId, membersCanPause: false },
+            update: { membersCanPause: false },
+        });
+        expect((await service.list(siteId, "visitor")).pauseWeeks).toEqual([]);
     });
 
     it("a cancelled member doesn't count towards Most chosen", async () => {
@@ -236,6 +251,7 @@ describe("GET public/sites/:siteId/plans (G9, real database)", () => {
             payOnline: false,
             autopayMethods: [],
             offered: true,
+            pauseWeeks: [2, 4, 8],
         });
     });
 
@@ -296,6 +312,7 @@ describe("GET public/sites/:siteId/plans (G9, real database)", () => {
             payOnline: false,
             autopayMethods: [],
             offered: true,
+            pauseWeeks: [2, 4, 8],
         });
     });
 });

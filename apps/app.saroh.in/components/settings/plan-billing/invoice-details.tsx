@@ -5,7 +5,9 @@ import { Input } from "@saroh/ui/input";
 import { OptionSelect } from "@saroh/ui/option-select";
 import type { ChangeEvent } from "react";
 
+import { BusinessPhoneInput } from "@/components/shared/fields/business-phone-input";
 import { GST_STATES } from "@/lib/invoices/gst";
+import { phoneProblem } from "@/lib/organizations/business-phone";
 import type { BillingDetail, ChangeQuote } from "@/lib/saroh-billing/plan-view";
 
 /**
@@ -149,10 +151,8 @@ export function detailsProblems(
         out.billingState = "Choose the state your business is registered in.";
     }
     if (gstin && !GSTIN.test(gstin)) out.gstin = "A GSTIN is 15 characters.";
-    const phone = d.phone.replace(/[\s\-.()]/g, "");
-    if (phone && !/^\+[1-9]\d{7,14}$/.test(phone)) {
-        out.phone = "Start with + and the country code, like +91 98450 12345.";
-    }
+    const phone = d.phone.trim() ? phoneProblem(d.phone) : null;
+    if (phone) out.phone = phone;
     return out;
 }
 
@@ -207,7 +207,7 @@ export function InvoiceDetailsFields({
             {required ? (
                 <p className="text-[12px] text-muted-foreground">
                     Saroh&apos;s invoice needs these before the payment opens.
-                    The address is saved to your business details.
+                    They&apos;re saved to the billing profile Saroh bills.
                 </p>
             ) : null}
             {asked.name ? (
@@ -269,16 +269,14 @@ export function InvoiceDetailsFields({
                 <Field
                     label="Phone"
                     optional
-                    hint="Printed on Saroh's invoice. Like +91 98450 12345."
+                    hint="Printed on Saroh's invoice."
                     error={errors.phone}
                 >
-                    <Input
+                    <BusinessPhoneInput
                         id="bill-phone"
-                        {...input("phone")}
-                        type="tel"
-                        inputMode="tel"
-                        maxLength={32}
-                        autoComplete="tel"
+                        value={value.phone}
+                        onValueChange={(v) => onChange("phone", v)}
+                        autoComplete="tel-national"
                     />
                 </Field>
             ) : null}
@@ -287,9 +285,9 @@ export function InvoiceDetailsFields({
 }
 
 /**
- * The business's registered address, asked for when its profile has none
- * whole and kept there (Settings › Business shows it after): it prints on
- * Saroh's invoice (CGST Rule 46(e)).
+ * The billing address, asked for when the business's billing profile has
+ * none whole and kept there (Plan & billing's "Billed to" shows it after,
+ * DEC-167): it prints on Saroh's invoice (CGST Rule 46(e)).
  */
 function AddressFields({
     value,

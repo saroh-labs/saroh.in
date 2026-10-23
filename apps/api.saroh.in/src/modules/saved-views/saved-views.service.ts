@@ -66,6 +66,37 @@ export class SavedViewsService {
         });
     }
 
+    /**
+     * Set the caller's one view by this resource and name, replacing any
+     * they had: a choice kept for one person, like where Bookings opens
+     * (DEC-170). The old one goes and the new one comes in one transaction,
+     * under a lock on the caller, resource and name, so two saves at once
+     * (the header saves on every change) take turns: never none and never
+     * two.
+     */
+    async put(
+        ctx: OrganizationContext,
+        input: SavedViewInput,
+    ): Promise<SavedViewRecord> {
+        const where = {
+            organizationId: ctx.organizationId,
+            ownerUserId: ctx.userId,
+            resource: input.resource,
+            name: input.name,
+        };
+        const lock = `saved-view:${where.organizationId}:${where.ownerUserId}:${where.resource}:${where.name}`;
+        return this.db.$transaction(async (tx) => {
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lock}))`;
+            await tx.savedView.deleteMany({ where });
+            return tx.savedView.create({
+                data: {
+                    ...where,
+                    filters: input.filters as SavedViewFilters,
+                },
+            });
+        });
+    }
+
     /** Delete only the caller's own view (org + owner scoped). */
     async remove(ctx: OrganizationContext, id: string): Promise<void> {
         await this.db.savedView.deleteMany({

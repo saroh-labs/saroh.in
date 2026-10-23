@@ -18,10 +18,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ProductDetail, ProductOptionView } from "@/lib/products/service";
 
+import { VariantsSection } from "@/components/commerce/product-variants/variants-section";
 import { DetailsSection } from "./details-section";
 import { ProductEditorV2 } from "./editor-shell";
 import { ProductEditorProvider, useEditor } from "./editor-state";
-import { VariantsSection } from "./variants-section";
 
 const createProduct = vi.fn();
 const patchProduct = vi.fn();
@@ -64,7 +64,7 @@ vi.mock("./description-section", () => ({ DescriptionSection: () => null }));
 vi.mock("./made-by-section", () => ({ MadeBySection: () => null }));
 vi.mock("./photos-section", () => ({ PhotosSection: () => null }));
 vi.mock("./category-picker", () => ({ CategoryPicker: () => null }));
-vi.mock("./option-values-inline", () => ({
+vi.mock("@/components/commerce/product-variants/option-values-inline", () => ({
     OptionValuesInline: () => null,
 }));
 vi.mock("@saroh/ui/option-select", () => ({

@@ -80,9 +80,13 @@ export function safeDestination(
     const candidate = value.trim();
 
     // A same-origin path, which cannot leave this origin. `//evil.example` is
-    // NOT one: the browser reads it as protocol-relative and leaves.
-    if (candidate.startsWith("/") && !candidate.startsWith("//")) {
-        return candidate;
+    // NOT one: the browser reads it as protocol-relative and leaves. Nor is
+    // `/\evil.example` or `/<tab>/evil.example`: the browser turns `\` into
+    // `/` and drops tabs and newlines, so both become `//evil.example`.
+    if (candidate.startsWith("/")) {
+        return candidate.startsWith("//") || /[\\\t\n\r]/.test(candidate)
+            ? null
+            : candidate;
     }
 
     return isTrustedOrigin(candidate) ? candidate : null;

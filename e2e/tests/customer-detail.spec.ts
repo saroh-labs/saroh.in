@@ -174,10 +174,10 @@ test.describe("customer detail", () => {
         await expect(which).toContainText("Upcoming");
         await which.click();
         await page
-            .getByRole("option", { name: /^No-shows and late cancels/ })
+            .getByRole("option", { name: /^Didn't come or cancelled late/ })
             .click();
         await expect(
-            page.getByText(/Late cancel|No-show/).first(),
+            page.getByText(/Late cancel|Didn't come/).first(),
         ).toBeVisible();
     });
 

@@ -11,8 +11,11 @@ import { catalogPlanIdForKey } from "@saroh/pricing-catalog";
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { PLATFORM_OPERATOR_ROLE_KEY } from "../audit/audit.service";
-import { enqueueBillingCustomerSync } from "../billing/billing-customer-sync";
 import { enqueueBillingEmail } from "../billing/billing-email.job";
+import {
+    BILLING_PROFILE_SYNC_TYPE,
+    enqueueBillingProfileSync,
+} from "../billing/billing-profile-sync";
 import { recordRefundInTx } from "../billing/billing-refunds";
 import { CheckoutService } from "../billing/checkout.service";
 import type { DoubleChargeRefundPayload } from "../billing/double-charge";
@@ -48,7 +51,10 @@ type Staff = PlatformAdminInfo;
  *   provider answers a payment already refunded in full with that refund,
  *   so after the owner refunded it by hand the job writes the done row,
  *   emails the business and notes it — never a second refund.
- * - **Sync the provider's customer again** ({@link syncCustomer}).
+ * - **Sync the provider's customer again** ({@link syncCustomer}): queues
+ *   `billing.profile.sync` for the billing profile the business is billed
+ *   to (DEC-167). The profile spans businesses, so it syncs one customer
+ *   for all of them.
  * - **Record a refund the owner made by hand** ({@link recordRefund})
  *   against the invoice it paid: a `BillingRefund`, and a Needs-action row
  *   to ask the CA about a credit note (Saroh issues none).
@@ -240,27 +246,36 @@ export class AdminBillingControlsService {
         return prisma.$transaction(async (tx) => {
             const org = await tx.organization.findUnique({
                 where: { id: organizationId },
-                select: { id: true },
+                select: { id: true, billingProfileId: true },
             });
             if (!org) throw new NotFoundException("Organization not found");
+            const billingProfileId = org.billingProfileId;
+            if (!billingProfileId) {
+                throw new ConflictException(
+                    "This business hasn't chosen a billing profile yet, so there's no customer to sync. An owner chooses one in Plan & billing.",
+                );
+            }
             const before = await tx.job.count({
                 where: {
-                    type: "billing.customer.sync",
-                    organizationId,
+                    type: BILLING_PROFILE_SYNC_TYPE,
                     status: "PENDING",
+                    payload: {
+                        path: ["billingProfileId"],
+                        equals: billingProfileId,
+                    },
                 },
             });
-            await enqueueBillingCustomerSync(tx, organizationId);
+            await enqueueBillingProfileSync(tx, billingProfileId);
             await this.audit.write(tx, {
                 actorUserId: staff.userId,
                 permission: AdminPermission.SarohBillingAct,
-                action: "billing.customer.sync",
+                action: BILLING_PROFILE_SYNC_TYPE,
                 targetType: "organization",
                 targetId: organizationId,
                 organizationId,
                 reason,
                 outcome: AdminAuditOutcome.Success,
-                metadata: { alreadyQueued: before > 0 },
+                metadata: { alreadyQueued: before > 0, billingProfileId },
             });
             return { ok: true, changed: before === 0 };
         });

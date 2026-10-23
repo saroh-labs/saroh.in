@@ -290,14 +290,44 @@ describe("PublicBookingsService.book — capacity-one reservation", () => {
         expect(jobCreate).not.toHaveBeenCalled();
     });
 
-    it("maps a Postgres serialization failure (P2034) to 409", async () => {
+    it("tries once more after losing a serialization race (P2034), and books a time still free", async () => {
         const service = new PublicBookingsService();
         wireBookHappyPath();
         transaction.mockRejectedValueOnce({ code: "P2034" });
 
         await expect(
             service.book("svc_1", baseInput(), "iphash"),
-        ).rejects.toBeInstanceOf(ConflictException);
+        ).resolves.toMatchObject({ id: "bk_1" });
+        expect(transaction).toHaveBeenCalledTimes(2);
+    });
+
+    it("tries up to three times against lost races, and books on the third (review #33)", async () => {
+        const service = new PublicBookingsService();
+        wireBookHappyPath();
+        transaction
+            .mockRejectedValueOnce({ code: "P2034" })
+            .mockRejectedValueOnce({ code: "P2034" });
+
+        await expect(
+            service.book("svc_1", baseInput(), "iphash"),
+        ).resolves.toMatchObject({ id: "bk_1" });
+        expect(transaction).toHaveBeenCalledTimes(3);
+    });
+
+    it("says it is busy, never fully booked, when all three tries lose a race (review #33)", async () => {
+        const service = new PublicBookingsService();
+        wireBookHappyPath();
+        transaction
+            .mockRejectedValueOnce({ code: "P2034" })
+            .mockRejectedValueOnce({ code: "P2034" })
+            .mockRejectedValueOnce({ code: "P2034" });
+
+        const refused = service.book("svc_1", baseInput(), "iphash");
+        await expect(refused).rejects.toBeInstanceOf(ConflictException);
+        await expect(refused).rejects.toThrow(
+            "Lots of people are booking right now. Try again.",
+        );
+        expect(transaction).toHaveBeenCalledTimes(3);
     });
 
     it("replays an existing booking for a repeated (serviceId, idempotencyKey) — no tx", async () => {

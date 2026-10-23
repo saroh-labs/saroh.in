@@ -76,6 +76,15 @@ export class JobWorkerService implements OnModuleInit, OnModuleDestroy {
                 env.JOB_WORKER_BATCH,
             );
             for (const job of jobs) {
+                // One claim covers the batch: a job that waited behind a long
+                // one may have been reclaimed, and is then the other's to run.
+                if (!(await this.queue.renew(job.id, this.workerId))) {
+                    this.logger.warn(
+                        `Job ${job.id} (${job.type}) skipped: its lease ` +
+                            `lapsed in the batch and another worker holds it.`,
+                    );
+                    continue;
+                }
                 await this.dispatch(job);
             }
             return jobs.length;

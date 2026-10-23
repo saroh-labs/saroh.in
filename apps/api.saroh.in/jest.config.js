@@ -48,6 +48,12 @@ module.exports = {
         // Internal control plane: fixed staff permissions, admin read models,
         // and services with mocked Prisma. Never touch a DB.
         "<rootDir>/src/modules/admin/**/*.spec.ts",
+        // Saroh's own leads (U20): the rules, pure. The rows are in
+        // saroh-leads.db.spec.ts (integration).
+        "<rootDir>/src/modules/saroh-leads/**/*.spec.ts",
+        // Commission (U21): the pay rules, pure. The rows are in
+        // commission.db.spec.ts (integration).
+        "<rootDir>/src/modules/commission/**/*.spec.ts",
         "<rootDir>/src/modules/feature-flags/**/*.spec.ts",
         // #119 Home aggregator: pure ranking with mocked availability + counts.
         "<rootDir>/src/modules/home/**/*.spec.ts",
@@ -225,6 +231,12 @@ module.exports = {
         "<rootDir>/src/modules/stock/stock.gate.spec.ts",
         // The stock lists' numbered pages: the window and the DTOs — pure.
         "<rootDir>/src/modules/stock/stock-paging.spec.ts",
+        // U23 back in stock: the stop link and the address (pure), the
+        // public routes' limits and refusals (mocked), and the scan that
+        // every stock writer calls the one hook.
+        "<rootDir>/src/modules/stock/stock-watch-rules.spec.ts",
+        "<rootDir>/src/modules/stock/stock-watch.controller.spec.ts",
+        "<rootDir>/src/modules/stock/on-sellable-again.guard.spec.ts",
         "<rootDir>/src/modules/catalogue/catalogue-defaults.spec.ts",
         "<rootDir>/src/modules/catalogue/sku-pattern.spec.ts",
         "<rootDir>/src/modules/catalogue/field-rules.spec.ts",
@@ -307,6 +319,13 @@ module.exports = {
         "<rootDir>/src/modules/invoices/totals.spec.ts",
         "<rootDir>/src/modules/invoices/numbering.spec.ts",
         "<rootDir>/src/modules/invoices/invoice-state.spec.ts",
+        // DEC-173: the ledger's settle rules, pure.
+        "<rootDir>/src/modules/invoices/invoice-ledger.spec.ts",
+        // Nothing pays an invoice outside the ledger (DEC-173, U3).
+        "<rootDir>/src/modules/invoices/invoice-ledger.guard.spec.ts",
+        "<rootDir>/src/modules/invoices/invoice-payments.guard.spec.ts",
+        // DEC-173, U5: what a shared invoice and its receipt say.
+        "<rootDir>/src/modules/invoices/invoice-share-words.spec.ts",
         "<rootDir>/src/modules/invoices/invoices.service.spec.ts",
         // U13: the invoice pay link (make, replace, revoke, read).
         "<rootDir>/src/modules/invoices/pay-link.spec.ts",
@@ -331,9 +350,16 @@ module.exports = {
         // D18: what narrows the list by source, pack, course or order, and
         // its query (list-filter.db.spec.ts runs in integration).
         "<rootDir>/src/modules/invoices/list-filter.spec.ts",
+        // DEC-173 (U4): what in the search box reads as an amount.
+        "<rootDir>/src/modules/invoices/money-query.spec.ts",
         // D16: the invoice's paper and its PDF, read back as text — pure
         // (invoice-pdf.db.spec.ts runs in integration).
         "<rootDir>/src/modules/invoices/invoice-pdf.spec.ts",
+        // DEC-173 (U6 #1118): the three invoice styles in the PDF, and
+        // what a style or colour write may store — pure
+        // (invoice-paper-styles.db.spec.ts runs in integration).
+        "<rootDir>/src/modules/invoices/invoice-pdf.styles.spec.ts",
+        "<rootDir>/src/modules/invoices/paper-styles.spec.ts",
         // DEC-072: a line's GST note on the paper and the PDF — pure.
         "<rootDir>/src/modules/invoices/invoice-line-gst.spec.ts",
         // How a paper prints a line GST was added to (12 Oct 2026): the
@@ -350,6 +376,8 @@ module.exports = {
         // GST on plans, class packs and courses (12 Oct 2026): what one is
         // charged, pure and with a jest-mocked Prisma for the terms read.
         "<rootDir>/src/modules/invoices/sale-price.spec.ts",
+        // Overdue reminders: which one, when, and the hours (U20).
+        "<rootDir>/src/modules/invoices/overdue-remind.spec.ts",
         // ADR-007 subscriptions: the period calendar, the service and the
         // renewal job with a jest-mocked Prisma. subscriptions.db.spec.ts needs
         // Postgres and runs in integration.
@@ -391,6 +419,8 @@ module.exports = {
         "<rootDir>/src/modules/class-packs/pack-checkout.spec.ts",
         // G20: a pack as the site's Prices page shows it. Pure.
         "<rootDir>/src/modules/class-packs/public-packs.spec.ts",
+        // DEC-174 U22: which purchases the expiry sweep tells. Pure.
+        "<rootDir>/src/modules/class-packs/pack-expiring.handler.spec.ts",
         "<rootDir>/src/modules/courses/courses.service.spec.ts",
         "<rootDir>/src/modules/subscriptions/dto.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",

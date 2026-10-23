@@ -1,0 +1,146 @@
+"use client";
+
+import { useId } from "react";
+
+import { LimitNoticeBlock } from "@/components/billing/limit-notice";
+import { Chip, Eyebrow } from "@/components/bookings/calendar/parts";
+import type { PlanLock } from "@/lib/billing/access";
+import { depositLock } from "@/lib/billing/access";
+import type { OnlineProblem } from "@/lib/services/online-booking";
+import type { DepositMode } from "@/lib/services/service";
+import type { ServiceCharged } from "@/lib/services/service-editor";
+import { depositNote, depositPausedNote } from "@/lib/services/service-editor";
+import type { BookingPayment } from "@/lib/staff/types";
+
+import { PlanWay } from "@/components/billing/plan-way";
+import { HELP } from "@/components/services/service-editor/fields";
+import { isPlanHref } from "@/lib/billing/plan-access";
+import { Notice } from "@saroh/ui/notice";
+import { TextLink } from "@saroh/ui/text-link";
+
+const DEPOSITS: [DepositMode, string][] = [
+    ["NONE", "Nothing, they pay at the visit"],
+    ["PERCENT_25", "25% deposit"],
+    ["PERCENT_50", "50% deposit"],
+    ["FULL", "The full price"],
+];
+
+/**
+ * "At booking, they pay" (E8, the Service Editor design): nothing, a 25%
+ * or 50% deposit, or the full price. The note works the split out from the
+ * price as typed, so the merchant sees what a customer pays now and at the
+ * visit; the booking page charges what the server works out. A price with
+ * GST added on top is said from the API's own amounts once saved, and in
+ * words while it is being changed (`depositNote`). When online
+ * can't take what it asks, it says what happens instead, with a link to
+ * what fixes it (DEC-088, DEC-089, #821): paid at the desk where the
+ * business allows the desk, or — a business that takes payment online
+ * only — can't be booked online at all.
+ *
+ * A deposit is taken online, so on a plan without online payments
+ * (`paymentsLock`, 6 Oct 2026) the deposits are locked, with the way up:
+ * the business can take a deposit off, never set a new one, and a service
+ * that already has one keeps it, paused — paid at the desk where the
+ * business allows the desk. The API refuses the same (`MODULE_LOCKED`).
+ */
+export function DepositField({
+    deposit,
+    price,
+    currency,
+    visits = 1,
+    saved = "NONE",
+    paymentsLock = null,
+    way = "BOTH",
+    problem = null,
+    charged = null,
+    gstOnTop = false,
+    onChange,
+}: {
+    deposit: DepositMode;
+    /** The price as typed. */
+    price: string;
+    currency: string;
+    /** A treatment's rest is paid over its visits (E10). */
+    visits?: number;
+    /** The deposit the service has saved: kept on a plan without online payments. */
+    saved?: DepositMode;
+    /** The plan's lock on online payments; null when deposits are open. */
+    paymentsLock?: PlanLock | null;
+    /** How the business takes payment when people book (DEC-088). */
+    way?: BookingPayment;
+    /** What happens when people book it online, when it isn't as chosen. */
+    problem?: OnlineProblem | null;
+    /** The API's amounts for the price as saved; null once it is changed. */
+    charged?: ServiceCharged | null;
+    /** GST is added on top of the typed price (12 Oct 2026). */
+    gstOnTop?: boolean;
+    onChange: (deposit: DepositMode) => void;
+}) {
+    const label = useId();
+    const lock = depositLock(paymentsLock, saved !== "NONE");
+    const paused = lock !== null && deposit !== "NONE";
+    // When online can't take it, only what happens instead is said (UX-056):
+    // paid at the desk — never "they pay ₹300 when booking" right above it —
+    // or, when it can't be booked online at all, the problem alone.
+    const gst = { charged, gstOnTop };
+    const note = paused
+        ? depositPausedNote
+        : problem
+          ? problem.blocked
+              ? null
+              : depositNote(deposit, price, currency, visits, "DESK", gst)
+          : depositNote(deposit, price, currency, visits, way, gst);
+    return (
+        <>
+            <Eyebrow id={label} className="mt-3">
+                At booking, they pay
+            </Eyebrow>
+            <div
+                role="radiogroup"
+                aria-labelledby={label}
+                className="flex flex-wrap gap-1.5"
+            >
+                {DEPOSITS.map(([value, text]) => (
+                    <Chip
+                        key={value}
+                        on={deposit === value}
+                        // Locked: off, or the deposit it already has.
+                        disabled={
+                            lock !== null && value !== "NONE" && value !== saved
+                        }
+                        onClick={() => onChange(value)}
+                    >
+                        {text}
+                    </Chip>
+                ))}
+            </div>
+            {note === null ? null : <p className={HELP}>{note}</p>}
+            {lock ? (
+                <LimitNoticeBlock
+                    full={false}
+                    title={lock.title}
+                    body={lock.body}
+                    cta={lock.cta}
+                    href={lock.href}
+                    className="mt-2.5"
+                />
+            ) : problem ? (
+                <Notice
+                    tone={problem.blocked ? "warning" : "neutral"}
+                    role="status"
+                    className="mt-2"
+                >
+                    {problem.text}{" "}
+                    <PlanWay
+                        when={isPlanHref(problem.fix.href)}
+                        className="text-[length:inherit] text-inherit"
+                    >
+                        <TextLink href={problem.fix.href}>
+                            {problem.fix.label}
+                        </TextLink>
+                    </PlanWay>
+                </Notice>
+            ) : null}
+        </>
+    );
+}

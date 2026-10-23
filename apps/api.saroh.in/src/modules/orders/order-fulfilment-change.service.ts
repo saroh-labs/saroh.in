@@ -35,7 +35,11 @@ import {
 } from "./fulfilment";
 import { handPaidCents } from "./hand-payments";
 import type { ChangeFulfilmentDto } from "./order-change.dto";
-import { fulfilmentNote, tellOrderCustomer } from "./order-customer-note";
+import {
+    fulfilmentNote,
+    handBackOf,
+    tellOrderCustomer,
+} from "./order-customer-note";
 import { isServiceLine } from "./order-line";
 import { fromCents, toCents, withGstRates } from "./order-pricing";
 import { lockOrder } from "./order-stage-write";
@@ -401,7 +405,10 @@ export class OrderFulfilmentChangeService {
                       organizationId: ctx.organizationId,
                       actorUserId: ctx.userId,
                       customerId: result.customerId,
-                      body: fulfilmentNote(result),
+                      body: fulfilmentNote({
+                          ...result,
+                          handBack: handBackOf(result, refund, moneyError),
+                      }),
                       event: "ORDER_FULFILMENT_CHANGED",
                   },
                   this.logger,

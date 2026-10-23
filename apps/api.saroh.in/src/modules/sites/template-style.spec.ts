@@ -3,7 +3,13 @@ import {
     InternalServerErrorException,
 } from "@nestjs/common";
 import type { TemplateManifest } from "@saroh/templates";
-import { listTemplates, TEMPLATE_KINDS } from "@saroh/templates";
+import {
+    listTemplates,
+    LOOK_IDS,
+    parsePalette,
+    siteStyleSafeColours,
+    TEMPLATE_KINDS,
+} from "@saroh/templates";
 
 import { MODULE_KEYS } from "../capabilities/module-registry";
 import { WAITLIST_KINDS } from "../waitlist/waitlist-keys";
@@ -106,4 +112,22 @@ describe("every registered template's metadata", () => {
             }
         },
     );
+});
+
+describe("every shipped colourway reads in every look (DEC-172, KD4)", () => {
+    const colourways = listTemplates().flatMap((t) =>
+        (t.styles ?? []).map((preset) => ({
+            name: `${t.id} v${t.version} ${preset.id}`,
+            style: parseSiteStyle(preset.style),
+        })),
+    );
+
+    it.each(LOOK_IDS)("%s", (look) => {
+        expect(colourways.length).toBeGreaterThan(10);
+        for (const { name, style } of colourways) {
+            const safe = siteStyleSafeColours({ ...style, look });
+            const parsed = parsePalette(safe?.palette);
+            expect({ name, ok: parsed.ok }).toEqual({ name, ok: true });
+        }
+    });
 });

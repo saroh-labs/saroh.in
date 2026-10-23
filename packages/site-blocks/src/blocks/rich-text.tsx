@@ -1,6 +1,9 @@
 import type { RenderedRichText } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 import { siteImage } from "../lib/site-image";
+import { cn } from "../lib/utils";
+import type { LookProps } from "../look-context";
+import { FRONT_WRAP } from "./look-front";
 
 /**
  * `richText` v1 — authored rich content.
@@ -25,7 +28,8 @@ import { siteImage } from "../lib/site-image";
 export default function RichTextSection({
     content,
     align = "column",
-}: {
+    look,
+}: LookProps & {
     content: RenderedRichText;
     /**
      * `column`: the centred reading column every page has always had.
@@ -76,7 +80,7 @@ export default function RichTextSection({
                    text colour (#189), and `dark:prose-invert` is gone with
                    them: once a palette is chosen, a visitor's OS setting
                    must not repaint a storefront its owner picked. */
-                className={`prose prose-headings:font-site-heading prose-headings:text-site-fg prose-p:text-site-fg/80 prose-a:text-site-accent prose-strong:text-site-fg prose-li:text-site-fg/80 max-w-[var(--site-measure,none)] text-[length:var(--site-body-size,1rem)]${labels}`}
+                className={`prose prose-headings:font-site-heading prose-headings:text-site-fg prose-p:text-site-fg/80 prose-a:text-site-accent-text prose-strong:text-site-fg prose-li:text-site-fg/80 max-w-[var(--site-measure,none)] text-[length:var(--site-body-size,1rem)]${labels}`}
                 // Sanitized at publish (see the safety note above).
                 dangerouslySetInnerHTML={{ __html: content.value }}
             />
@@ -97,7 +101,7 @@ export default function RichTextSection({
         <>
             <p
                 data-site-title=""
-                className="font-site-body text-site-accent mb-4 text-[13px] font-semibold uppercase leading-snug tracking-[0.1em]"
+                className="font-site-body text-site-accent-text mb-4 text-[13px] font-semibold uppercase leading-snug tracking-[0.1em]"
             >
                 {label}
             </p>
@@ -134,6 +138,54 @@ export default function RichTextSection({
     }
 
     /*
+     * Under a look (DEC-172), the photo above is the boards' band (VD01's
+     * at the content width, 16:9; VA01's edge to edge, 21:9 on a desk and
+     * 3:2 on a phone), with the text under it as a small caption.
+     */
+    if (content.imageSide === "above" && look) {
+        const folio = look === "folio";
+        return (
+            <section
+                data-site-look-band={look}
+                className={cn("w-full", folio && "pt-10 min-[700px]:pt-[72px]")}
+            >
+                <div className={folio ? undefined : FRONT_WRAP}>
+                    <img
+                        src={image.src}
+                        alt={image.alt ?? ""}
+                        width={image.width}
+                        height={image.height}
+                        {...siteImage("below", {
+                            src: image.src,
+                            width: image.width,
+                            sizes: folio
+                                ? "100vw"
+                                : "(min-width: 1280px) 1280px, 100vw",
+                        })}
+                        className={cn(
+                            "bg-site-surface block aspect-[3/2] h-auto w-full object-cover",
+                            folio
+                                ? "min-[700px]:aspect-[21/9]"
+                                : "rounded-site-photo min-[700px]:aspect-video",
+                        )}
+                    />
+                </div>
+                {content.value.trim() || callout ? (
+                    <div
+                        className={cn(
+                            FRONT_WRAP,
+                            "pt-2.5 tracking-[0.06em] [--site-body-size:13px] [&_.prose>:first-child]:mt-0 [&_.prose]:max-w-none",
+                        )}
+                    >
+                        {text}
+                        {callout}
+                    </div>
+                ) : null}
+            </section>
+        );
+    }
+
+    /*
      * The photo above the text (template polish), at 16:9 and the width of
      * the text's column, as a case study opens on the thing it built.
      */
@@ -144,7 +196,11 @@ export default function RichTextSection({
                 alt={image.alt ?? ""}
                 width={image.width}
                 height={image.height}
-                {...siteImage()}
+                {...siteImage("below", {
+                    src: image.src,
+                    width: image.width,
+                    sizes: "(min-width: 1280px) 1280px, 100vw",
+                })}
                 className="bg-site-surface mb-8 aspect-video h-auto w-full rounded-[var(--site-radius)] object-cover"
             />
         );
@@ -188,7 +244,11 @@ export default function RichTextSection({
                     alt={image.alt ?? ""}
                     width={image.width}
                     height={image.height}
-                    {...siteImage()}
+                    {...siteImage("below", {
+                        src: image.src,
+                        width: image.width,
+                        sizes: "(min-width: 768px) 50vw, 100vw",
+                    })}
                     className={
                         photoLeft
                             ? "h-auto w-full rounded-[var(--site-radius)] object-cover"

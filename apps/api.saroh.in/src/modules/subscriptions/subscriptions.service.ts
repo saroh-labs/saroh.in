@@ -17,7 +17,7 @@ import { resolveContact } from "../customer-workspace/resolve-contact";
 import { assertBusinessDetails } from "../invoices/business-details";
 import type { GstOnPrice, PriceTerms } from "../invoices/gst-price";
 import { assertSaleRated } from "../invoices/gst-rate-required";
-import { isPastDue } from "../invoices/invoice-state";
+import { isPastDue, leftToPayCents } from "../invoices/invoice-state";
 import { InvoicesService } from "../invoices/invoices.service";
 import { assertPaymentsOn, paymentsOn } from "../invoices/payments-on";
 import { loadPriceTerms } from "../invoices/price-terms";
@@ -99,6 +99,7 @@ import { createPlanRow, setPlanStatusRow, updatePlanRow } from "./plan-writes";
 import type { PlanView } from "./plans";
 import { planViews, readPlan } from "./plans";
 import { SUBSCRIPTION_RENEW_TYPE } from "./renew-job";
+import { sendRenewalUnlessCharged } from "./renewal-send";
 import type {
     AutopayBadge,
     AutopayCardView,
@@ -409,6 +410,8 @@ interface InvoiceRowLite {
     status: string;
     subscriptionId: string | null;
     total: { toString(): string };
+    /** The ledger's paid so far (DEC-173). */
+    paidCents: number;
     dueAt: Date | null;
     paidAt: Date | null;
     issuedAt: Date | null;
@@ -1112,6 +1115,15 @@ export class SubscriptionsService {
             createdByUserId: opts.createdByUserId,
         });
         await log("RESUMED", { invoiceId, data: { restarted: true } });
+        // A pause whose end date came restarts on the renewal job, which
+        // sends the new period's invoice as it sends a renewal's (U10). A
+        // resume by hand or by the member leaves Send to the team.
+        if (ended) {
+            await sendRenewalUnlessCharged(tx, sub.organizationId, invoiceId, {
+                charge: undefined,
+                now,
+            });
+        }
     }
 
     async cancel(
@@ -1976,7 +1988,7 @@ export class SubscriptionsService {
             // (D13): its intent and first step, or MANDATE_LIMIT_LOW. With
             // none, or its provider's charging off, the pay link as before.
             // Its debit follows the merchant's timing (D13B).
-            await this.charges?.queueInTx(tx, {
+            const charge = await this.charges?.queueInTx(tx, {
                 organizationId: sub.organizationId,
                 subscriptionId: id,
                 invoiceId,
@@ -1990,6 +2002,11 @@ export class SubscriptionsService {
                     periodStart: period.start,
                     timezone: sub.timezone,
                 },
+            });
+            // Nobody has to press Send (DEC-174 R3, U10).
+            await sendRenewalUnlessCharged(tx, sub.organizationId, invoiceId, {
+                charge,
+                now,
             });
             return "renewed";
         });
@@ -2082,7 +2099,7 @@ export class SubscriptionsService {
                     early: true,
                 },
             });
-            await this.charges.queueInTx(tx, {
+            const charge = await this.charges.queueInTx(tx, {
                 organizationId: sub.organizationId,
                 subscriptionId: id,
                 invoiceId,
@@ -2092,6 +2109,11 @@ export class SubscriptionsService {
                     periodStart: period.start,
                     timezone: sub.timezone,
                 },
+            });
+            // Sent on its early day when autopay won't take it (U10).
+            await sendRenewalUnlessCharged(tx, sub.organizationId, invoiceId, {
+                charge,
+                now,
             });
             return "issued";
         });
@@ -2541,6 +2563,7 @@ export class SubscriptionsService {
                 status: true,
                 subscriptionId: true,
                 total: true,
+                paidCents: true,
                 dueAt: true,
                 paidAt: true,
                 issuedAt: true,
@@ -2639,8 +2662,9 @@ export class SubscriptionsService {
             overdue: pastDue > 0,
             overdueCount: pastDue,
             unpaidCount: unpaid.length,
+            // What is left to pay on them (DEC-173).
             unpaidTotal: fromCents(
-                unpaid.reduce((sum, u) => sum + toCents(u.total.toString()), 0),
+                unpaid.reduce((sum, u) => sum + leftToPayCents(u), 0),
             ),
             oldestUnpaid: oldest
                 ? {

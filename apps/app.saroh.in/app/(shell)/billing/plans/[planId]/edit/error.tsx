@@ -1,6 +1,6 @@
 "use client";
 
-import { SectionError } from "@/components/shared/section-error";
+import { SectionError } from "@/components/shared/states/section-error";
 import { PLANS_HREF } from "@/lib/subscriptions/plan-detail";
 
 /**

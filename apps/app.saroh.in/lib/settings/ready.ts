@@ -360,7 +360,7 @@ function howToPay(
 /**
  * The registered address, the API's rule for an invoice (DEC-068): its
  * first line, city and PIN, and an Indian address its state. Until it is
- * in, Issue, Send, a pay link and connecting payments ask for it first.
+ * in, Issue, Send, a payment link and connecting payments ask for it first.
  */
 function address(
     registered: NonNullable<OrganizationSettings["registeredAddress"]>,

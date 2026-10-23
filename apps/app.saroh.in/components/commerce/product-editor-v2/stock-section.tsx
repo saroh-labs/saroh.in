@@ -5,7 +5,7 @@ import { Button } from "@saroh/ui/button";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
-import { SoldOutActions } from "@/components/commerce/product-page/sold-out-actions";
+import { SoldOutActions } from "@/components/commerce/product-stock/sold-out-actions";
 import { setInventory, setVariantStock } from "@/lib/products/actions";
 import type { StockDraft, StockLine } from "@/lib/products/editor-sections";
 import { isCount, mergeDraft } from "@/lib/products/editor-sections";

@@ -10,6 +10,8 @@ import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { MediaStorageModule } from "../media/media-storage.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { BookingPageController } from "./booking-page.controller";
+import { BookingPageService } from "./booking-page.service";
 import { GoLiveHandler, SITE_GO_LIVE_TYPE } from "./go-live.handler";
 import { SITE_PAGES_REVALIDATE_TYPE } from "./page-cache-revalidate";
 import { PageCacheRevalidateHandler } from "./page-cache.job";
@@ -30,6 +32,7 @@ import { SiteTrackingController } from "./site-tracking.controller";
 import { SiteTrackingService } from "./site-tracking.service";
 import { SitesController } from "./sites.controller";
 import { SitesService } from "./sites.service";
+import { StarterContentController } from "./starter-content.controller";
 import { TestReleasesController } from "./test-releases.controller";
 import { TestReleasesService } from "./test-releases.service";
 
@@ -66,9 +69,14 @@ import { TestReleasesService } from "./test-releases.service";
         QrCodesController,
         PublicSitesController,
         PublicQrController,
+        // "Your booking page" in Bookings (DEC-175).
+        BookingPageController,
+        // A look's starter content copied into the draft (DEC-182).
+        StarterContentController,
     ],
     providers: [
         SitesService,
+        BookingPageService,
         SitePreviewLinksService,
         SiteTrackingService,
         SiteIconService,

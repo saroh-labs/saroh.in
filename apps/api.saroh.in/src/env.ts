@@ -91,31 +91,6 @@ const envSchema = z.object({
     SMTP_PASS: z.string().optional(),
     USER_ACCOUNT: z.string().optional(),
     USER_PASSWORD: z.string().optional(),
-    // Saroh's sender for a business's email while it has no provider of its
-    // own (DEC-086): its own address on the notify subdomain, and the SES
-    // configuration set its bounces and complaints are measured on. The
-    // credentials are the SMTP_* set above.
-    SAROH_BUSINESS_EMAIL_FROM: z.string().email().optional(),
-    SAROH_BUSINESS_EMAIL_CONFIG_SET: z
-        .string()
-        .regex(/^[A-Za-z0-9_-]{1,64}$/)
-        .optional(),
-    // The global stop for that route: "true" stops every business's Saroh
-    // email at once, queued and retrying ones included, whatever each
-    // business's SAROH_BUSINESS_EMAIL flag says (the complaint alarm's
-    // runbook step). Checked on every send and queued job
-    // (`communications/saroh-may-send.ts`), but env is read at boot, so it
-    // takes effect once the API and workers restart with it set; for an
-    // instant stop, turn off the business's SAROH_BUSINESS_EMAIL flag.
-    SAROH_BUSINESS_EMAIL_STOP: z.enum(["true", "false"]).optional(),
-    // At most this many Saroh-sent business emails in any 24 hours, for
-    // every business together, so sign-in codes keep their room on the SES
-    // account. Unset: `SAROH_DAILY_CEILING_DEFAULT` (1,000).
-    SAROH_BUSINESS_EMAIL_DAILY_CEILING: z.coerce
-        .number()
-        .int()
-        .positive()
-        .optional(),
 
     // Sign-in codes for a business's customers on its own site (ADR-011,
     // round-2 plan A, A2). Every one is optional in the schema so dev and
@@ -129,6 +104,14 @@ const envSchema = z.object({
     // The key the destination email and the code are HMAC'd under, so a
     // database read reveals neither who asked nor the code.
     SITE_ACCOUNTS_CODE_SECRET: z.string().min(32).optional(),
+    // The secret a public page view's visitor hash is derived from, by a
+    // salt that changes every day (U15 privacy review): the hash is
+    // sha256(HMAC(secret, the UTC day) : site : address), so a visitor can't
+    // be followed from day to day. Unset: a fixed public value in
+    // development and test, and a random one per process anywhere else
+    // (with a warning; a restart splits a day's unique visitors). Read in
+    // `modules/analytics/visitor-hash.ts`. Never logged.
+    ANALYTICS_IP_SALT: z.string().min(1).optional(),
     // Signs the pricing draft-preview token staff mint in the admin console
     // (plans catalogue KTD-10): at most 15 minutes, bound to one draft
     // revision. API only — saroh.in passes the token through, never checks
@@ -246,6 +229,14 @@ const envSchema = z.object({
     // credential is en/decrypted) and throws a clear error if it is
     // missing/malformed. Never logged.
     PAYMENTS_ENC_KEY: z.string().optional(),
+    // Staff personal data (DEC-169): seals a teammate's tax id on their
+    // StaffProfile. Its own 32-byte AES-256-GCM key (base64 or 64-hex), never
+    // the payments key, so one leaked key opens only one kind of value.
+    // OPTIONAL at boot like PAYMENTS_ENC_KEY; `staff-profile.ts` checks it
+    // the moment a tax id is sealed or its last 4 characters are read, and
+    // refuses with a clear error when it is missing or malformed. Never
+    // logged, never in an example file with a value.
+    STAFF_PII_ENC_KEY: z.string().optional(),
     // Which Cashfree the API talks to, for merchants' payments and Saroh's own
     // billing alike: `sandbox` for test credentials, `production` (default)
     // for live ones. The API sends the mode with every checkout's client

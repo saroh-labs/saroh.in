@@ -121,6 +121,25 @@ export interface PublicCatalogue {
     products: PublicCatalogueCard[];
 }
 
+/**
+ * The shop's live counts (review #21): for each card `/shop` lists, what
+ * its Add to bag adds and how many of it are left when the page would say
+ * "Only N left". Nothing else: the Live look polls this, not the whole
+ * catalogue.
+ */
+export interface PublicShopStock {
+    items: {
+        /** The card's product, as `/shop` names it. */
+        slug: string;
+        listingId: string;
+        /** The option the card's Add to bag adds; null without options. */
+        variantId: string | null;
+        /** `bagLeft`: how many can go in the bag; null: not counted out. */
+        left: number | null;
+        soldOut: boolean;
+    }[];
+}
+
 /** One product's page: `ProductPageData`, plus its address and search text. */
 export interface PublicProduct {
     /**

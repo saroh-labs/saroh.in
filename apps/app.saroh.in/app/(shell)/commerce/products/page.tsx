@@ -1,16 +1,16 @@
-import { PartialRead } from "@/components/shared/failed-read";
+import { PartialRead } from "@/components/shared/states/failed-read";
 import { rememberedPageSize } from "@/lib/paging/remembered";
 import { redirect } from "next/navigation";
 
 import { PausedNote } from "@/components/billing/paused-banner";
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { CollectionsPanel } from "@/components/commerce/collections/collections-panel";
-import { PageContainer } from "@/components/shared/page-container";
-import { SinceNotice } from "@/components/shared/since-notice";
-import { CatalogueScreen } from "@/components/stores/catalogue-screen";
-import type { ProductsTab } from "@/components/stores/products-tabs";
-import { ProductsTabs } from "@/components/stores/products-tabs";
-import { ReviewsView } from "@/components/stores/reviews-view";
+import { SinceNotice } from "@/components/shared/notices/since-notice";
+import { PageContainer } from "@/components/shared/page/page-container";
+import { CatalogueScreen } from "@/components/stores/catalogue/catalogue-screen";
+import type { ProductsTab } from "@/components/stores/catalogue/products-tabs";
+import { ProductsTabs } from "@/components/stores/catalogue/products-tabs";
+import { ReviewsView } from "@/components/stores/reviews/reviews-view";
 import { rowNotice } from "@/lib/billing/access";
 import { planMeter } from "@/lib/billing/meter";
 import { activeCut, pausedListWords } from "@/lib/billing/paused";
@@ -23,7 +23,11 @@ import {
     reviewEmailSetup,
     reviewSummary,
 } from "@/lib/product-reviews/service";
-import { canStockProducts, canWriteProducts } from "@/lib/products/access";
+import {
+    canReadOrders,
+    canStockProducts,
+    canWriteProducts,
+} from "@/lib/products/access";
 import { choicesFrom } from "@/lib/products/filter-choices";
 import {
     catalogueFilter,
@@ -278,6 +282,7 @@ export default async function CataloguePage({
                         : null
                 }
                 canStock={canStockProducts(organization)}
+                canOrders={canReadOrders(organization)}
                 collectionCount={collections ? collections.length : null}
                 collectionsPanel={
                     active === "collections" ? (

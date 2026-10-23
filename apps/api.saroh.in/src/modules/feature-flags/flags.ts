@@ -107,17 +107,16 @@ export const FlagKey = {
     PLAN_ENFORCEMENT: "PLAN_ENFORCEMENT",
 
     /**
-     * Saroh sends a business's booking emails while it has no email
-     * provider of its own (DEC-086): confirmed, moved and cancelled, from
-     * `bookings@notify.saroh.in`, counted against the plan's
-     * `sarohEmailsPerMonth`. Per business, off by default; the env's
-     * `SAROH_BUSINESS_EMAIL_STOP` overrides it for everyone. Readers, all
-     * through `communications/saroh-may-send.ts`: the notify handler and
-     * `queueTransactional` (whether Saroh sends), notice reach (what the
-     * workspace says), and `message.send` (a queued send re-checks it).
-     * Deleted once the route is on for every business for a release.
+     * Looks on merchant sites (DEC-172, KD12): Folio, Quiet and Live.
+     * Off, a style save can't set or change a look and a new site starts
+     * Classic; keeping a look a site already has, and going back to
+     * Classic, always work. On only in the development environment
+     * (saroh.io) until the owner says otherwise; production stays off,
+     * globally and per business. Three readers, all in
+     * `sites/site-looks.ts`: style saves, site creation and the editor's
+     * `looksAvailable`. The renderer never reads it.
      */
-    SAROH_BUSINESS_EMAIL: "SAROH_BUSINESS_EMAIL",
+    SITE_LOOKS: "SITE_LOOKS",
 } as const;
 
 export type FlagKey = (typeof FlagKey)[keyof typeof FlagKey];
@@ -254,15 +253,15 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         removeWhen:
             "The catalogue has been enforced for every business on every instance for a release with no need to switch it off, and its readers no longer ask it.",
     },
-    SAROH_BUSINESS_EMAIL: {
-        shownAs: "Booking emails from Saroh",
+    SITE_LOOKS: {
+        shownAs: "Website looks",
         group: "feature",
         purpose:
-            "Lets Saroh email a business's booking confirmations, moves and cancellations from its own notify address while the business has no email provider connected, counted against the plan's monthly allowance. Turn it on for one business first, only once the notify subdomain is verified in SES and the plan versions carry the allowance; off, those customers are told in their account alone, as before. SAROH_BUSINESS_EMAIL_STOP on the API stops it for everyone at once.",
+            "Lets a business choose a look for its website (Folio, Quiet or Live) in Website › Style, and starts its new sites in its industry's look. On only in the development environment until the owner says so; off, no look can be set or changed and new sites start Classic, while a site that has a look keeps it and can always go back to Classic.",
         owner: "Release manager",
         reviewBy: "2027-03-31",
         removeWhen:
-            "Saroh's booking emails have been on for every business on every instance for a release with no need to switch them off, and the four readers in saroh-may-send.ts no longer ask it.",
+            "Every site has chosen a look or Classic is retired, the looks have been on for every business on every instance for a release, and the three readers in site-looks.ts no longer ask it.",
     },
     WEB_ADDRESS_CHANGE: {
         shownAs: "Change web address",

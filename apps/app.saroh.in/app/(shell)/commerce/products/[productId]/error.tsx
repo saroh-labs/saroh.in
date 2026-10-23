@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useEffect } from "react";
 
 import { ProductPageFrame } from "@/components/commerce/product-page/page-state";
-import { SectionError } from "@/components/shared/section-error";
+import { SectionError } from "@/components/shared/states/section-error";
 import { isDenial } from "@/lib/api/errors";
 
 /**

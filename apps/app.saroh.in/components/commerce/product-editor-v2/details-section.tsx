@@ -27,7 +27,7 @@ import type {
 } from "@/lib/products/service";
 import type { EffectiveDefaults } from "@/lib/products/settings";
 
-import { Chip } from "@/components/shared/chip";
+import { Chip } from "@/components/shared/lists/chip";
 import { useEditor, useSection } from "./editor-state";
 import { Count, FieldHelp, FieldLabel } from "./fields";
 import { SectionCard } from "./section-card";

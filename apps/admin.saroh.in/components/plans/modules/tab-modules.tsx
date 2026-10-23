@@ -32,6 +32,7 @@ import {
     restoreModule,
 } from "../plans/structure-edits";
 import { useFlash } from "../toast";
+import { FreeStyles } from "./free-styles";
 import { GroupHead } from "./group-head";
 import { DetailsFor, ModuleLine } from "./module-line";
 
@@ -43,7 +44,8 @@ import { DetailsFor, ModuleLine } from "./module-line";
  * row; a module's name opens its details inline. The matrix scrolls
  * sideways inside itself on a narrow screen. Row groups are made, renamed
  * and (once empty) removed here, and a module that was never published can
- * be removed again, with Undo.
+ * be removed again, with Undo. Under the matrix, which looks, typefaces
+ * and colourways are free (DEC-177, `FreeStyles`).
  *
  * Drawn from the shared draft and changed only through `edit`.
  */
@@ -187,6 +189,13 @@ export function TabModules() {
                     </AddButton>
                 )}
             </div>
+            {catalog.groups.length > 0 && (
+                <p className="text-[12.5px] text-muted-foreground">
+                    What each module is called on the pricing page, its order
+                    and whether it shows. Which plans include it is on Plans,
+                    and whether businesses can use it at all is in Releases.
+                </p>
+            )}
             {canEdit && catalog.groups.length === 0 && (
                 <p
                     id="add-module-why"
@@ -213,7 +222,7 @@ export function TabModules() {
                 ))}
 
             <p className="flex flex-wrap gap-x-3.5 gap-y-1 text-[12px] text-muted-foreground">
-                <span>Click a cell to edit it plan by plan.</span>
+                <span>Click a cell to edit that feature on every plan.</span>
                 <span className="inline-flex items-center gap-1.5">
                     <span
                         aria-hidden
@@ -433,6 +442,7 @@ export function TabModules() {
                     )}
                 </table>
             </ScrollX>
+            <FreeStyles />
         </section>
     );
 }

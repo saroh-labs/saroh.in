@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     ConflictException,
     GoneException,
     NotFoundException,
@@ -10,6 +11,7 @@ import { prismaErrorCode } from "../../common/prisma-errors";
 import type { ActivationEvents } from "../analytics/activation-events";
 import { planMeter } from "../billing/metering.service";
 import { bookingsPaused } from "../billing/plan-limit-errors";
+import { isReservedContactEmail } from "../contacts/contact-email";
 import { phoneToFill } from "../customer-workspace/contact-phone-fill";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import type { PriceTerms } from "../invoices/gst-price";
@@ -22,9 +24,11 @@ import { guarded, guardMinutes } from "./availability";
 import { BookingEventType } from "./booking-event-type";
 import { holdsPlace, releaseHoldInTx } from "./booking-hold";
 import { bookingLocation, intakeNoteOf } from "./booking-intake";
-import { freeCancelDeadline, loadBookingRules } from "./booking-rules";
+import { freeCancelDeadline } from "./booking-rules";
 import type { AccountBookPay, BookingLocationType, PaidWith } from "./dto";
 import { seatsHeld } from "./held-seats";
+import { loadRulesFor } from "./person-rules";
+import { phoneContactInTx, PhoneSeenLate } from "./phone-booker";
 import { depositCents } from "./service-fields";
 import { bookedPriceOf, serviceCharge } from "./service-price";
 import { acceptWaitlistInTx } from "./waitlist-queue";
@@ -39,8 +43,19 @@ import { acceptWaitlistInTx } from "./waitlist-queue";
 export interface BookInput {
     startAt: string;
     bookerName?: string;
-    bookerEmail: string;
+    /**
+     * Who books, by email: the contact with it, or someone new. Absent only
+     * for a booking made by hand for someone known by their phone alone
+     * (DEC-170), when `phoneKey` says how to find them.
+     */
+    bookerEmail?: string;
     bookerPhone?: string;
+    /**
+     * A booking made by hand with a name and phone and no email (DEC-170):
+     * the phone as matched (`normalisePhone`). The contact with it is
+     * booked, else one is made kept by it (`phone-booker.ts`).
+     */
+    phoneKey?: string;
     idempotencyKey?: string;
     /** The person asked for (U3); absent means whoever is free. */
     staffId?: string;
@@ -205,6 +220,28 @@ export async function ownHoldOn(
 }
 
 /**
+ * Runs `load` at most once per key for the life of one read; the plain
+ * {@link readNow} runs it every time. Keys name their business.
+ */
+export type OnceRead = <T>(key: string, load: () => Promise<T>) => Promise<T>;
+
+/** No sharing: every check reads the database. */
+export const readNow: OnceRead = (_key, load) => load();
+
+/** A {@link OnceRead} for one read across several services (review #4). */
+export function onceReads(): OnceRead {
+    const memo = new Map<string, Promise<unknown>>();
+    return <T>(key: string, load: () => Promise<T>): Promise<T> => {
+        let kept = memo.get(key) as Promise<T> | undefined;
+        if (!kept) {
+            kept = load();
+            memo.set(key, kept);
+        }
+        return kept;
+    };
+}
+
+/**
  * Load an ACTIVE, non-deleted bookable service + its rules, or throw
  * (404/410). A service whose organization switched Appointments off is 410
  * like an archived one: the booking would otherwise land behind a module
@@ -214,7 +251,17 @@ export async function ownHoldOn(
  */
 export async function loadBookableService(
     serviceId: string,
-    { bookingPage = false }: { bookingPage?: boolean } = {},
+    {
+        bookingPage = false,
+        once = readNow,
+    }: {
+        bookingPage?: boolean;
+        /**
+         * Shares the business-wide checks across several services read
+         * together (On today, the Timetable: review #4). Keyed by business.
+         */
+        once?: OnceRead;
+    } = {},
 ): Promise<{ service: Service; rules: AvailabilityRuleWindow[] }> {
     const service = await prisma.service.findUnique({
         where: { id: serviceId },
@@ -230,10 +277,14 @@ export async function loadBookableService(
         throw new GoneException("This service isn't booked online");
     }
     // A deleted business's booking page is offline with its site (#921).
-    if (bookingPage && !(await publicSiteOnlineFor(service.organizationId))) {
+    const org = service.organizationId;
+    if (
+        bookingPage &&
+        !(await once(`${org}:site-online`, () => publicSiteOnlineFor(org)))
+    ) {
         throw new NotFoundException("Service not found");
     }
-    if (!(await appointmentsOpen(service.organizationId))) {
+    if (!(await once(`${org}:appointments`, () => appointmentsOpen(org)))) {
         throw new GoneException(
             "This business isn't taking online bookings right now",
         );
@@ -301,33 +352,55 @@ export async function reserve(
          * something changed (A10).
          */
         retryOnce?: boolean;
+        /**
+         * How many tries in all against lost races, a short random wait
+         * apart ({@link RACE_RETRY_WAIT_MS}); more than `retryOnce`'s two.
+         * The booking page's (review #33): many visitors booking at once
+         * each lose to another's serializable write, of any time, until
+         * one try sees the true count.
+         */
+        tries?: number;
+        /**
+         * What to say when every try lost a race: nobody has been told the
+         * time is full, since none of the tries saw it full.
+         */
+        busy?: string;
     },
     person?: ReserveWith,
 ): Promise<Booking> {
-    try {
-        return await reserveOnce(
-            activation,
-            service,
-            startAt,
-            endAt,
-            input,
-            by,
-            also,
-            person,
-        );
-    } catch (err) {
-        if (!also?.retryOnce || !(err instanceof RaceLost)) throw err;
-        return reserveOnce(
-            activation,
-            service,
-            startAt,
-            endAt,
-            input,
-            by,
-            also,
-            person,
-        );
+    const tries = Math.max(1, also?.tries ?? (also?.retryOnce ? 2 : 1));
+    for (let attempt = 1; ; attempt += 1) {
+        try {
+            return await reserveOnce(
+                activation,
+                service,
+                startAt,
+                endAt,
+                input,
+                by,
+                also,
+                person,
+            );
+        } catch (err) {
+            if (!(err instanceof RaceLost) || tries === 1) throw err;
+            if (attempt >= tries) {
+                throw also?.busy ? new RaceLost(also.busy) : err;
+            }
+            await sleep(raceRetryWait());
+        }
     }
+}
+
+/** Between tries after a lost race: 20 to 80 ms, so racers spread out. */
+export const RACE_RETRY_WAIT_MS = { min: 20, max: 80 } as const;
+
+function raceRetryWait(): number {
+    const { min, max } = RACE_RETRY_WAIT_MS;
+    return min + Math.floor(Math.random() * (max - min + 1));
+}
+
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function reserveOnce(
@@ -387,7 +460,9 @@ async function reserveOnce(
         }
         // Serialization failure — Postgres aborted the loser of a race.
         // On its own, the only thing two bookings contend for is the slot.
-        if (code === "P2034") {
+        // A phone's contact made under us by a walk-in order counts the
+        // same: the retry books that contact (phone-booker.ts).
+        if (code === "P2034" || err instanceof PhoneSeenLate) {
             throw new RaceLost(also?.onRace ?? "That time is fully booked.");
         }
         throw err;
@@ -426,7 +501,13 @@ export async function reserveInTx(
 ): Promise<Booking> {
     const serviceId = service.id;
     const organizationId = service.organizationId;
-    const email = input.bookerEmail.trim().toLowerCase();
+    const email = input.bookerEmail?.trim().toLowerCase() ?? "";
+    if (!email && !input.phoneKey && !by.account) {
+        throw new BadRequestException({
+            message: "Give an email or a phone number.",
+            field: "bookerEmail",
+        });
+    }
     // The price is fixed here, as the business charges it today
     // (`service-price.ts`): the amount to pay, the typed price and the
     // mode, read in the booking's own transaction.
@@ -451,9 +532,15 @@ export async function reserveInTx(
     }
     // The free-cancel deadline, fixed now from today's rule (E8, DEC-051):
     // no later move changes it.
+    // A one-to-one keeps its person's own rule, else the business's
+    // (DEC-170, #1038); a class, the business's.
     const freeCancelUntil = freeCancelDeadline(
         startAt,
-        await loadBookingRules(tx, organizationId),
+        await loadRulesFor(
+            tx,
+            organizationId,
+            person?.perPerson ? person.staffId : null,
+        ),
     );
 
     // A signed-in customer booking a session they hold themselves, unpaid
@@ -534,20 +621,31 @@ export async function reserveInTx(
 
     const contact = by.account
         ? await accountContactInTx(tx, organizationId, by.account, input)
-        : await tx.contact.upsert({
-              where: {
-                  organizationId_email: { organizationId, email },
-              },
-              update: contactUpdate(input),
-              create: {
-                  organizationId,
-                  email,
-                  firstName: splitName(input.bookerName).first ?? null,
-                  lastName: splitName(input.bookerName).last ?? null,
-                  phone: input.bookerPhone ?? null,
-                  source: by.source,
-              },
-          });
+        : !email && input.phoneKey
+          ? await phoneContactInTx(
+                tx,
+                organizationId,
+                {
+                    name: input.bookerName,
+                    phone: input.bookerPhone,
+                    key: input.phoneKey,
+                },
+                by.source,
+            )
+          : await tx.contact.upsert({
+                where: {
+                    organizationId_email: { organizationId, email },
+                },
+                update: contactUpdate(input),
+                create: {
+                    organizationId,
+                    email,
+                    firstName: splitName(input.bookerName).first ?? null,
+                    lastName: splitName(input.bookerName).last ?? null,
+                    phone: input.bookerPhone ?? null,
+                    source: by.source,
+                },
+            });
 
     const booking = await tx.booking.create({
         data: {
@@ -562,7 +660,9 @@ export async function reserveInTx(
             holdExpiresAt: person?.holdUntil ?? null,
             snapshot: snapshot as Prisma.InputJsonValue,
             bookerName: input.bookerName ?? null,
-            bookerEmail: email,
+            // A placeholder (someone known by their phone, DEC-049) is no
+            // email: the booking says none.
+            bookerEmail: bookerEmailOf(email),
             bookerPhone: input.bookerPhone ?? null,
             idempotencyKey: input.idempotencyKey ?? null,
             courseEnrollmentId: course?.enrollmentId ?? null,
@@ -679,6 +779,8 @@ async function releaseOwnHoldInTx(
  * start) are not a clash — they are the class. `excludeBookingId` is a
  * booking being moved, which is not its own competitor. `padMinutes` is the
  * service's buffers either side (DEC-052): what the listing keeps clear too.
+ * A one-to-one also keeps the person's gap between bookings clear (DEC-170,
+ * #1038), read under the lock so a gap set meanwhile is kept.
  */
 export async function assertPersonFreeInTx(
     tx: Prisma.TransactionClient,
@@ -690,8 +792,13 @@ export async function assertPersonFreeInTx(
     padMinutes = 0,
 ): Promise<void> {
     if (!person.staffId) return;
-    const pad = padMinutes * 60_000;
-    await tx.$queryRaw`SELECT id FROM "StaffMember" WHERE id = ${person.staffId} FOR UPDATE`;
+    const locked = await tx.$queryRaw<
+        { organizationId: string; gapMinutes: number | null }[]
+    >`SELECT "organizationId", "gapMinutes" FROM "StaffMember" WHERE id = ${person.staffId} FOR UPDATE`;
+    const gap = person.perPerson
+        ? await personGapInTx(tx, Array.isArray(locked) ? locked[0] : undefined)
+        : { minutes: 0 };
+    const pad = (padMinutes + gap.minutes) * 60_000;
     const clashes = await tx.booking.count({
         where: {
             staffId: person.staffId,
@@ -703,11 +810,29 @@ export async function assertPersonFreeInTx(
         },
     });
     if (clashes > 0) {
+        const who = person.staffName ?? "That person";
         throw new ConflictException({
-            message: `${person.staffName ?? "That person"} is already booked then.`,
+            message:
+                gap.minutes > 0
+                    ? `${who} is already booked then, or needs ${gap.minutes} min between bookings.`
+                    : `${who} is already booked then.`,
             field: "staffId",
         });
     }
+}
+
+/** A person's gap between bookings: their own, else the business's. */
+async function personGapInTx(
+    tx: Prisma.TransactionClient,
+    person: { organizationId: string; gapMinutes: number | null } | undefined,
+): Promise<{ minutes: number }> {
+    if (!person) return { minutes: 0 };
+    if (person.gapMinutes !== null) return { minutes: person.gapMinutes };
+    const business = await tx.bookingRules.findUnique({
+        where: { organizationId: person.organizationId },
+        select: { gapMinutes: true },
+    });
+    return { minutes: business?.gapMinutes ?? 0 };
 }
 
 /**
@@ -769,7 +894,7 @@ export function buildSnapshot(
         },
         booker: {
             name: input.bookerName ?? null,
-            email: input.bookerEmail.trim().toLowerCase(),
+            email: bookerEmailOf(input.bookerEmail),
             phone: input.bookerPhone ?? null,
         },
     };
@@ -817,6 +942,17 @@ async function accountContactInTx(
         });
     }
     return { id: contact.id };
+}
+
+/**
+ * The email a booking keeps of its booker: none for none, or for a reserved
+ * placeholder (a contact known by their phone alone, DEC-049), which every
+ * reader treats as no email.
+ */
+export function bookerEmailOf(email: string | undefined): string | null {
+    const value = email?.trim().toLowerCase();
+    if (!value || isReservedContactEmail(value)) return null;
+    return value;
 }
 
 /** Contact fields to update on a repeat booking (only supplied values). */

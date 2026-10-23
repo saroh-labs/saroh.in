@@ -28,7 +28,7 @@ export default function RootLayout({
         // merchant's `--site-font-body`, which falls back to a neutral system
         // stack where no SiteTheme is mounted. Gate G7 fails the build if a
         // Saroh face comes back.
-        <html lang="en" data-skin="mono">
+        <html lang="en-IN" data-skin="mono">
             <body className="font-site-body">{children}</body>
         </html>
     );

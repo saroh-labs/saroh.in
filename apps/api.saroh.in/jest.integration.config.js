@@ -76,6 +76,12 @@ module.exports = {
         // Contact messages: mocked specs in the unit project; only
         // contact-messages.db.spec.ts runs here.
         "<rootDir>/src/modules/contact-messages/(?!.*\\.db\\.spec\\.ts$)",
+        // Saroh's own leads (U20): pure specs in the unit project; only
+        // saroh-leads.db.spec.ts runs here.
+        "<rootDir>/src/modules/saroh-leads/(?!.*\\.db\\.spec\\.ts$)",
+        // Commission (U21): pure specs in the unit project; only
+        // commission.db.spec.ts runs here.
+        "<rootDir>/src/modules/commission/(?!.*\\.db\\.spec\\.ts$)",
         // Plans catalogue U3: pure specs run in the unit project; only the
         // pricing *.db.spec.ts run here.
         "<rootDir>/src/modules/pricing/(?!.*\\.db\\.spec\\.ts$)",
@@ -99,6 +105,9 @@ module.exports = {
         "<rootDir>/src/modules/products/merge-report.service.spec.ts",
         "<rootDir>/src/modules/stock/stock-words.spec.ts",
         "<rootDir>/src/modules/stock/stock.gate.spec.ts",
+        "<rootDir>/src/modules/stock/stock-watch-rules.spec.ts",
+        "<rootDir>/src/modules/stock/stock-watch.controller.spec.ts",
+        "<rootDir>/src/modules/stock/on-sellable-again.guard.spec.ts",
         "<rootDir>/src/modules/products/product-rules.spec.ts",
         // GST is part of MRP (12 Oct 2026): pure, or a jest-mocked Prisma.
         // mrp-includes-gst.db.spec.ts runs here.
@@ -153,12 +162,19 @@ module.exports = {
         "<rootDir>/src/modules/invoices/list-filter.spec.ts",
         // D16: pure; invoice-pdf.db.spec.ts runs here.
         "<rootDir>/src/modules/invoices/invoice-pdf.spec.ts",
+        // DEC-173 (U6 #1118): the three invoice styles in the PDF, and
+        // what a style or colour write may store — pure
+        // (invoice-paper-styles.db.spec.ts runs in integration).
+        "<rootDir>/src/modules/invoices/invoice-pdf.styles.spec.ts",
+        "<rootDir>/src/modules/invoices/paper-styles.spec.ts",
         // DEC-072: a line's GST note on the paper and the PDF — pure.
         "<rootDir>/src/modules/invoices/invoice-line-gst.spec.ts",
         "<rootDir>/src/modules/invoices/invoice-pdf-logo.spec.ts",
         // DEC-068: which business details are missing — pure (the refusals
         // and the flag after money are in business-details.db.spec.ts).
         "<rootDir>/src/modules/invoices/business-details.spec.ts",
+        // Overdue reminders, pure (U20): the unit project.
+        "<rootDir>/src/modules/invoices/overdue-remind.spec.ts",
         "<rootDir>/src/modules/payments/public-invoices.service.spec.ts",
         // D20: mocked Prisma; the real rows are in mandates.db.spec.ts.
         "<rootDir>/src/modules/payments/mandates.service.spec.ts",

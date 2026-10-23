@@ -181,7 +181,7 @@ describe("useUndo", () => {
         act(() => h.undo.resetStyle());
         expect(h.style).toEqual(PLAIN);
         expect(toast.showUndo).toHaveBeenLastCalledWith(
-            "Back to the starting look",
+            "Colours, type and spacing reset.",
             expect.any(Function),
             { duration: 10_000 },
         );

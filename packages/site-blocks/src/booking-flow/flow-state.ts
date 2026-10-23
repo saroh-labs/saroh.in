@@ -1,5 +1,6 @@
+import type { BookingLookup } from "../account/booking-page";
 import type { PaymentHandoff } from "./api";
-import type { BookingDays, BookResult } from "./model";
+import type { BookingDays, BookPay, BookResult } from "./model";
 import type { WaitlistReach } from "./waitlist";
 
 // ── State ────────────────────────────────────────────────────────────────
@@ -23,6 +24,8 @@ export type Phase =
           price: string;
           /** What is left for the visit when only the deposit is paid. */
           rest?: string | null;
+          /** How it is being paid: now, or a deposit (U9: a kept hold). */
+          pay?: BookPay;
           /**
            * The provider's window closed on a payment (E11). Only a hint:
            * the webhook confirms the booking. If the hold runs out anyway,
@@ -53,4 +56,15 @@ export type Phase =
           placeInLine: number | null;
           reach: WaitlistReach;
           email: string;
+      }
+    | {
+          /**
+           * A booking named by the address (`?step=done&ref=`, U9) that this
+           * page didn't make in this visit — a reload, or Forward after
+           * leaving it — read through the customer's own session. `null`
+           * while it is read.
+           */
+          kind: "booked";
+          ref: string;
+          lookup: BookingLookup | null;
       };

@@ -135,6 +135,28 @@ async function status(p: Promise<unknown>): Promise<number | undefined> {
 }
 
 describe("sending an invoice (real database)", () => {
+    it("says the contact's phone, for Share's WhatsApp tab (U11), and nothing without one", async () => {
+        const withPhone = (
+            await prisma.contact.create({
+                data: {
+                    organizationId: owner.organizationId,
+                    email: "vivek@example.com",
+                    firstName: "Vivek",
+                    lastName: "Nair",
+                    phone: "+919845011234",
+                },
+            })
+        ).id;
+        const id = await issued(withPhone);
+        const read = await sending.readFor(owner.organizationId, id);
+        expect(read.send.phone).toBe("+919845011234");
+        const without = await sending.readFor(
+            owner.organizationId,
+            await issued(),
+        );
+        expect(without.send).not.toHaveProperty("phone");
+    });
+
     it("offers email, queues one Message, and the email's pay link works", async () => {
         const id = await issued();
         const before = await sending.readFor(owner.organizationId, id);

@@ -1,7 +1,7 @@
 import { PageHeader } from "@saroh/ui/page-header";
 
 import { ProjectModuleSelector } from "@/components/projects/project-module-selector";
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { rolledOut } from "@/lib/modules/rollout";
 import { listModules } from "@/lib/modules/service";
 import { requireSession } from "@/lib/session";

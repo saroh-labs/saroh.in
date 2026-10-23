@@ -69,3 +69,66 @@ describe("NoSiteHere", () => {
         expect(html).not.toContain("<a ");
     });
 });
+
+describe("SiteNotFound in a look (DEC-172, U15)", () => {
+    const BOOK = { label: "Book", href: "/book", kind: "book" as const };
+
+    it.each(["folio", "quiet", "live"] as const)(
+        "%s: one way home, filled, and Book, in the look",
+        (look) => {
+            const html = renderToStaticMarkup(
+                <SiteNotFound
+                    siteName="Prana Yoga"
+                    secondary={null}
+                    look={look}
+                    action={BOOK}
+                />,
+            );
+            expect(html).toContain(`data-site-state-look="${look}"`);
+            expect(html).toContain("This page isn’t here");
+            expect(html).toContain("Everything Prana Yoga offers");
+            expect(html).toMatch(
+                /<a [^>]*href="\/"[^>]*>Go to the home page<\/a>/,
+            );
+            expect(html).toMatch(/<a [^>]*href="\/book"[^>]*>Book<\/a>/);
+            // One filled button: home. Book is a link beside it.
+            expect(html.match(/bg-site-accent/g)).toHaveLength(1);
+            // The large 404 is decoration; the heading says it in words.
+            expect(html).toMatch(/<p aria-hidden="true"[^>]*>404<\/p>/);
+            expect(html).not.toMatch(SAROH_BRAND);
+        },
+    );
+
+    it("keeps the shop or contact way when it is a different place", () => {
+        const html = renderToStaticMarkup(
+            <SiteNotFound
+                siteName="Rye"
+                secondary={{ href: "/contact", label: "Contact us" }}
+                look="quiet"
+                action={BOOK}
+            />,
+        );
+        expect(html.match(/<a /g)).toHaveLength(3);
+        expect(html).toContain("Contact us");
+    });
+
+    it("never offers the same place twice", () => {
+        const html = renderToStaticMarkup(
+            <SiteNotFound
+                siteName="Rye"
+                secondary={{ href: "/shop", label: "Browse the shop" }}
+                look="live"
+                action={{ label: "Order", href: "/shop", kind: "shop" }}
+            />,
+        );
+        expect(html.match(/href="\/shop"/g)).toHaveLength(1);
+    });
+
+    it("with no main action, home alone", () => {
+        const html = renderToStaticMarkup(
+            <SiteNotFound siteName={null} secondary={null} look="folio" />,
+        );
+        expect(html.match(/<a /g)).toHaveLength(1);
+        expect(html).not.toContain("null");
+    });
+});

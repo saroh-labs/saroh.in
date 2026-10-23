@@ -15,6 +15,12 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
 import { formatMoney } from "@/lib/format/money";
 import {
+    deliveryDoneText,
+    readyDoneText,
+    readyUndoneText,
+    trackingSavedText,
+} from "@/lib/messages/notice-reach";
+import {
     editBeforePreparing,
     moveStage,
     recordPayment as recordPaymentAction,
@@ -32,10 +38,10 @@ import type {
 import { HOLD_MS, STAGE_LABEL } from "@/lib/orders/lifecycle";
 import type { KitchenStage, OrderRead } from "@/lib/orders/read";
 
+import type { Panel } from "@/components/commerce/order-changes/panel";
+import type { RefundChoice } from "@/components/commerce/order-changes/refund-panel";
 import { runAction } from "@/lib/api/run-action";
 import type { Hold } from "./hold-card";
-import type { Panel } from "./panel";
-import type { RefundChoice } from "./refund-panel";
 
 export type PendingHold = Hold & {
     /** What the hold records when it runs out, or on "now". */
@@ -121,6 +127,29 @@ export function useKitchen({
         [order.id, refresh],
     );
 
+    const undoReady = useCallback(
+        (eventId: string, back: KitchenStage) => {
+            startTransition(async () => {
+                const res = await runAction(() => undoStage(order.id, eventId));
+                if (!res) return;
+                if (!res.ok) {
+                    showError(res.error);
+                    return;
+                }
+                showInfo(
+                    readyUndoneText(
+                        order.customerNotice,
+                        first,
+                        res.data.told,
+                        STAGE_LABEL[back],
+                    ),
+                );
+                refresh();
+            });
+        },
+        [order.id, order.customerNotice, first, refresh],
+    );
+
     const move = (
         to: KitchenStage,
         extra: CourierFields & { note?: string } = {},
@@ -150,9 +179,36 @@ export function useKitchen({
                         ? "Preparing. Items are locked now."
                         : `${STAGE_LABEL[to]}.`);
                 if (to === "READY") {
-                    showSuccess(
+                    // The notice waits ten seconds after the step, so Undo
+                    // here takes it back unsent (U5).
+                    showUndo(
                         "Marked ready.",
-                        `It shows on the order. Nothing was sent to ${first}.`,
+                        () => undoReady(res.data.eventId, from),
+                        {
+                            description: readyDoneText(
+                                order.customerNotice,
+                                first,
+                            ),
+                            duration: HOLD_MS,
+                        },
+                    );
+                } else if (to === "DELIVERED" || to === "SENT") {
+                    // Told like Ready while the business sends delivery
+                    // updates, held ten seconds so Undo takes it back (U16).
+                    showUndo(
+                        message,
+                        () =>
+                            order.deliveryUpdates === true
+                                ? undoReady(res.data.eventId, from)
+                                : undo(res.data.eventId, from),
+                        {
+                            description: deliveryDoneText(
+                                order.customerNotice,
+                                first,
+                                order.deliveryUpdates,
+                            ),
+                            duration: HOLD_MS,
+                        },
                     );
                 } else {
                     showUndo(message, () => undo(res.data.eventId, from), {
@@ -289,7 +345,7 @@ export function useKitchen({
 
     /**
      * Hand it to the courier with whatever of their details are known now
-     * (all optional, B10). Nothing is sent to the customer.
+     * (all optional, B10). The handover's own notice (A14) carries them.
      */
     const handOver = (fields: CourierFields) => {
         const courier = fields.courierName ?? null;
@@ -326,7 +382,11 @@ export function useKitchen({
                 fields.trackingNumber
                     ? "Tracking number saved."
                     : "Tracking details saved.",
-                `It stays on the order. Nothing is sent to ${first}.`,
+                trackingSavedText(
+                    order.customerNotice,
+                    first,
+                    res.data.trackingNotice,
+                ),
             );
             refresh();
         });

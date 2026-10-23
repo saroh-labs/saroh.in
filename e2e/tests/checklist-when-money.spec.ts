@@ -2,7 +2,7 @@
 import type { Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { ownAddress } from "../fixtures/own-business";
+import { billingChoice, ownAddress } from "../fixtures/own-business";
 import { stamp } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
@@ -38,6 +38,7 @@ async function makeWork(page: Page, testInfo: TestInfo): Promise<string> {
             kind: "WORK",
             address,
             profile: { country: "IN", timezone: "Asia/Kolkata" },
+            ...(await billingChoice(page)),
         },
     });
     expect(res.ok(), await res.text()).toBe(true);

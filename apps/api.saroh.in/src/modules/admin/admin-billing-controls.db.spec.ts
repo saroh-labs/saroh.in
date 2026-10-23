@@ -12,7 +12,7 @@
  * - Mark resolved, end autopay (the plan runs to the end of what is paid,
  *   the provider told to stop, the business emailed), re-check a refused
  *   double-charge refund after the owner refunded it by hand, sync the
- *   provider's customer again, record a hand refund on an invoice (a
+ *   business's billing profile's customer again (DEC-167), record a hand refund on an invoice (a
  *   credit-note question raised for the CA).
  *
  * The real staff guards run; only Better Auth is a stand-in (a test
@@ -441,7 +441,7 @@ describe("Admin › Billing controls: who may read and act (DEC-166)", () => {
             people.billing,
         );
         expect(res.status).toBe(400);
-        expect(await ledger("billing.customer.sync")).toHaveLength(0);
+        expect(await ledger("billing.profile.sync")).toHaveLength(0);
     });
 });
 
@@ -450,7 +450,7 @@ describe("Needs action: mark resolved (DEC-166)", () => {
         const ctx = await business();
         await prisma.$transaction((tx) =>
             raiseBillingOpsNoticeInTx(tx, new Logger("spec"), {
-                code: "billing_spec_notice",
+                code: "billing_credit_note_may_be_needed",
                 organizationId: ctx.organizationId,
                 refs: { payment: "pay_spec1" },
                 note: "Refund it by hand.",
@@ -462,7 +462,11 @@ describe("Needs action: mark resolved (DEC-166)", () => {
             items: { id: string; code: string; organization: { id: string } }[];
             openCount: number;
         };
-        const row = listed.items.find((i) => i.code === "billing_spec_notice");
+        const row = listed.items.find(
+            (i) =>
+                i.code === "billing_credit_note_may_be_needed" &&
+                i.organization.id === ctx.organizationId,
+        );
         expect(row?.organization.id).toBe(ctx.organizationId);
         expect(listed.openCount).toBeGreaterThanOrEqual(1);
 
@@ -719,14 +723,29 @@ describe("Re-check a double charge's refund (DEC-166)", () => {
     });
 });
 
-describe("Sync the provider's customer again (DEC-166)", () => {
-    it("queues one sync, on the ledger; a second while one waits changes nothing", async () => {
-        const ctx = await business();
-        await prisma.job.deleteMany({
+describe("Sync the provider's customer again (DEC-166, DEC-167)", () => {
+    const profileJobs = (billingProfileId: string) =>
+        prisma.job.count({
             where: {
-                type: "billing.customer.sync",
-                organizationId: ctx.organizationId,
+                type: "billing.profile.sync",
+                status: "PENDING",
+                payload: {
+                    path: ["billingProfileId"],
+                    equals: billingProfileId,
+                },
             },
+        });
+
+    it("queues one sync of the business's billing profile, on the ledger; a second while one waits changes nothing", async () => {
+        const ctx = await business();
+        const { billingProfileId } =
+            await prisma.organization.findUniqueOrThrow({
+                where: { id: ctx.organizationId },
+                select: { billingProfileId: true },
+            });
+        expect(billingProfileId).not.toBeNull();
+        await prisma.job.deleteMany({
+            where: { type: "billing.profile.sync" },
         });
         const path = `/billing/organizations/${ctx.organizationId}/customer/sync`;
         const first = await post(
@@ -741,6 +760,8 @@ describe("Sync the provider's customer again (DEC-166)", () => {
             people.billing,
         );
         expect(await second.json()).toEqual({ ok: true, changed: false });
+        expect(await profileJobs(billingProfileId!)).toBe(1);
+        // Not DEC-165's per-business job any more.
         expect(
             await prisma.job.count({
                 where: {
@@ -749,10 +770,30 @@ describe("Sync the provider's customer again (DEC-166)", () => {
                     status: "PENDING",
                 },
             }),
-        ).toBe(1);
+        ).toBe(0);
+        const rows = await ledger("billing.profile.sync", ctx.organizationId);
+        expect(rows).toHaveLength(2);
+        expect(rows[0]!.metadata).toEqual(
+            expect.objectContaining({ billingProfileId }),
+        );
+    });
+
+    it("409 in plain words for a business with no billing profile yet, queuing nothing", async () => {
+        seq += 1;
+        const org = await prisma.organization.create({
+            data: { name: `Controls ${seq}`, slug: `controls-${seq}-${tag}` },
+        });
+        const res = await post(
+            `/billing/organizations/${org.id}/customer/sync`,
+            { reason: "Owner asked", idempotencyKey: key() },
+            people.billing,
+        );
+        expect(res.status).toBe(409);
         expect(
-            await ledger("billing.customer.sync", ctx.organizationId),
-        ).toHaveLength(2);
+            ((await res.json()) as { error: { message: string } }).error
+                .message,
+        ).toMatch(/hasn't chosen a billing profile/);
+        expect(await ledger("billing.profile.sync", org.id)).toHaveLength(0);
     });
 });
 
@@ -854,24 +895,49 @@ describe("Record a refund the owner made by hand (DEC-166)", () => {
             )
         ).json()) as { items: { id: string }[] };
         expect(byPayment.items.map((i) => i.id)).toEqual([invoice.id]);
-        const customer = `cust_spec${tag.replace(/\D/g, "")}`;
-        await prisma.billingCustomer.upsert({
-            where: {
-                organizationId_provider: {
-                    organizationId: paying.organizationId,
-                    provider: "RAZORPAY",
-                },
-            },
-            create: {
-                organizationId: paying.organizationId,
-                provider: "RAZORPAY",
-                providerCustomerId: customer,
-            },
-            update: { providerCustomerId: customer },
+        // Another business billed to the same profile: the sheet names it,
+        // and the profile's customer id finds both (DEC-167).
+        const profile = await prisma.billingProfile.findFirstOrThrow({
+            where: { organizations: { some: { id: paying.organizationId } } },
         });
+        // Razorpay's shape (the fake's own ids aren't `cust_…`).
+        const customer = `cust_spec${tag.replace(/\D/g, "")}`;
+        await prisma.billingProfile.update({
+            where: { id: profile.id },
+            data: { providerCustomerId: customer },
+        });
+        seq += 1;
+        const sibling = await prisma.organization.create({
+            data: {
+                name: `Sibling ${seq}`,
+                slug: `sibling-${seq}-${tag}`,
+                billingProfileId: profile.id,
+            },
+        });
+        await startOnFreePlan(prisma, sibling.id, { planId: "free" });
+        const siblingSub = await prisma.subscription.findFirstOrThrow({
+            where: { organizationId: sibling.id },
+        });
+        const sheet = (await (
+            await get(`/billing/subscriptions/${payingSub}`, people.billing)
+        ).json()) as { billingProfile: Record<string, unknown> | null };
+        expect(sheet.billingProfile).toEqual(
+            expect.objectContaining({
+                id: profile.id,
+                legalName: profile.legalName,
+                billingEmail: profile.billingEmail,
+                gstin: profile.gstin,
+                providerCustomerId: customer,
+                contactWithheld: false,
+                otherBusinesses: [{ id: sibling.id, name: sibling.name }],
+            }),
+        );
+        expect(sheet).not.toHaveProperty("billingCustomer");
         const bySub = (await (
             await get(`/billing/subscriptions?q=${customer}`, people.billing)
         ).json()) as { items: { id: string }[] };
-        expect(bySub.items.map((i) => i.id)).toEqual([payingSub]);
+        expect(bySub.items.map((i) => i.id).sort()).toEqual(
+            [payingSub, siblingSub.id].sort(),
+        );
     });
 });

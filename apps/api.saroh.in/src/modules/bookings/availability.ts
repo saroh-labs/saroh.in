@@ -321,6 +321,12 @@ export interface StaffAvailabilityInput {
     timeOff: Interval[];
     /** Absolute confirmed bookings of this person, on any service. */
     busy: Interval[];
+    /**
+     * Minutes kept clear either side of their bookings, on top of the
+     * service's buffers (DEC-170, #1038): their own gap, else the
+     * business's. None when absent.
+     */
+    gapMinutes?: number;
 }
 
 /** A free start, and who is free to take it. */
@@ -557,8 +563,21 @@ export function personSlots(
         from,
         to,
     ).filter(
-        (slot) => countOverlapping(guarded(slot, service), person.busy) === 0,
+        (slot) =>
+            countOverlapping(
+                widen(guarded(slot, service), person.gapMinutes ?? 0),
+                person.busy,
+            ) === 0,
     );
+}
+
+/** `slot` widened by `minutes` either side; itself with none. */
+export function widen(slot: Interval, minutes: number): Interval {
+    if (minutes <= 0) return slot;
+    return {
+        startAt: new Date(slot.startAt.getTime() - minutes * MINUTE),
+        endAt: new Date(slot.endAt.getTime() + minutes * MINUTE),
+    };
 }
 
 /**

@@ -934,7 +934,7 @@ upcoming bookings count). No migration.
   (in this branch or in #708's), `saroh.app`, `site-blocks` or `e2e` (only
   the permissions API mock sent them; it no longer does).
 - **Kept on purpose:** `actions` (the workspace rail's badges read its
-  OVERDUE rows, `components/shared/app-shell.tsx`), `upcoming` (Needs you's
+  OVERDUE rows, `components/shared/shell/app-shell.tsx`), `upcoming` (Needs you's
   "Next" line) and `hasAnyModule` (the first-run screen). They are not
   legacy while the app reads them.
 

@@ -41,6 +41,10 @@ export const RETENTION_ERASED: readonly ErasedThing[] = [
         how: "deleted",
     },
     {
+        what: "Customers' “Ask to remove my data” requests, with the name and email each was asked with (DEC-172)",
+        how: "deleted",
+    },
+    {
         what: "Every customer (Contact): name, email (a placeholder), phone, company, address; with their notes, needs-attention entries, consents, message thread, site account, sessions and sign-in codes, and their autopay's UPI handle or card digits — the privacy removal's own rules, for every contact",
         how: "cleared",
     },
@@ -86,7 +90,7 @@ export interface KeptThing {
 /** Everything the eraser leaves, and why. */
 export const RETENTION_KEPT: readonly KeptThing[] = [
     {
-        what: "Invoices and credit notes with their lines, as printed (bill-to name, email and address; the seller's details; amounts and GST)",
+        what: "Invoices and credit notes with their lines, as printed (bill-to name, email and address; the seller's details; amounts and GST), and the payments recorded on them (method, cheque number and bank, reference and note)",
         why: "Tax records, kept eight years (ADR-008).",
     },
     {
@@ -182,6 +186,9 @@ export const KEPT_FIELD_DECISIONS: Readonly<Record<string, KeptDecision>> = {
         at180Days: "erased",
         why: "Free text about a lead; no business is left to keep its CRM.",
     },
+    // DEC-172's "Ask to remove my data": a removal no longer keeps its
+    // requester's name or email (review #19), so neither is decided here;
+    // the eraser still deletes every request of a business that is gone.
 };
 
 /**

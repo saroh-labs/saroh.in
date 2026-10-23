@@ -9,7 +9,8 @@
  * allowed without anyone asking. So the lists below are pinned: a new public
  * write route fails this spec until it is added to REFUSED (a write: it
  * stores, sends or charges something) or to ALLOWED (it writes nothing,
- * with the reason).
+ * or, decided on the record, only the caller's own request; with the
+ * reason).
  */
 jest.mock("@saroh/database", () => ({
     prisma: {},
@@ -26,6 +27,11 @@ import { TestHostWriteGuard } from "./test-host.guard";
 const ALLOWED: Record<string, string> = {
     "POST public/sites/:siteId/checkout/quote":
         "prices the bag from listings and stores nothing",
+    // DEC-172 (#1106, U13): the one ALLOWED write. It deletes nothing and
+    // touches only the signed-in customer's own record, and the account's
+    // browser test (U14) asks from a test release.
+    "POST public/site-accounts/me/data-request":
+        "asks the business to remove the signed-in customer's own data; it deletes nothing",
 };
 
 /** Provider callbacks: no browser origin from a test host ever reaches them. */
@@ -59,6 +65,10 @@ const REFUSED = [
     "POST public/sites/:siteId/checkout",
     "POST public/orders/:orderId/payment-intent",
     "POST public/order-pay/:token/payment-intent",
+    // Back in stock (U23): a watch stores an address and later emails it;
+    // stopping one changes it.
+    "POST public/sites/:siteId/products/:productId/watch",
+    "POST public/sites/:siteId/stock-watch/:token/stop",
     "POST public/invoices/:token/payment-intent",
     "POST public/invoices/:token/autopay",
     // Bookings, holds and waitlists.
@@ -85,6 +95,9 @@ const REFUSED = [
     // saroh.in/contact's message to the team: stored for staff; only
     // saroh.in's server sends one, never a merchant's test release.
     "POST public/contact-messages",
+    // A staff invite's preview (admin plan U24): it writes nothing, but only
+    // accounts' server calls it, never a merchant's test release.
+    "POST public/staff-invites/preview",
     // Plans, packs and autopay.
     "POST public/site-accounts/me/plans/:ref/join",
     "POST public/site-accounts/me/plan/:ref/cancel",

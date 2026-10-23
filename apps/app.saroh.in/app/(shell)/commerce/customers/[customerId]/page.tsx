@@ -4,11 +4,11 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { DeleteCustomerMenu } from "@/components/customers/delete-customer-menu";
-import { EditStoreCustomer } from "@/components/customers/edit-store-customer";
-import { FailedRead } from "@/components/shared/failed-read";
-import { PageContainer } from "@/components/shared/page-container";
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { DeleteCustomerMenu } from "@/components/customers/store-customer/delete-customer-menu";
+import { EditStoreCustomer } from "@/components/customers/store-customer/edit-store-customer";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { PageContainer } from "@/components/shared/page/page-container";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { personHref } from "@/lib/contacts/person-href";
 import { contactForCustomer } from "@/lib/customer-workspace/detail";
 import { customerHref } from "@/lib/customers/links";
@@ -17,6 +17,7 @@ import { getCustomer, listCustomers } from "@/lib/customers/service";
 import { formatMoneyMajor } from "@/lib/format/money";
 import type { OrderStanding } from "@/lib/orders/business-service";
 import { listAllOrderRows } from "@/lib/orders/business-service";
+import { phoneLabel } from "@/lib/organizations/business-phone";
 import { requireSession } from "@/lib/session";
 import type { BusinessStore as Store } from "@/lib/stores/service";
 import { listBusinessStores } from "@/lib/stores/service";
@@ -257,7 +258,7 @@ function detailRows(customer: Customer): { label: string; value: string }[] {
             value: join([customer.firstName, customer.lastName], " "),
         },
         { label: "Email", value: customer.email },
-        { label: "Phone", value: customer.phone?.trim() ?? "" },
+        { label: "Phone", value: phoneLabel(customer.phone) },
         {
             label: "Address",
             value: join(

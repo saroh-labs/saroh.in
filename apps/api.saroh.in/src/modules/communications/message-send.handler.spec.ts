@@ -44,7 +44,7 @@ import {
     FakeCommsProvider,
     FakeCommsProviderFactory,
 } from "./providers/fake.provider";
-import { SECRET_LINK_SLOT } from "./transactional";
+import { HOW_TO_PAY_SLOT, SECRET_LINK_SLOT } from "./transactional";
 
 const deliveryFindUnique = prisma.delivery.findUnique as jest.Mock;
 const deliveryUpdate = prisma.delivery.update as jest.Mock;
@@ -442,6 +442,58 @@ describe("MessageSendHandler", () => {
         expect(deliveryUpdate.mock.calls[0][0].data).toMatchObject({
             status: "FAILED",
             error: "secret link missing",
+        });
+    });
+
+    it("puts a renewal's sealed How to pay us lines in only as it goes (DEC-178)", async () => {
+        deliveryFindUnique.mockResolvedValue({ id: "del_1", status: "QUEUED" });
+        messageFindUnique.mockResolvedValue({
+            ...message,
+            body: `<p>How to pay:<br>${HOW_TO_PAY_SLOT}</p>`,
+        });
+        providerFindUnique.mockResolvedValue(sealedProviderRow());
+        const fake = new FakeCommsProvider("EMAIL");
+        const handler = new MessageSendHandler(
+            new FakeCommsProviderFactory(fake),
+        );
+
+        await handler.handle({
+            ...job(),
+            payload: {
+                messageId: "msg_1",
+                deliveryId: "del_1",
+                howToPay: encryptSecret(
+                    JSON.stringify(["UPI: rye@okhdfc", "A/c 1234 5678 9012"]),
+                ),
+            },
+        } as unknown as Job);
+
+        expect(fake.calls[0]?.body).toBe(
+            "<p>How to pay:<br>UPI: rye@okhdfc<br>A/c 1234 5678 9012</p>",
+        );
+        expect(JSON.stringify(messageUpdate.mock.calls)).not.toContain(
+            "1234 5678",
+        );
+    });
+
+    it("never sends a body still waiting for its How to pay us lines", async () => {
+        deliveryFindUnique.mockResolvedValue({ id: "del_1", status: "QUEUED" });
+        messageFindUnique.mockResolvedValue({
+            ...message,
+            body: `How to pay: ${HOW_TO_PAY_SLOT}`,
+        });
+        providerFindUnique.mockResolvedValue(sealedProviderRow());
+        const fake = new FakeCommsProvider("EMAIL");
+        const handler = new MessageSendHandler(
+            new FakeCommsProviderFactory(fake),
+        );
+
+        await handler.handle(job());
+
+        expect(fake.calls).toHaveLength(0);
+        expect(deliveryUpdate.mock.calls[0][0].data).toMatchObject({
+            status: "FAILED",
+            error: "how to pay missing",
         });
     });
 

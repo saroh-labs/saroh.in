@@ -509,7 +509,9 @@ test.describe("shipping on order detail", () => {
         ).toBeVisible();
     });
 
-    test("a pay link: shown once, then replaced (B11)", async ({ page }) => {
+    test("a payment link: shown once, then replaced (B11)", async ({
+        page,
+    }) => {
         test.setTimeout(90_000);
         await signIn(page);
         await page.goto(`/open/${NORTHWIND}`);
@@ -519,7 +521,9 @@ test.describe("shipping on order detail", () => {
         await page.goto(`/commerce/orders/${id}`);
 
         const money = page.getByRole("region", { name: "Money" });
-        await money.getByRole("button", { name: "Make a pay link" }).click();
+        await money
+            .getByRole("button", { name: "Make a payment link" })
+            .click();
         const address = money.locator("code");
         await expect(address).toContainText("/pay/o/");
         const first = (await address.textContent()) ?? "";
@@ -537,11 +541,11 @@ test.describe("shipping on order detail", () => {
 
         // After a reload the address is gone: only when it was made shows.
         await page.reload();
-        await expect(money.getByText(/^Pay link made/)).toBeVisible();
+        await expect(money.getByText(/^Payment link made/)).toBeVisible();
         await expect(money.locator("code")).toHaveCount(0);
 
         // A new link says the old one stops working, and it does.
-        await money.getByRole("button", { name: "New pay link" }).click();
+        await money.getByRole("button", { name: "New payment link" }).click();
         await page.getByRole("button", { name: "Make a new link" }).click();
         await expect(money.locator("code")).toContainText("/pay/o/");
         await expect(money.locator("code")).not.toHaveText(first);

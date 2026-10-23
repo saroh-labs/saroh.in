@@ -15,16 +15,16 @@ import type { PlansTab } from "@/lib/pricing-draft";
 import { tabFrom } from "@/lib/pricing-draft";
 import { instanceApps } from "@/lib/sibling-apps";
 
-export const metadata = { title: "Plans & modules" };
+export const metadata = { title: "Plans and modules" };
 
 /**
- * Plans & modules (plans catalogue U6, the design "Saroh Admin Plans v2"):
+ * Plans and modules (plans catalogue U6, the design "Saroh Admin Plans v2"):
  * the pricing catalogue every business is billed and limited by, edited as
  * one shared draft and published as versions. This page reads; the shell
  * below holds the draft, and each tab (U7–U10) draws from it.
  *
  * The heading and chrome draw at once; the catalogue streams in behind a
- * skeleton, and a failed read is a failed state with Try again, never an
+ * skeleton (the shell draws the heading again with what is live), and a failed read is a failed state with Try again, never an
  * empty editor that could be saved over what is live.
  */
 export default async function PlansPage({
@@ -40,12 +40,16 @@ export default async function PlansPage({
     return (
         <AdminShell staff={staff}>
             <PageContainer width="full">
-                <div className="grid min-w-0 gap-4">
-                    <PlansHeader />
-                    <Suspense fallback={<PlansSkeleton />}>
-                        <PlansLoaded staff={staff} tab={tab} />
-                    </Suspense>
-                </div>
+                <Suspense
+                    fallback={
+                        <div className="grid min-w-0 gap-4">
+                            <PlansHeader />
+                            <PlansSkeleton />
+                        </div>
+                    }
+                >
+                    <PlansLoaded staff={staff} tab={tab} />
+                </Suspense>
             </PageContainer>
         </AdminShell>
     );
@@ -63,9 +67,23 @@ async function PlansLoaded({
         listCoupons().catch(() => null),
         instanceApps(),
     ]);
-    if (pricing === undefined) return <PlansFailed />;
+    if (pricing === undefined) {
+        return (
+            <div className="grid min-w-0 gap-4">
+                <PlansHeader />
+                <PlansFailed />
+            </div>
+        );
+    }
     // Refused after the gate let them in: their access changed mid-visit.
-    if (pricing === null) return <NoAccessPanel email={staff.email} />;
+    if (pricing === null) {
+        return (
+            <div className="grid min-w-0 gap-4">
+                <PlansHeader />
+                <NoAccessPanel email={staff.email} />
+            </div>
+        );
+    }
     const impact = pricing.draft
         ? await getPricingImpact().catch(() => null)
         : null;

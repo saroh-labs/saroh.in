@@ -7,6 +7,9 @@ import { z } from "zod";
 
 import type { OrganizationKind } from "./kind";
 import { kindOf, ORGANIZATION_KINDS } from "./kind";
+import { managerCodeProblem } from "./referral-carry";
+import type { SetupBilling } from "./setup-billing";
+import { BILLING_FIELDS, billingProblems } from "./setup-billing";
 
 /**
  * Setup as a stepper (DEC-130, amended 11 Oct 2026): one question to a
@@ -18,35 +21,85 @@ import { kindOf, ORGANIZATION_KINDS } from "./kind";
  * (`?step=`) is read and written here. The names in the panel come from
  * `SETUP_PLAN` in `@saroh/ui`, which the sign-up page draws too.
  *
+ * One step is asked only of some: "Who does Saroh bill for this
+ * business?" (DEC-167, R7), between the name and what to do first, for an
+ * owner who has a billing profile already. Someone with none gets their
+ * first from the business, so is never asked. Every function that walks
+ * the steps takes `billing`, whether it is asked, and leaves it out when
+ * it isn't, so the plan's own three steps read as they always have.
+ *
  * Pure and client-safe.
  */
 
-/** What a person answers at setup. One form holds it for every step. */
-export function setupSchema(needsName: boolean) {
-    return z.object({
-        // "A business" to start with (owner, 10 Oct): the answer is one
-        // press to change.
-        kind: z.enum(ORGANIZATION_KINDS),
-        // Asked only of an account that has no name yet: one made with an
-        // emailed code, which asks for nothing but the address.
-        yourName: needsName
-            ? z.string().trim().min(1, { message: "Enter your name" }).max(120)
-            : z.string().optional(),
-        name: z.string().trim().min(1, { message: "It needs a name" }),
-        address: z.string().min(3, {
-            message: "A web address needs at least 3 characters",
-        }),
-        country: z.string().length(2),
-        // A goal's key, or "LATER".
-        goal: z.string().min(1),
-    });
+/**
+ * What a person answers at setup. One form holds it for every step.
+ * `billing` is who Saroh may bill, when that is asked: the owner's
+ * profiles, whose emails a new one can't reuse.
+ */
+export function setupSchema(
+    needsName: boolean,
+    billing: SetupBilling | null = null,
+) {
+    return z
+        .object({
+            // "A business" to start with (owner, 10 Oct): the answer is one
+            // press to change.
+            kind: z.enum(ORGANIZATION_KINDS),
+            // Asked only of an account that has no name yet: one made with an
+            // emailed code, which asks for nothing but the address.
+            yourName: needsName
+                ? z
+                      .string()
+                      .trim()
+                      .min(1, { message: "Enter your name" })
+                      .max(120)
+                : z.string().optional(),
+            name: z.string().trim().min(1, { message: "It needs a name" }),
+            address: z.string().min(3, {
+                message: "A web address needs at least 3 characters",
+            }),
+            country: z.string().length(2),
+            // A goal's key, or "LATER".
+            goal: z.string().min(1),
+            // Who Saroh bills (DEC-167): a profile's id, or "new" with its
+            // fields below. Checked only when asked.
+            billingChoice: z.string().optional(),
+            billLegalName: z.string().optional(),
+            billEmail: z.string().optional(),
+            billGstin: z.string().optional(),
+            billState: z.string().optional(),
+            billAddress: z.string().optional(),
+            billCity: z.string().optional(),
+            billPin: z.string().optional(),
+            // The code of a Saroh teammate helping them (DEC-169):
+            // optional, and said under the field when it can't be a code.
+            managerCode: z.string().optional(),
+        })
+        .superRefine((values, ctx) => {
+            const codeProblem = managerCodeProblem(values.managerCode);
+            if (codeProblem) {
+                ctx.addIssue({
+                    code: "custom",
+                    path: ["managerCode"],
+                    message: codeProblem,
+                });
+            }
+            if (!billing) return;
+            for (const [field, message] of billingProblems(values, billing)) {
+                ctx.addIssue({ code: "custom", path: [field], message });
+            }
+        });
 }
 
 export type SetupValues = z.infer<ReturnType<typeof setupSchema>>;
 export type SetupField = keyof SetupValues;
 
-export const SETUP_STEP_IDS = ["kind", "name", "first"] as const;
+/** Every step there is, in order. "billing" is asked only of some. */
+export const SETUP_STEP_IDS = ["kind", "name", "billing", "first"] as const;
 export type SetupStepId = (typeof SETUP_STEP_IDS)[number];
+
+/** The plan's own steps, which everyone is asked. */
+const PLAN_STEP_IDS = ["kind", "name", "first"] as const;
 
 export interface SetupStep {
     id: SetupStepId;
@@ -58,12 +111,13 @@ export interface SetupStep {
 
 const FIELDS: Record<SetupStepId, readonly SetupField[]> = {
     kind: ["kind"],
-    name: ["yourName", "name", "address", "country"],
+    name: ["yourName", "name", "address", "country", "managerCode"],
+    billing: BILLING_FIELDS,
     first: ["goal"],
 };
 
 /** Setup's steps, in order: the plan's, after the account's. */
-export const SETUP_STEPS: readonly SetupStep[] = SETUP_STEP_IDS.map(
+export const SETUP_STEPS: readonly SetupStep[] = PLAN_STEP_IDS.map(
     (id, index) => ({
         id,
         plan: SETUP_PLAN[SETUP_PLAN_ACCOUNT_STEPS + index] ?? "",
@@ -71,11 +125,38 @@ export const SETUP_STEPS: readonly SetupStep[] = SETUP_STEP_IDS.map(
     }),
 );
 
+/**
+ * Who Saroh bills: part of naming it in the plan beside the form, which
+ * lists the plan's own steps.
+ */
+const BILLING_STEP: SetupStep = {
+    id: "billing",
+    plan: SETUP_PLAN[SETUP_PLAN_ACCOUNT_STEPS + 1] ?? "",
+    fields: FIELDS.billing,
+};
+
+const WITH_BILLING: readonly SetupStep[] = [
+    ...SETUP_STEPS.slice(0, 2),
+    BILLING_STEP,
+    ...SETUP_STEPS.slice(2),
+];
+
+/** The steps this person is asked, in order. */
+export function setupSteps(billing = false): readonly SetupStep[] {
+    return billing ? WITH_BILLING : SETUP_STEPS;
+}
+
+/** The answers a step asks for, whoever is asked it. */
+export function fieldsOfStep(step: SetupStepId): readonly SetupField[] {
+    return FIELDS[step];
+}
+
 const FIRST_STEP: SetupStepId = "kind";
 const LAST_STEP: SetupStepId = "first";
 
-export function stepIndex(step: SetupStepId): number {
-    return SETUP_STEP_IDS.indexOf(step);
+/** Where a step is among those asked; -1 for one that isn't. */
+export function stepIndex(step: SetupStepId, billing = false): number {
+    return setupSteps(billing).findIndex((s) => s.id === step);
 }
 
 export function isLastStep(step: SetupStepId): boolean {
@@ -83,20 +164,28 @@ export function isLastStep(step: SetupStepId): boolean {
 }
 
 /** The step before this one, or null on the first. */
-export function stepBefore(step: SetupStepId): SetupStepId | null {
-    return SETUP_STEP_IDS[stepIndex(step) - 1] ?? null;
+export function stepBefore(
+    step: SetupStepId,
+    billing = false,
+): SetupStepId | null {
+    return setupSteps(billing)[stepIndex(step, billing) - 1]?.id ?? null;
 }
 
 /** The step after this one, or null on the last. */
-export function stepAfter(step: SetupStepId): SetupStepId | null {
-    return SETUP_STEP_IDS[stepIndex(step) + 1] ?? null;
+export function stepAfter(
+    step: SetupStepId,
+    billing = false,
+): SetupStepId | null {
+    const at = stepIndex(step, billing);
+    return at < 0 ? null : (setupSteps(billing)[at + 1]?.id ?? null);
 }
 
 /** The step that asks for a field: where its problem is shown. */
 export function stepOfField(field: string): SetupStepId | null {
     return (
-        SETUP_STEPS.find((s) => (s.fields as readonly string[]).includes(field))
-            ?.id ?? null
+        WITH_BILLING.find((s) =>
+            (s.fields as readonly string[]).includes(field),
+        )?.id ?? null
     );
 }
 
@@ -133,12 +222,15 @@ export function stepHref(href: string, step: SetupStepId): string {
 export function firstUnanswered(
     values: unknown,
     needsName: boolean,
+    billing: SetupBilling | null = null,
 ): SetupStepId | null {
-    const result = setupSchema(needsName).safeParse(values);
+    const result = setupSchema(needsName, billing).safeParse(values);
     if (result.success) return null;
     const wrong = new Set(result.error.issues.map((i) => String(i.path[0])));
     return (
-        SETUP_STEPS.find((s) => s.fields.some((f) => wrong.has(f)))?.id ?? null
+        setupSteps(billing !== null).find((s) =>
+            s.fields.some((f) => wrong.has(f)),
+        )?.id ?? null
     );
 }
 
@@ -152,9 +244,15 @@ export function openStep(
     asked: SetupStepId,
     values: unknown,
     needsName: boolean,
+    billing: SetupBilling | null = null,
 ): SetupStepId {
-    const stuck = firstUnanswered(values, needsName);
-    return stuck && stepIndex(stuck) < stepIndex(asked) ? stuck : asked;
+    const asks = billing !== null;
+    // Who Saroh bills, asked for where it isn't asked: the step after it.
+    const step = stepIndex(asked, asks) < 0 ? LAST_STEP : asked;
+    const stuck = firstUnanswered(values, needsName, billing);
+    return stuck && stepIndex(stuck, asks) < stepIndex(step, asks)
+        ? stuck
+        : step;
 }
 
 /* Where the person is. */
@@ -167,23 +265,32 @@ export function openStep(
 export function stepPosition(
     step: SetupStepId,
     another: boolean,
+    billing = false,
 ): { now: number; of: number } {
     const before = another ? 0 : SETUP_PLAN_ACCOUNT_STEPS;
     return {
-        now: before + stepIndex(step) + 1,
-        of: before + SETUP_STEPS.length,
+        now: before + stepIndex(step, billing) + 1,
+        of: before + setupSteps(billing).length,
     };
 }
 
 /** "Step 2 of 4". */
-export function stepCount(step: SetupStepId, another: boolean): string {
-    const { now, of } = stepPosition(step, another);
+export function stepCount(
+    step: SetupStepId,
+    another: boolean,
+    billing = false,
+): string {
+    const { now, of } = stepPosition(step, another, billing);
     return stepLine(now, of);
 }
 
 /** The line above the heading. Another business says so on a phone too. */
-export function stepEyebrow(step: SetupStepId, another: boolean): string {
-    const count = stepCount(step, another);
+export function stepEyebrow(
+    step: SetupStepId,
+    another: boolean,
+    billing = false,
+): string {
+    const count = stepCount(step, another, billing);
     return another ? `Set up another · ${count}` : count;
 }
 
@@ -192,9 +299,11 @@ export function planFor(step: SetupStepId): {
     steps: string[];
     current: number;
 } {
+    // Who Saroh bills is part of naming it there.
+    const shown = step === "billing" ? "name" : step;
     return {
         steps: [...SETUP_PLAN],
-        current: SETUP_PLAN_ACCOUNT_STEPS + stepIndex(step) + 1,
+        current: SETUP_PLAN_ACCOUNT_STEPS + stepIndex(shown) + 1,
     };
 }
 
@@ -210,6 +319,7 @@ const NAME_HEADING: Record<OrganizationKind, string> = {
 export function stepHeading(step: SetupStepId, kind: unknown): string {
     if (step === "kind") return "What are you setting up?";
     if (step === "name") return NAME_HEADING[kindOf(kind)];
+    if (step === "billing") return "Who does Saroh bill for this business?";
     return "What will you do first?";
 }
 
@@ -222,6 +332,9 @@ export function stepLead(step: SetupStepId, another: boolean): string {
     }
     if (step === "name") {
         return "The name people see, and the web address your website lives at.";
+    }
+    if (step === "billing") {
+        return "Saroh's invoices for its plan go to the billing profile you pick. Use one you have, or add one with its own GSTIN.";
     }
     return "It is set up with sensible defaults and opens ready to fill in. You can add the others whenever.";
 }
@@ -239,6 +352,8 @@ export function stepPrimary(step: SetupStepId, kind: unknown): string {
  * it. It holds the answers only: no code, no token (a plan or an invite
  * stays in the address), nothing secret. It is cleared when the business is
  * made and on signing out, and one written by another account is ignored.
+ * Who Saroh bills is never kept: a billing email and a GSTIN stay out of
+ * storage, and the step is asked again after a reload.
  */
 export const SETUP_DRAFT_KEY = "saroh.setup-draft";
 
@@ -261,6 +376,7 @@ const draftSchema = z.object({
         address: z.string().max(100),
         country: z.string().length(2),
         goal: z.string().min(1).max(40),
+        managerCode: z.string().max(20).optional(),
     }),
     edited: z.boolean(),
     goalPicked: z.boolean(),
@@ -291,10 +407,15 @@ export function readSetupDraft(email: string): SetupDraft | null {
 }
 
 export function writeSetupDraft(email: string, draft: SetupDraft): void {
+    const values = Object.fromEntries(
+        Object.entries(draft.values).filter(
+            ([key]) => !(BILLING_FIELDS as readonly string[]).includes(key),
+        ),
+    );
     try {
         storage()?.setItem(
             SETUP_DRAFT_KEY,
-            JSON.stringify({ for: email, ...draft }),
+            JSON.stringify({ for: email, ...draft, values }),
         );
     } catch {
         // Full or refused: setup works without a draft.

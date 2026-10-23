@@ -13,6 +13,7 @@ import {
     isRenewalInvoice,
     planTakesOnlinePayment,
 } from "../billing/online-payments-plan";
+import { businessTimezone } from "../bookings/staff-availability";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { businessPayInstructionsOf } from "../organizations/business-pay-instructions";
 import { authorize } from "../organizations/organization-policy";
@@ -31,20 +32,33 @@ import type {
     VoidInvoiceDto,
 } from "./dto";
 import { exemptInvoiceIds } from "./exempt-invoices";
-import { isGstRate, rateToBps } from "./gst";
+import { isGstRate, notGstRateMessage, rateToBps } from "./gst";
 import { assertRatesSet } from "./gst-rate-required";
 import { gstinProblem, stateCode } from "./gst-states";
+import type { InvoiceActor } from "./invoice-events";
+import {
+    actorOrJob,
+    CUSTOMER_ACTOR,
+    personActor,
+    recordInvoiceEvent,
+} from "./invoice-events";
+import { lockInvoiceForLedger } from "./invoice-ledger";
+import type { RecordedPaymentView } from "./invoice-payments.service";
+import { InvoicePaymentsService } from "./invoice-payments.service";
 import type { InvoiceSource } from "./invoice-state";
 import {
     CAPTURED_NEEDS_REFUND,
     DEFAULT_DUE_DAYS,
     isPastDue,
+    leftToPayCents,
     NOT_A_BOOKING_HOLD,
     OWED_WHERE,
-    paidSinceFilter,
     viewWhere,
+    WAITING_CHEQUE_WHERE,
 } from "./invoice-state";
-import { listFilterWhere } from "./list-filter";
+import { startOfDayIn } from "./invoice-summary.service";
+import { listFilterWhere, paidFromWhere, searchWhere } from "./list-filter";
+import { moneyQueryCents } from "./money-query";
 import type { BuiltDocument, TaxProfile } from "./order-invoice";
 import { buildManualInvoice } from "./order-invoice";
 import {
@@ -52,10 +66,13 @@ import {
     issueCreditNote,
     loadTaxProfile,
     numberFor,
+    previewCreditNote,
     writeDocumentLines,
 } from "./order-invoicing";
+import type { PaperColumns } from "./paper-styles";
+import { paperWrite, resolvePaper } from "./paper-styles";
 import { invoiceOnlineBlocker } from "./pay-online";
-import { mintPayToken } from "./pay-token";
+import { replacePayTokenInTx } from "./pay-token";
 import { assertPaymentsOn } from "./payments-on";
 import type {
     InvoiceOnlineView,
@@ -101,6 +118,41 @@ const VIEW_LINK: LinkOptions = { requireProvider: false, allowPaid: true };
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LIST_LIMIT = 500;
 
+/** Why a partly paid invoice isn't voided or credited (DEC-173). */
+const PAID_IN_PART =
+    "Part of this invoice is paid. Remove its payments before cancelling it.";
+
+/** The invoice was paid between opening Cancel and confirming it (#2). */
+export const JUST_PAID = "This invoice was just paid. Reload it.";
+
+/** Its payments changed between opening Cancel and confirming it (#2). */
+export const PAYMENTS_JUST_CHANGED =
+    "A payment on this invoice just changed. Reload it.";
+
+/** A cheque not in the bank yet holds a cancel back (#5). */
+export const CHEQUE_STILL_WAITING = "Wait for the cheque to clear or bounce.";
+
+/** What the merchant saw when they opened Cancel, checked under the lock. */
+interface CreditSeen {
+    status: string;
+    paidSoFarCents: number;
+}
+
+/** What was seen: the screen's, when it said, else the API's read before. */
+function creditSeenOf(
+    dto: CreditInvoiceDto,
+    current: InvoiceViewModel,
+): CreditSeen {
+    const status =
+        dto.expectStatus === undefined
+            ? current.status
+            : dto.expectStatus === "OVERDUE"
+              ? "ISSUED"
+              : dto.expectStatus;
+    const paidSoFar = dto.expectPaidSoFar ?? current.paidSoFar;
+    return { status, paidSoFarCents: toCents(paidSoFar) };
+}
+
 /** A refusal the form can put on the field it is about. */
 function fieldError(message: string, field: string): never {
     throw new BadRequestException({ message, details: { field } });
@@ -108,6 +160,33 @@ function fieldError(message: string, field: string): never {
 
 function notFound(): never {
     throw new NotFoundException("Invoice not found");
+}
+
+/** Where a refused style or colour is shown on the draft. */
+const PAPER_FIELDS = { style: "paperStyle", colour: "paperColour" };
+
+/** The business's default look (DEC-173): its style and colour, or none. */
+async function businessPaperDefault(
+    db: Pick<Tx, "businessProfile">,
+    organizationId: string,
+): Promise<PaperColumns | null> {
+    const p = await db.businessProfile.findUnique({
+        where: { organizationId },
+        select: { invoiceStyle: true, invoiceColour: true },
+    });
+    return p ? { style: p.invoiceStyle, colour: p.invoiceColour } : null;
+}
+
+/**
+ * The look issued paper freezes: the draft's own, else the default, each
+ * written out (never null), so the paper never reads a default again.
+ */
+function frozenPaper(
+    own: PaperColumns,
+    fallback: PaperColumns,
+): { paperStyle: string; paperColour: string | null } {
+    const paper = resolvePaper(own, fallback);
+    return { paperStyle: paper.style, paperColour: paper.colour };
 }
 
 /** What another module asks to be invoiced, inside its own transaction. */
@@ -129,6 +208,21 @@ export interface IssueInvoiceInput {
 }
 
 /** Unpaid invoices for a person or a subscription, per currency. */
+/** "Cancel and write a correct one" (U13): the credit note and the new draft. */
+export interface CreditAndRewriteView {
+    creditNote: { id: string; number: string | null };
+    draft: InvoiceViewModel;
+}
+
+/** The credit note "Cancel all of it" would issue (U13); nothing is taken. */
+export interface CreditPreviewView {
+    /** Most likely its number: one issued meanwhile moves it on. */
+    number: string;
+    /** Decimal string, as every amount on the wire. */
+    amount: string;
+    currency: string;
+}
+
 export interface OwedSummary {
     unpaidCount: number;
     overdueCount: number;
@@ -162,37 +256,97 @@ interface BillToGst {
  */
 @Injectable()
 export class InvoicesService {
+    // The ledger (DEC-173). Defaulted so a spec or another module's own
+    // `new InvoicesService()` records through the same path; it holds no
+    // state.
+    constructor(
+        private readonly payments: InvoicePaymentsService = new InvoicePaymentsService(),
+    ) {}
+
     async list(
         ctx: OrganizationContext,
         query: ListInvoicesQueryDto,
     ): Promise<InvoiceViewModel[]> {
         authorize(ctx, "invoice:read");
         const now = new Date();
+        const organizationId = ctx.organizationId;
+        const { q, paidFrom: paidFromDay } = query;
+        const [search, paidFrom] = await Promise.all([
+            q ? this.searchFor(organizationId, q) : null,
+            paidFromDay
+                ? businessTimezone(prisma, organizationId).then((zone) =>
+                      startOfDayIn(paidFromDay, zone),
+                  )
+                : null,
+        ]);
+        // What it was for (D18), then search and Paid this month (DEC-173,
+        // U4), all ANDed on: each brings its own OR, and hidden drafts stay
+        // hidden. Searched on the server, so an invoice older than the
+        // newest page is found.
+        const narrowed = listFilterWhere(query);
+        const and = [
+            ...((narrowed.AND as Prisma.InvoiceWhereInput[] | undefined) ?? []),
+            ...(search ? [search] : []),
+            ...(paidFrom ? [paidFromWhere(paidFrom)] : []),
+            // Home's money figures' link: the same money-in rule from an
+            // instant (`money-in.ts`).
+            ...(query.paidSince
+                ? [paidFromWhere(new Date(query.paidSince))]
+                : []),
+        ];
         const rows = await prisma.invoice.findMany({
             where: {
-                organizationId: ctx.organizationId,
+                organizationId,
                 ...NOT_A_BOOKING_HOLD,
                 ...(query.view ? viewWhere(query.view, now) : {}),
                 ...(query.contactId ? { contactId: query.contactId } : {}),
                 ...(query.subscriptionId
                     ? { subscriptionId: query.subscriptionId }
                     : {}),
-                ...(query.paidSince
-                    ? paidSinceFilter(new Date(query.paidSince))
-                    : {}),
-                // What it was for (D18); ANDed on, so hidden drafts stay hidden.
-                ...listFilterWhere(query),
+                ...(and.length > 0 ? { AND: and } : {}),
             },
             orderBy: { createdAt: "desc" },
             take: LIST_LIMIT,
             select: INVOICE_LIST_SELECT,
         });
-        const exempt = await exemptInvoiceIds(prisma, ctx.organizationId, rows);
+        const exempt = await exemptInvoiceIds(prisma, organizationId, rows);
+        // Drafts show the look they will go out in (DEC-173).
+        const paperDefault = rows.some((r) => r.status === "DRAFT")
+            ? await businessPaperDefault(prisma, organizationId)
+            : null;
         return rows.map((r) =>
             serializeInvoice(r as InvoiceRow, now, {
                 exempt: exempt.has(r.id),
+                paperDefault,
             }),
         );
+    }
+
+    /**
+     * The search's where (DEC-173, U4). When `q` reads as an amount, the
+     * partly paid invoices whose left to pay is that amount are found
+     * here, through `leftToPayCents`, the one place it is worked out:
+     * there are few of them, so they are read and folded rather than
+     * worked out again in SQL.
+     */
+    private async searchFor(
+        organizationId: string,
+        q: string,
+    ): Promise<Prisma.InvoiceWhereInput> {
+        const cents = moneyQueryCents(q);
+        if (cents === null) return searchWhere(q, null);
+        const partlyPaid = await prisma.invoice.findMany({
+            where: {
+                organizationId,
+                status: "ISSUED",
+                paidCents: { gt: 0 },
+            },
+            select: { id: true, total: true, paidCents: true },
+        });
+        const leftIds = partlyPaid
+            .filter((inv) => leftToPayCents(inv) === cents)
+            .map((inv) => inv.id);
+        return searchWhere(q, cents, leftIds);
     }
 
     /**
@@ -234,7 +388,7 @@ export class InvoicesService {
         ctx: OrganizationContext,
         id: string,
     ): Promise<MadeLink> {
-        return this.payLink(prisma, ctx, id, PAY_LINK);
+        return this.madeByHand(ctx, id, PAY_LINK);
     }
 
     /**
@@ -250,7 +404,30 @@ export class InvoicesService {
         ctx: OrganizationContext,
         id: string,
     ): Promise<MadeLink> {
-        return this.payLink(prisma, ctx, id, VIEW_LINK);
+        return this.madeByHand(ctx, id, VIEW_LINK);
+    }
+
+    /**
+     * "Copy link" or "New link" pressed: the link, and LINK_MADE on the
+     * history in the same transaction. A link minted by a send or a share
+     * is told by that send or share instead.
+     */
+    private async madeByHand(
+        ctx: OrganizationContext,
+        id: string,
+        options: LinkOptions,
+    ): Promise<MadeLink> {
+        return prisma.$transaction(async (tx) => {
+            const made = await this.payLink(tx, ctx, id, options);
+            await recordInvoiceEvent(tx, {
+                organizationId: ctx.organizationId,
+                invoiceId: id,
+                kind: "LINK_MADE",
+                actor: personActor(ctx),
+                ...(options.requireProvider ? {} : { data: { view: true } }),
+            });
+            return made;
+        });
     }
 
     /**
@@ -271,6 +448,21 @@ export class InvoicesService {
         return this.payLink(tx, ctx, id, options);
     }
 
+    /**
+     * {@link createPayLinkInTx} for a send Saroh makes on the business's
+     * behalf (a renewal's invoice, automatic notices U10): every check a
+     * person's link makes, with nobody to authorize. Never reached from a
+     * request.
+     */
+    async payLinkForJobInTx(
+        tx: Tx,
+        organizationId: string,
+        id: string,
+        options: LinkOptions = PAY_LINK,
+    ): Promise<MadeLink> {
+        return this.checkedLink(tx, organizationId, id, options);
+    }
+
     private async payLink(
         db: Tx,
         ctx: OrganizationContext,
@@ -278,25 +470,34 @@ export class InvoicesService {
         options: LinkOptions,
     ): Promise<MadeLink> {
         authorize(ctx, "invoice:write");
+        return this.checkedLink(db, ctx.organizationId, id, options);
+    }
+
+    private async checkedLink(
+        db: Tx,
+        organizationId: string,
+        id: string,
+        options: LinkOptions,
+    ): Promise<MadeLink> {
         // A link asks to be paid: the business details first (DEC-068). A
         // member's own "Pay now" is never refused for it.
-        await assertBusinessDetails(db, ctx.organizationId);
+        await assertBusinessDetails(db, organizationId);
         // Taking money online is Payments' (DEC-070); a view link isn't.
         if (options.requireProvider) {
-            await assertPaymentsOn(db, ctx.organizationId, "make a pay link");
+            await assertPaymentsOn(db, organizationId, "make a pay link");
             // And the plan's (403 MODULE_LOCKED), except for a renewal of a
             // subscription the business already has: that stays payable.
-            if (!(await planTakesOnlinePayment(ctx.organizationId))) {
+            if (!(await planTakesOnlinePayment(organizationId))) {
                 const paper = await db.invoice.findFirst({
-                    where: { id, organizationId: ctx.organizationId },
+                    where: { id, organizationId },
                     select: { subscriptionId: true },
                 });
                 if (!isRenewalInvoice(paper)) {
-                    await assertPlanTakesOnlinePayment(ctx.organizationId);
+                    await assertPlanTakesOnlinePayment(organizationId);
                 }
             }
         }
-        return this.mintInvoiceLink(db, ctx.organizationId, id, options);
+        return this.mintInvoiceLink(db, organizationId, id, options);
     }
 
     /**
@@ -311,7 +512,19 @@ export class InvoicesService {
         organizationId: string,
         id: string,
     ): Promise<MadeLink> {
-        return this.mintInvoiceLink(db, organizationId, id, PAY_LINK);
+        const made = await this.mintInvoiceLink(
+            db,
+            organizationId,
+            id,
+            PAY_LINK,
+        );
+        await recordInvoiceEvent(db, {
+            organizationId,
+            invoiceId: id,
+            kind: "LINK_MADE",
+            actor: CUSTOMER_ACTOR,
+        });
+        return made;
     }
 
     /**
@@ -350,27 +563,22 @@ export class InvoicesService {
         if (await chargeUnderWayOn(db, ctx.organizationId, id)) {
             throw autopayChargeInProgress();
         }
-        const { token, tokenHash } = mintPayToken();
-        const payLinkCreatedAt = new Date();
-        const { count } = await db.invoice.updateMany({
-            where: {
-                id,
-                organizationId: ctx.organizationId,
-                status: paidView ? "PAID" : "ISSUED",
-                orderId: null,
-                kind: { not: "CREDIT_NOTE" },
-            },
-            data: { payTokenHash: tokenHash, payLinkCreatedAt },
-        });
-        if (count === 0) {
+        const made = await replacePayTokenInTx(
+            db,
+            ctx.organizationId,
+            id,
+            paidView ? "PAID" : "ISSUED",
+        );
+        if (!made) {
             throw new ConflictException("This invoice changed. Reload it.");
         }
-        return { token, payLinkCreatedAt };
+        return made;
     }
 
     /**
-     * What a person, or one subscription, still owes: issued and unpaid.
-     * Totals are kept per currency rather than added across them.
+     * What a person, or one subscription, still owes: issued and unpaid,
+     * each invoice counted at what is left to pay on it (DEC-173). Totals
+     * are kept per currency rather than added across them.
      */
     async owed(
         ctx: OrganizationContext,
@@ -403,14 +611,21 @@ export class InvoicesService {
                     ? { subscriptionId: who.subscriptionId }
                     : {}),
             },
-            select: { status: true, currency: true, total: true, dueAt: true },
+            select: {
+                status: true,
+                currency: true,
+                total: true,
+                paidCents: true,
+                dueAt: true,
+            },
         });
         const byCurrency = new Map<string, number>();
         let overdueCount = 0;
         for (const r of rows) {
+            // What is left to pay on it (DEC-173), not its whole total.
             byCurrency.set(
                 r.currency,
-                (byCurrency.get(r.currency) ?? 0) + toCents(r.total.toString()),
+                (byCurrency.get(r.currency) ?? 0) + leftToPayCents(r),
             );
             if (isPastDue(r, now)) overdueCount += 1;
         }
@@ -443,6 +658,12 @@ export class InvoicesService {
         });
         const profile = await loadTaxProfile(prisma, ctx.organizationId);
         const doc = this.price(dto.lines, profile, gst, dto.tax ?? "0");
+        // Its own look, else none: a draft follows the business's default
+        // until it chooses (DEC-173, #1118).
+        const paper = paperWrite(
+            { style: dto.paperStyle, colour: dto.paperColour },
+            PAPER_FIELDS,
+        );
 
         const id = await prisma.$transaction(async (tx) => {
             const created = await tx.invoice.create({
@@ -454,6 +675,8 @@ export class InvoicesService {
                     currency,
                     ...gst,
                     ...documentColumns(doc),
+                    paperStyle: paper.style ?? null,
+                    paperColour: paper.colour ?? null,
                     dueAt: dto.dueAt ? new Date(dto.dueAt) : null,
                     createdByUserId: ctx.userId,
                 },
@@ -495,6 +718,21 @@ export class InvoicesService {
         // A receipt keeps the tax typed on it; a tax invoice derives its own.
         const typedTax = dto.tax ?? (current.gst ? "0" : current.tax);
         const doc = this.price(lines, profile, gst, typedTax);
+        // The draft's own look: what was sent, else what it had chosen.
+        const sentPaper = paperWrite(
+            { style: dto.paperStyle, colour: dto.paperColour },
+            PAPER_FIELDS,
+        );
+        const paper = {
+            paperStyle:
+                sentPaper.style !== undefined
+                    ? sentPaper.style
+                    : current.paperChoice.style,
+            paperColour:
+                sentPaper.colour !== undefined
+                    ? sentPaper.colour
+                    : current.paperChoice.colour,
+        };
 
         await prisma.$transaction(async (tx) => {
             // Guarded on DRAFT so an issue that lands between the read and
@@ -513,6 +751,7 @@ export class InvoicesService {
                         : {}),
                     ...gst,
                     ...documentColumns(doc),
+                    ...paper,
                 },
             });
             if (count === 0) this.assertDraft("ISSUED", "changed");
@@ -569,6 +808,8 @@ export class InvoicesService {
                     billToGstin: true,
                     billToState: true,
                     billToAddress: true,
+                    paperStyle: true,
+                    paperColour: true,
                     lines: {
                         orderBy: { position: "asc" },
                         select: {
@@ -655,12 +896,31 @@ export class InvoicesService {
                         ),
                     ...billTo,
                     ...documentColumns(doc),
+                    // Frozen (DEC-173, DEC-082): the draft's own look,
+                    // else the business's default as it is now. A later
+                    // change of default never redraws this paper.
+                    ...frozenPaper(
+                        {
+                            style: draft.paperStyle,
+                            colour: draft.paperColour,
+                        },
+                        {
+                            style: profile.seller.paperStyle,
+                            colour: profile.seller.paperColour,
+                        },
+                    ),
                 },
             });
             // Throwing rolls the number back with everything else.
             if (count === 0) this.assertDraft("ISSUED", "issued again");
             await tx.invoiceLine.deleteMany({ where: { invoiceId: id } });
             await writeDocumentLines(tx, ctx.organizationId, id, doc);
+            await recordInvoiceEvent(tx, {
+                organizationId: ctx.organizationId,
+                invoiceId: id,
+                kind: "ISSUED",
+                actor: personActor(ctx),
+            });
         });
         return this.read(ctx.organizationId, id);
     }
@@ -672,7 +932,13 @@ export class InvoicesService {
     ): Promise<InvoiceViewModel> {
         authorize(ctx, "invoice:write");
         await prisma.$transaction((tx) =>
-            this.voidInTx(tx, ctx.organizationId, id, dto.reason),
+            this.voidInTx(
+                tx,
+                ctx.organizationId,
+                id,
+                dto.reason,
+                personActor(ctx),
+            ),
         );
         return this.read(ctx.organizationId, id);
     }
@@ -691,32 +957,73 @@ export class InvoicesService {
         dto: CreditInvoiceDto,
     ): Promise<InvoiceViewModel> {
         authorize(ctx, "invoice:write");
-        const current = await this.read(ctx.organizationId, id);
-        this.assertOwnPaper(current, "cancelled here");
-        if (current.status !== "ISSUED" && current.status !== "PAID") {
-            throw new ConflictException(
-                current.status === "DRAFT"
-                    ? "A draft has nothing to credit. Delete it instead."
-                    : current.status === "CREDITED"
-                      ? "This invoice is already credited."
-                      : "A void invoice cannot be credited.",
-            );
-        }
+        const current = await this.assertCreditable(ctx, id);
+        const seen = creditSeenOf(dto, current);
         const noteId = await prisma.$transaction(async (tx) => {
-            const note = await issueCreditNote(tx, {
-                invoiceId: id,
-                amountCents: MAX_CENTS,
-                note: dto.reason,
-                createdByUserId: ctx.userId,
-            });
-            if (!note) {
-                throw new ConflictException(
-                    "Nothing is left on this invoice to credit.",
-                );
-            }
+            const note = await this.creditInTx(tx, ctx, id, dto.reason, seen);
             return note.id;
         });
         return this.read(ctx.organizationId, noteId);
+    }
+
+    /**
+     * "Cancel and write a correct one" (DEC-173, U13): the credit note for
+     * all of it and a draft with the same person, reason for being and
+     * lines, in one transaction — a failure can't leave a credit note with
+     * no draft, or a draft beside an invoice still owed. Only an unpaid
+     * issued invoice: a paid one is refunded (Refund…), never written
+     * again here. The draft points back at the invoice it replaces
+     * (`reissuedFromId`), as a reissued receipt's does.
+     */
+    async creditAndRewrite(
+        ctx: OrganizationContext,
+        id: string,
+        dto: CreditInvoiceDto,
+    ): Promise<CreditAndRewriteView> {
+        authorize(ctx, "invoice:write");
+        const current = await this.assertCreditable(ctx, id);
+        const seen = creditSeenOf(dto, current);
+        if (seen.status === "ISSUED" && current.status === "PAID") {
+            throw new ConflictException(JUST_PAID);
+        }
+        if (current.status === "PAID") {
+            throw new ConflictException(
+                "A paid invoice is refunded with a credit note, not written again.",
+            );
+        }
+        const made = await prisma.$transaction(async (tx) => {
+            const note = await this.creditInTx(tx, ctx, id, dto.reason, seen);
+            const draftId = await this.draftFromInTx(tx, ctx, id);
+            return { note, draftId };
+        });
+        return {
+            creditNote: { id: made.note.id, number: made.note.number },
+            draft: await this.read(ctx.organizationId, made.draftId),
+        };
+    }
+
+    /**
+     * What "Cancel all of it" would issue, before it is pressed (DEC-173,
+     * U13): the credit note's likely number and its amount. A read — no
+     * number is taken — so a credit note issued meanwhile moves it on.
+     * Refused as the credit itself would be, so the sheet can say why
+     * before anyone types a reason.
+     */
+    async creditPreview(
+        ctx: OrganizationContext,
+        id: string,
+    ): Promise<CreditPreviewView> {
+        authorize(ctx, "invoice:write");
+        await this.assertCreditable(ctx, id);
+        const preview = await prisma.$transaction((tx) =>
+            previewCreditNote(tx, id),
+        );
+        if (!preview) notFound();
+        return {
+            number: preview.number,
+            amount: fromCents(preview.amountCents),
+            currency: preview.currency,
+        };
     }
 
     /**
@@ -735,105 +1042,277 @@ export class InvoicesService {
     ): Promise<InvoiceViewModel> {
         authorize(ctx, "invoice:write");
         const draftId = await prisma.$transaction(async (tx) => {
-            await this.voidInTx(tx, ctx.organizationId, id, dto.reason);
-            const old = await tx.invoice.findFirst({
-                where: { id, organizationId: ctx.organizationId },
-                select: {
-                    contactId: true,
-                    currency: true,
-                    subtotal: true,
-                    tax: true,
-                    total: true,
-                    source: true,
-                    subscriptionId: true,
-                    periodStart: true,
-                    periodEnd: true,
-                    courseEnrollmentId: true,
-                    packPurchaseId: true,
-                    billToGstin: true,
-                    billToState: true,
-                    billToAddress: true,
-                    lines: {
-                        orderBy: { position: "asc" },
-                        select: {
-                            position: true,
-                            description: true,
-                            quantity: true,
-                            unitPrice: true,
-                            amount: true,
-                            discount: true,
-                            hsnSac: true,
-                            gstRate: true,
-                        },
-                    },
-                },
-            });
-            if (!old) notFound();
-            const draft = await tx.invoice.create({
-                data: {
-                    organizationId: ctx.organizationId,
-                    status: "DRAFT",
-                    contactId: old.contactId,
-                    currency: old.currency,
-                    subtotal: old.subtotal,
-                    tax: old.tax,
-                    total: old.total,
-                    source: old.source,
-                    subscriptionId: old.subscriptionId,
-                    periodStart: old.periodStart,
-                    periodEnd: old.periodEnd,
-                    courseEnrollmentId: old.courseEnrollmentId,
-                    packPurchaseId: old.packPurchaseId,
-                    billToGstin: old.billToGstin,
-                    billToState: old.billToState,
-                    billToAddress: old.billToAddress,
-                    reissuedFromId: id,
-                    createdByUserId: ctx.userId,
-                },
-                select: { id: true },
-            });
-            await tx.invoiceLine.createMany({
-                data: old.lines.map((l) => ({
-                    organizationId: ctx.organizationId,
-                    invoiceId: draft.id,
-                    ...l,
-                })),
-            });
-            return draft.id;
+            await this.voidInTx(
+                tx,
+                ctx.organizationId,
+                id,
+                dto.reason,
+                personActor(ctx),
+            );
+            return this.draftFromInTx(tx, ctx, id);
         });
         return this.read(ctx.organizationId, draftId);
     }
 
     /**
-     * Money taken outside Saroh — cash, UPI, a bank transfer, a card at the
-     * counter — written down. Nothing is charged. An order's invoice is paid
-     * on the order.
+     * "Write again" on an invoice already void (DEC-173, U13): the draft a
+     * reissue would have opened, for a void invoice nobody wrote again —
+     * same person, reason for being and lines. Once only: a void invoice
+     * already written again answers 409 naming the draft's way, so a
+     * double tap makes one draft. A subscription period that has a live
+     * invoice again is refused rather than given a second.
      */
-    async recordPayment(
+    async writeAgain(
+        ctx: OrganizationContext,
+        id: string,
+    ): Promise<InvoiceViewModel> {
+        authorize(ctx, "invoice:write");
+        const draftId = await prisma.$transaction(async (tx) => {
+            // Under the row's lock: two taps queue here, and the second
+            // finds the first's draft.
+            await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${id} AND "organizationId" = ${ctx.organizationId} FOR UPDATE`;
+            const row = await tx.invoice.findFirst({
+                where: { id, organizationId: ctx.organizationId },
+                select: {
+                    status: true,
+                    kind: true,
+                    orderId: true,
+                    bookingId: true,
+                    subscriptionId: true,
+                    periodStart: true,
+                    reissues: { select: { id: true }, take: 1 },
+                },
+            });
+            if (!row) notFound();
+            if (row.orderId || row.bookingId) {
+                throw new ConflictException(
+                    row.orderId
+                        ? "This invoice belongs to an order. Make changes on the order."
+                        : "This invoice belongs to a booking. Make changes on the booking.",
+                );
+            }
+            if (row.kind !== "INVOICE" || row.status !== "VOID") {
+                throw new ConflictException(
+                    "Only a void invoice is written again. Cancel or correct this one instead.",
+                );
+            }
+            if (row.reissues.length > 0) {
+                throw new ConflictException(
+                    "This invoice was already written again. Open that draft instead.",
+                );
+            }
+            if (row.subscriptionId && row.periodStart) {
+                const live = await tx.invoice.count({
+                    where: {
+                        organizationId: ctx.organizationId,
+                        subscriptionId: row.subscriptionId,
+                        periodStart: row.periodStart,
+                        status: { notIn: ["VOID", "CREDITED"] },
+                    },
+                });
+                if (live > 0) {
+                    throw new ConflictException(
+                        "This period already has an invoice that isn't void. Open that one instead.",
+                    );
+                }
+            }
+            return this.draftFromInTx(tx, ctx, id);
+        });
+        return this.read(ctx.organizationId, draftId);
+    }
+
+    /**
+     * The checks a credit runs before its transaction: the business's own
+     * paper, issued or paid, nothing paid in part. Answers the invoice.
+     */
+    private async assertCreditable(
+        ctx: OrganizationContext,
+        id: string,
+    ): Promise<InvoiceViewModel> {
+        const current = await this.read(ctx.organizationId, id);
+        this.assertOwnPaper(current, "cancelled here");
+        if (current.status !== "ISSUED" && current.status !== "PAID") {
+            throw new ConflictException(
+                current.status === "DRAFT"
+                    ? "A draft has nothing to credit. Delete it instead."
+                    : current.status === "CREDITED"
+                      ? "This invoice is already credited."
+                      : "A void invoice cannot be credited.",
+            );
+        }
+        this.assertNothingPaid(current);
+        if (current.chequeWaiting) {
+            throw new ConflictException(CHEQUE_STILL_WAITING);
+        }
+        return current;
+    }
+
+    /**
+     * The credit note for all of it, on the caller's transaction. Checked
+     * again under the ledger's lock against what the merchant saw: an
+     * invoice paid meanwhile (a pay-link webhook, a payment recorded on
+     * another phone) is refused with words that say so, never credited on
+     * a stale screen (#2). A cheque not in the bank yet holds it back too:
+     * it may still bounce (#5).
+     */
+    private async creditInTx(
+        tx: Tx,
+        ctx: OrganizationContext,
+        id: string,
+        reason: string,
+        seen: CreditSeen,
+    ): Promise<{ id: string; number: string | null }> {
+        const locked = await lockInvoiceForLedger(tx, ctx.organizationId, id);
+        if (!locked) notFound();
+        const paidSoFarNow =
+            locked.status === "PAID" ? locked.totalCents : locked.paidCents;
+        if (locked.status !== seen.status) {
+            throw new ConflictException(
+                locked.status === "PAID" ? JUST_PAID : PAYMENTS_JUST_CHANGED,
+            );
+        }
+        if (paidSoFarNow !== seen.paidSoFarCents) {
+            throw new ConflictException(PAYMENTS_JUST_CHANGED);
+        }
+        if (locked.status === "ISSUED" && locked.paidCents > 0) {
+            throw new ConflictException(PAID_IN_PART);
+        }
+        const waiting = await tx.invoicePayment.count({
+            where: {
+                invoiceId: id,
+                organizationId: ctx.organizationId,
+                ...WAITING_CHEQUE_WHERE,
+            },
+        });
+        if (waiting > 0) throw new ConflictException(CHEQUE_STILL_WAITING);
+        const note = await issueCreditNote(tx, {
+            invoiceId: id,
+            amountCents: MAX_CENTS,
+            note: reason,
+            createdByUserId: ctx.userId,
+        });
+        if (!note) {
+            throw new ConflictException(
+                "Nothing is left on this invoice to credit.",
+            );
+        }
+        await recordInvoiceEvent(tx, {
+            organizationId: ctx.organizationId,
+            invoiceId: id,
+            kind: "CREDITED",
+            actor: personActor(ctx),
+            data: {
+                reason,
+                creditNoteId: note.id,
+                creditNoteNumber: note.number,
+            },
+        });
+        return note;
+    }
+
+    /**
+     * A draft in an issued invoice's place, on the caller's transaction:
+     * the same person, reason for being (subscription period, course,
+     * pack), bill-to, look and lines, pointing back at it
+     * (`reissuedFromId`). Answers the draft's id.
+     */
+    private async draftFromInTx(
+        tx: Tx,
+        ctx: OrganizationContext,
+        id: string,
+    ): Promise<string> {
+        const old = await tx.invoice.findFirst({
+            where: { id, organizationId: ctx.organizationId },
+            select: {
+                contactId: true,
+                currency: true,
+                subtotal: true,
+                tax: true,
+                total: true,
+                source: true,
+                subscriptionId: true,
+                periodStart: true,
+                periodEnd: true,
+                courseEnrollmentId: true,
+                packPurchaseId: true,
+                billToGstin: true,
+                billToState: true,
+                billToAddress: true,
+                paperStyle: true,
+                paperColour: true,
+                lines: {
+                    orderBy: { position: "asc" },
+                    select: {
+                        position: true,
+                        description: true,
+                        quantity: true,
+                        unitPrice: true,
+                        amount: true,
+                        discount: true,
+                        hsnSac: true,
+                        gstRate: true,
+                    },
+                },
+            },
+        });
+        if (!old) notFound();
+        const draft = await tx.invoice.create({
+            data: {
+                organizationId: ctx.organizationId,
+                status: "DRAFT",
+                contactId: old.contactId,
+                currency: old.currency,
+                subtotal: old.subtotal,
+                tax: old.tax,
+                total: old.total,
+                source: old.source,
+                subscriptionId: old.subscriptionId,
+                periodStart: old.periodStart,
+                periodEnd: old.periodEnd,
+                courseEnrollmentId: old.courseEnrollmentId,
+                packPurchaseId: old.packPurchaseId,
+                billToGstin: old.billToGstin,
+                billToState: old.billToState,
+                billToAddress: old.billToAddress,
+                // Written again in the look it went out in (DEC-173).
+                paperStyle: old.paperStyle,
+                paperColour: old.paperColour,
+                reissuedFromId: id,
+                createdByUserId: ctx.userId,
+            },
+            select: { id: true },
+        });
+        await tx.invoiceLine.createMany({
+            data: old.lines.map((l) => ({
+                organizationId: ctx.organizationId,
+                invoiceId: draft.id,
+                ...l,
+            })),
+        });
+        // Written again (reissue, credit and rewrite, Write again): on the
+        // history of the invoice it replaces, naming the draft.
+        await recordInvoiceEvent(tx, {
+            organizationId: ctx.organizationId,
+            invoiceId: id,
+            kind: "REISSUED",
+            actor: personActor(ctx),
+            data: { draftId: draft.id },
+        });
+        return draft.id;
+    }
+
+    /**
+     * Money taken outside Saroh — cash, UPI, a bank transfer, a card at the
+     * counter, a cheque — written down, in full or in part. Nothing is
+     * charged. It goes on the invoice's ledger (DEC-173), which settles the
+     * status; an order's invoice is paid on the order.
+     */
+    recordPayment(
         ctx: OrganizationContext,
         id: string,
         dto: RecordPaymentDto,
-    ): Promise<InvoiceViewModel> {
-        authorize(ctx, "invoice:write");
-        const current = await this.read(ctx.organizationId, id);
-        this.assertOwnPaper(current, "paid here");
-        if (current.status !== "ISSUED") {
-            throw new ConflictException(this.notIssued(current.status, "paid"));
-        }
-        const { count } = await prisma.invoice.updateMany({
-            where: { id, organizationId: ctx.organizationId, status: "ISSUED" },
-            data: {
-                status: "PAID",
-                paidAt: dto.paidAt ? new Date(dto.paidAt) : new Date(),
-                paymentMethod: dto.method,
-                paymentReference: dto.reference ?? null,
-                paymentNote: dto.note ?? null,
-            },
-        });
-        if (count === 0) {
-            throw new ConflictException("This invoice changed. Reload it.");
-        }
-        return this.read(ctx.organizationId, id);
+    ): Promise<RecordedPaymentView> {
+        return this.payments.record(ctx, id, dto);
     }
 
     /**
@@ -903,6 +1382,13 @@ export class InvoicesService {
             select: { id: true },
         });
         await writeDocumentLines(tx, organizationId, created.id, doc);
+        // By the person who sold it, else by Saroh (a renewal).
+        await recordInvoiceEvent(tx, {
+            organizationId,
+            invoiceId: created.id,
+            kind: "ISSUED",
+            actor: actorOrJob(input.createdByUserId),
+        });
         return { id: created.id, number };
     }
 
@@ -918,7 +1404,15 @@ export class InvoicesService {
             select: INVOICE_DETAIL_SELECT,
         });
         if (!row) notFound();
-        return serializeInvoice(row, new Date(), { detail: true });
+        // A draft that chose no look follows the business's (DEC-173).
+        const paperDefault =
+            row.status === "DRAFT"
+                ? await businessPaperDefault(db, organizationId)
+                : null;
+        return serializeInvoice(row, new Date(), {
+            detail: true,
+            paperDefault,
+        });
     }
 
     /**
@@ -937,10 +1431,7 @@ export class InvoicesService {
         }
         for (const line of lines) {
             if (line.gstRate && !isGstRate(line.gstRate)) {
-                fieldError(
-                    `${line.gstRate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
-                    "lines",
-                );
+                fieldError(notGstRateMessage(line.gstRate), "lines");
             }
         }
         const doc = buildManualInvoice(
@@ -997,6 +1488,7 @@ export class InvoicesService {
         organizationId: string,
         id: string,
         reason: string,
+        actor: InvoiceActor,
     ): Promise<void> {
         const row = await tx.invoice.findFirst({
             where: { id, organizationId },
@@ -1006,6 +1498,7 @@ export class InvoicesService {
                 orderId: true,
                 bookingId: true,
                 sellerGstin: true,
+                paidCents: true,
             },
         });
         if (!row) notFound();
@@ -1024,6 +1517,7 @@ export class InvoicesService {
         if (row.status !== "ISSUED") {
             throw new ConflictException(this.notIssued(row.status, "voided"));
         }
+        if (row.paidCents > 0) throw new ConflictException(PAID_IN_PART);
         // A GST-registered business never voids an issued invoice: a void
         // leaves a hole in the series. It credits it instead (ADR-008).
         const profile = await loadTaxProfile(tx, organizationId);
@@ -1033,8 +1527,9 @@ export class InvoicesService {
             );
         }
         // A void invoice is not to be paid, so its pay link stops working.
+        // Fenced on nothing paid, too: a payment recorded meanwhile wins.
         const { count } = await tx.invoice.updateMany({
-            where: { id, organizationId, status: "ISSUED" },
+            where: { id, organizationId, status: "ISSUED", paidCents: 0 },
             data: {
                 status: "VOID",
                 voidedAt: new Date(),
@@ -1046,6 +1541,13 @@ export class InvoicesService {
         if (count === 0) {
             throw new ConflictException("This invoice changed. Reload it.");
         }
+        await recordInvoiceEvent(tx, {
+            organizationId,
+            invoiceId: id,
+            kind: "VOIDED",
+            actor,
+            data: { reason },
+        });
     }
 
     /**
@@ -1166,6 +1668,18 @@ export class InvoicesService {
         }
         if (invoice.kind === "CREDIT_NOTE") {
             throw new ConflictException(`A credit note is not ${verb}.`);
+        }
+    }
+
+    /**
+     * A partly paid invoice isn't cancelled while money stands on it
+     * (DEC-173): its payments are removed first. What a credit note does to
+     * money paid is the owner's decision still to come; a PAID invoice keeps
+     * today's Refund….
+     */
+    private assertNothingPaid(invoice: InvoiceViewModel): void {
+        if (invoice.status === "ISSUED" && invoice.partlyPaid) {
+            throw new ConflictException(PAID_IN_PART);
         }
     }
 

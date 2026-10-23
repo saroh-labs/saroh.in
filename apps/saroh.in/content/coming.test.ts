@@ -150,7 +150,6 @@ describe("the two lists together", () => {
             (item) => !planned.includes(item.line),
         ).map((item) => item.name);
         expect(ownWork).toEqual([
-            "QR codes",
             "Saroh for Android",
             "Invoice layouts",
             "Sign in with Google",
@@ -159,9 +158,15 @@ describe("the two lists together", () => {
         ]);
     });
 
-    it("keep QR codes in the nearest group until they are released", () => {
-        expect(
-            COMING_NEXT.find((item) => item.name === "QR codes")?.group,
-        ).toBe("next");
+    it("drop QR codes once released: they are in the launch entry", () => {
+        expect(COMING_NEXT.find((item) => item.name === "QR codes")).toBe(
+            undefined,
+        );
+    });
+
+    it("never promise a booking reminder: none is sent on any channel yet", () => {
+        for (const item of COMING_NEXT) {
+            expect(item.line).not.toMatch(/reminder/i);
+        }
     });
 });

@@ -18,7 +18,7 @@ find out", and on a shop floor the merchant acts on that difference.
 ## The named set
 
 Import from `@saroh/ui/data-state`. Do not hand-roll a dashed card, a red line
-or a sentence of your own: `components/shared/states-scan.test.ts` fails on
+or a sentence of your own: `components/shared/states/states-scan.test.ts` fails on
 them.
 
 | State         | Component                      | Means                                | Says                                                                                  |
@@ -75,7 +75,7 @@ is no button and the sentence does not promise one.
 - `FailedState` takes `onRetry` (a boundary's `retry`, a hook's refetch,
   `router.refresh()`) or `retryHref`. Never "reload the page".
 - A part of a page the server couldn't read is `FailedRead`
-  (`components/shared/failed-read.tsx`): one line, Try again refreshes the
+  (`components/shared/states/failed-read.tsx`): one line, Try again refreshes the
   page's reads and leaves the rest of the screen where it was. A page that
   is drawn without one of its reads says so above with `PartialRead`
   ("Couldn't load reviews. Their count shows as “—”."). For a read the

@@ -227,9 +227,17 @@ export function savedWhere(
  */
 export function missingLine(missing: MissingRates | null): string | null {
     if (!missing?.registered || missing.items.length === 0) return null;
+    const parts = missingParts(missing);
+    const total = missing.items.length;
+    const what = missing.more ? `More than ${listed(parts)}` : listed(parts);
+    return `${what} ${plural(total, "has", "have")} no GST rate. Until you choose one, ${plural(total, "its", "their")} tax invoices show no GST.`;
+}
+
+/** What is missing, by kind: "2 plans", "1 service and 3 products". */
+function missingParts(missing: MissingRates): string[] {
     const of = (kind: SoldKind) =>
         missing.items.filter((i) => i.kind === kind).length;
-    const parts = (
+    return (
         [
             ["SERVICE", "service", "services"],
             ["PRODUCT", "product", "products"],
@@ -241,9 +249,19 @@ export function missingLine(missing: MissingRates | null): string | null {
         const n = of(kind);
         return n > 0 ? [count(n, one, many)] : [];
     });
-    const total = missing.items.length;
+}
+
+/**
+ * The same, as one part of a status line (the Invoices list's GST line,
+ * DEC-173): "2 plans need a GST rate", "1 service needs a GST rate". Null
+ * when nothing is missing, so the line says nothing of it.
+ */
+export function missingShort(missing: MissingRates | null): string | null {
+    if (!missing?.registered || missing.items.length === 0) return null;
+    const parts = missingParts(missing);
     const what = missing.more ? `More than ${listed(parts)}` : listed(parts);
-    return `${what} ${plural(total, "has", "have")} no GST rate. Until you choose one, ${plural(total, "its", "their")} tax invoices show no GST.`;
+    const many = missing.items.length > 1 || missing.more;
+    return `${what} ${many ? "need" : "needs"} a GST rate`;
 }
 
 /** The list's sheet: the line under its title, by how prices carry GST. */

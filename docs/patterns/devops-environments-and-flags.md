@@ -17,8 +17,15 @@
   `PORT` default never applies under it; pass every value explicitly wherever
   there is no `.env` (CI, containers).
 - **Adopted** — **Document every variable in the relevant `.env.example`.** Gap:
-  `JOB_VISIBILITY_MS`, `JOB_WORKER_BATCH`, `JOB_WORKER_POLL_MS` and
-  `PAYMENTS_ENC_KEY` are validated by the API and missing from its examples.
+  `JOB_VISIBILITY_MS`, `JOB_WORKER_BATCH`, `JOB_WORKER_POLL_MS`,
+  `PAYMENTS_ENC_KEY` and `STAFF_PII_ENC_KEY` are validated by the API and
+  missing from its examples.
+- **Current** — **An encryption key is optional at boot and checked at use.**
+  `PAYMENTS_ENC_KEY` (merchants' provider credentials) and `STAFF_PII_ENC_KEY`
+  (a teammate's tax id, DEC-169) are each a 32-byte key, base64 or 64-hex,
+  passed to `apps/api.saroh.in/src/common/crypto.ts`. The API boots without
+  them; the first seal or open refuses with an error naming the variable. One
+  key per kind of value: never reuse the payments key for staff data.
 
 - **Current** — **A build-time switch that hides something is off when
   unset.** `NEXT_PUBLIC_TEMPLATES` (DEC-135) shows templates only when it is

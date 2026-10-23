@@ -1,0 +1,240 @@
+"use client";
+
+import { formatMoneyMajor } from "@/lib/format/money";
+import { AbsentOr } from "@saroh/ui/absent-value";
+import { Badge } from "@saroh/ui/badge";
+import { Button } from "@saroh/ui/button";
+import { countLabel, PageHeader } from "@saroh/ui/page-header";
+import { Ticket } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+import { DataView } from "@/components/shared/data-view/data-view";
+import type {
+    DataColumn,
+    DataFilter,
+} from "@/components/shared/data-view/types";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import type { ContactOption } from "@/components/shared/fields/contact-picker";
+import type { PackStanding } from "@/lib/class-packs/balance";
+import { paidByLabel } from "@/lib/class-packs/sell-words";
+import type { ClassPack, PackPurchase } from "@/lib/class-packs/service";
+import { personHref } from "@/lib/contacts/person-href";
+import type { GstAsk } from "@/lib/gst/item-words";
+
+import { ClassPacksTabs } from "@/components/class-packs/list/class-packs-tabs";
+import { SellPackDialog } from "@/components/class-packs/list/sell-pack-dialog";
+import { TextLink } from "@saroh/ui/text-link";
+
+const STANDING: Record<
+    PackStanding,
+    { label: string; variant: "success" | "neutral" }
+> = {
+    ACTIVE: { label: "Active", variant: "success" },
+    USED_UP: { label: "Used up", variant: "neutral" },
+    EXPIRED: { label: "Expired", variant: "neutral" },
+};
+
+const FILTERS: DataFilter<PackPurchase>[] = (
+    ["ACTIVE", "USED_UP", "EXPIRED"] as const
+).map((s) => ({
+    id: s.toLowerCase().replace("_", "-"),
+    label: STANDING[s].label,
+    predicate: (p: PackPurchase) => p.standing === s,
+}));
+
+/**
+ * Who holds which pack: classes left, when it runs out, and the invoice it
+ * was sold with. The balance is the API's — classes sold less the ones spent
+ * and not given back — so this list and a booking never disagree.
+ */
+export function PurchasesScreen({
+    purchases,
+    packs,
+    contacts,
+    canWrite,
+    invoicesOnSale,
+    initialFilterId,
+    gst = null,
+}: {
+    /** The business's GST standing, for the sell dialog's amount to pay. */
+    gst?: GstAsk | null;
+    purchases: PackPurchase[];
+    packs: ClassPack[];
+    contacts: ContactOption[];
+    canWrite: boolean;
+    invoicesOnSale: boolean;
+    initialFilterId?: string;
+}) {
+    const router = useRouter();
+    const [selling, setSelling] = useState(false);
+
+    const columns: DataColumn<PackPurchase>[] = [
+        {
+            id: "who",
+            header: "Who",
+            priority: "primary",
+            sortValue: (p) => p.contact.name.toLowerCase(),
+            cell: (p) => (
+                <span className="block min-w-0">
+                    <span className="block truncate font-medium">
+                        {p.contact.name}
+                    </span>
+                    <span className="block truncate text-[11.5px] text-muted-foreground">
+                        {p.contact.email}
+                    </span>
+                </span>
+            ),
+        },
+        {
+            id: "pack",
+            header: "Pack",
+            priority: "secondary",
+            sortValue: (p) => p.pack.name.toLowerCase(),
+            cell: (p) => <span className="block truncate">{p.pack.name}</span>,
+        },
+        {
+            id: "left",
+            header: "Classes left",
+            priority: "secondary",
+            width: "130px",
+            sortValue: (p) => (p.standing === "ACTIVE" ? p.left : -1),
+            cell: (p) =>
+                p.standing === "ACTIVE" ? (
+                    <Badge variant="success">
+                        {p.left} of {p.credits} left
+                    </Badge>
+                ) : (
+                    <Badge variant={STANDING[p.standing].variant}>
+                        {STANDING[p.standing].label}
+                    </Badge>
+                ),
+        },
+        {
+            id: "expires",
+            header: "Expires",
+            priority: "detail",
+            width: "124px",
+            sortValue: (p) => p.expiresAt,
+            cell: (p) => <ViewerDate iso={p.expiresAt} />,
+        },
+        {
+            id: "price",
+            header: "Paid",
+            priority: "detail",
+            numeric: true,
+            money: true,
+            width: "118px",
+            sortValue: (p) => Number(p.price),
+            cell: (p) =>
+                formatMoneyMajor(p.price, p.currency, { decimals: "always" }),
+        },
+        {
+            id: "paid-by",
+            header: "Paid by",
+            priority: "detail",
+            width: "118px",
+            sortValue: (p) => paidByLabel(p.paidBy),
+            cell: (p) => (
+                <span className="text-[12.5px]">
+                    <AbsentOr says="Not recorded">
+                        {paidByLabel(p.paidBy)}
+                    </AbsentOr>
+                </span>
+            ),
+        },
+        {
+            id: "invoice",
+            header: "Invoice",
+            priority: "detail",
+            width: "96px",
+            cell: (p) =>
+                p.invoiceId ? (
+                    <TextLink
+                        href={`/billing/invoices/${p.invoiceId}`}
+                        className="text-[12.5px]"
+                    >
+                        Open
+                    </TextLink>
+                ) : (
+                    <span className="text-[12.5px] text-muted-foreground">
+                        None
+                    </span>
+                ),
+        },
+    ];
+
+    return (
+        <>
+            <PageHeader
+                breadcrumb={[
+                    <Link key="bookings" href="/bookings">
+                        Bookings
+                    </Link>,
+                    "Class packs",
+                ]}
+                title="Class packs"
+                count={countLabel(purchases.length, {
+                    one: "pack sold",
+                    other: "packs sold",
+                })}
+                className="mb-0"
+                actions={
+                    canWrite ? (
+                        <Button onClick={() => setSelling(true)}>
+                            Sell a pack
+                        </Button>
+                    ) : undefined
+                }
+            />
+            <ClassPacksTabs current="holders" />
+            <DataView
+                viewId="class-pack-purchases"
+                rows={purchases}
+                columns={columns}
+                rowKey={(p) => p.id}
+                rowHref={(p) => personHref(p.contact.id)}
+                modes={["table", "list"]}
+                hideModeToggle
+                filters={FILTERS}
+                initialFilterId={initialFilterId}
+                noun={{ one: "pack sold", other: "packs sold" }}
+                showTotal={false}
+                searchPlaceholder="Search people or packs"
+                searchableColumnIds={["who", "pack"]}
+                emptyState={{
+                    icon: <Ticket />,
+                    title: "No packs sold yet",
+                    note: "Sell someone a pack and it shows here with the classes they have left and when it runs out.",
+                    action: canWrite ? (
+                        <Button onClick={() => setSelling(true)}>
+                            Sell a pack
+                        </Button>
+                    ) : undefined,
+                }}
+            />
+            {canWrite && selling ? (
+                <SellPackDialog
+                    open
+                    onOpenChange={(o) => {
+                        if (!o) {
+                            setSelling(false);
+                            router.refresh();
+                        }
+                    }}
+                    contacts={contacts}
+                    packs={packs}
+                    invoicesOnSale={invoicesOnSale}
+                    gst={gst}
+                    held={purchases.map((p) => ({
+                        contactId: p.contact.id,
+                        packId: p.pack.id,
+                        left: p.left,
+                        standing: p.standing,
+                    }))}
+                />
+            ) : null}
+        </>
+    );
+}

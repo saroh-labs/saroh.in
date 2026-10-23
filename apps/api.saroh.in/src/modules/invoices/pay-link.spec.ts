@@ -13,31 +13,36 @@ jest.mock("./business-details", () => ({
 
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
-    const tx = {
+    // One client for the transaction and outside it: a link made by hand
+    // and a void each run on a transaction with their history line (U9).
+    const client = {
         invoice: { findFirst: jest.fn(), updateMany: jest.fn() },
+        merchantPaymentProvider: {
+            count: jest.fn(),
+            findFirst: jest.fn(),
+        },
+        paymentIntent: { findMany: jest.fn() },
+        // "How to pay us" on the read of an unpaid one (#833): none set.
         // Unregistered: a receipt may be voided (ADR-008).
         businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
         organization: {
             findUnique: jest.fn().mockResolvedValue({ name: "Rye & Co." }),
         },
+        // DEC-070: Payments on (no row) unless a test turns it off.
+        organizationModule: {
+            findFirst: jest.fn().mockResolvedValue(null),
+        },
+        // The invoice's history (U9 #1140).
+        invoiceEvent: { createMany: jest.fn() },
     };
     return {
         ...actual,
         prisma: {
-            invoice: { findFirst: jest.fn(), updateMany: jest.fn() },
-            merchantPaymentProvider: {
-                count: jest.fn(),
-                findFirst: jest.fn(),
-            },
-            paymentIntent: { findMany: jest.fn() },
-            // "How to pay us" on the read of an unpaid one (#833): none set.
-            businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
-            // DEC-070: Payments on (no row) unless a test turns it off.
-            organizationModule: {
-                findFirst: jest.fn().mockResolvedValue(null),
-            },
-            $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
-            __tx: tx,
+            ...client,
+            $transaction: jest.fn((fn: (t: typeof client) => unknown) =>
+                fn(client),
+            ),
+            __tx: client,
         },
     };
 });
@@ -504,20 +509,28 @@ describe("one charge at a time (D13)", () => {
 
 describe("revoking a pay link", () => {
     it("clears the token when the invoice is voided", async () => {
-        tx.invoice?.findFirst?.mockResolvedValue({
-            status: "ISSUED",
-            kind: "INVOICE",
-            orderId: null,
-            bookingId: null,
-            sellerGstin: null,
-        });
+        // The void's own read, then the answer's read of the void invoice.
+        tx.invoice?.findFirst
+            ?.mockResolvedValueOnce({
+                status: "ISSUED",
+                kind: "INVOICE",
+                orderId: null,
+                bookingId: null,
+                sellerGstin: null,
+            })
+            .mockResolvedValue(row({ status: "VOID" }));
         tx.businessProfile?.findUnique?.mockResolvedValue(null);
         tx.invoice?.updateMany?.mockResolvedValue({ count: 1 });
 
         await service.voidInvoice(owner, "inv_1", { reason: "Wrong amount" });
 
         expect(tx.invoice?.updateMany).toHaveBeenCalledWith({
-            where: { id: "inv_1", organizationId: "org_1", status: "ISSUED" },
+            where: {
+                id: "inv_1",
+                organizationId: "org_1",
+                status: "ISSUED",
+                paidCents: 0,
+            },
             data: expect.objectContaining({
                 status: "VOID",
                 payTokenHash: null,

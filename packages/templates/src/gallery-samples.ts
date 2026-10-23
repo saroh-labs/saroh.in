@@ -14,6 +14,7 @@ import {
     DIETICIAN_TEMPLATE_ID,
 } from "./templates/dietician";
 import { GYM_GALLERY_SAMPLE, GYM_TEMPLATE_ID } from "./templates/gym";
+import { PRANA_GALLERY_SAMPLE, PRANA_TEMPLATE_ID } from "./templates/prana";
 import { SALON_GALLERY_SAMPLE, SALON_TEMPLATE_ID } from "./templates/salon";
 import { STUDIO_GALLERY_SAMPLE, STUDIO_TEMPLATE_ID } from "./templates/studio";
 
@@ -24,12 +25,15 @@ import { STUDIO_GALLERY_SAMPLE, STUDIO_TEMPLATE_ID } from "./templates/studio";
  * (`*_GALLERY_SAMPLE`, beside the placeholders it replaces); each carries
  * at least the footer's line.
  *
- * GALLERY ONLY. `instantiateTemplate` never reads these, so a merchant's
- * site keeps the placeholders (which the pre-publish check names until
- * they are replaced). The render route (`apps/saroh.app`,
- * `lib/template-renders`) is the one reader: it lays them over the
- * instantiated pages. `gallery-samples.test.ts` holds both sides: every
- * gallery template has one, and none of its words reach a merchant's site.
+ * NEVER ON A NEW SITE. `instantiateTemplate` never reads these, so a site
+ * made from a template keeps the placeholders (which the pre-publish check
+ * names until they are replaced). They are laid over a template's pages by
+ * `gallery-patches.ts` for three readers: the gallery's renders, a look's
+ * Preview, and "Use this look with its starter content" (DEC-182), the
+ * one way they reach a merchant's draft, by the owner's choice; the
+ * pre-publish check then names each one still there (`sample-words.ts`).
+ * `gallery-samples.test.ts` holds both sides: every gallery template has
+ * one, and none of its words reach a site made from it.
  */
 export const GALLERY_SAMPLES: Readonly<
     Record<string, { readonly footer: string }>
@@ -43,4 +47,6 @@ export const GALLERY_SAMPLES: Readonly<
     [DEVELOPER_TEMPLATE_ID]: DEVELOPER_GALLERY_SAMPLE,
     [SALON_TEMPLATE_ID]: SALON_GALLERY_SAMPLE,
     [CLINIC_TEMPLATE_ID]: CLINIC_GALLERY_SAMPLE,
+    // Showcase only (DEC-182, 22 Oct): the looks' boards' studio.
+    [PRANA_TEMPLATE_ID]: PRANA_GALLERY_SAMPLE,
 };

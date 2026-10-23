@@ -48,7 +48,7 @@ export async function setPlanChargeTiming(
     return then(api.setPlanChargeTiming(planId, timing));
 }
 /**
- * Retry a failed renewal: a new pay link (F4's Retry by pay link), or a new
+ * Retry a failed renewal: a new payment link (F4's Retry by payment link), or a new
  * charge on their autopay (D13).
  */
 export async function retrySubscription(

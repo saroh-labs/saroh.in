@@ -31,6 +31,7 @@ import {
     SERVICES,
     SIDE_BUSINESSES,
     SITES,
+    STAFF_EMAIL,
     SUBMISSIONS,
 } from "./data";
 import { seedEmailPromptBusinesses } from "./email-prompt";
@@ -54,7 +55,7 @@ import {
 import { seedPlanEndingBusiness } from "./plan-ending";
 import { seedPreviousAddress } from "./previous-address";
 import { seedPlanId } from "./pricing";
-import { seedSarohEmailBusinesses } from "./saroh-email";
+import { seedStaff } from "./staff";
 import {
     PLACEHOLDER_CREDENTIALS,
     seedStandInCommunicationProvider,
@@ -327,9 +328,13 @@ export async function seed(): Promise<void> {
     // service (#868; `role-calendar-only.spec.ts`).
     await seedCalendarOnlyTeammate(prisma, org.id, id("service", 2), now);
     const founderId = await seedFounder(prisma);
-    // Two of Asha's that Saroh sends booking emails for, flags on for them
-    // alone (DEC-086; `providers-saroh-email.spec.ts`).
-    await seedSarohEmailBusinesses(prisma, founderId, now);
+    // Sam, Saroh staff, a Platform owner on the operator console (admin
+    // plan U23). Local and CI databases only.
+    if (await seedStaff(prisma)) {
+        console.log(
+            `[seed] the operator console as staff: ${STAFF_EMAIL} / ${passwordHint(seedPassword())}`,
+        );
+    }
     // Three with no email of their own, Communications rolled out for them
     // alone, one on an enforced entry plan (#850; `email-setup-prompt.spec.ts`).
     await seedEmailPromptBusinesses(prisma, founderId, now);

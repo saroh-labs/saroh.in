@@ -5,9 +5,9 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { FormSheet } from "@/components/shared/form-sheet";
+import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import type { PickableProduct } from "@/lib/collections/actions";
 import {
     loadCollection,

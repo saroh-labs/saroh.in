@@ -41,6 +41,12 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn().mockResolvedValue([]),
         },
         invoiceSequence: { upsert: jest.fn() },
+        // The invoice's history (U9 #1140).
+        invoiceEvent: { createMany: jest.fn() },
+        // A link made by hand runs on its own transaction (U9 #1140).
+        organizationModule: { findFirst: jest.fn().mockResolvedValue(null) },
+        // No cheque waits unless a test says so (#5).
+        invoicePayment: { count: jest.fn().mockResolvedValue(0) },
         contact: { findFirst: jest.fn() },
         businessProfile: { findUnique: jest.fn() },
         // The seller's name, frozen on issue (DEC-082).
@@ -86,6 +92,7 @@ import { validate } from "class-validator";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { InvoiceInputDto, RecordPaymentDto } from "./dto";
+import type { InvoicePaymentsService } from "./invoice-payments.service";
 import { InvoicesService } from "./invoices.service";
 import { financialYear } from "./numbering";
 import { serializeInvoice } from "./serialize";
@@ -192,6 +199,8 @@ beforeEach(() => {
         email: "asha@example.com",
     });
     db.invoice.updateMany!.mockResolvedValue({ count: 1 });
+    // Row locks find nothing unless a test says so.
+    tx.$queryRaw!.mockResolvedValue([]);
     db.invoice.deleteMany!.mockResolvedValue({ count: 1 });
     // Unregistered unless a test says otherwise: a receipt.
     db.businessProfile.findUnique!.mockResolvedValue(null);
@@ -454,37 +463,21 @@ describe("who issued it", () => {
 });
 
 describe("payments recorded by hand", () => {
-    it("marks an issued invoice paid with the method and date", async () => {
-        db.invoice.findFirst!.mockResolvedValue(row({ status: "ISSUED" }));
-        await service.recordPayment(owner, "inv_1", {
-            method: "UPI",
-            reference: "UTR 4411",
-            paidAt: "2026-09-22T11:00:00.000Z",
-        } as RecordPaymentDto);
-        expect(db.invoice.updateMany).toHaveBeenCalledWith({
-            where: { id: "inv_1", organizationId: "org_1", status: "ISSUED" },
-            data: {
-                status: "PAID",
-                paidAt: new Date("2026-09-22T11:00:00.000Z"),
-                paymentMethod: "UPI",
-                paymentReference: "UTR 4411",
-                paymentNote: null,
-            },
-        });
+    // The ledger's writes, refusals and races run against Postgres
+    // (`invoice-payments.db.spec.ts`); here, only that Record payment goes
+    // through it.
+    it("records through the invoice ledger (DEC-173)", async () => {
+        const payments = {
+            record: jest.fn().mockResolvedValue({ id: "inv_1" }),
+        };
+        const withLedger = new InvoicesService(
+            payments as unknown as InvoicePaymentsService,
+        );
+        const dto = { method: "UPI", amount: "1000" } as RecordPaymentDto;
+        await withLedger.recordPayment(owner, "inv_1", dto);
+        expect(payments.record).toHaveBeenCalledWith(owner, "inv_1", dto);
+        expect(db.invoice.updateMany).not.toHaveBeenCalled();
     });
-
-    it.each(["DRAFT", "VOID", "PAID"])(
-        "refuses to record a payment on a %s invoice",
-        async (status) => {
-            db.invoice.findFirst!.mockResolvedValue(row({ status }));
-            await expect(
-                service.recordPayment(owner, "inv_1", {
-                    method: "CASH",
-                } as RecordPaymentDto),
-            ).rejects.toBeInstanceOf(ConflictException);
-            expect(db.invoice.updateMany).not.toHaveBeenCalled();
-        },
-    );
 });
 
 /** What the void reads under its transaction: an unregistered receipt. */
@@ -536,6 +529,8 @@ describe("void and reissue", () => {
             id: "inv_1",
             organizationId: "org_1",
             status: "ISSUED",
+            // Nothing paid on it (DEC-173): a payment recorded meanwhile wins.
+            paidCents: 0,
         });
         expect(voidCall.data).toEqual(
             expect.objectContaining({
@@ -732,9 +727,65 @@ describe("lists and what is owed", () => {
                 source: { in: ["BOOKING", "PACK", "SUBSCRIPTION"] },
                 number: null,
             },
-            paidAt: { gte: new Date(since) },
-            kind: { not: "CREDIT_NOTE" },
+            // Money in by the one rule (`money-in.ts`, DEC-173): a payment
+            // that counts received since, or an order's paper paid since.
+            AND: [
+                {
+                    kind: { not: "CREDIT_NOTE" },
+                    OR: [
+                        {
+                            orderId: null,
+                            payments: {
+                                some: {
+                                    removedAt: null,
+                                    OR: [
+                                        { bankStatus: null },
+                                        { bankStatus: { not: "BOUNCED" } },
+                                    ],
+                                    receivedAt: { gte: new Date(since) },
+                                },
+                            },
+                        },
+                        {
+                            orderId: { not: null },
+                            paidAt: { gte: new Date(since) },
+                        },
+                    ],
+                },
+            ],
         });
+    });
+
+    it("searches on the server, finding what is left to pay through leftToPayCents (DEC-173)", async () => {
+        // First the partly paid invoices (for the amount), then the list.
+        db.invoice
+            .findMany!.mockResolvedValueOnce([
+                { id: "inv_left", total: "10000.00", paidCents: 160_000 },
+                { id: "inv_other", total: "10000.00", paidCents: 100_000 },
+            ])
+            .mockResolvedValueOnce([]);
+        await service.list(owner, { q: "₹8,400", view: "owed" });
+        const partly = db.invoice.findMany!.mock.calls[0]![0].where;
+        expect(partly).toEqual({
+            organizationId: "org_1",
+            status: "ISSUED",
+            paidCents: { gt: 0 },
+        });
+        const where = db.invoice.findMany!.mock.calls[1]![0].where;
+        expect(where).toMatchObject({
+            organizationId: "org_1",
+            status: "ISSUED",
+            orderId: null,
+        });
+        const [search] = where.AND;
+        expect(search.OR).toContainEqual({ total: "8400.00" });
+        expect(search.OR).toContainEqual({ id: { in: ["inv_left"] } });
+    });
+
+    it("reads no partly paid invoices for a search that isn't an amount", async () => {
+        db.invoice.findMany!.mockResolvedValue([]);
+        await service.list(owner, { q: "vivek" });
+        expect(db.invoice.findMany).toHaveBeenCalledTimes(1);
     });
 
     it("says what each listed invoice is for, without sending every line", async () => {
@@ -764,18 +815,21 @@ describe("lists and what is owed", () => {
                 status: "ISSUED",
                 currency: "INR",
                 total: decimal("1200"),
+                paidCents: 0,
                 dueAt: new Date(0),
             },
             {
                 status: "ISSUED",
                 currency: "INR",
                 total: decimal("0.5"),
+                paidCents: 0,
                 dueAt: new Date(Date.now() + 86_400_000),
             },
             {
                 status: "ISSUED",
                 currency: "USD",
                 total: decimal("40"),
+                paidCents: 0,
                 dueAt: null,
             },
         ]);
@@ -788,6 +842,25 @@ describe("lists and what is owed", () => {
                 { currency: "INR", amount: "1200.50" },
                 { currency: "USD", amount: "40.00" },
             ],
+        });
+    });
+
+    it("counts a partly paid invoice at what is left to pay (DEC-173)", async () => {
+        db.invoice.findMany!.mockResolvedValue([
+            {
+                status: "ISSUED",
+                currency: "INR",
+                total: decimal("2500"),
+                paidCents: 100_000,
+                dueAt: null,
+            },
+        ]);
+        await expect(
+            service.owed(owner, { contactId: "c_1" }),
+        ).resolves.toEqual({
+            unpaidCount: 1,
+            overdueCount: 0,
+            totals: [{ currency: "INR", amount: "1500.00" }],
         });
     });
 
@@ -827,12 +900,39 @@ describe("what the API accepts", () => {
         expect(await errors({ tax: "1.005" })).toContain("tax");
     });
 
-    it("refuses an unknown payment method", async () => {
-        const dto = plainToInstance(RecordPaymentDto, { method: "CHEQUE" });
-        expect((await validate(dto)).map((e) => e.property)).toContain(
-            "method",
-        );
+    it.each(["ONLINE", "BITCOIN"])(
+        "refuses %s as a payment recorded by hand",
+        async (method) => {
+            const dto = plainToInstance(RecordPaymentDto, { method });
+            expect((await validate(dto)).map((e) => e.property)).toContain(
+                "method",
+            );
+        },
+    );
+
+    it("takes a cheque with its number and bank (DEC-173)", async () => {
+        const dto = plainToInstance(RecordPaymentDto, {
+            method: "CHEQUE",
+            amount: "8400",
+            chequeNumber: " 004512 ",
+            chequeBank: "HDFC Bank",
+        });
+        expect(await validate(dto)).toEqual([]);
+        expect(dto.chequeNumber).toBe("004512");
     });
+
+    it.each(["-10", "1.005", "ten", "12,000"])(
+        "refuses %s as an amount paid",
+        async (amount) => {
+            const dto = plainToInstance(RecordPaymentDto, {
+                method: "CASH",
+                amount,
+            });
+            expect((await validate(dto)).map((e) => e.property)).toContain(
+                "amount",
+            );
+        },
+    );
 });
 
 describe("GST (ADR-008)", () => {
@@ -1247,14 +1347,31 @@ describe("GST (ADR-008)", () => {
             ...orderInvoice(),
             status: "ISSUED",
         });
+        // A link made by hand is minted on its own transaction (U9).
+        tx.invoice!.findFirst!.mockResolvedValueOnce({
+            ...orderInvoice(),
+            status: "ISSUED",
+        });
         await expect(service.createPayLink(owner, "inv_1")).rejects.toThrow(
             /order ORD-001/,
         );
+        // The ledger's lock and read find it is an order's.
+        tx.$queryRaw!.mockResolvedValueOnce([{ id: "inv_1" }]);
+        tx.invoice!.findFirst!.mockResolvedValueOnce({
+            id: "inv_1",
+            organizationId: "org_1",
+            status: "ISSUED",
+            kind: "INVOICE",
+            currency: "INR",
+            total: decimal("100"),
+            paidCents: 0,
+            order: { orderId: "ORD-001" },
+        });
         await expect(
             service.recordPayment(owner, "inv_1", {
                 method: "CASH",
             } as RecordPaymentDto),
-        ).rejects.toBeInstanceOf(ConflictException);
+        ).rejects.toThrow(/order ORD-001/);
         expect(db.invoice.updateMany).not.toHaveBeenCalled();
     });
 
@@ -1270,6 +1387,18 @@ describe("GST (ADR-008)", () => {
             row({ status: "ISSUED", number: "RC/26-27/0004" }),
         );
         registered();
+        // The ledger's lock and read, as the merchant saw it (#2).
+        tx.$queryRaw!.mockResolvedValueOnce([{ id: "inv_1" }]);
+        tx.invoice!.findFirst!.mockResolvedValueOnce({
+            id: "inv_1",
+            organizationId: "org_1",
+            status: "ISSUED",
+            kind: "INVOICE",
+            currency: "INR",
+            total: decimal("2360"),
+            paidCents: 0,
+            order: null,
+        });
         // The original's read; the number the credit note takes is free.
         tx.invoice!.findUnique!.mockResolvedValue(null).mockResolvedValueOnce({
             id: "inv_1",

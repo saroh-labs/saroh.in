@@ -59,7 +59,19 @@ const nextConfig = {
     // No `X-Powered-By: Next.js`: it only tells scanners what to try.
     poweredByHeader: false,
     async headers() {
-        return [{ source: "/:path*", headers: SECURITY_HEADERS }];
+        return [
+            { source: "/:path*", headers: SECURITY_HEADERS },
+            // A staff invite's page (admin console U24) sends no referrer to
+            // anything it links to or loads, as its meta tag says too.
+            {
+                source: "/staff-invite/:path*",
+                headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+            },
+            {
+                source: "/staff-invite",
+                headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+            },
+        ];
     },
     // Development logs every server action's arguments by default, and some
     // carry secrets: provider keys, sign-in codes (UX-005, 7 Oct). Production

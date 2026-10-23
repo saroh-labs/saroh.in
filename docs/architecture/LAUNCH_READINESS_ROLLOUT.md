@@ -520,7 +520,7 @@ notes (P1, P3, Z2a, D13B, WHSECRET, F10b) are in
       WARN noise, not money. Before `RAZORPAY_AUTOPAY` goes on, give
       `lookUpAll` and `confirmHoldPayment` a wall-clock budget under the
       lease, or look up a few at a time (code review, batch 10).
-- Optional: delete `components/invoices/payments-denied.tsx` once no route
+- Optional: delete `components/invoices/locked/payments-denied.tsx` once no route
   uses it (DEC-070 plan).
 
 ---

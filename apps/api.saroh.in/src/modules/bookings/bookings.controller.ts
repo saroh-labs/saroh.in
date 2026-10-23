@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     Body,
     Controller,
     Delete,
@@ -27,6 +28,7 @@ import { payLinkUrlFor } from "../invoices/pay-link-url";
 import type { DeskPayment } from "./booking-desk-pay";
 import type { WithoutIntakeNote } from "./booking-intake";
 import { withoutIntakeNote } from "./booking-intake";
+import type { ReassignCandidate } from "./booking-reassign";
 import type {
     BookingDetailView,
     BookingsCalendar,
@@ -39,7 +41,10 @@ import {
     BookByHandDto,
     BookingsRangeQueryDto,
     BookVisitDto,
+    CancelBookingDto,
     CreateServiceDto,
+    ReassignBookingDto,
+    ReassignCandidatesQueryDto,
     RecordOutcomeDto,
     ReplaceRulesDto,
     RescheduleBookingDto,
@@ -257,6 +262,41 @@ export class BookingsController {
     }
 
     /**
+     * Change who a booking is with, or give one that has nobody a person
+     * (#1157), optionally at a new time. A route of its own, not the move's
+     * PATCH: who may give a booking away is narrower than who may move it.
+     * 409 when the person is booked then (saying when) or for a class, 400
+     * when they don't take it or aren't working, 404 for another business's
+     * booking or person.
+     */
+    @Post("bookings/:bookingId/reassign")
+    @RequireModule("APPOINTMENTS")
+    @HttpCode(200)
+    reassignBooking(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("bookingId") bookingId: string,
+        @Body() dto: ReassignBookingDto,
+    ): Promise<WithoutIntakeNote<Booking>> {
+        return this.bookings
+            .reassignBooking(ctx, bookingId, dto)
+            .then(withoutIntakeNote);
+    }
+
+    /**
+     * Who this booking could be given to at a time (#1157's picker): each
+     * person who takes the service, free, booked then or not working.
+     */
+    @Get("bookings/:bookingId/people")
+    @RequireModule("APPOINTMENTS")
+    reassignCandidates(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("bookingId") bookingId: string,
+        @Query() query: ReassignCandidatesQueryDto,
+    ): Promise<{ startAt: string; people: ReassignCandidate[] }> {
+        return this.bookings.reassignCandidates(ctx, bookingId, query.startAt);
+    }
+
+    /**
      * Record how an appointment went (#241). A separate route from the
      * reschedule PATCH because it is a separate decision: one changes when the
      * appointment is, the other says what happened at it.
@@ -336,6 +376,14 @@ export class BookingsController {
      * `?closesClass=true` when the whole class is cancelled: its waitlist is
      * closed rather than offered the place (A12).
      *
+     * `?ifUnpaid=true` is Home's Turn down (review #11): cancel only while
+     * the booking still awaits payment, else 409 "They just paid".
+     *
+     * The body's `reason` goes only with `closesClass` (DEC-178, #1172):
+     * why the business cancelled the class, 1 to 200 characters, which the
+     * customer's email and the booking's history say. Optional, so a cancel
+     * sent without one reads as before.
+     *
      * Not gated on Appointments (#117, owner 9 Oct): a business that
      * switched Appointments off can still cancel a booking already made,
      * and the refund its policy gives (DEC-058). `booking:*` still applies.
@@ -347,11 +395,21 @@ export class BookingsController {
         @Param("bookingId") bookingId: string,
         @Query("returnCredit") returnCredit?: string,
         @Query("closesClass") closesClass?: string,
+        @Query("ifUnpaid") ifUnpaid?: string,
+        @Body() dto?: CancelBookingDto,
     ): Promise<WithoutIntakeNote<CancelledBooking>> {
+        const reason = dto?.reason;
+        if (reason !== undefined && closesClass !== "true") {
+            throw new BadRequestException(
+                "A reason is given only when the whole class is cancelled.",
+            );
+        }
         return this.bookings
             .cancelBooking(ctx, bookingId, undefined, {
                 returnCredit: returnCredit === "true",
                 closesClass: closesClass === "true",
+                ifUnpaid: ifUnpaid === "true",
+                ...(reason !== undefined ? { classReason: reason } : {}),
             })
             .then(withoutIntakeNote);
     }

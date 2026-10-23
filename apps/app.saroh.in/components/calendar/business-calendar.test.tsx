@@ -17,39 +17,6 @@ import type {
 } from "@/lib/calendar/types";
 
 const push = vi.hoisted(() => vi.fn());
-vi.mock("@saroh/ui/option-select", () => ({
-    OptionSelect: ({
-        id,
-        value,
-        onValueChange,
-        options,
-        disabled,
-        readOnly,
-        ...aria
-    }: {
-        id?: string;
-        value: string;
-        onValueChange: (v: string) => void;
-        options: { value: string; label: string }[];
-        disabled?: boolean;
-        readOnly?: boolean;
-        "aria-label"?: string;
-    }) => (
-        <select
-            id={id}
-            aria-label={aria["aria-label"]}
-            value={value}
-            disabled={Boolean(disabled) || Boolean(readOnly)}
-            onChange={(e) => onValueChange(e.target.value)}
-        >
-            {options.map((o) => (
-                <option key={o.value} value={o.value}>
-                    {o.label}
-                </option>
-            ))}
-        </select>
-    ),
-}));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push, refresh: vi.fn(), replace: vi.fn() }),
     usePathname: () => "/calendar",
@@ -173,34 +140,44 @@ function render(data: CalendarMonth, team?: string) {
     });
 }
 
-const filter = () =>
-    host.querySelector<HTMLSelectElement>('select[aria-label="Team member"]');
+/** What to show's button, and the overlay it opens (a popover on the desk). */
+const whatToShow = () =>
+    host.querySelector<HTMLButtonElement>('button[aria-label^="What to show"]');
+function openFilter() {
+    act(() => whatToShow()?.click());
+}
+/** Whose: the people the overlay lists, or null when it lists none. */
+const whose = () =>
+    document.querySelector('[role="radiogroup"][aria-label="Whose"]');
+const radios = () =>
+    Array.from(
+        whose()?.querySelectorAll<HTMLButtonElement>('[role="radio"]') ?? [],
+    );
 const cell = (date: string) =>
     host.querySelector<HTMLButtonElement>(`[data-day="${date}"]`);
 const panel = () => host.querySelector("#calendar-day")?.textContent ?? "";
 
-function choose(select: HTMLSelectElement, value: string) {
-    act(() => {
-        Object.getOwnPropertyDescriptor(
-            HTMLSelectElement.prototype,
-            "value",
-        )?.set?.call(select, value);
-        select.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+function choose(name: string) {
+    openFilter();
+    const radio = radios().find((r) => r.textContent === name);
+    if (!radio) throw new Error(`No ${name} in Whose`);
+    act(() => radio.click());
 }
 
 describe("BusinessCalendar: days off and the team filter (E24)", () => {
-    it("lists Everyone and each dentist", () => {
+    it("lists Everyone and each dentist under Whose", () => {
         render(kavi());
-        const options = Array.from(filter()?.options ?? []).map(
-            (o) => o.textContent,
-        );
-        expect(options).toEqual([
+        expect(whatToShow()?.textContent).toBe("Everyone · bookings");
+        openFilter();
+        expect(radios().map((r) => r.textContent)).toEqual([
             "Everyone",
             "Dr. Arun Pillai",
             "Dr. Meenakshi Rao",
         ]);
-        expect(filter()?.value).toBe("");
+        expect(
+            radios().find((r) => r.getAttribute("aria-checked") === "true")
+                ?.textContent,
+        ).toBe("Everyone");
     });
 
     it("says who is off on the day, unstriped for Everyone", () => {
@@ -216,9 +193,8 @@ describe("BusinessCalendar: days off and the team filter (E24)", () => {
     it("filtering to one dentist hides the other's bookings and stripes their day off", () => {
         render(kavi());
         expect(panel()).toContain("Cleaning");
-        const select = filter();
-        if (!select) throw new Error("No team filter");
-        choose(select, PILLAI);
+        choose("Dr. Arun Pillai");
+        expect(whatToShow()?.textContent).toBe("Dr. Pillai · bookings");
 
         expect(panel()).toContain("Root canal");
         expect(panel()).not.toContain("Cleaning");
@@ -240,7 +216,7 @@ describe("BusinessCalendar: days off and the team filter (E24)", () => {
 
     it("opens on the person the address names", () => {
         render(kavi(), RAO);
-        expect(filter()?.value).toBe(RAO);
+        expect(whatToShow()?.textContent).toBe("Dr. Rao · bookings");
         expect(panel()).toContain("Cleaning");
         expect(panel()).not.toContain("Root canal");
         // Dr. Rao works the 23rd: nothing said, nothing striped.
@@ -271,12 +247,15 @@ describe("BusinessCalendar: days off and the team filter (E24)", () => {
 
     it("shows no filter to a business with no staff", () => {
         render(kavi({ hasStaff: false, staff: [], daysOff: [] }));
-        expect(filter()).toBeNull();
+        expect(whatToShow()?.textContent).toBe("Bookings");
+        openFilter();
+        expect(whose()).toBeNull();
     });
 
     it("shows no filter to a viewer the team isn't named to", () => {
         render(kavi({ staff: undefined }));
-        expect(filter()).toBeNull();
+        openFilter();
+        expect(whose()).toBeNull();
     });
 
     it("draws a closed day striped, whoever is picked", () => {

@@ -3,11 +3,18 @@ import { BadRequestException, ConflictException } from "@nestjs/common";
 // Mock the database package so the service never touches a real Postgres. The
 // `$transaction` mock simply invokes its callback with the same mocked client,
 // so we can assert every write happens inside the one transaction.
-// The billing customer's sync job (DEC-165) has its own db spec.
-const mockEnqueueBillingCustomerSync = jest.fn();
-jest.mock("../billing/billing-customer-sync", () => ({
-    enqueueBillingCustomerSync: (...args: unknown[]) =>
-        mockEnqueueBillingCustomerSync(...args),
+// Billing profiles (DEC-167) have their own db specs: here the choice
+// answers what each test says (none, so the first is made, by default).
+const mockFirstBillingProfile = jest.fn();
+const mockChosenBillingProfile = jest.fn();
+jest.mock("../billing/billing-profiles.service", () => ({
+    ...jest.requireActual<typeof import("../billing/billing-profiles.service")>(
+        "../billing/billing-profiles.service",
+    ),
+    firstBillingProfileInTx: (...args: unknown[]) =>
+        mockFirstBillingProfile(...args) as unknown,
+    chosenBillingProfileInTx: (...args: unknown[]) =>
+        mockChosenBillingProfile(...args) as unknown,
 }));
 jest.mock("@saroh/database", () => {
     const client = {
@@ -29,6 +36,10 @@ jest.mock("@saroh/database", () => {
         },
         membership: {
             create: jest.fn(),
+        },
+        // The owner's billing profiles (DEC-167): none, unless a test says.
+        billingProfile: {
+            findFirst: jest.fn().mockResolvedValue(null),
         },
     };
     return {
@@ -57,12 +68,22 @@ jest.mock("./referral", () => ({
     referringBusiness: jest.fn().mockResolvedValue(null),
 }));
 
+// Who brought it in (DEC-169) has its own specs (`account-manager.spec.ts`,
+// `account-manager.db.spec.ts`); here it answers what each test says.
+jest.mock("./account-manager", () => ({
+    ...jest.requireActual<typeof import("./account-manager")>(
+        "./account-manager",
+    ),
+    recordManagerInTx: jest.fn().mockResolvedValue(null),
+}));
+
 import { prisma, startOnFreePlan as startOnFreePlanFn } from "@saroh/database";
 
 import { sendWelcomeEmail as sendWelcomeEmailFn } from "../../common/email";
 
 import type { AuditService } from "../audit/audit.service";
 import { AuditAction, AuditOutcome } from "../audit/audit.service";
+import { recordManagerInTx as recordManagerInTxFn } from "./account-manager";
 import type { OnboardOrganizationDto } from "./dto";
 import { OrganizationOnboardingService } from "./organization-onboarding.service";
 import { referringBusiness as referringBusinessFn } from "./referral";
@@ -81,6 +102,8 @@ const transaction = prisma.$transaction as jest.Mock;
 const startOnFreePlan = startOnFreePlanFn as unknown as jest.Mock;
 const sendWelcomeEmail = sendWelcomeEmailFn as unknown as jest.Mock;
 const referringBusiness = referringBusinessFn as unknown as jest.Mock;
+const recordManagerInTx = recordManagerInTxFn as unknown as jest.Mock;
+const MADE_AT = new Date("2026-11-30T10:00:00.000Z");
 
 describe("OrganizationOnboardingService.onboard", () => {
     // AuditService.record is fire-and-forget (never throws); a jest mock stands
@@ -95,10 +118,139 @@ describe("OrganizationOnboardingService.onboard", () => {
         orgFindUnique.mockResolvedValue(null);
         siteFindUnique.mockResolvedValue(null);
         heldFindUnique.mockResolvedValue(null);
-        orgCreate.mockResolvedValue({ id: "org_1", slug: "acme" });
+        orgCreate.mockResolvedValue({
+            id: "org_1",
+            slug: "acme",
+            createdAt: MADE_AT,
+        });
+        recordManagerInTx.mockResolvedValue(null);
         profileCreate.mockResolvedValue({ id: "bp_1" });
         membershipCreate.mockResolvedValue({ id: "mem_1" });
         referringBusiness.mockResolvedValue(null);
+        mockChosenBillingProfile.mockResolvedValue(null);
+    });
+
+    describe("who Saroh bills for it (DEC-167, R6, R7)", () => {
+        it("makes the owner's first profile in the sign-up's transaction when nothing was chosen and they have none", async () => {
+            await service.onboard("user_1", { name: "Acme" });
+
+            expect(mockChosenBillingProfile).toHaveBeenCalledWith(
+                expect.anything(),
+                "user_1",
+                {
+                    billingProfileId: undefined,
+                    newBillingProfile: undefined,
+                },
+            );
+            expect(mockFirstBillingProfile).toHaveBeenCalledTimes(1);
+            expect(mockFirstBillingProfile).toHaveBeenCalledWith(
+                expect.anything(),
+                { ownerUserId: "user_1", organizationId: "org_1" },
+            );
+        });
+
+        it("bills a later business to the profile chosen, and makes no other", async () => {
+            mockChosenBillingProfile.mockResolvedValueOnce("bprof_1");
+
+            await service.onboard("user_1", {
+                name: "Acme",
+                billingProfileId: "bprof_1",
+            });
+
+            expect(mockChosenBillingProfile).toHaveBeenCalledWith(
+                expect.anything(),
+                "user_1",
+                { billingProfileId: "bprof_1", newBillingProfile: undefined },
+            );
+            expect(orgCreate).toHaveBeenCalledWith({
+                data: {
+                    name: "Acme",
+                    slug: "acme",
+                    kind: "BUSINESS",
+                    billingProfileId: "bprof_1",
+                },
+                select: { id: true, slug: true, createdAt: true },
+            });
+            expect(mockFirstBillingProfile).not.toHaveBeenCalled();
+        });
+
+        it("passes a new profile's details on to be made with the business", async () => {
+            mockChosenBillingProfile.mockResolvedValueOnce("bprof_new");
+            const newBillingProfile = {
+                legalName: "Asha Foods LLP",
+                billingEmail: "accounts@example.com",
+            };
+
+            await service.onboard("user_1", {
+                name: "Acme",
+                newBillingProfile,
+            });
+
+            expect(mockChosenBillingProfile).toHaveBeenCalledWith(
+                expect.anything(),
+                "user_1",
+                { billingProfileId: undefined, newBillingProfile },
+            );
+            expect(
+                (
+                    orgCreate.mock.calls[0] as [
+                        { data: Record<string, unknown> },
+                    ]
+                )[0].data.billingProfileId,
+            ).toBe("bprof_new");
+        });
+
+        it("creates nothing when the choice is refused", async () => {
+            mockChosenBillingProfile.mockRejectedValueOnce(
+                new BadRequestException({
+                    message: "Choose who Saroh bills for this business.",
+                    details: { field: "billingProfile" },
+                }),
+            );
+
+            await expect(
+                service.onboard("user_1", { name: "Acme" }),
+            ).rejects.toMatchObject({
+                response: { details: { field: "billingProfile" } },
+            });
+            expect(orgCreate).not.toHaveBeenCalled();
+            expect(membershipCreate).not.toHaveBeenCalled();
+            expect(record).not.toHaveBeenCalled();
+        });
+
+        it("reads a new profile's email lost to the database's unique index as the 409 the check gives", async () => {
+            transaction.mockRejectedValueOnce(
+                Object.assign(new Error("Unique constraint failed"), {
+                    code: "P2002",
+                    meta: { modelName: "BillingProfile" },
+                }),
+            );
+
+            await expect(
+                service.onboard("user_1", {
+                    name: "Acme",
+                    newBillingProfile: {
+                        legalName: "Asha Foods LLP",
+                        billingEmail: "accounts@example.com",
+                    },
+                }),
+            ).rejects.toMatchObject({
+                status: 409,
+                response: { details: { field: "billingEmail" } },
+            });
+        });
+
+        it("leaves another unique index's error as it is", async () => {
+            const slugRace = Object.assign(new Error("Unique"), {
+                code: "P2002",
+                meta: { modelName: "Organization", target: ["slug"] },
+            });
+            transaction.mockRejectedValueOnce(slugRace);
+
+            await expect(
+                service.onboard("user_1", { name: "Acme" }),
+            ).rejects.toBe(slugRace);
+        });
     });
 
     describe("who referred it (DEC-156)", () => {
@@ -132,7 +284,7 @@ describe("OrganizationOnboardingService.onboard", () => {
 
             expect(orgCreate).toHaveBeenCalledWith({
                 data: { name: "Acme", slug: "acme", kind: "BUSINESS" },
-                select: { id: true, slug: true },
+                select: { id: true, slug: true, createdAt: true },
             });
         });
 
@@ -153,7 +305,7 @@ describe("OrganizationOnboardingService.onboard", () => {
             ).resolves.toEqual({ id: "org_1", slug: "acme" });
             expect(orgCreate).toHaveBeenCalledWith({
                 data: { name: "Acme", slug: "acme", kind: "BUSINESS" },
-                select: { id: true, slug: true },
+                select: { id: true, slug: true, createdAt: true },
             });
         });
 
@@ -165,6 +317,78 @@ describe("OrganizationOnboardingService.onboard", () => {
             expect(JSON.stringify(record.mock.calls)).not.toContain(
                 "org_referrer",
             );
+        });
+    });
+
+    describe("who at Saroh brought it in (DEC-169)", () => {
+        it("asks inside the create transaction with the link, the typed code and when the business was made", async () => {
+            await service.onboard("user_1", {
+                name: "Acme",
+                managerLinkCode: "ABCD2345",
+                managerLinkSetAt: "2026-11-29T09:00:00.000Z",
+                managerCode: "WXYZ6789",
+            });
+
+            expect(recordManagerInTx).toHaveBeenCalledTimes(1);
+            const [tx, input] = recordManagerInTx.mock.calls[0] as [
+                unknown,
+                Record<string, unknown>,
+            ];
+            // The transaction's own client: it lands or rolls back with
+            // the business.
+            expect(tx).not.toHaveProperty("$transaction");
+            expect((tx as { membership: unknown }).membership).toBe(
+                prisma.membership,
+            );
+            expect(input).toEqual({
+                organizationId: "org_1",
+                ownerUserId: "user_1",
+                madeAt: MADE_AT,
+                claim: {
+                    link: {
+                        code: "ABCD2345",
+                        setAt: "2026-11-29T09:00:00.000Z",
+                    },
+                    code: "WXYZ6789",
+                },
+            });
+        });
+
+        it("still asks with nothing carried, for a lead's email", async () => {
+            await service.onboard("user_1", { name: "Acme" });
+
+            expect(recordManagerInTx).toHaveBeenCalledWith(expect.anything(), {
+                organizationId: "org_1",
+                ownerUserId: "user_1",
+                madeAt: MADE_AT,
+                claim: { link: null, code: undefined },
+            });
+        });
+
+        it("says how the manager was proved in the audit event, never who", async () => {
+            recordManagerInTx.mockResolvedValue({
+                platformAdminId: "pa_asha",
+                source: "LINK",
+                evidence: {
+                    source: "LINK",
+                    code: "ABCD2345",
+                    cookieSetAt: null,
+                },
+            });
+
+            const made = await service.onboard("user_1", { name: "Acme" });
+
+            expect(made).toEqual({ id: "org_1", slug: "acme" });
+            expect(record).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    metadata: {
+                        slug: "acme",
+                        kind: "BUSINESS",
+                        accountManager: "LINK",
+                    },
+                }),
+            );
+            expect(JSON.stringify(record.mock.calls)).not.toContain("pa_asha");
         });
     });
 
@@ -184,7 +408,7 @@ describe("OrganizationOnboardingService.onboard", () => {
         expect(orgCreate).toHaveBeenCalledWith({
             // No kind sent (an app from before DEC-070): a business.
             data: { name: "Acme", slug: "acme", kind: "BUSINESS" },
-            select: { id: true, slug: true },
+            select: { id: true, slug: true, createdAt: true },
         });
         expect(profileCreate).toHaveBeenCalledWith({
             data: {
@@ -387,7 +611,7 @@ describe("OrganizationOnboardingService.onboard", () => {
 
                 expect(orgCreate).toHaveBeenCalledWith({
                     data: { name: "Asha Rao", slug: "asha-rao", kind },
-                    select: { id: true, slug: true },
+                    select: { id: true, slug: true, createdAt: true },
                 });
                 expect(record).toHaveBeenCalledWith(
                     expect.objectContaining({
@@ -516,7 +740,7 @@ describe("OrganizationOnboardingService.onboard", () => {
         });
         expect(orgCreate).toHaveBeenCalledWith({
             data: { name: "  My Shop!  ", slug: "my-shop", kind: "BUSINESS" },
-            select: { id: true, slug: true },
+            select: { id: true, slug: true, createdAt: true },
         });
     });
 

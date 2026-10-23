@@ -13,6 +13,26 @@
   Overdue is derived — `isPastDue` in `modules/invoices/invoice-state.ts` is the
   one rule, used by the invoice's standing, the owed sums and subscriptions.
   Never store it.
+  ISSUED and PAID are worked out from the invoice's payment ledger (below),
+  never set by hand: a removed payment or a bounced cheque takes a PAID
+  invoice back to ISSUED. "Partly paid" is derived like Overdue (ISSUED
+  with `paidCents > 0`, `isPartlyPaid`), never a status.
+- **Cancel or correct** (DEC-173, U13 #1125): one sheet in the app
+  (`components/invoices/cancel-or-correct/cancel-or-correct-sheet.tsx`) for every way an
+  unpaid issued invoice is taken back. A registered business credits all
+  of it (`POST :id/credit`) or credits it and writes a correct one
+  (`POST :id/credit-and-rewrite`: the credit note and a draft with the same
+  lines in **one transaction**, so a failure leaves neither; a PAID invoice
+  is refused, it is refunded instead). One not registered voids it, or
+  voids and writes again (`reissue`). The credit note is previewed before
+  it is made (`GET :id/credit-preview`, `peekInvoiceNumber`: the number it
+  would most likely take, nothing taken), refused as the credit itself
+  would be. A void invoice nobody wrote again gets **Write again**
+  (`POST :id/write-again`): the same draft, once, under the row lock, and
+  never beside a live invoice for the same subscription period. Every
+  draft made this way points back with `reissuedFromId`. A partly paid
+  invoice is refused everywhere until its payments are removed; Refund…
+  on a paid one is unchanged (`RefundInvoiceDialog`).
 - **Numbers** come from `InvoiceSequence` inside the caller's transaction
   (`nextInvoiceNumber`), so a rolled-back caller leaves no gap. Another module
   issues through `InvoicesService.issueInTx(tx, organizationId, input)`, never
@@ -56,6 +76,452 @@ requireProvider: false })`), the email says "view it and download a copy",
   doesn't take payment online." Automatic invoicing (renewals, packs,
   courses, subscribe) still stops with Payments off (`payments-on.ts`).
 
+## Payments on an invoice are a ledger — **Current** (DEC-173, #1113, #1114, #1115)
+
+- **One row per payment** (`InvoicePayment`, integer paise): cash, UPI, a
+  bank transfer, a card, other, a cheque, or ONLINE (the webhook's alone).
+  An order's invoice has none: the order is its ledger (ADR-008).
+- **One write path:** `modules/invoices/invoice-ledger.ts`. Lock the
+  invoice with `lockInvoiceForLedger` (FOR NO KEY UPDATE: no key column
+  changes), then write with `recordLedgerPaymentInTx`, or change a row and
+  call `settleFromLedger`. Settling, in the same transaction, sets
+  `paidCents` to the live sum (not removed, not bounced; a waiting cheque
+  counts), the status to PAID when it reaches the total and ISSUED
+  otherwise, and the legacy `paidAt` / `paymentMethod` /
+  `paymentReference` / `paymentNote` from the last live payment while
+  PAID (null while owed, so their readers keep meaning "paid, and how").
+  Nothing else writes `paidCents` or sets a non-order invoice PAID.
+- **Refused by the ledger, whoever calls it:** an order's invoice or a
+  credit note (409), an invoice not ISSUED (409; PAID takes nothing more),
+  an amount of 0 (400), more than is left (422 with `details.leftToPay`;
+  no advances yet), one payment over the `Int` range (400).
+- **The hand routes** (`InvoicePaymentsService`, `invoice:write` on each,
+  DEC-098): `POST :invoiceId/payments` (`amount` defaults to what is left;
+  answers `recorded.paymentId` for Undo), `DELETE
+:invoiceId/payments/:paymentId` (soft: `removedAt`, who, a reason,
+  "Recorded by mistake" by default; an ONLINE payment is refunded, never
+  removed), `POST …/cleared` (a WAITING cheque) and `POST …/bounced` (a
+  WAITING cheque, or one already CLEARED: banks return cheques days later,
+  and it keeps its `clearedAt` so the history and the pay page say it was
+  returned after it was banked; a bounce reopens what it paid, with no
+  charge). Neither moves money on a CREDITED or VOID invoice. **Retries are
+  keyed, never matched on fields** (review #6, 20 Oct): Record payment
+  sends an `idempotencyKey`, one per opening of the sheet, stored on the
+  row under a unique `(invoiceId, idempotencyKey)`; a retry with it answers
+  with the first payment (`recorded.replayed`), and the app says "Already
+  recorded" with no Undo. Two real payments of the same amount carry two
+  keys and both count; a record with no key is always a payment of its
+  own. Record payment is refused while an autopay charge is under way on
+  the invoice (`chargeUnderWayOn`, 409 "Autopay charge in progress"), as
+  Pay, Remind and the desk are. A bounced cheque is never removable
+  (`canRemove` false); it already doesn't count.
+- **A receipt is never for a cheque not in the bank** (review #9): Email
+  receipt and the WhatsApp RECEIPT text thank the last live payment that
+  isn't a WAITING cheque, and answer 409 "This cheque isn't in the bank
+  yet." when that is all there is. The `invoice.receipt` handler also
+  sends nothing for a waiting cheque or on an invoice no longer ISSUED or
+  PAID. "Cheques not in the bank" (`WAITING_CHEQUE_WHERE`) leaves out a
+  credited or void invoice's cheque.
+- **Every write is an event** on the invoice's history: an audit row in
+  the same transaction (`invoice.payment.recorded`, `.removed`,
+  `.cheque_cleared`, `.cheque_bounced`; `invoice-payment-events.ts`),
+  ids, amounts and the method only. The automatic receipt (owner, 20 Oct)
+  hangs from `paymentRecordedInTx` (below, U5 #1117).
+- **Every other path that pays an invoice writes the ledger** (U3, #1115),
+  in its own transaction: the webhook, a mandate charge found by a look-up
+  (`settleCapturedChargeInTx`) and a pay-now hold, a pack or a plan bought
+  online (numbered, issued, then `payIssuedDraftOnlineInTx`) all go through
+  `recordOnlinePaymentInTx`; the desk (`booking-desk-pay.ts`) issues its
+  paper and records its one payment with `recordLedgerPaymentInTx`. An
+  order's paper is stamped paid by `stampOrderPaperPaidInTx` or
+  `order-invoicing.ts`, with no row. `invoice-ledger.guard.spec.ts` reads the
+  sources and fails a write anywhere else that sets an invoice PAID or
+  writes `paidCents`.
+- **Owed is what is left to pay** everywhere money is owed:
+  `leftToPayCents` (`invoice-state.ts`) is the one place it is worked out,
+  and every owed figure folds its bills through it (Home's week and how
+  late, the overdue and failed-renewal rows, awaiting payment, a customer's
+  Owed, `GET /owed`, a subscription's unpaid total, the calendar's due
+  amounts, the reminder email and thread message). Takings and spent are
+  unchanged: they count paid invoices.
+- **A partly paid invoice isn't voided or credited** until its payments
+  are removed (409); the void is fenced on `paidCents = 0` and the credit
+  checks again under the ledger lock. **A credit checks what the merchant
+  saw** (review #2): Cancel and Refund send `expectStatus` and
+  `expectPaidSoFar` from the screen (the API's own read before stands in
+  when they don't), and `creditInTx` compares them with the invoice under
+  `lockInvoiceForLedger`: paid meanwhile is 409 "This invoice was just
+  paid. Reload it.", any other payment change 409 "A payment on this
+  invoice just changed. Reload it." Nothing is credited and no draft is
+  written. **Nor while a cheque waits** (review #5): 409 "Wait for the
+  cheque to clear or bounce.", from the preview too.
+- **The read** serves `paidSoFar`, `leftToPay`, `partlyPaid` and
+  `chequeWaiting` on every invoice, and `payments[]` (each with
+  `bankStatus`, `removed` and `canRemove`) on the detail. A PAID invoice
+  reads its total as paid, so an order's invoice reads right with no rows.
+- **Tests:** `invoice-ledger.spec.ts` (the settle rules) and
+  `invoice-payments.db.spec.ts` (every refusal, repeats, two payments
+  racing on the row lock, one business never reaching another's), plain
+  and under `TEST_RLS=on`. The whole journey (written on the paper in
+  Band, issued and shared on WhatsApp, ₹1,000 in cash taking ₹1,000 off
+  Owed, the rest by cheque, the cheques line, in the bank, the receipt
+  shared) is one browser spec on Northwind's own data,
+  `e2e/tests/invoices-journey.spec.ts`, `@serial` because the strip and
+  the cheques line are business-wide (U17 #1129).
+- **Demo data shows every state** (U17 #1129). The showcase plans what
+  happened to an invoice after it went out in
+  `packages/database/src/seed/showcase/invoice-states.ts`: its ledger
+  rows, its share log and its `INVOICE_SENT` / `INVOICE_REMINDER` emails,
+  and the look it went out in. The invoice's status and paid columns are
+  worked out from the planned rows by `settleLedger`, the API's `settle`
+  rules, never typed by hand, and an overpayment stops the seed. Rye &
+  Co. (`bakery.ts`, GST) has a part payment, two cheques waiting (₹8,400
+  and ₹5,600), one in the bank, one bounced and owed again, overdue a
+  week, a month and longer, WhatsApp shares, reminders both ways, a
+  credit note with the invoice written again, and Classic, Band and
+  Compact paper with Band in its colour as the default. Pulse (`pulse.ts`,
+  not registered) has part payments on two renewals, a void invoice
+  written again, and Compact in its colour. A paid invoice planned without
+  rows gets its one payment from the ledger backfill, as a live database
+  did. The seed's own check (`check.ts`) fails on: `paidCents` not its
+  live sum, a PAID invoice with no payment, a status that doesn't follow
+  the payments, a paid date that isn't the last payment's, cheque fields
+  that don't fit the method and bank status, a payment on paper that
+  doesn't take one or out of time, a share or email before issue, a
+  rewrite from an invoice that wasn't cancelled, and a style or colour the
+  API wouldn't store; `checkRye` and `checkPulse` fail when a state is
+  missing. The emails are `Message` rows, which an invoice's delete leaves
+  (`SetNull`): a seed clears them on its own seeded ids.
+- **The list's search, views and money strip** (U4, #1116). `GET /`
+  takes `q` (trimmed, at most 80 characters): a name (bill-to, or the
+  contact's first and last name, so a draft is found too), part of a
+  number, or an amount (`money-query.ts`: "₹8,400", "8400", "8,400.00";
+  "8,40" is not one) matching the total or what is left to pay. What is
+  left is found by folding the partly paid invoices through
+  `leftToPayCents`, never worked out again in SQL. Searched on the server,
+  so the 500 cap never hides an older invoice. New views: `owed`
+  (`OWED_VIEW_WHERE`: issued, overdue included, not an order's paper or a
+  credit note) and `cheques` (`WAITING_CHEQUE_WHERE`); `paidFrom`
+  (`YYYY-MM-DD` in the business's zone) and Home's `paidSince` (an
+  instant) are the invoices money came in on since then, by the one
+  money-in rule (`invoices/money-in.ts` `moneyInSinceWhere`; below). New
+  parts are ANDed on, so no part's `OR` overwrites another's.
+- **Money in is one rule** (DEC-173, `invoices/money-in.ts`). The Invoices
+  strip's Paid this month, Home's Money in today, This week, How it's
+  going and the last 24 hours, and Insights' takings (money in, the bars,
+  today, this week so far, where it came from, the first sale) all read
+  it, and nothing else works out when money came in:
+    - paper that isn't an order's counts its **ledger**: each payment that
+      counts (`LIVE_PAYMENT_WHERE`: not removed, not a bounced cheque; a
+      waiting cheque counts) on its `receivedAt`, never the invoice's
+      total on its `paidAt`. A part payment counts the day it came in; a
+      bounced or removed one stops counting where it fell; a back-dated
+      one counts on the day it was received;
+    - an order's paper counts its total on its `paidAt` (the order is its
+      ledger, ADR-008); Insights reads the order itself, as Spent does;
+    - never a credit note, nor a hold's, an online pack's or a plan's
+      unnumbered draft (`NOT_A_BOOKING_HOLD`);
+    - Prisma reads `readMoneyIn` (`moneyInPaymentWhere`,
+      `orderPaperPaidWhere`); SQL reads `moneyInPaymentSql()`;
+    - money handed back stays each surface's own: the strip is money
+      received; Home takes a refund's credit note off on the day it was
+      issued; Insights takes an invoice's credit notes off its latest
+      payments first, so a payment never reads below zero;
+    - `money-in.db.spec.ts` pins the strip, Home and Insights to one
+      figure for a part-paid invoice, a bounced cheque on a paid invoice
+      and a back-dated payment. A new surface that says how much came in
+      reads `money-in.ts` and joins that spec. A spec that writes a PAID
+      invoice straight to the database gives it its ledger row
+      (`test/ledger-paid.ts` `onTheLedger`), as the app and the backfill
+      always do;
+    - a customer's **Spent** (the Customers list, Customer Detail, and
+      Insights' best customers and "came back") is the same rule per
+      contact: `spent.sql.ts` `spentLedgerRowsSql` reads
+      `moneyInPaymentSql()`, net of credit notes latest payment first, as
+      takings does; an order counts its total net of refunds. Who counts as
+      a customer is "has a payment that counts", never `status = 'PAID'`.
+      `customer-spent.money-in.db.spec.ts` pins the list, Detail and
+      Insights to `readMoneyIn`.
+- **"So far" compares with the same time of day** (DEC-171). Money in
+  today, How it's going's sales and orders, and Insights' money in, this
+  week so far and today all end the earlier window at the same moment
+  as now on the day it stands for (`lastSoFar`, `goingWindows`
+  `beforeSoFar`, `periodWindows` `beforeSoFar`; Insights swaps that day's
+  rows for its so-far read with `withDaySoFar`), never part of today
+  against a whole day. Bookings, counted by when they start, and the
+  bars, a picture of whole days, stay whole.
+- **One zone reader.** A business's zone is `businessTimezone`
+  (`bookings/staff-availability.ts`: its setting, else its first active
+  service's, else `FALLBACK_TIMEZONE`) on every money surface: the strip,
+  the list's `paidFrom`, Home and Insights. No other reader or fallback
+  constant is written.
+- **`GET invoices/summary`** (`InvoiceSummaryService`, `invoice:read`):
+  Owed and Overdue (left to pay, `isPastDue`), Paid this month (money in
+  from the 1st in the business's zone, by the one rule above), Drafts, and
+  `chequesWaiting` (null while none waits). Each figure is `{ count, totals?, filter }`,
+  totals per currency in minor units (`amountMinor`, as Home's), and
+  `filter` is the list query it stands for. Without `payment:read` there
+  are no `totals` (DEC-098). Home's `week.chequesWaiting`
+  (`home/home-cheques.ts`, `{ count, totals, href }`, href
+  `/billing/invoices?view=cheques`) reads the same `readChequesWaiting`,
+  and is null without `payment:read` and `invoice:read` (the line opens the
+  invoices) or while none waits. `HomeService` reads it in a guarded read
+  of its own beside the week, never inside `readWeek`: a failure is named
+  "Cheques" in `unavailable` (the phone says "Couldn't check cheques just
+  now") and the week's other figures still come (Home U18, invoices U8
+  #1120).
+- **Overdue bills have one definition** (`invoices/overdue-bills.ts`,
+  `overdueBillsWhere`): issued, past due, not an order's or a credit note,
+  not a live subscription's latest period invoice, not a cancelled
+  booking's paid link. Home's bills group (`home-money-sources.ts`) and
+  Remind all both read it, so "10 overdue" and the people Remind all
+  lists never disagree. Never write a second where for "overdue bills".
+- **Remind all** (DEC-171, Home plan U8 #1085) is Remind many with
+  `quietDays: 3`, never a route of its own. Home's bills group carries
+  `remind: { invoiceIds, quietDays }` (the 100 oldest overdue,
+  `overdueBillIds`) only for `invoice:write`; the sheet posts them to
+  `POST invoices/reminders/preview` and, after the ten-second hold with
+  Undo on Home's one hold (`useInlineActions().remindAll`), the EMAIL ones
+  to `POST invoices/reminders` with the same `quietDays`, which reads every
+  bill again. "Heard from" is `lastHeardFrom`: an email that went, an
+  account-thread post or a WhatsApp NEW or REMINDER share, the three
+  things one reminder a day counts. On a phone it is the bills sheet's
+  foot, beside See bills, with the hold's Undo in the sheet.
+- **Search speed:** a business's invoices are filtered after the
+  `organizationId` index; 5,000 invoices (among 55,000) search in about
+  4 ms, so there is no trigram index. `list-filter.db.spec.ts` times 1,500.
+
+## Sharing an invoice, reminding many, and the receipt — **Current** (DEC-173, U5 #1117)
+
+- **WhatsApp is a link, never a sender.** `POST :invoiceId/share`
+  (`InvoiceShareService`, `invoice:write`) with `channel` WHATSAPP, LINK,
+  PDF or PRINT and an optional `kind` (NEW, REMINDER, RECEIPT; by default
+  a receipt once paid, a reminder once overdue, else new). WHATSAPP and
+  LINK mint a fresh link as a send does (a pay link while the invoice is
+  owed and payable online, else a view link; the old link stops, DEC-110)
+  and answer `{ url, text, phone, whatsappUrl }`; PDF and PRINT mint
+  nothing. The words are `invoice-share-words.ts`, in the business's voice,
+  asking for what is left on a partly paid invoice. The app opens
+  `whatsappChatLink(phone, text)` (`@saroh/block-contract`); the API
+  answers the same link so the bulk flow needs no second rule. Saroh can't
+  know a WhatsApp message went: words say "shared on WhatsApp".
+- **The share sheet** (U11 #1123, `components/invoices/share/share-sheet.tsx`,
+  rules in `lib/invoices/share.ts`) is the one place an invoice is shared
+  by hand: the details open it through `useShareFlow`, and Record
+  payment's "Share receipt on WhatsApp" opens it on the receipt. Tabs
+  WhatsApp, Email, Link, PDF. The preview is drawn from the invoice before
+  anything is minted (`previewMessage`, the API's words with the link as
+  a chip); the API's text replaces it once shared. A link minted in the
+  sheet is reused by every tab while it is open (Copy message then Open
+  WhatsApp is one share, one link). The number comes from `send.phone`
+  (the contact's, on the detail read); with none, it is typed and used for
+  that message only. Each refusal mirrors the API's, said before the
+  press; a 429's `retryAt` reaches the screen as `ApiFailure.retryAt`.
+  A WhatsApp tab is opened inside the press (`about:blank`) and pointed at
+  `wa.me` once the share answers, so no popup blocker stops it. PDF and
+  print are logged quietly where a share could be, never for a reader.
+- **The share log** is `InvoiceShare` (channel, kind, who, when; its own
+  RLS policy and CHECKs), served as `shared[]` on the invoice read. Emails
+  aren't in it: their `Message` rows are the record.
+- **One reminder a day, whichever way:** `nextReminderAt`
+  (`invoice-send.service.ts`) reads email Messages, account-thread posts
+  and WhatsApp NEW or REMINDER shares together, so a WhatsApp reminder
+  after an email one (or the other way) is a 429 with `retryAt`. Link, PDF
+  and print don't count.
+- **Automatic overdue reminders** (DEC-174 D3, U20 #1151): opt-in, at
+  most two per invoice, and inside the one-a-day rule: a hand or WhatsApp
+  reminder in the last day moves the automatic one to a later run. When is
+  the business's (DEC-178, #1169): the days after the due date for each
+  (default 3 and 10) and the hours (default 9 am to 8 pm, its zone), one
+  `OverdueReminderTiming` row while it differs from the defaults
+  (`communications/overdue-timing.ts`). Each reminder may still go from
+  its day until the day before the next one's, a week at most
+  (`reminderWindows`). Only through
+  `remindAutomatic`, never a send path of its own. The sweep and its
+  claim are in `backend-jobs.md` → Customer notices.
+- **Remind many:** `POST invoices/reminders/preview` and `POST
+invoices/reminders` (`InvoiceRemindersService`, `invoice:write`, at most
+  100 ids, duplicates once). Each invoice is EMAIL when an email can go
+  (`channelsFor`: provider connected, an address, email not turned off),
+  else WHATSAPP with a phone, else NONE with why (`UNREACHABLE` with
+  `emailBlocked`; `DRAFT`, `PAID`, `ORDER`, `NOT_OWED`, `AUTOPAY_PENDING`,
+  `NOT_FOUND` for an id that isn't the business's); one reminded today is
+  WAIT with `retryAt`; with `quietDays` (1 to 14) one sent or reminded
+  inside them is WAIT `REMINDED_RECENTLY` with `lastAt`, `lastWords`
+  ("Reminded 2 days ago") and `retryAt`, read again at Send. Each row has
+  `dueAt` and `lateDays`; `leftToPay` only with `payment:read`. The
+  preview's `message` is the first EMAIL row's reminder email as words
+  (`invoice-reminder-sample.ts`), null without `payment:read`. Send emails the EMAIL ones, each through `remind`
+  (its own transaction and checks), and sends nothing else: the business
+  opens each WhatsApp one through the share route. Never a failure for
+  the lot.
+- **Remind many's three steps** (U12 #1124, INVBulkSend;
+  `components/invoices/bulk-remind/bulk-remind-sheet.tsx`, its steps in
+  `bulk-remind-steps.tsx`, the words in `lib/invoices/remind-many.ts`):
+  "Remind all N" on the Overdue view, or the rows ticked at a desk (the
+  ink bar, `remind-bar.tsx`), opens one `FormSheet`: Pick who (all
+  ticked), How each one goes (the preview grouped Email / WhatsApp /
+  Can't reach now, headed by INVShareB's one look, the button saying
+  "Send 3 emails, then WhatsApp 2"), Send. The emails go through
+  `useHold().send` (ten seconds; the sheet draws its own Undo, since the
+  toast is behind a modal); Undo before any WhatsApp opened comes back to
+  step 2, after one it stands. WhatsApp is walked one at a time with Open
+  (`openWhatsAppShare`, the share route, so it is logged and counts as the
+  day's reminder) or Skip. More than 100 picked go in calls of at most 100
+  (`chunks`), for the preview and the send. A row reminded here shows
+  "Reminded today · by email / on WhatsApp" until the list is read again.
+  On Overdue each row also has its own Remind: the share sheet on the
+  reminder, through `useRowShare` (details read, then `useShareFlow`).
+  Only `invoice:write` sees any of it.
+- **The receipt is automatic** (owner, 20 Oct). `paymentRecordedInTx`
+  queues `invoice.receipt` (`invoice-receipt.ts`) at
+  `now + RECEIPT_HOLD_MS`, for every payment the ledger records, by hand,
+  online, by autopay or at the desk; a cheque's goes when it is marked in
+  the bank. It is queued only when it can go (`receiptCanGo`: the
+  business's email provider connected, an address, email not turned off),
+  so with no provider nothing is queued or sent; Saroh's address never
+  carries it. Removing a payment (Undo) deletes its waiting job. The
+  handler (`invoice-receipt.handler.ts`) locks the payment row, sends
+  nothing for one removed, bounced or already receipted, and records the
+  Message on `InvoicePayment.receiptMessageId` in the same transaction, so
+  a retry never emails twice. The email (`INVOICE_PAYMENT_RECEIVED`) says
+  the payment, paid so far and left to pay, with the PDF attached and no
+  link. `share` with `channel: EMAIL` (receipts only) sends it now, and a
+  409 with no provider.
+- **Tests:** `invoice-share-words.spec.ts`, `invoice-share.db.spec.ts`,
+  `invoice-reminders.db.spec.ts`, `invoice-receipt.db.spec.ts` and
+  `rls/invoice-shares-rls.db.spec.ts`, plain and under `TEST_RLS=on`.
+
+## An invoice's history: who did what — **Current** (automatic notices U9 #1140, DEC-174)
+
+- **`InvoiceEvent`** (`invoices/invoice-events.ts`, migration
+  `20261223140000_invoice_events`): `kind` ISSUED, SENT, REMINDED,
+  AUTO_SENT, AUTO_REMINDED, SEND_FAILED, VOIDED, CREDITED, REISSUED,
+  PAY_ATTEMPT_FAILED, LINK_MADE; `actorKind` USER (with `actorUserId`),
+  JOB (Saroh, on the business's behalf) or CUSTOMER; `channel` EMAIL or
+  THREAD; `messageId`; small `data` (address, reason, credit note, draft;
+  never a token). Its own RLS policy and CHECKs, including "USER exactly
+  when there is a person". `AuditEvent` can't hold it: its actor is
+  required and an automatic send has none.
+- **Written with `recordInvoiceEvent(tx, …)` in the change's own
+  transaction**: `issue` and `issueInTx` (a person, else JOB), `voidInTx`,
+  `creditInTx`, `draftFromInTx` (reissue, credit and rewrite, Write again
+  are REISSUED with the draft), a link made by hand (`createPayLink` /
+  `createViewLink`, now on a transaction; a member's own new link is
+  CUSTOMER), `send` / `remind` (one event per send, with the Message id
+  and SUPPRESSED when the customer turned email off), the webhook's
+  `applyInvoiceFailure` (CUSTOMER, or JOB for autopay). A link a send or a
+  share mints is told by that send or share, not as LINK_MADE.
+- **Automatic sends** pass `{ automatic: true }` to `send` / `remind`
+  (renewals U10, overdue reminders U20): AUTO_SENT / AUTO_REMINDED, actor
+  JOB. Every rule of a send still applies.
+- **A renewal's invoice is sent by Saroh** (U10 #1141, DEC-174 R3).
+  `renewOne`, `renewEarlyOne` and a restart when a pause's end date comes
+  queue `invoice.auto-send` (`invoice-auto-send.ts`) on the renewal's
+  transaction through `sendRenewalUnlessCharged`
+  (`subscriptions/renewal-send.ts`): not when live autopay will charge it
+  (`queueInTx` QUEUED) or the customer has a checkout open, and only while
+  `noticeOn(RENEWAL_INVOICE)`. The handler re-reads the invoice and calls
+  `InvoiceSendService.sendAutomatic` (no person: the job's pay link is
+  `payLinkForJobInTx`); paid, voided, under a charge, already sent or
+  switched off sends nothing, and a refusal is SEND_FAILED with
+  `data.reason` (NO_EMAIL_PROVIDER, NO_EMAIL_ADDRESS,
+  BUSINESS_DETAILS_MISSING, REFUSED), never thrown. Hand-made invoices are
+  never auto-sent. The autopay-cancelled note's words follow the switch.
+- **An eMandate renewal is announced, or not taken** (DEC-180, #1175): a
+  day before each eMandate debit the customer is emailed what will be
+  taken, when and for what (`AUTOPAY_PRE_DEBIT`); if that email didn't go
+  the period isn't debited, NOT_CHARGED_NO_NOTICE says why on the
+  subscription's history ("Autopay didn't charge. A bank account debit
+  needs an email to the customer a day before, and no email provider is
+  connected"), and the renewal invoice goes as without autopay
+  (`sendRenewalUnlessCharged`). Not a failure: no RENEWAL_FAILED, no
+  "Payment failed", no failed-charge email. Rules in
+  `backend-integrations.md` → "eMandate: Saroh's notice, or no debit".
+- **A failed autopay charge tells the customer** (U10): every place that
+  writes RENEWAL_FAILED for a decline (`failMandateChargeInTx`, the charge
+  job's give-up, the webhook's `applyInvoiceFailure`) calls
+  `enqueueAutopayFailedNotice` (`site-accounts/notices/autopay-failed.ts`);
+  CHECKOUT_OPEN and AMOUNT_MISMATCH are not told. Its email carries a pay
+  link minted only as it goes (the notice's `secretLink`, sealed into the
+  send, DEC-110), recorded as LINK_MADE (JOB) and PAY_LINK_EMAILED on the
+  subscription.
+- **A failed send is told once**: the `message.send` handler calls
+  `recordInvoiceSendFailed` only on the last attempt (or a failure it
+  won't retry), for an invoice's own emails; a partial unique index on
+  `(messageId, kind)` keeps a re-run to one line.
+- **Reads.** The detail read carries `events[]` (newest 50, with the
+  person's name now) and `shared[].byName`; the app's `historyLines` draws
+  them (`lib/invoices/event-words.ts`), dates a credit note from its
+  CREDITED event, and skips a `sent[]` email its event already tells.
+  `GET :invoiceId/history` (`invoice:read`) merges events, shares, the
+  ledger's payment audit rows (amounts only with `payment:read`), emails
+  from before events, and the invoice's own dates for what no row
+  records. No backfill (A16): older invoices read their dates without
+  names. In the data export as `invoice-history.csv`.
+- **Tests:** `invoice-events.db.spec.ts`,
+  `rls/invoice-events-rls.db.spec.ts`, plain and under `TEST_RLS=on`;
+  `lib/invoices/details-view.test.ts`; `e2e/tests/invoices-history.spec.ts`.
+
+## Invoice styles: Classic, Band, Compact, frozen at issue — **Current** (DEC-173, U6 #1118)
+
+- **Three styles in the business's colour.** `PAPER_STYLES` (CLASSIC, BAND,
+  COMPACT), the colour rule and `RULE_46_FIELDS` live in
+  `@saroh/block-contract` (`invoice-paper.ts`) so the app's paper and the
+  API's PDF draw from one rule; `invoices/paper-styles.ts` is the API's
+  side (what a write may store, which look a paper is drawn in). Null style
+  is Classic and null colour is ink: every invoice issued before styles
+  reads as it did, with no backfill.
+- **The business's default** is `BusinessProfile.invoiceStyle` and
+  `invoiceColour`, set through the settings PATCH as `invoicePaper: {
+style, colour }` (Owner or Admin, `org:update`) and read back as
+  `invoicePaper` on the settings read. It is its own field, not part of
+  `tax`, so a style save never re-runs the GSTIN and address checks.
+- **A draft may choose its own** (`paperStyle`, `paperColour` on the draft
+  DTO); null follows the default, read when the draft is (`paper` on the
+  read is what it will go out in, `paperChoice` what it chose itself).
+  Style and colour fall back on their own. `""` or null clears one.
+- **Issuing freezes the look** (DEC-082): `issue` writes the draft's own
+  choice, else the default as it is then, never null, so a later change of
+  default never redraws issued paper. Every other path that issues
+  (orders, bookings, plans, packs) freezes the default through
+  `loadTaxProfile` → `documentColumns`. A credit note takes its original's
+  look (`sellerOf`, `asOriginal`); a reissued draft carries it too. The
+  logo stays live.
+- **Validation:** a colour is `#RRGGBB` (stored in capitals), a style one
+  of the three; anything else is a 400 on its field (`paperWrite`, after
+  the DTO's own check). A colour is never refused for being pale or dark.
+- **Readable by rule, never typed:** the colour as text and heavy rules is
+  the business's when it reads at 4.5:1 on white, else moved toward ink
+  (`paperColours`, the safe-colour rule the site looks use). Band's text is
+  ink or white, whichever reads on the fill (`bandTextTone`); a mid grey
+  neither reads on is moved, not refused.
+- **The PDF** (`invoice-pdf.ts`): Classic is today's paper with the colour
+  on the title, the labels and the heavy rules; Band fills the top of the
+  first page edge to edge, measured first, with the seller and the number
+  on it; Compact has smaller rows and the seller, the buyer and the place
+  of supply side by side, still A4. Every style draws every Rule 46
+  particular; an unregistered business's paper draws no GST in any.
+  Saroh's own invoices to businesses carry no look: Classic in ink.
+- **Chosen in the app** (U15 #1127): a draft's own look is picked on the
+  paper's style rail (`paper-editor/style-panel.tsx`) and saved with the
+  draft as `paperStyle`/`paperColour` through its autosave ("" follows the
+  default; "Use my default" sends both ""). "Make this my default" and
+  Settings › Business › Tax and invoices › Invoice style
+  (`invoice-paper-sheet.tsx`) send `invoicePaper`, Owner and Admin only
+  (`org:update`; `mayUpdateBusiness` reads the resolved actions, never a
+  role name). The app's details paper (`invoice-paper.tsx`) draws the
+  invoice's `paper` in the same three styles from `paperColours`, so the
+  sheet, the PDF and the paper agree; its spec checks each style against
+  the Rule 46 particulars.
+- **Not here:** terms and a business's own signature are #1060.
+- **Tests:** `paper-styles.spec.ts`, `invoice-pdf.styles.spec.ts` (each
+  style against `RULE_46_FIELDS`, no GST unregistered, a long name, pale
+  and dark colours read from the uncompressed drawing, with and without a
+  logo), `invoice-paper-styles.db.spec.ts` (the default's permissions and
+  refusals, the freeze, credit notes and reissues), plain and under
+  `TEST_RLS=on`; `@saroh/block-contract` `invoice-paper.test.ts`.
+
 ## Saroh's own invoices — **Current** (pricing catalogue U17)
 
 Saroh billing a business for its plan is not the business's paper: it is
@@ -67,24 +533,71 @@ paper view. Written by the billing webhook with the charge, once per
 charge; rules in `docs/architecture/PRICING_ROLLOUT.md` › "Saroh's own
 invoices (U17)".
 
-**Who Saroh bills, before it charges (owner, 17 Oct 2026).** Every
-checkout that charges or sets up autopay — all but a move to Free; a first
-month, an upgrade, a renewal, a scheduled change, a year paid once — is
-refused before anything is made at the provider until the business has a
-billing name (legal name, else its name), an email (the owner's, else the
-profile's contact email), a whole registered address (first line, city,
-six-digit PIN) and a state. `billing/billing-details.ts` is the one rule:
-a 400 with `details.field` (`billingName`, `billingEmail`, `addressLine1`,
-`city`, `postalCode`, `billingState`, `phone`) and `details.missing`; the
-quote's `billingDetails: { missing, phone }` tells the change-plan dialog
-what to ask, in place. A GSTIN stays optional, a phone "if available".
-What was missing and given is kept: the address, state and legal name on
-the profile (never over what it has), an email or phone on the checkout
-(`BillingCheckout.billToEmail`, `billToPhone`), since the profile's phone
-is the one its website shows. The invoice carries the billing email and
-the phone (`SarohInvoice.billToEmail`, `billToPhone`) and prints them under
-the address. The Razorpay customer is brought up to date when it is found
-again (`PUT /customers/:id`, `backend-integrations.md`).
+**Who Saroh bills: the billing profile (DEC-167, owner, 18 Oct 2026).**
+A business is billed to one `BillingProfile` (owned by a user, possibly
+billing several businesses); Saroh's invoice takes its bill-to — legal
+name, GSTIN, address, state, billing email and phone — from the profile at
+issue, with the profile's id (`SarohInvoice.billingProfileId`, also on
+`BillingCheckout`), and its email goes to the profile's billing email as
+well as the people who manage the business's billing. Earlier invoices
+keep what they were issued with. Settings › Business (`BusinessProfile`)
+stays the business's own seller identity, for the business's own
+invoices; it is not Saroh's bill-to. A profile's details are its owner's
+(R2), also on the reads Plan & billing makes with `billing:read`: the
+checkout handoff (the provider window's prefill and notes) is built only
+for `billing:manage`, and with another owner's profile (a co-owner paying)
+carries no email or phone and notes naming only the profile and the
+business; a quote's `billingDetails.profile` is null without
+`billing:manage` (`checkout.service.ts`, `checkout-privacy.db.spec.ts`).
+
+**Switching a paid business's profile waits for the renewal (R13, U6).**
+Choosing another profile applies at once only while nothing more is
+charged at the provider (Free, a plan ending, a year paid once), or while
+the business has no profile (nothing to move from; a business the data
+move left without one can then upgrade at once). While a coupon still
+comes off charges to come, a switch is refused (409 `discount-running`,
+naming the date the discount ends): the switch's new subscription is made
+at full price, so it waits until the discount is used. A
+business whose subscription renews gets a SCHEDULED checkout for the same
+plan and cycle on the new profile's customer, starting at the period's end
+(`billing/profile-switch.ts` decides, `CheckoutService.startProfileSwitch`
+makes it); authorised, the webhook tells the old autopay to end with its
+period (a same-plan checkout on another profile is never a "renewal"), and
+`applyDueMoveInTx` repoints `Organization.billingProfileId` as it adopts
+the checkout, with an audit row — unless the checkout's profile has been
+deleted since (its owner deleted their account; `BillingCheckout` has no
+foreign key to it): then the checkout is still adopted, the business keeps
+its pointer, and `billing_profile_gone` is raised in Admin › Billing ›
+Needs action. Deleting an account raises `billing_profile_owner_left` for
+each business billed to, or with an OPEN or SCHEDULED checkout on, one of
+its profiles (`noticeProfilesOfDeletedOwnerInTx`, through `@saroh/auth`'s
+`onUserDeleting`), and never refuses the deletion. Unauthorised, it lapses like any checkout
+and nothing changes. A plan change and a switch before one renewal are one
+checkout: a switch after an authorised plan change is made for that plan
+and supersedes it once authorised; a change starting at the renewal while
+a switch is in play is made on the profile it moves to. Choosing the
+profile it keeps gives up a switch still waiting; once authorised (the old
+autopay told to end) staying is a switch back, authorised again. A payment
+for a plan waiting is a 409 `checkout-waiting`.
+
+**What Saroh needs before it charges (owner, 17 Oct 2026; the profile's
+since 18 Oct).** Every checkout that charges or sets up autopay — all but
+a move to Free; a first month, an upgrade, a renewal, a scheduled change, a
+year paid once — is refused before anything is made at the provider until
+the business has a billing profile with a billing name (its legal name,
+else the business's name), a billing email, a whole address (first line,
+city, six-digit PIN) and a state. `billing/billing-details.ts` is the one
+rule: a 400 with `details.field` (`billing-profile` when there is none,
+`billingName`, `billingEmail`, `addressLine1`, `city`, `postalCode`,
+`billingState`, `phone`) and `details.missing`; the quote's
+`billingDetails: { missing, phone }` tells the change-plan dialog what to
+ask, in place. A GSTIN stays optional, a phone "if available". What was
+missing and given is saved on the profile (never on `BusinessProfile`,
+and never over what the profile has; a GSTIN given replaces the
+profile's, with its state). The invoice prints the billing email and the
+phone under the address. The profile's Razorpay customer is brought up to
+date by the `billing.profile.sync` job the save queues
+(`backend-integrations.md`).
 
 **Cancelling a plan (owner, 17 Oct 2026).** "Cancel plan" under Your plan
 (`components/settings/plan-billing/cancel-plan.tsx`, owner only, offered
@@ -221,8 +734,9 @@ Rules and edge cases in `PRICING_ROLLOUT.md` › "During the first month".
 - A `plan` override never takes away a dearer plan the business pays for:
   the plan read is the dearer of the two (`effectivePlanId` with
   `planPriceOf`), and an override that dearer plan shadows is not reported.
-- A renewal's invoice is billed to the business as it is now (its profile's
-  GSTIN and state); the checkout's are for its own first charge.
+- A renewal's invoice is billed to the business's billing profile as it is
+  now (its GSTIN and state, DEC-167); the checkout's are for its own first
+  charge.
 - A suspended business, still billed, may always pay less: change-plan and
   add-ons are `@LifecycleWrite("lower-charges")` and ask `new` themselves
   for anything that charges more.
@@ -235,6 +749,59 @@ checkout, and an add-on is a line on the charge after the period it covers
 (`SubscriptionAddonCharge`). The amount the provider charges and the
 invoice's lines are worked out by one rule each, so they agree. Rules in
 `PRICING_ROLLOUT.md` › "Trials, yearly, coupons and add-ons (U16)".
+
+## Commission on Saroh's payments — **Current** (DEC-169, admin console U21)
+
+What an account manager earns on the payments of the businesses they look
+after: `modules/commission/`. **No rate is ever in code, tests, seeds,
+fixtures or docs**: a rate is a `CommissionRate` row for a link kind
+(`BROUGHT_IN`, `ASSIGNED`), set in the console by `commission:rates`, from
+now or a later day, never backdated; specs draw theirs at random per run.
+
+- **Payments stay correct.** Nothing commission does is inside a payment's
+  transaction. `BillingWebhookService` calls `CommissionQueue` only after
+  its transaction has committed (`afterCommit`), wrapped so a failure is
+  logged (`commission_enqueue_failed`) and the webhook still answers. The
+  queue writes a `commission.line` job for each invoice the event wrote
+  whose business had a manager then, and a `commission.refund` job for a
+  refunded or disputed payment whose invoice has lines. No `*InTx` billing
+  function, `saroh-invoices.service.ts` or `billing-refunds.ts` knows
+  commission exists; `commission.db.spec.ts` proves a payment records the
+  same with the job failing every try, the enqueue failing, and the
+  tables gone.
+- **A line** (`CommissionLine`, relation-free like `BillingAction`, one per
+  invoice and installment) is for the manager whose link was open when the
+  invoice was issued, at the rate in force then for the link's kind, on
+  the invoice's `taxablePaise` (before GST, after its discount), rounded
+  half up once (`commissionPaise`). The rate and its id are copied onto the
+  line: a later rate never moves it. No link, a manager not
+  `onCommission`, or nothing before GST: no line. A paid first month and
+  an upgrade's difference are invoices like any other, so they earn; a
+  trial with no charge, Free and a failed payment have no invoice. A year
+  paid at once is twelve lines, one twelfth each (`splitEvenly`, adding up
+  exactly), the k-th payable at the end of the k-th month (owner, 19 Oct).
+- **When it is paid** (`settleInvoiceInTx`, `nextStatus`): PENDING until
+  its `periodEnd` passes with no refund or dispute open, then PAYABLE in
+  `statementMonth`, the month the period ended in India (`monthOf`), or
+  the next month not yet marked paid for that manager. HELD while the
+  invoice's `providerAmountPaise` differs from its total and the
+  `amount-mismatch:<invoice>` Needs-action row is unresolved. NO_RATE
+  while no rate exists for the kind (worked out with the first set after
+  the payment, at once when a rate is set and by the sweep). A refund
+  PROCESSED or a dispute LOST cancels it, whether written before or after
+  the line (matched by invoice or payment id); PENDING refunds and open
+  disputes hold it; FAILED, WON and CLOSED change nothing. Once PAID a
+  line never changes: a refund then raises
+  `commission_refund_after_payout` once, and nothing is deducted.
+- **Mark paid** (`team:pay`, never one's own) turns the month's PAYABLE
+  lines PAID with a `CommissionPayout` (a reference, a reason), and that
+  month is locked for them. Both run under `commission-payout:<id>`.
+- **The jobs** retry; the line job's last try raises
+  `commission_line_failed` once per invoice. `commission.sweep`
+  (hourly) writes lines a lost job missed (60 days back), moves lines
+  whose period ended or that are HELD, NO_RATE or PAYABLE, and re-checks
+  invoices whose refund changed in the last 3 days (hand refunds
+  included).
 
 ## Moving to a lower plan — **Current** (#800, #801, #802; the Terms' "Moving to a lower plan")
 
@@ -920,21 +1487,45 @@ options, items, more }` and a sentence with the count, the first
   a new link replaces the old, and voiding the invoice or deleting its contact
   clears it. Never log `/public/invoices/<token>` — the request log redacts it.
 - **The public read is an allow-list** (business name, number, dates, lines,
-  tax, total, currency, status, billed-to name, `payOnline`, and on an owed
+  tax, total, `paidSoFar` and `leftToPay` (DEC-173), `payments` (U16),
+  currency, status,
+  billed-to name, `payOnline`, and on an owed
   view-only invoice `payInstructions`, R32) served
   server-to-server to `saroh.app/pay/<token>`; reads and payment starts are
   rate-limited per link. With `payOnline` false (DEC-070) the page shows the
   invoice with no Pay button, only "Print or save as PDF", and starting a payment or autopay
   is a 409 (`assertPaysOnline`). An older API without the field means "as
   before": show Pay.
-- **The amount is the stored invoice's.** A payment request carries only a
-  provider and an idempotency key; anything else is ignored.
+- **The amount is what is left to pay** (DEC-173, #1115): the stored total
+  less the ledger's `paidCents`, worked out by the API
+  (`createIntentForInvoicePublic`), so a partly paid invoice is charged its
+  balance and still has a working link. A payment request carries only a
+  provider and an idempotency key; anything else is ignored. An autopay
+  charge and autopay's first payment charge what is left too.
 - **`PaymentIntent` pays an Order or an Invoice** — exactly one (a CHECK in the
   migration). Webhooks find the intent by provider id or by the invoice id
-  echoed back as the merchant reference. Success on an ISSUED invoice marks it
-  PAID (`ONLINE`) under its row lock; success on one already PAID or VOID is
+  echoed back as the merchant reference. Success on an ISSUED invoice writes
+  one `ONLINE` payment on its ledger for the intent's amount
+  (`recordOnlinePaymentInTx`, linked by `paymentIntentId`, unique, so a
+  replay never doubles it): PAID when that settles it, partly paid when not.
+  Success on one already PAID or VOID, or for more than is left (part was
+  paid by hand while the checkout was open: `MORE_THAN_LEFT`), is
   `CAPTURED_NEEDS_REFUND`, raised on Home until the provider's refund webhook
   clears it. A refund never changes an invoice's status.
+- **The page says what was paid, and only that** (DEC-173, U16 #1128). The
+  pay read's `payments` (`payments/pay-link-payments.ts`, the newest 20,
+  oldest first) is its own allow-list: amount, method, `receivedAt`, and a
+  cheque's number, bank and bank status. Never a reference, note, reason,
+  who recorded it or an id; a removed payment is left out; a bounced cheque
+  stays so the page can say why the amount is due again. The renderer
+  (`saroh.app` `lib/invoice-paid-shape.ts`, `components/invoice-paid-so-far.tsx`)
+  draws the newest payment as a receipt ("₹4,000.00 received · Cash · 19
+  October 2026"), Paid so far and Left to pay under the total, and Pay for
+  what is left. A cheque not in the bank yet has its own words ("This invoice
+  is settled once the cheque clears…"), is badged "Cheque received", never
+  "Paid", and offers no Pay when it covers what was left. Every owed figure on
+  the page (Pay, autopay's "just pay", How to pay us' amount and QR) reads
+  `leftToPay`. An older API without these fields reads as before.
 
 ## How to pay us: offline payment details — **Current** (R32)
 
@@ -983,6 +1574,21 @@ options, items, more }` and a sentence with the count, the first
 - **A hold is only ever let go through `releaseHoldInTx`** — the sweep, the
   booker, and the team cancelling it (`cancelBooking`) — so its draft is
   always voided and its pay token cleared with it.
+- **A hold whose time ran out is a lapse, not a cancel** (#1137, DEC-174).
+  `releaseHoldInTx`'s `why` says which: `let-go` (the booker or the team:
+  CANCELLED, with the team member as actor), `lapsed` (the sweep: a
+  `LAPSED` BookingEvent with no actor, and one `booking.notify` with reason
+  `lapsed` when there is a contact and it is not a course's session — the
+  booker hears "Your hold on ‹service›, ‹time› has lapsed because it wasn't
+  paid", `BOOKING_LAPSED`, with "Book again:" and `/book?service=…`), or
+  `paid-late` (money came after the place was taken: `LAPSED`, owed back,
+  no notice). Nothing that reads "cancelled by the customer" (a null actor
+  on CANCELLED) counts a lapse: the team gets no bell for it.
+- **A hold that moves is not told "has moved"** (#1137): the move's
+  `booking.notify` carries `held: true` while the booking is PENDING, and
+  the handler sends no BOOKING_MOVED for it (the team still hears a move
+  the customer made). The payment's confirmation reads the booking's time
+  then, so it gives the new one.
 - **Lock a booking that may be a hold invoice first, then booking**
   (`lockBookingInTx`), the webhook's order. The other way round, a release
   and a payment arriving together deadlock (#508).
@@ -1026,6 +1632,15 @@ options, items, more }` and a sentence with the count, the first
   settles it and makes the credit note on the booking's invoice
   (`creditNoteForRefund`, DEC-023). A late cancel keeps the money; the
   business's `returnCredit` override refunds it only with `payment:manage`.
+  **The refund is in the booking's history** (#1137): once sent, a
+  `REFUNDED` BookingEvent ("Refunded ₹500 to how they paid"), or
+  `REFUND_FAILED` ("Refund failed") when the provider refused it, with
+  `data: { amountCents, currency, refundId, outcome }`
+  (`recordBookingRefundInTx`). The refund row's status decides which, under
+  its lock, and a line already the newest for that refund is not written
+  again; the refund webhook's settle and fail (and a refund made in the
+  provider's dashboard) call the same helper, so a refund that fails later
+  appends "Refund failed". Only a booking's own invoice (no order).
   A visit of a treatment has no booking invoice, so it never refunds here
   (DEC-050): its money goes back through the order.
 - **Money taken at the desk is the booking's paper, paid by hand** (round-2
@@ -1038,12 +1653,18 @@ options, items, more }` and a sentence with the count, the first
   set). Nothing is charged, so nothing is refundable online: the booking's
   `paidAtDeskCents` and `deskMethod` read PAID booking paper whose method
   is one of `PAYMENT_METHODS` — so "Mark it paid" on the invoice counts
-  too — and `dueCents` subtracts it. What "Take ₹X" may take, and why not
+  too — for the words only. **What was paid is the paper's ledger**
+  (DEC-173, `paidOnPaperCents`: each invoice's paid so far,
+  `paidSoFarCents`, however the money came in: online, at the desk, or
+  recorded by hand on Invoices, in one payment or several), never the
+  last payment's method or the intents: `dueCents` and the take are the
+  price less it, a pay link out takes `leftToPayCents` of its invoice, and
+  paid in full is refused as paid. What "Take ₹X" may take, and why not
   (cancelled, a hold, a treatment's visit, a course's session, a pack or
   membership, a payment PROCESSING, a voided invoice, no price, paid), is
   one pure rule, `bookings/desk-take.ts`, shared by the booking read, the
-  diary and the write. The write takes the cancel's lock order, refuses an
-  `amountCents` that differs from what it works out, and answers a repeat
+  diary, the calendar's Due and the write. The write takes the cancel's
+  lock order, refuses an `amountCents` that differs from what it works out, and answers a repeat
   of the last take (same method and amount, within ten minutes) as it did.
   A `PAID_AT_DESK` BookingEvent names who took it. No Undo: the invoice
   is issued paper.
@@ -1178,7 +1799,9 @@ options, items, more }` and a sentence with the count, the first
   `PackExtension` row; a pack with nothing left can't be extended, and an
   expired one can if the new date is still to come. Every create, publish,
   change, sale, extension, archive and restore writes one `PackEvent` in
-  its own transaction (`pack-events.ts`, actors as `event-actors.ts`);
+  its own transaction (`pack-events.ts`, actors as `event-actors.ts`); a
+  pack bought online writes its SOLD as the CUSTOMER when the money lands
+  (`completePackDraftInTx`, DEC-174 U22);
   without a CREATED event the read says `earlierUnrecorded`. Pack Detail's
   reads (`GET class-packs/:id` with `overview`, `…/holders`, `…/used`,
   `…/sales`, `…/events`) need only `pack:read`, money included (DEC-039);
@@ -1364,6 +1987,20 @@ options, items, more }` and a sentence with the count, the first
 - **Contact deletion** cancels the person's future course and pack-paid
   bookings and deletes their enrolments **before** the contact (a booking
   references both; one cascade trips a foreign key — `DEV_LEARNINGS.md`).
+- **Course and class notices** (DEC-174 U17, #1148). `enrol` and
+  `cancelEnrollment` queue COURSE_ENROLLED / COURSE_CANCELLED once per
+  enrolment (`queueCourseNotice`, `site-accounts/notices/course.ts`) on
+  their own transaction, only while `noticeOn(COURSE)`. The enrolment
+  lists every session as booked; the cancel's money line reads the
+  enrolment's invoice when it runs (paid and not refunded, still open,
+  voided, credited), since a cancel refunds nothing itself. A course's
+  sessions are still never told one by one. A class the business cancels
+  (`closesClass`) is not behind COURSE: each place's `booking.notify`
+  carries `classCancelled` ("‹Business› cancelled this class", money read
+  when it runs: `notices/class-cancel.ts`), an unpaid hold in it is told
+  too, and `closeSessionWaitlistInTx` with `tell` queues
+  WAITLIST_CLASS_CANCELLED for everyone still in line. A class taken off
+  sale closes its line silently.
 
 ## Modules and routes — **Current**
 
@@ -1392,3 +2029,5 @@ options, items, more }` and a sentence with the count, the first
 - Demo data: `db:seed:showcase` builds Pulse (subscriptions and invoices),
   Prana (courses, packs, online classes) and CarePoint (a clinic without
   Payments), and checks its own sums in SQL (`docs/architecture/LOCAL_DEV.md`).
+  Rye & Co. and Pulse carry every state the rebuilt invoice screens draw
+  ("Payments on an invoice are a ledger" → Demo data, #1129).

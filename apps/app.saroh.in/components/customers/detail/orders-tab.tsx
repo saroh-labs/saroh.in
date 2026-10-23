@@ -15,8 +15,8 @@ import {
     ordersShown,
 } from "@/lib/customer-workspace/view";
 
-import { listTable } from "@/components/shared/list-toolbar";
-import { StatusBadge } from "@/components/shared/status-badge";
+import { listTable } from "@/components/shared/lists/list-toolbar";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { cn } from "@saroh/ui/lib/utils";
 import { TextLink } from "@saroh/ui/text-link";
 import { Chips, Empty } from "./parts";

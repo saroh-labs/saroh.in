@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Section } from "@/lib/sites/service";
 
-import { saveableSections } from "../saveable-sections";
+import { saveableSections } from "@/components/sites/blocks/saveable-sections";
 import { withVariant } from "./variant-field";
 
 /**

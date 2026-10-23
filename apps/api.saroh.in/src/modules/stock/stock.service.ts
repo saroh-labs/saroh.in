@@ -13,6 +13,7 @@ import {
     lockProducts,
     lockStockLevels,
 } from "../products/stock-levels";
+import { onSellableAgain, onSellableAgainAll } from "./on-sellable-again";
 import { clearSoldOut } from "./sold-out";
 import type { AdjustKind, StockSystemReason } from "./stock-words";
 import {
@@ -303,6 +304,8 @@ async function resolveRowId(
         if (started.count > 0) {
             // Started by a count, not the switch: Activity says so.
             const soldOutCleared = await clearSoldOut(tx, { productId });
+            // Its count says whether it sells now (U23).
+            await onSellableAgain(tx, organizationId, productId);
             const named = await tx.product.findUniqueOrThrow({
                 where: { id: productId },
                 select: { name: true },
@@ -490,6 +493,11 @@ export async function recordEntry(
                 : {}),
         },
     });
+    // Units added, or a promise given back: anyone waiting for it to be
+    // back hears once it stays sellable (U23, `on-sellable-again.ts`).
+    if (input.quantity > 0 || (input.promisedDelta ?? 0) < 0) {
+        await onSellableAgain(tx, row.organizationId, row.productId);
+    }
     return tx.stockEntry.create({
         data: {
             organizationId: row.organizationId,
@@ -557,6 +565,15 @@ async function writeEntries(
 ): Promise<StockEntryView[]> {
     if (data.length === 0) return [];
     const made = await tx.stockEntry.createManyAndReturn({ data: [...data] });
+    // Units added: anyone waiting for it to be back (U23).
+    const rose = data.filter((d) => d.quantity > 0);
+    if (rose.length > 0) {
+        await onSellableAgainAll(
+            tx,
+            rose[0].organizationId,
+            rose.map((d) => d.productId),
+        );
+    }
     const byKey = new Map(made.map((e) => [key(e), e] as const));
     return data.map((d) => {
         const entry = byKey.get(key(d));

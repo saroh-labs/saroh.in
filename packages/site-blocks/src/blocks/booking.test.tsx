@@ -232,8 +232,9 @@ describe("booking block — sign-in is always on (A9)", () => {
         const link = await screen.findByText("Book a time");
         expect(link).not.toHaveAttribute("href");
         expect(link).toHaveAttribute("aria-disabled", "true");
-        // Its times are read, never tapped.
-        expect(screen.getByText("2:00 pm").tagName).toBe("SPAN");
+        // Its times are read, never tapped. They draw after the button on
+        // a busy machine, so the test waits for them.
+        expect((await screen.findByText("2:00 pm")).tagName).toBe("SPAN");
     });
 });
 

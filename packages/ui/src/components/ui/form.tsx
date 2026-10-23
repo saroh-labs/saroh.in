@@ -3,7 +3,12 @@ import type * as LabelPrimitive from "@radix-ui/react-label";
 import { Slot } from "@radix-ui/react-slot";
 import * as React from "react";
 import type { ControllerProps, FieldPath, FieldValues } from "react-hook-form";
-import { Controller, FormProvider, useFormContext } from "react-hook-form";
+import {
+    Controller,
+    FormProvider,
+    useFormContext,
+    useFormState,
+} from "react-hook-form";
 import { cn } from "../../lib/utils";
 import { FieldError, FieldHint } from "./field";
 import { Label } from "./label";
@@ -35,8 +40,12 @@ function FormField<
 const useFormField = () => {
     const fieldContext = React.useContext(FormFieldContext);
     const itemContext = React.useContext(FormItemContext);
-    const { getFieldState, formState } = useFormContext();
-
+    const { getFieldState } = useFormContext();
+    // Its own subscription to this field's state, not the form's: under the
+    // React Compiler the form's re-render no longer reaches a memoized field,
+    // so a message read from the context's formState stayed blank after a
+    // refused submit (the Close request dialog, #1107). As shadcn's own.
+    const formState = useFormState({ name: fieldContext.name });
     const fieldState = getFieldState(fieldContext.name, formState);
 
     if (!fieldContext) {

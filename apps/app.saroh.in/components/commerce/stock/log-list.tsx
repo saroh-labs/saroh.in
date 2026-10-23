@@ -30,8 +30,8 @@ import {
     listTable,
     ListTableHead,
     ListToolbar,
-} from "@/components/shared/list-toolbar";
-import { StatusBadge } from "@/components/shared/status-badge";
+} from "@/components/shared/lists/list-toolbar";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { TextLink } from "@saroh/ui/text-link";
 import { PILL_TONE, TEXT_TONE } from "./tones";
 

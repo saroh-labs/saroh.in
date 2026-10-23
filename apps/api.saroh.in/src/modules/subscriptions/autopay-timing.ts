@@ -13,8 +13,9 @@ import { PRE_DEBIT_LEAD_HOURS } from "../payments/providers/provider.port";
  * - `ON_RENEWAL_DATE`: the renewal invoice, and with it the bank's
  *   pre-debit notice, go out {@link AUTOPAY_LEAD_DAYS} days before the
  *   renewal date, so the debit lands on it. Every method gets the early
- *   invoice, even a card or eMandate that needs no notice, so a plan's
- *   invoices always go out on the same day.
+ *   invoice, even a card that needs no notice, so a plan's invoices
+ *   always go out on the same day. (An eMandate waits on Saroh's own
+ *   notice, DEC-180, as UPI waits on the provider's.)
  * - `DAY_AFTER_RENEWAL` (the default; D13 as it shipped): the invoice on
  *   the renewal date, the debit {@link PRE_DEBIT_LEAD_HOURS} later — at
  *   once for a method that needs no notice.
@@ -63,12 +64,47 @@ export function timingOf(v: unknown): AutopayChargeTiming {
 }
 
 /**
- * Whether a mandate's method waits on a pre-debit notice. UPI does (and a
- * mandate whose method is unknown is treated as UPI, as Razorpay's adapter
- * does); a card or eMandate answers NOT_NEEDED and may be debited at once.
+ * Whether a mandate's method waits on a pre-debit notice. UPI does, sent
+ * by the provider (and a mandate whose method is unknown is treated as
+ * UPI, as Razorpay's adapter does). eMandate does too, sent by Saroh
+ * ({@link sarohSendsNotice}, DEC-180). A card answers NOT_NEEDED (its bank
+ * tells the customer when the debit is asked for) and may be debited at
+ * once.
  */
 export function needsNotice(method: string | null | undefined): boolean {
-    return method === "UPI" || method == null;
+    return method === "UPI" || method == null || sarohSendsNotice(method);
+}
+
+/**
+ * Whether Saroh itself tells the customer before each debit (DEC-180): an
+ * eMandate (a bank account through NPCI's API e-mandate), for which
+ * neither Razorpay nor the bank sends a pre-debit notice. The charge job
+ * queues `AUTOPAY_PRE_DEBIT` through the business's own email and debits
+ * only once it went (`site-accounts/notices/pre-debit.ts`).
+ */
+export function sarohSendsNotice(method: string | null | undefined): boolean {
+    return method === "EMANDATE";
+}
+
+/**
+ * The least time between Saroh's pre-debit email going and the eMandate
+ * debit (DEC-180, "about a day before"): a debit due sooner after it waits
+ * until then.
+ */
+export const SAROH_NOTICE_MIN_HOURS = 24;
+
+/**
+ * When Saroh's pre-debit email is queued: {@link PRE_DEBIT_LEAD_HOURS}
+ * before the planned debit, or `now` when that has passed. Every eMandate
+ * debit is planned at least that far after its charge is prepared
+ * (`earliestDebit`), so the email has two hours beyond
+ * {@link SAROH_NOTICE_MIN_HOURS} to go before the debit is due.
+ */
+export function sarohNoticeAt(debitAt: Date, now: Date): Date {
+    return later(
+        now,
+        new Date(debitAt.getTime() - PRE_DEBIT_LEAD_HOURS * HOUR_MS),
+    );
 }
 
 /** The earliest a debit can go when its charge is prepared `now`. */

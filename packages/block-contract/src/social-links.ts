@@ -18,6 +18,8 @@
  *   one that no longer passes is dropped, never drawn.
  */
 
+import { E164, normalisePhoneNumber, PHONE_SEPARATORS } from "./phone";
+
 /** The networks, in the order they are listed and drawn. */
 export const SOCIAL_NETWORKS = [
     "instagram",
@@ -400,14 +402,28 @@ function googleMaps(raw: string): SocialCheck {
     return refuse(wrong);
 }
 
-/** What a merchant may type between a number's digits. */
-const PHONE_SEPARATORS = /[\s\-.()]/g;
-const E164 = /^\+[1-9]\d{7,14}$/;
 const WHATSAPP_HOSTS = ["wa.me", "api.whatsapp.com"];
 
 /** A `wa.me` link from an E.164 number ("+919845012345"), or null. */
 export function whatsappLinkFromPhone(phone: string): string | null {
     return E164.test(phone) ? `https://wa.me/${phone.slice(1)}` : null;
+}
+
+/**
+ * A click-to-chat link that opens WhatsApp on `phone` with `text` already
+ * typed (DEC-173): `https://wa.me/919845011234?text=Hi%20Vivek`. The number
+ * is read as `normalisePhoneNumber` reads one, so a saved E.164 number or one
+ * typed the way people say it ("+91 98450 11234", "98450 11234") both work;
+ * null when it can't be dialled. Saroh sends nothing: the person presses
+ * Send in WhatsApp, or doesn't.
+ */
+export function whatsappChatLink(phone: string, text: string): string | null {
+    const read = normalisePhoneNumber(phone);
+    if (!("phone" in read) || read.phone === null) return null;
+    const base = `https://wa.me/${read.phone.slice(1)}`;
+    return text.trim() === ""
+        ? base
+        : `${base}?text=${encodeURIComponent(text)}`;
 }
 
 function whatsapp(raw: string): SocialCheck {

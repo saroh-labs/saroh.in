@@ -25,6 +25,10 @@ export interface OpenOrders {
     count: number;
     /** The rest of the Orders list's Open tab: in progress, due later. */
     later: number;
+    /** Of `count`, late now (Home A's "3 late"). */
+    late?: number;
+    /** Of `count`, due today and not late yet ("3 due today"). */
+    dueToday?: number;
     evidence: HomeEvidence[];
     /** The worst of what `count` holds past `evidence`, when anything. */
     moreTone?: HomeTone;
@@ -40,6 +44,14 @@ export function soonCutoff(now: Date, zone: string): Date {
     return DateTime.fromJSDate(now, { zone })
         .startOf("day")
         .plus({ days: 2 })
+        .toJSDate();
+}
+
+/** The start of tomorrow in the business's zone: "due today" ends there. */
+export function todayCutoff(now: Date, zone: string): Date {
+    return DateTime.fromJSDate(now, { zone })
+        .startOf("day")
+        .plus({ days: 1 })
         .toJSDate();
 }
 
@@ -78,10 +90,12 @@ export async function readOpenOrders(
             open: number;
             total: number;
             lates: number;
+            dueToday?: number;
         }[]
     >(Prisma.sql`WITH candidates AS (
         SELECT o.id, o."createdAt", ${lateSql(view.now)} AS late,
-            ${lateSql(soonCutoff(view.now, view.zone))} AS soon
+            ${lateSql(soonCutoff(view.now, view.zone))} AS soon,
+            ${lateSql(todayCutoff(view.now, view.zone))} AS today
         FROM "Order" o
         ${lateSettingsJoin()}
         WHERE ${openOrderSql(organizationId)}${storeSql(view.storeIds, "o")}
@@ -89,7 +103,8 @@ export async function readOpenOrders(
     SELECT id, late, soon,
         (COUNT(*) OVER ())::int AS open,
         (COUNT(*) FILTER (WHERE soon) OVER ())::int AS total,
-        (COUNT(*) FILTER (WHERE late) OVER ())::int AS lates
+        (COUNT(*) FILTER (WHERE late) OVER ())::int AS lates,
+        (COUNT(*) FILTER (WHERE today AND NOT late) OVER ())::int AS "dueToday"
     FROM candidates
     ORDER BY soon DESC, late DESC, "createdAt" ASC, id ASC
     LIMIT ${EVIDENCE_LIMIT}`);
@@ -98,9 +113,12 @@ export async function readOpenOrders(
     const count = read[0].total;
     const later = read[0].open - count;
     const lates = read[0].lates;
+    const dueToday = read[0].dueToday ?? 0;
     // Soon ones sort first, so a later one picked only fills the limit.
     const picked = read.filter((p) => p.soon);
-    if (picked.length === 0) return { count: 0, later, evidence: [] };
+    if (picked.length === 0) {
+        return { count: 0, later, evidence: [], late: 0, dueToday: 0 };
+    }
     const shownLate = picked.filter((p) => p.late).length;
 
     const rows = await db.order.findMany({
@@ -148,6 +166,8 @@ export async function readOpenOrders(
         count,
         later,
         evidence,
+        late: lates,
+        dueToday,
         ...(hidden > 0 ? { moreTone: lates > shownLate ? "bad" : "due" } : {}),
     };
 }

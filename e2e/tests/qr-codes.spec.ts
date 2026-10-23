@@ -178,6 +178,7 @@ test("the owner makes a QR code, a phone scans it, and the list counts it", asyn
         }
 
         // A phone scans the printed code: the site forwards it, tagged.
+        // The request fixture: signed out on purpose, a visitor's scan.
         const scan = await request.get(`${LIVE}/q/${code}`, {
             maxRedirects: 0,
             headers: visitor(testInfo),

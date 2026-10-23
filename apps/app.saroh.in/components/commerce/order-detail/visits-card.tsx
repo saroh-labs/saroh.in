@@ -18,8 +18,8 @@ import {
     visitWhen,
 } from "@/lib/orders/visits";
 
-import { FailedRead } from "@/components/shared/failed-read";
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { Notice } from "@saroh/ui/notice";
 import { FOCUS, Panel, PanelTitle } from "./parts";
 

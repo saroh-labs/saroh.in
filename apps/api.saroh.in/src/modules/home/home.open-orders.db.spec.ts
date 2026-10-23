@@ -203,6 +203,22 @@ describe("Home's open orders (DB)", () => {
         expect(home.moreTone).toBe("due");
     });
 
+    it("says how many are late and how many are due today (Home A's To pack, DEC-171)", async () => {
+        const home = await readOpenOrders(prisma, orgId, view);
+        // The pick-up 150 minutes old is late; the one paid online turns
+        // late at 14:00 today; the five deliveries are due tomorrow.
+        expect(home).toMatchObject({ count: 7, late: 1, dueToday: 1 });
+        // At 01:00 IST the next day the business's day has turned: both
+        // pick-ups are late, and the deliveries (late from 04:00) are due
+        // today.
+        const nextDay = await readOpenOrders(prisma, orgId, {
+            ...view,
+            now: new Date(NOW.getTime() + 13 * HOUR),
+        });
+        expect(nextDay.late).toBe(2);
+        expect(nextDay.dueToday).toBe(5);
+    });
+
     it("lists the shipping order once it is due tomorrow (DEC-163)", async () => {
         // A day on: it turns late at noon tomorrow.
         const home = await readOpenOrders(prisma, orgId, {

@@ -26,13 +26,15 @@ export function firstNameOf(name: string | null | undefined): string | null {
 /**
  * Mark sent (MARK_SENT): the order's move to its handover step. `notifies`
  * is whether that step has a customer notice at all (A14 tells the
- * customer about a courier handover or a delivery going out; a digital
- * order's "sent" has none), and `reach` how it would reach them.
+ * customer about a courier handover or a delivery going out, and a digital
+ * order's "sent" while the business sends delivery updates, U16), and
+ * `reach` how it would reach them.
  */
 export function markSentWords(
     first: string | null,
     notifies: boolean,
     reach: NoticeReach,
+    stage?: string,
 ): Words {
     const who = first ?? "the customer";
     const done = "Marked sent";
@@ -44,7 +46,11 @@ export function markSentWords(
         sends: false,
     };
     if (!notifies || reach === "NONE") return quiet;
-    const onItsWay = "that the order is on its way";
+    // A digital order isn't on its way: it is sent (U16).
+    const onItsWay =
+        stage === "SENT"
+            ? "that the order has been sent"
+            : "that the order is on its way";
     switch (reach) {
         case "EMAIL_AND_ACCOUNT":
             return {
@@ -150,16 +156,27 @@ export function reminderWords(
 
 /**
  * Reply (REPLY): A13's thread. A reply shows in the customer's account on
- * the business's site and nothing else is sent — no email, no text — which
- * is what Customer Detail's Messages tab says under its reply box too.
+ * the business's site, and is emailed a minute later where the business's
+ * own email sends it (DEC-174 U14, `emailedTo`); nothing is texted. The
+ * same as Customer Detail's Messages tab says under its reply box. Home's
+ * Undo holds the reply before it is sent, so an undone one is never
+ * written, nor emailed.
  */
-export function replyWords(first: string | null, signsIn: boolean): Words {
+export function replyWords(
+    first: string | null,
+    signsIn: boolean,
+    emailedTo: string | null = null,
+): Words {
     const who = first ?? "They";
     return {
         label: "Reply",
-        confirm: signsIn
-            ? `${who} sees your reply in Messages when they're signed in on your site. Nothing is emailed or texted.`
-            : `${who} doesn't sign in on your site now. They'll see your reply when they sign in there. Nothing is emailed or texted.`,
+        confirm: emailedTo
+            ? signsIn
+                ? `Emailed to ${emailedTo} a minute after you send. ${who} also sees it in Messages on your site.`
+                : `Emailed to ${emailedTo} a minute after you send. ${first ? `${first} can` : "They can"} also read it when they sign in on your site.`
+            : signsIn
+              ? `${who} sees your reply in Messages when they're signed in on your site. Nothing is emailed or texted.`
+              : `${who} doesn't sign in on your site now. They'll see your reply when they sign in there. Nothing is emailed or texted.`,
         yes: "Send reply",
         done: first ? `Replied · it's in ${first}'s account` : "Replied",
         sends: true,
@@ -204,6 +221,56 @@ export function refundMismatchWords(
         yes: `Refund ${amount}`,
         done: first ? `Refund on its way to ${first}` : "Refund on its way",
         sends: false,
+    };
+}
+
+/**
+ * Send payment link (SEND_PAY_LINK, DEC-171): the booking's own pay link
+ * (`POST bookings/:id/pay-link`), which makes a new link on its invoice;
+ * the one sent before stops working. Saroh sends nothing: the link is
+ * handed back to share on WhatsApp or SMS, as the booking's page does.
+ */
+export function payLinkWords(first: string | null, service: string): Words {
+    const whose = first ? `${first}'s` : "this";
+    return {
+        label: "Send payment link",
+        confirm: `This makes a new payment link for ${whose} ${service}, and the link sent before stops working. Saroh doesn't send it: share it with ${first ?? "them"} on WhatsApp or SMS.`,
+        yes: "Make the link",
+        done: "Payment link ready",
+        sends: false,
+    };
+}
+
+/**
+ * Turn down (TURN_DOWN, A7): the booking's own cancel
+ * (`DELETE bookings/:id`). A booking with a link sent is cancelled: the
+ * customer is told, as a cancel from the booking's page tells them, its
+ * link stops and the time opens up. A booking still being paid for on the
+ * booking page (a hold) is let go: nothing was booked yet, so nothing is
+ * sent, and their payment page stops working.
+ */
+export function turnDownWords(
+    first: string | null,
+    service: string,
+    when: string,
+    held: boolean,
+): Words {
+    const whose = first ? `${first}'s` : "this";
+    if (held) {
+        return {
+            label: "Turn down",
+            confirm: `${capital(first ?? "the customer")} is paying for ${service} on ${when} on your booking page right now. Turning it down lets the place go and their payment page stops working. Nothing is sent.`,
+            yes: "Turn down",
+            done: "Turned down",
+            sends: false,
+        };
+    }
+    return {
+        label: "Turn down",
+        confirm: `This cancels ${whose} ${service} on ${when}. ${first ? `${first} is` : "They're"} told, the payment link stops working, and the time opens up for someone else.`,
+        yes: "Turn down",
+        done: "Turned down",
+        sends: true,
     };
 }
 

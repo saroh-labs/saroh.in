@@ -7,7 +7,12 @@ export function StepHead({ n, title }: { n: number; title: string }) {
             >
                 {n}
             </span>
-            <h2 className="font-site-heading text-site-fg text-[calc(1.1875rem*var(--site-heading-scale,1))] font-semibold leading-tight tracking-[-0.02em]">
+            {/* Focusable by the page alone: Back and Forward put focus here
+                (U9), so a screen reader hears the step it is on. */}
+            <h2
+                tabIndex={-1}
+                className="font-site-heading text-site-fg text-[calc(1.1875rem*var(--site-heading-scale,1))] font-semibold leading-tight tracking-[-0.02em] outline-none"
+            >
                 {title}
             </h2>
         </div>

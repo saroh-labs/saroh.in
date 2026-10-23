@@ -1,6 +1,7 @@
 "use server";
 
 import type {
+    BookingLookup,
     BookingResult,
     BookResult,
     CreditAnswer,
@@ -20,6 +21,7 @@ import {
     TEST_RELEASE_REASON,
 } from "@saroh/site-blocks";
 
+import { getBooking } from "@/lib/account-area";
 import { accountBookingBody } from "@/lib/account-booking";
 import { accountFetch } from "@/lib/customer-session";
 import { siteOrigin } from "@/lib/origin";
@@ -78,6 +80,22 @@ export async function bookSignedIn(
 }
 
 const MAX_ID = 64;
+
+const REF = /^[A-Za-z0-9_-]{1,64}$/;
+
+/**
+ * One of the signed-in customer's own bookings by its reference (U9): the
+ * booking page's booked step, read again after Back and Forward. Through
+ * the customer's session only (`me/bookings/:ref`): signed out, or someone
+ * else's, it is "missing". No public read by reference exists.
+ */
+export async function findMyBooking(ref: unknown): Promise<BookingLookup> {
+    if (!(await siteOrigin())) return { ok: false, reason: "unavailable" };
+    if (typeof ref !== "string" || !REF.test(ref)) {
+        return { ok: false, reason: "missing" };
+    }
+    return getBooking(ref);
+}
 
 /**
  * The class credit the signed-in customer could pay with (round-2 A10), for

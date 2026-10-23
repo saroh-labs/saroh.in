@@ -69,6 +69,18 @@ describe("detailsProblems", () => {
         expect(detailsProblems(ok)).toEqual({});
     });
 
+    it("checks a phone once it is changed (#1036)", () => {
+        const old = { ...ok, phone: "ext 12" };
+        // Saved before numbers were checked: the rest still saves.
+        expect(detailsProblems(old, old)).toEqual({});
+        expect(
+            detailsProblems({ ...old, phone: "+9198450" }, old).phone,
+        ).toMatch(/phone number/);
+        expect(
+            detailsProblems({ ...old, phone: "+919845000001" }, old),
+        ).toEqual({});
+    });
+
     it("says a customer needs a name, and an email must look like one", () => {
         expect(
             detailsProblems({

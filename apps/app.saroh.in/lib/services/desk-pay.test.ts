@@ -54,7 +54,7 @@ describe("taking payment at the desk (P2)", () => {
         expect(deskButton("CASH", "₹500")).toBe("Take ₹500 cash");
         expect(deskButton("UPI", "₹500")).toBe("UPI received");
         expect(deskButton("CARD", "₹500")).toBe("Card approved");
-        expect(deskButton("LINK", "₹500")).toBe("Get the pay link");
+        expect(deskButton("LINK", "₹500")).toBe("Get the payment link");
         expect(deskNote("UPI", "₹500")).toContain("₹500 shows on your UPI app");
         expect(deskNote("CARD", "₹500")).toContain("Key ₹500 into the machine");
     });
@@ -157,7 +157,7 @@ describe("a booking paid at the desk, as the screens say it", () => {
     } as unknown as DiaryBooking;
 
     it("calendar: the quick look's Paid row and the block's line", () => {
-        expect(paidText(booking)).toBe("Pays at the session");
+        expect(paidText(booking)).toBe("Pays at the visit");
         const paid = { ...booking, paidAtDesk: { method: "UPI" } };
         expect(paidText(paid)).toBe("Paid at the desk · UPI");
         // Paid online says how, never "Paid · Paid" (UX-049).
@@ -166,9 +166,7 @@ describe("a booking paid at the desk, as the screens say it", () => {
             ({ kind: "one", booking: b, state: "booked" }) as Parameters<
                 typeof blockLine
             >[0];
-        expect(blockLine(block(booking))).toBe(
-            "Check-up · pays at the session",
-        );
+        expect(blockLine(block(booking))).toBe("Check-up · pays at the visit");
         expect(blockLine(block(paid))).toBe("Check-up · paid at the desk");
     });
 });
@@ -193,6 +191,6 @@ describe("Take ₹X's choices on each plan (R33)", () => {
                 canLink: true,
                 online: takesOnlinePayment(onlinePlan()),
             }).find((c) => c.key === "LINK"),
-        ).toEqual({ key: "LINK", label: "Send a pay link", off: null });
+        ).toEqual({ key: "LINK", label: "Send a payment link", off: null });
     });
 });

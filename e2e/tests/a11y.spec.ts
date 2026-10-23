@@ -107,18 +107,18 @@ const SCREENS: Screen[] = [
         ready: h1("Priya Raman"),
     },
     {
-        name: "Overview",
+        name: "Calendar",
         org: PULSE,
         path: "/calendar",
-        ready: (page) =>
-            page.getByRole("group", { name: "Show on the calendar" }),
+        // The month's one filter button (bookings U13).
+        ready: (page) => page.getByRole("button", { name: /^What to show/ }),
     },
     {
         name: "Bookings",
         org: PULSE,
         path: "/bookings",
         ready: (page) =>
-            page.getByRole("navigation", { name: "Bookings view" }),
+            page.getByRole("button", { name: /Change the day or the view$/ }),
     },
     {
         name: "Products",

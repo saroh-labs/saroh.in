@@ -78,7 +78,9 @@ describe("All modules", () => {
         expect(heads[3]).toContain("0 businesses");
         expect(heads.slice(-2)).toEqual(["Pricing page", "Order"]);
         expect(
-            screen.getByText("Click a cell to edit it plan by plan."),
+            screen.getByText(
+                "Click a cell to edit that feature on every plan.",
+            ),
         ).toBeTruthy();
         expect(screen.getByText("Changed in this draft")).toBeTruthy();
         expect(
@@ -88,12 +90,12 @@ describe("All modules", () => {
         // Cells: words and limits, or Locked / Hidden.
         expect(
             matrix().getByRole("button", {
-                name: "Things on Plan A: 11, limit 11. Edit plan by plan",
+                name: "Things on Plan A: 11, limit 11. Edit on every plan",
             }),
         ).toBeTruthy();
         // A soft cap says so, in words and to a screen reader.
         const soft = matrix().getByRole("button", {
-            name: "Things on Plan B: 111, soft limit 111. Edit plan by plan",
+            name: "Things on Plan B: 111, soft limit 111. Edit on every plan",
         });
         expect(within(soft).getByText("soft")).toBeTruthy();
         expect(
@@ -103,12 +105,12 @@ describe("All modules", () => {
         ).toBeNull();
         expect(
             matrix().getByRole("button", {
-                name: "Widgets on Plan A: Hidden. Edit plan by plan",
+                name: "Widgets on Plan A: Hidden. Edit on every plan",
             }),
         ).toBeTruthy();
         expect(
             matrix().getByRole("button", {
-                name: "Gadgets on Plan A: Locked. Edit plan by plan",
+                name: "Gadgets on Plan A: Locked. Edit on every plan",
             }),
         ).toBeTruthy();
     });
@@ -142,28 +144,26 @@ describe("All modules", () => {
         ).toBeTruthy();
     });
 
-    it("opens the Plans tab on a cell's plan with its row focused", () => {
+    it("opens the Plans tab with that feature's sheet on the cell's plan", () => {
         open();
         fireEvent.click(
             matrix().getByRole("button", {
-                name: "Widgets on Plan C: Included. Edit plan by plan",
+                name: "Widgets on Plan C: Included. Edit on every plan",
             }),
         );
+        // Under the sheet (hidden from a screen reader while it is open).
         expect(
             screen
-                .getByRole("tab", { name: "Plans" })
+                .getByRole("tab", { name: "Plans", hidden: true })
                 .getAttribute("aria-selected"),
         ).toBe("true");
         expect(window.location.search).toBe("?tab=plans");
-        const chips = within(screen.getByRole("group", { name: "Plans" }));
-        expect(
-            chips
-                .getByRole("button", { name: /^Plan C/ })
-                .getAttribute("aria-pressed"),
-        ).toBe("true");
-        const tick = screen.getByRole("checkbox", { name: /Widgets/ });
+        const sheet = within(screen.getByRole("dialog", { name: "Widgets" }));
+        const tick = sheet.getByRole("checkbox", {
+            name: "Plan C has Widgets",
+        });
         expect(document.activeElement).toBe(tick);
-        expect(tick.closest("[data-module]")?.className).toContain(
+        expect(tick.closest("[data-plan]")?.className).toContain(
             "bg-highlight-subtle",
         );
     });

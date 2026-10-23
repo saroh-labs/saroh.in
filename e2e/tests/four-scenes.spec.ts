@@ -3,6 +3,7 @@ import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
+import { pressUntil } from "../fixtures/press";
 import { useSession } from "../fixtures/sessions";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
 
@@ -35,7 +36,7 @@ const ROUTES = ["/", "/bookings", "/commerce", "/contacts"] as const;
 const LANDMARK: Record<(typeof ROUTES)[number], (page: Page) => Locator> = {
     "/": (page) => page.getByRole("region", { name: "Needs you" }),
     "/bookings": (page) =>
-        page.getByRole("navigation", { name: "Bookings view" }),
+        page.getByRole("button", { name: /Change the day or the view$/ }),
     // Sell lands on its location, titled with its own name; its first card
     // is the same whatever it is called.
     "/commerce": (page) => page.getByRole("region", { name: "The place" }),
@@ -245,12 +246,10 @@ test.describe("the phone tab bar", () => {
         await expect(more).toHaveAttribute("aria-expanded", "false");
 
         // Pressed until it opens: a press before hydration does nothing.
-        await expect(async () => {
-            await more.click();
-            await expect(
-                page.getByRole("dialog", { name: "Everything else" }),
-            ).toBeVisible({ timeout: 2_000 });
-        }).toPass({ timeout: 20_000 });
+        await pressUntil(
+            more,
+            page.getByRole("dialog", { name: "Everything else" }),
+        );
 
         const sheet = page.getByRole("dialog", { name: "Everything else" });
         await expect(
@@ -289,9 +288,9 @@ test.describe("touch targets", () => {
         await signIn(page);
         await page.goto("/bookings");
         // The calendar itself, not its failed or locked state: measuring a
-        // page without the layout switch passes vacuously.
+        // page without header C's date title passes vacuously.
         await expect(
-            page.getByRole("navigation", { name: "Bookings view" }),
+            page.getByRole("button", { name: /Change the day or the view$/ }),
         ).toBeVisible();
 
         // Guard the guard: if `pointer: coarse` does not match, every
@@ -441,5 +440,31 @@ test.describe("dark is a surface, not an inversion", () => {
         // dark surface ends up light in one context and right in another.
         expect(background).not.toBe("rgba(0, 0, 0, 0)");
         expect(background).not.toBe("transparent");
+    });
+});
+
+test.describe("Home on a phone, simplified (U17)", () => {
+    test("every line, figure and button is a thumb's height, and nothing hides sideways", async ({
+        page,
+    }, testInfo) => {
+        test.skip(
+            !testInfo.project.name.startsWith("phone"),
+            "The phone's Home",
+        );
+        await signIn(page);
+        await page.goto("/");
+        const home = page.locator(
+            '[data-home-layout="phone"] [data-phone-home]',
+        );
+        await expect(home).toBeVisible();
+        const short = await home
+            .locator("a, button")
+            .evaluateAll((els) =>
+                els
+                    .map((el) => Math.round(el.getBoundingClientRect().height))
+                    .filter((h) => h > 2 && h < 44),
+            );
+        expect(short).toEqual([]);
+        await expectNothingHiddenSideways(page);
     });
 });

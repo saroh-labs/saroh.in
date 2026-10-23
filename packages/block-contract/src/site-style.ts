@@ -1,7 +1,17 @@
 import type { FontPairKey } from "./fonts";
 import { DEFAULT_FONT_PAIR, fontPairVariables, isFontPairKey } from "./fonts";
-import type { SitePalette } from "./palette";
-import { paletteVariables, parsePalette } from "./palette";
+import type { LookId } from "./looks";
+import { LOOKS, parseLook } from "./looks";
+import type { PaletteRole, SitePalette } from "./palette";
+import {
+    hslTripleToHex,
+    PALETTE_ROLES,
+    PALETTE_VARIABLES,
+    paletteVariables,
+    parsePalette,
+} from "./palette";
+import type { SafeColours } from "./safe-colours";
+import { deriveSafeColours } from "./safe-colours";
 import type { SiteTypeScale } from "./type-scale";
 import { parseTypeScale, typeScaleVariables } from "./type-scale";
 
@@ -192,6 +202,13 @@ export interface SiteStyle {
     palette?: SitePalette;
     /** A template's type scale (DEC-090), absent for today's sizes. */
     type?: SiteTypeScale;
+    /**
+     * The site's look (DEC-172, KD1): Folio, Quiet or Live. ABSENT for
+     * Classic, never written as "classic", for the reason `fontPair` is:
+     * every style saved before looks has no such field, and a site that
+     * chose nothing must not report a change.
+     */
+    look?: LookId;
 }
 
 /** The look a site has before anyone chooses anything: today's appearance. */
@@ -312,7 +329,7 @@ export function siteStyleVariables(style: SiteStyle): Record<string, string> {
         ? chosenText
         : readableOn(ground);
 
-    return {
+    const vars: Record<string, string> = {
         "--site-bg": ground,
         "--site-surface": ground,
         "--site-fg": text,
@@ -356,6 +373,60 @@ export function siteStyleVariables(style: SiteStyle): Record<string, string> {
         // Its type scale: nothing at all for a site without one.
         ...typeScaleVariables(style.type),
     };
+    // A look draws in safe colours (KD4); Classic keeps exactly these.
+    return withLookColours(style, vars);
+}
+
+/**
+ * Resolved `--site-*` variables in a look's safe colours (KD4), or the
+ * same variables for Classic. The step `siteStyleVariables` ends with,
+ * exported for the editor's preview (U16), which resolves its rows from
+ * the palette the API serves and then draws a look in the colours
+ * publishing will.
+ */
+export function withLookColours(
+    style: Pick<SiteStyle, "look" | "palette">,
+    vars: Record<string, string>,
+): Record<string, string> {
+    const safe = style.look ? safeColoursOf(style, vars) : null;
+    if (!safe) return vars;
+    return {
+        ...vars,
+        ...paletteVariables(safe.palette),
+        ...(safe.accentTreatment === "outline"
+            ? { "--site-accent-treatment": "outline" }
+            : {}),
+    };
+}
+
+/**
+ * The colours a site with a look draws in (KD4): its template's palette,
+ * or the colours its rows resolve to, made safe by `deriveSafeColours`.
+ * Null for Classic. Every colour goes through the one derivation, so a
+ * look cannot draw a pair that does not read; `siteStyleVariables` writes
+ * it out, with the derived roles (`--site-accent-text`, `--site-rule`, …)
+ * and `--site-accent-treatment: outline` for an accent that is the ink.
+ */
+export function siteStyleSafeColours(style: SiteStyle): SafeColours | null {
+    return style.look ? safeColoursOf(style, siteStyleVariables(style)) : null;
+}
+
+function safeColoursOf(
+    style: Pick<SiteStyle, "look" | "palette">,
+    vars: Record<string, string>,
+): SafeColours | null {
+    if (!style.look) return null;
+    if (style.palette) return deriveSafeColours(style.palette, style.look);
+    const palette = {} as SitePalette;
+    for (const role of PALETTE_ROLES as readonly PaletteRole[]) {
+        const triple = vars[PALETTE_VARIABLES[role]];
+        const hex = triple ? hslTripleToHex(triple) : null;
+        // Every role is set by the rows; one that is not a colour is a
+        // style this build cannot draw safely, so it keeps Classic's.
+        if (!hex) return null;
+        palette[role] = hex;
+    }
+    return deriveSafeColours(palette, style.look);
 }
 
 /**
@@ -372,6 +443,7 @@ export function presetSiteStyle(input: {
     fontPair?: string;
     palette?: unknown;
     type?: unknown;
+    look?: unknown;
 }): SiteStyle {
     const style = defaultSiteStyle();
     for (const row of STYLE_ROW_KEYS) {
@@ -389,8 +461,17 @@ export function presetSiteStyle(input: {
     if (isFontPairKey(input.fontPair) && input.fontPair !== DEFAULT_FONT_PAIR) {
         style.fontPair = input.fontPair;
     }
+    const look = parseLook(input.look);
     if (input.palette !== undefined && input.palette !== null) {
-        const parsed = parsePalette(input.palette);
+        const parsed = parsePalette(
+            input.palette,
+            look.ok && look.look
+                ? {
+                      accentFillContrast:
+                          LOOKS[look.look].colour.accentFillContrast,
+                  }
+                : {},
+        );
         if (parsed.ok) style.palette = parsed.palette;
     }
     if (input.type !== undefined && input.type !== null) {
@@ -399,5 +480,6 @@ export function presetSiteStyle(input: {
             style.type = parsed.type;
         }
     }
+    if (look.ok && look.look) style.look = look.look;
     return style;
 }

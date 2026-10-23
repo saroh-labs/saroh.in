@@ -24,22 +24,29 @@ vi.mock("@/lib/services/actions", () => ({
     listAvailability: vi.fn(() => Promise.resolve([])),
     readBookingPerson: vi.fn(() => Promise.resolve(null)),
 }));
+vi.mock("@/lib/services/bookings-opens-actions", () => ({
+    saveBookingsOpens: vi.fn((change: object) =>
+        Promise.resolve({ ok: true, data: change }),
+    ),
+}));
 vi.mock("../availability/add-person-dialog", () => ({
     AddPersonDialog: ({ open }: { open: boolean }) =>
         open ? <div role="dialog">Add someone</div> : null,
 }));
-vi.mock("./booking-quick-look", () => ({
+vi.mock("@/components/bookings/quick-look/booking-quick-look", () => ({
     BookingQuickLook: ({ block }: { block: { key: string } | null }) =>
         block ? <div role="dialog">Quick look {block.key}</div> : null,
 }));
-vi.mock("./new-booking-from-gap", () => ({
+vi.mock("@/components/bookings/free-time/new-booking-from-gap", () => ({
     NewBookingFromGap: ({
         target,
     }: {
         target: { free: readonly [number, number] } | null;
     }) => (target ? <div role="dialog">Book from {target.free[0]}</div> : null),
 }));
-vi.mock("./open-hours-dialog", () => ({ OpenHoursDialog: () => null }));
+vi.mock("@/components/bookings/free-time/open-hours-dialog", () => ({
+    OpenHoursDialog: () => null,
+}));
 
 /**
  * The calendar as a screen: the one toolbar row, cancelled bookings off the
@@ -174,8 +181,20 @@ const hourMarks = () =>
     Array.from(host.querySelectorAll("[aria-hidden] > div > span")).map(
         (s) => s.textContent,
     );
+/** The "…" options, opened: the cancelled switch lives there (U2). */
+const openOptions = () => {
+    const more = host.querySelector<HTMLButtonElement>(
+        'button[aria-label^="This day:"]',
+    );
+    if (!more) throw new Error("no options button");
+    act(() => more.click());
+};
 const cancelledSwitch = () =>
-    host.querySelector<HTMLButtonElement>('button[role="switch"]');
+    document.querySelector<HTMLButtonElement>(
+        '[data-header-popover] button[role="switch"]',
+    );
+const summaryText = () =>
+    host.querySelector('[data-calendar-header] [role="status"]')?.textContent;
 
 describe("cancelled bookings", () => {
     const calendar = calendarOf([
@@ -183,51 +202,50 @@ describe("cancelled bookings", () => {
         booking("gone", "Meera Shah", 15, 60, { status: "CANCELLED" }),
     ]);
 
-    it("stay off the diary by default, counted beside the day's count", () => {
+    it("stay off the diary by default; the summary line says the rest", () => {
         draw(calendar);
         expect(blocks("one")).toHaveLength(1);
         expect(blocks("cancelled")).toHaveLength(0);
-        expect(host.querySelector('[role="status"]')?.textContent).toBe(
-            "1 booking · ₹500 booked",
-        );
+        // 9 to 10 and 11 to 5 are free; 3 to 4 is free again once cancelled.
+        expect(summaryText()).toBe("1 booked · 2 free times · ₹500 booked");
+        openOptions();
         const sw = cancelledSwitch();
         expect(sw?.getAttribute("aria-checked")).toBe("false");
-        // Named for what it does; the words beside it take the press too.
-        expect(sw?.getAttribute("aria-label")).toBe("Show 1 cancelled");
-        expect(host.querySelector(`label[for="${sw?.id}"]`)?.textContent).toBe(
-            "1 cancelled",
-        );
+        expect(sw?.getAttribute("aria-label")).toBe("Show cancelled bookings");
+        expect(document.body.textContent).toContain("1 cancelled today");
     });
 
     it("draw as a thin line when switched on, and the address remembers", () => {
         draw(calendar);
+        openOptions();
         act(() => cancelledSwitch()?.click());
         expect(cancelledSwitch()?.getAttribute("aria-checked")).toBe("true");
         const line = blocks("cancelled");
         expect(line).toHaveLength(1);
         expect(line[0]?.textContent).toContain("Meera Shah");
-        expect(window.location.search).toBe(`?date=${DAY}&cancelled=1`);
-        // The next day and the other layouts keep it on.
+        expect(summaryText()).toContain("· 1 cancelled shown");
+        expect(window.location.search).toBe(
+            `?date=${DAY}&layout=day&person=all&cancelled=1`,
+        );
+        // The next day keeps it on.
         expect(
             host
                 .querySelector('a[aria-label="Next day"]')
                 ?.getAttribute("href"),
-        ).toBe("/bookings?date=2026-09-30&cancelled=1");
-        expect(
-            Array.from(host.querySelectorAll("nav[data-segmented] a")).map(
-                (a) => a.getAttribute("href"),
-            ),
-        ).toContain(`/bookings?date=${DAY}&layout=week&cancelled=1`);
+        ).toBe("/bookings?date=2026-09-30&layout=day&person=all&cancelled=1");
 
         act(() => cancelledSwitch()?.click());
         expect(blocks("cancelled")).toHaveLength(0);
-        expect(window.location.search).toBe(`?date=${DAY}`);
+        expect(window.location.search).toBe(
+            `?date=${DAY}&layout=day&person=all`,
+        );
     });
 
     it("are drawn from the start when the address asks", () => {
         draw(calendar, { showCancelled: true });
-        expect(cancelledSwitch()?.getAttribute("aria-checked")).toBe("true");
         expect(blocks("cancelled")).toHaveLength(1);
+        openOptions();
+        expect(cancelledSwitch()?.getAttribute("aria-checked")).toBe("true");
     });
 
     it("still open the quick look from their line", () => {
@@ -236,9 +254,11 @@ describe("cancelled bookings", () => {
         expect(host.textContent).toContain("Quick look gone");
     });
 
-    it("offer no switch on a day with none", () => {
+    it("a day with none still offers the switch, and says so", () => {
         draw(calendarOf([booking("b1", "Tariq Ali", 10, 60)]));
-        expect(cancelledSwitch()).toBeNull();
+        openOptions();
+        expect(cancelledSwitch()).not.toBeNull();
+        expect(document.body.textContent).toContain("None cancelled today");
     });
 });
 
@@ -259,17 +279,17 @@ describe("a free gap", () => {
         });
     };
 
-    it("shows nothing at rest, and the time it would book under the pointer", () => {
+    it("says Free and + Book at rest, and the time it would book under the pointer", () => {
         draw(calendarOf([]));
         const el = gap();
-        const label = el.querySelector("span");
-        expect(label?.className).toContain("hidden");
+        expect(el.textContent).toContain("Free · 9:00 am to 5:00 pm");
+        const book = el.querySelector("[data-free-book]");
+        expect(book?.textContent).toBe("Book");
         // 100 minutes into the gap: 10:40, so the quarter hour at 10:45.
         fire(el, "pointermove", { clientY: 100 });
-        expect(label?.textContent).toBe("Book 10:45 am");
-        expect(label?.className).not.toContain("hidden");
+        expect(book?.textContent).toBe("Book 10:45 am");
         fire(el, "pointerout", { relatedTarget: document.body });
-        expect(label?.className).toContain("hidden");
+        expect(book?.textContent).toBe("Book");
     });
 
     it("books at the nearest quarter hour to a click or a tap", () => {
@@ -285,33 +305,23 @@ describe("a free gap", () => {
     });
 });
 
-describe("the legend follows what is drawn", () => {
-    const key = () =>
-        Array.from(host.querySelectorAll('ul[aria-label="Key"] li')).map(
-            (li) => li.textContent,
-        );
-
-    it("names closed time on a day with closed time, and never Free", () => {
+describe("the colours", () => {
+    it("are no longer a row above the diary: the … sheet says what they mean", () => {
         draw(calendarOf([booking("b1", "Tariq Ali", 10, 60)]));
-        expect(key()).toEqual(["Closed"]);
-    });
-
-    it("adds Cancelled only while cancelled bookings are drawn", () => {
-        const calendar = calendarOf([
-            booking("gone", "Meera Shah", 15, 60, { status: "CANCELLED" }),
-        ]);
-        draw(calendar);
-        expect(key()).toEqual(["Closed"]);
-        act(() => cancelledSwitch()?.click());
-        expect(key()).toEqual(["Closed", "Cancelled"]);
-    });
-
-    it("is not drawn at all when only bookings are", () => {
-        // The staff read failed: no hours are known, so nothing is hatched.
-        draw(calendarOf([booking("b1", "Tariq Ali", 10, 60)]), {
-            staff: null,
-        });
         expect(host.querySelector('ul[aria-label="Key"]')).toBeNull();
+        openOptions();
+        const sheet = document.querySelector("[data-header-popover]");
+        expect(sheet?.textContent).toContain("What the colours mean");
+        for (const name of [
+            "A booking for one person",
+            "A group class",
+            "Free time",
+            "Closed",
+            "Time off",
+            "Now",
+        ]) {
+            expect(sheet?.textContent).toContain(name);
+        }
     });
 });
 
@@ -364,45 +374,126 @@ describe("the Unassigned column", () => {
         );
         draw(calendar);
         expect(heads()).toEqual(["asha"]);
+        openOptions();
         act(() => cancelledSwitch()?.click());
         expect(heads()).toEqual(["asha", "unassigned"]);
     });
 });
 
-describe("the toolbar is one row", () => {
-    it("has the date as the page's heading and one view switch", () => {
+describe("header C", () => {
+    it("has the date as the page's heading, and no visible view switch", () => {
         draw(calendarOf([booking("b1", "Tariq Ali", 10, 60)]));
         expect(host.querySelectorAll("h1")).toHaveLength(1);
         expect(host.querySelector("h1")?.textContent).toBe("Tue 29 Sep");
-        expect(host.querySelectorAll("[data-segmented]")).toHaveLength(1);
-        expect(
-            Array.from(host.querySelectorAll("nav[data-segmented] a")).map(
-                (a) => a.getAttribute("href"),
-            ),
-        ).toEqual([
-            `/bookings?date=${DAY}`,
-            `/bookings?date=${DAY}&layout=week`,
-            `/bookings?date=${DAY}&layout=agenda`,
-            "/bookings/all",
-        ]);
+        expect(host.querySelectorAll("[data-segmented]")).toHaveLength(0);
         // No standing sentence under the diary.
         expect(host.textContent).not.toContain("Customers can book");
     });
 
-    it("offers Today only on another day, after back and forward", () => {
-        draw(calendarOf([]));
-        const lead = host.querySelector('[data-slot="page-lead"]');
-        expect(
-            Array.from(lead?.querySelectorAll("a") ?? []).map(
-                (a) => a.getAttribute("aria-label") ?? a.textContent,
-            ),
-        ).toEqual(["Previous day", "Next day", "Today"]);
-
+    it("says Today on today, and the arrows go a day back or on", () => {
         draw(calendarOf([]), { date: "2026-09-30" });
-        expect(host.querySelector("h1")?.textContent).toBe(
-            "Wed 30 Sep · today",
+        expect(host.querySelector("h1")?.textContent).toBe("Today, Wed 30 Sep");
+        expect(
+            host
+                .querySelector('a[aria-label="Previous day"]')
+                ?.getAttribute("href"),
+        ).toBe("/bookings?date=2026-09-29&layout=day&person=all");
+    });
+
+    it("has no chip with one person on the diary", () => {
+        draw(calendarOf([]));
+        expect(
+            host.querySelector('button[aria-label^="Whose bookings"]'),
+        ).toBeNull();
+    });
+});
+
+describe("whose bookings", () => {
+    const arjun = {
+        ...asha,
+        id: "arjun",
+        name: "Arjun Rao",
+        title: "Sports therapist",
+    } as unknown as StaffView;
+    const two: BookingsCalendar = {
+        ...calendarOf([booking("b1", "Tariq Ali", 10, 60)]),
+        diaries: [
+            {
+                person: { id: "asha", name: "Asha Rao", title: "Stylist" },
+                bookings: [booking("b1", "Tariq Ali", 10, 60)],
+                classes: [],
+            },
+            {
+                person: { id: "arjun", name: "Arjun Rao", title: null },
+                bookings: [
+                    booking("a1", "Isha Joshi", 11, 30, {
+                        staff: { id: "arjun", name: "Arjun Rao" },
+                    }),
+                    booking("a2", "Farah Khan", 14, 30, {
+                        staff: { id: "arjun", name: "Arjun Rao" },
+                    }),
+                ],
+                classes: [],
+            },
+        ],
+    };
+    const heads = () =>
+        Array.from(host.querySelectorAll("[data-diary-column]")).map((c) =>
+            c.getAttribute("data-diary-column"),
         );
-        expect(lead?.textContent).not.toContain("Today");
+
+    it("Everyone draws a column each; the chip names who is shown", () => {
+        draw(two, { staff: [asha, arjun] });
+        expect(heads()).toEqual(["asha", "arjun"]);
+        expect(
+            host
+                .querySelector('button[aria-label^="Whose bookings"]')
+                ?.getAttribute("aria-label"),
+        ).toBe("Whose bookings: Everyone. Change");
+        expect(summaryText()).toMatch(/^3 booked/);
+    });
+
+    it("one person draws their column, and the count matches theirs", () => {
+        draw(two, { staff: [asha, arjun], person: "arjun" });
+        expect(heads()).toEqual(["arjun"]);
+        expect(summaryText()).toMatch(/^2 booked/);
+        expect(
+            host
+                .querySelector('button[aria-label^="Whose bookings"]')
+                ?.getAttribute("aria-label"),
+        ).toBe("Whose bookings: Arjun Rao. Change");
+    });
+
+    it("picking someone in the sheet goes to them, with their count", () => {
+        draw(two, { staff: [asha, arjun] });
+        act(() =>
+            host
+                .querySelector<HTMLButtonElement>(
+                    'button[aria-label^="Whose bookings"]',
+                )
+                ?.click(),
+        );
+        const rows = Array.from(
+            document.querySelectorAll<HTMLButtonElement>(
+                '[data-header-popover] [role="radiogroup"][aria-label="Whose bookings"] [role="radio"]',
+            ),
+        );
+        expect(rows.map((r) => r.textContent)).toEqual([
+            expect.stringContaining("Everyone"),
+            expect.stringContaining("Asha Rao"),
+            expect.stringContaining("Arjun Rao"),
+        ]);
+        expect(rows[2]?.textContent).toContain("2bookings today");
+        act(() => rows[2]?.click());
+        expect(push).toHaveBeenCalledWith(
+            `/bookings?date=${DAY}&layout=day&person=arjun`,
+            { scroll: false },
+        );
+    });
+
+    it("someone not on the diary in the address reads as Everyone", () => {
+        draw(two, { staff: [asha, arjun], person: "gone" });
+        expect(heads()).toEqual(["asha", "arjun"]);
     });
 });
 
@@ -415,23 +506,13 @@ describe("with nobody on the diary", () => {
         Parameters<typeof CalendarScreen>[0]["serviceHours"]
     >;
 
-    it("says how the column works once, and Got it puts it away for good", () => {
+    it("says how the column works above it, with Add who takes bookings", () => {
         draw(empty, { staff: [], serviceHours: own });
-        expect(host.textContent).toContain(
-            "Customers book each service in its own hours.",
+        const note = host.querySelector("[data-service-hours-note]");
+        expect(note?.textContent).toContain(
+            "Nobody takes bookings yet, so customers book each service in its own hours.",
         );
-        const gotIt = Array.from(host.querySelectorAll("button")).find(
-            (b) => b.textContent === "Got it",
-        );
-        act(() => gotIt?.click());
-        expect(host.textContent).not.toContain(
-            "Customers book each service in its own hours.",
-        );
-        expect(
-            window.localStorage.getItem("saroh:bookings:service-hours-hint"),
-        ).toBe("1");
-        // The action is still at the head of the column.
-        const add = Array.from(host.querySelectorAll("button")).find(
+        const add = Array.from(note?.querySelectorAll("button") ?? []).find(
             (b) => b.textContent === "Add who takes bookings",
         );
         expect(add).toBeTruthy();

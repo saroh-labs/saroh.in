@@ -1,0 +1,493 @@
+/**
+ * DEC-174, U1 #1132 against a real Postgres: the business's switches for
+ * its automatic customer notices. A fresh business reads every kind at its
+ * default; a switch put back leaves no row; a Member can't change one; the
+ * enquiry reply needs the business's own email; `noticeOn` reads the
+ * caller's transaction; and one business never sees another's choices
+ * (under `TEST_RLS=on`, row-level security itself).
+ *
+ * Runs in the integration project (TEST_DATABASE_URL).
+ */
+import { ForbiddenException } from "@nestjs/common";
+import { prisma, runInOrgContext } from "@saroh/database";
+
+import { isRlsTestMode } from "../../../test/rls-mode";
+import type { OrganizationContext } from "../../common/types/organization-context";
+import { AuditService } from "../audit/audit.service";
+import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
+import { NOTICE_KINDS, NOTICE_SENDS, noticeOn } from "./notice-settings";
+import { NoticeSettingsService } from "./notice-settings.service";
+
+let n = 0;
+const uniq = (p: string) => `${p}-${process.pid}-${++n}`;
+
+/** Every module on: which kinds a module hides is the unit spec's. */
+const availability = {
+    evaluate: () =>
+        Promise.resolve({
+            rolloutAllowed: true,
+            configured: true,
+            entitled: true,
+        }),
+} as unknown as ModuleAvailabilityService;
+
+const settings = new NoticeSettingsService(availability, new AuditService());
+
+// Every kind read as one Saroh sends: which are hidden until their sender
+// ships is the unit spec's. Jest gives each file its own modules, so
+// nothing else reads this.
+beforeAll(() => {
+    for (const kind of NOTICE_KINDS) NOTICE_SENDS[kind] = true;
+});
+
+interface Business {
+    organizationId: string;
+    owner: string;
+    member: string;
+}
+
+async function business(name = "Rye & Co"): Promise<Business> {
+    const org = await prisma.organization.create({
+        data: { name, slug: uniq("notices") },
+    });
+    const [owner, member] = await Promise.all(
+        ["priya", "meera"].map((who) =>
+            prisma.user.create({
+                data: { email: `${uniq(who)}@example.com`, name: who },
+            }),
+        ),
+    );
+    await prisma.membership.createMany({
+        data: [
+            { organizationId: org.id, userId: owner.id, role: "OWNER" },
+            { organizationId: org.id, userId: member.id, role: "MEMBER" },
+        ],
+    });
+    return { organizationId: org.id, owner: owner.id, member: member.id };
+}
+
+async function connectEmail(b: Business) {
+    await prisma.communicationProvider.create({
+        data: {
+            organizationId: b.organizationId,
+            channel: "EMAIL",
+            provider: "SMTP",
+            fromAddress: "hello@example.com",
+            encryptedCredentials: "sealed",
+            credentialsIv: "iv",
+            credentialsAuthTag: "tag",
+        },
+    });
+}
+
+const as = (b: Business, who: "owner" | "member") =>
+    ({
+        organizationId: b.organizationId,
+        userId: b[who],
+        role: who === "owner" ? "OWNER" : "MEMBER",
+        roleKey: who === "owner" ? "OWNER" : "MEMBER",
+    }) satisfies OrganizationContext;
+
+const rows = (b: Business) =>
+    prisma.customerNoticeSetting.findMany({
+        where: { organizationId: b.organizationId },
+        select: { kind: true, enabled: true, updatedByUserId: true },
+    });
+
+describe("customer notice switches (real database)", () => {
+    it("a fresh business reads every kind at its default: on, except overdue reminders", async () => {
+        const b = await business();
+        await connectEmail(b);
+
+        const view = await settings.read(as(b, "owner"));
+
+        expect(view.canChange).toBe(true);
+        expect(view.emailConnected).toBe(true);
+        expect(
+            Object.fromEntries(view.notices.map((x) => [x.kind, x.on])),
+        ).toEqual(
+            Object.fromEntries(
+                NOTICE_KINDS.map((k) => [k, k !== "OVERDUE_REMINDERS"]),
+            ),
+        );
+        expect(view.notices.every((x) => x.offered)).toBe(true);
+        for (const kind of NOTICE_KINDS) {
+            expect(await noticeOn(prisma, b.organizationId, kind)).toBe(
+                kind !== "OVERDUE_REMINDERS",
+            );
+        }
+        expect(await rows(b)).toEqual([]);
+    });
+
+    it("turning Membership emails off writes one row; turning them back on deletes it", async () => {
+        const b = await business();
+
+        const off = await settings.update(as(b, "owner"), {
+            kind: "MEMBERSHIP",
+            on: false,
+        });
+        expect(off.notices.find((x) => x.kind === "MEMBERSHIP")?.on).toBe(
+            false,
+        );
+        expect(await rows(b)).toEqual([
+            { kind: "MEMBERSHIP", enabled: false, updatedByUserId: b.owner },
+        ]);
+        expect(await noticeOn(prisma, b.organizationId, "MEMBERSHIP")).toBe(
+            false,
+        );
+
+        const on = await settings.update(as(b, "owner"), {
+            kind: "MEMBERSHIP",
+            on: true,
+        });
+        expect(on.notices.find((x) => x.kind === "MEMBERSHIP")?.on).toBe(true);
+        expect(await rows(b)).toEqual([]);
+        expect(await noticeOn(prisma, b.organizationId, "MEMBERSHIP")).toBe(
+            true,
+        );
+    });
+
+    it("overdue reminders, off by default, are kept as a row once turned on", async () => {
+        const b = await business();
+        await settings.update(as(b, "owner"), {
+            kind: "OVERDUE_REMINDERS",
+            on: true,
+        });
+        expect(await rows(b)).toEqual([
+            {
+                kind: "OVERDUE_REMINDERS",
+                enabled: true,
+                updatedByUserId: b.owner,
+            },
+        ]);
+    });
+
+    it("each change is a settings-audit entry, with the kind and on or off", async () => {
+        const b = await business();
+        await settings.update(as(b, "owner"), { kind: "REFUND", on: false });
+        // Setting what is already set records nothing.
+        await settings.update(as(b, "owner"), { kind: "REFUND", on: false });
+
+        const entries = await prisma.auditEvent.findMany({
+            where: {
+                organizationId: b.organizationId,
+                action: "customer-notices.setting",
+            },
+        });
+        expect(entries).toHaveLength(1);
+        expect(entries[0]).toMatchObject({
+            actorUserId: b.owner,
+            targetType: "organization",
+            targetId: b.organizationId,
+            outcome: "SUCCESS",
+            metadata: {
+                kind: "REFUND",
+                changes: [{ field: "noticeOn", before: true, after: false }],
+            },
+        });
+    });
+
+    it("a Member reads the switches but is refused a change (403), and nothing is written", async () => {
+        const b = await business();
+
+        const view = await settings.read(as(b, "member"));
+        expect(view.canChange).toBe(false);
+
+        await expect(
+            settings.update(as(b, "member"), { kind: "MEMBERSHIP", on: false }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(await rows(b)).toEqual([]);
+    });
+
+    it("with no email provider, the enquiry reply isn't offered and says why; connected, it is", async () => {
+        const b = await business();
+
+        const before = await settings.read(as(b, "owner"));
+        expect(before.emailConnected).toBe(false);
+        expect(
+            before.notices.find((x) => x.kind === "ENQUIRY_REPLY"),
+        ).toMatchObject({
+            offered: false,
+            why: "Connect your email first",
+        });
+        await expect(
+            settings.update(as(b, "owner"), {
+                kind: "ENQUIRY_REPLY",
+                on: false,
+            }),
+        ).rejects.toThrow("Connect your email first.");
+        expect(await rows(b)).toEqual([]);
+
+        await connectEmail(b);
+        const after = await settings.read(as(b, "owner"));
+        expect(
+            after.notices.find((x) => x.kind === "ENQUIRY_REPLY"),
+        ).toMatchObject({ offered: true, why: null });
+    });
+
+    it("noticeOn inside a transaction that has just turned the kind off reads false", async () => {
+        const b = await business();
+
+        const seen = await prisma.$transaction(async (tx) => {
+            await tx.customerNoticeSetting.create({
+                data: {
+                    organizationId: b.organizationId,
+                    kind: "COURSE",
+                    enabled: false,
+                },
+            });
+            return noticeOn(tx, b.organizationId, "COURSE");
+        });
+
+        expect(seen).toBe(false);
+    });
+
+    it("one business's choices never reach another's", async () => {
+        const a = await business("Rye & Co");
+        const other = await business("Pulse Fitness");
+        await settings.update(as(a, "owner"), {
+            kind: "PACK_CREDITS",
+            on: false,
+        });
+
+        const theirs = await settings.read(as(other, "owner"));
+        expect(theirs.notices.find((x) => x.kind === "PACK_CREDITS")?.on).toBe(
+            true,
+        );
+        expect(
+            await noticeOn(prisma, other.organizationId, "PACK_CREDITS"),
+        ).toBe(true);
+        expect(await rows(other)).toEqual([]);
+    });
+
+    describe("when overdue reminders go (DEC-178, #1169)", () => {
+        const timing = {
+            firstDay: 5,
+            secondDay: 12,
+            fromHour: 10,
+            untilHour: 18,
+        };
+        const timingRow = (b: Business) =>
+            prisma.overdueReminderTiming.findUnique({
+                where: { organizationId: b.organizationId },
+                select: {
+                    firstDay: true,
+                    secondDay: true,
+                    fromHour: true,
+                    untilHour: true,
+                    updatedByUserId: true,
+                },
+            });
+
+        it("a fresh business reads the defaults; a choice is one row, read back with its sentence; the defaults again delete it", async () => {
+            const b = await business();
+            const fresh = await settings.read(as(b, "owner"));
+            expect(
+                fresh.notices.find((x) => x.kind === "OVERDUE_REMINDERS")
+                    ?.timing,
+            ).toEqual({
+                firstDay: 3,
+                secondDay: 10,
+                fromHour: 9,
+                untilHour: 20,
+            });
+
+            const after = await settings.updateOverdueTiming(
+                as(b, "owner"),
+                timing,
+            );
+            expect(
+                after.notices.find((x) => x.kind === "OVERDUE_REMINDERS"),
+            ).toMatchObject({
+                timing,
+                says: "Up to 2 reminders for an unpaid invoice, 5 and 12 days after it's due, from 10 am to 6 pm your time.",
+            });
+            expect(await timingRow(b)).toEqual({
+                ...timing,
+                updatedByUserId: b.owner,
+            });
+
+            await settings.updateOverdueTiming(as(b, "owner"), {
+                firstDay: 3,
+                secondDay: 10,
+                fromHour: 9,
+                untilHour: 20,
+            });
+            expect(await timingRow(b)).toBeNull();
+        });
+
+        it("turning reminders off and on keeps the timing", async () => {
+            const b = await business();
+            await settings.update(as(b, "owner"), {
+                kind: "OVERDUE_REMINDERS",
+                on: true,
+            });
+            await settings.updateOverdueTiming(as(b, "owner"), timing);
+            await settings.update(as(b, "owner"), {
+                kind: "OVERDUE_REMINDERS",
+                on: false,
+            });
+            await settings.update(as(b, "owner"), {
+                kind: "OVERDUE_REMINDERS",
+                on: true,
+            });
+            const view = await settings.read(as(b, "owner"));
+            expect(
+                view.notices.find((x) => x.kind === "OVERDUE_REMINDERS"),
+            ).toMatchObject({ on: true, timing });
+        });
+
+        it("each change is an audit entry under the switch's action, naming what moved", async () => {
+            const b = await business();
+            await settings.updateOverdueTiming(as(b, "owner"), timing);
+            await settings.updateOverdueTiming(as(b, "owner"), timing);
+            const entries = await prisma.auditEvent.findMany({
+                where: {
+                    organizationId: b.organizationId,
+                    action: "customer-notices.setting",
+                },
+            });
+            expect(entries).toHaveLength(1);
+            expect(entries[0]).toMatchObject({
+                actorUserId: b.owner,
+                metadata: {
+                    kind: "OVERDUE_REMINDERS",
+                    changes: [
+                        { field: "firstReminderDay", before: 3, after: 5 },
+                        { field: "secondReminderDay", before: 10, after: 12 },
+                        { field: "remindFromHour", before: 9, after: 10 },
+                        { field: "remindUntilHour", before: 20, after: 18 },
+                    ],
+                },
+            });
+        });
+
+        it("a Member is refused (403); a second day before the first is refused in words (400); nothing is written", async () => {
+            const b = await business();
+            await expect(
+                settings.updateOverdueTiming(as(b, "member"), timing),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+            await expect(
+                settings.updateOverdueTiming(as(b, "owner"), {
+                    ...timing,
+                    secondDay: 4,
+                }),
+            ).rejects.toThrow(
+                "The second reminder goes after the first, at most 60 days after the due date.",
+            );
+            expect(await timingRow(b)).toBeNull();
+        });
+
+        it("one business's timing never reaches another's", async () => {
+            const a = await business("Rye & Co");
+            const other = await business("Pulse Fitness");
+            await settings.updateOverdueTiming(as(a, "owner"), timing);
+            const theirs = await settings.read(as(other, "owner"));
+            expect(
+                theirs.notices.find((x) => x.kind === "OVERDUE_REMINDERS")
+                    ?.timing,
+            ).toEqual({
+                firstDay: 3,
+                secondDay: 10,
+                fromHour: 9,
+                untilHour: 20,
+            });
+        });
+
+        // The policies and CHECKs exist only where the migrations ran.
+        (isRlsTestMode() ? it : it.skip)(
+            "under row-level security, a business sees and changes only its own timing, and the database refuses one that doesn't fit",
+            async () => {
+                const a = await business("Rye & Co");
+                const other = await business("Pulse Fitness");
+                await settings.updateOverdueTiming(as(a, "owner"), timing);
+                await settings.updateOverdueTiming(as(other, "owner"), timing);
+
+                const seen = await runInOrgContext(a.organizationId, () =>
+                    prisma.overdueReminderTiming.findMany({
+                        where: {
+                            organizationId: {
+                                in: [a.organizationId, other.organizationId],
+                            },
+                        },
+                        select: { organizationId: true },
+                    }),
+                );
+                expect(seen).toEqual([{ organizationId: a.organizationId }]);
+
+                const changed = await runInOrgContext(a.organizationId, () =>
+                    prisma.overdueReminderTiming.updateMany({
+                        where: { organizationId: other.organizationId },
+                        data: { firstDay: 1 },
+                    }),
+                );
+                expect(changed.count).toBe(0);
+
+                await expect(
+                    prisma.overdueReminderTiming.update({
+                        where: { organizationId: a.organizationId },
+                        data: { secondDay: 2 },
+                    }),
+                ).rejects.toThrow();
+                await expect(
+                    prisma.overdueReminderTiming.update({
+                        where: { organizationId: a.organizationId },
+                        data: { fromHour: 19 },
+                    }),
+                ).rejects.toThrow();
+            },
+        );
+    });
+
+    // Row-level security itself: only where the policies exist.
+    (isRlsTestMode() ? it : it.skip)(
+        "under row-level security, a business sees and changes only its own rows",
+        async () => {
+            const a = await business("Rye & Co");
+            const other = await business("Pulse Fitness");
+            await settings.update(as(a, "owner"), {
+                kind: "MEMBERSHIP",
+                on: false,
+            });
+            await settings.update(as(other, "owner"), {
+                kind: "MEMBERSHIP",
+                on: false,
+            });
+
+            const seen = await runInOrgContext(a.organizationId, () =>
+                prisma.customerNoticeSetting.findMany({
+                    where: {
+                        organizationId: {
+                            in: [a.organizationId, other.organizationId],
+                        },
+                    },
+                    select: { organizationId: true },
+                }),
+            );
+            expect(seen).toEqual([{ organizationId: a.organizationId }]);
+
+            const changed = await runInOrgContext(a.organizationId, () =>
+                prisma.customerNoticeSetting.updateMany({
+                    where: { organizationId: other.organizationId },
+                    data: { enabled: true },
+                }),
+            );
+            expect(changed.count).toBe(0);
+
+            await expect(
+                runInOrgContext(a.organizationId, () =>
+                    prisma.customerNoticeSetting.create({
+                        data: {
+                            organizationId: other.organizationId,
+                            kind: "REFUND",
+                            enabled: false,
+                        },
+                    }),
+                ),
+            ).rejects.toThrow();
+            expect(
+                await noticeOn(prisma, other.organizationId, "MEMBERSHIP"),
+            ).toBe(false);
+        },
+    );
+});

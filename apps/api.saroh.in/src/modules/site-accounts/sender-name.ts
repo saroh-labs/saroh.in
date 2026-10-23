@@ -50,3 +50,16 @@ export function codeSenderName(businessName: string): string {
 export function codeSubject(businessName: string): string {
     return `Your code for ${businessName}`;
 }
+
+/**
+ * The one footer every email from the site sign-in code sender carries: the
+ * code, the email-changed notice (`common/email.ts`) and the data-removal
+ * emails (`data-request-emails.ts`). It names everything that address sends
+ * (DEC-011 as amended by DEC-172, #1156), so a new kind of email from it
+ * changes these words too. Kept here, beside the sender's name and subject,
+ * so the notice modules take the words without Saroh's sender
+ * (`no-saroh-customer-mail.spec.ts`). `escapedName` must already be escaped.
+ */
+export function siteAccountEmailFooter(escapedName: string): string {
+    return `${escapedName}'s website runs on Saroh. This address sends only sign-in codes and notices about your account there: a changed email, or a request to remove your data.`;
+}

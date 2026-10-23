@@ -4,8 +4,8 @@ import { EmptyState } from "@saroh/ui/data-state";
 import { Inbox } from "lucide-react";
 import Link from "next/link";
 
-import { ListCard, ListRow } from "@/components/shared/list-card";
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { ListCard, ListRow } from "@/components/shared/lists/list-card";
 import { listForms } from "@/lib/forms/service";
 import { requireSession } from "@/lib/session";
 

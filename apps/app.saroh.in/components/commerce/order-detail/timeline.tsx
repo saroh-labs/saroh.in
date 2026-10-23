@@ -1,6 +1,6 @@
 import { cn } from "@saroh/ui/lib/utils";
 
-import { BusinessDate } from "@/components/shared/business-zone";
+import { BusinessDate } from "@/components/shared/dates/business-zone";
 
 import { Panel, PanelTitle } from "./parts";
 

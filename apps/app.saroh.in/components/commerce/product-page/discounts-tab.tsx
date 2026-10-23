@@ -4,7 +4,7 @@ import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
 import { Tag } from "lucide-react";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import type { ProductOverview } from "@/lib/products/overview";
 import {

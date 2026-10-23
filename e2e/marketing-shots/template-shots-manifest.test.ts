@@ -7,14 +7,17 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 
 import type {
+    CapturedLookThumbnail,
     CapturedShot,
     CapturedThumbnail,
 } from "./template-shots-manifest";
 import {
+    lookThumbnailsSource,
     templateShotsSource,
     templateThumbnailsSource,
 } from "./template-shots-manifest";
@@ -46,6 +49,41 @@ const THUMBS: CapturedThumbnail[] = [
     { id: "bakery", src: "/templates/bakery.webp", width: 360, height: 225 },
 ];
 
+const LOOK_THUMBS: CapturedLookThumbnail[] = (
+    [
+        ["salon", "live"],
+        ["gym", "quiet"],
+        ["salon", "classic"],
+        ["gym", "classic"],
+    ] as const
+).map(([id, look]) => ({
+    id,
+    look,
+    src: `/looks/${id}-${look}.webp`,
+    width: 180,
+    height: 390,
+}));
+
+void test("the Look row's list is the same whatever order, Classic first (U16)", () => {
+    const once = lookThumbnailsSource(LOOK_THUMBS);
+    assert.equal(lookThumbnailsSource([...LOOK_THUMBS].reverse()), once);
+    assert.ok(once.indexOf('"gym:classic"') < once.indexOf('"gym:quiet"'));
+    assert.ok(once.indexOf('"gym:quiet"') < once.indexOf('"salon:classic"'));
+});
+
+void test("the committed Look row list is what the capture writes", () => {
+    const root = path.resolve(__dirname, "..", "..");
+    const committed = fs.readFileSync(
+        path.join(root, "apps/app.saroh.in/lib/sites/look-thumbnails.ts"),
+        "utf8",
+    );
+    // Nothing captured yet, or whatever was: either way the generator's text.
+    assert.match(committed, /export const LOOK_THUMBNAILS/);
+    if (committed.includes("> = {};")) {
+        assert.equal(committed, lookThumbnailsSource([]));
+    }
+});
+
 void test("the gallery's list is the same whatever order the files came in", () => {
     const once = templateShotsSource(SHOTS);
     assert.equal(templateShotsSource([...SHOTS].reverse()), once);
@@ -76,6 +114,14 @@ void test("both lists are as prettier writes them", () => {
         [
             templateThumbnailsSource(THUMBS),
             "apps/app.saroh.in/lib/sites/template-thumbnails.ts",
+        ],
+        [
+            lookThumbnailsSource(LOOK_THUMBS),
+            "apps/app.saroh.in/lib/sites/look-thumbnails.ts",
+        ],
+        [
+            lookThumbnailsSource([]),
+            "apps/app.saroh.in/lib/sites/look-thumbnails.ts",
         ],
     ] as const) {
         const formatted = execFileSync(

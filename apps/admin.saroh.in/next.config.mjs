@@ -61,6 +61,18 @@ const nextConfig = {
     async headers() {
         return [{ source: "/:path*", headers: SECURITY_HEADERS }];
     },
+    // A business's address opens its Overview tab (admin plan U2), before
+    // anything renders: the page's own redirect, after the layout has
+    // streamed, drew the tab twice for a moment.
+    async redirects() {
+        return [
+            {
+                source: "/businesses/:organizationId",
+                destination: "/businesses/:organizationId/overview",
+                permanent: false,
+            },
+        ];
+    },
     // Development logs every server action's arguments by default, and some
     // carry secrets: provider keys, sign-in codes (UX-005, 7 Oct). Production
     // never logs them; this keeps local logs clean too.

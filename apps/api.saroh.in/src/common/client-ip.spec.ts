@@ -44,9 +44,14 @@ describe("hashClientIp", () => {
         );
     });
 
-    it("hashes IPv4 as before, and never returns the raw address", () => {
-        expect(hashClientIp("203.0.113.7")).toBe(
+    it("never returns the raw address, nor a plain hash anyone can reverse", () => {
+        expect(hashClientIp("203.0.113.7")).not.toContain("203.0.113.7");
+        expect(hashClientIp("203.0.113.7")).not.toBe(
             createHash("sha256").update("203.0.113.7").digest("hex"),
+        );
+        // Without the server's secret, trying every address finds nothing.
+        expect(hashClientIp("203.0.113.7", "another-secret")).not.toBe(
+            hashClientIp("203.0.113.7"),
         );
         expect(hashClientIp("::ffff:203.0.113.7")).toBe(
             hashClientIp("203.0.113.7"),

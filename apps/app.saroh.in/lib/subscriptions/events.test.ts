@@ -135,7 +135,14 @@ describe("changeWhat", () => {
         expect(what({ kind: "RESUMED", data: { restarted: true } })).toBe(
             "Resumed. A new period started",
         );
-        expect(what({ kind: "RETRIED" })).toBe("Made a new pay link");
+        expect(what({ kind: "RETRIED" })).toBe("Made a new payment link");
+        // U10: Saroh told the customer their autopay charge failed.
+        expect(
+            what({
+                kind: "PAY_LINK_EMAILED",
+                data: { reason: "AUTOPAY_FAILED" },
+            }),
+        ).toBe("Emailed them a new link to pay after autopay failed");
     });
 
     it("has words for the kinds later units write, and for one it doesn't know", () => {
@@ -147,6 +154,20 @@ describe("changeWhat", () => {
             "Not charged, above the autopay limit",
         );
         expect(what({ kind: "SOMETHING_NEW" })).toBe("Changed");
+    });
+
+    it("says why an eMandate renewal wasn't charged: its pre-debit email didn't go (DEC-180)", () => {
+        const noNotice = (reason?: string) =>
+            what({ kind: "NOT_CHARGED_NO_NOTICE", data: { reason } });
+        expect(noNotice("NO_EMAIL_PROVIDER")).toBe(
+            "Autopay didn't charge. A bank account debit needs an email to the customer a day before, and no email provider is connected",
+        );
+        expect(noNotice("NO_EMAIL_ADDRESS")).toContain(
+            "and they have no email address",
+        );
+        expect(noNotice("EMAIL_OFF")).toContain("and they turned email off");
+        expect(noNotice("NOT_SENT")).toContain("and it didn't go");
+        expect(noNotice()).toContain("and it didn't go");
     });
 
     it("says why autopay was cancelled (D20)", () => {
@@ -275,7 +296,7 @@ describe("autopay set up by the customer (D12)", () => {
             "Meera, from the Prices page",
         );
         expect(changeWho(setUp("PAY_LINK"), SUB, null)).toBe(
-            "Meera, from the pay link",
+            "Meera, from the payment link",
         );
         expect(changeWho(setUp("ACCOUNT"), SUB, null)).toBe(
             "Meera, from their account",

@@ -91,7 +91,9 @@ test.describe("new order and new booking from the person", () => {
         );
         const dialog = page.getByRole("dialog", { name: "New booking" });
         await expect(dialog).toBeVisible();
-        await expect(dialog.getByText(who.name).first()).toBeVisible();
+        await expect(
+            dialog.getByText(who.name).filter({ visible: true }).first(),
+        ).toBeVisible();
 
         await page.keyboard.press("Escape");
         await expect(dialog).toBeHidden();
@@ -110,16 +112,15 @@ test.describe("new order and new booking from the person", () => {
 });
 
 test.describe("new order and new booking, as a Member", () => {
-    test("neither is offered to a role that can't take them", async ({
-        page,
-    }) => {
+    test("a Member takes no order from a person's page", async ({ page }) => {
         await signIn(page, RYE, "member");
         await page.goto(`/contacts/${PRIYA}`);
         await expect(
             page.getByRole("heading", { name: "Priya Raman" }),
         ).toBeVisible();
-        // A Member stages orders (DEC-024) but takes neither (B16, E26).
+        // A Member stages orders (DEC-024) but takes none (B16). They do
+        // book at the front desk (DEC-170): `role-member.spec.ts` opens New
+        // booking as one on Northwind, where Bookings is on.
         await expect(start(page, "New order")).toHaveCount(0);
-        await expect(start(page, "New booking")).toHaveCount(0);
     });
 });

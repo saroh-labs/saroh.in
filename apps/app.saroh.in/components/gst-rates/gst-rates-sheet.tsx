@@ -2,17 +2,20 @@
 
 import { Field, focusFirstError } from "@saroh/ui/field";
 import { Notice } from "@saroh/ui/notice";
-import { OptionSelect } from "@saroh/ui/option-select";
 import type { FormEvent } from "react";
 import { useState } from "react";
 
+import {
+    GstRatePicker,
+    pickerWiring,
+} from "@/components/shared/fields/gst-rate-picker";
 import {
     FormSheet,
     FormSheetBody,
     FormSheetFoot,
     useFormSheetDirty,
-} from "@/components/shared/form-sheet";
-import { Refusal } from "@/components/shared/refusal";
+} from "@/components/shared/forms/form-sheet";
+import { Refusal } from "@/components/shared/states/refusal";
 import { WHO_CAN_CHANGE } from "@/lib/access/who-can-change";
 import { runAction } from "@/lib/api/run-action";
 import { formatMoney } from "@/lib/format/money";
@@ -27,11 +30,7 @@ import {
 } from "@/lib/gst-rates/missing";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import type { GstRateValue } from "@/lib/invoices/gst";
-import {
-    GST_RATE_CHOICES,
-    GST_RATE_NEEDED,
-    GST_RATE_PLACEHOLDER,
-} from "@/lib/invoices/gst";
+import { GST_RATE_NEEDED } from "@/lib/invoices/gst";
 
 /** How a save went: nothing more to say, or why it didn't go through. */
 export type RatesSaved = { ok: true } | { ok: false; error: string };
@@ -51,8 +50,10 @@ export type RatesSaved = { ok: true } | { ok: false; error: string };
  * that does to their next renewal (`membersLines`): the rate is saved at
  * once, with no Publish step, so this is where the business is told.
  *
- * 0% is a row in the list of rates like any other. The box starts on its
- * placeholder, which is the only way "not chosen" is drawn.
+ * Each row is the rates as buttons (`GstRatePicker`, DEC-176): 0% is a
+ * chip like any other, and no chip pressed is the only way "not chosen" is
+ * drawn. The rates wrap under the row's name on a phone, and Other rate
+ * opens its second row in place, under that row only.
  */
 export function GstRatesSheet({
     rows,
@@ -180,26 +181,29 @@ function RatesDraft({
                             label={`One rate for all ${open.length}`}
                             hint="Fills every row below. Change any that differ."
                         >
-                            <OptionSelect<GstRateValue>
-                                value={forAll}
-                                onValueChange={(rate) => {
-                                    setForAll(rate);
-                                    if (rate === "") return;
-                                    setChoices(
-                                        Object.fromEntries(
-                                            open.map((row) => [
-                                                rateKey(row),
-                                                rate,
-                                            ]),
-                                        ),
-                                    );
-                                    setRefusal(null);
-                                }}
-                                options={GST_RATE_CHOICES}
-                                placeholder={GST_RATE_PLACEHOLDER}
-                                disabled={saving}
-                                aria-label="GST rate for all of these"
-                            />
+                            {(control) => (
+                                <GstRatePicker
+                                    {...pickerWiring(control)}
+                                    labelledBy={undefined}
+                                    label="GST rate for all of these"
+                                    required={false}
+                                    value={forAll}
+                                    onChange={(rate) => {
+                                        setForAll(rate);
+                                        if (rate === "") return;
+                                        setChoices(
+                                            Object.fromEntries(
+                                                open.map((row) => [
+                                                    rateKey(row),
+                                                    rate,
+                                                ]),
+                                            ),
+                                        );
+                                        setRefusal(null);
+                                    }}
+                                    disabled={saving}
+                                />
+                            )}
                         </Field>
                     </div>
                 ) : null}
@@ -231,22 +235,29 @@ function RatesDraft({
                                 }
                                 error={missing ? GST_RATE_NEEDED : null}
                             >
-                                <OptionSelect<GstRateValue>
-                                    value={value}
-                                    onValueChange={(rate) => {
-                                        setChoices((had) => ({
-                                            ...had,
-                                            [key]: rate,
-                                        }));
-                                        // No longer one rate for all of them.
-                                        if (rate !== forAll) setForAll("");
-                                        setRefusal(null);
-                                    }}
-                                    options={GST_RATE_CHOICES}
-                                    placeholder={GST_RATE_PLACEHOLDER}
-                                    disabled={row.canSet === false || saving}
-                                    aria-label={`GST rate for ${name}`}
-                                />
+                                {(control) => (
+                                    <GstRatePicker
+                                        {...pickerWiring(control)}
+                                        labelledBy={undefined}
+                                        label={`GST rate for ${name}`}
+                                        // Asked of every row only when a
+                                        // payment waits on them all.
+                                        required={requireAll}
+                                        value={value}
+                                        onChange={(rate) => {
+                                            setChoices((had) => ({
+                                                ...had,
+                                                [key]: rate,
+                                            }));
+                                            // No longer one rate for all of them.
+                                            if (rate !== forAll) setForAll("");
+                                            setRefusal(null);
+                                        }}
+                                        disabled={
+                                            row.canSet === false || saving
+                                        }
+                                    />
+                                )}
                             </Field>
                             {members.length > 0 ? (
                                 <p

@@ -22,6 +22,7 @@ import {
 import type { SocialNetwork } from "@saroh/block-contract";
 import { MAP_LINK_MAX, SOCIAL_INPUT_MAX } from "@saroh/block-contract";
 
+import { NewBillingProfileDto } from "../billing/billing-profile.dto";
 import type { GstPriceMode } from "../invoices/gst-price";
 import { GST_PRICE_MODES } from "../invoices/gst-price";
 import {
@@ -31,7 +32,14 @@ import {
     NUMBER_RESTARTS,
     NUMBER_SEPARATORS,
 } from "../invoices/numbering";
+import {
+    COLOUR_INPUT,
+    COLOUR_MESSAGE,
+    STYLE_INPUTS,
+    STYLE_MESSAGE,
+} from "../invoices/paper-styles";
 
+import { managerCodeOf } from "./account-manager";
 import type { AcceptedBusinessType } from "./business-type";
 import { ACCEPTED_BUSINESS_TYPES } from "./business-type";
 import type { OrganizationKind } from "./organization-kind";
@@ -201,6 +209,59 @@ export class OnboardOrganizationDto {
     @IsOptional()
     @IsString()
     referralCode?: string;
+
+    /**
+     * The account manager's code from the `?am=` link the browser carried
+     * from saroh.in (DEC-169, the `saroh_am` cookie), sent by the
+     * workspace, never typed. Never refused: anything not shaped like a
+     * code is dropped, and one that names no active manager links nobody
+     * (`account-manager.ts`), so a bad link can't stop a business being
+     * made.
+     */
+    @Transform(
+        ({ value }: { value: unknown }) => managerCodeOf(value) ?? undefined,
+    )
+    @IsOptional()
+    @IsString()
+    managerLinkCode?: string;
+
+    /** When that link was kept (ISO 8601), stored as the link's evidence. */
+    @Transform(({ value }: { value: unknown }) =>
+        typeof value === "string" && value.length <= 40 ? value : undefined,
+    )
+    @IsOptional()
+    @IsString()
+    managerLinkSetAt?: string;
+
+    /**
+     * The code of the Saroh teammate helping them, typed by the owner at
+     * setup (DEC-169). Dropped like the link's when it isn't shaped like a
+     * code; one that names no active manager links nobody.
+     */
+    @Transform(
+        ({ value }: { value: unknown }) => managerCodeOf(value) ?? undefined,
+    )
+    @IsOptional()
+    @IsString()
+    managerCode?: string;
+
+    /**
+     * Who Saroh bills for it (DEC-167, R7): one of the caller's own billing
+     * profiles. An owner who has a profile already must choose, this or
+     * {@link newBillingProfile}; one who has none gets their first from the
+     * business's details. Whose it is is checked by the service: another
+     * person's is a 404, as if it didn't exist.
+     */
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    billingProfileId?: string;
+
+    /** Or a new profile, made with the business in its transaction. */
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => NewBillingProfileDto)
+    newBillingProfile?: NewBillingProfileDto;
 }
 
 const DIGITS_MESSAGE = `The counter is ${MIN_COUNTER_DIGITS} to ${MAX_COUNTER_DIGITS} digits.`;
@@ -371,6 +432,25 @@ export class PayInstructionsDto {
 }
 
 /**
+ * How the business's invoices look by default (DEC-173, #1118): CLASSIC,
+ * BAND or COMPACT, and a colour as `#RRGGBB`. "" clears either, back to
+ * Classic in ink. Owner/Admin (`org:update`), as the tax settings are. A
+ * draft may choose its own; issued paper keeps the look it went out in.
+ */
+export class InvoicePaperDto {
+    @IsOptional()
+    @Transform(trim)
+    @IsIn(STYLE_INPUTS, { message: STYLE_MESSAGE })
+    style?: string;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @Matches(COLOUR_INPUT, { message: COLOUR_MESSAGE })
+    colour?: string;
+}
+
+/**
  * Payload for `PATCH /organizations/:organizationId`. Both fields are optional
  * so a caller can rename the org, edit the business profile, or both.
  *
@@ -478,6 +558,12 @@ export class UpdateOrganizationDto {
     @IsString()
     @MaxLength(MAP_LINK_MAX, { message: "That link is too long." })
     registeredAddressMapUrl?: string;
+
+    /** The invoices' default style and colour (DEC-173, #1118). */
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => InvoicePaperDto)
+    invoicePaper?: InvoicePaperDto;
 }
 
 /**

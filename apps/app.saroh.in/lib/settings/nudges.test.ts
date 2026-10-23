@@ -383,7 +383,11 @@ describe("the email nudge follows the plan (DEC-091, #850)", () => {
         modules: [mod("COMMUNICATIONS")],
         messaging: [] as ConnectedCommsProvider[],
     };
-    const free = { connected: false, canConnect: false };
+    const free = {
+        connected: false,
+        canConnect: false,
+        accountUpdates: false,
+    };
 
     it("where the plan has room (or it can't be read), asks to connect, as before", () => {
         for (const emailSetup of [
@@ -419,7 +423,7 @@ describe("the email nudge follows the plan (DEC-091, #850)", () => {
             {
                 key: "email",
                 label: "Email your customers",
-                why: "No email provider is connected, so invoices, booking and order updates and review invitations aren't emailed. Your customers see their updates only in their account.",
+                why: "No email provider is connected, so invoices, booking and order updates and review invitations aren't emailed, and your customers don't hear about them.",
                 comesWith: "Comes with a paid plan",
                 cta: "See plans",
                 href: "/settings/billing/plans",

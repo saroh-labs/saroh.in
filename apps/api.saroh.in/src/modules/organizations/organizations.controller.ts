@@ -17,6 +17,10 @@ import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { AuthUser } from "../../common/types/store-context";
+import {
+    accountManagerOf,
+    seesAccountManager,
+} from "./business-account-manager";
 import type { ClosingNoticeView } from "./closing-notice";
 import { closingNotice } from "./closing-notice";
 import {
@@ -159,14 +163,20 @@ export class OrganizationsController {
     @Get(":organizationId")
     @UseGuards(BetterAuthGuard, OrganizationGuard)
     async getOne(@OrgContext() ctx: OrganizationContext) {
-        const organization = await this.organizations.getSummary(
-            ctx.organizationId,
-        );
+        const [organization, accountManager] = await Promise.all([
+            this.organizations.getSummary(ctx.organizationId),
+            // Who at Saroh looks after it, while a link is open (U26);
+            // never sent to a Reviewer.
+            seesAccountManager(ctx.role)
+                ? accountManagerOf(ctx.organizationId)
+                : Promise.resolve(null),
+        ]);
         return {
             organizationId: ctx.organizationId,
             userId: ctx.userId,
             role: ctx.role,
             organization,
+            accountManager,
         };
     }
 }

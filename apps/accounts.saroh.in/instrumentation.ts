@@ -2,6 +2,7 @@ import { reportRequestError } from "@saroh/error-tracking/server";
 import type { Instrumentation } from "next";
 
 import { trackingSettings } from "@/lib/error-tracking";
+import { untrackedPage } from "@/lib/untracked-pages";
 
 /**
  * Server errors in accounts (sign-in): Next calls this for an error thrown while
@@ -15,4 +16,8 @@ export const onRequestError: Instrumentation.onRequestError = (
     error,
     request,
     context,
-) => reportRequestError(error, request, context, trackingSettings);
+) =>
+    // A page error tracking leaves out sends nothing (`lib/untracked-pages.ts`).
+    untrackedPage(request.path)
+        ? undefined
+        : reportRequestError(error, request, context, trackingSettings);

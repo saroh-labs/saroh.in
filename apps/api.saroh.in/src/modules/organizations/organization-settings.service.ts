@@ -15,10 +15,11 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
-import { enqueueBillingCustomerSync } from "../billing/billing-customer-sync";
 import { planTakesOnlinePayment } from "../billing/online-payments-plan";
 import type { NumberRestart } from "../invoices/numbering";
 import { invoiceSeriesKeys } from "../invoices/numbering";
+import type { InvoicePaper } from "../invoices/paper-styles";
+import { paperWrite, resolvePaper } from "../invoices/paper-styles";
 import { MediaService } from "../media/media.service";
 import { findOverMrp, overMrpRefusal } from "../products/over-mrp";
 import {
@@ -137,6 +138,12 @@ export interface OrganizationSettings {
      * none is set.
      */
     registeredAddressMapUrl: string | null;
+    /**
+     * How its invoices look by default (DEC-173, #1118): Classic, Band or
+     * Compact, and its colour (`#RRGGBB`, null for ink). Classic in ink
+     * until chosen. A draft may choose its own; issued paper keeps its own.
+     */
+    invoicePaper: InvoicePaper;
 }
 
 /**
@@ -176,6 +183,25 @@ const PRICE_WORDS_COLUMNS: ReadonlySet<string> = new Set([
     "gstState",
     "taxId",
 ]);
+
+/**
+ * The profile columns an `invoicePaper` save writes: a style and a colour
+ * each when sent, null to clear. Refused with a 400 on its field otherwise.
+ */
+function invoicePaperData(sent: UpdateOrganizationDto["invoicePaper"]): {
+    invoiceStyle?: string | null;
+    invoiceColour?: string | null;
+} {
+    if (!sent) return {};
+    const paper = paperWrite(sent, {
+        style: "invoiceStyle",
+        colour: "invoiceColour",
+    });
+    return {
+        ...(paper.style !== undefined ? { invoiceStyle: paper.style } : {}),
+        ...(paper.colour !== undefined ? { invoiceColour: paper.colour } : {}),
+    };
+}
 
 /** The checklist's facts ({@link OrganizationSettings.setup}). */
 export interface SetupFacts {
@@ -229,6 +255,8 @@ const PROFILE_SELECT = {
     socialLinks: true,
     siteShowsRegisteredAddress: true,
     registeredAddressMapUrl: true,
+    invoiceStyle: true,
+    invoiceColour: true,
     ...PAY_SELECT,
 } as const;
 
@@ -258,6 +286,8 @@ interface ProfileRow {
     socialLinks?: unknown;
     siteShowsRegisteredAddress?: boolean | null;
     registeredAddressMapUrl?: string | null;
+    invoiceStyle?: string | null;
+    invoiceColour?: string | null;
     payUpiId?: string | null;
     payBankAccountName?: string | null;
     payBankAccountNumber?: string | null;
@@ -280,6 +310,7 @@ function splitProfile(
             socialLinks: {},
             siteShowsRegisteredAddress: false,
             registeredAddressMapUrl: null,
+            invoicePaper: resolvePaper(null),
         };
     }
     const {
@@ -306,6 +337,8 @@ function splitProfile(
         socialLinks,
         siteShowsRegisteredAddress,
         registeredAddressMapUrl,
+        invoiceStyle,
+        invoiceColour,
         ...profile
     } = p;
     return {
@@ -322,6 +355,10 @@ function splitProfile(
         socialLinks: socialLinksRead(socialLinks),
         siteShowsRegisteredAddress: siteShowsRegisteredAddress ?? false,
         registeredAddressMapUrl: mapLinkRead(registeredAddressMapUrl),
+        invoicePaper: resolvePaper({
+            style: invoiceStyle,
+            colour: invoiceColour,
+        }),
     };
 }
 
@@ -513,6 +550,9 @@ export class OrganizationSettingsService {
                   }),
             ...("url" in map ? { registeredAddressMapUrl: map.url } : {}),
         };
+        // The invoices' default look (DEC-173): "" clears either, back to
+        // Classic in ink. Issued paper keeps the look it froze.
+        const paperData = invoicePaperData(dto.invoicePaper);
         const changed: string[] = [
             ...(dto.name !== undefined ? ["name"] : []),
             ...(dto.kind !== undefined ? ["kind"] : []),
@@ -522,6 +562,7 @@ export class OrganizationSettingsService {
             ...Object.keys(payData),
             ...Object.keys(socialData),
             ...Object.keys(siteData),
+            ...Object.keys(paperData),
         ];
 
         // Nothing to do — return current state rather than writing an empty
@@ -565,6 +606,7 @@ export class OrganizationSettingsService {
                 ...payData,
                 ...socialData,
                 ...siteData,
+                ...paperData,
             };
             if (Object.keys(written).length > 0) {
                 await tx.businessProfile.upsert({
@@ -576,14 +618,9 @@ export class OrganizationSettingsService {
                     update: written,
                 });
             }
-            // Who Saroh bills changed: its customer at the billing
-            // provider is brought up to date by a job (DEC-165).
-            if (
-                dto.name !== undefined ||
-                Object.keys(written).some((k) => BILLING_FIELDS.has(k))
-            ) {
-                await enqueueBillingCustomerSync(tx, ctx.organizationId);
-            }
+            // Settings › Business is the business's own seller identity,
+            // not who Saroh bills (DEC-167): its billing profile is, and a
+            // save here leaves its customer at the provider alone.
 
             const organization = await tx.organization.findUnique(read);
             if (!organization) {
@@ -934,20 +971,6 @@ export class OrganizationSettingsService {
  * never blanks the other five. An explicit empty string is preserved — that is
  * how the UI clears a field — while `undefined` (absent) is dropped.
  */
-/** The profile fields the provider's customer is made of (DEC-165). */
-const BILLING_FIELDS = new Set([
-    "legalName",
-    "contactEmail",
-    "phone",
-    "taxId",
-    "gstRegistered",
-    "gstState",
-    "addressLine1",
-    "addressLine2",
-    "city",
-    "postalCode",
-]);
-
 function reduceProfile(profile: ProfileData | undefined): ProfileData {
     if (!profile) return {};
     const data: ProfileData = {};

@@ -5,7 +5,9 @@ import type {
     ProviderEventPage,
 } from "./billing-action-words";
 import type {
+    BillingCounts,
     GstinFilter,
+    InvoiceStatus,
     SarohInvoicePage,
     SarohSubscriptionDetail,
     SarohSubscriptionPage,
@@ -13,9 +15,10 @@ import type {
     SubscriptionView,
 } from "./billing-words";
 import { adminFetch, getJson } from "./control-plane";
+import type { BillingHistoryPage, HistoryShow } from "./subscription-sheet";
 
 /**
- * Admin › Billing's reads (DEC-163). Server-only: each forwards the
+ * Admin › Billing's reads (DEC-179). Server-only: each forwards the
  * operator's session to `/admin/billing/*`, where the API decides, with
  * `saroh-billing:read`, whether they may see it. `null` is the API's
  * refusal (401/403); a throw is an outage.
@@ -33,6 +36,7 @@ export function listSarohInvoices(filters: {
     month?: string;
     q?: string;
     gstin?: GstinFilter;
+    status?: InvoiceStatus;
     page?: number;
 }): Promise<SarohInvoicePage | null> {
     return getJson<SarohInvoicePage>(`/billing/invoices${query(filters)}`);
@@ -50,6 +54,11 @@ export function listSarohSubscriptions(filters: {
     );
 }
 
+/** Each Billing tab's count, for the tabs (R25). */
+export function getBillingCounts(): Promise<BillingCounts | null> {
+    return getJson<BillingCounts>("/billing/counts");
+}
+
 export function getSarohSubscription(
     subscriptionId: string,
 ): Promise<SarohSubscriptionDetail | null> {
@@ -58,11 +67,31 @@ export function getSarohSubscription(
     );
 }
 
+/**
+ * One subscription's history (admin plan U15): provider events, invoices,
+ * billing emails and staff actions, newest first, a page at a time.
+ */
+export function getSubscriptionHistory(
+    subscriptionId: string,
+    filters: { show?: HistoryShow; page?: number },
+): Promise<BillingHistoryPage | null> {
+    return getJson<BillingHistoryPage>(
+        `/billing/subscriptions/${encodeURIComponent(subscriptionId)}/history${query(
+            {
+                show: filters.show === "everything" ? undefined : filters.show,
+                page:
+                    filters.page && filters.page > 1 ? filters.page : undefined,
+            },
+        )}`,
+    );
+}
+
 /** The month's CSV, as the API sent it (the caller passes it on). */
 export function fetchInvoicesExport(filters: {
     month: string;
     q?: string;
     gstin?: GstinFilter;
+    status?: InvoiceStatus;
 }): Promise<Response> {
     return adminFetch(`/billing/invoices/export${query(filters)}`);
 }
@@ -70,6 +99,7 @@ export function fetchInvoicesExport(filters: {
 /** Billing › Needs action (DEC-166): open or resolved, a page. */
 export function listBillingActions(filters: {
     state?: ActionState;
+    q?: string;
     page?: number;
 }): Promise<BillingActionPage | null> {
     return getJson<BillingActionPage>(`/billing/actions${query(filters)}`);
@@ -78,6 +108,7 @@ export function listBillingActions(filters: {
 /** Billing › Provider events (DEC-166). */
 export function listProviderEvents(filters: {
     filter?: EventFilter;
+    q?: string;
     page?: number;
 }): Promise<ProviderEventPage | null> {
     return getJson<ProviderEventPage>(`/billing/events${query(filters)}`);

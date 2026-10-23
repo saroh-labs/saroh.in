@@ -9,7 +9,7 @@ import { urls } from "../playwright.config";
 /**
  * Pay pages on the business's own address (DEC-069, plan L6).
  *
- * A pay link opens at `<its host>/pay/<token>`: on the renderer's apex, as
+ * A payment link opens at `<its host>/pay/<token>`: on the renderer's apex, as
  * every link issued so far does, and on a business's own host, which the
  * renderer serves with the same page. Opened on another business's host, the
  * page sends the customer to the link's own address (the API's `payUrl`),
@@ -31,11 +31,11 @@ const RYE = hostOf("rye-and-co");
 /** The provider windows' scripts: never loaded from a test run. */
 const PROVIDER_SDKS = /checkout\.razorpay\.com|sdk\.cashfree\.com/;
 
-/** An issued Northwind invoice and its fresh pay link's token. */
+/** An issued Northwind invoice and its fresh payment link's token. */
 async function issuedInvoice(
     request: APIRequestContext,
     tag: string,
-): Promise<{ number: string; token: string }> {
+): Promise<{ id: string; number: string; token: string }> {
     const nw = northwind(request);
     const contact = await nw.post<{ id: string }>("/contacts", {
         email: `l6-${tag}@example.test`,
@@ -61,7 +61,7 @@ async function issuedInvoice(
         `/invoices/${draft.id}`,
     );
     const token = new URL(url).pathname.split("/").pop() ?? "";
-    return { number: read.number ?? "", token };
+    return { id: draft.id, number: read.number ?? "", token };
 }
 
 /** Where the API says the link lives. */
@@ -76,7 +76,7 @@ async function payUrlOf(
     return new URL(payUrl ?? "");
 }
 
-test.describe("pay links on the business's own address (L6)", () => {
+test.describe("payment links on the business's own address (L6)", () => {
     test("the apex link and Northwind's own host open the same invoice", async ({
         page,
     }, testInfo) => {
@@ -242,5 +242,131 @@ test.describe("pay links on the business's own address (L6)", () => {
         });
         expect(res.status()).toBe(200);
         expect(await res.text()).toContain("This link no longer works");
+    });
+});
+
+/**
+ * What the customer sees once money has come in (DEC-173, U16 #1128;
+ * INVRecordPlus "What Vivek sees" and "The receipt for a cheque"): the
+ * payment as a receipt, Paid so far and Left to pay, Pay for what is left;
+ * a cheque's own words while it waits for the bank, with nothing to pay;
+ * and a cheque the bank returned, owed again. Northwind's own invoice,
+ * paid by hand through the ledger's API; no provider window is opened.
+ */
+test.describe("the pay page after a payment (DEC-173)", () => {
+    test("part paid, then a cheque for the rest that bounces", async ({
+        page,
+    }, testInfo) => {
+        await useSession(page);
+        const request = page.request;
+        const nw = northwind(request);
+        const { id, number, token } = await issuedInvoice(
+            request,
+            stamp(testInfo),
+        );
+        await page.route(PROVIDER_SDKS, (route) => route.abort());
+
+        // ₹300 of ₹800 in cash.
+        await nw.post(`/invoices/${id}/payments`, {
+            method: "CASH",
+            amount: "300",
+        });
+        const read = await request.get(
+            `${urls.API_URL}/public/invoices/${token}`,
+        );
+        const { payOnline } = (await read.json()) as { payOnline?: boolean };
+
+        await page.goto(`${urls.RENDERER_URL}/pay/${token}`);
+        await expect(
+            page.getByRole("heading", { name: `Invoice ${number}` }),
+        ).toBeVisible();
+        const main = page.getByRole("main");
+        await expect(main.getByText("₹300.00 received")).toBeVisible();
+        await expect(main.getByText(/^Cash · /)).toBeVisible();
+        await expect(main.getByText("Partly paid")).toBeVisible();
+        await expect(
+            main.getByRole("row", { name: /Paid so far\s+₹300\.00/ }),
+        ).toBeVisible();
+        await expect(
+            main.getByRole("row", { name: /Left to pay\s+₹500\.00/ }),
+        ).toBeVisible();
+        if (payOnline === false) {
+            // View only: no Pay, a copy to keep, as before.
+            await expect(
+                main.getByRole("button", { name: /^Pay ₹/ }),
+            ).toHaveCount(0);
+        } else {
+            // Pay charges what is left, and says so.
+            await expect(
+                main.getByRole("button", { name: "Pay ₹500.00" }),
+            ).toBeVisible();
+            const intent = await request.post(
+                `${urls.API_URL}/public/invoices/${token}/payment-intent`,
+                { data: { idempotencyKey: `u16-${stamp(testInfo)}` } },
+            );
+            // The stack's provider may not start one; when it does, it is
+            // for what is left, never the total.
+            if (intent.ok()) {
+                const { amountCents } = (await intent.json()) as {
+                    amountCents: number;
+                };
+                expect(amountCents).toBe(50_000);
+            }
+        }
+
+        // A cheque for the rest, waiting for the bank: its own words, and
+        // nothing to pay.
+        const cheque = await nw.post<{ recorded: { paymentId: string } }>(
+            `/invoices/${id}/payments`,
+            {
+                method: "CHEQUE",
+                chequeNumber: "004512",
+                chequeBank: "HDFC Bank",
+            },
+        );
+        await page.reload();
+        await expect(
+            main.getByText("Cheque for ₹500.00 received"),
+        ).toBeVisible();
+        await expect(
+            main.getByText(/^Cheque 004512 · HDFC Bank · /),
+        ).toBeVisible();
+        await expect(
+            main.getByText(
+                "This invoice is settled once the cheque clears. If it's returned by the bank, the amount is due again.",
+            ),
+        ).toBeVisible();
+        await expect(main.getByText("Cheque received")).toBeVisible();
+        await expect(main.getByRole("button", { name: /^Pay ₹/ })).toHaveCount(
+            0,
+        );
+        await expect(main.getByText(/This invoice is paid/)).toHaveCount(0);
+
+        // The bank returns it: owed again, said so.
+        await nw.post(
+            `/invoices/${id}/payments/${cheque.recorded.paymentId}/bounced`,
+            {},
+        );
+        await page.reload();
+        await expect(
+            main.getByText(
+                "Cheque 004512 · HDFC Bank was returned by the bank",
+            ),
+        ).toBeVisible();
+        await expect(
+            main.getByText("The ₹500.00 it paid is due again."),
+        ).toBeVisible();
+        await expect(
+            main.getByRole("row", { name: /Left to pay\s+₹500\.00/ }),
+        ).toBeVisible();
+        if (payOnline !== false) {
+            await expect(
+                main.getByRole("button", { name: "Pay ₹500.00" }),
+            ).toBeVisible();
+        }
+        // Nothing private: no reference, note or id on the page.
+        await expect(page.locator("body")).not.toContainText(
+            /paymentId|recordedBy|bounceReason/,
+        );
     });
 });

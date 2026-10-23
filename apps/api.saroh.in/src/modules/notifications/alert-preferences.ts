@@ -24,6 +24,14 @@ export const ALERT_EVENTS = [
     "failed",
     "team",
     "site",
+    // A customer asked to remove their data (DEC-172, #1106).
+    "request",
+    // A booking with you was made, moved or cancelled (DEC-174 D7, #1138):
+    // personal, to the person on the diary with a login.
+    "mine",
+    // A member cancelled or paused their own membership, or stopped its
+    // autopay at their bank (DEC-174 U19, #1150).
+    "member",
 ] as const;
 export type AlertEvent = (typeof ALERT_EVENTS)[number];
 
@@ -48,12 +56,22 @@ export function isAlertChannel(value: unknown): value is AlertChannel {
  * The defaults (default 126): the bell on for everything, email on for a
  * failed payment and for a scheduled go-live (DEC-071, T10: whoever can
  * publish should hear that the site changed, or didn't, while nobody was
- * watching), WhatsApp off. Code, not rows: a row is written only
+ * watching), and for a customer's data removal request (DEC-172: it asks
+ * the business to act, and Saroh has told the customer it will hear back),
+ * WhatsApp off. Code, not rows: a row is written only
  * when someone's choice differs from these.
  */
 export function defaultOn(event: AlertEvent, channel: AlertChannel): boolean {
     if (channel === "bell") return true;
-    if (channel === "email") return event === "failed" || event === "site";
+    if (channel === "email") {
+        return (
+            event === "failed" ||
+            event === "site" ||
+            event === "request" ||
+            // Bookings with you (DEC-174, #1138): bell and email by default.
+            event === "mine"
+        );
+    }
     return false;
 }
 
@@ -69,6 +87,13 @@ export const ALERT_READS: Record<AlertEvent, readonly OrgAction[]> = {
     team: ["member:read"],
     // Who can put the site live hears when it went live without them.
     site: ["site:publish"],
+    // Anyone who can run a customer removal acts on a request (DEC-172).
+    request: ["customer:remove"],
+    // Anyone who reads bookings, Calendar only included: it is their own
+    // diary (DEC-074 scopes). Offered only to someone on the diary.
+    mine: ["booking:read"],
+    // Whoever reads memberships.
+    member: ["subscription:read"],
 };
 
 /**
@@ -82,16 +107,41 @@ export const ALERT_MODULE: Record<AlertEvent, string | null> = {
     failed: "PAYMENTS",
     team: null,
     site: "WEBSITE",
+    // A customer can ask from any site's account, whichever modules are on.
+    request: null,
+    mine: "APPOINTMENTS",
+    // Memberships are part of Payments: their routes ask for it.
+    member: "PAYMENTS",
 };
 
 /** The inbox notice types each row covers. */
 export const ALERT_NOTIFICATION_TYPES: Record<AlertEvent, readonly string[]> = {
     // R34: an order to pay on handover nobody came for in three days.
-    order: ["order.new", "order.uncollected"],
+    // #1139: a team-made order paid online by the customer (good news).
+    order: ["order.new", "order.uncollected", "order.paid_by_link"],
     booking: ["booking.new", "booking.moved", "booking.cancelled"],
     // UX-012: a provider that refused the business's keys, and (#555) one
     // that works again.
-    failed: ["payment.failed", "provider.attention", "provider.back"],
+    // #1139: an order's payment that didn't go through, and money captured
+    // at the wrong amount on an order or an invoice.
+    failed: [
+        "payment.failed",
+        "provider.attention",
+        "provider.back",
+        "order.payment_failed",
+        "payment.mismatch",
+        "payment.mismatch.invoice",
+        // #1143: a refund refused by the provider, or failed after it was
+        // sent, on an order, a booking or an invoice.
+        "refund.refused",
+        "refund.refused.booking",
+        "refund.refused.invoice",
+        "refund.failed",
+        "refund.failed.booking",
+        "refund.failed.invoice",
+        // A provider's event Saroh couldn't apply after its tries.
+        "payment.event_unapplied",
+    ],
     team: ["team.joined"],
     // UX-043: a reviewer's verdict, or their first note of a round.
     // #917: a live custom domain that stopped working, and came back.
@@ -104,7 +154,28 @@ export const ALERT_NOTIFICATION_TYPES: Record<AlertEvent, readonly string[]> = {
         "domain.down",
         "domain.back",
     ],
+    request: ["customer.data-request"],
+    // Personal notices (`userId`), and #1157's "now with you" / "now with
+    // Meera", which are the same thing said on the reassigning write.
+    mine: [
+        "booking.mine.new",
+        "booking.mine.moved",
+        "booking.mine.cancelled",
+        "booking.reassigned",
+    ],
+    // U19 (#1150): a member's own cancel or pause, and autopay cancelled at
+    // their bank. Nothing the team did themselves.
+    member: ["member.cancelled", "member.paused", "member.autopay_off"],
 };
+
+/**
+ * Notice types with no row of their own, shown only to whoever may act on
+ * them (#1138): a booking rules request reaches only who may approve it.
+ */
+export const NOTICE_TYPE_READS: Readonly<Record<string, readonly OrgAction[]>> =
+    {
+        "hours.rule-request": ["service:write"],
+    };
 
 /** Which row an inbox notice type belongs to, or null (enquiries, reviews). */
 export function alertEventOfType(type: string): AlertEvent | null {
@@ -196,9 +267,30 @@ export function hiddenNotificationTypes(
     has: (action: OrgAction) => boolean,
     roleKey?: string | null,
 ): string[] {
-    return ALERT_EVENTS.filter(
-        (event) =>
-            !mayHearAbout(event, has, roleKey) ||
-            !alertOn(stored, event, "bell"),
+    return [
+        ...ALERT_EVENTS.filter(
+            (event) =>
+                !mayHearAbout(event, has, roleKey) ||
+                !alertOn(stored, event, "bell"),
+        ).flatMap((event) => [...ALERT_NOTIFICATION_TYPES[event]]),
+        ...Object.entries(NOTICE_TYPE_READS)
+            .filter(([, reads]) => !reads.some(has))
+            .map(([type]) => type),
+    ];
+}
+
+/** The rows whose notices are personal (`userId`), not the business's. */
+export const PERSONAL_ALERTS: readonly AlertEvent[] = ["mine"];
+
+/**
+ * The types of a person's OWN notices (`userId`) they don't see: those of
+ * a personal row they turned the bell off for (#1138: "Bookings with
+ * you"). A notice addressed to them is theirs whatever their role reads.
+ */
+export function hiddenOwnNotificationTypes(
+    stored: readonly StoredPreference[],
+): string[] {
+    return PERSONAL_ALERTS.filter(
+        (event) => !alertOn(stored, event, "bell"),
     ).flatMap((event) => [...ALERT_NOTIFICATION_TYPES[event]]);
 }

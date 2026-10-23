@@ -1,11 +1,14 @@
-import type { RenderedHero } from "@saroh/block-contract";
-import { resolveVariant } from "@saroh/block-contract";
+import type { LookId, RenderedHero } from "@saroh/block-contract";
+import { LOOKS, resolveVariant } from "@saroh/block-contract";
 
 import type { PublicVisit } from "../lib/public-visit";
+import type { LookProps } from "../look-context";
 import FullBleedHero from "./hero-full-bleed";
 import { HeroHeading } from "./hero-heading";
 import type { HeroLevel } from "./hero-level";
+import LookHero from "./hero-look";
 import PlainHero from "./hero-plain";
+import type { FrontDoor, PageProof } from "./look-front";
 import type { PublicToday } from "./on-today";
 import OnTodayHero from "./on-today";
 
@@ -29,6 +32,13 @@ import OnTodayHero from "./on-today";
  *   already shows the business's name, and a page opening on it twice reads
  *   as a mistake — and with no line under it the section takes no room.
  *
+ * UNDER A LOOK (DEC-172, U6) a hero that chose no layout, or chose the
+ * look's own, is drawn as the look's hero (`hero-look.tsx`): its layout,
+ * its no-photo layout, the next booking's place and the page's proof line.
+ * A section's own other choice wins (KD2): a split hero under Quiet, a
+ * full-bleed or `none` hero, and one with On today keep their layouts,
+ * restyled by the look's tokens. Classic is unchanged.
+ *
  * ONE H1 A PAGE. Only the page's first hero draws its headline as the `h1`;
  * a later one is an `h2` (`level`, from `hero-level.ts`), whichever look it
  * wears.
@@ -43,7 +53,11 @@ export default function HeroSection({
     now,
     priority = false,
     level = 1,
-}: {
+    look: siteLook,
+    isOwnerPreview = false,
+    frontDoor = null,
+    proof = null,
+}: LookProps & {
     content: RenderedHero;
     /**
      * `1`: this is the page's first hero, and its headline is the page's
@@ -68,8 +82,32 @@ export default function HeroSection({
     today?: PublicToday;
     /** The moment "Open now" is worked out for (fixtures, tests). */
     now?: Date;
+    /**
+     * Under a look: the hero's way in beside its button, the booking page
+     * or the shop (`FrontDoor`). Live sites only; none draws no slot.
+     */
+    frontDoor?: FrontDoor | null;
+    /** Under a look: the page's first testimonial, as one proof line. */
+    proof?: PageProof | null;
 }) {
     const look = resolveVariant("hero", content);
+    if (siteLook && wearsLookHero(content, look, siteLook)) {
+        return (
+            <LookHero
+                content={content}
+                look={siteLook}
+                level={level}
+                priority={priority}
+                isOwnerPreview={isOwnerPreview}
+                frontDoor={frontDoor}
+                proof={proof}
+                siteId={siteId}
+                apiUrl={apiUrl}
+                today={today}
+                now={now}
+            />
+        );
+    }
     if (look === "fullBleed") {
         return (
             <FullBleedHero
@@ -140,4 +178,24 @@ function CompactHeading({
             ) : null}
         </section>
     );
+}
+
+/**
+ * Whether a hero is drawn as its look's own (U6): a centred or split hero
+ * whose section named no layout, or named the look's default (Quiet's
+ * centred, Folio's split; Live sets none, so either of the two). Never one
+ * with On today, whose panel is its own layout.
+ */
+export function wearsLookHero(
+    content: RenderedHero,
+    resolved: string,
+    look: LookId,
+): boolean {
+    if (content.onToday) return false;
+    if (resolved !== "split" && resolved !== "centered") return false;
+    const named =
+        typeof content.variant === "string" ? content.variant.trim() : "";
+    if (named === "") return true;
+    const own = LOOKS[look].defaultVariants.hero;
+    return own === undefined || named === own;
 }

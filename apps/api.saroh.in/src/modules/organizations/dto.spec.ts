@@ -341,3 +341,65 @@ describe("social links and the registered address choice (DEC-128)", () => {
         ).toMatchObject({ statusCode: 400 });
     });
 });
+
+describe("who Saroh bills for a new business (DEC-167, R7)", () => {
+    const pipe = new ValidationPipe(validationPipeOptions);
+    const taken = (body: unknown) =>
+        pipe.transform(body, {
+            type: "body",
+            metatype: OnboardOrganizationDto,
+        }) as Promise<OnboardOrganizationDto>;
+    const through = (body: unknown) =>
+        taken(body)
+            .then(() => null)
+            .catch((e: BadRequestException) => e.getResponse());
+
+    it("takes one of the caller's profiles by id, or none", async () => {
+        expect(
+            (await taken({ name: "Asha", billingProfileId: "bprof_1" }))
+                .billingProfileId,
+        ).toBe("bprof_1");
+        expect(await through({ name: "Asha" })).toBeNull();
+    });
+
+    it("takes a new profile's fields whole, leaving what each must be to its save", async () => {
+        const dto = await taken({
+            name: "Asha",
+            newBillingProfile: {
+                legalName: "",
+                billingEmail: "not an email",
+                gstin: "29ABCDE1234F1ZW",
+                gstState: "29",
+                addressLine1: "3 Hill Road",
+                city: "Bengaluru",
+                postalCode: "560038",
+            },
+        });
+        // Refused by the service, which names the field (400 with
+        // `details.field`), not here as a bare "Validation failed".
+        expect(dto.newBillingProfile).toMatchObject({
+            legalName: "",
+            billingEmail: "not an email",
+            postalCode: "560038",
+        });
+    });
+
+    it("refuses a new profile that isn't one, or a field it doesn't have", async () => {
+        expect(
+            await through({
+                name: "Asha",
+                newBillingProfile: { legalName: 1 },
+            }),
+        ).toMatchObject({ statusCode: 400 });
+        expect(
+            await through({
+                name: "Asha",
+                newBillingProfile: {
+                    legalName: "Asha Foods",
+                    billingEmail: "a@example.com",
+                    ownerUserId: "someone_else",
+                },
+            }),
+        ).toMatchObject({ statusCode: 400 });
+    });
+});

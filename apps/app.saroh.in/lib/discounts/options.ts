@@ -1,4 +1,4 @@
-import type { ReachOptions } from "@/components/stores/discount-form";
+import type { ReachOptions } from "@/components/stores/discounts/discount-form";
 import { listCategories, listProducts } from "@/lib/products/service";
 import { listBusinessStores } from "@/lib/stores/service";
 import { getStorefront } from "@/lib/stores/storefronts";

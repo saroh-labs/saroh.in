@@ -59,7 +59,7 @@ describe("canSend / wasSent", () => {
 describe("sendConfirmLine", () => {
     it("says where it goes, and that the old link stops, for email", () => {
         expect(sendConfirmLine(email, "Farah", "₹2,400.00", false)).toBe(
-            "This tells Farah by email at farah@example.com about ₹2,400.00, with a new pay link. A link you shared before stops working.",
+            "This tells Farah by email at farah@example.com about ₹2,400.00, with a new payment link. A link you shared before stops working.",
         );
     });
 
@@ -90,7 +90,7 @@ describe("sendOutcome", () => {
             ),
         ).toEqual({
             ok: true,
-            message: "Sent to farah@example.com with a pay link.",
+            message: "Sent to farah@example.com with a payment link.",
         });
         expect(
             sendOutcome(
@@ -136,16 +136,16 @@ describe("without online payment (DEC-070)", () => {
     });
 
     it("names Send for what the link does", () => {
-        expect(sendLabel(true)).toBe("Send with pay link");
+        expect(sendLabel(true)).toBe("Send with payment link");
         expect(sendLabel(false)).toBe("Send invoice");
     });
 
-    it("promises no pay link in the confirm or the toast", () => {
+    it("promises no payment link in the confirm or the toast", () => {
         const line = sendConfirmLine(view, "Farah", "₹2,400.00", false);
         expect(line).toBe(
             "This tells Farah by email at farah@example.com about ₹2,400.00, with a link to view it and download a copy. A link you shared before stops working.",
         );
-        expect(line).not.toMatch(/pay link/);
+        expect(line).not.toMatch(/payment link/);
         expect(
             sendConfirmLine(
                 { ...view, channels: ["thread"] },
@@ -177,7 +177,7 @@ describe("without online payment (DEC-070)", () => {
             false,
             false,
         );
-        expect(suppressed.message).not.toMatch(/pay link/);
+        expect(suppressed.message).not.toMatch(/payment link/);
         expect(suppressed.message).toMatch(/Download the PDF/);
     });
 });

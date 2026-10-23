@@ -74,13 +74,13 @@ vi.mock("@/lib/discounts/options", () => ({
     loadReachOptions: () => loadReachOptions(),
 }));
 // The forms themselves are not under test: a marker says one was drawn.
-vi.mock("@/components/stores/discount-form", () => ({
+vi.mock("@/components/stores/discounts/discount-form", () => ({
     DiscountForm: () => <form data-testid="discount-form" />,
 }));
-vi.mock("@/components/customers/add-customer-form", () => ({
+vi.mock("@/components/customers/store-customer/add-customer-form", () => ({
     AddCustomerForm: () => <form data-testid="add-customer-form" />,
 }));
-vi.mock("@/components/sites/post-editor", () => ({
+vi.mock("@/components/sites/posts/post-editor", () => ({
     PostEditor: () => <form data-testid="post-editor" />,
 }));
 
@@ -186,42 +186,50 @@ const GUARDED: {
     },
 ];
 
-describe("a create or edit page, for a role without the permission", () => {
-    it.each(GUARDED)(
-        "$page says it can't be opened, before any form ($action)",
-        async ({ load, props, thing, action }) => {
-            resolveActiveOrganization.mockResolvedValue(org(MEMBER));
-            const { default: Page } = await load();
-            const said = text(await Page((props ?? {}) as never));
-            expect(said).toContain(`You can't open ${thing}`);
-            expect(said).toContain(
-                `Your role in Rye & Co. is Member. It doesn't include ${thing}.`,
-            );
-            expect(said).toContain(
-                "An owner or admin can change this in Settings › Team.",
-            );
-            expect(said).not.toMatch(/<form|<input|<textarea/);
-            expect(said).not.toContain(action);
-            expect(said).not.toContain('role="alert"');
-        },
-    );
-
-    it("opens for a role the business made with the permission ticked", async () => {
-        resolveActiveOrganization.mockResolvedValue(
-            org(["contact:read", "contact:write"], { roleKey: "front-desk" }),
+// Each case imports its page cold, and a page like New invoice pulls in a
+// large module graph: 5s isn't enough with the rest of the suite running.
+describe(
+    "a create or edit page, for a role without the permission",
+    { timeout: 15_000 },
+    () => {
+        it.each(GUARDED)(
+            "$page says it can't be opened, before any form ($action)",
+            async ({ load, props, thing, action }) => {
+                resolveActiveOrganization.mockResolvedValue(org(MEMBER));
+                const { default: Page } = await load();
+                const said = text(await Page((props ?? {}) as never));
+                expect(said).toContain(`You can't open ${thing}`);
+                expect(said).toContain(
+                    `Your role in Rye & Co. is Member. It doesn't include ${thing}.`,
+                );
+                expect(said).toContain(
+                    "An owner or admin can change this in Settings › Team.",
+                );
+                expect(said).not.toMatch(/<form|<input|<textarea/);
+                expect(said).not.toContain(action);
+                expect(said).not.toContain('role="alert"');
+            },
         );
-        const { default: Customers } =
-            await import("@/app/(shell)/commerce/customers/new/page");
-        expect(text(await Customers())).toContain("add-customer-form");
 
-        resolveActiveOrganization.mockResolvedValue(
-            org(["discount:read", "discount:write"], { roleKey: "offers" }),
-        );
-        const { default: Discounts } =
-            await import("@/app/(shell)/commerce/discounts/new/page");
-        expect(text(await Discounts())).toContain("discount-form");
-    });
-});
+        it("opens for a role the business made with the permission ticked", async () => {
+            resolveActiveOrganization.mockResolvedValue(
+                org(["contact:read", "contact:write"], {
+                    roleKey: "front-desk",
+                }),
+            );
+            const { default: Customers } =
+                await import("@/app/(shell)/commerce/customers/new/page");
+            expect(text(await Customers())).toContain("add-customer-form");
+
+            resolveActiveOrganization.mockResolvedValue(
+                org(["discount:read", "discount:write"], { roleKey: "offers" }),
+            );
+            const { default: Discounts } =
+                await import("@/app/(shell)/commerce/discounts/new/page");
+            expect(text(await Discounts())).toContain("discount-form");
+        });
+    },
+);
 
 describe("New post and a post, for someone who reads the site", () => {
     const site = (edit: boolean) => ({

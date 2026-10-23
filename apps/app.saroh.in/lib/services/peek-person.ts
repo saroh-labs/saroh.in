@@ -27,7 +27,12 @@ export async function readPeekPerson(
         readNoticeReach(contactId),
     ]);
     if (!contact) return null;
-    return { phone: contact.phone, attention, reach: notices?.reach ?? null };
+    return {
+        phone: contact.phone,
+        attention,
+        reach: notices?.reach ?? null,
+        emailTo: notices?.to ?? null,
+    };
 }
 
 /** Needs attention for one contact; null when it can't be read. The

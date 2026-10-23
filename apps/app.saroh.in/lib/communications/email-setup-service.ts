@@ -48,6 +48,9 @@ function isEmailSetup(body: unknown): body is EmailSetup {
     const b = body as Record<string, unknown>;
     return (
         typeof b.connected === "boolean" &&
-        (b.canConnect === null || typeof b.canConnect === "boolean")
+        (b.canConnect === null || typeof b.canConnect === "boolean") &&
+        (b.accountUpdates === undefined ||
+            b.accountUpdates === null ||
+            typeof b.accountUpdates === "boolean")
     );
 }

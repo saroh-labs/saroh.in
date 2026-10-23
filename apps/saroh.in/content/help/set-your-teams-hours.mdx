@@ -1,19 +1,19 @@
 ---
 # Every label below was checked against the real screens on 6 Oct 2026
 # (R7), in the code and in the captured shots. Sources, from the repo root:
-#   NAV   apps/app.saroh.in/components/shared/nav-items.tsx (Bookings ›
+#   NAV   apps/app.saroh.in/components/shared/navigation/nav-items.tsx (Bookings ›
 #         Availability, /bookings/availability)
 #   PAGE  apps/app.saroh.in/components/bookings/availability/availability-editor.tsx
 #         ("When each person can be booked. Customers only ever see free
 #         times inside these hours, minus bookings and the gap after each.
 #         Changing hours never moves a booking that's already made.";
 #         the "Team member" chips, "+ Add someone"; the bar "Unsaved. …",
-#         "Discard", "Save hours"; "One-off extra hours", "None. Click
+#         "Discard", "Save hours"; "Extra opening hours", "None. Click
 #         closed time on the calendar to add some.")
 #   WEEK  .../bookings/availability/weekly-hours.tsx ("Weekly hours", "Copy
 #         Monday to weekdays", "+ Hours", From "to" To, "Add", "Not
 #         bookable"); lib/services/availability-rules.ts (half-hour steps)
-#   OFF   .../bookings/availability/time-off-card.tsx, lib/staff/time-off.ts
+#   OFF   .../bookings/time-off/time-off-card.tsx, lib/staff/time-off.ts
 #         ("Time off": From, To, When "All day" / "Part of the day", Who
 #         "Just ‹name›" / "Everyone — business closed", "Reason — team
 #         only", "Add day off")
@@ -65,10 +65,10 @@ updated: "2026-10-06"
 publishOn: "2026-10-17"
 steps:
     # NAV, PAGE, ADD, OPEN.
-    - title: Open Availability
-      body: "In Saroh, open Bookings › Availability in the sidebar. Everyone who takes bookings is across the top: pick a person to see their hours. Someone new? Press + Add someone and give their name. They need no account, and nobody can book them until you add their hours. If you've set opening hours, a line under the page's intro says in-person bookings are only offered while you're open."
+    - title: Open Hours and time off
+      body: "In Saroh, open Bookings › Hours and time off in the sidebar. Everyone who takes bookings is across the top: pick a person to see their hours. Someone new? Press + Add someone and give their name. They need no account, and nobody can book them until you add their hours. If you've set opening hours, a line under the page's intro says in-person bookings are only offered while you're open."
       shot: help-team-hours-1
-      caption: "Availability at Kavi Dental (demo clinic), with Dr. Arun Pillai picked."
+      caption: "Hours and time off at Kavi Dental (demo clinic), with Dr. Arun Pillai picked."
       marker: Dr. Arun Pillai
     # WEEK.
     - title: Add their weekly hours
@@ -95,7 +95,7 @@ steps:
       body: "Under Time off, choose the first and last day, and whether it's all day or part of the day. Under Who, keep it to this person, or choose Everyone — business closed for a holiday. Add a reason if you like; only your team sees it. Then press Add day off, and press Save hours. Nobody can book them then."
       shot: help-team-hours-5
       caption: "Dr. Arun Pillai's time off at Kavi Dental (demo clinic): a day at a conference, the clinic closed for Diwali, and the form to add a day off."
-      tip: "Working an extra day just once? Click the closed time on the calendar to open it for bookings. It shows here under One-off extra hours."
+      tip: "Working an extra day just once? Click the closed time on the calendar to open it for bookings. It shows here under Extra opening hours."
       marker: Add day off
     # RULES, SLOTS.
     - title: Set the booking rules

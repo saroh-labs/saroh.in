@@ -15,6 +15,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { dayWords, moneyWords } from "../../common/words-format";
 import type { TransactionalRecipient } from "../communications/communications.service";
 import { CommunicationsService } from "../communications/communications.service";
+import { noticeOn } from "../communications/notice-settings";
 import {
     autopayCancelledSentence,
     renderAutopayCancelled,
@@ -450,12 +451,23 @@ export class SubscriptionAutopayService {
             },
         });
         if (!sub) return { email: null, suppressed: false, account: false };
-        const vars = {
+        const names = {
             business: await businessName(organizationId),
             firstName: firstNameOf(sub.contact.firstName),
             plan: sub.plan.name,
         };
         return prisma.$transaction(async (tx) => {
+            // The next renewal's words follow "Renewal invoices" (U10): on,
+            // it is emailed with a link to pay; off, nobody sends it unless
+            // the team does.
+            const vars = {
+                ...names,
+                invoiceSent: await noticeOn(
+                    tx,
+                    organizationId,
+                    "RENEWAL_INVOICE",
+                ),
+            };
             const channels = await noticeChannels(tx, organizationId);
             let email: string | null = null;
             let suppressed = false;

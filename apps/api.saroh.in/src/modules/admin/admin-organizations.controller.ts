@@ -8,6 +8,7 @@ import { IdempotencyService } from "../../common/idempotency/idempotency.service
 import { NOT_CATALOGUE_PLAN } from "../billing/plans.service";
 import { AdminAccessService } from "./admin-access.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
+import { AdminBusinessModulesService } from "./admin-business-modules.service";
 import { AdminLifecycleService } from "./admin-lifecycle.service";
 import { AdminOrganizationViewService } from "./admin-organization-view.service";
 import { AdminOrganizationsService } from "./admin-organizations.service";
@@ -21,6 +22,7 @@ import {
     ChangePlanDto,
     ListOrganizationsDto,
     ModuleOverrideDto,
+    OfferPreviewDto,
     OpenAdminAccessSessionDto,
     OperatorReasonDto,
     PlanOverrideDto,
@@ -50,6 +52,7 @@ export class AdminOrganizationsController {
         private readonly adminAudit: AdminAuditService,
         private readonly idempotency: IdempotencyService,
         private readonly siteTrackers: AdminSiteTrackersService,
+        private readonly businessModules: AdminBusinessModulesService,
     ) {}
 
     /**
@@ -87,6 +90,20 @@ export class AdminOrganizationsController {
     @RequireAdminPermission(AdminPermission.OrganizationRead)
     summary(@Param("organizationId") organizationId: string) {
         return this.organizations.summary(organizationId);
+    }
+
+    /**
+     * Each module's true state for the business (U1, #989): on, off or
+     * locked, the gate in the way in words and what clears it, as the
+     * business's owner meets it. No support session: it carries no
+     * personal data.
+     */
+    // TODO(U25): scope — an Account manager reads only the businesses they
+    // manage (`scopeForStaff`, U18).
+    @Get("organizations/:organizationId/modules/state")
+    @RequireAdminPermission(AdminPermission.OrganizationRead)
+    moduleState(@Param("organizationId") organizationId: string) {
+        return this.businessModules.state(organizationId);
     }
 
     /**
@@ -375,6 +392,35 @@ export class AdminOrganizationsController {
                     overrideId,
                 }),
         );
+    }
+
+    /**
+     * What the offer sheet can give this business, and Take away a module…
+     * can take (admin console U5, R5): each kind with why not, and what to
+     * pick from. Writes nothing.
+     */
+    @Get("organizations/:organizationId/offers")
+    @RequireAdminPermission(AdminPermission.PricingOverride)
+    offers(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+    ) {
+        return this.overrides.offers(staff, organizationId);
+    }
+
+    /**
+     * The dry run of a custom offer or of Take away a module… (U5, R5):
+     * what the write would refuse, or what the business would see. Writes
+     * nothing — no override, no ledger row — so it takes no idempotency key.
+     */
+    @Post("organizations/:organizationId/overrides/preview")
+    @RequireAdminPermission(AdminPermission.PricingOverride)
+    previewOffer(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+        @Body() dto: OfferPreviewDto,
+    ) {
+        return this.overrides.preview(staff, organizationId, dto);
     }
 
     /** Grant, remove, or set the limit of one catalogue row (pricing U11). */

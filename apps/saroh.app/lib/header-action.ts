@@ -1,5 +1,16 @@
-import type { ModulePageStates, SiteHeaderAction } from "@saroh/site-blocks";
-import { contactPageHref, sitePrimaryAction } from "@saroh/site-blocks";
+import type { LookId } from "@saroh/block-contract";
+import type {
+    DockTab,
+    ModulePageStates,
+    SiteHeaderAction,
+} from "@saroh/site-blocks";
+import {
+    contactPageHref,
+    dockTabs,
+    siteMenuEntries,
+    sitePrimaryAction,
+    withoutPrimaryAction,
+} from "@saroh/site-blocks";
 
 import type { BookingPageLookup } from "./booking-page";
 
@@ -50,5 +61,41 @@ export function headerAction({
             pages.map((page) => ({ href: page.path, kind: page.kind })),
             modules,
         ),
+    });
+}
+
+/**
+ * Live's dock on a phone (DEC-172, U5): Home, the site's own pages, the
+ * same main action as the header (`headerAction`), the shop while it
+ * serves and isn't that action, and You while the site has customer
+ * accounts. The other looks have no dock (their phone bar is the main
+ * action alone), and get none.
+ */
+export function lookDock({
+    look,
+    navigation,
+    modules,
+    shopServes,
+    action,
+    accountArea,
+}: {
+    look: LookId;
+    navigation: readonly { label: string; href: string; kind?: string }[];
+    modules?: ModulePageStates | null;
+    shopServes: boolean;
+    action: SiteHeaderAction | null;
+    accountArea: boolean;
+}): DockTab[] {
+    if (look !== "live") return [];
+    const pages = withoutPrimaryAction(
+        siteMenuEntries({ navigation: [...navigation], modules, shopServes }),
+        action,
+    );
+    return dockTabs({
+        home: "/",
+        pages,
+        action,
+        shopHref: shopServes && action?.kind !== "shop" ? "/shop" : null,
+        accountHref: accountArea ? "/account" : null,
     });
 }

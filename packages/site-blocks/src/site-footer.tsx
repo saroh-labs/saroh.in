@@ -1,6 +1,10 @@
+import type { LookId } from "@saroh/block-contract";
 import type { ReactNode } from "react";
 
 import { CookieChoicesButton } from "./consent-banner";
+import type { SiteSession } from "./look-chrome";
+import { lookOf } from "./look-context";
+import { LookFooter } from "./look-footer";
 import type { SiteContact } from "./site-footer-contact";
 import {
     FOOTER_LINK,
@@ -146,7 +150,20 @@ export function SiteFooter({
     shopServes = false,
     basePath = "",
     now,
+    look,
+    action = null,
+    session = null,
 }: {
+    /**
+     * The site's look (DEC-172, U5): Folio, Quiet and Live draw their own
+     * footer (`look-footer.tsx`) with every fact this one has. Absent is
+     * Classic, unchanged.
+     */
+    look?: LookId | null;
+    /** The site's main action, an outline in a look's footer; Classic draws none. */
+    action?: { label: string; href: string } | null;
+    /** Who is signed in, for a look's "Your account" (drawn in the browser). */
+    session?: SiteSession | null;
     footer: SiteFooterContent | null | undefined;
     /** The site's name: the footer's line when the merchant wrote none. */
     name: string;
@@ -201,6 +218,69 @@ export function SiteFooter({
             linkClassName={FOOTER_LINK}
         />
     ) : null;
+    const drawn = lookOf(look);
+    if (drawn) {
+        const one = written ? footerLine(written) : null;
+        return (
+            <LookFooter
+                look={drawn}
+                name={name}
+                line={
+                    one && one.value !== "" ? (
+                        one.kind === "html" ? (
+                            <span
+                                // Sanitized at publish — see the safety note above.
+                                dangerouslySetInnerHTML={{ __html: one.value }}
+                            />
+                        ) : (
+                            one.value
+                        )
+                    ) : null
+                }
+                block={
+                    written && one === null ? (
+                        written.format === "html" ? (
+                            <div
+                                className={WRITTEN_PROSE}
+                                // Sanitized at publish — see the safety note above.
+                                dangerouslySetInnerHTML={{
+                                    __html: written.value,
+                                }}
+                            />
+                        ) : (
+                            <p className="text-site-footer-muted m-0 whitespace-pre-wrap text-[15px]">
+                                {written.value}
+                            </p>
+                        )
+                    ) : null
+                }
+                action={
+                    action
+                        ? {
+                              label: action.label,
+                              href: underBasePath(basePath, action.href),
+                          }
+                        : null
+                }
+                contact={contact}
+                menu={menu}
+                session={session}
+                basePath={basePath}
+                closing={
+                    credit ? (
+                        <>
+                            <MadeWithSaroh credit={credit} />
+                            {credit.reportHref ? (
+                                <ReportLink href={credit.reportHref} />
+                            ) : null}
+                        </>
+                    ) : null
+                }
+                cookieChoices={cookieChoices}
+                owner={owner}
+            />
+        );
+    }
     if (left) {
         return (
             <LeftFooter

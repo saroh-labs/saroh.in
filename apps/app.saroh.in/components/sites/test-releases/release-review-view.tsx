@@ -5,9 +5,9 @@ import { PartialNotice } from "@saroh/ui/data-state";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import type { ReviewPanelAbilities } from "@/components/sites/review-panel";
-import { ReviewPanel } from "@/components/sites/review-panel";
-import { SectionReview } from "@/components/sites/section-review";
+import type { ReviewPanelAbilities } from "@/components/sites/review/review-panel";
+import { ReviewPanel } from "@/components/sites/review/review-panel";
+import { SectionReview } from "@/components/sites/review/section-review";
 import type {
     PublishedPage,
     ReviewableSection,

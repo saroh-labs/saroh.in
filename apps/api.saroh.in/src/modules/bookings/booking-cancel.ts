@@ -1,17 +1,18 @@
-import type { Logger } from "@nestjs/common";
-import type { Booking } from "@saroh/database";
+import { ConflictException, Logger } from "@nestjs/common";
+import type { Booking, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { reversePackInTx } from "../class-packs/redeem-pack";
 import {
     bookingPaymentInTx,
     lockBookingIntentsInTx,
+    recordBookingRefundInTx,
     reserveBookingRefundInTx,
 } from "../payments/booking-refund";
 import type { PaymentsService } from "../payments/payments.service";
-import { BookingEventType } from "./booking-event-type";
+import { BookingEventType, classCancelledData } from "./booking-event-type";
 import { lockBookingInTx, releaseHoldInTx } from "./booking-hold";
-import { retirePayLinkInTx } from "./booking-pay-link";
+import { PAID_ALREADY, retirePayLinkInTx } from "./booking-pay-link";
 import {
     isLateCancel,
     loadBookingRules,
@@ -56,6 +57,43 @@ export interface CancelMoney {
 }
 
 export const NOTHING_MOVED: CancelMoney = { refund: null, kept: null };
+
+/**
+ * Home's Turn down (review #11) cancels only a booking still awaiting its
+ * money. When the customer paid in the ten seconds Undo was offered, the
+ * cancel is refused with this, and the row says so: the booking stands.
+ */
+export const THEY_JUST_PAID = "They just paid. The booking stands.";
+/** `details.reason` on that refusal, which the app answers in place. */
+export const JUST_PAID_REASON = "paid";
+
+/**
+ * Whether a booking still waits on its money, under its locks: a pay-now
+ * hold (PENDING), or a confirmed booking not paid another way whose own
+ * invoice is still issued (Home's "awaiting payment",
+ * `home-pending-bookings.ts`). A webhook that confirmed the hold, or paid
+ * the link's invoice, ends it.
+ */
+async function awaitsPaymentInTx(
+    tx: Prisma.TransactionClient,
+    booking: Booking,
+): Promise<boolean> {
+    if (booking.status === "PENDING") return true;
+    if (booking.status !== "CONFIRMED") return false;
+    if (booking.paidWith && PAID_ALREADY.includes(booking.paidWith)) {
+        return false;
+    }
+    const issued = await tx.invoice.findFirst({
+        where: {
+            bookingId: booking.id,
+            kind: "INVOICE",
+            source: "BOOKING",
+            status: "ISSUED",
+        },
+        select: { id: true },
+    });
+    return issued !== null;
+}
 
 /**
  * A cancelled booking, and what happened to its money. `told`: the cancel
@@ -109,7 +147,21 @@ export async function cancelFoundBooking(
     found: Booking,
     actor: CancelActor,
     now: Date,
-    options: { returnCredit?: boolean; closesClass?: boolean },
+    options: {
+        returnCredit?: boolean;
+        closesClass?: boolean;
+        /**
+         * Cancel only while it still awaits payment (Home's Turn down,
+         * review #11): else 409 `THEY_JUST_PAID`, and nothing changes.
+         */
+        ifUnpaid?: boolean;
+        /**
+         * With `closesClass`: why the business cancelled it (DEC-178,
+         * #1172), kept on the CANCELLED event's `data` and told to its
+         * customers and its waitlist.
+         */
+        classReason?: string;
+    },
     send: (refundId: string) => Promise<RefundStatus>,
 ): Promise<CancelledBooking> {
     if (found.status === "CANCELLED") {
@@ -133,12 +185,25 @@ export async function cancelFoundBooking(
         if (booking.status === "CANCELLED") {
             return { booking, money: NOTHING_MOVED, send: null, told: false };
         }
+        // Turned down from Home after ten seconds of Undo: a payment that
+        // landed meanwhile (the webhook takes the same locks first) wins.
+        if (options.ifUnpaid && !(await awaitsPaymentInTx(tx, booking))) {
+            throw new ConflictException({
+                message: THEY_JUST_PAID,
+                details: { reason: JUST_PAID_REASON },
+            });
+        }
         // A pay-now hold nobody has paid: let it go as the booker would,
         // so its draft invoice is voided and its pay link stops working.
         // A payment that lands after is recorded as owed back.
         if (booking.status === "PENDING") {
             await releaseHoldInTx(tx, booking.id, now, actor.userId, {
                 freesPlace: !options.closesClass,
+                // The whole class is off (U17): the booker of an unpaid
+                // hold in it hears so too.
+                ...(options.closesClass
+                    ? { classCancelled: true, classReason: options.classReason }
+                    : {}),
             });
             if (options.closesClass) {
                 await closeSessionWaitlistInTx(tx, {
@@ -146,6 +211,8 @@ export async function cancelFoundBooking(
                     serviceId: booking.serviceId,
                     startAt: booking.startAt,
                     now,
+                    tell: true,
+                    reason: options.classReason,
                 });
             }
             return {
@@ -205,7 +272,13 @@ export async function cancelFoundBooking(
             startAt: booking.startAt,
         };
         if (options.closesClass) {
-            await closeSessionWaitlistInTx(tx, { ...session, now });
+            // Everyone waiting for it hears the class is off (U17).
+            await closeSessionWaitlistInTx(tx, {
+                ...session,
+                now,
+                tell: true,
+                reason: options.classReason,
+            });
         } else {
             await offerFreedPlaceInTx(tx, session);
         }
@@ -219,6 +292,11 @@ export async function cancelFoundBooking(
                 type: BookingEventType.Cancelled,
                 actorUserId: actor.userId,
                 fromStartAt: booking.startAt,
+                // The whole class (DEC-178, #1172): and why, in the
+                // business's words, for the email and the history.
+                ...(options.closesClass
+                    ? { data: { ...classCancelledData(options.classReason) } }
+                    : {}),
             },
             select: { id: true },
         });
@@ -237,6 +315,11 @@ export async function cancelFoundBooking(
                         contactId: booking.contactId,
                         reason: "cancelled",
                         eventId: event.id,
+                        // The business cancelled the whole class (U17):
+                        // "‹Business› cancelled this class", and the money.
+                        ...(options.closesClass
+                            ? { classCancelled: true }
+                            : {}),
                     },
                 },
                 select: { id: true },
@@ -265,8 +348,36 @@ export async function cancelFoundBooking(
     // Phase two, after commit: the provider, under the row's id.
     if (done.send && done.money.refund) {
         done.money.refund.status = await send(done.send);
+        await recordRefundOutcome(done.send, done.money.refund.status);
     }
     return { ...done.booking, money: done.money, told: done.told };
+}
+
+const logger = new Logger("BookingCancel");
+
+/**
+ * The cancel's refund in the booking's history (#1137): "Refunded ₹X"
+ * once sent or awaiting the provider, "Refund failed" when refused. Under
+ * the refund row's lock, which the refund webhook takes too, so whichever
+ * writes first the line follows the row. Never throws: the cancel and the
+ * refund have happened, and the webhook writes the final line regardless.
+ */
+async function recordRefundOutcome(
+    refundId: string,
+    status: RefundStatus,
+): Promise<void> {
+    try {
+        await prisma.$transaction(async (tx) => {
+            await tx.$queryRaw`SELECT id FROM "PaymentRefund" WHERE id = ${refundId} FOR UPDATE`;
+            await recordBookingRefundInTx(tx, refundId, status);
+        });
+    } catch (err) {
+        logger.warn(
+            `Refund ${refundId}: not written to the booking's history (${
+                err instanceof Error ? err.message : String(err)
+            }); the refund webhook writes it`,
+        );
+    }
 }
 
 /**

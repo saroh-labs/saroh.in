@@ -67,14 +67,6 @@ each with why it stops there:
   one serializable write with its helpers; cutting them splits a method.
   A10's credit rules went to `bookings/booking-credit.ts` rather than grow
   them further; `bookOnline` is the seam when they are next cut.
-- `site-blocks/src/booking-flow/booking-flow.tsx` (1,068; 643 before E7,
-  E11, G18, A9's sign-in at the last step and A10's credit) — its state,
-  effects and handlers (the hold poll, confirm, letting a hold go, signing
-  in and "Not you?") share one component's state; the drawing is already in
-  `steps/`, the pure rules in `flow-helpers.ts` and `initial-start.ts`, and
-  A10's credit read in the `use-credit.ts` hook. Less means a reducer or
-  more hook seams, which is new logic; the sign-in handlers are the next
-  one to take out.
 - Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
   (1,289 after C14, whose Spent read — net of refunds, the list's rule — is
   `customer-spent.ts` over `spent.sql.ts`; 1,293 after C7, which moved the
@@ -163,19 +155,11 @@ each with why it stops there:
   geometry `lib/calendar/hour-layout.ts`; `business-week.tsx` (243) only
   chooses between it and the columns. The API's working hours are
   `calendar/working-hours.ts`, read beside the days off.
-- `organizations/team-screen.tsx` (1,377 after F16 and F17) — the Roles and
-  People tabs, the member drawer and the invite dialog share the screen's
-  roster and role state. Each piece is its own function already; moving them
-  is a file split with props threaded through, not yet done. F17 put a
-  person's extra permissions in `member-extras.tsx` (the column's chips, the
-  drawer's list and its draft hook) and `lib/organizations/extras.ts`, adding
-  only the calls, the drawer's two-step save and the column's grid; the
-  drawer is the next cut.
 - `shared/nav-items.tsx` (1,176; Sell › Stock and its Track stock rule, #527) — the nav's data (`NAV_GROUPS`,
   `SETTINGS_PAGES`) and every rule that filters it by role, module and
   site; half of it is the table itself. Splitting data from rules is a move,
   not yet made.
-- `modules/module-list.tsx` (430) — one list and its row, switch and state
+- `modules/catalog/module-list.tsx` (430) — one list and its row, switch and state
   tag; a little over, and the row carries most of it.
 - `site-accounts/customer-view.ts` (502 after A6) — the account area's one
   allow-list (ADR-011): every answer a signed-in customer gets is built here,
@@ -257,7 +241,7 @@ with why it stops there:
   `backfill/listings-stock-levels.ts` (491) and `backfill/held-stock.ts`
   (481) — one-off backfills, each one exported unit that the integration
   suite runs twice. The merge is already split, into deciding and moving.
-- `stores/catalogue-screen.tsx` (425; 401 before the Collections chip,
+- `stores/catalogue/catalogue-screen.tsx` (425; 401 before the Collections chip,
   #524) — the Products list's rows, paging, bulk bar, quick look and
   delete confirm share its list state. The Collections chip's cards and
   sheet went to their own `commerce/collections/collections-panel.tsx`,
@@ -269,7 +253,7 @@ with why it stops there:
   `collection-fields.tsx`, `kind-choice.tsx` and `products-picker.tsx`;
   the load-save-delete flow, as a hook, is the next seam. One line over,
   and not yet cut.
-- `sites/media-picker.tsx` (509) — the media library dialog. Photos and
+- `shared/fields/media-picker.tsx` (509) — the media library dialog. Photos and
   videos (#517) added the video rules and the poster frame to its one
   upload state. Less means an upload hook, which is new logic.
 - `lib/products/editor-sections.ts` (762) — every editor section's schema,
@@ -285,27 +269,74 @@ with why it stops there:
   paths; and the header, jumps, create flow and two columns. The library
   panel went to `photo-library-panel.tsx`, and the status pill, read-only
   note and next steps to `editor-parts.tsx` (leaving asks through the one
-  guard, `components/shared/use-leave-guard.tsx`). A little over;
+  guard, `components/shared/forms/use-leave-guard.tsx`). A little over;
   what is left shares one component's state.
-- `sites/custom-domain.tsx` (417 after DEC-140's bare domains) — the
+- `sites/domain/custom-domain.tsx` (417 after DEC-140's bare domains) — the
   domains' read, add, check and remove share its list and busy state. The
   bare domain's step, standing and words went to `bare-domain-step.tsx`
   and `lib/domains/bare-view.ts`, leaving only the call and "Add ‹domain›"
   from a row. A domain's card is the next seam.
 
-Split rather than listed: `organizations/organization-settings-form.tsx`
+Added or grown past 400 by the Bookings rebuild (#1016, #1035, #1038),
+each with why it stops there:
+
+- `app.saroh.in/components/bookings/calendar/calendar-screen.tsx` (474;
+  908 before the review fixes) — the screen's own state (the peek, the
+  cancelled switch, Add someone) and the layout switch. Its held actions
+  went to `use-calendar-actions.ts`, its free and closed time to
+  `use-gap-targets.ts`, and what each day and week draws, with Header C's
+  facts, to `use-calendar-days.ts`. The three layouts' JSX (day, week,
+  list) is the next seam.
+- `app.saroh.in/components/bookings/new-booking/new-booking-flow.tsx`
+  (690) — the five steps share one draft (who, service, with, when, pay)
+  and `book()`, whose refusals send the flow back to the step they name.
+  The steps' drawing is already `steps.tsx`, `check-step.tsx` and
+  `done-step.tsx`, the reads `use-flow-reads.ts` and the rules
+  `lib/services/new-booking.ts`. `book()` and its refusals, as a hook,
+  are the next cut.
+- `app.saroh.in/components/bookings/sheets/customer-step.tsx` (587) —
+  `useCustomerFinder` (search, the new customer's card, the duplicate
+  check) and the step that draws it, which New booking and the free-time
+  sheet share. The hook is the seam: its own file.
+- `app.saroh.in/components/bookings/sheets/time-picker.tsx` (505) — one
+  picker for New booking, Move and Book their next visit: the read and
+  its retry, the day strip with Pick a date, and the times by part of the
+  day share its day and window. The day strip is the next seam.
+- API, not cut in this batch: `notifications/team-alert.handler.ts` (756;
+  689 before) — every alert's wording (`wordOrder`, `wordFailed`,
+  `wordJoined`, `wordBooking`, `wordSite`) and who it is emailed to,
+  beside the handler; the rule-request 'ask' branch grew it, and the
+  wording functions, one file per kind as `team-alerts.ts` started, are
+  the seam. `staff/staff-rules.service.ts` (560) — read, apply, ask,
+  approve, turn down, withdraw and dismiss share one row lock and one
+  view; the request transitions (`move`, `askInTx`, `answerInTx`) are the
+  next cut. `admin/admin-own-rate.service.ts` (465) — read, preview, set
+  and end a business's own rate around one window rule; the
+  module-level helpers (`windowInTx`, `viewsOf`, `summaryOf`) can move
+  to their own file.
+
+Split rather than listed: `organizations/team/team-screen.tsx` (1,486
+before; 334 now, 22 Oct, DEC-183): the screen only composes its tabs; the
+roster is `people-tab.tsx` with `pending-invites.tsx`, the drawer
+`member-drawer.tsx` (extras still in `member-extras.tsx`), the removal
+`remove-member.tsx`, the invite `invite-sheet.tsx`, and one answer to every
+role question `role-book.ts` over `roles/role-words.ts`. Its Roles tab,
+`organizations/roles/roles-tab.tsx` (836 before; 181 now), splits the same
+way: `role-list`, `role-detail`, `permissions`, `role-sheet`,
+`new-role-sheet`, and the viewer's reach in `role-reach.ts`. And
+`organizations/business-settings/organization-settings-form.tsx`
 (1,321 before; 219 now) when Settings › Business became rows with a sheet
 each (10 Oct): the page only composes. Its schema, draft and the patch a
-save sends are `business-form.ts`; the rows `business-detail-rows.tsx` and
-`business-tax-rows.tsx`; the sheet `business-field-sheet.tsx`, with its
-fields in `business-sheet-fields.tsx` and `business-tax-fields.tsx`; and
+save sends are `business-form.ts`; the rows `business-details/business-detail-rows.tsx` and
+`tax/business-tax-rows.tsx`; the sheet `business-field-sheet.tsx`, with its
+fields in `business-sheet-fields.tsx` and `tax/business-tax-fields.tsx`; and
 which sheet is open `use-business-sheets.ts` over
-`lib/organizations/business-rows.ts`. And `sites/site-editor.tsx` (2,160 before; under 300 since
+`lib/organizations/business-rows.ts`. And `sites/editor/site-editor.tsx` (2,160 before; under 300 since
 round-2 G1, #260) along its hooks and panels into `sites/editor/`. Of what it
 became, `editor/use-editor-draft.ts` (409) is a little over: the sections,
 what the server last accepted, the save and its autosave share one set of
 state, and the form-id stamping already went to `stamp-form-ids.ts`. And
-`providers/provider-list.tsx` (435 before; 120
+`providers/connections/provider-list.tsx` (435 before; 120
 now) along its rows, which went to `provider-row.tsx` (331); and
 `lib/settings/activity.ts` (451 before; 297 now, with the Track stock lines)
 along its own seam — what a save recorded, the counts a stock line says and
@@ -333,7 +364,7 @@ says why.
 ## 9. No `alert()` or `confirm()`
 
 **Current** — none in app code (the last three went in #329). For a
-confirmation in `app.saroh.in` use `components/shared/confirm-dialog.tsx`,
+confirmation in `app.saroh.in` use `components/shared/confirm/confirm-dialog.tsx`,
 and only for what cannot be undone (`frontend-forms.md`: one sheet, one
 dialog, one confirm); elsewhere `@saroh/ui/alert-dialog` or
 `@saroh/ui/dialog`, and `@saroh/ui/toast`.

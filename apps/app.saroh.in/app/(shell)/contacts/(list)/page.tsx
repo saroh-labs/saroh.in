@@ -3,7 +3,7 @@ import { countLabel, PageHeader } from "@saroh/ui/page-header";
 
 import { AddContactDialog } from "@/components/contacts/add-contact-dialog";
 import { ContactsView } from "@/components/contacts/contacts-view";
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { listContacts } from "@/lib/contacts/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";

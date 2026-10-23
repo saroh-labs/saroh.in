@@ -1,8 +1,8 @@
 import type { Prisma } from "@saroh/database";
 
 import { accountThreadOn } from "../communications/account-thread";
-import { emailRoute, sarohRoomLeft } from "../communications/saroh-may-send";
-import type { NoticeTemplate } from "../communications/transactional";
+import { contactNoticeAddress } from "../communications/contact-address";
+import { emailRoute } from "../communications/email-route";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { accountAreaOn } from "./account-area";
 
@@ -18,20 +18,19 @@ import { accountAreaOn } from "./account-area";
  *   updates off (`BusinessProfile.accountUpdates`, on by default). The rule
  *   is `accountThreadOn`. A customer with a live site account sees it
  *   there; one without sees it when they first sign in.
- * - **Email** goes only to a live site account's verified email, through
- *   the business's own connected EMAIL provider (D17, default 10) — or,
- *   for a booking notice at a business with none, through Saroh when
- *   the one rule (`emailRoute`) says so and its monthly allowance has room (DEC-086).
- *   So email reach is per notice kind.
+ * - **Email** goes to the contact's own email (DEC-174 D1, U2 #1133): a
+ *   desk, phone or guest customer as much as one with a site account,
+ *   whose verified address wins when it differs (A2,
+ *   `contactNoticeAddress`). Only through the business's own connected
+ *   EMAIL provider (D17, default 10; `emailRoute`), and never to one who
+ *   turned email off. Saroh never emails a business's customers itself
+ *   (DEC-086 reversed, its code removed in #1134).
  *   Nothing goes by SMS or WhatsApp this round.
  */
 
 /** What the business can use at all. */
 export interface NoticeChannels {
-    /**
-     * A notice of the kind asked about is emailed: its own EMAIL provider
-     * is connected, or (a booking notice) Saroh sends it (DEC-086).
-     */
+    /** A notice is emailed: the business's own EMAIL provider is connected. */
     email: boolean;
     /** The account thread is live for it. */
     thread: boolean;
@@ -39,7 +38,8 @@ export interface NoticeChannels {
 
 /**
  * - `EMAIL_AND_ACCOUNT`: emailed, and it shows in their account.
- * - `EMAIL`: emailed (the thread isn't live).
+ * - `EMAIL`: emailed; no account thread for them (it isn't live, or they
+ *   have no account yet and see it there only if they sign in).
  * - `ACCOUNT`: shown in their account on the site; no email.
  * - `ON_SIGN_IN`: no account yet; they see it when they sign in.
  * - `NONE`: nothing is sent.
@@ -49,25 +49,12 @@ export type NoticeReach =
 
 type Db = Pick<
     Prisma.TransactionClient,
-    "communicationProvider" | "customerAccount" | "consent" | "$queryRaw"
+    | "communicationProvider"
+    | "customerAccount"
+    | "contact"
+    | "consent"
+    | "$queryRaw"
 >;
-
-/** Who emails a notice: the business's provider, Saroh, or nobody. */
-export type NoticeEmailRoute = "PROVIDER" | "SAROH" | null;
-
-/**
- * Who would email a notice of `kind` for this business now: its own
- * connected provider; else, for a booking notice, Saroh when the one rule
- * says so; else nobody (`emailRoute`). With no `kind`, the provider alone,
- * as before Saroh sent anything.
- */
-export async function noticeEmailRoute(
-    db: Pick<Prisma.TransactionClient, "communicationProvider">,
-    organizationId: string,
-    kind?: NoticeTemplate,
-): Promise<NoticeEmailRoute> {
-    return (await emailRoute(db, organizationId, kind)).route;
-}
 
 /**
  * Whether Saroh posts to the business's account threads: the one rule
@@ -82,35 +69,25 @@ export async function threadLive(organizationId: string): Promise<boolean> {
 export async function noticeChannels(
     db: Pick<Prisma.TransactionClient, "communicationProvider">,
     organizationId: string,
-    kind?: NoticeTemplate,
 ): Promise<NoticeChannels> {
-    const now = new Date();
-    const [route, thread] = await Promise.all([
-        emailRoute(db, organizationId, kind, now),
+    const [provider, thread] = await Promise.all([
+        emailRoute(db, organizationId),
         threadLive(organizationId),
     ]);
-    // Saroh's route says "emailed" only while this month's allowance has
-    // room: past it, the notice is recorded as not emailed (U3). The row
-    // the rule read is counted against, not read again.
-    const email =
-        route.route === "PROVIDER" ||
-        (route.route === "SAROH" &&
-            (await sarohRoomLeft(
-                organizationId,
-                now,
-                undefined,
-                route.allowance,
-            )));
-    return { email, thread };
+    return { email: provider !== null, thread };
 }
 
-/** The rule itself, from what the business can use and the contact has. */
+/**
+ * The rule itself, from what reaches this contact: `email` is whether an
+ * email goes to them (a provider, an address, consent), `thread` whether
+ * the thread is live, and whether they have a live account.
+ */
 export function reachOf(
     channels: NoticeChannels,
     hasAccount: boolean,
 ): NoticeReach {
-    if (hasAccount && channels.email) {
-        return channels.thread ? "EMAIL_AND_ACCOUNT" : "EMAIL";
+    if (channels.email) {
+        return channels.thread && hasAccount ? "EMAIL_AND_ACCOUNT" : "EMAIL";
     }
     if (channels.thread) return hasAccount ? "ACCOUNT" : "ON_SIGN_IN";
     return "NONE";
@@ -128,24 +105,30 @@ export async function hasLiveAccount(
     return count > 0;
 }
 
+/** How a notice reaches a contact, and the address an email goes to. */
+export interface ContactNotice {
+    reach: NoticeReach;
+    /** Where it is emailed ("Emailed to ‹email›"); null when it isn't. */
+    to: string | null;
+}
+
 /**
- * How a notice would reach this contact now. A merged-away contact is read
- * as its survivor; a removed one, or none, hears nothing. One who revoked
- * email consent is not emailed (the send is SUPPRESSED, D17), so is never
- * said to be.
+ * How a notice would reach this contact now, and where it is emailed. A
+ * merged-away contact is read as its survivor; a removed one, or none,
+ * hears nothing. One with no email address, or who revoked email consent
+ * (the send is SUPPRESSED, D17), is not emailed, so is never said to be.
  */
-export async function contactReach(
+export async function contactNotice(
     db: Db,
     organizationId: string,
     contactId: string | null,
     channels?: NoticeChannels,
-    kind?: NoticeTemplate,
-): Promise<NoticeReach> {
-    if (!contactId) return "NONE";
+): Promise<ContactNotice> {
+    if (!contactId) return { reach: "NONE", to: null };
     const contact = await resolveContact(db, contactId, organizationId);
-    if (!contact || contact.removed) return "NONE";
-    const [can, account, consent] = await Promise.all([
-        channels ?? noticeChannels(db, organizationId, kind),
+    if (!contact || contact.removed) return { reach: "NONE", to: null };
+    const [can, account, consent, address] = await Promise.all([
+        channels ?? noticeChannels(db, organizationId),
         hasLiveAccount(db, organizationId, contact.id),
         db.consent.findUnique({
             where: {
@@ -153,9 +136,22 @@ export async function contactReach(
             },
             select: { status: true },
         }),
+        contactNoticeAddress(db, organizationId, contact.id),
     ]);
-    return reachOf(
-        { ...can, email: can.email && consent?.status !== "REVOKED" },
-        account,
-    );
+    const emailed =
+        can.email && address !== null && consent?.status !== "REVOKED";
+    return {
+        reach: reachOf({ ...can, email: emailed }, account),
+        to: emailed ? address : null,
+    };
+}
+
+/** {@link contactNotice}'s reach alone. */
+export async function contactReach(
+    db: Db,
+    organizationId: string,
+    contactId: string | null,
+    channels?: NoticeChannels,
+): Promise<NoticeReach> {
+    return (await contactNotice(db, organizationId, contactId, channels)).reach;
 }

@@ -65,9 +65,9 @@ export default async function BusinessesPage({
         <AdminShell staff={staff}>
             <PageContainer width="wide">
                 <PageHeader
-                    breadcrumb={["Instance", "Businesses"]}
+                    breadcrumb={["Help customers", "Businesses"]}
                     title="Businesses"
-                    description="Every business on this instance. A row opens everything about that one."
+                    description="Every business on Saroh. A row opens everything about that one."
                 />
 
                 <FilterBar action="/businesses" active={filtered}>

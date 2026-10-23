@@ -3,7 +3,7 @@ import { cache } from "react";
 
 import { OrderDetail } from "@/components/commerce/order-detail/order-detail";
 import { OrderLocked } from "@/components/commerce/orders/orders-states";
-import { OrderReviews } from "@/components/stores/order-reviews";
+import { OrderReviews } from "@/components/stores/reviews/order-reviews";
 import { ownAccountsRoom, takesOnlinePayment } from "@/lib/billing/access";
 import { personHref } from "@/lib/contacts/person-href";
 import { customerHref } from "@/lib/customers/links";
@@ -91,7 +91,7 @@ export default async function OrderPage({
 
     const may = permitsFor(organization);
     // What this person may do to it, each the power its endpoint asks (B16).
-    // A pay link is offered only on a plan that takes payment online
+    // A payment link is offered only on a plan that takes payment online
     // (R33): elsewhere the order is paid in cash or at the counter, and no
     // link is drawn at all.
     const powers = orderPowers(organization);
@@ -102,7 +102,7 @@ export default async function OrderPage({
     const connectable = ownAccountsRoom(billing);
 
     const contactId = order.customer?.contactId ?? null;
-    // A pay link (B11) is offered only to someone who may take or change
+    // A payment link (B11) is offered only to someone who may take or change
     // orders, on an order that shows money, and only while a provider can
     // open the checkout window (DEC-054).
     const payOnline =

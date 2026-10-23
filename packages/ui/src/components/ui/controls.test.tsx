@@ -509,6 +509,9 @@ describe("44px on a touch pointer, in every control that lacked it", () => {
             expect(cls, key).toContain("coarse:min-h-11");
             expect(cls, key).toContain("coarse:min-w-11");
         }
+        // The second line takes the bar's colour in dark mode too, over
+        // Sonner's own light-grey description.
+        expect(String(c.description).split(/\s+/)).toContain("!text-current");
         const toast = String(c.toast).split(/\s+/);
         expect(toast).toContain("min-w-0");
         expect(toast).toContain("sm:min-w-[300px]");

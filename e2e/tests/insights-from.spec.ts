@@ -1,0 +1,528 @@
+// @covers app:/analytics api:analytics
+import type {
+    APIRequestContext,
+    Browser,
+    Page,
+    TestInfo,
+} from "@playwright/test";
+import { expect, test } from "@playwright/test";
+
+import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
+import type { OwnBusiness } from "../fixtures/own-business";
+import { makeBusiness, ownAddress } from "../fixtures/own-business";
+import { useSession } from "../fixtures/sessions";
+import { ignoreHTTPSErrors, NORTHWIND_ORG, urls } from "../playwright.config";
+
+/**
+ * Insights' "Where customers come from" (DEC-171, plan U14, #1097, and
+ * U16, #1101; boards `IBFromD`, `IBSiteD`, `IBFromP`, `IBSiteP`): the
+ * website figures for the page's one period, a change on each figure, the
+ * path from visit to paid and where visitors come from (no longer marked
+ * Next), every day of the period drawn (a day nobody came as a baseline),
+ * the pages with their paths, and a site picker only when the business has
+ * more than one website (a sheet on a phone).
+ *
+ * Sources are counted by the hourly rollup from what U15's beacon sends,
+ * and the seed records none, so Northwind shows either its counted path
+ * or the one message that counting starts with the next visit; a business
+ * of the spec's own is always the second. The path's rules (never going
+ * up, small sources in Other sites, from when it counted) are pinned by
+ * `sources.db.spec.ts`, `sources-words.test.ts`, `visit-path.test.tsx` and
+ * `sources-table.test.tsx`.
+ *
+ * Northwind is read only (one website, ninety days of seeded visits). The
+ * empty days and the picker are on a business of the spec's own
+ * (`makeBusiness`, as Asha), so nothing another spec reads is written.
+ *
+ * A read that fails is named on the tab (`from-tab.test.tsx`): a browser
+ * can't make the API fail on cue, so it isn't repeated here.
+ *
+ * The links made in Saroh (DEC-181, #1099) are made, copied and archived
+ * with Undo on a business and website of the spec's own; their rules are
+ * pinned by `site-links.db.spec.ts`, `link-maker.test.ts` and
+ * `site-links.test.tsx`.
+ */
+
+const onPhone = () => test.info().project.name.startsWith("phone");
+
+async function openFrom(page: Page, org: string, query: string) {
+    await page.goto(`${urls.APP_URL}/open/${org}`);
+    await page.goto(`${urls.APP_URL}/analytics?tab=from${query}`);
+    await expect(
+        page.getByRole("heading", { level: 1, name: "Insights" }),
+    ).toBeVisible();
+    await expect(
+        page
+            .getByRole("navigation", { name: "Insights" })
+            .getByRole("link", { name: /^Where customers come from/ }),
+    ).toHaveAttribute("aria-current", "page");
+}
+
+/** Nothing on the page is wider than the screen it was given. */
+async function expectNoSidewaysScroll(page: Page) {
+    const width = page.viewportSize()?.width ?? 0;
+    await expect
+        .poll(() =>
+            page.evaluate(() => ({
+                scroll: document.documentElement.scrollWidth,
+                inner: window.innerWidth,
+            })),
+        )
+        .toEqual({ scroll: width, inner: width });
+    if (onPhone()) await expectNothingHiddenSideways(page);
+}
+
+const WEEKDAYS = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+];
+
+/** Each day's bar, in order: no day is skipped between two drawn. */
+async function expectEveryDay(page: Page, days: { min: number; max: number }) {
+    const bars = page
+        .getByRole("group", { name: /^Visits each day/ })
+        .getByRole("button");
+    const labels = await bars.evaluateAll((all) =>
+        all.map((b) => b.getAttribute("aria-label") ?? ""),
+    );
+    expect(labels.length).toBeGreaterThanOrEqual(days.min);
+    expect(labels.length).toBeLessThanOrEqual(days.max);
+    const weekdays = labels.map((l) => WEEKDAYS.indexOf(l.split(" ")[0] ?? ""));
+    expect(weekdays.every((d) => d >= 0)).toBe(true);
+    for (let i = 1; i < weekdays.length; i++) {
+        expect(weekdays[i], `${labels[i - 1]} then ${labels[i]}`).toBe(
+            ((weekdays[i - 1] ?? -1) + 1) % 7,
+        );
+    }
+    return labels;
+}
+
+/**
+ * From visit to paid and Where do visitors come from? (U16): the four
+ * steps never going up, the table's columns and sources by name, said as
+ * counts; or, before a source is counted, the one message that says when
+ * counting begins.
+ */
+async function expectSources(page: Page) {
+    const path = page.getByTestId("visit-path");
+    const notYet = page.getByTestId("sources-not-yet");
+    await expect(path.or(notYet)).toBeVisible();
+    if (await notYet.isVisible()) {
+        await expect(notYet).toContainText(
+            "Where visits come from is counted from the next visit to your site",
+        );
+        await expect(page.getByTestId("sources-table")).toHaveCount(0);
+        return;
+    }
+    await expect(
+        page.getByRole("region", { name: "From visit to paid" }),
+    ).toBeVisible();
+    const steps = path.locator("li[data-step]");
+    await expect(steps).toHaveCount(4);
+    await expect(steps.nth(0)).toContainText("Visited your site");
+    await expect(steps.nth(1)).toContainText("Looked at a product or class");
+    await expect(steps.nth(2)).toContainText("Started an order or booking");
+    await expect(steps.nth(3)).toContainText("Paid");
+    // Each step's count, never above the one before.
+    const counts = (
+        await path
+            .locator("li[data-step] > span:nth-child(2)")
+            .allTextContents()
+    ).map((t) => Number(t.replace(/[^\d]/g, "")));
+    expect(counts).toHaveLength(4);
+    for (let i = 1; i < counts.length; i++) {
+        expect(counts[i]).toBeLessThanOrEqual(counts[i - 1] ?? 0);
+    }
+    const sources = page.getByRole("region", {
+        name: "Where do visitors come from?",
+    });
+    await expect(sources).toBeVisible();
+    await expect(sources).toContainText(
+        /brings? the most visits|No visits counted in/,
+    );
+    const table = sources.getByRole("table");
+    if ((await table.count()) > 0) {
+        await expect(table.getByRole("columnheader")).toHaveText([
+            "From",
+            "Visits",
+            "Paid",
+            "How many paid",
+        ]);
+        for (const name of await table
+            .getByRole("rowheader")
+            .allTextContents()) {
+            expect([
+                "Instagram",
+                "Google search",
+                "WhatsApp links",
+                "Typed your address",
+                "Other sites",
+            ]).toContain(name.trim());
+        }
+    }
+    // Shares are counts ("1 in 7"), never a percentage.
+    await expect(path).not.toContainText("%");
+    await expect(sources).not.toContainText("%");
+}
+
+test("a business with one website reads every figure for the period, with how it moved", async ({
+    page,
+}) => {
+    await useSession(page);
+    await openFrom(page, NORTHWIND_ORG, "&period=3m");
+    const main = page.locator("main");
+
+    // Nothing is still to come (A9 done, U16): no banner, no Next mark.
+    await expect(page.getByTestId("from-next")).toHaveCount(0);
+    await expect(
+        page
+            .getByRole("navigation", { name: "Insights" })
+            .getByRole("link", { name: /^Where customers come from/ }),
+    ).toHaveText(/^Where customers come from$/);
+    // One website: no picker.
+    await expect(page.getByTestId("site-picker")).toHaveCount(0);
+
+    const website = page.getByRole("region", { name: "Your website" });
+    await expect(website).toContainText(
+        "Last 3 months: visits, visitors, enquiries, and paid orders and bookings. Updated every hour.",
+    );
+    const figures = page.getByTestId("website-figures");
+    for (const name of [
+        "Visits",
+        "Visitors",
+        "Enquiries",
+        "Paid orders and bookings",
+    ]) {
+        await expect(figures).toContainText(name);
+    }
+    // Each says how it moved on the three months before, as a count.
+    await expect(figures.getByRole("listitem")).toHaveCount(4);
+    for (const item of await figures.getByRole("listitem").all()) {
+        await expect(item).toContainText(
+            /(more|fewer) than the 3 months before|Same as the 3 months before|None in the 3 months before/,
+        );
+    }
+    await expect(
+        figures.getByRole("link", { name: /^Enquiries/ }),
+    ).toHaveAttribute("href", "/leads");
+    await expect(
+        figures.getByRole("link", { name: /^Paid orders and bookings/ }),
+    ).toHaveAttribute(
+        "href",
+        /^\/commerce\/orders\?date=custom&from=\d{4}-\d{2}-\d{2}&to=\d{4}-\d{2}-\d{2}&payment=paid$/,
+    );
+
+    await expectSources(page);
+
+    // Every day of the three months, in order, each read by a tap.
+    await expectEveryDay(page, { min: 89, max: 92 });
+    const visits = page.getByTestId("website-visits");
+    await expect(visits).toContainText(/^Visits each day[\d,]+ visits? from/);
+    const firstDay = visits.getByRole("button").first();
+    await firstDay.click();
+    await expect(visits.locator("[aria-live=polite]")).toHaveText(
+        /^\w+day \d+ \w{3} · (no visits|[\d,]+ visits? · [\d,]+ visitors?)$/,
+    );
+
+    // The pages, each named, its path kept under it.
+    const pages = page.getByTestId("website-pages");
+    await expect(pages).toContainText("Which pages do people open?");
+    await expect(pages.getByRole("listitem").first()).toContainText(/\//);
+
+    // How these are counted, as on every tab.
+    await expect(main.getByText("How these are counted")).toBeVisible();
+    await expect(main).not.toContainText(/\b\d{2}-\d{2}\b/);
+    await expectNoSidewaysScroll(page);
+});
+
+/**
+ * A module rolled out to the business by Sam: a business set up here has
+ * none rolled out, so its owner can't turn one on until Saroh has
+ * (DEC-057), as `providers-customer-emails.spec.ts` does for Payments.
+ */
+async function rollOut(
+    browser: Browser,
+    org: string,
+    key: string,
+    testInfo: TestInfo,
+) {
+    const context = await browser.newContext({ ignoreHTTPSErrors });
+    try {
+        const staff = await context.newPage();
+        await useSession(staff, "staff");
+        const res = await staff.request.put(
+            `${urls.API_URL}/admin/flags/MODULE_${key}/organizations/${org}`,
+            {
+                headers: { origin: urls.APP_URL },
+                data: {
+                    enabled: true,
+                    reason: "Insights browser test (U14)",
+                    idempotencyKey: `insf-${key}-${testInfo.project.name}-${testInfo.retry}-${org}`,
+                },
+            },
+        );
+        expect(res.ok(), `roll out ${key}: ${await res.text()}`).toBe(true);
+    } finally {
+        await context.close();
+    }
+}
+
+/** The business's own module switched on, as its owner. */
+async function turnOn(request: APIRequestContext, org: string, key: string) {
+    const res = await request.put(
+        `${urls.API_URL}/organizations/${org}/modules/${key}`,
+        {
+            headers: { "x-organization-id": org, origin: urls.APP_URL },
+            data: { status: "ENABLED" },
+        },
+    );
+    expect(res.ok(), `turn on ${key}: ${await res.text()}`).toBe(true);
+}
+
+/** A website made for the business, or why the stack wouldn't. */
+async function addSite(
+    request: APIRequestContext,
+    business: OwnBusiness,
+    address: string,
+): Promise<{ id: string; name: string } | { refused: string }> {
+    const name = `Site ${address}`;
+    const res = await request.post(
+        `${urls.API_URL}/organizations/${business.id}/sites`,
+        {
+            headers: {
+                "x-organization-id": business.id,
+                origin: urls.APP_URL,
+            },
+            data: { name, subdomain: address },
+        },
+    );
+    if (res.status() === 409 || res.status() === 403) {
+        return { refused: await res.text() };
+    }
+    expect(res.ok(), `add ${name}: ${await res.text()}`).toBe(true);
+    const made = (await res.json()) as { id: string };
+    return { id: made.id, name };
+}
+
+test("a business nobody has visited draws every day as a baseline, never an empty chart", async ({
+    page,
+    browser,
+}, testInfo) => {
+    const business = await makeBusiness(page, testInfo, "insf");
+    await rollOut(browser, business.id, "INSIGHTS", testInfo);
+    await turnOn(page.request, business.id, "INSIGHTS");
+    await openFrom(page, business.id, "&period=7d");
+
+    const labels = await expectEveryDay(page, { min: 7, max: 7 });
+    expect(labels.every((l) => l.endsWith("· no visits"))).toBe(true);
+    await expect(page.getByTestId("website-visits")).toContainText(
+        "No visits to your website in the last 7 days.",
+    );
+    // Zero in words; the figures say none came before either.
+    await expect(page.getByTestId("website-figures")).toContainText(
+        "None in the 7 days before either",
+    );
+    await expect(page.getByTestId("website-orders-note")).toContainText(
+        /^No paid orders (recorded )?in the last 7 days\./,
+    );
+    await expect(page.getByTestId("website-pages")).toContainText(
+        "No page visits yet.",
+    );
+    // No source counted yet: one message says counting starts with the
+    // next visit, and the path and the table wait for it (U16).
+    await expect(page.getByTestId("sources-not-yet")).toContainText(
+        "Where visits come from is counted from the next visit to your site",
+    );
+    await expect(page.getByTestId("visit-path")).toHaveCount(0);
+    await expect(page.getByTestId("sources-table")).toHaveCount(0);
+    await expectNoSidewaysScroll(page);
+
+    // The Overview's third answer: before the first sale it says the
+    // website's figures alone (`IBNoSalesD`), and never that sources come
+    // next.
+    await page.goto(`${urls.APP_URL}/analytics?period=7d`);
+    const card = page.getByRole("region", {
+        name: "Where do customers come from?",
+    });
+    await expect(card).toContainText(
+        "No visits to your website in the last 7 days.",
+    );
+    await expect(card).not.toContainText("comes next");
+    await expect(
+        card.getByRole("link", { name: "See your website" }),
+    ).toHaveAttribute("href", "/analytics?tab=from&period=7d");
+});
+
+test("with more than one website the picker chooses one and keeps it in the address", async ({
+    page,
+    browser,
+}, testInfo) => {
+    const business = await makeBusiness(page, testInfo, "insp");
+    await rollOut(browser, business.id, "INSIGHTS", testInfo);
+    await rollOut(browser, business.id, "WEBSITE", testInfo);
+    await turnOn(page.request, business.id, "INSIGHTS");
+    await turnOn(page.request, business.id, "WEBSITE");
+    // Two websites of its own; a stack that allows one per business
+    // (ADR-006, the catalogue not governing websites) can't show a picker.
+    const first = await addSite(
+        page.request,
+        business,
+        ownAddress("inspa", testInfo),
+    );
+    const second = await addSite(
+        page.request,
+        business,
+        ownAddress("inspb", testInfo),
+    );
+    test.skip(
+        "refused" in second,
+        "this stack allows one website per business; the picker is covered by site-picker.test.tsx and from-tab.test.tsx",
+    );
+    if ("refused" in second) return;
+
+    await openFrom(page, business.id, "&period=7d");
+    const picker = page.getByTestId("site-picker");
+    await expect(picker).toHaveText("All your sites");
+    await expect(
+        page.getByRole("region", { name: "Your website" }),
+    ).toContainText("for all your sites.");
+    if (onPhone()) {
+        // A real touch pointer, so the 44px rule is really checked.
+        expect(
+            await page.evaluate(
+                () => window.matchMedia("(pointer: coarse)").matches,
+            ),
+        ).toBe(true);
+        await expect
+            .poll(async () => (await picker.boundingBox())?.height ?? 0)
+            .toBeGreaterThanOrEqual(44);
+    }
+
+    await picker.click();
+    const sheet = page.getByRole("dialog", { name: "Which website" });
+    await expect(sheet).toBeVisible();
+    // On a phone it rises from the foot of the screen; at a desk it comes
+    // in from the right.
+    const viewport = page.viewportSize();
+    if (!viewport) throw new Error("the project sets a viewport");
+    await expect
+        .poll(async () => {
+            const box = await sheet.boundingBox();
+            if (!box) return null;
+            return onPhone()
+                ? Math.round(box.y + box.height) === viewport.height
+                : Math.round(box.x + box.width) === viewport.width;
+        })
+        .toBe(true);
+    const options = sheet.getByTestId("site-options").getByRole("link");
+    await expect(options.first()).toHaveAttribute("aria-current", "true");
+    await expect(options.first()).toContainText("All your sites");
+    if (!("refused" in first)) {
+        await expect(sheet).toContainText(first.name);
+    }
+
+    await sheet.getByRole("link", { name: new RegExp(second.name) }).click();
+    await expect(sheet).toBeHidden();
+    await expect(page).toHaveURL(new RegExp(`[?&]siteId=${second.id}(&|$)`));
+    await expect(page).toHaveURL(/[?&]tab=from/);
+    await expect(page).toHaveURL(/[?&]period=7d/);
+    await expect(picker).toHaveText(second.name);
+    await expect(page.getByTestId("website-orders-note")).toContainText(
+        "counted for your whole business, not one website",
+    );
+
+    // The tab, the period and the website survive a refresh.
+    await page.reload();
+    await expect(page.getByTestId("site-picker")).toHaveText(second.name);
+    await expectNoSidewaysScroll(page);
+});
+
+test("a link made in Saroh: the label made from the name, copied with the site's address, archived with Undo (DEC-181)", async ({
+    page,
+    browser,
+    context,
+}, testInfo) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"], {
+        origin: new URL(urls.APP_URL).origin,
+    });
+    const business = await makeBusiness(page, testInfo, "insl");
+    await rollOut(browser, business.id, "INSIGHTS", testInfo);
+    await rollOut(browser, business.id, "WEBSITE", testInfo);
+    await turnOn(page.request, business.id, "INSIGHTS");
+    await turnOn(page.request, business.id, "WEBSITE");
+    const address = ownAddress("insl", testInfo);
+    const site = await addSite(page.request, business, address);
+    test.skip(
+        "refused" in site,
+        "this stack wouldn't make a website for the business; the maker is covered by site-links.test.tsx",
+    );
+    if ("refused" in site) return;
+
+    await openFrom(page, business.id, `&period=7d&siteId=${site.id}`);
+    const links = page.getByTestId("site-links");
+    await expect(links).toContainText("Links made in Saroh");
+    await expect(page.getByTestId("site-links-none")).toContainText(
+        "No links yet.",
+    );
+
+    // Make a link: the label follows the name, and the hint says what a
+    // name is for.
+    await links.getByRole("button", { name: "Make a link" }).click();
+    const dialog = page.getByRole("dialog", { name: "Make a link" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("Name the post, not the person.");
+    await dialog.getByLabel("Name").fill("Diwali post");
+    const label = dialog.getByLabel("Label");
+    await expect(label).toHaveValue("diwali-post");
+    // The label is the person's to change.
+    await label.fill("diwali-reel");
+    await expect(dialog).toContainText(
+        new RegExp(`The link: https://\\S*${address}\\S*/\\?ref=diwali-reel`),
+    );
+    await dialog.getByRole("button", { name: "Make and copy link" }).click();
+    await expect(dialog).toBeHidden();
+
+    // Made and copied: the site's own address with the label.
+    const row = links.locator(
+        '[data-testid="site-link"][data-label="diwali-reel"]',
+    );
+    await expect(row).toContainText("Diwali post");
+    await expect(row).toContainText("?ref=diwali-reel");
+    await expect(row).toContainText("Fewer than 3 visits");
+    await expect
+        .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+        .toMatch(new RegExp(`^https://\\S*${address}\\S*/\\?ref=diwali-reel$`));
+
+    // Copy again from the list.
+    await page.evaluate(() => navigator.clipboard.writeText(""));
+    await row
+        .getByRole("button", { name: "Copy the link for Diwali post" })
+        .click();
+    await expect
+        .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+        .toMatch(/\?ref=diwali-reel$/);
+    if (onPhone()) {
+        const box = await row
+            .getByRole("button", { name: "Archive Diwali post" })
+            .boundingBox();
+        expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    }
+    await expectNoSidewaysScroll(page);
+
+    // Archive, then Undo brings it back.
+    await row.getByRole("button", { name: "Archive Diwali post" }).click();
+    await expect(row).toHaveCount(0);
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect(row).toBeVisible();
+
+    // It stays after a reload: the Undo reached the API.
+    await page.reload();
+    await expect(
+        page.locator('[data-testid="site-link"][data-label="diwali-reel"]'),
+    ).toBeVisible();
+});

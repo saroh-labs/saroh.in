@@ -101,6 +101,20 @@ export interface AdminPricing {
     /** By plan id, one entry per module in catalogue order. */
     usage: Record<string, ModuleUsage[]>;
     businesses: { total: number; measured: string[] };
+    /**
+     * The looks, typefaces and colourways that can be marked free
+     * (DEC-177), as the API's build has them. Absent from an older API.
+     */
+    styles?: FreeStyleChoices;
+}
+
+/** `GET /admin/pricing`'s `styles`: what the free lists can name. */
+export interface FreeStyleChoices {
+    looks: { id: string; name: string }[];
+    /** Every pair but the visitor's system font, which is always free. */
+    fontPairs: { id: string; name: string }[];
+    /** `template:colourway`, with the template's name. */
+    colourways: { id: string; name: string; template: string }[];
 }
 
 export type ImpactTone = "danger" | "warn" | "ok" | "info";

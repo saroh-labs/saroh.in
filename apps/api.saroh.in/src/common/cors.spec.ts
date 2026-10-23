@@ -38,4 +38,24 @@ describe("corsOptionsFor (U19)", () => {
             corsOptionsFor("/public/webhooks/razorpay/org_1", TRUSTED),
         ).toEqual(WORKSPACE);
     });
+
+    it('answers any origin with "*" on a live read the edge may keep (review #4)', () => {
+        for (const path of [
+            "/public/sites/site_1/today",
+            "/public/sites/site_1/timetable?services=a,b",
+            "/public/sites/site_1/shop/stock",
+        ]) {
+            expect(corsOptionsFor(path, TRUSTED)).toEqual({
+                origin: "*",
+                credentials: false,
+            });
+        }
+        // The rest of the public reads still echo the caller.
+        expect(
+            corsOptionsFor("/public/sites/site_1/shop/products", TRUSTED),
+        ).toEqual({ origin: true, credentials: false });
+        expect(
+            corsOptionsFor("/public/sites/site_1/today/extra", TRUSTED),
+        ).toEqual({ origin: true, credentials: false });
+    });
 });

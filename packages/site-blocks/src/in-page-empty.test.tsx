@@ -152,6 +152,23 @@ describe("PageSections leaves a known-empty section out", () => {
         );
         expect(container.querySelector("#journal")).not.toBeNull();
     });
+    // U15: an empty section is left out under every look too, on every
+    // page a customer can reach; only the owner's preview may say so.
+    it.each(["folio", "quiet", "live"] as const)(
+        "%s: a journal with no posts draws nothing for a customer",
+        (look) => {
+            const { container } = render(
+                <PageSections
+                    sections={[journal, visit]}
+                    journal={posts(0)}
+                    look={look}
+                />,
+            );
+            expect(container.querySelector("#journal")).toBeNull();
+            expect(container.querySelector("#visit")).not.toBeNull();
+            expect(container.textContent).not.toMatch(/No posts yet|0 posts/);
+        },
+    );
 });
 
 describe("the header hides a jump to a section that shows nothing (the browser's half)", () => {

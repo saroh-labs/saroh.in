@@ -194,7 +194,7 @@ export function dueSplit(
 }
 
 /**
- * The month strip, after the design: "In so far · Out so far · Net · Due".
+ * The month strip, after the design: "In so far · Out so far · Net · Still due".
  * "So far" only on the current month; a month still to come has nothing in
  * or out yet, so it says "—" rather than a zero. Due counts from today;
  * money due before today is "Overdue", in red, shown only when there is
@@ -220,7 +220,8 @@ export function monthStrip(entries: MoneyEntry[], at: StripAt): StripPart[] {
         { key: "net", label: "Net", value: money(done.net), out: false },
         {
             key: "due",
-            label: "Due",
+            // "Still due" (bookings U13): what is owed from today on.
+            label: "Still due",
             value: minorMoney(due, at.currency),
             out: false,
         },
@@ -241,7 +242,7 @@ const STRIP_TITLE: Record<StripKey, string> = {
     in: "Money in",
     out: "Money out",
     net: "Net",
-    due: "Due",
+    due: "Still due",
     overdue: "Overdue",
 };
 
@@ -299,7 +300,14 @@ export function stripBreakdown(
 export function dayMoney(
     entries: MoneyEntry[],
     currency: string,
-): { in: string; out: string; due: string | null; why: string } | null {
+): {
+    in: string;
+    out: string;
+    /** Something went out: only then is Out drawn as a loss. */
+    hasOut: boolean;
+    due: string | null;
+    why: string;
+} | null {
     const sum = sumEntries(entries);
     if (!sum.in && !sum.out && !sum.due) return null;
     const count = (kind: MoneyEntry["kind"]) =>
@@ -313,6 +321,7 @@ export function dayMoney(
     return {
         in: minorMoney(sum.in, currency),
         out: minorMoney(sum.out, currency),
+        hasOut: sum.out > 0,
         due: sum.due ? minorMoney(sum.due, currency) : null,
         why: whys.length ? `Out is ${whys.join(" and ")}.` : "",
     };

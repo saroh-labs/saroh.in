@@ -2,33 +2,34 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { Job, Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
-import { lockMeter } from "../billing/metering.service";
 import { CommunicationsService } from "../communications/communications.service";
-import { SAROH_EMAILS_KEY } from "../communications/saroh-delivery";
-import { emailRoute } from "../communications/saroh-may-send";
+import { contactNoticeAddress } from "../communications/contact-address";
+import { emailRoute } from "../communications/email-route";
+import { noticeOn } from "../communications/notice-settings";
 import { isNoticeTemplate } from "../communications/transactional";
 import { resolveContact } from "../customer-workspace/resolve-contact";
-import { holdsOnPayment } from "../orders/online-checkout";
 import type { CustomerNotifyPayload } from "./customer-notify-queue";
 import { CUSTOMER_NOTIFY_TYPE } from "./customer-notify-queue";
 import { noticeLink } from "./notice-link";
-import { hasLiveAccount, threadLive } from "./notice-reach";
-import type { NoticeVars } from "./notify-templates";
-import { noticeSentence } from "./notify-templates";
+import { threadLive } from "./notice-reach";
+import type { NoticeVars } from "./notices";
+import {
+    loadNotice,
+    noticeDefinition,
+    secretLinkLead,
+    withLink,
+} from "./notices";
+import type { NoticeSubject as Subject } from "./notices/notice";
 import { appendMessage } from "./thread-store";
-import { loadWaitlistOffer } from "./waitlist-notice";
 
 export { CUSTOMER_NOTIFY_TYPE } from "./customer-notify-queue";
+export { loadNotice as loadSubject, withLink } from "./notices";
+export { orderContactId } from "./notices/order";
 
 type Tx = Prisma.TransactionClient;
 
 /** What a notice is about, read fresh when it runs. */
-export interface NoticeSubject {
-    contactId: string;
-    vars: NoticeVars;
-    bookingId?: string;
-    orderId?: string;
-}
+export type NoticeSubject = Subject<NoticeVars>;
 
 /** What one notice became. */
 export interface NoticeOutcome {
@@ -49,7 +50,12 @@ const NOTHING: NoticeOutcome = {
  * (round-2 A14, R15): the `customer.notify` job, and what `booking.notify`
  * delegates to.
  *
- * On one transaction, in the business's RLS context:
+ * Each kind is a file under `notices/` (U2 #1133), registered in
+ * `notices/index.ts`: what it is about, its words, its switch. This
+ * handler is the same for every kind. On one transaction, in the
+ * business's RLS context:
+ *  0. A kind with a switch (U1, `noticeOn`) that the business turned off
+ *     tells nobody, read on this transaction.
  *  1. The event's `CustomerNotice` row is claimed first (insert, skipping a
  *     duplicate), so a job run twice, or two jobs for one event, tell the
  *     customer once.
@@ -59,16 +65,18 @@ const NOTHING: NoticeOutcome = {
  *     nothing.
  *  3. The account thread gets a SYSTEM message when it is live
  *     (`notice-reach.ts`): the customer sees it in their account, or when
- *     they first sign in.
- *  4. A live site account with a verified email, at a business whose own
- *     email provider is connected, is also emailed through D17's one
- *     transactional path (`CommunicationsService.queueTransactional`): a
+ *     they first sign in. Never for an email-only kind (the enquiry
+ *     reply, U15), which with no provider stops before step 1.
+ *  4. The contact's own email (DEC-174 D1: a desk, phone or guest
+ *     customer too; a live site account's verified address wins, A2,
+ *     `contactNoticeAddress`), at a business whose own email provider is
+ *     connected, is also emailed through D17's one transactional path (`CommunicationsService.queueTransactional`): a
  *     `Message` and `Delivery` sent by `message.send`, which retries a
- *     failed send and leaves the thread message standing. A booking notice
- *     at a business with no provider goes through Saroh instead when
- *     the one rule says so (`emailRoute`, DEC-086). Who emails is decided
- *     here, once and first, and handed to the call, so the path's "connect
- *     an email provider" 409 can never roll this transaction back.
+ *     failed send and leaves the thread message standing. Saroh never
+ *     emails it itself: with no provider, nothing is emailed. Who emails
+ *     is read here, once and first (`emailRoute`), and handed to the call,
+ *     so the path's "connect an email provider" 409 can never roll this
+ *     transaction back.
  *
  * Nothing goes by SMS or WhatsApp: there is no verified phone this round.
  */
@@ -83,15 +91,19 @@ export class CustomerNotifyService {
         payload: CustomerNotifyPayload,
         now: Date,
     ): Promise<NoticeOutcome> {
-        // Who would email it, decided once (DEC-086). Saroh's route is
-        // counted against its email allowance, so only then is the
-        // plan-meter lock taken — here, the one place it is, before any
-        // row this transaction writes (`backend-jobs.md`, advisory lock
-        // registry; `booking.notify` writes nothing before calling this).
-        const route = await emailRoute(tx, organizationId, payload.kind, now);
-        if (route.route === "SAROH") {
-            await lockMeter(tx, organizationId, SAROH_EMAILS_KEY);
+        const definition = noticeDefinition(payload.kind);
+        if (
+            definition.setting !== null &&
+            !(await noticeOn(tx, organizationId, definition.setting))
+        ) {
+            return NOTHING;
         }
+        // Who would email it, read once: the business's own provider, or
+        // nobody.
+        const provider = await emailRoute(tx, organizationId);
+        // An email-only notice (the enquiry reply) with no provider reaches
+        // nobody: nothing is claimed or written.
+        if (definition.emailOnly && provider === null) return NOTHING;
         const claimed = await tx.customerNotice.createMany({
             data: [
                 {
@@ -106,8 +118,47 @@ export class CustomerNotifyService {
         });
         if (claimed.count === 0) return { ...NOTHING, duplicate: true };
 
-        const subject = await loadSubject(tx, organizationId, payload, now);
+        const subject = await loadNotice(tx, organizationId, payload, now);
         if (!subject) return NOTHING;
+        // An email-only notice to the address its own record holds (a
+        // back-in-stock watch, U23): no contact to resolve, no thread.
+        if (subject.recipient) {
+            if (!definition.emailOnly || provider === null) return NOTHING;
+            // A watch's stop link (DEC-178), made only if the email goes.
+            const secret = definition.secretLink;
+            const queued = await this.comms.queueTransactional(
+                tx,
+                organizationId,
+                {
+                    template: payload.kind,
+                    notice: subject.vars,
+                    provider,
+                    recipient: subject.recipient,
+                    createdByUserId: null,
+                    ...(secret && secretLinkLead(subject.vars) !== null
+                        ? {
+                              secretLink: () =>
+                                  secret.make(tx, organizationId, subject),
+                          }
+                        : {}),
+                },
+            );
+            await tx.customerNotice.update({
+                where: {
+                    organizationId_eventKey: {
+                        organizationId,
+                        eventKey: payload.eventKey,
+                    },
+                },
+                data: { contactId: subject.contactId, messageId: queued.id },
+            });
+            return {
+                duplicate: false,
+                threadMessageId: null,
+                messageId: queued.id,
+            };
+        }
+        if (!subject.contactId) return NOTHING;
         const contact = await resolveContact(
             tx,
             subject.contactId,
@@ -115,9 +166,13 @@ export class CustomerNotifyService {
         );
         if (!contact || contact.removed) return NOTHING;
 
-        const [thread, account] = await Promise.all([
-            threadLive(organizationId),
-            hasLiveAccount(tx, organizationId, contact.id),
+        const [thread, address] = await Promise.all([
+            definition.emailOnly
+                ? Promise.resolve(false)
+                : threadLive(organizationId),
+            provider === null
+                ? Promise.resolve(null)
+                : contactNoticeAddress(tx, organizationId, contact.id),
         ]);
 
         let threadMessageId: string | null = null;
@@ -126,7 +181,7 @@ export class CustomerNotifyService {
                 organizationId,
                 contactId: contact.id,
                 author: "SYSTEM",
-                body: noticeSentence(subject.vars),
+                body: definition.sentence(subject.vars),
                 event: payload.kind,
                 now,
             });
@@ -134,7 +189,7 @@ export class CustomerNotifyService {
         }
 
         let messageId: string | null = null;
-        if (account && route.route !== null) {
+        if (address !== null && provider !== null) {
             // The email carries the way back to the order or the booking
             // on the business's own site; the thread's sentence doesn't
             // need one, since it is read there.
@@ -143,20 +198,30 @@ export class CustomerNotifyService {
                 contactId: contact.id,
                 orderId: subject.orderId,
                 bookingId: subject.bookingId,
+                serviceId: subject.serviceId,
             });
+            // A notice asking to be paid carries a fresh pay link (U10),
+            // made only if the email really goes and sealed into its send.
+            const secret = definition.secretLink;
+            const notice = withLink(subject.vars, link);
             const queued = await this.comms.queueTransactional(
                 tx,
                 organizationId,
                 {
                     template: payload.kind,
-                    notice: withLink(subject.vars, link),
-                    route,
-                    // Saroh's cap per booking counts by it (DEC-086).
-                    ...(subject.bookingId
-                        ? { bookingId: subject.bookingId }
-                        : {}),
-                    recipient: { kind: "SITE_ACCOUNT", contactId: contact.id },
+                    notice,
+                    provider,
+                    recipient: { kind: "CONTACT", contactId: contact.id },
                     createdByUserId: null,
+                    ...(secret && secretLinkLead(notice) !== null
+                        ? {
+                              secretLink: () =>
+                                  secret.make(tx, organizationId, subject),
+                          }
+                        : {}),
+                    ...(subject.invoiceId
+                        ? { invoiceId: subject.invoiceId }
+                        : {}),
                 },
             );
             messageId = queued.id;
@@ -205,18 +270,6 @@ export class CustomerNotifyHandler {
     };
 }
 
-/** The notice with its link back, on the kinds whose email carries one. */
-export function withLink(vars: NoticeVars, link: string | null): NoticeVars {
-    if (!link) return vars;
-    if (vars.kind === "ORDER_PLACED") {
-        return { ...vars, placed: { ...vars.placed, link } };
-    }
-    if (vars.kind === "BOOKING_CONFIRMED" || vars.kind === "BOOKING_MOVED") {
-        return { ...vars, booking: { ...vars.booking, link } };
-    }
-    return vars;
-}
-
 function payloadOf(value: unknown): CustomerNotifyPayload | null {
     if (typeof value !== "object" || value === null) return null;
     const p = value as Partial<CustomerNotifyPayload>;
@@ -225,250 +278,4 @@ function payloadOf(value: unknown): CustomerNotifyPayload | null {
         return null;
     }
     return p as CustomerNotifyPayload;
-}
-
-// ---- What each notice is about ---------------------------------------------
-
-/** Read the booking, order or place the notice is about; null to skip. */
-export async function loadSubject(
-    tx: Tx,
-    organizationId: string,
-    payload: CustomerNotifyPayload,
-    now: Date = new Date(),
-): Promise<NoticeSubject | null> {
-    switch (payload.kind) {
-        case "BOOKING_CONFIRMED":
-        case "BOOKING_MOVED":
-        case "BOOKING_CANCELLED":
-            return loadBooking(tx, organizationId, payload.kind, payload);
-        case "ORDER_PLACED":
-            return loadPlacedOrder(tx, organizationId, payload);
-        case "ORDER_READY":
-        case "ORDER_HANDED_OVER":
-            return loadOrderStep(tx, organizationId, payload.kind, payload);
-        case "WAITLIST_OFFER":
-            // A place held for them (A12), while it still is.
-            return loadWaitlistOffer(tx, organizationId, payload, now);
-    }
-}
-
-async function businessName(tx: Tx, organizationId: string): Promise<string> {
-    const org = await tx.organization.findUnique({
-        where: { id: organizationId },
-        select: { name: true },
-    });
-    return org?.name ?? "";
-}
-
-function firstWord(name: string | null | undefined): string | null {
-    const first = name?.trim().split(/\s+/)[0] ?? "";
-    return first === "" ? null : first;
-}
-
-async function loadBooking(
-    tx: Tx,
-    organizationId: string,
-    kind: "BOOKING_CONFIRMED" | "BOOKING_MOVED" | "BOOKING_CANCELLED",
-    payload: CustomerNotifyPayload,
-): Promise<NoticeSubject | null> {
-    if (!payload.bookingId) return null;
-    const booking = await tx.booking.findFirst({
-        where: { id: payload.bookingId, organizationId },
-        select: {
-            id: true,
-            status: true,
-            startAt: true,
-            timezone: true,
-            contactId: true,
-            bookerName: true,
-            courseEnrollmentId: true,
-            service: { select: { name: true } },
-            staff: { select: { name: true } },
-            contact: { select: { firstName: true } },
-        },
-    });
-    if (!booking?.contactId) return null;
-    // A course's sessions are told about as the course, not one by one.
-    if (booking.courseEnrollmentId) return null;
-    // Where it stands now: a booking cancelled since isn't confirmed or
-    // moved any more, and one not cancelled isn't cancelled.
-    if (kind === "BOOKING_CONFIRMED" && booking.status !== "CONFIRMED") {
-        return null;
-    }
-    if (kind === "BOOKING_MOVED" && booking.status === "CANCELLED") {
-        return null;
-    }
-    if (kind === "BOOKING_CANCELLED" && booking.status !== "CANCELLED") {
-        return null;
-    }
-    const event = payload.bookingEventId
-        ? await tx.bookingEvent.findFirst({
-              where: { id: payload.bookingEventId, bookingId: booking.id },
-              select: {
-                  actorUserId: true,
-                  fromStartAt: true,
-                  toStartAt: true,
-              },
-          })
-        : null;
-    const startAt =
-        kind === "BOOKING_CANCELLED"
-            ? (event?.fromStartAt ?? booking.startAt)
-            : kind === "BOOKING_MOVED"
-              ? (event?.toStartAt ?? booking.startAt)
-              : booking.startAt;
-    return {
-        contactId: booking.contactId,
-        bookingId: booking.id,
-        vars: {
-            kind,
-            booking: {
-                business: await businessName(tx, organizationId),
-                firstName:
-                    firstWord(booking.contact?.firstName) ??
-                    firstWord(booking.bookerName),
-                service: booking.service.name,
-                staff: booking.staff?.name ?? null,
-                startAt,
-                fromStartAt:
-                    kind === "BOOKING_MOVED"
-                        ? (event?.fromStartAt ?? null)
-                        : null,
-                timeZone: booking.timezone,
-                byCustomer: event ? event.actorUserId === null : false,
-            },
-        },
-    };
-}
-
-async function loadOrderStep(
-    tx: Tx,
-    organizationId: string,
-    kind: "ORDER_READY" | "ORDER_HANDED_OVER",
-    payload: CustomerNotifyPayload,
-): Promise<NoticeSubject | null> {
-    if (!payload.orderId || !payload.orderEventId) return null;
-    const [order, event] = await Promise.all([
-        tx.order.findFirst({
-            where: { id: payload.orderId, organizationId },
-            select: {
-                id: true,
-                orderId: true,
-                status: true,
-                fulfilment: true,
-                customerId: true,
-                customerAccountId: true,
-                courierName: true,
-                trackingNumber: true,
-                trackingUrl: true,
-                customer: { select: { firstName: true } },
-            },
-        }),
-        tx.orderEvent.findFirst({
-            where: { id: payload.orderEventId, orderId: payload.orderId },
-            select: { toStage: true, undoneAt: true },
-        }),
-    ]);
-    // Undone before it went (B6), or the order cancelled meanwhile.
-    if (!order || !event || event.undoneAt) return null;
-    if (order.status === "CANCELLED") return null;
-    const stage = event.toStage;
-    if (
-        stage !== "READY" &&
-        stage !== "HANDED_TO_COURIER" &&
-        stage !== "OUT_FOR_DELIVERY"
-    ) {
-        return null;
-    }
-    const contactId = await orderContactId(tx, organizationId, order);
-    if (!contactId) return null;
-    return {
-        contactId,
-        orderId: order.id,
-        vars: {
-            kind,
-            order: {
-                business: await businessName(tx, organizationId),
-                firstName: firstWord(order.customer?.firstName ?? null),
-                number: order.orderId,
-                stage,
-                pickup: order.fulfilment === "PICKUP",
-                courier: order.courierName,
-                trackingNumber: order.trackingNumber,
-                trackingUrl: order.trackingUrl,
-            },
-        },
-    };
-}
-
-/**
- * A website order just placed (UX-042), while it still stands: not
- * cancelled, and an online checkout only once it is paid (G13).
- */
-async function loadPlacedOrder(
-    tx: Tx,
-    organizationId: string,
-    payload: CustomerNotifyPayload,
-): Promise<NoticeSubject | null> {
-    if (!payload.orderId) return null;
-    const order = await tx.order.findFirst({
-        where: { id: payload.orderId, organizationId },
-        select: {
-            id: true,
-            orderId: true,
-            status: true,
-            paymentStatus: true,
-            placedOnline: true,
-            payOnHandover: true,
-            fulfilment: true,
-            customerId: true,
-            customerAccountId: true,
-            customer: { select: { firstName: true } },
-        },
-    });
-    if (!order?.placedOnline || order.status === "CANCELLED") return null;
-    if (holdsOnPayment(order) && order.paymentStatus !== "PAID") return null;
-    const contactId = await orderContactId(tx, organizationId, order);
-    if (!contactId) return null;
-    return {
-        contactId,
-        orderId: order.id,
-        vars: {
-            kind: "ORDER_PLACED",
-            placed: {
-                business: await businessName(tx, organizationId),
-                firstName: firstWord(order.customer?.firstName ?? null),
-                number: order.orderId,
-                fulfilment: order.fulfilment,
-                payOnHandover: order.payOnHandover,
-            },
-        },
-    };
-}
-
-/**
- * The contact an order is told to: the site account that placed it, or
- * else the contact its store customer is linked to (C2's identity links,
- * the oldest first), as the account's Orders tab reads them (A7).
- */
-export async function orderContactId(
-    tx: Pick<Tx, "customerAccount" | "customerIdentityLink">,
-    organizationId: string,
-    order: { customerId: string | null; customerAccountId: string | null },
-): Promise<string | null> {
-    if (order.customerAccountId) {
-        const account = await tx.customerAccount.findFirst({
-            where: { id: order.customerAccountId, organizationId },
-            select: { contactId: true },
-        });
-        if (account) return account.contactId;
-    }
-    // A walk-in (B13) has no customer record, so no one to tell.
-    if (!order.customerId) return null;
-    const link = await tx.customerIdentityLink.findFirst({
-        where: { organizationId, customerId: order.customerId },
-        orderBy: { createdAt: "asc" },
-        select: { contactId: true },
-    });
-    return link?.contactId ?? null;
 }

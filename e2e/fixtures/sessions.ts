@@ -69,6 +69,12 @@ export const people = {
         email: "tara.calendar@saroh.dev",
         password: demoUser.password,
     },
+    /**
+     * Sam, Saroh staff: a Platform owner on the operator console and in no
+     * business (the seed's `staff.ts`, admin plan U23). Signed in through
+     * the same form as everyone else; the console reads the same session.
+     */
+    staff: { email: "staff@saroh.dev", password: demoUser.password },
 } as const;
 
 export type Role = keyof typeof people;

@@ -12,6 +12,11 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+    pickRate,
+    ratePicker,
+} from "@/components/shared/fields/gst-rate-picker.testing";
+
 import type { Plan, Subscription } from "@/lib/subscriptions/service";
 
 import { useSubscriptionActions } from "./use-subscription-actions";
@@ -164,17 +169,7 @@ async function press(name: string) {
 }
 
 function choose(rate: string) {
-    const box = document.querySelector<HTMLSelectElement>(
-        'select[aria-label="GST rate for Gold monthly"]',
-    );
-    if (!box) throw new Error("No GST rate box for Gold monthly");
-    act(() => {
-        Object.getOwnPropertyDescriptor(
-            HTMLSelectElement.prototype,
-            "value",
-        )?.set?.call(box, rate);
-        box.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    pickRate(ratePicker("GST rate for Gold monthly"), rate);
 }
 
 const sheet = () => document.querySelector<HTMLElement>('[role="dialog"]');

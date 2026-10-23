@@ -14,6 +14,13 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+    pickRate,
+    rateGroup,
+    ratePicker,
+    rateShown,
+} from "@/components/shared/fields/gst-rate-picker.testing";
+
 import type { RateItem } from "@/lib/gst-rates/missing";
 
 import { useGstRateStep } from "./use-gst-rate-step";
@@ -146,23 +153,13 @@ async function press(name: string) {
     await settle();
 }
 
-function rateBox(name: string): HTMLSelectElement {
-    const box = sheet()?.querySelector<HTMLSelectElement>(
-        `select[aria-label="GST rate for ${name}"]`,
-    );
-    if (!box) throw new Error(`No GST rate box for ${name}`);
-    return box;
+/** A row's rates (DEC-176). */
+function rateBox(name: string): HTMLElement {
+    return ratePicker(`GST rate for ${name}`, sheet() ?? document);
 }
 
 function choose(name: string, rate: string) {
-    const box = rateBox(name);
-    act(() => {
-        Object.getOwnPropertyDescriptor(
-            HTMLSelectElement.prototype,
-            "value",
-        )?.set?.call(box, rate);
-        box.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    pickRate(rateBox(name), rate);
 }
 
 const PT: RateItem = {
@@ -196,7 +193,7 @@ describe("the GST rate ask", () => {
             "The rate is saved on the service, so you're asked once.",
         );
         // The box starts on its placeholder: nothing is chosen for them.
-        expect(rateBox("Personal Training").value).toBe("");
+        expect(rateShown(rateBox("Personal Training"))).toBe("");
 
         choose("Personal Training", "18");
         await press("Save and take payment");
@@ -222,11 +219,13 @@ describe("the GST rate ask", () => {
 
         expect(saveGstRates).not.toHaveBeenCalled();
         expect(action).toHaveBeenCalledTimes(1);
-        expect(rateBox("Vitamin C serum").getAttribute("aria-invalid")).toBe(
-            "true",
-        );
         expect(
-            rateBox("Personal Training").getAttribute("aria-invalid"),
+            rateGroup(rateBox("Vitamin C serum")).getAttribute("aria-invalid"),
+        ).toBe("true");
+        expect(
+            rateGroup(rateBox("Personal Training")).getAttribute(
+                "aria-invalid",
+            ),
         ).toBeNull();
         expect(sheet()?.textContent).toContain(
             "Choose a GST rate. Pick 0% if it's exempt or nil-rated.",
@@ -262,7 +261,7 @@ describe("the GST rate ask", () => {
         expect(sheet()?.textContent).toContain(
             "Your role can't change services.",
         );
-        expect(rateBox("Personal Training").value).toBe("18");
+        expect(rateShown(rateBox("Personal Training"))).toBe("18");
         expect(action).toHaveBeenCalledTimes(1);
         expect(result).toBeUndefined();
     });

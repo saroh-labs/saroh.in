@@ -6,6 +6,8 @@ import { resolveContact } from "../customer-workspace/resolve-contact";
 import { rateToBps } from "../invoices/gst";
 import type { GstPriceMode } from "../invoices/gst-price";
 import { isGstPriceMode } from "../invoices/gst-price";
+import type { OnlinePayment } from "../invoices/invoice-ledger";
+import { payIssuedDraftOnlineInTx } from "../invoices/invoice-ledger";
 import { buildManualInvoice } from "../invoices/order-invoice";
 import {
     documentColumns,
@@ -16,6 +18,7 @@ import {
 import type { SaleCharge } from "../invoices/sale-price";
 import { toCents } from "../invoices/totals";
 import { assertFirstPackAllowed } from "./first-pack";
+import { recordPackEvent } from "./pack-events";
 
 /**
  * A class pack bought online by a signed-in customer (round-2 A11, R12;
@@ -29,7 +32,9 @@ import { assertFirstPackAllowed } from "./first-pack";
  * invoice payment path; nothing is bought until its webhook arrives. Then,
  * under the invoice's row lock, {@link completePackDraftInTx} numbers the
  * invoice PAID and makes the `PackPurchase` from the snapshot, so a pack the
- * merchant changed or archived meanwhile still sells on the terms shown.
+ * merchant changed or archived meanwhile still sells on the terms shown,
+ * with its SOLD event by the customer (U22). The payment's receipt
+ * (DEC-173) says what was bought; no second email.
  *
  * An unpaid draft is voided after {@link PACK_DRAFT_HOURS} by the hold sweep
  * ({@link discardStalePackDrafts}). It never had a number, so the series has
@@ -260,7 +265,8 @@ export async function createPackDraftInTx(
  * invoice's row lock, after the intent's). The purchase is made from the
  * snapshot — the credits, the price and the validity shown when the
  * customer started paying, counted from now — and the invoice takes its
- * number and is written PAID, naming the purchase.
+ * number, names the purchase and is issued, then paid through its ledger
+ * (`payIssuedDraftOnlineInTx`, DEC-173): one ONLINE payment for the intent.
  *
  * "gone" when it can't be bought any more: the draft is no longer a draft
  * (paid by another intent, or discarded), its snapshot or pack is missing,
@@ -275,11 +281,7 @@ export async function completePackDraftInTx(
         invoiceId: string;
         organizationId: string;
         now: Date;
-        payment: {
-            paymentMethod: string;
-            paymentReference: string | null;
-            paymentNote: string;
-        };
+        payment: OnlinePayment;
     },
 ): Promise<"bought" | "gone"> {
     const { now, organizationId } = input;
@@ -333,21 +335,35 @@ export async function completePackDraftInTx(
         },
         select: { id: true },
     });
+    // Its "Sold" row in the pack's history, as a desk sale writes one, by
+    // the customer themselves (DEC-174 U22).
+    await recordPackEvent(tx, {
+        organizationId,
+        packId: pack.id,
+        purchaseId: purchase.id,
+        kind: "SOLD",
+        actor: { actorKind: "CUSTOMER", actorUserId: null },
+        details: {
+            price: packPay(terms),
+            currency: terms.currency,
+            credits: terms.credits,
+            paidBy: "ONLINE",
+        },
+    });
     const profile = await loadTaxProfile(tx, organizationId);
     const number = await numberFor(tx, organizationId, profile, "INVOICE", now);
     await tx.invoice.update({
         where: { id: draft.id },
         data: {
-            status: "PAID",
+            status: "ISSUED",
             number,
             issuedAt: now,
             dueAt: now,
-            paidAt: now,
             contactId: buyer.id,
             packPurchaseId: purchase.id,
-            ...input.payment,
         },
     });
+    await payIssuedDraftOnlineInTx(tx, organizationId, draft.id, input.payment);
     return "bought";
 }
 

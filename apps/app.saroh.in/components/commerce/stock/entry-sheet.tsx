@@ -1,6 +1,6 @@
 "use client";
 
-import { FormSheet } from "@/components/shared/form-sheet";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
@@ -19,7 +19,7 @@ import {
 import { recordStockEntry, undoStock } from "@/lib/stock/screen-actions";
 import { OptionSelect } from "@saroh/ui/option-select";
 
-import { ChipGroup } from "@/components/shared/choice-group";
+import { ChipGroup } from "@/components/shared/fields/choice-group";
 import { targetKey, targetOptions, useStockTargets } from "./use-stock-targets";
 
 /**

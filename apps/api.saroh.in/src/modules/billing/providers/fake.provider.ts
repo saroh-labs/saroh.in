@@ -1,7 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import type {
-    BillingCustomer,
     BillingEventPhase,
     BillingProvider,
     BillingProviderFactory,
@@ -14,6 +13,7 @@ import type {
     CustomerCreated,
     NextChargeItem,
     ParsedBillingEvent,
+    ProfileCustomer,
     ProviderChargeCapability,
     ProviderCustomer,
     ProviderCustomerCapability,
@@ -134,17 +134,20 @@ export class FakeProviderOrders implements ProviderOrderCapability {
  * The fake's provider customers, as Razorpay with `fail_existing: "1"`:
  * one per email and phone, a second refused as `exists` (and handed back
  * by {@link existingCustomer}, as `fail_existing: "0"` does); the same
- * email without a phone is a new one; an update to another's email and
- * phone is `exists`. Every create and update recorded; a test turns the
- * keys off with {@link keys}, queues a failure, loses the next create's
- * answer after making it ({@link loseNextAnswer}), or adds a customer the
- * provider made itself ({@link addCustomer}).
+ * email without a phone is a new one, unless a customer has that email
+ * and no phone either (one is refused the same way, as saroh.io's
+ * DEC-165 customers made without a phone are); an update to another's email and
+ * phone is `exists`. A customer's id is `fake_cus_<billing profile id>`.
+ * Every create and update recorded; a test turns the keys off with
+ * {@link keys}, queues a failure, loses the next create's answer after
+ * making it ({@link loseNextAnswer}), or adds a customer the provider made
+ * itself ({@link addCustomer}).
  */
 export class FakeProviderCustomers implements ProviderCustomerCapability {
-    readonly created: { input: BillingCustomer; withContact: boolean }[] = [];
+    readonly created: { input: ProfileCustomer; withContact: boolean }[] = [];
     readonly updated: {
         providerCustomerId: string;
-        input: BillingCustomer;
+        input: ProfileCustomer;
         withContact: boolean;
     }[] = [];
     readonly looked: string[] = [];
@@ -152,15 +155,32 @@ export class FakeProviderCustomers implements ProviderCustomerCapability {
     failNext: BillingProviderError | null = null;
     loseNextAnswer = false;
     private readonly byEmailPhone = new Map<string, string>();
-    private readonly byId = new Map<string, string | null>();
+    private readonly byId = new Map<string, CustomerNotes>();
 
     configured(): boolean {
         return this.keys;
     }
 
-    /** A customer the provider holds already, with its notes' business. */
-    addCustomer(providerCustomerId: string, organizationId: string | null) {
-        this.byId.set(providerCustomerId, organizationId);
+    /**
+     * A customer the provider holds already, with its notes: a profile's,
+     * a business's (made before profiles), or none (made by the provider).
+     * Its email and phone, when given, are taken as Razorpay would.
+     */
+    addCustomer(
+        providerCustomerId: string,
+        notes: Partial<CustomerNotes> = {},
+        emailPhone?: { email: string; contact: string | null },
+    ) {
+        this.byId.set(providerCustomerId, {
+            billingProfileId: notes.billingProfileId ?? null,
+            organizationId: notes.organizationId ?? null,
+        });
+        if (emailPhone) {
+            this.byEmailPhone.set(
+                `${emailPhone.email}|${emailPhone.contact ?? ""}`,
+                providerCustomerId,
+            );
+        }
     }
 
     private take(): Promise<never> | null {
@@ -170,25 +190,37 @@ export class FakeProviderCustomers implements ProviderCustomerCapability {
         return Promise.reject(error);
     }
 
-    private key(input: BillingCustomer, withContact: boolean) {
+    private key(input: ProfileCustomer, withContact: boolean) {
         const contact = withContact ? input.contact : null;
-        return input.email && contact ? `${input.email}|${contact}` : null;
+        return input.email ? `${input.email}|${contact ?? ""}` : null;
     }
 
-    private make(input: BillingCustomer, withContact: boolean): string {
-        let id = `fake_cus_${input.organizationId}`;
+    private make(input: ProfileCustomer, withContact: boolean): string {
+        let id = `fake_cus_${input.billingProfileId}`;
         for (let n = 2; this.byId.has(id); n += 1) {
-            id = `fake_cus_${input.organizationId}_${n}`;
+            id = `fake_cus_${input.billingProfileId}_${n}`;
         }
-        this.byId.set(id, input.organizationId);
+        this.byId.set(id, {
+            billingProfileId: input.billingProfileId,
+            organizationId: null,
+        });
         const key = this.key(input, withContact);
         if (key) this.byEmailPhone.set(key, id);
         this.created.push({ input, withContact });
         return id;
     }
 
+    private customer(providerCustomerId: string): ProviderCustomer {
+        const notes = this.byId.get(providerCustomerId);
+        return {
+            providerCustomerId,
+            billingProfileId: notes?.billingProfileId ?? null,
+            organizationId: notes?.organizationId ?? null,
+        };
+    }
+
     createCustomer(
-        input: BillingCustomer,
+        input: ProfileCustomer,
         options: { withContact: boolean },
     ): Promise<CustomerCreated> {
         const failed = this.take();
@@ -209,7 +241,7 @@ export class FakeProviderCustomers implements ProviderCustomerCapability {
     }
 
     existingCustomer(
-        input: BillingCustomer,
+        input: ProfileCustomer,
         options: { withContact: boolean },
     ): Promise<ProviderCustomer> {
         const failed = this.take();
@@ -218,10 +250,7 @@ export class FakeProviderCustomers implements ProviderCustomerCapability {
         const id =
             (key && this.byEmailPhone.get(key)) ??
             this.make(input, options.withContact);
-        return Promise.resolve({
-            providerCustomerId: id,
-            organizationId: this.byId.get(id) ?? null,
-        });
+        return Promise.resolve(this.customer(id));
     }
 
     findCustomer(providerCustomerId: string): Promise<ProviderCustomer | null> {
@@ -230,17 +259,14 @@ export class FakeProviderCustomers implements ProviderCustomerCapability {
         this.looked.push(providerCustomerId);
         return Promise.resolve(
             this.byId.has(providerCustomerId)
-                ? {
-                      providerCustomerId,
-                      organizationId: this.byId.get(providerCustomerId) ?? null,
-                  }
+                ? this.customer(providerCustomerId)
                 : null,
         );
     }
 
     updateCustomer(
         providerCustomerId: string,
-        input: BillingCustomer,
+        input: ProfileCustomer,
         options: { withContact: boolean },
     ): Promise<"updated" | "exists"> {
         const failed = this.take();
@@ -258,6 +284,12 @@ export class FakeProviderCustomers implements ProviderCustomerCapability {
         });
         return Promise.resolve("updated");
     }
+}
+
+/** What the fake keeps of a customer's notes. */
+interface CustomerNotes {
+    billingProfileId: string | null;
+    organizationId: string | null;
 }
 
 /**

@@ -39,7 +39,7 @@ export interface NewOrderCatalogue {
      */
     taxBps: number;
     gstRegistered: boolean;
-    /** The storefront can take a payment online (for a pay link). */
+    /** The storefront can take a payment online (for a payment link). */
     takesPayments: boolean;
     products: NewOrderProduct[];
 }
@@ -123,7 +123,7 @@ export interface NewOrderInput {
 
 export interface NewOrderMade {
     id: string;
-    /** The pay link, handed over this once (B11). */
+    /** The payment link, handed over this once (B11). */
     payLink?: { url: string; payLinkCreatedAt: string };
 }
 

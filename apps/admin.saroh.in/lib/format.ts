@@ -47,11 +47,32 @@ export function formatRelative(
 }
 
 /** `COMMERCE` → "Commerce", `organization.plan.changed` → "Organization plan changed". */
+/** Short forms people read in capitals: "Gst rate set" reads wrong. */
+const ACRONYMS = new Set([
+    "gst",
+    "gstin",
+    "sac",
+    "hsn",
+    "upi",
+    "pdf",
+    "csv",
+    "sms",
+    "otp",
+    "qr",
+    "url",
+    "id",
+    "api",
+    "dns",
+]);
+
 export function asWords(key: string): string {
     const words = key
         .toLowerCase()
         .replace(/[_.:-]+/g, " ")
-        .trim();
+        .trim()
+        .split(/\s+/)
+        .map((w) => (ACRONYMS.has(w) ? w.toUpperCase() : w))
+        .join(" ");
     return words.charAt(0).toUpperCase() + words.slice(1);
 }
 

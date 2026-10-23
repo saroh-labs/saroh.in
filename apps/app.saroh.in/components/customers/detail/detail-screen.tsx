@@ -36,19 +36,22 @@ import {
     tagFor,
 } from "@/lib/customer-workspace/view";
 
-import { runAction } from "@/lib/api/run-action";
 import {
     AttentionCard,
     AttentionEditor,
     HeaderAttention,
     useAttention,
-} from "./attention";
-import { AttentionSuggestions } from "./attention-suggestions";
+} from "@/components/customers/attention/attention";
+import { AttentionSuggestions } from "@/components/customers/attention/attention-suggestions";
+import { RequestBanner } from "@/components/customers/data-requests/request-banner";
+import { useMoreActions } from "@/components/customers/more-actions/more-actions";
+import { runAction } from "@/lib/api/run-action";
+import type { DataRequestRow } from "@/lib/customer-workspace/data-requests-view";
+import { requestsHref } from "@/lib/customer-workspace/data-requests-view";
 import { InvoicesTab, SubscriptionsTab } from "./billing-tabs";
 import { BookingsTab } from "./bookings-tab";
 import { Header, Tabs } from "./header";
 import { MessagesTab } from "./messages-tab";
-import { useMoreActions } from "./more-actions";
 import { Notes } from "./notes";
 import { DuplicateNotice, PartialNotice, PossibleMatch } from "./notices";
 import { OrdersTab } from "./orders-tab";
@@ -99,6 +102,7 @@ export function CustomerDetailScreen({
     deleteWords,
     canRecordPayment = false,
     starts = [],
+    dataRequest = null,
 }: {
     d: CustomerDetail;
     initialTab: TabKey;
@@ -152,6 +156,11 @@ export function CustomerDetailScreen({
     canRecordPayment?: boolean;
     /** New order, New booking for them (#247), in the header. */
     starts?: { label: string; href: string }[];
+    /**
+     * Their open "Ask to remove my data" request (DEC-172, #1107): the
+     * page's one banner while it is open, the other notes left out.
+     */
+    dataRequest?: DataRequestRow | null;
 }) {
     const router = useRouter();
     const now = new Date(nowIso);
@@ -176,6 +185,8 @@ export function CustomerDetailScreen({
         suggestions,
         duplicates,
         deleteWords,
+        // A removal that answers their request lands where it reads Done.
+        removedHref: dataRequest ? requestsHref("all") : undefined,
     });
     const first = d.contact.firstName?.trim()
         ? d.contact.firstName.trim()
@@ -358,15 +369,29 @@ export function CustomerDetailScreen({
                     menu={more.menu}
                     starts={starts}
                 />
+                {dataRequest ? (
+                    <RequestBanner
+                        request={dataRequest}
+                        name={name}
+                        onReview={more.removeDetails}
+                    />
+                ) : null}
                 <DuplicateNotice
+                    // One message at a time: none while a request is open.
                     // A same email is offered to whoever edits contacts
                     // (DEC-097); a phone pair as before (C2).
-                    duplicates={shownDuplicates(duplicates, {
-                        canEdit: canWrite,
-                    })}
+                    duplicates={
+                        dataRequest
+                            ? []
+                            : shownDuplicates(duplicates, {
+                                  canEdit: canWrite,
+                              })
+                    }
                     onMerge={more.mergeDuplicate}
                 />
-                {canWrite && d.attention?.suggestions?.length ? (
+                {canWrite &&
+                !dataRequest &&
+                d.attention?.suggestions?.length ? (
                     <AttentionSuggestions
                         contactId={d.contact.id}
                         suggestions={d.attention.suggestions}
@@ -387,7 +412,7 @@ export function CustomerDetailScreen({
                 className="px-[26px] pb-[30px] pt-5"
             >
                 <PartialNotice first={first} missing={pageMissing(d)} />
-                {tab === "over" || tab === "ord" ? (
+                {!dataRequest && (tab === "over" || tab === "ord") ? (
                     <PossibleMatch
                         matches={d.possibleMatches ?? []}
                         canLink={canWrite}

@@ -42,7 +42,9 @@ export type RemovalRuleKind =
     /** Deleted with its messages (A13). */
     | "delete-thread"
     /** Cancelled at the provider first, then its display hint cleared (D20). */
-    | "cancel-mandates";
+    | "cancel-mandates"
+    /** Kept as the record of their request, and marked done (DEC-172). */
+    | "mark-request-done";
 
 export interface RemovalRule {
     kind: RemovalRuleKind;
@@ -126,6 +128,10 @@ export const REMOVAL_RULES: Readonly<Record<string, RemovalRule>> = {
     "PaymentMandate.contactId": {
         kind: "cancel-mandates",
         note: "Autopay is cancelled at the provider before anything else, then its UPI handle or card digits are cleared (D20).",
+    },
+    "CustomerDataRequest.contactId": {
+        kind: "mark-request-done",
+        note: "Their “Ask to remove my data” request is kept as the record and reads done, in the removal's transaction; its account link clears before the account goes, and they are emailed that it's done (DEC-172).",
     },
 };
 

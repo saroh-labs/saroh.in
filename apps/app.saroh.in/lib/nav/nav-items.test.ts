@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import type { NavGroup, NavRole } from "@/components/shared/nav-items";
+import type {
+    NavGroup,
+    NavRole,
+} from "@/components/shared/navigation/nav-items";
 import {
     NAV_GROUPS,
+    NOTIFICATIONS_NAV,
     SETTINGS_PAGES,
     filterNavGroups,
     filterNavGroupsByRole,
@@ -17,7 +21,7 @@ import {
     navRoleCan,
     navRowsForModule,
     settingsPagesFor,
-} from "@/components/shared/nav-items";
+} from "@/components/shared/navigation/nav-items";
 
 /**
  * What each role is OFFERED (#313).
@@ -120,6 +124,22 @@ describe("navRoleCan", () => {
         expect(navRoleCan("MEMBER", "section:write")).toBe(false);
         expect(navRoleCan("MEMBER", "notification:read")).toBe(false);
         expect(navRoleCan("MEMBER", "provider:read")).toBe(false);
+    });
+
+    it("gives a member the bell for their own alerts, never a reviewer (DEC-170)", () => {
+        expect(navRoleCan("MEMBER", "notification:read-own")).toBe(true);
+        expect(navRoleCan("MEMBER", NOTIFICATIONS_NAV.action)).toBe(true);
+        expect(navRoleCan("REVIEWER", NOTIFICATIONS_NAV.action)).toBe(false);
+        for (const role of ["OWNER", "ADMIN"] as const) {
+            expect(navRoleCan(role, "notification:read-own")).toBe(true);
+        }
+        // An invented role with only its own alerts still has the bell.
+        expect(
+            navCan(
+                { role: "MEMBER", actions: ["notification:read-own"] },
+                NOTIFICATIONS_NAV.action,
+            ),
+        ).toBe(true);
     });
 
     it("holds a reviewer to one thing: reading a site", () => {
@@ -990,7 +1010,7 @@ describe("Class packs (ADR-007), a page under Bookings", () => {
         );
     });
 
-    it("sits in the Bookings section beside Calendar and Services", () => {
+    it("sits in the Bookings section beside the diary and Services", () => {
         const bookings = navFor({
             role: "OWNER",
             moduleKeys: ["APPOINTMENTS", "CLASS_PACKS"],
@@ -1005,7 +1025,7 @@ describe("Class packs (ADR-007), a page under Bookings", () => {
         ]);
     });
 
-    it("lights Availability alone on its page, and Calendar on the rest", () => {
+    it("lights Hours and time off alone on its page, and the diary on the rest", () => {
         const kids = [
             { href: "/bookings" },
             { href: "/bookings/availability" },
@@ -1144,9 +1164,9 @@ describe("Bookings, a section across two modules", () => {
 
     it("tells Modules which rows Appointments, Courses, Class packs and Payments own", () => {
         expect(navRowsForModule("APPOINTMENTS")).toEqual([
-            "Calendar",
+            "Bookings",
             "Services",
-            "Availability",
+            "Hours and time off",
         ]);
         expect(navRowsForModule("COURSES")).toEqual(["Courses"]);
         expect(navRowsForModule("CLASS_PACKS")).toEqual(["Class packs"]);

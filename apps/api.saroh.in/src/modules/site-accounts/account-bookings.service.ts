@@ -17,6 +17,7 @@ import { moveFoundBooking } from "../bookings/booking-move";
 import type { BookingRulesValue } from "../bookings/booking-rules";
 import { isLateCancel, loadBookingRules } from "../bookings/booking-rules";
 import type { BookingLocationType } from "../bookings/dto";
+import { loadRulesFor } from "../bookings/person-rules";
 import { bookVisit, refuseClosedTreatment } from "../bookings/visits";
 import { PaymentsService } from "../payments/payments.service";
 import type { Ctx, Row } from "./account-booking-rules";
@@ -354,7 +355,17 @@ export class AccountBookingsService {
                 details: { reason: "service-closed" },
             });
         }
-        return { booking, service, rules };
+        // A one-to-one moves inside its person's own window, else the
+        // business's (DEC-170, #1038); a class, the business's.
+        const window =
+            service.capacity === 1 && booking.staffId
+                ? await loadRulesFor(
+                      prisma,
+                      ctx.organizationId,
+                      booking.staffId,
+                  )
+                : rules;
+        return { booking, service, rules: window };
     }
 
     private async rowWithActions(

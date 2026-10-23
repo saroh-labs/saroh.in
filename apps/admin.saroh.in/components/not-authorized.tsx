@@ -61,7 +61,7 @@ export function NotAuthorized({
 /**
  * The refusal as a work-area panel, for a screen already inside the shell —
  * one whose read was refused after the gate let it in (access changed
- * mid-visit). Sign out is in the header, so the way out here is the overview,
+ * mid-visit). Sign out is in the header, so the way out here is Home,
  * which every staff member may open.
  */
 export function NoAccessPanel({ email }: { email: string }) {
@@ -77,7 +77,7 @@ export function NoAccessPanel({ email }: { email: string }) {
                         size: "sm",
                     })}
                 >
-                    Go to the overview
+                    Go to Home
                 </Link>
             }
         />

@@ -27,7 +27,7 @@ import {
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
-import { ChoiceGroup } from "@/components/shared/choice-group";
+import { ChoiceGroup } from "@/components/shared/fields/choice-group";
 import {
     descriptionFootnote,
     markupCount,

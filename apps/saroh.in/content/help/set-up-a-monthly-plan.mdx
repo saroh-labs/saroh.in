@@ -1,14 +1,14 @@
 ---
 # Every label below was checked against the real screens on 6 Oct 2026
 # (R7), in the code and in the captured shots. Sources, from the repo root:
-#   NAV   apps/app.saroh.in/components/shared/nav-items.tsx (Payments ›
-#         Subscriptions); components/subscriptions/subscriptions-screen.tsx
+#   NAV   apps/app.saroh.in/components/shared/navigation/nav-items.tsx (Payments ›
+#         Subscriptions); components/subscriptions/list/subscriptions-screen.tsx
 #         (tabs Subscribers and Plans); lib/subscriptions/view.ts (the
 #         list's views Need you, Active, Paused, Cancelled, All
 #         subscriptions; a row's status "Payment failed")
-#   PLANS apps/app.saroh.in/components/subscriptions/subscriptions-screen.tsx
+#   PLANS apps/app.saroh.in/components/subscriptions/list/subscriptions-screen.tsx
 #         ("New plan", the page's button on the Plans tab);
-#         plans-tab.tsx (plans as rows). The tip under step 2 stood on the
+#         subscriptions/plans/plans-tab.tsx (plans as rows). The tip under step 2 stood on the
 #         Plans tab until 12 Oct 2026; it is a fact of how plans work
 #         (lib/subscriptions/view.ts, `olderPrice`).
 #   EDIT  .../subscriptions/plan-editor/details-section.tsx ("Details",
@@ -20,7 +20,7 @@
 #         autopay is offered; "Draft · saved, nobody can join it yet")
 #   PUB   lib/editor-shell/state.ts ("Publish", "Publish changes");
 #         plan-editor.ts ("… is open for sign-ups.")
-#   SUB   .../subscriptions/subscribe-dialog.tsx, lib/subscriptions/autopay.ts,
+#   SUB   .../subscriptions/list/subscribe-dialog.tsx, lib/subscriptions/autopay.ts,
 #         lib/subscriptions/renewal.ts ("Subscribe someone"; "It renews with
 #         an invoice each period. Nothing is charged and nobody is
 #         contacted."; Who, Plan, Starting; "The first invoice is issued
@@ -29,15 +29,15 @@
 #         ("Subscribe" on a contact's page)
 #   RENEW apps/api.saroh.in/src/modules/subscriptions/subscription-renew.handler.ts,
 #         subscriptions.service.ts (each period's invoice is issued on the
-#         renewal day, not sent); lib/invoices/send.ts ("Send with pay link"
+#         renewal day, not sent); lib/invoices/send.ts ("Send with payment link"
 #         only with a provider that takes money, else "Send invoice")
-#   FAIL  lib/subscriptions/view.ts ("Try again with a new pay link", "Record a
+#   FAIL  lib/subscriptions/view.ts ("Try again with a new payment link", "Record a
 #         payment", "Pause instead"; "Saroh doesn't charge a card or try
 #         again on its own …")
 #   OFF   apps/api.saroh.in/src/modules/invoices/payments-on.ts (with
 #         Payments off nobody can be subscribed and renewals wait)
 # Autopay (MARKETING_CLAIMS D1, DEC-075): RAZORPAY_AUTOPAY is off, so the
-# app offers none today and every renewal is an invoice with a pay link.
+# app offers none today and every renewal is an invoice with a payment link.
 # The article says only that, and that the screen says so where it's
 # offered. A plan has no Save button: it saves itself as a draft, and
 # Publish opens it (the design's "Save the plan" isn't a control).
@@ -47,7 +47,7 @@ area: Subscriptions
 group: Monthly plans
 order: 10
 intro: "A plan is something you sell on repeat: a monthly membership, a weekly loaf. You make the plan once, put people on it, and each renewal makes its own invoice. This takes about three minutes."
-description: "Make a monthly plan in Saroh, put a customer on it, and see how each renewal is invoiced and paid with a pay link."
+description: "Make a monthly plan in Saroh, put a customer on it, and see how each renewal is invoiced and paid with a payment link."
 readMinutes: 3
 updated: "2026-10-12"
 publishOn: "2026-10-17"
@@ -60,7 +60,7 @@ steps:
       marker: New plan
     # EDIT.
     - title: Name, what's included and price
-      body: "Give the plan a name, and one line on what's included: it's what people read on the booking page and their receipt. Enter the price, and under Charged choose Every month. More… has every week and every quarter too. Under it, Saroh says how it's paid: invoiced each month with a pay link."
+      body: "Give the plan a name, and one line on what's included: it's what people read on the booking page and their receipt. Enter the price, and under Charged choose Every month. More… has every week and every quarter too. Under it, Saroh says how it's paid: invoiced each month with a payment link."
       shot: help-monthly-plan-2
       caption: "Rye & Co.'s monthly plan (demo bakery): its name, what's included, the price, charged every month."
       tip: "Changing a price later only changes what's sold next. Everyone already on the plan keeps what they agreed to."
@@ -79,16 +79,16 @@ steps:
       marker: Subscribe and invoice
     # RENEW.
     - title: Each renewal makes an invoice
-      body: "On the renewal day, Saroh issues that month's invoice and lists it under Charges on the subscription. It isn't sent on its own: open it and press Send with pay link, and your customer pays it online. Without a payment provider connected, the button says Send invoice and there's no pay link; record the payment when they pay you."
+      body: "On the renewal day, Saroh issues that month's invoice and lists it under Charges on the subscription. It isn't sent on its own: open it and press Send with payment link, and your customer pays it online. Without a payment provider connected, the button says Send invoice and there's no payment link; record the payment when they pay you."
       shot: help-monthly-plan-5
       caption: "Sana Qureshi's charges at Rye & Co. (demo bakery): an invoice for each month."
       tip: "Plans can only renew while Payments is on. Turn it off and nobody can be put on a plan, and renewals wait until it's back."
       marker: The month's invoice
     # FAIL.
     - title: When a renewal isn't paid
-      body: "A renewal that isn't paid by its due day is marked Payment failed, and nothing more is collected until it's paid. Subscriptions opens on the people who need you, with what they owe at the top. Saroh doesn't charge a card or try again on its own. Press Try again with a new pay link and send the link yourself, Record a payment you took, or pause or cancel it."
+      body: "A renewal that isn't paid by its due day is marked Payment failed, and nothing more is collected until it's paid. Subscriptions opens on the people who need you, with what they owe at the top. Saroh doesn't charge a card or try again on its own. Press Try again with a new payment link and send the link yourself, Record a payment you took, or pause or cancel it."
       shot: help-monthly-plan-6
       caption: "Arjun Mehta's renewal at Rye & Co. (demo bakery), not paid yet."
-      marker: Try again with a new pay link
+      marker: Try again with a new payment link
 next: []
 ---

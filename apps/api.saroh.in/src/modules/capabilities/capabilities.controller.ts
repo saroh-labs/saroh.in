@@ -116,7 +116,11 @@ export class CapabilitiesController {
         }
         switch (dto.status) {
             case "ENABLED":
-                await this.lifecycle.enable(ctx, moduleKey);
+                // What follows a module being turned on, here as with a
+                // setup: Bookings makes its booking page (DEC-175).
+                if (await this.lifecycle.enable(ctx, moduleKey)) {
+                    await this.setup.afterTurnedOn(ctx, moduleKey);
+                }
                 break;
             case "DISABLED":
                 await this.lifecycle.disable(ctx, moduleKey);

@@ -479,6 +479,12 @@ describe("HomeService needs", () => {
             },
             // B9's failed refunds: none.
             paymentRefund: { findMany: jest.fn().mockResolvedValue([]) },
+            // U8: no bill reminded this week.
+            message: { findMany: jest.fn().mockResolvedValue([]) },
+            customerThreadMessage: {
+                findMany: jest.fn().mockResolvedValue([]),
+            },
+            invoiceShare: { findMany: jest.fn().mockResolvedValue([]) },
             // PAY-06's captures at the wrong amount: none.
             paymentAttempt: { findMany: jest.fn().mockResolvedValue([]) },
             storeSettings: {

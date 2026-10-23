@@ -3,9 +3,9 @@ import { LimitReachedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
-import { sellCrumbs } from "@/components/commerce/sell-crumbs";
-import { PageContainer } from "@/components/shared/page-container";
-import { CreateStoreForm } from "@/components/stores/create-store-form";
+import { sellCrumbs } from "@/components/commerce/sell-pages/sell-crumbs";
+import { PageContainer } from "@/components/shared/page/page-container";
+import { CreateStoreForm } from "@/components/stores/locations/create-store-form";
 import { requireCan } from "@/lib/access/require-can";
 import { mayAddStorefront } from "@/lib/business-limits";
 import { requireSession } from "@/lib/session";

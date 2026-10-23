@@ -19,6 +19,8 @@ import {
 
 import type { GstPriceMode } from "../invoices/gst-price";
 import { GST_PRICE_MODES } from "../invoices/gst-price";
+import type { DeskMethod } from "./desk-take";
+import { DESK_METHODS } from "./desk-take";
 
 /** Service lifecycle statuses. ACTIVE is bookable; ARCHIVED is not. */
 export const SERVICE_STATUSES = ["ACTIVE", "ARCHIVED"] as const;
@@ -227,6 +229,14 @@ export class CreateServiceDto {
     @IsOptional()
     @IsBoolean()
     showOnBookingPage?: boolean;
+
+    /**
+     * Whether the team books it by hand (DEC-170, Q5): Who can book it's
+     * "Your team". Neither this nor `showOnBookingPage` reads as paused.
+     */
+    @IsOptional()
+    @IsBoolean()
+    bookableByTeam?: boolean;
 }
 
 /** Update a Service (PATCH semantics — every field optional). */
@@ -350,6 +360,14 @@ export class UpdateServiceDto {
     @IsOptional()
     @IsBoolean()
     showOnBookingPage?: boolean;
+
+    /**
+     * Whether the team books it by hand (DEC-170, Q5): Who can book it's
+     * "Your team". Neither this nor `showOnBookingPage` reads as paused.
+     */
+    @IsOptional()
+    @IsBoolean()
+    bookableByTeam?: boolean;
 }
 
 /**
@@ -461,9 +479,11 @@ export class BookServiceDto {
 
 /**
  * A booking the merchant makes for someone (#384). The org and the service
- * come from the route; the booker is either a contact (`contactId`) or someone
- * new (`bookerEmail`, optionally a name and phone). The service checks that
- * one of the two is given.
+ * come from the route; the booker is a contact (`contactId`), someone by
+ * their email (`bookerEmail`, optionally a name and phone), or someone by
+ * their phone alone (`bookerPhone` and a name, DEC-170): the contact with
+ * that phone, else a new one kept by it. The service checks that one of the
+ * three is given (`hand-booker.ts`).
  */
 export class BookByHandDto {
     @IsISO8601()
@@ -526,6 +546,16 @@ export class BookByHandDto {
     @IsIn(PAID_WITH)
     paidWith?: PaidWith;
 
+    /**
+     * How "Paid now" was paid at the desk (DEC-170): cash, UPI or card.
+     * Only with `paidWith: "PAID"`; the booking and its desk payment are
+     * written in one transaction, so neither is left without the other.
+     * Taking money needs `invoice:write` (DEC-098).
+     */
+    @IsOptional()
+    @IsIn(DESK_METHODS)
+    paidBy?: DeskMethod;
+
     @IsOptional()
     @IsString()
     @MaxLength(64)
@@ -543,6 +573,30 @@ export class RescheduleBookingDto {
     /** ISO-8601 absolute instant of the new slot start. */
     @IsISO8601()
     startAt!: string;
+}
+
+/**
+ * Change who a booking is with, or give one that has nobody a person
+ * (#1157); `startAt` moves it in the same step. Only the person and the
+ * time: its terms, money and links stay.
+ */
+export class ReassignBookingDto {
+    @IsString()
+    @MaxLength(64)
+    staffId!: string;
+
+    /** ISO-8601 absolute instant of a new start; left out, it keeps its time. */
+    @IsOptional()
+    @IsISO8601()
+    startAt?: string;
+}
+
+/** Who could take a booking at a time (#1157's picker). */
+export class ReassignCandidatesQueryDto {
+    /** ISO-8601; left out, the booking's own start. */
+    @IsOptional()
+    @IsISO8601()
+    startAt?: string;
 }
 
 /**
@@ -590,4 +644,34 @@ export class BookVisitDto {
     @MinLength(1)
     @MaxLength(64)
     staffId?: string;
+}
+
+/** The longest reason a class can be cancelled with (DEC-178, #1172). */
+export const CLASS_CANCEL_REASON_MAX = 200;
+
+/**
+ * One line, as the customer reads it: trimmed, and any run of spaces or
+ * line breaks inside made one space.
+ */
+export function oneLineReason(value: unknown): unknown {
+    return typeof value === "string"
+        ? value.trim().replace(/\s+/g, " ")
+        : value;
+}
+
+/**
+ * Cancelling a booking (`DELETE …/bookings/:id`). The body is optional:
+ * only cancelling a whole class (`?closesClass=true`) gives a reason
+ * (DEC-178, #1172), which its customers and its waitlist are told in the
+ * business's own words, and the booking's history keeps.
+ */
+export class CancelBookingDto {
+    @IsOptional()
+    @Transform(({ value }) => oneLineReason(value))
+    @IsString()
+    @MinLength(1, { message: "Say why the class is cancelled" })
+    @MaxLength(CLASS_CANCEL_REASON_MAX, {
+        message: `A reason can be at most ${CLASS_CANCEL_REASON_MAX} characters`,
+    })
+    reason?: string;
 }

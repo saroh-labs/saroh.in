@@ -3,6 +3,7 @@ import type { Job, Message } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { isKeysRefused } from "../../common/providers/provider-attention";
+import { recordInvoiceSendFailed } from "../invoices/invoice-events";
 import { IssuedInvoicePdf } from "../invoices/issued-invoice-pdf";
 import type { EncryptedSecret } from "../payments/crypto";
 import { decryptSecret } from "../payments/crypto";
@@ -18,9 +19,12 @@ import {
     COMMS_PROVIDER_FACTORY,
     isCommsChannel,
 } from "./providers/provider.port";
-import { SAROH_PROVIDER, SAROH_STOPPED, SAROH_UNKNOWN } from "./saroh-delivery";
-import { deliverThroughSaroh } from "./saroh-send";
-import { fillSecretLink, SECRET_LINK_SLOT } from "./transactional";
+import {
+    fillHowToPay,
+    fillSecretLink,
+    HOW_TO_PAY_SLOT,
+    SECRET_LINK_SLOT,
+} from "./transactional";
 
 /** The `type` this handler is registered under (matches the send producer). */
 export const MESSAGE_SEND_TYPE = "message.send";
@@ -42,12 +46,32 @@ export interface MessageSendPayload {
      */
     link?: EncryptedSecret;
     /**
+     * A renewal's "How to pay us" lines (DEC-178), as JSON, sealed as the
+     * link is: put into the body where the stored one has
+     * `HOW_TO_PAY_SLOT`, never logged or written back.
+     */
+    howToPay?: EncryptedSecret;
+    /**
      * Send the invoice's PDF with it (DEC-083): the message's own invoice,
      * drawn here at send time and never stored. Only where the provider
      * takes attachments; otherwise, or if it can't be drawn, the email goes
      * with its link alone.
      */
     attach?: typeof INVOICE_PDF_ATTACHMENT;
+}
+
+/** The sealed "How to pay us" lines, opened: strings only, or none. */
+function howToPayLinesOf(json: string): string[] {
+    try {
+        const parsed: unknown = JSON.parse(json);
+        return Array.isArray(parsed)
+            ? parsed.filter(
+                  (l): l is string => typeof l === "string" && l !== "",
+              )
+            : [];
+    } catch {
+        return [];
+    }
 }
 
 /** The one attachment a message can ask for: its invoice's PDF. */
@@ -70,12 +94,6 @@ const SENT_STATES = new Set(["SENT", "DELIVERED"]);
  * the earlier link no longer works). The job skips it.
  */
 export const CANCELLED_DELIVERY = "CANCELLED";
-
-/**
- * A Saroh delivery's own terminal states (DEC-086): STOPPED never goes, and
- * UNKNOWN may already have gone, so a re-run must not send either.
- */
-const SAROH_TERMINAL_STATES = new Set([SAROH_STOPPED, SAROH_UNKNOWN]);
 
 /**
  * Consumer for the `message.send` job (S6-001): take a QUEUED Delivery and hand
@@ -116,7 +134,7 @@ export class MessageSendHandler {
 
     /** Bound {@link JobHandler} to register with the {@link JobHandlerRegistry}. */
     readonly handle = async (job: Job): Promise<void> => {
-        const { messageId, deliveryId, link, attach } =
+        const { messageId, deliveryId, link, howToPay, attach } =
             job.payload as unknown as MessageSendPayload;
 
         const delivery = await prisma.delivery.findUnique({
@@ -148,15 +166,6 @@ export class MessageSendHandler {
             );
             return;
         }
-        if (
-            delivery.provider === SAROH_PROVIDER &&
-            SAROH_TERMINAL_STATES.has(delivery.status)
-        ) {
-            this.logger.log(
-                `message.send: Saroh delivery ${deliveryId} already ${delivery.status}; skipping.`,
-            );
-            return;
-        }
 
         const message = await prisma.message.findUnique({
             where: { id: messageId },
@@ -174,23 +183,6 @@ export class MessageSendHandler {
                 message.id,
                 `unsupported channel "${message.channel}"`,
             );
-            return;
-        }
-
-        // Saroh sends it for a business with no email of its own (DEC-086):
-        // the route stamped when it was queued wins, so a provider connected
-        // since never sends it a second way.
-        if (delivery.provider === SAROH_PROVIDER) {
-            try {
-                if (await deliverThroughSaroh(delivery.id, message)) {
-                    await this.stamp(message);
-                }
-            } catch (err) {
-                if (job.attempts + 1 >= job.maxAttempts) {
-                    await this.sarohGaveUp(delivery.id, message.organizationId);
-                }
-                throw err;
-            }
             return;
         }
 
@@ -223,6 +215,21 @@ export class MessageSendHandler {
                 return;
             }
             body = fillSecretLink(body, decryptSecret(link));
+        }
+        // A renewal's "How to pay us" lines: none, and it goes nowhere.
+        if (body.includes(HOW_TO_PAY_SLOT)) {
+            const lines = howToPay
+                ? howToPayLinesOf(decryptSecret(howToPay))
+                : [];
+            if (lines.length === 0) {
+                await this.recordFailure(
+                    delivery.id,
+                    message.id,
+                    "how to pay missing",
+                );
+                return;
+            }
+            body = fillHowToPay(body, lines);
         }
 
         const credentials = this.openCredentials(providerRow);
@@ -263,7 +270,14 @@ export class MessageSendHandler {
             // Adapter errors are already sanitized (HTTP status only). Record
             // the failure, then re-throw so the worker retries with backoff.
             const reason = err instanceof Error ? err.message : "send failed";
-            await this.recordFailure(delivery.id, message.id, reason);
+            // Only the last attempt is a failed send on an invoice's
+            // history: an earlier one may yet go.
+            await this.recordFailure(
+                delivery.id,
+                message.id,
+                reason,
+                job.attempts + 1 >= job.maxAttempts,
+            );
             // The provider refused the keys: the connection needs attention
             // and the team hears of it once (UX-012).
             if (isKeysRefused(err)) await this.flag(providerRow);
@@ -352,34 +366,14 @@ export class MessageSendHandler {
         }
     }
 
-    /**
-     * The last attempt at a Saroh send ended with it still QUEUED (its
-     * switch couldn't be read each time, DEC-086): nothing more will try
-     * it, yet a QUEUED delivery counts against the business's allowance
-     * and nobody is told. Said once at WARN, by business only — never the
-     * address or the words — so someone can look.
-     */
-    private async sarohGaveUp(
-        deliveryId: string,
-        organizationId: string,
-    ): Promise<void> {
-        try {
-            const now = await prisma.delivery.findUnique({
-                where: { id: deliveryId },
-                select: { status: true },
-            });
-            if (now?.status !== "QUEUED") return;
-        } catch {
-            // Unreadable now too: it is most likely still QUEUED; say so.
-        }
-        this.logger.warn(`saroh_business_email_gave_up org=${organizationId}`);
-    }
-
     /** Mark the Delivery FAILED (+ sanitized error, attempts++) and Message FAILED. */
     private async recordFailure(
         deliveryId: string,
         messageId: string,
         error: string,
+        // Nothing will try it again (U9 #1140): an invoice's email is
+        // then a failed send on its history.
+        final = true,
     ): Promise<void> {
         await prisma.delivery.update({
             where: { id: deliveryId },
@@ -393,6 +387,20 @@ export class MessageSendHandler {
             where: { id: messageId },
             data: { status: "FAILED" },
         });
+        if (final) await this.invoiceSendFailed(messageId);
+    }
+
+    /** An invoice email failed for good: told on its history, never thrown. */
+    private async invoiceSendFailed(messageId: string): Promise<void> {
+        try {
+            await recordInvoiceSendFailed(messageId);
+        } catch (err) {
+            this.logger.warn(
+                `message.send: message ${messageId}'s failed send couldn't be written on its invoice (${
+                    err instanceof Error ? err.message : "unknown"
+                })`,
+            );
+        }
     }
 
     /** Decrypt the org's sealed credential blob into an in-memory string map. */

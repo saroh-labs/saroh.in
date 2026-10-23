@@ -44,6 +44,51 @@ describe("JobWorkerService.runOnce", () => {
         expect(queue.jobs[0].processedAt).toBeInstanceOf(Date);
     });
 
+    it("skips a job of the batch whose lease another worker took while an earlier one ran", async () => {
+        const queue = new FakeJobQueue();
+        const registry = new JobHandlerRegistry();
+        const second = jest.fn().mockResolvedValue(undefined);
+        await queue.enqueue({ type: "slow", payload: {} });
+        await queue.enqueue({ type: "next", payload: {} });
+        registry.register("slow", () => {
+            // Ran past the visibility timeout: another worker reclaimed the
+            // second job of this batch.
+            queue.jobs[1].lockedBy = "other-worker";
+            return Promise.resolve();
+        });
+        registry.register("next", second);
+
+        await makeWorker(queue, registry).runOnce();
+
+        expect(second).not.toHaveBeenCalled();
+        expect(queue.jobs[0].status).toBe("DONE");
+        // Left as the other worker holds it: its outcome is theirs.
+        expect(queue.jobs[1]).toMatchObject({
+            status: "PROCESSING",
+            lockedBy: "other-worker",
+        });
+    });
+
+    it("restarts each job's lease just before running it", async () => {
+        const queue = new FakeJobQueue();
+        const registry = new JobHandlerRegistry();
+        let leaseAt: Date | null = null;
+        await queue.enqueue({ type: "a", payload: {} });
+        await queue.enqueue({ type: "b", payload: {} });
+        registry.register("a", () => {
+            queue.jobs[1].lockedAt = new Date(0);
+            return Promise.resolve();
+        });
+        registry.register("b", (job) => {
+            leaseAt = queue.jobs.find((j) => j.id === job.id)!.lockedAt;
+            return Promise.resolve();
+        });
+
+        await makeWorker(queue, registry).runOnce();
+
+        expect(leaseAt!.getTime()).toBeGreaterThan(0);
+    });
+
     it("fails (records error, reschedules) a job whose handler throws", async () => {
         const queue = new FakeJobQueue();
         const registry = new JobHandlerRegistry();

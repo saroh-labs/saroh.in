@@ -1,27 +1,23 @@
 /**
  * The pages of a merchant's site that are about one customer, not the
- * business: their account, a checkout, an autopay setup, an order's status
- * and a pay link. Search engines are kept out of them (`robots.txt`, #890),
- * and they never appear in the sitemap.
+ * business (their account, a checkout, an autopay setup, an order's status,
+ * a pay link, a waitlist claim, a "stop waiting" link, a QR short link).
  *
- * `/q` is here too: a QR code's short link (`/q/<code>`) is not a page at
- * all. It counts a scan and forwards, so a crawler following it would add
- * scans nobody made, and it must never be kept by the page cache.
+ * The list itself lives in `@saroh/block-contract` (`private-paths.ts`),
+ * shared with the API, whose `site.view` contract refuses a view of one
+ * (U15 privacy review): the site and the server read one list. This module
+ * adds what only the site needs: the robots rules and the response header.
  *
  * A plain module (no "use client"), so the robots route, the sitemap and
- * client components can share one list.
+ * client components can share it.
  */
-export const PRIVATE_PATH_PREFIXES = [
-    "/account",
-    "/checkout",
-    "/autopay",
-    "/shop/order",
-    "/pay",
-    "/q",
-] as const;
+import {
+    isPrivateSitePath,
+    PRIVATE_PATH_PREFIXES,
+    QR_PATH_PREFIX,
+} from "@saroh/block-contract";
 
-/** The short link's own prefix: only ever `/q/<code>`. */
-export const QR_PATH_PREFIX = "/q";
+export { isPrivateSitePath, PRIVATE_PATH_PREFIXES, QR_PATH_PREFIX };
 
 /**
  * What `robots.txt` disallows for each. A robots rule matches any address
@@ -32,13 +28,6 @@ export const QR_PATH_PREFIX = "/q";
 export const ROBOTS_DISALLOW: readonly string[] = PRIVATE_PATH_PREFIXES.map(
     (prefix) => (prefix === QR_PATH_PREFIX ? `${QR_PATH_PREFIX}/` : prefix),
 );
-
-/** Whether `path` is one of those pages or under one. */
-export function isPrivateSitePath(path: string): boolean {
-    return PRIVATE_PATH_PREFIXES.some(
-        (prefix) => path === prefix || path.startsWith(`${prefix}/`),
-    );
-}
 
 /**
  * What every private page answers with, as a header (DEC-142): a crawler

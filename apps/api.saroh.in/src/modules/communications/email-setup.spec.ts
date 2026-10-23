@@ -8,10 +8,10 @@ import type { Prisma } from "@saroh/database";
 import { allows, roleDenial } from "../organizations/organization-policy";
 import { CommunicationsService } from "./communications.service";
 import {
-    EMAIL_SETUP_MISSED,
     EMAIL_SETUP_PLAN,
     EMAIL_SETUP_TITLE,
     emailSetupAsk,
+    emailSetupMissed,
     readEmailSetup,
 } from "./email-setup";
 
@@ -31,33 +31,61 @@ const room = (answer: boolean | Error) =>
             ? Promise.reject(answer)
             : Promise.resolve(answer),
     );
+// Whether Saroh posts to the business's account threads (U5).
+const thread = room;
 
 describe("readEmailSetup", () => {
     it("a connected provider: nothing to ask, and the plan isn't read", async () => {
         const r = room(false);
-        expect(await readEmailSetup(db("CONNECTED"), "org_1", r)).toEqual({
+        const t = thread(true);
+        expect(await readEmailSetup(db("CONNECTED"), "org_1", r, t)).toEqual({
             connected: true,
             canConnect: null,
+            accountUpdates: null,
         });
         expect(r).not.toHaveBeenCalled();
+        expect(t).not.toHaveBeenCalled();
     });
 
     it.each([null, "DISABLED"])(
         "none (%s): whether the plan has room to connect one",
         async (status) => {
             expect(
-                await readEmailSetup(db(status), "org_1", room(true)),
-            ).toEqual({ connected: false, canConnect: true });
+                await readEmailSetup(
+                    db(status),
+                    "org_1",
+                    room(true),
+                    thread(true),
+                ),
+            ).toEqual({
+                connected: false,
+                canConnect: true,
+                accountUpdates: true,
+            });
             expect(
-                await readEmailSetup(db(status), "org_1", room(false)),
-            ).toEqual({ connected: false, canConnect: false });
+                await readEmailSetup(
+                    db(status),
+                    "org_1",
+                    room(false),
+                    thread(false),
+                ),
+            ).toEqual({
+                connected: false,
+                canConnect: false,
+                accountUpdates: false,
+            });
         },
     );
 
     it("a plan that couldn't be read is never claimed either way", async () => {
         expect(
-            await readEmailSetup(db(null), "org_1", room(new Error("down"))),
-        ).toEqual({ connected: false, canConnect: null });
+            await readEmailSetup(
+                db(null),
+                "org_1",
+                room(new Error("down")),
+                thread(new Error("down")),
+            ),
+        ).toEqual({ connected: false, canConnect: null, accountUpdates: null });
     });
 });
 
@@ -65,13 +93,20 @@ describe("emailSetupAsk: only whoever can act is asked", () => {
     const all = { connect: true, plans: true };
     it("nothing once a provider is connected", () => {
         expect(
-            emailSetupAsk({ connected: true, canConnect: null }, all),
+            emailSetupAsk(
+                { connected: true, canConnect: null, accountUpdates: null },
+                all,
+            ),
         ).toBeNull();
     });
 
     it("connect, for comms:manage, where the plan has room or can't be read", () => {
         for (const canConnect of [true, null]) {
-            const setup = { connected: false, canConnect };
+            const setup = {
+                connected: false,
+                canConnect,
+                accountUpdates: null,
+            };
             expect(emailSetupAsk(setup, all)).toBe("connect");
             expect(
                 emailSetupAsk(setup, { connect: false, plans: true }),
@@ -80,7 +115,11 @@ describe("emailSetupAsk: only whoever can act is asked", () => {
     });
 
     it("the plans, for billing:read, where the plan can't connect one (DEC-091)", () => {
-        const setup = { connected: false, canConnect: false };
+        const setup = {
+            connected: false,
+            canConnect: false,
+            accountUpdates: null,
+        };
         expect(emailSetupAsk(setup, all)).toBe("plans");
         expect(
             emailSetupAsk(setup, { connect: true, plans: false }),
@@ -91,8 +130,15 @@ describe("emailSetupAsk: only whoever can act is asked", () => {
 describe("the words", () => {
     it("say what the customers miss, plainly, and that a paid plan brings it", () => {
         expect(EMAIL_SETUP_TITLE).toBe("Your customers get no emails from you");
-        expect(EMAIL_SETUP_MISSED).toBe(
-            "No email provider is connected, so invoices, booking and order updates and review invitations aren't emailed. Your customers see their updates only in their account.",
+        expect(emailSetupMissed(true)).toBe(
+            "No email provider is connected, so invoices, booking and order updates and review invitations aren't emailed. Customers with an account on your site see booking and order updates there.",
+        );
+        expect(emailSetupMissed(false)).toBe(
+            "No email provider is connected, so invoices, booking and order updates and review invitations aren't emailed, and your customers don't hear about them.",
+        );
+        // Unknown claims neither.
+        expect(emailSetupMissed(null)).toBe(
+            "No email provider is connected, so invoices, booking and order updates and review invitations aren't emailed.",
         );
         expect(EMAIL_SETUP_PLAN).toBe(
             "Connecting your own email comes with a paid plan.",

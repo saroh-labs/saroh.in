@@ -126,6 +126,51 @@ describe("alerts (real database)", () => {
         });
     });
 
+    it("Bookings with you is offered only to someone on the diary, bell and email on (#1138)", async () => {
+        const b = await business();
+        const owner = as(b, b.owner, "OWNER");
+        const before = await preferences.read(owner);
+        expect(before.alerts.map((a) => a.key)).not.toContain("mine");
+        await expect(
+            preferences.update(owner, {
+                alert: "mine",
+                channel: "email",
+                on: false,
+            }),
+        ).rejects.toThrow("That alert isn't one you can choose here.");
+
+        const membership = await prisma.membership.findFirstOrThrow({
+            where: { organizationId: b.organizationId, userId: b.owner },
+        });
+        await prisma.staffMember.create({
+            data: {
+                organizationId: b.organizationId,
+                name: "Priya",
+                membershipId: membership.id,
+            },
+        });
+        const after = await preferences.read(owner);
+        expect(after.alerts.find((a) => a.key === "mine")?.channels).toEqual({
+            bell: true,
+            email: true,
+            whatsapp: false,
+        });
+        // The email off, the bell kept.
+        const off = await preferences.update(owner, {
+            alert: "mine",
+            channel: "email",
+            on: false,
+        });
+        expect(off.alerts.find((a) => a.key === "mine")?.channels).toEqual({
+            bell: true,
+            email: false,
+            whatsapp: false,
+        });
+        // Nobody else on the team is offered it.
+        const admin = await preferences.read(as(b, b.admin, "ADMIN"));
+        expect(admin.alerts.map((a) => a.key)).not.toContain("mine");
+    });
+
     it("another person's choices can't be read or written: each reads and writes only their own", async () => {
         const b = await business();
         await preferences.update(as(b, b.owner, "OWNER"), {

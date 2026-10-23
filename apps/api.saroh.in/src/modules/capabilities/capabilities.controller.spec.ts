@@ -44,6 +44,7 @@ function build() {
         ),
     } as unknown as ModuleLifecycleService;
     const setup = {
+        afterTurnedOn: jest.fn().mockResolvedValue(undefined),
         enable: jest.fn().mockResolvedValue({
             alreadyEnabled: false,
             created: { pipelineId: "pipe_1" },
@@ -100,6 +101,20 @@ describe("CapabilitiesController", () => {
         expect(lifecycle.enable).toHaveBeenCalledWith(CTX, "CRM");
         expect(setup.enable).not.toHaveBeenCalled();
         expect(res).toEqual({ data: { key: "CRM", lifecycle: "ENABLED" } });
+    });
+
+    it("a plain switch that turned a module on runs what follows it (DEC-175)", async () => {
+        const { controller, lifecycle, setup } = build();
+        (lifecycle.enable as jest.Mock).mockResolvedValueOnce(true);
+        await controller.setStatus(CTX, "APPOINTMENTS", { status: "ENABLED" });
+        expect(setup.afterTurnedOn).toHaveBeenCalledWith(CTX, "APPOINTMENTS");
+    });
+
+    it("a plain switch on a module already on runs nothing after it", async () => {
+        const { controller, lifecycle, setup } = build();
+        (lifecycle.enable as jest.Mock).mockResolvedValueOnce(false);
+        await controller.setStatus(CTX, "APPOINTMENTS", { status: "ENABLED" });
+        expect(setup.afterTurnedOn).not.toHaveBeenCalled();
     });
 
     it("an enable with setup goes to the setup, and says what it did", async () => {

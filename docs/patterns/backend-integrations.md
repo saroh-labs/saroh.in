@@ -99,10 +99,10 @@ a note saying so.
   credentials, webhooks or contracts (DEC-010).
 - **Current** — **The Organization connects its own messaging provider** for real
   sends; Saroh-owned email is only for identity mail and a template test to the
-  signed-in user's own verified address (DEC-011) — and, while a business has
-  no email provider, its booking notices, sent from `notify.saroh.in` under
-  one rule (`emailRoute` → `sarohDecision`) and counted against its plan's
-  `sarohEmailsPerMonth`, failing closed (DEC-086).
+  signed-in user's own verified address (DEC-011). A business's customers
+  are never emailed from Saroh's address: with no provider of its own, they
+  are not emailed (DEC-086 reversed; its code removed in #1134, and
+  `no-saroh-customer-mail.spec.ts` keeps it out).
 - **Current** — **Settings → Providers is one row per provider, connected
   first** (DEC-036): a disconnected one stays listed as theirs, only what the
   API can connect is offered, and a row shows only what the API sends as
@@ -166,6 +166,16 @@ a note saying so.
   own billing inbox (`BillingWebhookEvent`) has no business in its URL and
   stays `(provider, providerEventId)`. Reconciliation follows a state machine that rejects illegal
   transitions.
+  A merchant delivery is stored, answered 200 and then applied: its row
+  commits with a `webhook.process` retry job, the request tries once, an
+  unexpected error is left to the job's retries (about 16 hours, its own
+  schedule in `RETRY_SCHEDULES`, `jobs/job-queue.port.ts`), and a 4xx
+  refusal or the last try keeps the row FAILED for replay and raises
+  `merchant_webhook_failed` in Admin › Billing › Needs action, and tells
+  the business's team on the Payment failed row
+  (`payment.event_unapplied`, `notifications/webhook-alerts.ts`). Only a row
+  that could not be stored is a 5xx, because a provider switches off a
+  webhook that keeps failing (`webhooks/webhooks.service.ts`).
 - **Current** — **Stored provider payloads are for verification and audit,**
   never read on a serving path (`WebhookEvent.payload`).
 - **Current** — **A capture is compared before it pays anything** (PAY-06).
@@ -185,6 +195,13 @@ a note saying so.
   invoice or credit note; its refund webhook (Saroh's, or a dashboard
   refund matched by payment id) settles on that row before the order's
   refund path (`payments/mismatch-refund.ts`).
+- **Current** (22 Oct 2026) — **A provider order id Saroh chooses is unique
+  per intent.** Cashfree refuses an `order_id` it has seen, so each intent
+  sends `<Order or Invoice id>_<12 hex>` and keeps it as its
+  `providerIntentId`; refunds, look-ups and webhooks name the order by it.
+  An intent made before kept Cashfree's numeric `cf_order_id` and was sent
+  under its Order's or Invoice's id, which `cashfreeOrderId` falls back to
+  (`payments/providers/cashfree.provider.ts`).
 - **Current** — **The server derives amounts.** A payment intent's amount comes
   from the Order or, for an invoice pay link, the Invoice — never from the
   request. The public invoice intent route reads its body by hand, so an
@@ -231,7 +248,10 @@ a note saying so.
 - **Current** — **Money that arrives for something already settled is kept,
   not lost.** A webhook success on a paid or void invoice marks the intent
   SUCCEEDED and records a `CAPTURED_NEEDS_REFUND` attempt, which Home raises
-  until a refund is recorded.
+  until a refund is recorded. A capture on a paid order with nothing
+  left to take (two tabs on its pay page) marks its intent SUPERSEDED and is
+  owed back as a superseded edit charge is, never counted
+  (`webhooks.service.ts` `nothingLeftToTake`).
 - **Current** — **Consent gates the send.** A revoked consent makes a message
   `SUPPRESSED`: no job, no delivery.
 - **Current** (D17) — **One transactional path.** A message about a
@@ -240,8 +260,7 @@ a note saying so.
   transaction: fixed templates (`communications/transactional.ts`), only to
   the bill-to email or a verified site-account email (never a typed
   address, never a DEC-049 placeholder), only through the business's own
-  EMAIL provider (409 otherwise; a booking notice given as its values may go
-  through Saroh instead, DEC-086), no marketing opt-in, and a revoked email
+  EMAIL provider (409 otherwise), no marketing opt-in, and a revoked email
   consent still suppresses it. A secret link in it (a pay link) is sealed
   into the `message.send` job with the credentials' key and filled in only
   as the email goes to the provider; the stored body keeps a slot, so
@@ -429,71 +448,81 @@ transaction as its row and ignores one older than the last applied
   whichever of the two lands second changes nothing (the invoice is keyed
   once per charge). Rate-limited per business; an unanswered call is
   "still waiting", never a reason to pay again.
-- **The business as Razorpay's customer: one per business, made at
-  sign-up (DEC-165, owner, 17 Oct 2026)** (`billing-customer.ts`,
-  `customers` capability). Its id is kept on `BillingCustomer`
-  (organization × provider) and copied to every checkout, subscription and
-  Saroh invoice; it is never looked up by email or phone.
-    - **Made** by the `billing.customer.sync` job, queued in the sign-up's
-      transaction: `POST /customers` with the billing name, the owner's email,
-      the phone and the GSTIN (the profile's only while `gstRegistered`, as
-      on the invoice), `notes` holding only what never changes
-      (`organizationId`, `saroh_business`: the slug; notes are create-only,
-      so a billing snapshot there would go stale — it stays on each
-      subscription's or order's notes), and `fail_existing: "1"`. Razorpay
-      refuses a second customer with the same email and phone (400
+- **The billing profile as Razorpay's customer: one per profile (DEC-167,
+  owner, 18 Oct 2026; it replaced DEC-165's one per business, which
+  Razorpay's email-and-phone rule left 17 of 32 saroh.io businesses
+  without)** (`billing-customer.ts`, `customers` capability). A business is
+  billed to one `BillingProfile` (owned by a user; legal name, GSTIN,
+  address with state, billing email, phone), which keeps the customer's id;
+  every checkout, subscription and Saroh invoice copies it, with the
+  profile's id beside it. It is never looked up by email or phone.
+  Settings › Business is the business's own seller identity and is
+  separate: saving it touches no customer.
+    - **Made** by the `billing.profile.sync` job (`billing-profile-sync.ts`),
+      queued in the transaction that made or saved the profile: `POST
+/customers` with the profile's legal name, billing email, phone and
+      GSTIN, `notes` holding only what never changes (`billing_profile_id`,
+      `saroh_owner`, and `saroh_business`: the first business's slug; notes
+      are create-only, so a billing snapshot there would go stale — it stays
+      on each subscription's or order's notes), and `fail_existing: "1"`.
+      Razorpay refuses a second customer with the same email and phone (400
       "Customer already exists for the merchant", checked in test mode 17
-      Oct 2026; the same email without a phone makes a new one). Saroh then
-      asks which one with the same create and `fail_existing: "0"` (which
-      "fetches details of the existing customer", per Razorpay's docs; not
-      yet run in test mode): **its notes' `organizationId` is this
-      business's** — an earlier try whose answer was lost — and it is
-      adopted; **another's** (an owner's second business) and this one is
-      made **without the phone** (`contactWithheld`; the phone stays in
-      Saroh and is never sent on an update). Never adopted by email or phone
-      alone.
-    - **Adopted, not made twice**: a business that paid before DEC-165 has
-      the customer Razorpay made at its payment (`Subscription`, else its
-      latest `BillingCheckout`, `providerCustomerId`). The job checks it
-      with `GET /customers/:id` (an unknown id is a 400), skips one another
-      business holds or whose notes name another, adopts it and sends the
-      current details by `PUT`.
-    - **Never lost**: the advisory lock's transaction only holds the lock
-      (`SET LOCAL lock_timeout`); each id is stored the moment Razorpay
-      answers it, on its own connection, only where none is stored.
-    - **Kept current**: Settings › Business (the name, legal name, contact
-      email, phone, GSTIN, state or registered address) and every checkout
-      (its details step) queue the same job, at most one waiting per
-      business; it sends `PUT /customers/:id` with the name, email, phone and
-      GSTIN (PUT takes the GSTIN, checked in test mode). **The address can't
-      be updated**: a customer's notes are create-only (a PUT leaves them as
-      they were, checked in test mode), so the current address is on each
-      subscription's or order's notes and on Saroh's invoice. The owner's
-      change of email queues it for every business they own (Better Auth's
-      `user.update.after` hook, `onUserEmailChanged`), and so does a new
-      owner. A `PUT` refused because the email and phone are another
-      customer's (the owner's other business, saved since) is sent again
-      without the phone, withheld from then on; any other refusal is an
-      admin note (`billing_customer_refused`), once until it is fixed.
-    - **A checkout** uses the stored id, and makes the customer then only
-      when the sign-up's job hasn't (under a per-business advisory lock, so
-      the two never make two): `customer_id` on `POST /subscriptions`, and on
-      the window for an order. A refusal is logged
-      (`billing_customer_refused`) and the checkout goes on with the notes
-      and the prefill; a provider that can't answer stops the checkout with
-      a 503 "try again" **before** the subscription is made — made without
-      `customer_id`, Razorpay would make a second customer of its own.
+      Oct 2026). Saroh then asks which one with `fail_existing: "0"`: **its
+      notes name this profile** (an earlier try whose answer was lost), or,
+      made per business before profiles, one of its businesses — it is
+      adopted; **anyone else's** and this one is made **without the phone**
+      (`contactWithheld`; the phone stays in Saroh). Never adopted by email
+      or phone alone. An owner's two profiles can't share a billing email
+      (the service asks before saving; the database holds it unique per
+      owner).
+    - **Adopted, not made twice**: a profile whose businesses paid before
+      DEC-165 has the customer Razorpay made at payment (their
+      `Subscription`, else latest `BillingCheckout`, `providerCustomerId`).
+      The job checks it with `GET /customers/:id`, skips one another profile
+      holds or whose notes name another, adopts it and sends the current
+      details by `PUT`.
+    - **Never lost**: the advisory lock's transaction (per profile) only
+      holds the lock (`SET LOCAL lock_timeout`); each id is stored the
+      moment Razorpay answers it, on its own connection, only where none is
+      stored.
+    - **Kept current**: saving the profile (and a checkout's details step,
+      which writes the profile) queues the same job, at most one waiting
+      per profile; it sends `PUT /customers/:id` with the name, email,
+      phone and GSTIN. **The address can't be updated**: the current
+      address is on each subscription's or order's notes and on Saroh's
+      invoice. An account email change or a change of owners touches no
+      customer: the profile holds its own billing email. A profile's owner
+      who stops being an owner of a business on it leaves billing as it is
+      and raises one Needs action (`billing_profile_owner_left`,
+      `billing-profile-owner.ts`). A `PUT` refused because the email and
+      phone are another customer's is sent again without the phone; any
+      other refusal is an admin note (`billing_customer_refused`) on each
+      business on the profile, once until it is fixed.
+    - **A checkout** uses the profile's stored id, and makes the customer
+      then only when the job hasn't (under the same per-profile lock):
+      `customer_id` on `POST /subscriptions`, and on the window for an
+      order. A business with no profile can't check out until an owner
+      chooses one. A refusal is logged (`billing_customer_refused`) and the
+      checkout goes on with the notes and the prefill; a provider that
+      can't answer stops the checkout with a 503 "try again" **before** the
+      subscription is made — made without `customer_id`, Razorpay would
+      make a second customer of its own.
     - **No keys, nothing asked**: where Saroh's Razorpay key id and secret
       aren't set (local, CI) the job skips (`billing_customer_skipped`, a
       warning in production) and the first checkout there makes it. A
       provider that can't answer is retried by the queue (10 tries; a 429
       is asked again after its `Retry-After`, at most 10 s, twice, in the
-      adapter's `call`); the last error is kept on the row (`lastError`), a
-      refusal logged (`billing_customer_sync_failed`) and not retried.
-    - **Businesses from before**: `backfill/billing-customers.cli.ts`
-      (`packages/database`) queues the job for every business without a
-      customer; idempotent. Its order in a release: `PRICING_ROLLOUT.md`
-      step 10.
+      adapter's `call`); the last error is kept on the profile
+      (`lastError`), a refusal logged and not retried. DEC-165's queued
+      `billing.customer.sync` jobs still run: their handler syncs the
+      business's profile.
+    - **Profiles from before**: `backfill/billing-profiles.cli.ts`
+      (`packages/database`) queues the job for every profile without a
+      customer and counts the businesses left without a profile;
+      idempotent. Its order in a release: `PRICING_ROLLOUT.md` step 10.
+    - **Admin**: the subscription sheet shows the profile, its customer and
+      the other businesses on it; a `cust_` search finds every business on
+      the profile; "Sync again" queues `billing.profile.sync` for it.
 
 **After Saroh lets go (17 Oct 2026, DEC-164)**: a subscription is made with
 `expire_by` (the checkout's `expiresAt`); a refused cancel asks
@@ -631,6 +660,30 @@ Test mode, 2026-09-29, on a business's own connection (Northwind). Docs:
   400 `pre_debit_notification_not_sent` (`NOT_YET`). **Razorpay sends the
   pre-debit notice** to the customer's UPI app; Saroh sends none. A
   renewal's invoice must be raised at least ~26 hours before its charge.
+- **Card and eMandate pre-debit notice (D6, U21).** Card: the issuing bank
+  sends the notice (SMS or email) when the debit is asked for, and Razorpay
+  debits ~36 hours later (an AFA link instead above ₹15,000); the order
+  needs no `notification`. eMandate: Razorpay and the bank send none (the
+  RBI framework covers cards, PPIs and UPI only), so **Saroh sends it**
+  (DEC-180, below); its order carries no `notification` either
+  (`PRE_DEBIT_METHODS` stays UPI only). Evidence:
+  `docs/architecture/research/2026-10-pre-debit-notice.md`, DEC-174.
+- **eMandate: Saroh's notice, or no debit (DEC-180, #1175).** For an
+  eMandate (`sarohSendsNotice` in `subscriptions/autopay-timing.ts`) the
+  debit is planned at least `PRE_DEBIT_LEAD_HOURS` (26 h) after the
+  charge is prepared, as for UPI (`needsNotice`, `prepareCharge` holds
+  `debitAfter` to `debitAt` though the provider answers `NOT_NEEDED`).
+  Once prepared, the charge job queues `customer.notify`
+  `AUTOPAY_PRE_DEBIT` (`site-accounts/notices/pre-debit.ts`, keyed
+  `pre-debit:<intentId>`) for 26 h before the debit (`sarohNoticeAt`):
+  "₹X will be taken from your bank account on ‹day› for ‹plan›", through
+  the business's own email provider, no switch. Before the debit it reads
+  `preDebitNoticeState`: the email SENT, the debit goes no sooner than
+  `SAROH_NOTICE_MIN_HOURS` (24 h) after it (a late email moves the debit);
+  otherwise (no provider, no address, email turned off, not sent) the
+  charge is CANCELLED, the subscription's history gets
+  NOT_CHARGED_NO_NOTICE with `data.reason`, and the renewal invoice takes
+  U10's auto-send. Card and UPI are untouched.
 - **Unanswered charges.** A UPI debit can take 24–36 hours to be answered,
   more when the notice fails; some banks leave the payment `created`.
   Razorpay doesn't retry a failed debit on an order with `notification`;

@@ -145,6 +145,7 @@ const INVOICE = {
     status: "PAID",
     source: "SUBSCRIPTION",
     total: "1200",
+    paidCents: 0,
     currency: "INR",
     issuedAt: PAST,
     dueAt: PAST,
@@ -311,6 +312,7 @@ function make(views: Views = ALL_ON) {
                                   status: "ISSUED",
                                   dueAt: PAST,
                                   total: "300",
+                                  paidCents: 0,
                                   currency: "INR",
                               },
                           ]

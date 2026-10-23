@@ -16,16 +16,15 @@ import {
     ValidateNested,
 } from "class-validator";
 
-import type {
-    InvoiceSource,
-    InvoiceView,
-    PaymentMethod,
-} from "./invoice-state";
+import type { InvoiceSource, InvoiceView } from "./invoice-state";
+import { INVOICE_SOURCES, INVOICE_VIEWS } from "./invoice-state";
+import { SEARCH_MAX } from "./list-filter";
 import {
-    INVOICE_SOURCES,
-    INVOICE_VIEWS,
-    PAYMENT_METHODS,
-} from "./invoice-state";
+    COLOUR_INPUT,
+    COLOUR_MESSAGE,
+    STYLE_INPUTS,
+    STYLE_MESSAGE,
+} from "./paper-styles";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -136,6 +135,24 @@ export class InvoiceInputDto {
     @IsString()
     @MaxLength(500)
     billToAddress?: string;
+
+    /**
+     * The draft's own style (DEC-173, #1118): CLASSIC, BAND or COMPACT. ""
+     * or null goes back to the business's default. Frozen at issue.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsIn(STYLE_INPUTS, { message: STYLE_MESSAGE })
+    paperStyle?: string | null;
+
+    /**
+     * The draft's own colour, `#RRGGBB`. "" or null goes back to the
+     * business's default. Frozen at issue.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @Matches(COLOUR_INPUT, { message: COLOUR_MESSAGE })
+    paperColour?: string | null;
 }
 
 /** Cancel an issued invoice with a credit note for all of it (ADR-008). */
@@ -145,6 +162,24 @@ export class CreditInvoiceDto {
     @MinLength(1, { message: "Say why it is being cancelled" })
     @MaxLength(500)
     reason!: string;
+
+    /**
+     * What the merchant saw when they opened Cancel (#2 review): its status
+     * and what had been paid. Checked again under the ledger's lock, so an
+     * invoice paid meanwhile (a pay-link webhook) is never credited, or
+     * written again, on a stale screen. Left out, the API's own read just
+     * before is used.
+     */
+    @IsOptional()
+    @IsIn(["ISSUED", "OVERDUE", "PAID"])
+    expectStatus?: "ISSUED" | "OVERDUE" | "PAID";
+
+    /** Paid so far, as the screen showed it ("0.00"). */
+    @IsOptional()
+    @Matches(/^\d{1,10}(\.\d{1,2})?$/, {
+        message: "An amount has at most two decimal places",
+    })
+    expectPaidSoFar?: string;
 }
 
 export class VoidInvoiceDto {
@@ -155,32 +190,40 @@ export class VoidInvoiceDto {
     reason!: string;
 }
 
-export class RecordPaymentDto {
-    @IsIn(PAYMENT_METHODS)
-    method!: PaymentMethod;
-
-    @IsOptional()
-    @Transform(trimOrOmit)
-    @IsString()
-    @MaxLength(120)
-    reference?: string;
-
-    @IsOptional()
-    @Transform(trimOrOmit)
-    @IsString()
-    @MaxLength(500)
-    note?: string;
-
-    /** When the money came in; defaults to now. */
-    @IsOptional()
-    @IsISO8601()
-    paidAt?: string;
-}
+/** The ledger's DTOs live with the ledger (`invoice-payments.dto.ts`). */
+export {
+    ChequeBouncedDto,
+    ChequeClearedDto,
+    RecordPaymentDto,
+    RemovePaymentDto,
+} from "./invoice-payments.dto";
 
 export class ListInvoicesQueryDto {
+    /**
+     * Search (DEC-173, U4): a name, part of a number, or an amount ("₹8,400",
+     * "8400", "8,400.00") that is the total or what is left to pay. Trimmed;
+     * a blank search is none.
+     */
+    @IsOptional()
+    @Transform(trimOrOmit)
+    @IsString()
+    @MaxLength(SEARCH_MAX, { message: "Search with fewer words" })
+    q?: string;
+
+    /** `owed` and `cheques` are the money strip's (DEC-173, U4). */
     @IsOptional()
     @IsIn(INVOICE_VIEWS)
     view?: InvoiceView;
+
+    /**
+     * Money received from this day on, in the business's zone
+     * (`2026-10-01`): the money strip's "Paid this month" (DEC-173, U4).
+     * Part payments count; an order's paper counts when it was paid.
+     */
+    @IsOptional()
+    @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: "A date like 2026-10-01" })
+    @IsISO8601({ strict: true })
+    paidFrom?: string;
 
     @IsOptional()
     @IsString()

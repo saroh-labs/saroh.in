@@ -107,14 +107,14 @@ export const liveIntegrations: readonly LiveIntegration[] = [
  * in the same groups and the same words (`content/changelog.ts`, ledger §12
  * CN1–CN18; `integrations.test.ts` holds the two lists together). What is
  * Saroh's own work stays on the changelog: the Android app, invoice
- * layouts, QR codes, API keys, bringing your own login and customers
+ * layouts, API keys, bringing your own login and customers
  * signing in with Google.
  */
 export const plannedIntegrations: readonly PlannedIntegration[] = [
     {
         group: "next",
         name: "Automatic WhatsApp messages",
-        line: "Booking reminders, order updates and pay links sent to your customers on WhatsApp for you.",
+        line: "Order updates and pay links sent to your customers on WhatsApp for you.",
     },
     {
         group: "next",

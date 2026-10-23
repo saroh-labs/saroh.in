@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import type {
+    BusinessModulesState,
+    BusinessModuleState,
     BusinessPlan,
     BusinessView,
     CatalogueModuleRow,
+    Panel,
     SiteTrackersRow,
 } from "./businesses";
 import {
@@ -63,7 +66,7 @@ describe("planWords", () => {
     it("names the plan they are on", () => {
         expect(planWords(plan())).toBe("Growth");
     });
-    it("falls back to the subscription's plan, then the free floor", () => {
+    it("falls back to the subscription's plan, then the free basics", () => {
         expect(
             planWords(
                 plan({
@@ -85,26 +88,81 @@ describe("planWords", () => {
             ),
         ).toBe("Pro");
         expect(planWords(plan({ effective: null }))).toBe(
-            "No plan — the free floor applies",
+            "No plan yet, so they get the free basics",
         );
     });
 });
 
+const mod = (over: Partial<BusinessModuleState>): BusinessModuleState => ({
+    moduleKey: "WEBSITE",
+    label: "Website",
+    state: "on",
+    blocker: null,
+    reason: null,
+    fix: null,
+    dependencies: [],
+    ...over,
+});
+
+const modules = (
+    rows: BusinessModuleState[],
+    over: Partial<BusinessModulesState> = {},
+): BusinessModulesState => ({
+    organizationId: "o1",
+    planLimitsEnforced: true,
+    note: null,
+    modules: rows,
+    ...over,
+});
+
 describe("moduleWords", () => {
-    it("lists what is on, then what is off", () => {
+    it("words each module's true state with the API's reason", () => {
         expect(
-            moduleWords([
-                { label: "Website", status: "ENABLED" },
-                { label: "CRM", status: "ENABLED" },
-                { label: "Courses", status: "DISABLED" },
-                { label: "Class packs", status: "NOT_INSTALLED" },
-            ]),
-        ).toBe("On: Website, CRM. Off: Courses, Class packs.");
-    });
-    it("says when nothing is on", () => {
-        expect(moduleWords([{ label: "CRM", status: "DISABLED" }])).toBe(
-            "None switched on. Off: CRM.",
+            moduleWords(
+                modules([
+                    mod({}),
+                    mod({ moduleKey: "CRM", label: "CRM" }),
+                    mod({
+                        moduleKey: "APPOINTMENTS",
+                        label: "Bookings",
+                        state: "off",
+                        blocker: "ROLLOUT_DISABLED",
+                        reason: "Release off for everyone",
+                    }),
+                    mod({
+                        moduleKey: "COURSES",
+                        label: "Courses",
+                        state: "locked",
+                        blocker: "ENTITLEMENT_REQUIRED",
+                        reason: "Not in their plan",
+                    }),
+                ]),
+            ),
+        ).toBe(
+            "On: Website, CRM. Off: Bookings (release off for everyone). Locked: Courses (not in their plan).",
         );
+    });
+
+    it("never says On for a module whose release is off, whatever their switch", () => {
+        const words = moduleWords(
+            modules([
+                mod({
+                    moduleKey: "APPOINTMENTS",
+                    label: "Bookings",
+                    state: "off",
+                    reason: "Release off for everyone",
+                }),
+            ]),
+        );
+        expect(words).toBe(
+            "None on. Off: Bookings (release off for everyone).",
+        );
+    });
+
+    it("lists an on module by name only, even with setup still to do", () => {
+        expect(
+            moduleWords(modules([mod({ reason: "Publish a page first" })])),
+        ).toBe("On: Website.");
     });
 });
 
@@ -260,17 +318,6 @@ describe("addresses", () => {
 describe("whatTheySee", () => {
     const view = (over: Partial<BusinessView>): BusinessView =>
         ({
-            modules: {
-                status: "ok",
-                data: [
-                    {
-                        key: "WEBSITE",
-                        label: "Website",
-                        status: "ENABLED",
-                        dependencies: [],
-                    },
-                ],
-            },
             plan: { status: "ok", data: plan() },
             sites: { status: "ok", data: [site()] },
             presence: {
@@ -289,9 +336,12 @@ describe("whatTheySee", () => {
             },
             ...over,
         }) as BusinessView;
+    const ok = (
+        state: BusinessModulesState = modules([mod({})]),
+    ): Panel<BusinessModulesState> => ({ status: "ok", data: state });
 
     it("gives one line per area, in order", () => {
-        expect(whatTheySee(view({}))).toEqual([
+        expect(whatTheySee(view({}), ok())).toEqual([
             { area: "Plan", text: "Growth" },
             { area: "Modules", text: "On: Website." },
             { area: "Payments", text: "Not connected" },
@@ -300,12 +350,41 @@ describe("whatTheySee", () => {
         ]);
     });
 
+    it("says plan limits aren't enforced once, under Modules, not per module", () => {
+        const lines = whatTheySee(
+            view({}),
+            ok(
+                modules(
+                    [
+                        mod({}),
+                        mod({
+                            moduleKey: "APPOINTMENTS",
+                            label: "Bookings",
+                        }),
+                    ],
+                    {
+                        planLimitsEnforced: false,
+                        note: "Plan limits not enforced yet",
+                    },
+                ),
+            ),
+        );
+        expect(lines.slice(1, 3)).toEqual([
+            { area: "Modules", text: "On: Website, Bookings." },
+            { area: "Plan limits", text: "Plan limits not enforced yet" },
+        ]);
+        expect(
+            lines.filter((l) => l.text.includes("not enforced")),
+        ).toHaveLength(1);
+    });
+
     it("says an area couldn't be read rather than guessing", () => {
         const lines = whatTheySee(
             view({
                 presence: { status: "failed" },
                 plan: { status: "failed" },
             }),
+            { status: "failed" },
         );
         expect(lines.find((l) => l.area === "Payments")?.text).toBe(
             "Couldn’t be read just now",
@@ -313,8 +392,11 @@ describe("whatTheySee", () => {
         expect(lines.find((l) => l.area === "Plan")?.text).toBe(
             "Couldn’t be read just now",
         );
+        expect(lines.find((l) => l.area === "Modules")?.text).toBe(
+            "Couldn’t be read just now",
+        );
         expect(
-            whatTheySee(view({ presence: undefined })).find(
+            whatTheySee(view({ presence: undefined }), ok()).find(
                 (l) => l.area === "Website",
             )?.text,
         ).toBe("Couldn’t be read just now");

@@ -8,7 +8,7 @@ import { useRef, useState } from "react";
 
 import { MediaThumb } from "@/components/commerce/product-sections/media-thumb";
 import { AddressPanel } from "@/components/commerce/product-sections/photos-field";
-import { useImageUpload } from "@/components/sites/media-picker";
+import { useImageUpload } from "@/components/shared/fields/media-picker";
 import type { LibraryItem } from "@/lib/media/service";
 import { replaceProductImages } from "@/lib/products/actions";
 import type { PhotoDraft } from "@/lib/products/editor-sections";

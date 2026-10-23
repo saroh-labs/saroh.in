@@ -6,6 +6,7 @@ import { cache } from "react";
 import { SiteTheme } from "@saroh/site-blocks";
 
 import { InvoicePay } from "@/components/invoice-pay";
+import { PayLinkGone } from "@/components/pay-link-gone";
 import { publicApiUrl } from "@/lib/api-url";
 import { getPayInvoice } from "@/lib/invoice-pay";
 import { payPdfHref } from "@/lib/invoice-pdf";
@@ -43,24 +44,6 @@ export async function generateMetadata({
     };
 }
 
-const GONE: Record<
-    "missing" | "busy" | "unavailable",
-    { title: string; body: string }
-> = {
-    missing: {
-        title: "This link no longer works",
-        body: "The invoice may have been cancelled, or the business may have sent you a newer link. Ask them for the latest one.",
-    },
-    busy: {
-        title: "Too many tries at once",
-        body: "Wait a minute, then open the link again.",
-    },
-    unavailable: {
-        title: "We couldn't open your invoice",
-        body: "Something went wrong on our side. Try the link again in a moment.",
-    },
-};
-
 export default async function PayPage({
     params,
 }: {
@@ -69,19 +52,7 @@ export default async function PayPage({
     const { token } = await params;
     const result = await readInvoice(token);
 
-    if (!result.ok) {
-        const copy = GONE[result.reason];
-        return (
-            <main className="min-h-screen bg-site-bg text-site-body">
-                <section className="mx-auto w-full max-w-xl px-5 py-16 sm:px-8">
-                    <h1 className="text-2xl font-bold tracking-tight text-site-fg">
-                        {copy.title}
-                    </h1>
-                    <p className="mt-2 text-site-muted">{copy.body}</p>
-                </section>
-            </main>
-        );
-    }
+    if (!result.ok) return <PayLinkGone reason={result.reason} />;
 
     const { invoice } = result;
     const elsewhere = payRedirect(

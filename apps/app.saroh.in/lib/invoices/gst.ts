@@ -10,6 +10,7 @@ export const GST_RATE_OPTIONS = [
     { value: "", label: "Not set" },
     { value: "0", label: "0%, nil-rated or exempt" },
     { value: "0.25", label: "0.25%" },
+    { value: "1.5", label: "1.5%" },
     { value: "3", label: "3%" },
     { value: "5", label: "5%" },
     { value: "12", label: "12%" },
@@ -29,8 +30,27 @@ export const GST_RATE_CHOICES = GST_RATE_OPTIONS.filter(
     (option) => option.value !== "",
 );
 
-/** What the box says before a rate is chosen. */
-export const GST_RATE_PLACEHOLDER = "Choose a rate";
+/**
+ * The rates the picker shows as its main buttons (DEC-176): GST's slabs
+ * since GST 2.0 (22 Sep 2025). Every other rate in `GST_RATE_OPTIONS` sits
+ * behind "Other rate", so a rate added there lands in Other on its own.
+ */
+export const MAIN_GST_RATES = [
+    "0",
+    "5",
+    "18",
+    "40",
+] as const satisfies readonly GstRateValue[];
+
+/** A rate shown as a main button (`MAIN_GST_RATES`). */
+export function isMainGstRate(value: string): boolean {
+    return (MAIN_GST_RATES as readonly string[]).includes(value);
+}
+
+/** The rates behind "Other rate": every rate that is not a main one. */
+export const OTHER_GST_RATE_CHOICES = GST_RATE_CHOICES.filter(
+    (option) => !isMainGstRate(option.value),
+);
 
 /** What a priced thing with no rate is told, under its GST rate box. */
 export const GST_RATE_NEEDED =

@@ -1,4 +1,4 @@
-import { PageLoading } from "@/components/shared/page-loading";
+import { PageLoading } from "@/components/shared/page/page-loading";
 import { ORDERS_TABS } from "@/lib/orders/list-query";
 
 export default function Loading() {

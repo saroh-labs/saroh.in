@@ -3,7 +3,7 @@ jest.mock("@saroh/database", () => ({
     prisma: {
         notification: {
             findMany: jest.fn(),
-            findUnique: jest.fn(),
+            findFirst: jest.fn(),
             update: jest.fn(),
             updateMany: jest.fn(),
             count: jest.fn(),
@@ -26,7 +26,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { NotificationsService } from "./notifications.service";
 
 const findMany = prisma.notification.findMany as jest.Mock;
-const findUnique = prisma.notification.findUnique as jest.Mock;
+const findFirst = prisma.notification.findFirst as jest.Mock;
 const update = prisma.notification.update as jest.Mock;
 const updateMany = prisma.notification.updateMany as jest.Mock;
 const count = prisma.notification.count as jest.Mock;
@@ -41,6 +41,22 @@ function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
     };
 }
 
+/**
+ * What an owner or admin sees (DEC-170, #1038): the business's notices
+ * (less the types `hidden` names) and those addressed to them.
+ */
+function seenByAdmin(hidden: object = {}, userId = "user_1") {
+    return {
+        organizationId: "org_1",
+        OR: [{ userId: null, ...hidden }, { userId }],
+    };
+}
+
+/** What a Member sees: only what is addressed to them. */
+function seenByMember(userId = "user_1") {
+    return { organizationId: "org_1", OR: [{ userId }] };
+}
+
 describe("NotificationsService.list", () => {
     beforeEach(() => jest.clearAllMocks());
 
@@ -48,7 +64,7 @@ describe("NotificationsService.list", () => {
         findMany.mockResolvedValue([]);
         await new NotificationsService().list(ctx());
         expect(findMany).toHaveBeenCalledWith({
-            where: { organizationId: "org_1" },
+            where: seenByAdmin(),
             orderBy: { createdAt: "desc" },
         });
     });
@@ -63,6 +79,11 @@ describe("NotificationsService.list", () => {
             { id: "n6", type: "team.joined" },
             // Written before its column existed: the kind's list opens.
             { id: "n7", type: "order.new", orderId: null },
+            // A booking rules request opens the person (#1038); one
+            // written before it had a person opens the page.
+            { id: "n8", type: "hours.rule-request", staffId: "st_1" },
+            { id: "n9", type: "hours.rule-answer", staffId: "st_1" },
+            { id: "n10", type: "hours.rule-request" },
         ]);
         const rows = await new NotificationsService().list(ctx());
         expect(rows.map((r) => r.target)).toEqual([
@@ -73,6 +94,9 @@ describe("NotificationsService.list", () => {
             { kind: "lead", id: "lead_1" },
             { kind: "team", id: null },
             { kind: "order", id: null },
+            { kind: "hours", id: "st_1" },
+            { kind: "hours", id: "st_1" },
+            { kind: "hours", id: null },
         ]);
     });
 
@@ -80,14 +104,23 @@ describe("NotificationsService.list", () => {
         findMany.mockResolvedValue([]);
         await new NotificationsService().list(ctx(), { unreadOnly: true });
         expect(findMany).toHaveBeenCalledWith({
-            where: { organizationId: "org_1", readAt: null },
+            where: { ...seenByAdmin(), readAt: null },
             orderBy: { createdAt: "desc" },
         });
     });
 
-    it("denies a MEMBER (notification:read is OWNER/ADMIN-only) before any I/O", async () => {
+    it("shows a MEMBER only what is addressed to them, never the business's", async () => {
+        findMany.mockResolvedValue([]);
+        await new NotificationsService().list(ctx({ role: "MEMBER" }));
+        expect(findMany).toHaveBeenCalledWith({
+            where: seenByMember(),
+            orderBy: { createdAt: "desc" },
+        });
+    });
+
+    it("denies a REVIEWER, who has no bell, before any I/O", async () => {
         await expect(
-            new NotificationsService().list(ctx({ role: "MEMBER" })),
+            new NotificationsService().list(ctx({ role: "REVIEWER" })),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(findMany).not.toHaveBeenCalled();
     });
@@ -97,9 +130,10 @@ describe("NotificationsService.markRead", () => {
     beforeEach(() => jest.clearAllMocks());
 
     it("stamps readAt on an owned unread notification", async () => {
-        findUnique.mockResolvedValue({
+        findFirst.mockResolvedValue({
             id: "notif_1",
             organizationId: "org_1",
+            userId: null,
             readAt: null,
         });
         update.mockResolvedValue({ id: "notif_1", readAt: new Date() });
@@ -110,13 +144,18 @@ describe("NotificationsService.markRead", () => {
             where: { id: "notif_1" },
             data: { readAt: expect.any(Date) },
         });
+        expect(findFirst.mock.calls[0][0].where).toEqual({
+            id: "notif_1",
+            ...seenByAdmin(),
+        });
     });
 
     it("is idempotent: an already-read notification is not re-stamped", async () => {
         const readAt = new Date("2026-01-01T00:00:00Z");
-        findUnique.mockResolvedValue({
+        findFirst.mockResolvedValue({
             id: "notif_1",
             organizationId: "org_1",
+            userId: null,
             readAt,
         });
 
@@ -126,12 +165,10 @@ describe("NotificationsService.markRead", () => {
         expect(res).toMatchObject({ readAt });
     });
 
-    it("rejects a cross-tenant mark-read with 404 and never updates", async () => {
-        findUnique.mockResolvedValue({
-            id: "notif_1",
-            organizationId: "org_OTHER",
-            readAt: null,
-        });
+    it("rejects a cross-tenant or someone else's mark-read with 404 and never updates", async () => {
+        // The read is scoped to the org and to who it is for, so another
+        // business's row, or another person's, is simply not found.
+        findFirst.mockResolvedValue(null);
 
         await expect(
             new NotificationsService().markRead(ctx(), "notif_1"),
@@ -140,20 +177,58 @@ describe("NotificationsService.markRead", () => {
     });
 
     it("404s a missing notification", async () => {
-        findUnique.mockResolvedValue(null);
+        findFirst.mockResolvedValue(null);
         await expect(
             new NotificationsService().markRead(ctx(), "nope"),
         ).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it("denies a MEMBER (notification:write is OWNER/ADMIN-only) before any I/O", async () => {
+    it("lets a MEMBER open their own: reading it is theirs", async () => {
+        findFirst.mockResolvedValue({
+            id: "notif_1",
+            organizationId: "org_1",
+            userId: "user_1",
+            readAt: null,
+        });
+        update.mockResolvedValue({ id: "notif_1" });
+        await new NotificationsService().markRead(
+            ctx({ role: "MEMBER" }),
+            "notif_1",
+        );
+        expect(findFirst.mock.calls[0][0].where).toEqual({
+            id: "notif_1",
+            ...seenByMember(),
+        });
+        expect(update).toHaveBeenCalled();
+    });
+
+    it("refuses a business notice to a role that reads but can't clear it", async () => {
+        findFirst.mockResolvedValue({
+            id: "notif_1",
+            organizationId: "org_1",
+            userId: null,
+            readAt: null,
+        });
         await expect(
             new NotificationsService().markRead(
-                ctx({ role: "MEMBER" }),
+                ctx({
+                    role: "MEMBER",
+                    actions: new Set(["notification:read"]),
+                }),
                 "notif_1",
             ),
         ).rejects.toBeInstanceOf(ForbiddenException);
-        expect(findUnique).not.toHaveBeenCalled();
+        expect(update).not.toHaveBeenCalled();
+    });
+
+    it("denies a REVIEWER before any I/O", async () => {
+        await expect(
+            new NotificationsService().markRead(
+                ctx({ role: "REVIEWER" }),
+                "notif_1",
+            ),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(findFirst).not.toHaveBeenCalled();
     });
 });
 
@@ -166,7 +241,7 @@ describe("NotificationsService.markAllRead", () => {
         const res = await new NotificationsService().markAllRead(ctx());
 
         expect(updateMany).toHaveBeenCalledWith({
-            where: { organizationId: "org_1", readAt: null },
+            where: { ...seenByAdmin(), readAt: null },
             data: { readAt: expect.any(Date) },
         });
         // The instant it stamped, for its Undo.
@@ -174,9 +249,18 @@ describe("NotificationsService.markAllRead", () => {
         expect(res).toEqual({ updated: 3, readAt: stamped.toISOString() });
     });
 
-    it("denies a MEMBER before any I/O", async () => {
+    it("marks only a MEMBER's own read", async () => {
+        updateMany.mockResolvedValue({ count: 1 });
+        await new NotificationsService().markAllRead(ctx({ role: "MEMBER" }));
+        expect(updateMany.mock.calls[0][0].where).toEqual({
+            ...seenByMember(),
+            readAt: null,
+        });
+    });
+
+    it("denies a REVIEWER before any I/O", async () => {
         await expect(
-            new NotificationsService().markAllRead(ctx({ role: "MEMBER" })),
+            new NotificationsService().markAllRead(ctx({ role: "REVIEWER" })),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(updateMany).not.toHaveBeenCalled();
     });
@@ -192,7 +276,7 @@ describe("NotificationsService.undoMarkAllRead", () => {
         const res = await new NotificationsService().undoMarkAllRead(ctx(), at);
 
         expect(updateMany).toHaveBeenCalledWith({
-            where: { organizationId: "org_1", readAt: new Date(at) },
+            where: { ...seenByAdmin(), readAt: new Date(at) },
             data: { readAt: null },
         });
         expect(res).toEqual({ updated: 3 });
@@ -209,7 +293,7 @@ describe("NotificationsService.undoMarkAllRead", () => {
             "2026-10-10T09:30:00.123Z",
         );
 
-        expect(updateMany.mock.calls[0][0].where.type.notIn).toEqual(
+        expect(updateMany.mock.calls[0][0].where.OR[0].type.notIn).toEqual(
             expect.arrayContaining(["order.new", "order.uncollected"]),
         );
     });
@@ -223,10 +307,10 @@ describe("NotificationsService.undoMarkAllRead", () => {
         expect(updateMany).not.toHaveBeenCalled();
     });
 
-    it("denies a MEMBER before any I/O", async () => {
+    it("denies a REVIEWER before any I/O", async () => {
         await expect(
             new NotificationsService().undoMarkAllRead(
-                ctx({ role: "MEMBER" }),
+                ctx({ role: "REVIEWER" }),
                 "2026-10-10T09:30:00.123Z",
             ),
         ).rejects.toBeInstanceOf(ForbiddenException);
@@ -241,14 +325,22 @@ describe("NotificationsService.unreadCount", () => {
         count.mockResolvedValue(2);
         const res = await new NotificationsService().unreadCount(ctx());
         expect(count).toHaveBeenCalledWith({
-            where: { organizationId: "org_1", readAt: null },
+            where: { ...seenByAdmin(), readAt: null },
         });
         expect(res).toEqual({ count: 2 });
     });
 
-    it("denies a MEMBER before any I/O", async () => {
+    it("counts only a MEMBER's own", async () => {
+        count.mockResolvedValue(1);
+        await new NotificationsService().unreadCount(ctx({ role: "MEMBER" }));
+        expect(count).toHaveBeenCalledWith({
+            where: { ...seenByMember(), readAt: null },
+        });
+    });
+
+    it("denies a REVIEWER before any I/O", async () => {
         await expect(
-            new NotificationsService().unreadCount(ctx({ role: "MEMBER" })),
+            new NotificationsService().unreadCount(ctx({ role: "REVIEWER" })),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(count).not.toHaveBeenCalled();
     });
@@ -271,16 +363,14 @@ describe("what each person sees of the inbox (F14)", () => {
         await new NotificationsService().unreadCount(ctx());
 
         const hidden = {
-            type: { notIn: ["order.new", "order.uncollected"] },
+            type: {
+                notIn: ["order.new", "order.uncollected", "order.paid_by_link"],
+            },
         };
-        expect(findMany.mock.calls[0][0].where).toEqual({
-            organizationId: "org_1",
-            ...hidden,
-        });
+        expect(findMany.mock.calls[0][0].where).toEqual(seenByAdmin(hidden));
         expect(count.mock.calls[0][0].where).toEqual({
-            organizationId: "org_1",
+            ...seenByAdmin(hidden),
             readAt: null,
-            ...hidden,
         });
     });
 
@@ -304,16 +394,32 @@ describe("what each person sees of the inbox (F14)", () => {
                 actions: new Set(["notification:read", "member:read"]),
             }),
         );
-        expect(findMany.mock.calls[0][0].where.type).toEqual({
+        expect(findMany.mock.calls[0][0].where.OR[0].type).toEqual({
             notIn: [
                 "order.new",
                 "order.uncollected",
+                // A team order paid by its link (#1139).
+                "order.paid_by_link",
                 "booking.new",
                 "booking.moved",
                 "booking.cancelled",
                 "payment.failed",
                 "provider.attention",
                 "provider.back",
+                // An order's payment failed, and money taken at the wrong
+                // amount (#1139).
+                "order.payment_failed",
+                "payment.mismatch",
+                "payment.mismatch.invoice",
+                // A refund refused or failed (#1143).
+                "refund.refused",
+                "refund.refused.booking",
+                "refund.refused.invoice",
+                "refund.failed",
+                "refund.failed.booking",
+                "refund.failed.invoice",
+                // A provider's event Saroh couldn't apply.
+                "payment.event_unapplied",
                 "site.live",
                 "site.not_live",
                 "site.review.approved",
@@ -321,6 +427,19 @@ describe("what each person sees of the inbox (F14)", () => {
                 "site.review.note",
                 "domain.down",
                 "domain.back",
+                // Only who can run a customer removal sees a request (DEC-172).
+                "customer.data-request",
+                // Bookings with you (#1138) are personal: never the business's.
+                "booking.mine.new",
+                "booking.mine.moved",
+                "booking.mine.cancelled",
+                "booking.reassigned",
+                // A member's own changes, to who reads memberships (#1150).
+                "member.cancelled",
+                "member.paused",
+                "member.autopay_off",
+                // A rules request, only to who may approve it (#1138).
+                "hours.rule-request",
             ],
         });
     });
@@ -332,9 +451,8 @@ describe("what each person sees of the inbox (F14)", () => {
         updateMany.mockResolvedValue({ count: 1 });
         await new NotificationsService().markAllRead(ctx());
         expect(updateMany.mock.calls[0][0].where).toEqual({
-            organizationId: "org_1",
+            ...seenByAdmin({ type: { notIn: ["team.joined"] } }),
             readAt: null,
-            type: { notIn: ["team.joined"] },
         });
     });
 
@@ -348,7 +466,8 @@ describe("what each person sees of the inbox (F14)", () => {
         );
         findMany.mockResolvedValue([]);
         await new NotificationsService().list(ctx());
-        const hidden = findMany.mock.calls[0][0].where.type.notIn as string[];
+        const hidden = findMany.mock.calls[0][0].where.OR[0].type
+            .notIn as string[];
         expect(hidden).not.toContain("enquiry.new");
         expect(hidden).not.toContain("review.needs-reply");
     });

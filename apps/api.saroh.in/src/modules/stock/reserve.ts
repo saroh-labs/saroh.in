@@ -3,6 +3,7 @@ import type { Prisma, StockRow } from "@saroh/database";
 
 import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
 import { lockStockLevels } from "../products/stock-levels";
+import { onSellableAgain } from "./on-sellable-again";
 import { markedSoldOut, soldOutKey } from "./sold-out";
 import {
     ORDER_CLOSED_WHILE_PAYING,
@@ -409,10 +410,14 @@ export async function changeHold(
 async function releaseOne(tx: Tx, line: Line, units: number): Promise<number> {
     const n = Math.min(Math.max(0, units), line.heldQuantity);
     if (n === 0 || !line.stockLevelId) return 0;
-    await tx.stockLevel.update({
+    const shelf = await tx.stockLevel.update({
         where: { id: line.stockLevelId },
         data: { promised: { decrement: n } },
+        select: { organizationId: true },
     });
+    // A promise given back frees units: anyone waiting for it hears once it
+    // stays sellable (U23, `on-sellable-again.ts`).
+    await onSellableAgain(tx, shelf.organizationId, line.productId);
     await tx.orderItem.update({
         where: { id: line.id },
         data: { heldQuantity: { decrement: n } },

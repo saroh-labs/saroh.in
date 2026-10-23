@@ -1,14 +1,15 @@
 "use client";
 
-import { Refusal } from "@/components/shared/refusal";
+import { Refusal } from "@/components/shared/states/refusal";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { FormDialog } from "@/components/shared/form-dialog";
+import { FormDialog } from "@/components/shared/forms/form-dialog";
 import { runAction } from "@/lib/api/run-action";
+import { firstName } from "@/lib/names";
 import { addPerson } from "@/lib/staff/actions";
 import { defaultWeek, weekLines } from "@/lib/staff/starting-week";
 
@@ -54,6 +55,7 @@ export function AddPersonDialog({
     hoursHint = "Their week is below. Change it any time.",
     week,
     seatNote,
+    hoursScreen = false,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -64,6 +66,11 @@ export function AddPersonDialog({
     week?: "opening" | "default";
     /** The seat this uses, said only when the plan counts seats. */
     seatNote?: string | null;
+    /**
+     * Opened on Hours and time off (U17, BKMAvailability "add someone"):
+     * its words, and the button names them ("Add Ishaan").
+     */
+    hoursScreen?: boolean;
 }) {
     const router = useRouter();
     const ids = { name: useId(), title: useId() };
@@ -109,18 +116,27 @@ export function AddPersonDialog({
         router.refresh();
     }
 
+    const sentence = hoursScreen
+        ? week === "default"
+            ? `They start with ${DEFAULT_WORDS} and don't need a sign-in.`
+            : "They start with your opening hours and don't need a sign-in."
+        : weekSentence(week);
     return (
         <FormDialog
             open={open}
             size="sm"
-            title="New person who takes bookings"
-            description={
-                seatNote
-                    ? `${weekSentence(week)} ${seatNote}`
-                    : weekSentence(week)
+            title={
+                hoursScreen
+                    ? "Add someone who takes bookings"
+                    : "New person who takes bookings"
             }
+            description={seatNote ? `${sentence} ${seatNote}` : sentence}
             pending={saving}
-            saveLabel="Add person"
+            saveLabel={
+                hoursScreen && name.trim()
+                    ? `Add ${firstName(name)}`
+                    : "Add person"
+            }
             savingLabel="Adding…"
             fieldsClassName="gap-0"
             onClose={close}

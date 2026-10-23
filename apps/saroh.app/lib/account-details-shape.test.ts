@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
     coursesResult,
+    dataRequestResult,
     homeDetails,
     invoicesDueResult,
     isChange,
@@ -250,5 +251,47 @@ describe("Home's newer blocks", () => {
             courses: { ok: true, value: [] },
             linkPending: false,
         });
+    });
+});
+
+describe("the removal request (DEC-172, #1107)", () => {
+    const REQUEST = {
+        ref: "cdr_1",
+        status: "open",
+        askedAt: "2026-10-19T06:00:00.000Z",
+        handledAt: null,
+    };
+
+    it("reads an open request, field by field", () => {
+        expect(
+            dataRequestResult({ request: { ...REQUEST, extra: "x" } }),
+        ).toEqual(REQUEST);
+    });
+
+    it("reads never having asked as null", () => {
+        expect(dataRequestResult({ request: null })).toBeNull();
+    });
+
+    it("reads a closed one with its date", () => {
+        expect(
+            dataRequestResult({
+                request: {
+                    ...REQUEST,
+                    status: "closed",
+                    handledAt: "2026-10-20T06:00:00.000Z",
+                },
+            }),
+        ).toMatchObject({ status: "closed" });
+    });
+
+    it("a shape it doesn't know is a failed read, never 'never asked'", () => {
+        expect(dataRequestResult(null)).toBeUndefined();
+        expect(dataRequestResult({})).toBeUndefined();
+        expect(
+            dataRequestResult({ request: { ...REQUEST, status: "OPEN" } }),
+        ).toBeUndefined();
+        expect(
+            dataRequestResult({ request: { ...REQUEST, askedAt: "soon" } }),
+        ).toBeUndefined();
     });
 });

@@ -5,7 +5,7 @@ import { IconButton } from "@saroh/ui/icon-button";
 import { Input } from "@saroh/ui/input";
 import { useState } from "react";
 
-import { Chip } from "@/components/shared/chip";
+import { Chip } from "@/components/shared/lists/chip";
 import type { CartLine, NewOrderSellable } from "@/lib/orders/new-order";
 import {
     chipWords,

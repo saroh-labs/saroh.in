@@ -5,7 +5,7 @@ import type { OpeningHoursDay, Weekday } from "@/lib/stores/storefronts";
  * "07:00–19:00" or "Closed" per day, from what the API keeps per storefront:
  * seven `{ day, open, close, closed }` entries, Monday first
  * (`UpdateStorefrontDto.openingHours`). The week is edited with the
- * location's own fields (`components/stores/opening-hours.tsx`), so nothing
+ * location's own fields (`components/stores/place/opening-hours.tsx`), so nothing
  * here parses typed text.
  *
  * Pure, so the rules are tested without a form.

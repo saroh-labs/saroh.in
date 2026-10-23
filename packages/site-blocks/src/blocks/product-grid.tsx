@@ -17,6 +17,7 @@ import {
 } from "../lib/product-grid-read";
 import { siteImage } from "../lib/site-image";
 import { cn, trimTrailingSlashes } from "../lib/utils";
+import type { LookProps } from "../look-context";
 import { NamePlate } from "../product/name-plate";
 import { optionSummary } from "../product/option-summary";
 import { formatAmount } from "../product/product-page";
@@ -130,7 +131,7 @@ export default function ProductGridSection({
     feed,
     siteId,
     apiUrl = DEFAULT_API_URL,
-}: {
+}: LookProps & {
     content: RenderedProductGrid;
     /** The products, read by the page that serves the site (live or preview). */
     feed?: ProductGridFeed;
@@ -268,7 +269,7 @@ const focusRing =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent focus-visible:ring-offset-2 focus-visible:ring-offset-site-bg";
 
 const textButton = cn(
-    "cursor-pointer rounded-[var(--site-radius)] text-sm font-semibold text-site-accent underline-offset-4 transition-opacity hover:underline active:opacity-70",
+    "cursor-pointer rounded-[var(--site-radius)] text-sm font-semibold text-site-accent-text underline-offset-4 transition-opacity hover:underline active:opacity-70",
     focusRing,
 );
 
@@ -277,6 +278,7 @@ function GridFrame({
     more,
     count = null,
     note = null,
+    cutOff = null,
     children,
 }: {
     title: string;
@@ -285,6 +287,12 @@ function GridFrame({
     count?: string | null;
     /** The merchant's line under the grid (template polish). */
     note?: string | null;
+    /**
+     * The owner's own cut-off line ("Order by 9 pm", DEC-172, U11): their
+     * words, shown under the title only when written. Saroh never works it
+     * out or enforces it; a real cut-off is Phase 2.
+     */
+    cutOff?: string | null;
     children: React.ReactNode;
 }) {
     return (
@@ -311,6 +319,14 @@ function GridFrame({
                 ) : null}
                 {more ?? null}
             </div>
+            {cutOff ? (
+                <p
+                    data-cut-off=""
+                    className="text-site-fg -mt-1 mb-4 text-[14.5px] font-semibold [overflow-wrap:anywhere]"
+                >
+                    {cutOff}
+                </p>
+            ) : null}
             {children}
             {note ? (
                 <p className="text-site-body mt-6 max-w-[60ch] whitespace-pre-line text-[15px] leading-relaxed">
@@ -397,6 +413,7 @@ function ProductCards({
             title={title}
             count={content.showAvailability ? availabilityLine(products) : null}
             note={said(content.note)}
+            cutOff={said(content.cutOff)}
             more={
                 feed.atShop ? null : base !== null ? (
                     <a
@@ -406,7 +423,7 @@ function ProductCards({
                         Shop <span aria-hidden="true">→</span>
                     </a>
                 ) : (
-                    <span className="text-site-accent shrink-0 text-sm font-semibold">
+                    <span className="text-site-accent-text shrink-0 text-sm font-semibold">
                         Shop <span aria-hidden="true">→</span>
                     </span>
                 )
@@ -496,7 +513,10 @@ function ListRowBody({
                 <img
                     src={p.image.url}
                     alt={p.image.alt}
-                    {...siteImage()}
+                    {...siteImage("below", {
+                        src: p.image.url,
+                        sizes: "(min-width: 640px) 240px, 40vw",
+                    })}
                     className={listPhoto}
                 />
             ) : null}
@@ -522,7 +542,10 @@ function CardBody({
                 <img
                     src={p.image.url}
                     alt={p.image.alt}
-                    {...siteImage()}
+                    {...siteImage("below", {
+                        src: p.image.url,
+                        sizes: "(min-width: 1024px) 25vw, 50vw",
+                    })}
                     className="mb-1.5 h-[130px] w-full object-cover"
                 />
             ) : (
@@ -645,7 +668,10 @@ function BareGrid({
                                     <img
                                         src={p.image.url}
                                         alt={p.image.alt}
-                                        {...siteImage()}
+                                        {...siteImage("below", {
+                                            src: p.image.url,
+                                            sizes: "(min-width: 1024px) 25vw, 50vw",
+                                        })}
                                         className="h-full w-full object-cover"
                                     />
                                 ) : (
@@ -690,7 +716,7 @@ function BareGrid({
                             </span>
                         ) : null}
                         {show.label ? (
-                            <span className="text-site-accent mt-2 block text-sm font-semibold underline-offset-4 group-hover:underline">
+                            <span className="text-site-accent-text mt-2 block text-sm font-semibold underline-offset-4 group-hover:underline">
                                 {show.label}
                             </span>
                         ) : null}

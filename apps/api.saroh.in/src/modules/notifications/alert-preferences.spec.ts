@@ -4,11 +4,13 @@
 import type { OrgAction } from "../organizations/organization-actions";
 import {
     ALERT_EVENTS,
+    ALERT_MODULE,
     alertEventOfType,
     alertOn,
     channelState,
     defaultOn,
     hiddenNotificationTypes,
+    hiddenOwnNotificationTypes,
     mayHearAbout,
 } from "./alert-preferences";
 
@@ -18,21 +20,29 @@ const holds =
         actions.includes(a);
 
 describe("alerts", () => {
-    it("offers the design's four rows and the Website row (DEC-071), and no Monday summary (default 127)", () => {
+    it("offers the design's four rows, the Website row (DEC-071) and data removal requests (DEC-172), and no Monday summary (default 127)", () => {
         expect(ALERT_EVENTS).toEqual([
             "order",
             "booking",
             "failed",
             "team",
             "site",
+            "request",
+            // Bookings with you (#1138).
+            "mine",
+            // Members (#1150).
+            "member",
         ]);
     });
 
-    it("starts with the bell on for everything, email for a failed payment and a scheduled go-live, and WhatsApp off (default 126)", () => {
+    it("starts with the bell on for everything, email for a failed payment, a scheduled go-live and a data removal request, and WhatsApp off (default 126)", () => {
         for (const event of ALERT_EVENTS) {
             expect(defaultOn(event, "bell")).toBe(true);
             expect(defaultOn(event, "email")).toBe(
-                event === "failed" || event === "site",
+                event === "failed" ||
+                    event === "site" ||
+                    event === "request" ||
+                    event === "mine",
             );
             expect(defaultOn(event, "whatsapp")).toBe(false);
         }
@@ -69,6 +79,13 @@ describe("alerts", () => {
         );
         expect(alertEventOfType("site.live")).toBe("site");
         expect(alertEventOfType("site.not_live")).toBe("site");
+        // A data removal request: whoever can run a customer removal
+        // (DEC-172), not whoever only reads or edits customers.
+        expect(mayHearAbout("request", holds("customer:remove"))).toBe(true);
+        expect(
+            mayHearAbout("request", holds("contact:read", "contact:write")),
+        ).toBe(false);
+        expect(alertEventOfType("customer.data-request")).toBe("request");
     });
 
     it("never offers Calendar only the business's booking alerts (#868)", () => {
@@ -152,6 +169,92 @@ describe("alerts", () => {
                     () => true,
                 ),
             ).toEqual([]);
+        });
+    });
+
+    describe("Bookings with you (#1138)", () => {
+        it("is offered to whoever reads bookings, Calendar only included: it is their own diary", () => {
+            expect(mayHearAbout("mine", holds("booking:read"))).toBe(true);
+            expect(
+                mayHearAbout("mine", holds("booking:read"), "calendar-only"),
+            ).toBe(true);
+            // The business-wide row stays closed to Calendar only.
+            expect(
+                mayHearAbout("booking", holds("booking:read"), "calendar-only"),
+            ).toBe(false);
+            expect(mayHearAbout("mine", holds("order:read"))).toBe(false);
+        });
+
+        it("starts with the bell and email on", () => {
+            expect(alertOn([], "mine", "bell")).toBe(true);
+            expect(alertOn([], "mine", "email")).toBe(true);
+        });
+
+        it("covers its personal notices and #1157's reassignment notices", () => {
+            expect(alertEventOfType("booking.mine.new")).toBe("mine");
+            expect(alertEventOfType("booking.mine.moved")).toBe("mine");
+            expect(alertEventOfType("booking.mine.cancelled")).toBe("mine");
+            expect(alertEventOfType("booking.reassigned")).toBe("mine");
+        });
+
+        it("hides a person's own notices only once they turn its bell off", () => {
+            expect(hiddenOwnNotificationTypes([])).toEqual([]);
+            // Another row's bell says nothing about their own notices.
+            expect(
+                hiddenOwnNotificationTypes([
+                    { event: "booking", channel: "bell", enabled: false },
+                    { event: "mine", channel: "email", enabled: false },
+                ]),
+            ).toEqual([]);
+            expect(
+                hiddenOwnNotificationTypes([
+                    { event: "mine", channel: "bell", enabled: false },
+                ]),
+            ).toEqual([
+                "booking.mine.new",
+                "booking.mine.moved",
+                "booking.mine.cancelled",
+                "booking.reassigned",
+            ]);
+        });
+    });
+
+    describe("Members (#1150)", () => {
+        it("is offered to who reads memberships, under Payments, bell on and email off", () => {
+            expect(mayHearAbout("member", holds("subscription:read"))).toBe(
+                true,
+            );
+            expect(mayHearAbout("member", holds("booking:read"))).toBe(false);
+            expect(ALERT_MODULE.member).toBe("PAYMENTS");
+            expect(alertOn([], "member", "bell")).toBe(true);
+            expect(alertOn([], "member", "email")).toBe(false);
+        });
+
+        it("covers a member's own cancel and pause, and autopay off at the bank", () => {
+            for (const type of [
+                "member.cancelled",
+                "member.paused",
+                "member.autopay_off",
+            ]) {
+                expect(alertEventOfType(type)).toBe("member");
+            }
+        });
+    });
+
+    describe("a booking rules request (#1138)", () => {
+        it("shows only to who may approve it", () => {
+            const owner = () => true;
+            expect(hiddenNotificationTypes([], owner)).not.toContain(
+                "hours.rule-request",
+            );
+            const member = (a: OrgAction) => a !== "service:write";
+            expect(hiddenNotificationTypes([], member)).toContain(
+                "hours.rule-request",
+            );
+            // The answer is the asker's own, and never hidden by role.
+            expect(hiddenNotificationTypes([], member)).not.toContain(
+                "hours.rule-answer",
+            );
         });
     });
 });

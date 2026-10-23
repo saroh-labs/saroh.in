@@ -1,5 +1,5 @@
-import { PurchasesScreen } from "@/components/class-packs/purchases-screen";
-import { PageContainer } from "@/components/shared/page-container";
+import { PurchasesScreen } from "@/components/class-packs/purchases/purchases-screen";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { canSellPacks } from "@/lib/class-packs/access";
 import {
     getSellingTerms,

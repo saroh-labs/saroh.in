@@ -74,7 +74,7 @@ export function CataloguePlan({
                         "Version",
                         live === null || live === catalogue.version
                             ? `${catalogue.version} (live)`
-                            : `${catalogue.version} · live is ${live}`,
+                            : `${catalogue.version} (version ${live} is the live one)`,
                     ],
                     [
                         "Price a month",

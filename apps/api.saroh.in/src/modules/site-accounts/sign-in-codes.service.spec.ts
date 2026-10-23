@@ -162,7 +162,9 @@ describe("the code email", () => {
         expect(html).not.toContain("<b>");
         expect(html).toContain(">123456<");
         expect(html).toContain("expires in 10 minutes");
-        expect(html).toContain("This address sends only sign-in codes");
+        expect(html).toContain(
+            "This address sends only sign-in codes and notices about your account there",
+        );
     });
 });
 

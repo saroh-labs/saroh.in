@@ -223,6 +223,10 @@ const home = (over: Partial<HomeModel> = {}): HomeModel => ({
         items: [],
     },
     week: null,
+    tiles: null,
+    needGroups: null,
+    needGroupsTotal: 0,
+    going: null,
     ...over,
 });
 

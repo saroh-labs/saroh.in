@@ -1,11 +1,11 @@
 import Link from "next/link";
 
-import { PageLoading } from "@/components/shared/page-loading";
+import { PageLoading } from "@/components/shared/page/page-loading";
 
 export default function Loading() {
     return (
         <PageLoading
-            shape="form"
+            shape="editor"
             width="full"
             breadcrumb={[
                 "Payments",

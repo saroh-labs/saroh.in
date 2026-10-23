@@ -25,7 +25,29 @@ export const NOTICE_KINDS = {
     "booking.new": "booking",
     "booking.moved": "booking",
     "booking.cancelled": "booking",
+    // Given to someone else (#1157): in the two people's own alerts.
+    "booking.reassigned": "booking",
+    // A booking with you made, moved or cancelled (#1138): in that
+    // person's own alerts.
+    "booking.mine.new": "booking",
+    "booking.mine.moved": "booking",
+    "booking.mine.cancelled": "booking",
     "payment.failed": "invoice",
+    // Money alerts (#1139): an order's payment that didn't go through, a
+    // capture at the wrong amount (on an order, or on an invoice), and a
+    // team-made order paid by its link.
+    "order.payment_failed": "order",
+    "payment.mismatch": "order",
+    "payment.mismatch.invoice": "invoice",
+    "order.paid_by_link": "order",
+    // A refund that sent no money back (#1143): refused by the provider,
+    // or failed after it was sent; on an order, a booking or an invoice.
+    "refund.refused": "order",
+    "refund.refused.booking": "booking",
+    "refund.refused.invoice": "invoice",
+    "refund.failed": "order",
+    "refund.failed.booking": "booking",
+    "refund.failed.invoice": "invoice",
     "site.live": "site",
     "site.not_live": "site",
     "site.review.approved": "site",
@@ -37,7 +59,22 @@ export const NOTICE_KINDS = {
     // Pages: there is no one record to open.
     "provider.attention": "providers",
     "provider.back": "providers",
+    "payment.event_unapplied": "providers",
     "team.joined": "team",
+    // A customer asked to remove their data (DEC-172): the customer, when
+    // the request names one; else the Customers requests list.
+    "customer.data-request": "customer-request",
+    // A Member asked to change their own booking rules (#1038): Hours and
+    // time off on that person, where the request is reviewed.
+    "hours.rule-request": "hours",
+    // The answer, to the Member who asked alone (`userId`): approved, or
+    // turned down with the reason. Their own Hours and time off.
+    "hours.rule-answer": "hours",
+    // A member's own cancel or pause, or autopay cancelled at their bank
+    // (#1150): their Memberships on the person page.
+    "member.cancelled": "member",
+    "member.paused": "member",
+    "member.autopay_off": "member",
     "plan.limit": "plan",
     "plan.changed": "plan",
     "plan.ending": "plan",
@@ -61,8 +98,11 @@ interface TargetColumns {
     domain: { siteId: string | null };
     providers: Record<never, never>;
     team: Record<never, never>;
+    hours: { staffId: string };
     plan: Record<never, never>;
     products: Record<never, never>;
+    "customer-request": { contactId: string | null };
+    member: { contactId: string };
 }
 
 /** What a notice of type `T` must point at. */
@@ -79,6 +119,7 @@ export interface NoticeColumns {
     bookingId?: string;
     invoiceId?: string;
     siteId?: string | null;
+    staffId?: string;
 }
 
 /** A notice's type with the target that type requires. */
@@ -110,6 +151,8 @@ const COLUMN_OF: Partial<Record<NoticeKind, keyof NoticeColumns>> = {
     booking: "bookingId",
     invoice: "invoiceId",
     site: "siteId",
+    hours: "staffId",
+    member: "contactId",
 };
 
 /**
@@ -150,6 +193,7 @@ const TARGET_COLUMNS = [
     "bookingId",
     "invoiceId",
     "siteId",
+    "staffId",
 ] as const satisfies readonly (keyof NoticeColumns)[];
 
 /** What the inbox is told a row opens: the kind, and the record's id. */
@@ -172,6 +216,7 @@ export interface StoredNotice {
     bookingId?: string | null;
     invoiceId?: string | null;
     siteId?: string | null;
+    staffId?: string | null;
 }
 
 const ID_OF: Record<NoticeKind, (n: StoredNotice) => string | null> = {
@@ -185,8 +230,12 @@ const ID_OF: Record<NoticeKind, (n: StoredNotice) => string | null> = {
     domain: (n) => n.siteId ?? null,
     providers: () => null,
     team: () => null,
+    // The person, for a row written since #1038; an older one opens the page.
+    hours: (n) => n.staffId ?? null,
     plan: () => null,
     products: () => null,
+    "customer-request": (n) => n.contactId ?? null,
+    member: (n) => n.contactId ?? null,
 };
 
 /**

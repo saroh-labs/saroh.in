@@ -4,6 +4,7 @@ import type {
     TestInfo,
 } from "@playwright/test";
 import { expect } from "@playwright/test";
+import { randomInt } from "node:crypto";
 
 import { NORTHWIND_ORG, urls } from "../playwright.config";
 import { takeProduct } from "./throwaway-products";
@@ -29,7 +30,9 @@ export function stamp(testInfo?: TestInfo): string {
     const who = testInfo
         ? `${testInfo.project.name}${testInfo.parallelIndex}`
         : "x";
-    const tail = Math.floor(Math.random() * 36 ** 4)
+    // node:crypto, not Math.random: the code scanner reads a stamp sent as a
+    // billing email as a security value (#986).
+    const tail = randomInt(36 ** 4)
         .toString(36)
         .padStart(4, "0");
     return `${who}-${Date.now().toString(36)}${tail}`;
@@ -37,8 +40,16 @@ export function stamp(testInfo?: TestInfo): string {
 
 /** A phone number no other test is likely to hold: +91 9 and nine random digits. */
 export function phone(): string {
-    const digits = String(Math.floor(Math.random() * 1e9)).padStart(9, "0");
+    const digits = String(randomInt(1e9)).padStart(9, "0");
     return `+91 9${digits.slice(0, 4)} ${digits.slice(4)}`;
+}
+
+/**
+ * A cheque number no other test is likely to hold: six random digits, never
+ * the clock's last four, which desk and phone read in the same second.
+ */
+export function chequeNumber(): string {
+    return String(randomInt(1e6)).padStart(6, "0");
 }
 
 /** Northwind's API as the signed-in owner; writes carry an Origin (#50). */
@@ -52,7 +63,13 @@ export function northwind(request: APIRequestContext) {
             ? `${urls.API_URL}${path}`
             : `${urls.API_URL}/organizations/${NORTHWIND_ORG}${path}`;
     const ok = async <T>(res: APIResponse): Promise<T> => {
-        expect(res.ok(), `${res.url()}: ${await res.text()}`).toBe(true);
+        // A 401 here is almost always a context with no session: sign the
+        // page in (`useSession(page)`) before using its `page.request`.
+        const hint =
+            res.status() === 401
+                ? " (no session: call useSession(page) before page.request)"
+                : "";
+        expect(res.ok(), `${res.url()}: ${await res.text()}${hint}`).toBe(true);
         const text = await res.text();
         return (text ? JSON.parse(text) : null) as T;
     };
@@ -216,4 +233,44 @@ export async function makeOrder(
         `/orders/${id}`,
     );
     return { id, orderId: String(read.orderId ?? read.number ?? "") };
+}
+
+/**
+ * Issues a Northwind draft of the test's own that is overdue a moment
+ * later, and returns its number once it is.
+ *
+ * The API never issues an invoice already past its due date ("an invoice
+ * is never born overdue"), and nothing moves a due date after issue, so a
+ * spec can't make one "13 days late". It sets the due time a few seconds
+ * ahead, issues, and waits for the API to call it Overdue. On a slow
+ * runner the few seconds can pass before the issue lands: the API refuses
+ * it, and it tries again with a later time.
+ */
+export async function issueOverdue(
+    request: APIRequestContext,
+    draftId: string,
+): Promise<{ number: string }> {
+    const nw = northwind(request);
+    let issued: { number: string } | null = null;
+    for (let ahead = 4_000; !issued && ahead <= 16_000; ahead *= 2) {
+        await nw.patch(`/invoices/${draftId}`, {
+            dueAt: new Date(Date.now() + ahead).toISOString(),
+        });
+        const res = await request.post(
+            `${urls.API_URL}/organizations/${NORTHWIND_ORG}/invoices/${draftId}/issue`,
+            { headers: nw.headers, data: {} },
+        );
+        if (res.ok()) issued = (await res.json()) as { number: string };
+        else expect(await res.text()).toContain("due date has passed");
+    }
+    expect(issued, "issued before its due time").not.toBeNull();
+    await expect
+        .poll(
+            async () =>
+                (await nw.get<{ standing: string }>(`/invoices/${draftId}`))
+                    .standing,
+            { timeout: 20_000 },
+        )
+        .toBe("OVERDUE");
+    return { number: issued?.number ?? "" };
 }

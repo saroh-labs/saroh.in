@@ -1,8 +1,8 @@
 import { ProductEditorV2 } from "@/components/commerce/product-editor-v2/editor-shell";
 import { NoProductAccess } from "@/components/commerce/product-editor-v2/no-access";
-import { ProductLimitReached } from "@/components/commerce/product-limit-reached";
-import { StorefrontChooser } from "@/components/commerce/storefront-chooser";
-import { PageContainer } from "@/components/shared/page-container";
+import { ProductLimitReached } from "@/components/commerce/product-editor-v2/product-limit-reached";
+import { StorefrontChooser } from "@/components/commerce/sell-pages/storefront-chooser";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { planMeter } from "@/lib/billing/meter";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { loadEditorContext } from "@/lib/products/editor-data";

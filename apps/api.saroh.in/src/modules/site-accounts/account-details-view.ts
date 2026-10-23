@@ -339,3 +339,44 @@ export function latestChanges(changes: AccountChange[]): AccountChange[] {
         .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
         .slice(0, CHANGE_ROWS);
 }
+
+// ---- "Ask to remove my data" ------------------------------------------------
+
+/**
+ * Their latest "Ask to remove my data" request (DEC-172, #1106), as the
+ * account's Your details shows it: asked and waiting ("open"), or closed by
+ * the business without removal ("closed"), when they may ask again. "done"
+ * is only ever seen by the POST that raced the removal: after a removal the
+ * account no longer exists. Never the business's reason for closing it, nor
+ * who on the team handled it.
+ */
+export type AccountDataRequestStatus = "open" | "done" | "closed";
+
+export interface AccountDataRequest {
+    /** The request's own opaque id. */
+    ref: string;
+    status: AccountDataRequestStatus;
+    askedAt: string;
+    /** When it was done or closed; null while open. */
+    handledAt: string | null;
+}
+
+const DATA_REQUEST_STATUS: Record<string, AccountDataRequestStatus> = {
+    OPEN: "open",
+    DONE: "done",
+    CLOSED_WITHOUT_REMOVAL: "closed",
+};
+
+export function accountDataRequestView(row: {
+    id: string;
+    status: string;
+    createdAt: Date;
+    handledAt: Date | null;
+}): AccountDataRequest {
+    return {
+        ref: row.id,
+        status: DATA_REQUEST_STATUS[row.status] ?? "open",
+        askedAt: row.createdAt.toISOString(),
+        handledAt: row.handledAt?.toISOString() ?? null,
+    };
+}

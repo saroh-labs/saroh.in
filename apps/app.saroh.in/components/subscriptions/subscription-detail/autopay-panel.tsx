@@ -9,10 +9,10 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { RadioCards } from "@/components/shared/choice-group";
-import type { ConfirmResult } from "@/components/shared/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { FormDialog } from "@/components/shared/form-dialog";
+import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
+import { RadioCards } from "@/components/shared/fields/choice-group";
+import { FormDialog } from "@/components/shared/forms/form-dialog";
 import { UNREACHED } from "@/lib/api/unreached";
 import { cancelAutopay, sendAutopayLink } from "@/lib/subscriptions/actions";
 import type { AutopayPanel } from "@/lib/subscriptions/autopay";
@@ -327,7 +327,7 @@ function CancelAutopay({
             open={open}
             onOpenChange={(o) => (o ? null : onClose())}
             title="Cancel autopay?"
-            description={`${firstName}'s autopay stops now and ${at} is asked to cancel it. The subscription carries on: the next renewal is invoiced with a pay link.${
+            description={`${firstName}'s autopay stops now and ${at} is asked to cancel it. The subscription carries on: the next renewal is invoiced with a payment link.${
                 emailTo
                     ? ` Saroh emails ${firstName} at ${emailTo} to say so.`
                     : ""

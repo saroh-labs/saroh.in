@@ -415,7 +415,7 @@ describe("charges", () => {
     it("finds how it pays, and whether renewals are tax invoices", () => {
         expect(paysBy([charge()])).toBe("UPI");
         expect(paysBy([charge({ payment: { method: "ONLINE" } })])).toBe(
-            "the pay link",
+            "the payment link",
         );
         expect(paysBy([])).toBeNull();
         expect(gstNote([charge({ gst: { cgst: "0" } })])).toBe(
@@ -712,14 +712,17 @@ describe("autopay's retry (D13)", () => {
                 sub({ failedCharge: failed, retryVia: "PAY_LINK" }),
                 true,
             ),
-        ).toEqual({ label: "Try again with a new pay link", via: "PAY_LINK" });
+        ).toEqual({
+            label: "Try again with a new payment link",
+            via: "PAY_LINK",
+        });
         expect(
             retryOffer(
                 sub({ failedCharge: failed, retryVia: "PAY_LINK" }),
                 false,
             ),
         ).toBeNull();
-        // An API older than D13: a pay link, as before.
+        // An API older than D13: a payment link, as before.
         expect(retryOffer(sub({ failedCharge: failed }), true)?.via).toBe(
             "PAY_LINK",
         );

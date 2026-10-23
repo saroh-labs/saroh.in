@@ -77,7 +77,7 @@ describe("monthStrip", () => {
             ["Out so far", "₹200"],
             ["Net", "₹4,800"],
             // Due counts from today, as the design shows (DEC-067).
-            ["Due", "₹900"],
+            ["Still due", "₹900"],
             ["Overdue", "₹300"],
         ]);
         expect(
@@ -93,11 +93,11 @@ describe("monthStrip", () => {
             "In",
             "Out",
             "Net",
-            "Due",
+            "Still due",
             "Overdue",
         ]);
         expect(word(strip).slice(3)).toEqual([
-            ["Due", "₹0"],
+            ["Still due", "₹0"],
             ["Overdue", "₹1,200"],
         ]);
     });
@@ -120,7 +120,7 @@ describe("monthStrip", () => {
             due: 5_000,
         });
         expect(word(monthStrip([today], at("current"))).at(-1)).toEqual([
-            "Due",
+            "Still due",
             "₹50",
         ]);
     });
@@ -130,7 +130,7 @@ describe("monthStrip", () => {
             ["In", "—"],
             ["Out", "—"],
             ["Net", "—"],
-            ["Due", "₹1,200"],
+            ["Still due", "₹1,200"],
         ]);
     });
 
@@ -214,12 +214,13 @@ describe("cells and the day", () => {
         ).toEqual({
             in: "₹1,000",
             out: "₹225",
+            hasOut: true,
             due: null,
             why: "Out is a refund and fees.",
         });
         expect(
             dayMoney([entry({ kind: "booking_due", due: 50_000 })], "INR"),
-        ).toMatchObject({ out: "₹0", due: "₹500", why: "" });
+        ).toMatchObject({ out: "₹0", hasOut: false, due: "₹500", why: "" });
     });
 
     it("a day with no money has no money line", () => {

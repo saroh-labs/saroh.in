@@ -4,7 +4,7 @@ import { paiseToRupees } from "../billing/saroh-invoice-terms";
 import { stateName } from "../invoices/gst-states";
 
 /**
- * The pure rules behind Admin › Billing (DEC-163): which month an invoice
+ * The pure rules behind Admin › Billing (DEC-179): which month an invoice
  * falls in, the month's GST export, and what the subscriptions add up to.
  * No database here, so each rule is tested on its own.
  */
@@ -35,6 +35,12 @@ export function istMonthRange(
 export function istDay(at: Date): string {
     return new Date(at.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
 }
+
+// ── Invoice status ───────────────────────────────────────────────────────
+
+/** Billing › Invoices' status chips (R29), as the API takes them. */
+export const INVOICE_STATUSES = ["paid", "unpaid", "refunded"] as const;
+export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
 
 // ── The month's GST export ───────────────────────────────────────────────
 
@@ -243,4 +249,72 @@ export function mrrPaise(
         total += group.count * monthlyPaise(group.plan);
     }
     return total;
+}
+
+// ── A row's next charge ──────────────────────────────────────────────────
+
+/**
+ * How a subscription's next charge is taken: on the autopay the business
+ * approved, not at all because the year was paid at once, or none (Free,
+ * ended, ending, or not billed through a checkout).
+ */
+export type NextChargeHow = "AUTOPAY" | "PAID_FOR_YEAR" | "NONE";
+
+/** "Autopay runs out soon" looks this far ahead. */
+export const AUTOPAY_RUNS_OUT_DAYS = 30;
+
+export interface NextCharge {
+    nextChargeAt: Date | null;
+    nextChargeHow: NextChargeHow;
+    /** The autopay's approved charges end within 30 days. */
+    autopayRunsOutSoon: boolean;
+}
+
+/**
+ * When and how a subscription is charged next, from its row and its term
+ * (`billing-term.ts`). The autopay charges at the end of the period it is
+ * in, unless the approval it runs on ends with that period; a year paid at
+ * once is charged nothing more; a plan ending at its period's end, a free
+ * one and an ended one are charged nothing.
+ */
+export function nextChargeOf(
+    sub: {
+        status: string;
+        cancelAtPeriodEnd: boolean;
+        currentPeriodEnd: Date | null;
+        billingCycle: string;
+        providerSubscriptionId: string | null;
+        plan: { priceCents: number };
+    },
+    term: { payment: "AUTOPAY" | "ONE_TIME"; endsAt: Date } | null,
+    now: Date,
+): NextCharge {
+    const none: NextCharge = {
+        nextChargeAt: null,
+        nextChargeHow: "NONE",
+        autopayRunsOutSoon: false,
+    };
+    if (sub.status === "CANCELLED" || sub.plan.priceCents <= 0) return none;
+    const yearPaidOnce =
+        term?.payment === "ONE_TIME" ||
+        (!term &&
+            sub.billingCycle === "year" &&
+            sub.providerSubscriptionId?.startsWith("order_") === true);
+    if (yearPaidOnce) return { ...none, nextChargeHow: "PAID_FOR_YEAR" };
+    if (sub.cancelAtPeriodEnd) return none;
+    const autopayRunsOutSoon =
+        term?.payment === "AUTOPAY" &&
+        term.endsAt.getTime() <= now.getTime() + AUTOPAY_RUNS_OUT_DAYS * DAY_MS;
+    if (!sub.providerSubscriptionId || !sub.currentPeriodEnd) {
+        return { ...none, autopayRunsOutSoon };
+    }
+    if (term && term.endsAt.getTime() <= sub.currentPeriodEnd.getTime()) {
+        // The approval ends with this period: nothing more is taken.
+        return { ...none, autopayRunsOutSoon };
+    }
+    return {
+        nextChargeAt: sub.currentPeriodEnd,
+        nextChargeHow: "AUTOPAY",
+        autopayRunsOutSoon,
+    };
 }

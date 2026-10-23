@@ -1,12 +1,11 @@
-import { PageLoading } from "@/components/shared/page-loading";
+import { PageLoading } from "@/components/shared/page/page-loading";
 
 export default function Loading() {
     return (
         <PageLoading
             shape="dashboard"
             width="full"
-            breadcrumb={["Home", "Overview"]}
-            label="Loading the overview"
+            label="Loading the calendar"
         />
     );
 }

@@ -67,7 +67,7 @@ export function useGstRateStep({
 
     /**
      * `words` names this action where one screen starts more than one
-     * through the same step (take a payment, or make a pay link).
+     * through the same step (take a payment, or make a payment link).
      */
     async function run<R extends Outcome>(
         action: () => Promise<R | null>,

@@ -4,6 +4,7 @@ import { Button } from "@saroh/ui/button";
 import { Notice } from "@saroh/ui/notice";
 import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { GstRatesSheet } from "@/components/gst-rates/gst-rates-sheet";
@@ -15,6 +16,49 @@ import {
     missingLine,
     savedMessage,
 } from "@/lib/gst-rates/missing";
+
+/**
+ * The sheet where each missing GST rate is chosen in its row, and whether
+ * this person may open it: the notice's button and the Invoices list's GST
+ * line (DEC-173) both open this one sheet. Saving refreshes the page's
+ * reads, so the count goes down and whatever said it leaves by itself once
+ * the last rate is chosen.
+ */
+export function useMissingRatesSheet(missing: MissingRates | null): {
+    /** Someone who can set none of them reads the line, with no button. */
+    canSet: boolean;
+    open: () => void;
+    sheet: ReactNode;
+} {
+    const router = useRouter();
+    const [open, setOpen] = useState(false);
+    const canSet =
+        missing?.items.some((item) => item.canSet !== false) ?? false;
+    // How the prices carry GST, where the read could tell; else unsaid.
+    const mode = missing?.priceMode ?? null;
+    const sheet = missing ? (
+        <GstRatesSheet
+            rows={open ? missing.items : null}
+            title="GST rates to choose"
+            description={listWhy(mode)}
+            saveLabel="Save"
+            requireAll={false}
+            note={listNote(mode, missing.more)}
+            priceMode={mode}
+            save={async (chosen) => {
+                const res = await saveGstRates(chosen);
+                return res.ok ? { ok: true } : res;
+            }}
+            onDone={(saved) => {
+                setOpen(false);
+                if (saved === null) return;
+                showSuccess(savedMessage(saved));
+                router.refresh();
+            }}
+        />
+    ) : null;
+    return { canSet, open: () => setOpen(true), sheet };
+}
 
 /**
  * One quiet line for a GST-registered business with priced things on sale
@@ -42,14 +86,9 @@ export function MissingRatesNotice({
     className?: string;
     also?: string | null;
 }) {
-    const router = useRouter();
-    const [open, setOpen] = useState(false);
+    const rates = useMissingRatesSheet(missing);
     const line = missingLine(missing);
     if (!missing || line === null) return null;
-    // Someone who can set none of them reads the line, with no button.
-    const canSet = missing.items.some((item) => item.canSet !== false);
-    // How the prices carry GST, where the read could tell; else unsaid.
-    const mode = missing.priceMode ?? null;
 
     return (
         <>
@@ -58,12 +97,12 @@ export function MissingRatesNotice({
                 align="center"
                 className={className}
                 action={
-                    canSet ? (
+                    rates.canSet ? (
                         <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => setOpen(true)}
+                            onClick={rates.open}
                         >
                             Choose rates
                         </Button>
@@ -73,25 +112,7 @@ export function MissingRatesNotice({
                 {line}
                 {also ? ` ${also}` : null}
             </Notice>
-            <GstRatesSheet
-                rows={open ? missing.items : null}
-                title="GST rates to choose"
-                description={listWhy(mode)}
-                saveLabel="Save"
-                requireAll={false}
-                note={listNote(mode, missing.more)}
-                priceMode={mode}
-                save={async (chosen) => {
-                    const res = await saveGstRates(chosen);
-                    return res.ok ? { ok: true } : res;
-                }}
-                onDone={(saved) => {
-                    setOpen(false);
-                    if (saved === null) return;
-                    showSuccess(savedMessage(saved));
-                    router.refresh();
-                }}
-            />
+            {rates.sheet}
         </>
     );
 }

@@ -1,4 +1,6 @@
 import { BLOCK_META } from "./fixtures";
+import type { LookId } from "./looks";
+import { LOOKS } from "./looks";
 import type { SectionType } from "./section-contract";
 
 /**
@@ -125,19 +127,66 @@ const LEGACY_RESOLVERS = {
 } satisfies Record<SectionType, LegacyResolver>;
 
 /**
+ * What a look's default needs from the content before it is worn (KD2): a
+ * split or full-bleed hero is a photo's layout, so a hero with no photo
+ * keeps its no-photo layout whatever the look prefers. A variant not named
+ * here needs nothing a section can lack.
+ */
+const LOOK_DEFAULT_NEEDS: Partial<
+    Record<SectionType, Record<string, (content: unknown) => boolean>>
+> = {
+    hero: {
+        split: (content) => hasImage(content),
+        fullBleed: (content) => hasImage(content),
+    },
+};
+
+function hasImage(content: unknown): boolean {
+    const src = field(field(content, "image"), "src");
+    return typeof src === "string" && src.trim() !== "";
+}
+
+/** The look's default for `type`, when the content can wear it. */
+function lookDefault(
+    type: SectionType,
+    content: unknown,
+    look: LookId | undefined,
+): string | undefined {
+    if (!look) return undefined;
+    const id = LOOKS[look].defaultVariants[type];
+    if (!id || !isKnownVariant(type, id)) return undefined;
+    const needs = LOOK_DEFAULT_NEEDS[type]?.[id];
+    return !needs || needs(content) ? id : undefined;
+}
+
+/**
  * The look a section actually wears, for any content of any age.
  *
- * Three cases, in order:
- *   - names a look this build knows → that one;
+ * Four cases, in order:
+ *   - names a look this build knows → that one: a section's own choice
+ *     always wins over the site's look (KD2);
  *   - names one it does not → the block's default, NEVER nothing. A merchant's
  *     live hero blanking because a later deployment added a look they do not use
  *     is worse than the same hero in a different arrangement;
- *   - names none → the block's declared legacy rule.
+ *   - names none, on a site with a look (Folio, Quiet, Live) → the look's
+ *     default for the block, when the content meets its needs (a photo for
+ *     a split hero);
+ *   - otherwise → the block's declared legacy rule. With no look (Classic)
+ *     this is exactly what it always was.
+ *
+ * A v1 gallery's `layout` is the merchant's choice too, so no look sets a
+ * gallery default: under a look the gallery draws its grid or masonry as
+ * the look's own arrangement, and keeps a carousel the merchant chose as
+ * a strip (U7, `gallery-look.tsx`).
  */
-export function resolveVariant(type: SectionType, content: unknown): string {
+export function resolveVariant(
+    type: SectionType,
+    content: unknown,
+    look?: LookId,
+): string {
     const named = field(content, "variant");
     if (typeof named === "string" && named.trim() !== "") {
         return isKnownVariant(type, named) ? named : defaultVariant(type);
     }
-    return LEGACY_RESOLVERS[type](content);
+    return lookDefault(type, content, look) ?? LEGACY_RESOLVERS[type](content);
 }

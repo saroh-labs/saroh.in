@@ -50,7 +50,7 @@ There is no client-side server-state library and no global client store.
 
 ## The screen updates by itself: live refresh — **Current** (10 Oct 2026)
 
-One hook, `useLiveRefresh` (`components/shared/use-live-refresh.ts`),
+One hook, `useLiveRefresh` (`components/shared/live-refresh/use-live-refresh.ts`),
 mounted once in the app shell by `LiveRefresh`. It is `router.refresh()`,
 nothing more: the server reads the page again and React keeps what is on
 screen. No page keeps a timer of its own, and there is still no client
@@ -108,6 +108,26 @@ add or change there may be served to the next visitor without rendering.
   a `"use client"` file reaches a server component as a reference, not its
   value: the account's addresses are in `site-blocks/account/hrefs.ts` for
   that reason, not in the tab bar.
+- **A fact that changes by the minute is a live fact, read in the browser**
+  (DEC-172, U8, #1042): "Next free", places left, "Open now", stock.
+  Never on the server, never with `dontCachePage`: read it with
+  `useLiveRead` and draw it with `LiveFact` (`site-blocks/src/live/`). One read
+  per address on a page, once a minute while the page is in view, none while
+  it is hidden. The box keeps its height in every state (loading, fresh,
+  stale, unknown, failed); the cached HTML is always "loading", holding the
+  plain way in ("See times"). A count shows only while fresh (75 s,
+  `FRESH_FOR_MS`) and 5 or fewer (`placesLeftWords`); an older answer keeps
+  the time and hides the count. The API works each site's answer out once
+  and shares it 30 s (`LiveReadCache`, review #4), so a new live read is
+  one answer per site, never per visitor, and names nobody. `e2e/tests/site-live-facts.spec.ts` fetches the page with no
+  scripts and finds no time and no count.
+- **A look is part of the publication** (DEC-172). The renderer draws the
+  look the publication names and reads no flag; a value this build doesn't
+  know draws Classic (`lookOf`). Choosing a look changes the draft, and
+  customers see it only after a publish, which revalidates the page as any
+  publish does. A resized photo is not page state either: the Worker's
+  `/_img/…` route keeps each size in the Cache API by host, key, width and
+  format, apart from the page cache (`frontend-design-system.md` → "A photo is sized for the screen").
 - **A live read outside the publication shortens the page's life.** The
   head (trackers, codes; DEC-108) keeps it 60 seconds at most
   (`keepPageAtMost`). Everything else lives `SITE_PAGE_CACHE_TTL` (five

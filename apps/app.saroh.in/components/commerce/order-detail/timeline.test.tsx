@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { BusinessZoneProvider } from "@/components/shared/business-zone";
+import { BusinessZoneProvider } from "@/components/shared/dates/business-zone";
 
 import { OrderTimeline } from "./timeline";
 

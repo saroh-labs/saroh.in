@@ -19,7 +19,7 @@ Everything here is grounded in real files:
 
 - Tokens: `packages/ui/src/globals.css`, `tooling/tailwind-config/tailwind.config.ts`
 - Primitives (46): `packages/ui/src/components/ui/*` (Radix + shadcn)
-- App shell: `apps/app.saroh.in/app/layout.tsx`, `apps/app.saroh.in/components/shared/app-header.tsx`
+- App shell: `apps/app.saroh.in/app/layout.tsx`, `apps/app.saroh.in/components/shared/shell/app-header.tsx`
 - Auth: `apps/accounts.saroh.in/app/(auth)/layout.tsx`
 - Marketing: `apps/saroh.in/app/page.tsx` (forced dark)
 

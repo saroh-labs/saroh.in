@@ -14,7 +14,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
-import type { ContactOption } from "@/components/shared/contact-picker";
+import type { ContactOption } from "@/components/shared/fields/contact-picker";
 import { personHref } from "@/lib/contacts/person-href";
 import {
     cancelEnrollment,
@@ -41,13 +41,14 @@ import {
     priceHistoryShown,
 } from "@/lib/price-history/words";
 
-import type { ConfirmResult } from "@/components/shared/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { PriceHistoryList } from "@/components/shared/price-history";
-import { useHold } from "@/components/shared/use-hold";
+import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
+import { PriceHistoryList } from "@/components/shared/price-history/price-history";
+import { useHold } from "@/components/shared/undo/use-hold";
 
 import { runAction } from "@/lib/api/run-action";
 import type { GstAsk } from "@/lib/gst/item-words";
+import { initials } from "@/lib/names";
 import { AddSessionDialog } from "./add-session-dialog";
 import { EnrolDialog } from "./enrol-dialog";
 
@@ -59,14 +60,6 @@ const STANDING_WORD = {
     VOID: "Void",
     CREDITED: "Credited",
 } as const;
-
-const initials = (name: string) =>
-    name
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((w) => w.charAt(0).toUpperCase())
-        .join("");
 
 /**
  * A course, after the "Saroh Billing and Classes" design: its sessions on

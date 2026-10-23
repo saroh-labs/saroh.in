@@ -28,11 +28,22 @@ import {
     InvoiceInputDto,
     ListInvoicesQueryDto,
     OwedQueryDto,
-    RecordPaymentDto,
     VoidInvoiceDto,
 } from "./dto";
+import { readInvoiceHistory } from "./invoice-events";
+import {
+    ChequeBouncedDto,
+    ChequeClearedDto,
+    RecordPaymentDto,
+    RemovePaymentDto,
+} from "./invoice-payments.dto";
+import { InvoicePaymentsService } from "./invoice-payments.service";
 import { InvoicePdfService } from "./invoice-pdf.service";
+import { InvoiceRemindersService } from "./invoice-reminders.service";
 import { InvoiceSendService } from "./invoice-send.service";
+import { BulkRemindersDto, ShareInvoiceDto } from "./invoice-share.dto";
+import { InvoiceShareService } from "./invoice-share.service";
+import { InvoiceSummaryService } from "./invoice-summary.service";
 import { InvoicesService } from "./invoices.service";
 import { payLinkUrlFor } from "./pay-link-url";
 
@@ -54,6 +65,10 @@ export class InvoicesController {
         private readonly invoices: InvoicesService,
         private readonly sending: InvoiceSendService,
         private readonly pdfs: InvoicePdfService,
+        private readonly payments: InvoicePaymentsService,
+        private readonly summaries: InvoiceSummaryService,
+        private readonly shares: InvoiceShareService,
+        private readonly reminders: InvoiceRemindersService,
     ) {}
 
     @Get()
@@ -62,6 +77,46 @@ export class InvoicesController {
         @Query() query: ListInvoicesQueryDto,
     ) {
         return this.invoices.list(ctx, query);
+    }
+
+    /**
+     * The money strip (DEC-173, U4): owed, overdue, paid this month,
+     * drafts and cheques not in the bank, each with the filter it applies.
+     * Counts only without `payment:read`. Before `:invoiceId`, as `owed`.
+     */
+    @Get("summary")
+    summary(@OrgContext() ctx: OrganizationContext) {
+        return this.summaries.summary(ctx);
+    }
+
+    /**
+     * Remind many (DEC-173, U5): how each picked invoice's reminder would
+     * go (email, WhatsApp, wait until tomorrow, or no way, with why). At
+     * most 100. Before `:invoiceId`, like `summary`.
+     */
+    @Post("reminders/preview")
+    @LifecycleWrite("wind-down")
+    @HttpCode(200)
+    remindersPreview(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: BulkRemindersDto,
+    ) {
+        return this.reminders.preview(ctx, dto);
+    }
+
+    /**
+     * Send them: the email ones go now, each as `remind` sends it; the
+     * WhatsApp ones are opened one at a time by the business, through
+     * `POST :invoiceId/share`. Answers per invoice.
+     */
+    @Post("reminders")
+    @LifecycleWrite("wind-down")
+    @HttpCode(200)
+    remindMany(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: BulkRemindersDto,
+    ) {
+        return this.reminders.send(ctx, dto);
     }
 
     /** Declared before `:invoiceId`, or "owed" would be read as an id. */
@@ -81,6 +136,22 @@ export class InvoicesController {
             ...invoice,
             ...(await this.sending.readFor(ctx.organizationId, id)),
         };
+    }
+
+    /**
+     * Everything that happened to it, newest first, with who did it (U9
+     * #1140): issued, sent, reminded (by hand or automatically), a send
+     * that failed, voided, credited, written again, a failed pay attempt,
+     * a new link, its shares and its payments. An older invoice reads its
+     * own dates, without names. `invoice:read`; amounts need
+     * `payment:read`.
+     */
+    @Get(":invoiceId/history")
+    history(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+    ) {
+        return readInvoiceHistory(ctx, id);
     }
 
     /**
@@ -162,6 +233,42 @@ export class InvoicesController {
         @Body() dto: CreditInvoiceDto,
     ) {
         return this.invoices.credit(ctx, id, dto);
+    }
+
+    /**
+     * The credit note "Cancel all of it" would issue (DEC-173, U13): its
+     * likely number and amount, refused as the credit itself would be.
+     */
+    @Get(":invoiceId/credit-preview")
+    creditPreview(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+    ) {
+        return this.invoices.creditPreview(ctx, id);
+    }
+
+    /**
+     * "Cancel and write a correct one" (DEC-173, U13): the credit note and
+     * a draft with the same lines, in one transaction. Answers with both.
+     */
+    @Post(":invoiceId/credit-and-rewrite")
+    @HttpCode(201)
+    creditAndRewrite(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+        @Body() dto: CreditInvoiceDto,
+    ) {
+        return this.invoices.creditAndRewrite(ctx, id, dto);
+    }
+
+    /** "Write again" on a void invoice nobody wrote again (U13); the draft. */
+    @Post(":invoiceId/write-again")
+    @HttpCode(201)
+    writeAgain(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+    ) {
+        return this.invoices.writeAgain(ctx, id);
     }
 
     /** Void it and open a corrected draft; answers with the new draft. */
@@ -250,6 +357,31 @@ export class InvoicesController {
         return this.sending.remind(ctx, id);
     }
 
+    /**
+     * Share it by hand (DEC-173, U5): on WhatsApp (a fresh link and the
+     * message, with the `wa.me` link to open; Saroh sends nothing), as a
+     * link, a PDF or printed, each logged; or a receipt by email through
+     * the business's own provider. A second WhatsApp reminder in a day is
+     * a 429 with `retryAt`, as an email one is.
+     */
+    @Post(":invoiceId/share")
+    @LifecycleWrite("wind-down")
+    @HttpCode(200)
+    @Header("Cache-Control", "no-store")
+    share(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+        @Body() dto: ShareInvoiceDto,
+    ) {
+        return this.shares.share(ctx, id, dto);
+    }
+
+    /**
+     * Record a payment taken by hand (DEC-173): all that is left, or part
+     * of it (`amount`), or a cheque, which counts as received while it
+     * waits for the bank. More than is left is a 422 with `leftToPay`.
+     * Answers with the invoice and `recorded.paymentId`, what Undo removes.
+     */
     @Post(":invoiceId/payments")
     @LifecycleWrite("wind-down")
     @HttpCode(200)
@@ -258,6 +390,49 @@ export class InvoicesController {
         @Param("invoiceId") id: string,
         @Body() dto: RecordPaymentDto,
     ) {
-        return this.invoices.recordPayment(ctx, id, dto);
+        return this.payments.record(ctx, id, dto);
+    }
+
+    /**
+     * Remove a payment recorded by mistake: soft, with a reason, kept in
+     * the history; the invoice is owed again by what it paid. An online
+     * payment is refunded instead (409).
+     */
+    @Delete(":invoiceId/payments/:paymentId")
+    @LifecycleWrite("wind-down")
+    @HttpCode(200)
+    removePayment(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+        @Param("paymentId") paymentId: string,
+        @Body() dto: RemovePaymentDto,
+    ) {
+        return this.payments.remove(ctx, id, paymentId, dto);
+    }
+
+    /** A waiting cheque is in the bank. */
+    @Post(":invoiceId/payments/:paymentId/cleared")
+    @LifecycleWrite("wind-down")
+    @HttpCode(200)
+    chequeCleared(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+        @Param("paymentId") paymentId: string,
+        @Body() dto: ChequeClearedDto,
+    ) {
+        return this.payments.cleared(ctx, id, paymentId, dto);
+    }
+
+    /** A waiting cheque bounced: what it paid is owed again, no charge. */
+    @Post(":invoiceId/payments/:paymentId/bounced")
+    @LifecycleWrite("wind-down")
+    @HttpCode(200)
+    chequeBounced(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+        @Param("paymentId") paymentId: string,
+        @Body() dto: ChequeBouncedDto,
+    ) {
+        return this.payments.bounced(ctx, id, paymentId, dto);
     }
 }

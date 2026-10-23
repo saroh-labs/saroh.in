@@ -13,18 +13,17 @@ import type {
     FlagExplanation,
 } from "@/lib/control-plane";
 import type { ReleaseChange, WhoRow } from "@/lib/releases";
-import { QUICK_REASONS, whoHasIt } from "@/lib/releases";
+import { QUICK_REASONS, releaseHref, whoHasIt } from "@/lib/releases";
 
 import { REASON_LABEL } from "./release-actions";
 import { applyChange, useReleaseFeedback } from "./use-release-change";
 
 const SOURCE: Record<FlagExplanation["source"], string> = {
     OVERRIDE:
-        "because this business has its own setting, which wins over the default",
+        "because it was turned that way for this business alone, which wins over the default",
     DEFAULT:
-        "because that is the default for everyone and this business has no setting of its own",
-    UNCONFIGURED:
-        "because this release has never been switched on, and an unset release is off",
+        "because that is the default for everyone, and this business follows it",
+    UNCONFIGURED: "because this release has never been turned on for anyone",
     UNKNOWN_KEY:
         "because this is not a release the code knows, and an unknown one is off",
 };
@@ -33,10 +32,11 @@ const SOURCE: Record<FlagExplanation["source"], string> = {
 const SHOW_AT_MOST = 200;
 
 /**
- * Every business, what it gets and why (R3): its own setting or everyone's
- * default. An own setting equal to the default changes nothing today but
- * would the day the default moves, so it is marked for removal. "Why?" asks
- * the resolver itself, in place (R13).
+ * Every business, what it gets and why: turned on or off for it alone, or
+ * following the default. A business turned the same way as the default
+ * changes nothing today but would the day the default moves, so it says so.
+ * "Why?" asks the resolver itself, in place. Each name opens the business
+ * (R11), and "Use the default…" is the one way back to the default.
  */
 export function WhoHasIt({
     flag,
@@ -61,8 +61,8 @@ export function WhoHasIt({
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm text-muted-foreground">
                     {own === 0
-                        ? "Every business follows everyone's default."
-                        : `Set for ${own} ${own === 1 ? "business" : "businesses"} on their own.`}
+                        ? "Every business follows the default."
+                        : `${own} ${own === 1 ? "business is" : "businesses are"} turned on or off for them alone.`}
                 </p>
                 <div className="w-full sm:w-64">
                     <Label htmlFor="who-search" className="sr-only">
@@ -123,17 +123,20 @@ function WhoRowItem({
     const feedback = useReleaseFeedback(flag);
     const why =
         row.override === null
-            ? "everyone's default"
-            : row.sameAsDefault
-              ? "set for this business · same as default"
-              : "set for this business";
-    const whyHref = `/flags?release=${encodeURIComponent(flag.key)}&organizationId=${encodeURIComponent(row.organizationId)}`;
+            ? "follows the default"
+            : `turned ${row.override ? "on" : "off"} for this business${row.sameAsDefault ? " · same as the default" : ""}`;
+    const whyHref = `${releaseHref(flag.key, "who")}?organizationId=${encodeURIComponent(row.organizationId)}`;
 
     return (
         <li className="grid gap-1.5 px-3 py-2.5 text-sm">
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="truncate font-medium">{row.name}</span>
+                    <Link
+                        href={`/businesses/${encodeURIComponent(row.organizationId)}`}
+                        className="truncate font-medium underline-offset-2 hover:underline"
+                    >
+                        {row.name}
+                    </Link>
                     <Badge variant={row.on ? "success" : "neutral"}>
                         {row.on ? "On" : "Off"}
                     </Badge>
@@ -150,24 +153,20 @@ function WhoRowItem({
                     </Link>
                     {canPublish && row.override !== null && (
                         <OperatorDialog
-                            trigger={
-                                row.sameAsDefault
-                                    ? "Remove"
-                                    : "Use everyone's default"
-                            }
+                            trigger="Use the default…"
                             triggerVariant="ghost"
-                            title={`Use everyone's default for ${row.name}?`}
+                            title={`Use the default for ${row.name}?`}
                             effect={
                                 <p>
-                                    {row.name} stops having its own setting for{" "}
-                                    {flag.metadata.shownAs} and gets{" "}
+                                    {row.name} follows the default for{" "}
+                                    {flag.metadata.shownAs} again, and gets{" "}
                                     {row.sameAsDefault
-                                        ? "the same as now, from everyone's default"
-                                        : `everyone's default: ${(flag.enabledByDefault ?? false) ? "on" : "off"}`}
+                                        ? "the same as now"
+                                        : `it ${(flag.enabledByDefault ?? false) ? "on" : "off"}`}
                                     .
                                 </p>
                             }
-                            submitLabel="Use everyone's default"
+                            submitLabel="Use the default"
                             quickReasons={QUICK_REASONS}
                             reasonLabel={REASON_LABEL}
                             onSubmit={async ({ reason, idempotencyKey }) => {

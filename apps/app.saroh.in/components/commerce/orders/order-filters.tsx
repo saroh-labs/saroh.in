@@ -1,6 +1,6 @@
 "use client";
 
-import { Input } from "@saroh/ui/input";
+import { DateInput } from "@saroh/ui/date-picker";
 import { cn } from "@saroh/ui/lib/utils";
 
 import type { OrderFilterOptions } from "@/lib/orders/business-service";
@@ -22,7 +22,7 @@ import {
     AttentionToggle,
     listFilterClass,
     NARROWED,
-} from "@/components/shared/list-toolbar";
+} from "@/components/shared/lists/list-toolbar";
 import { ProductFilter } from "./product-filter";
 
 interface FilterProps {
@@ -107,20 +107,20 @@ export function OrderDateFilter({
                         stacked ? "grid grid-cols-2 gap-2.5" : "contents"
                     }
                 >
-                    <Input
-                        type="date"
+                    <DateInput
                         aria-label="From"
+                        placeholder="From"
                         value={query.from ?? ""}
                         max={query.to ?? undefined}
-                        onChange={(e) => go({ from: e.target.value || null })}
+                        onValueChange={(v) => go({ from: v || null })}
                         className={field}
                     />
-                    <Input
-                        type="date"
+                    <DateInput
                         aria-label="To"
+                        placeholder="To"
                         value={query.to ?? ""}
                         min={query.from ?? undefined}
-                        onChange={(e) => go({ to: e.target.value || null })}
+                        onValueChange={(v) => go({ to: v || null })}
                         className={field}
                     />
                 </div>

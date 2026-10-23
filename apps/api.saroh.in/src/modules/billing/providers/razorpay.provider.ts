@@ -15,6 +15,7 @@ import type {
     CustomerCreated,
     NextChargeItem,
     ParsedBillingEvent,
+    ProfileCustomer,
     ProviderChargeCapability,
     ProviderCustomer,
     ProviderCustomerCapability,
@@ -110,7 +111,9 @@ function addressLine(c: BillingCustomer): string | null {
 
 /**
  * Who is billed, as notes on a subscription, an order or the checkout
- * window: Razorpay's dashboard and its payment records show them.
+ * window: Razorpay's dashboard and its payment records show them. They
+ * name the billing profile and the business (its Saroh address), so a
+ * payment on a profile's customer is matched to its business (R12).
  */
 export function billingNotes(
     c: BillingCustomer | null | undefined,
@@ -127,6 +130,8 @@ export function billingNotes(
     put("phone", c.contact);
     put("gstin", c.gstin);
     put("billing_address", addressLine(c));
+    put("billing_profile_id", c.billingProfileId);
+    put("saroh_business", c.businessSlug);
     return out;
 }
 
@@ -134,7 +139,9 @@ export function billingNotes(
  * A name Razorpay's customer API takes: 3 to 50 characters of letters,
  * numbers, spaces and . ' / @ ( ) — "&" and the like become spaces.
  */
-export function razorpayCustomerName(c: BillingCustomer): string | null {
+export function razorpayCustomerName(
+    c: Pick<BillingCustomer, "name" | "businessName" | "email">,
+): string | null {
     const clean = (v: string | null | undefined) =>
         (v ?? "")
             .replace(/&/g, " and ")
@@ -156,7 +163,7 @@ export function razorpayCustomerName(c: BillingCustomer): string | null {
  * GSTIN; anything it would refuse is left out rather than sent.
  */
 function customerFields(
-    input: BillingCustomer,
+    input: ProfileCustomer,
     withContact: boolean,
 ): Record<string, string> {
     const name = razorpayCustomerName(input);
@@ -205,7 +212,10 @@ async function alreadyExists(res: Response): Promise<boolean> {
     return typeof said === "string" && /already exists/i.test(said);
 }
 
-/** A Razorpay customer entity as Saroh reads it: its id and its business. */
+/**
+ * A Razorpay customer entity as Saroh reads it: its id, and the profile (or,
+ * made before profiles, the business) its notes name.
+ */
 function customerOf(json: unknown, what: string): ProviderCustomer {
     const c = json as { id?: unknown; notes?: unknown };
     if (typeof c.id !== "string" || !c.id) {
@@ -219,10 +229,11 @@ function customerOf(json: unknown, what: string): ProviderCustomer {
         c.notes && typeof c.notes === "object" && !Array.isArray(c.notes)
             ? (c.notes as Record<string, unknown>)
             : {};
-    const org = notes.organizationId;
+    const text = (v: unknown) => (typeof v === "string" && v ? v : null);
     return {
         providerCustomerId: c.id,
-        organizationId: typeof org === "string" && org ? org : null,
+        billingProfileId: text(notes.billing_profile_id),
+        organizationId: text(notes.organizationId),
     };
 }
 
@@ -509,19 +520,20 @@ export class RazorpayBillingProvider implements BillingProvider {
     // ── One-time payments and asking how a checkout stands (DEC-093) ────
 
     /**
-     * The business as a new Razorpay customer (owner, 17 Oct 2026): its
-     * billing name, email, phone and GSTIN. Its notes hold only what never
-     * changes, `organizationId` and the business's address (slug): notes
-     * are create-only (a `PUT` leaves them unchanged, checked in test
-     * mode), so a billing name, GSTIN or address there would go stale; the
-     * details as billed stay on each subscription's or order's notes.
+     * A billing profile as a new Razorpay customer (DEC-167): its legal
+     * name, billing email, phone and GSTIN. Its notes hold only what never
+     * changes: the profile's id, its owner and the first business on it
+     * (its address, slug): notes are create-only (a `PUT` leaves them
+     * unchanged, checked in test mode), so a billing name, GSTIN or address
+     * there would go stale; the details as billed stay on each
+     * subscription's or order's notes.
      * `fail_existing: "1"`: Razorpay refuses a second customer with the same
      * email and phone with a 400 "Customer already exists for the merchant"
      * (checked in test mode), answered as `exists`; the same email without
      * a phone makes a new one. Which customer that is, {@link existingCustomer}.
      */
     private async createCustomer(
-        input: BillingCustomer,
+        input: ProfileCustomer,
         options: { withContact: boolean },
     ): Promise<CustomerCreated> {
         const res = await this.call(
@@ -552,13 +564,14 @@ export class RazorpayBillingProvider implements BillingProvider {
      * The customer Razorpay holds for the same email and phone: the same
      * create with `fail_existing: "0"`, which "fetches details of the
      * existing customer" (Razorpay's create-customer docs) — its id and its
-     * notes, so Saroh's `organizationId` says whether it is this business's
-     * own (an earlier try whose answer was lost) or another's. Not yet run
+     * notes, so Saroh's `billing_profile_id` says whether it is this
+     * profile's own (an earlier try whose answer was lost) or another's
+     * (`organizationId` on one made per business before profiles). Not yet run
      * in test mode: that the answer carries the notes is from the docs'
      * customer entity.
      */
     private async existingCustomer(
-        input: BillingCustomer,
+        input: ProfileCustomer,
         options: { withContact: boolean },
     ): Promise<ProviderCustomer> {
         const res = await this.call(
@@ -589,12 +602,13 @@ export class RazorpayBillingProvider implements BillingProvider {
     }
 
     private customerBody(
-        input: BillingCustomer,
+        input: ProfileCustomer,
         withContact: boolean,
         failExisting: "0" | "1",
     ) {
         const notes: Record<string, string> = {
-            organizationId: input.organizationId,
+            billing_profile_id: input.billingProfileId,
+            saroh_owner: input.ownerUserId,
         };
         const slug = note(input.businessSlug);
         if (slug) notes.saroh_business = slug;
@@ -606,7 +620,7 @@ export class RazorpayBillingProvider implements BillingProvider {
     }
 
     /**
-     * The business's details as they are now, on its customer: `PUT
+     * The profile's details as they are now, on its customer: `PUT
      * /customers/:id` takes the name, email, phone and GSTIN (checked in
      * test mode, 17 Oct 2026). A phone withheld at creation stays withheld.
      * An email and phone another customer has is answered `exists` when
@@ -615,7 +629,7 @@ export class RazorpayBillingProvider implements BillingProvider {
      */
     private async updateCustomer(
         providerCustomerId: string,
-        input: BillingCustomer,
+        input: ProfileCustomer,
         options: { withContact: boolean },
     ): Promise<"updated" | "exists"> {
         const res = await this.call(
@@ -994,12 +1008,15 @@ export class RazorpayBillingProvider implements BillingProvider {
      * (`POST /subscriptions/:id/addons`), which Razorpay charges with the
      * subscription's next invoice. Unverified (U16): that it is taken with
      * the next charge and not later, that a subscription that is only
-     * authenticated (a trial) accepts one, and that a repeat after a lost
-     * answer can't be told from a new one (Razorpay keeps no reference).
+     * authenticated (a trial) accepts one. Razorpay keeps no reference, so
+     * Saroh's rides in the item's description, and a repeat (a lost answer,
+     * or a SENT mark that failed) first looks for the add-on already made.
      */
     private async addToNextCharge(
         item: NextChargeItem,
     ): Promise<{ providerChargeId: string }> {
+        const made = await this.findAddon(item);
+        if (made) return { providerChargeId: made };
         const res = await this.call(
             "add-on item",
             "POST",
@@ -1022,6 +1039,39 @@ export class RazorpayBillingProvider implements BillingProvider {
             );
         }
         return { providerChargeId: json.id };
+    }
+
+    /**
+     * The add-on Saroh already put on the subscription under this reference,
+     * read from the newest pages of add-ons (`GET /addons`) as
+     * {@link findPlan} reads plans. Unverified (U16): the list's shape.
+     */
+    private async findAddon(item: NextChargeItem): Promise<string | null> {
+        const description = `${REFERENCE_NOTE}:${item.reference}`;
+        for (let page = 0; page < FIND_PLAN_PAGES; page += 1) {
+            const res = await this.call(
+                "add-on lookup",
+                "GET",
+                `/addons?count=${FIND_PLAN_PAGE_SIZE}&skip=${page * FIND_PLAN_PAGE_SIZE}`,
+            );
+            const json = (await res.json()) as {
+                items?: {
+                    id?: string;
+                    subscription_id?: string;
+                    item?: { description?: string | null };
+                }[];
+            };
+            const items = json.items ?? [];
+            const hit = items.find(
+                (a) =>
+                    a.id &&
+                    a.subscription_id === item.providerSubscriptionId &&
+                    a.item?.description === description,
+            );
+            if (hit?.id) return hit.id;
+            if (items.length < FIND_PLAN_PAGE_SIZE) return null;
+        }
+        return null;
     }
 
     // ── HTTP ────────────────────────────────────────────────────────────

@@ -86,7 +86,10 @@ export function PostArticle({ post }: { post: PostViewModel }) {
                 <img
                     src={post.image}
                     alt=""
-                    {...siteImage("above")}
+                    {...siteImage("above", {
+                        src: post.image,
+                        sizes: "(min-width: 768px) 768px, 100vw",
+                    })}
                     className="mb-8 w-full rounded-[var(--site-radius)]"
                 />
             ) : null}
@@ -96,7 +99,7 @@ export function PostArticle({ post }: { post: PostViewModel }) {
                    so a post reads like the rest of the site rather than like
                    a second typography system: the merchant's own text colour
                    at 80%, never the plugin's greys. */
-                className="prose max-w-none text-[length:var(--site-body-size,1rem)] prose-headings:font-site-heading prose-headings:text-site-fg prose-p:text-site-fg/80 prose-a:text-site-accent prose-strong:text-site-fg prose-li:text-site-fg/80"
+                className="prose max-w-none text-[length:var(--site-body-size,1rem)] prose-headings:font-site-heading prose-headings:text-site-fg prose-p:text-site-fg/80 prose-a:text-site-accent-text prose-strong:text-site-fg prose-li:text-site-fg/80"
                 // Sanitized at publish — see the note above.
                 dangerouslySetInnerHTML={{ __html: post.content }}
             />
@@ -144,12 +147,15 @@ export function PostIndex({
                                     <img
                                         src={post.image}
                                         alt=""
-                                        {...siteImage()}
+                                        {...siteImage("below", {
+                                            src: post.image,
+                                            sizes: "160px",
+                                        })}
                                         className="hidden aspect-[1.91/1] w-40 shrink-0 rounded-[var(--site-radius)] object-cover sm:block"
                                     />
                                 ) : null}
                                 <div className="min-w-0">
-                                    <h2 className="font-site-heading text-[calc(1.35rem*var(--site-heading-scale))] font-semibold leading-snug text-site-fg group-hover:text-site-accent">
+                                    <h2 className="font-site-heading text-[calc(1.35rem*var(--site-heading-scale))] font-semibold leading-snug text-site-fg group-hover:text-site-accent-text">
                                         {post.title}
                                     </h2>
                                     <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-site-body">

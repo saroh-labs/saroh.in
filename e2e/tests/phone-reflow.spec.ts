@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/customers app:/contacts app:/commerce/orders app:/commerce/orders/new app:/billing/invoices app:/billing/subscriptions app:/settings/people api:customer-workspace api:contacts api:customers api:orders api:payments api:invoices api:subscriptions api:organizations
+// @covers accounts:/login app:/open app:/customers app:/contacts app:/commerce/orders app:/commerce/orders/new app:/billing/invoices app:/billing/subscriptions app:/settings/people api:customer-workspace api:contacts api:customers api:orders api:payments api:invoices api:subscriptions api:organizations app:/ api:home
 import type { Locator, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -485,6 +485,11 @@ test.describe("phone reflow: New order", () => {
         test.setTimeout(90_000);
         await signIn(page);
         await orderLine(page.request);
+        // A customer of this test's own with the long name, found by it: the
+        // picker's chip for them is in the sheet while it is measured. Before
+        // the chips wrapped, one recent customer with a long name widened the
+        // sheet, and a tap scrolled the whole form sideways (20 Oct 2026).
+        const known = await longContact(page, testInfo);
         const { firstName, lastName } = longName(ownStamp(testInfo));
         await page.setViewportSize(WIDTHS[0]);
         await page.goto("/commerce/orders?storefront=seed_store");
@@ -494,6 +499,10 @@ test.describe("phone reflow: New order", () => {
             .first()
             .click();
         const sheet = page.getByRole("dialog", { name: "New order" });
+        await sheet.getByLabel("Find the customer").fill(known.name);
+        await expect(
+            sheet.getByRole("radio", { name: known.name, exact: true }),
+        ).toBeVisible();
         await sheet.getByRole("radio", { name: "Walk-in" }).click();
         await sheet.getByLabel("Name").fill(`${firstName} ${lastName}`);
         await sheet.getByLabel("Add a product").fill(ORDER_LINE);
@@ -539,8 +548,10 @@ test.describe("phone reflow: invoices", () => {
                 page.getByRole("article", { name: /as it prints$/ }),
             ).toContainText(who.email);
             await noSidewaysScroll(page, "a draft invoice with a long email");
+            // A draft's main button (DEC-173, U9): it asks once, then
+            // issues and sends.
             await page
-                .getByRole("button", { name: "Send with pay link" })
+                .getByRole("button", { name: "Issue and share" })
                 .filter({ visible: true })
                 .first()
                 .click();
@@ -658,5 +669,33 @@ test.describe("phone reflow: Settings › Team", () => {
         // Nothing is sent.
         await dialog.getByRole("button", { name: "Cancel" }).click();
         await expect(dialog).toHaveCount(0);
+    });
+});
+
+test.describe("phone reflow: Home's sheets (U17)", () => {
+    test("a Needs you group's sheet keeps its rows and its foot on the screen", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.setViewportSize(WIDTHS[1]);
+        await page.goto("/");
+        const line = page
+            .locator('[data-home-layout="phone"] [data-phone-line]')
+            .first();
+        test.skip(
+            (await line.count()) === 0,
+            "Nothing needs Northwind's owner just now",
+        );
+        await line.click();
+        const sheet = page.getByRole("dialog");
+        await fitsAtPhoneWidths(
+            page,
+            sheet,
+            [sheet.getByRole("button", { name: "Close" })],
+            "Needs you sheet",
+        );
+        // Only looked at: closed, nothing done.
+        await sheet.getByRole("button", { name: "Close" }).click();
+        await expect(sheet).toHaveCount(0);
     });
 });

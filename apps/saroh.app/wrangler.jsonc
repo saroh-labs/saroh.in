@@ -73,6 +73,12 @@
     // SITE_PAGE_CACHE_TTL is how long one is kept, in seconds.
     // SITE_ACCOUNT_AREA (on | off) shows Sign in / My account and /account,
     // on in dev (9 Oct); the api's own switch must be on first.
+    // NEXT_PUBLIC_SITE_MEDIA_URL (#1043) is the business media's public
+    // address. With it, photos get a srcset through the image route
+    // (/_img/…, worker.ts → lib/images/resize.ts), resized by the IMAGES
+    // binding above and fetched from this address only. It is compiled into
+    // the build too (siteImage), so leaving it out turns resizing off: plain
+    // src, as before. It reaches every site, Classic included.
     // POSTHOG_KEY / POSTHOG_HOST (DEC-125): server-side error reports only,
     // off until the project's public key (phc_…, not a secret) is set.
     // Never NEXT_PUBLIC_: nothing of a tracker's reaches a visitor's browser.
@@ -91,6 +97,7 @@
         "SITE_PAGE_CACHE": "on",
         "SITE_PAGE_CACHE_TTL": "300",
         "SITE_ACCOUNT_AREA": "on",
+        "NEXT_PUBLIC_SITE_MEDIA_URL": "https://media.saroh.io",
     },
     "env": {
         // Production (`wrangler deploy --env production`, from main):
@@ -148,6 +155,10 @@
                 // /account). On since 14 Oct 2026; the api's own switch was
                 // turned on first, as it must be.
                 "SITE_ACCOUNT_AREA": "on",
+                // Photos sized for the screen (#1043) are on development
+                // only until the owner approves them for production: add
+                // "NEXT_PUBLIC_SITE_MEDIA_URL": "https://media.saroh.in" here
+                // then. Without it, sites keep plain photo addresses.
             },
         },
     },

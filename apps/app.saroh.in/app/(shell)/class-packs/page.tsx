@@ -1,5 +1,5 @@
-import { PacksScreen } from "@/components/class-packs/packs-screen";
-import { PageContainer } from "@/components/shared/page-container";
+import { PacksScreen } from "@/components/class-packs/list/packs-screen";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { canSellPacks, canWritePacks } from "@/lib/class-packs/access";
 import { cardNotes } from "@/lib/class-packs/pack-card-notes";
 import { owedSummary, packKind, rulesNote } from "@/lib/class-packs/pack-cards";

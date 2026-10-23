@@ -116,6 +116,14 @@ const TOKEN_PATHS = [
     // A pay-now hold's pay token (U19), read and released by it.
     /^(\/public\/services\/holds\/)[^/?#]+/,
     /^(\/public\/sites\/preview\/)[^/?#]+/,
+    // A waitlist offer's claim link (U18, #1149).
+    /^(\/public\/sites\/[^/?#]+\/waitlist-claim\/)[^/?#]+/,
+    // A back-in-stock watch's stop link (U23, #1154).
+    /^(\/public\/sites\/[^/?#]+\/stock-watch\/)[^/?#]+/,
+    // An invitation link, read before sign-in and accepted after it.
+    /^(\/public\/organization-invitations\/)[^/?#]+/,
+    /^(\/organization-invitations\/)[^/?#]+/,
+    /^(\/invitations\/)[^/?#]+/,
 ];
 
 /**

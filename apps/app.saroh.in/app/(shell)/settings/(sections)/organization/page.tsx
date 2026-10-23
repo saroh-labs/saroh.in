@@ -1,17 +1,18 @@
 import { FailedState } from "@saroh/ui/data-state";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
-import { OrganizationSettingsForm } from "@/components/organizations/organization-settings-form";
-import { WebAddressSection } from "@/components/organizations/web-address-section";
-import {
-    ReadyChecklist,
-    readyHasCard,
-} from "@/components/settings/ready-checklist";
+import { OrganizationSettingsForm } from "@/components/organizations/business-settings/organization-settings-form";
+import { WebAddressSection } from "@/components/organizations/web-address/web-address-section";
 import {
     SettingsPanel,
     SettingsPanelHeader,
-} from "@/components/settings/settings-panel";
-import { SettingsColumns } from "@/components/shared/settings-columns";
+} from "@/components/settings/page/settings-panel";
+import {
+    ReadyChecklist,
+    readyHasCard,
+} from "@/components/settings/ready/ready-checklist";
+import { ShowSetupOnHome } from "@/components/settings/ready/show-setup-on-home";
+import { SettingsColumns } from "@/components/shared/page/settings-columns";
 import { mayChangePlan } from "@/lib/billing/plan-access";
 import { kindWords } from "@/lib/organizations/kind";
 import {
@@ -110,11 +111,18 @@ export default async function OrganizationSettingsPage() {
                 beside
                 aside={
                     ready && readyHasCard(ready) ? (
-                        <ReadyChecklist
-                            list={ready}
-                            businessId={organization?.id}
-                            canChangePlan={mayChangePlan(organization)}
-                        />
+                        <div className="grid gap-2.5">
+                            <ReadyChecklist
+                                list={ready}
+                                businessId={organization?.id}
+                                canChangePlan={mayChangePlan(organization)}
+                            />
+                            {/* Hidden on Home: the way back (A4). Home
+                                keeps it by the settings read's id. */}
+                            {settings ? (
+                                <ShowSetupOnHome businessId={settings.id} />
+                            ) : null}
+                        </div>
                     ) : undefined
                 }
             >

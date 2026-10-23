@@ -9,12 +9,15 @@ import {
     Param,
     Post,
     Query,
+    Res,
     UseGuards,
 } from "@nestjs/common";
 import type { Booking } from "@saroh/database";
+import type { Response } from "express";
 
 import { hashClientIp } from "../../common/client-ip";
 import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
+import { edgeMayKeep } from "../../common/live-read-headers";
 import type { HoldState } from "./booking-hold";
 import { holdState } from "./booking-hold";
 import type { AvailableSlot } from "./booking-slots";
@@ -232,37 +235,42 @@ export class PublicBookingPageController {
     /**
      * "On today" on the site's home page (G18): up to four of today's
      * classes and free times, as the booking page offers them, and the
-     * business's hours and zone for "Open now · closes 9pm". Read live, so
-     * never cached; limited per visitor. The source IP is hashed here and
-     * only the hash is passed on.
+     * business's hours and zone for "Open now · closes 9pm". Read live:
+     * one answer per site kept 30 seconds, in the API and at the edge
+     * (review #4); a refusal is never kept. Limited per visitor. The
+     * source IP is hashed here and only the hash is passed on.
      */
     @Get(":siteId/today")
     @Header("Cache-Control", "no-store")
-    todayOn(
+    async todayOn(
         @Param("siteId") siteId: string,
         @Ip() ip: string,
+        @Res({ passthrough: true }) res: Response,
     ): Promise<PublicToday> {
-        return this.today.read(siteId, hashClientIp(ip));
+        const today = await this.today.read(siteId, hashClientIp(ip));
+        edgeMayKeep(res, this.today.secondsLeft(siteId, today));
+        return today;
     }
 
     /**
      * The week's class sessions for the Timetable block (industry templates
      * U2): every class the booking page offers, or `?services=a,b` of them,
-     * for seven days, with places left. Read live, so never cached; limited
-     * per visitor like On today. The source IP is hashed here.
+     * for seven days, with places left. Read live and kept 30 seconds as
+     * On today is (review #4); limited per visitor like it. The source IP
+     * is hashed here.
      */
     @Get(":siteId/timetable")
     @Header("Cache-Control", "no-store")
-    timetableWeek(
+    async timetableWeek(
         @Param("siteId") siteId: string,
         @Ip() ip: string,
+        @Res({ passthrough: true }) res: Response,
         @Query("services") services?: unknown,
     ): Promise<PublicTimetable> {
-        return this.timetable.read(
-            siteId,
-            timetableIds(services),
-            hashClientIp(ip),
-        );
+        const ids = timetableIds(services);
+        const week = await this.timetable.read(siteId, ids, hashClientIp(ip));
+        edgeMayKeep(res, this.timetable.secondsLeft(siteId, ids, week));
+        return week;
     }
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { PartialRead } from "@/components/shared/failed-read";
+import { PartialRead } from "@/components/shared/states/failed-read";
 import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
@@ -9,8 +9,8 @@ import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { BusinessDate } from "@/components/shared/business-zone";
-import { QuickLook } from "@/components/shared/quick-look";
+import { BusinessDate } from "@/components/shared/dates/business-zone";
+import { QuickLook } from "@/components/shared/forms/quick-look";
 import { personHref } from "@/lib/contacts/person-href";
 import { customerHref } from "@/lib/customers/links";
 import { formatMoneyMajor } from "@/lib/format/money";

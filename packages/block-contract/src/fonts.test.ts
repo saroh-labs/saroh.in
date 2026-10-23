@@ -4,12 +4,16 @@ import {
     DEFAULT_FONT_PAIR,
     findFontPair,
     FONT_PAIRS,
+    fontFaceKey,
+    fontPairFaceKeys,
     fontPairFamilies,
     fontPairVariables,
     fontStack,
     isFontPairKey,
+    PICKABLE_FONT_PAIRS,
     SYSTEM_FONT_STACK,
 } from "./fonts";
+import { LOOK_IDS, LOOKS } from "./looks";
 
 describe("FONT_PAIRS", () => {
     it("has unique keys", () => {
@@ -135,5 +139,123 @@ describe("fontStack", () => {
         expect(fontStack(fraunces.heading, "'__Fraunces_1a2b'")).toMatch(
             /^'__Fraunces_1a2b', Georgia/,
         );
+    });
+});
+
+/**
+ * The looks' pairs (DEC-172, U3): two families each, and only the weights the
+ * look's type sets. Pinned as literals: a weight added here is a file every
+ * site in that look may fetch.
+ */
+/** A listed pair, or the test fails here. */
+function pairOf(key: string) {
+    const pair = findFontPair(key);
+    if (!pair) throw new Error(`no pair ${key}`);
+    return pair;
+}
+
+describe("the looks' pairs", () => {
+    const PINNED = {
+        folio: {
+            name: "Newsreader and Hanken Grotesk",
+            heading: ["Newsreader", [], ["normal", "italic"], ["opsz"]],
+            body: ["Hanken Grotesk", [400, 500, 600], undefined, undefined],
+        },
+        quiet: {
+            name: "Cormorant Garamond and Jost",
+            // Light (300) is for 48px and up only; 400 and 500 below.
+            heading: [
+                "Cormorant Garamond",
+                [300, 400, 500],
+                ["normal", "italic"],
+                undefined,
+            ],
+            body: ["Jost", [400, 500], undefined, undefined],
+        },
+        live: {
+            name: "Bricolage Grotesque and Figtree",
+            heading: ["Bricolage Grotesque", [], undefined, ["wdth"]],
+            body: ["Figtree", [400, 500, 600, 700], undefined, undefined],
+        },
+    } as const;
+
+    it.each(LOOK_IDS)("%s's pair is listed and is the look's", (id) => {
+        expect(isFontPairKey(LOOKS[id].fontPair)).toBe(true);
+        expect(findFontPair(LOOKS[id].fontPair)?.look).toBe(true);
+    });
+
+    it.each(LOOK_IDS)(
+        "%s names two families and no weight beyond its own",
+        (id) => {
+            const pair = findFontPair(id);
+            const pin = PINNED[id];
+            expect(pair?.name).toBe(pin.name);
+            expect(pair?.mono).toBeUndefined();
+            for (const role of ["heading", "body"] as const) {
+                const face = pair?.[role];
+                const [family, weights, styles, axes] = pin[role];
+                expect(face?.family).toBe(family);
+                expect(face?.weights).toEqual(weights);
+                expect(face?.styles).toEqual(styles);
+                expect(face?.axes).toEqual(axes);
+                // Empty only for a face with an axis, which next/font loads
+                // as the full variable range.
+                expect(face?.weights.length === 0).toBe(axes !== undefined);
+            }
+            expect(new Set(pair && fontPairFamilies(pair)).size).toBe(2);
+        },
+    );
+
+    it("loads the rupee's set only for faces that draw one", () => {
+        // Checked against the fonts' files: Newsreader, Cormorant Garamond,
+        // Bricolage Grotesque and Figtree have U+20B9 in latin-ext;
+        // Hanken Grotesk and Jost have it in no set.
+        const withRupee = FONT_PAIRS.filter((p) => "look" in p)
+            .flatMap((p) => [p.heading, p.body])
+            .filter((f) => f.subsets?.includes("latin-ext"))
+            .map((f) => f.family);
+        expect(withRupee).toEqual([
+            "Newsreader",
+            "Cormorant Garamond",
+            "Bricolage Grotesque",
+            "Figtree",
+        ]);
+    });
+
+    it("files each look's faces under their own keys", () => {
+        expect(fontPairFaceKeys(pairOf("folio"))).toEqual([
+            "folio:heading",
+            "folio:body",
+        ]);
+        // The first pairs keep their family names, so their loaded faces
+        // are found exactly as before.
+        expect(fontPairFaceKeys(pairOf("archivo-narrow"))).toEqual([
+            "Archivo Narrow",
+            "Archivo",
+            "IBM Plex Mono",
+        ]);
+        expect(fontFaceKey(FONT_PAIRS[0].heading)).toBeNull();
+    });
+
+    it("emits the look's key for both roles and no mono", () => {
+        expect(fontPairVariables("quiet")).toEqual({
+            "--site-font-heading": "quiet",
+            "--site-font-body": "quiet",
+        });
+    });
+
+    it("keeps the looks' pairs out of the Typeface picker", () => {
+        const keys = PICKABLE_FONT_PAIRS.map((p) => p.key);
+        expect(keys[0]).toBe(DEFAULT_FONT_PAIR);
+        for (const id of LOOK_IDS) expect(keys).not.toContain(id);
+        expect(keys).toHaveLength(FONT_PAIRS.length - LOOK_IDS.length);
+    });
+
+    it("never sets a look in Saroh's own faces", () => {
+        for (const id of LOOK_IDS) {
+            for (const family of fontPairFamilies(pairOf(id))) {
+                expect(family).not.toMatch(/Geist|Space Grotesk|JetBrains/);
+            }
+        }
     });
 });

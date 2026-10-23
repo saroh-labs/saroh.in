@@ -317,20 +317,6 @@ const input: CatalogInput = {
             },
         },
         {
-            // Booking emails Saroh sends for a business with no email of
-            // its own (DEC-086). Sample numbers, as everything here.
-            id: "saroh-emails",
-            name: "Booking emails Saroh sends",
-            group: "usage",
-            pricing: "show",
-            what: "Booking emails Saroh sends your customers while you haven't connected your own email. Your own email is never counted.",
-            cells: {
-                free: C("7 a month", "", 7, "month"),
-                grow: C("77 a month", "", 77, "month"),
-                pro: C("7,777 a month", "", 7777, "month"),
-            },
-        },
-        {
             id: "integrations",
             name: "Your own email and payment accounts",
             group: "team",
@@ -375,6 +361,17 @@ const input: CatalogInput = {
     ],
     yearly: { on: true, paid: 10 },
     gst: { show: "excl" },
+    // Which looks every business may choose (DEC-177): none beyond Classic,
+    // which is always free and needs no entry (owner, 21 Oct); Quiet, Folio
+    // and Live come with the `themes` row. Typefaces and colourways are
+    // left to what a site always has (the visitor's system font, its own
+    // template's fonts and colourway), so the rest need the `themes` row
+    // until the owner ticks some in admin.
+    freeStyles: {
+        looks: [],
+        fontPairs: [],
+        colourways: [],
+    },
     // One thing sold at a price and a maximum of its own on each plan
     // (DEC-157). Made up, like every number here.
     addons: [

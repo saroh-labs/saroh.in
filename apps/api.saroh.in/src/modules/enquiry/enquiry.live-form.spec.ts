@@ -6,7 +6,7 @@ jest.mock("@saroh/database", () => {
         form: { findUnique: jest.fn() },
         site: { findMany: jest.fn() },
         submission: { findUnique: jest.fn(), create: jest.fn() },
-        contact: { upsert: jest.fn() },
+        contact: { upsert: jest.fn(), findUnique: jest.fn() },
         pipeline: {
             findUnique: jest.fn(),
             findFirst: jest.fn(),
@@ -16,6 +16,9 @@ jest.mock("@saroh/database", () => {
         job: { create: jest.fn() },
         activity: { create: jest.fn() },
         analyticsEvent: { create: jest.fn() },
+        // The auto-reply's reads (U15): no email provider, so none is queued.
+        communicationProvider: { findUnique: jest.fn() },
+        customerNoticeSetting: { findUnique: jest.fn() },
     };
     return {
         ...actual,

@@ -1,3 +1,4 @@
+import { orderNoticeSetting } from "./notices/order";
 import type {
     BookingNoticeVars,
     NoticeVars,
@@ -85,6 +86,43 @@ describe("notice words (A14)", () => {
         ).toBe("You cancelled your Check-up on Tue 6 Oct at 11:00 am.");
     });
 
+    it("says who it is with now when it was given to someone else (#1157)", () => {
+        expect(
+            noticeSentence({
+                kind: "BOOKING_MOVED",
+                booking: booking({
+                    reassigned: true,
+                    staff: "Meera Iyer",
+                    fromStartAt: AT,
+                }),
+            }),
+        ).toBe(
+            "Your Check-up on Tue 6 Oct at 11:00 am is now with Meera Iyer.",
+        );
+        expect(
+            noticeSentence({
+                kind: "BOOKING_MOVED",
+                booking: booking({
+                    reassigned: true,
+                    staff: "Meera Iyer",
+                    fromStartAt: WAS,
+                }),
+            }),
+        ).toBe(
+            "Your Check-up is now with Meera Iyer on Tue 6 Oct at 11:00 am. It was Mon 5 Oct at 10:00 am.",
+        );
+        expect(
+            renderNotice({
+                kind: "BOOKING_MOVED",
+                booking: booking({
+                    reassigned: true,
+                    staff: "Meera Iyer",
+                    fromStartAt: AT,
+                }),
+            }).subject,
+        ).toBe("Your booking with Kavi Dental is now with Meera Iyer");
+    });
+
     it("leaves out the person when the booking has none", () => {
         expect(
             noticeSentence({
@@ -152,15 +190,20 @@ describe("notice words (A14)", () => {
         expect(orderNoticeKind("READY")).toBe("ORDER_READY");
         expect(orderNoticeKind("HANDED_TO_COURIER")).toBe("ORDER_HANDED_OVER");
         expect(orderNoticeKind("OUT_FOR_DELIVERY")).toBe("ORDER_HANDED_OVER");
-        for (const stage of [
-            "NEW",
-            "PREPARING",
-            "COLLECTED",
-            "DELIVERED",
-            "SENT",
-        ]) {
+        // U16: Delivered and a digital order's Sent are told; Collected never.
+        expect(orderNoticeKind("DELIVERED")).toBe("ORDER_DELIVERED");
+        expect(orderNoticeKind("SENT")).toBe("ORDER_SENT");
+        for (const stage of ["NEW", "PREPARING", "COLLECTED"]) {
             expect(orderNoticeKind(stage)).toBeNull();
         }
+    });
+
+    it("puts Delivered, Sent and tracking behind the delivery updates switch, Ready and the handover behind none", () => {
+        expect(orderNoticeSetting("ORDER_READY")).toBeNull();
+        expect(orderNoticeSetting("ORDER_HANDED_OVER")).toBeNull();
+        expect(orderNoticeSetting("ORDER_DELIVERED")).toBe("ORDER_DELIVERY");
+        expect(orderNoticeSetting("ORDER_SENT")).toBe("ORDER_DELIVERY");
+        expect(orderNoticeSetting("ORDER_TRACKING")).toBe("ORDER_DELIVERY");
     });
 });
 
@@ -337,10 +380,186 @@ describe("a website order placed (UX-042)", () => {
         ).toBe("We have your order ORD-1019, and it's paid.");
     });
 
+    it("promises email only when an email will go, and delivery steps only while delivery updates are on (U16)", () => {
+        const say = (over: Record<string, unknown>) =>
+            noticeSentence(placed({ payOnHandover: false, ...over }));
+        expect(say({ updates: "EMAIL", deliveryUpdates: true })).toBe(
+            "We have your order ORD-1019, and it's paid. We'll email you when it's ready for pick-up.",
+        );
+        expect(
+            say({
+                fulfilment: "SHIPPING",
+                updates: "EMAIL",
+                deliveryUpdates: true,
+            }),
+        ).toBe(
+            "We have your order ORD-1019, and it's paid. We'll email you when it's on its way, and when it's delivered.",
+        );
+        expect(
+            say({
+                fulfilment: "LOCAL_DELIVERY",
+                updates: "EMAIL",
+                deliveryUpdates: false,
+            }),
+        ).toBe(
+            "We have your order ORD-1019, and it's paid. We'll email you when it's on its way.",
+        );
+        expect(
+            say({
+                fulfilment: "DIGITAL",
+                updates: "EMAIL",
+                deliveryUpdates: true,
+            }),
+        ).toBe(
+            "We have your order ORD-1019, and it's paid. We'll email you when it's sent.",
+        );
+        expect(
+            say({
+                fulfilment: "DIGITAL",
+                updates: "EMAIL",
+                deliveryUpdates: false,
+            }),
+        ).toBe(
+            "We have your order ORD-1019, and it's paid. Rye & Co. will be in touch.",
+        );
+        // Only in their account: told, never "emailed".
+        expect(
+            say({
+                fulfilment: "SHIPPING",
+                updates: "ACCOUNT",
+                deliveryUpdates: true,
+            }),
+        ).toBe(
+            "We have your order ORD-1019, and it's paid. We'll tell you when it's on its way, and when it's delivered.",
+        );
+        // Nothing reaches them: no promise at all.
+        for (const fulfilment of ["PICKUP", "SHIPPING", "DIGITAL"]) {
+            const words = say({
+                fulfilment,
+                updates: "NONE",
+                deliveryUpdates: true,
+            });
+            expect(words).toMatch(/Rye & Co\. will be in touch\.$/);
+            expect(words).not.toMatch(/We'll/);
+        }
+    });
+
+    it("words Delivered, Sent and tracking added later (U16)", () => {
+        const delivery = {
+            business: "Rye & Co.",
+            firstName: "Asha",
+            number: "ORD-1019",
+            courier: "Bluedart",
+            trackingNumber: "BD123",
+            trackingUrl: "https://track.example.com/BD123",
+        };
+        expect(noticeSentence({ kind: "ORDER_DELIVERED", delivery })).toBe(
+            "Your order ORD-1019 has been delivered.",
+        );
+        expect(noticeSentence({ kind: "ORDER_SENT", delivery })).toBe(
+            "Your order ORD-1019 has been sent. If you can't find the download or access details, Rye & Co. can help.",
+        );
+        expect(noticeSentence({ kind: "ORDER_TRACKING", delivery })).toBe(
+            "You can track your order ORD-1019 with Bluedart now. Tracking number: BD123.",
+        );
+        const email = renderNotice({ kind: "ORDER_TRACKING", delivery });
+        expect(email.subject).toBe("Track your order ORD-1019 from Rye & Co.");
+        expect(email.body).toContain("Track your parcel:");
+        expect(email.body).toContain("https://track.example.com/BD123");
+        // A link that isn't a web address is never one.
+        const bad = renderNotice({
+            kind: "ORDER_TRACKING",
+            delivery: { ...delivery, trackingUrl: "javascript:alert(1)" },
+        });
+        expect(bad.body).not.toContain("javascript:");
+        expect(
+            renderNotice({ kind: "ORDER_DELIVERED", delivery }).body,
+        ).not.toContain("Track your parcel");
+    });
+
     it("emails in the business's voice, everything escaped", () => {
         const mail = renderNotice(placed({ business: "Rye <&> Co." }));
         expect(mail.subject).toBe("Your order ORD-1019 from Rye <&> Co.");
         expect(mail.body).toContain("<p>Hi Asha,</p>");
         expect(mail.body).toContain("<p>Rye &lt;&amp;&gt; Co.</p>");
+    });
+});
+
+describe("a lapsed hold (#1137)", () => {
+    const lapsed = (over: Partial<BookingNoticeVars> = {}): NoticeVars => ({
+        kind: "BOOKING_LAPSED",
+        booking: booking(over),
+    });
+
+    it("says the hold lapsed because it wasn't paid, in the business's zone", () => {
+        expect(noticeSentence(lapsed())).toBe(
+            "Your hold on Check-up, Tue 6 Oct at 11:00 am has lapsed because it wasn't paid.",
+        );
+    });
+
+    it("emails it with 'Book again' and the booking page", () => {
+        const mail = renderNotice(
+            lapsed({ link: "https://rye.saroh.app/book?service=s_1" }),
+        );
+        expect(mail.subject).toBe("Your hold with Kavi Dental has lapsed");
+        expect(mail.body).toContain("Hi Asha,");
+        expect(mail.body).toContain("Book again:");
+        expect(mail.body).toContain(
+            'href="https://rye.saroh.app/book?service=s_1"',
+        );
+    });
+
+    it("has no link line when there is no site to book on", () => {
+        const mail = renderNotice(lapsed());
+        expect(mail.body).not.toContain("Book again");
+    });
+
+    it("escapes what the business typed", () => {
+        const mail = renderNotice(lapsed({ service: "<b>Cut</b>" }));
+        expect(mail.body).toContain("&lt;b&gt;Cut&lt;/b&gt;");
+    });
+});
+
+describe("a waitlist offer's claim link (#1149)", () => {
+    const offer = (link?: string | null): NoticeVars => ({
+        kind: "WAITLIST_OFFER",
+        waitlist: {
+            business: "Pulse Fitness",
+            firstName: "Sneha",
+            service: "Spin",
+            startAt: AT,
+            heldUntil: WAS,
+            timeZone: "Asia/Kolkata",
+            ...(link === undefined ? {} : { link }),
+        },
+    });
+
+    it("emails the hold with a link to book the place before it ends", () => {
+        const url = "https://pulse.saroh.app/book/claim/v1.cl1.1.sig";
+        const mail = renderNotice(offer(url));
+        expect(mail.subject).toBe("A place opened at Pulse Fitness");
+        expect(mail.body).toContain("held for you until");
+        expect(mail.body).toContain("Book your place before then:");
+        expect(mail.body).toContain(`href="${url}"`);
+    });
+
+    it("has no link line with no site to claim it on", () => {
+        for (const link of [undefined, null]) {
+            expect(renderNotice(offer(link)).body).not.toContain(
+                "Book your place",
+            );
+        }
+    });
+
+    it("never links anything but a web address", () => {
+        expect(renderNotice(offer("javascript:alert(1)")).body).not.toContain(
+            "Book your place",
+        );
+    });
+
+    it("keeps the link out of the thread's sentence", () => {
+        expect(
+            noticeSentence(offer("https://pulse.saroh.app/book/claim/x")),
+        ).not.toContain("https://");
     });
 });

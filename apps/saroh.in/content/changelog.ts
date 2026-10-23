@@ -39,6 +39,86 @@ export interface ChangelogEntry {
 export const changelogHref = (slug: string) => `/changelog/${slug}`;
 
 export const CHANGELOG_ENTRIES: readonly ChangelogEntry[] = [
+    /**
+     * Released to production on 18 Oct 2026 (release PR #977): the products
+     * audit fixes (#972) and Home's open orders (DEC-163). Only what every
+     * merchant can use in production today (ledger CL11–CL17). Saroh's own
+     * billing (cancel in the app, billing details, double charges) waits for
+     * live billing and gets its own entry; the admin console and the demo
+     * businesses are not the merchant's.
+     */
+    {
+        slug: "products-tidied-up",
+        publishOn: "2026-10-18",
+        kind: "Improvements",
+        title: "Products, tidied up",
+        summary:
+            "Products now says how many you can sell, and you restock, publish and fix things where you are. Import reads your own spreadsheet, settings are simpler, and Home lists only the orders due soon.",
+        lead: "A day after opening, a round of fixes from a close look at every products screen, and one for Home. There's nothing to switch on: it's all there already.",
+        sections: [
+            {
+                name: "What you can sell",
+                // Stock cell "to sell" and the worst shelf; Needs you leaves
+                // out drafts and archived products; Restock opens the quick
+                // look with the Add box focused (feb2eb0a5). Ledger CL11.
+                // Not "on your site": the online shop is off (SITE_SHOP).
+                body: "The Products list now says how many of each thing you can sell, after what's promised to orders, and names the size, shade or location that's short. Needs you leaves out drafts and archived products, and Restock opens that product right there, ready for what you're adding.",
+                link: { label: "See Products", href: "/features/products" },
+            },
+            {
+                name: "A product's own page",
+                // Header by state: Publish, Sell again, Archive in the menu;
+                // stock card names what is out with Add stock (4c98c7440);
+                // the stock sheet focuses its first count (7413e87fb);
+                // quick look opens the page (d77955316); one word, Archive
+                // (aa56f92fb). Ledger CL12.
+                body: "Publish a draft, add stock or bring an archived product back from its own page. The stock card names what's out, with Add stock beside it, and the stock sheet opens on its first count, ready to type. From the quick look, one tap opens the product's page. Taking a product off sale is called Archive everywhere now, and Sell again brings it back.",
+            },
+            {
+                name: "Adding and editing",
+                // 9a5a60376: a taken name gets the next free path, a taken
+                // SKU is refused naming its holder, Create draft is never
+                // off. Ledger CL13. The path is not named: it is a site
+                // address, and the online shop is off.
+                body: "Two products can now share a name, and Saroh keeps them apart for you. A SKU another product already uses is caught when you save, and Saroh tells you which product has it. Press Create draft before the name and price are in and it shows you what's missing.",
+            },
+            {
+                name: "Product settings",
+                // Defaults card and category rows (36d8d27b4); option values
+                // renamed in place, reordered, sorted A to Z (3e8bcc3ce);
+                // Uncategorized and an option's count open the list
+                // (c4ebfbc75, 3e8bcc3ce). Ledger CL14.
+                body: "Defaults are one card: when stock counts as low for every product, then a row for each category saying only what it changes. Rename a size or shade where it stands and every product using it follows. Drag them into order, or sort them A to Z. Uncategorized, and the count beside each option, open the products they cover.",
+            },
+            {
+                name: "Bringing products in",
+                // 749df7fd9: status in any case (Live, Active, Published,
+                // Hidden), amounts with a rupee sign and commas, GST with a
+                // %, one line for a missing column, rows numbered as the
+                // spreadsheet does, a sample file from the API's descriptor
+                // for products and customers. Ledger CL15.
+                body: "Import reads a spreadsheet the way a shop writes it: Live or Hidden in any case, prices with a rupee sign or commas, GST with a % after it. A column that's missing is said once, not on every row, and rows are numbered as your spreadsheet numbers them. Not sure how to lay it out? Download a sample file for products or customers and fill it in.",
+            },
+            {
+                name: "Locations for your whole team",
+                // 29dcd8996: New product, Import and Edit read the
+                // business's locations for every role; Edit is read-only
+                // for a role that can't change products. Ledger CL16.
+                body: "Everyone on your team now sees your business's locations when they add or bring in products. Someone who can look at products but not change them opens a product read-only, instead of being told it wasn't found.",
+            },
+            {
+                name: "Home",
+                // DEC-163, f4b2052e9: late or due today or tomorrow, by the
+                // location's own late times; "and N more in progress" links
+                // to Orders' Open tab. Ledger CL17.
+                body: "Needs you lists an open order only when it's late, or due today or tomorrow. The rest stay in Orders, and Home tells you how many more are in progress, with a link to them.",
+                link: { label: "See Dashboard", href: "/features/dashboard" },
+            },
+        ],
+        signoff: "Team Saroh",
+        description:
+            "Products in Saroh now say what you can sell, restock and publish where you are, read your own spreadsheet, and Home lists only orders due soon.",
+    },
     {
         slug: "saroh-is-open",
         publishOn: "2026-10-17",
@@ -117,6 +197,17 @@ export const CHANGELOG_ENTRIES: readonly ChangelogEntry[] = [
                 },
             },
             {
+                name: "QR codes",
+                // Released to production on 11 Oct 2026 (#925, #932), so it is
+                // here on day one and no longer in Coming next (DEC-119,
+                // ledger CN2). Settings › Share and the QR button on a
+                // product, an order's pay link, an invoice and the site's
+                // address (`components/qr/`). The logo and colour depend on
+                // the plan (`qr-style-lock.ts`) and scan counts are the
+                // plan's, so neither is claimed here.
+                body: "A QR code for your website, a product, a pay link or an invoice, from Settings › Share or the QR button beside it. Download it, or print it ready for the counter.",
+            },
+            {
                 name: "Your website",
                 // Design: "Start from a template made for your kind of
                 // business…" with "See templates". /templates ships with
@@ -143,6 +234,7 @@ export const CHANGELOG_ENTRIES: readonly ChangelogEntry[] = [
  *
  * Every row was checked against the code on `development` on 10 Oct 2026
  * and has its row in the claims ledger (§12, CN1–CN18) before it is here.
+ * A row leaves when it is released, for an entry above (QR codes, 20 Oct).
  * A row promises only what isn't built: nothing a merchant can already do
  * is listed as coming (CSV import; their own Meta Pixel and Google
  * Analytics in Website › Settings › Tracking). No row names a plan or a
@@ -158,16 +250,11 @@ export const COMING_NEXT: readonly ComingNext[] = [
     {
         group: "next",
         // A business can already connect WhatsApp in Settings › Providers
-        // and write to an enquiry by hand; nothing is sent on its own. The
-        // design's "…not just email" is dropped: no booking reminder goes
-        // by email either (ledger BK2, CN1).
+        // and write to an enquiry by hand; nothing is sent on its own. No
+        // booking reminder exists on any channel yet (ledger BK2, CN1;
+        // #1057), so the line doesn't promise one (20 Oct 2026).
         name: "Automatic WhatsApp messages",
-        line: "Booking reminders, order updates and pay links sent to your customers on WhatsApp for you.",
-    },
-    {
-        group: "next",
-        name: "QR codes",
-        line: "A QR for your page, a service or a product, with your logo, ready to print for the counter.",
+        line: "Order updates and pay links sent to your customers on WhatsApp for you.",
     },
     {
         group: "next",

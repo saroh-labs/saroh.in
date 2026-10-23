@@ -1,14 +1,20 @@
 // @covers app:/open app:/ app:/settings/providers api:communications api:home api:organizations api:capabilities api:billing
-import type { Page, TestInfo } from "@playwright/test";
+import type { Locator, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import {
+    needRows,
+    needsYou,
+    openPhoneGroup,
+    phoneHome,
+} from "../fixtures/home";
 import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
 
 /**
  * The prompt to connect the business's own email (#850, DEC-011 amended
- * 2026-10-07): with none, its customers get no emails and see their
- * updates only in their account. Its owner sees that on Home's Needs you
+ * 2026-10-07): with none, its customers get no emails, and see their
+ * updates in their account only where Saroh posts there (U5). Its owner sees that on Home's Needs you
  * and on Settings › Providers, with Connect — or, on a plan that can't
  * connect one (DEC-091), See plans — and it goes once a provider is
  * connected.
@@ -25,8 +31,16 @@ import { urls } from "../playwright.config";
  */
 
 const TITLE = "Your customers get no emails from you";
-const MISSED =
-    "No email provider is connected, so invoices, booking and order updates and review invitations aren't emailed. Your customers see their updates only in their account.";
+/**
+ * What the customers miss, true for the business (U5): customers with an
+ * account see updates there only where Saroh posts to it.
+ */
+const missed = (accountUpdates: boolean | null | undefined) =>
+    accountUpdates === true
+        ? "No email provider is connected, so invoices, booking and order updates and review invitations aren't emailed. Customers with an account on your site see booking and order updates there."
+        : accountUpdates === false
+          ? "No email provider is connected, so invoices, booking and order updates and review invitations aren't emailed, and your customers don't hear about them."
+          : "No email provider is connected, so invoices, booking and order updates and review invitations aren't emailed.";
 const PLAN = "Connecting your own email comes with a paid plan.";
 
 const orgOf = (key: "desk" | "phone" | "free") =>
@@ -55,6 +69,7 @@ async function emailSetup(page: Page, org: string) {
     return (await res.json()) as {
         connected: boolean;
         canConnect: boolean | null;
+        accountUpdates?: boolean | null;
     };
 }
 
@@ -95,13 +110,25 @@ async function noSideways(page: Page) {
         .toBeLessThanOrEqual(width);
 }
 
+/**
+ * Home's Needs you, every group open (Home A groups it at a desk); on a
+ * phone (U17), the setup group's sheet, where the prompt's row is.
+ */
 async function openHome(page: Page, org: string) {
     await page.goto(`/open/${org}`);
     await page.goto("/");
-    const needs = page.getByRole("region", { name: "Needs you" });
-    await expect(needs).toBeVisible();
-    return needs;
+    if (phoneHome(page)) {
+        return (await openPhoneGroup(page, "SETUP")) ?? needsYou(page);
+    }
+    await needRows(page);
+    return needsYou(page);
 }
+
+/** The prompt's own row, not the group line that names it. */
+const promptRow = (needs: Locator) =>
+    needs
+        .locator("[data-need-row]")
+        .getByRole("link", { name: new RegExp(TITLE) });
 
 async function openProviders(page: Page) {
     await page.goto("/settings/providers");
@@ -122,11 +149,12 @@ test("with no email provider, the owner is asked to connect one on Home and Prov
         await connectEmail(page, org);
     } else {
         const setup = await emailSetup(page, org);
-        expect(setup).toEqual({ connected: false, canConnect: true });
+        expect(setup).toMatchObject({ connected: false, canConnect: true });
+        const MISSED = missed(setup.accountUpdates);
 
         // Home: one row in Needs you, saying what the customers miss.
         const needs = await openHome(page, org);
-        const row = needs.getByRole("link", { name: new RegExp(TITLE) });
+        const row = promptRow(needs);
         await expect(row).toBeVisible();
         await expect(row).toContainText(MISSED);
         await expect(row).toHaveAttribute("href", "/settings/providers");
@@ -137,6 +165,17 @@ test("with no email provider, the owner is asked to connect one on Home and Prov
         await openProviders(page);
         const prompt = page.getByRole("region", { name: TITLE });
         await expect(prompt).toContainText(MISSED);
+        // Saroh never sends them instead: no "Booking emails" block, and
+        // its read is gone (DEC-086 removed, #1134).
+        await expect(
+            page.getByRole("heading", { name: "Booking emails" }),
+        ).toHaveCount(0);
+        await expect(page.getByText(/Saroh sends your booking/)).toHaveCount(0);
+        const gone = await page.request.get(
+            api(org, "/comms-providers/saroh-email"),
+            { headers: headers(org) },
+        );
+        expect(gone.status()).toBe(404);
         const connect = prompt.getByRole("link", {
             name: "Connect your email",
         });
@@ -172,13 +211,15 @@ test("on a plan that can't connect one, it says a paid plan brings it, with See 
     await useSession(page, "founder");
     // Only read: nothing here changes it.
     const org = orgOf("free");
-    expect(await emailSetup(page, org)).toEqual({
+    const setup = await emailSetup(page, org);
+    expect(setup).toMatchObject({
         connected: false,
         canConnect: false,
     });
+    const MISSED = missed(setup.accountUpdates);
 
     const needs = await openHome(page, org);
-    const row = needs.getByRole("link", { name: new RegExp(TITLE) });
+    const row = promptRow(needs);
     await expect(row).toContainText(`${MISSED} ${PLAN}`);
     await expect(row).toHaveAttribute("href", "/settings/billing/plans");
     await expect(needs).toContainText("Paid plans");

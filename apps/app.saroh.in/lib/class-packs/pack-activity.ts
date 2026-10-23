@@ -27,7 +27,7 @@ import { paidByLabel } from "./sell-words";
 const USE_STATE: Record<PackUseState, { label: string; tone: Tone }> = {
     BOOKED: { label: "Booked", tone: "accent" },
     CAME: { label: "Came", tone: "ok" },
-    NO_SHOW: { label: "No-show", tone: "bad" },
+    NO_SHOW: { label: "Didn't come", tone: "bad" },
     CREDIT_BACK: { label: "Credit back", tone: "off" },
     LATE_CANCEL: { label: "Late cancel", tone: "bad" },
 };

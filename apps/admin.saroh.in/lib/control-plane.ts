@@ -44,6 +44,11 @@ export interface AdminFlag {
         organizationName: string;
         enabled: boolean;
     }[];
+    /**
+     * The newest change to it, and who made it; `null` when it has never
+     * changed. Absent from an API older than the Releases table.
+     */
+    lastChange?: { at: string; actorName: string | null } | null;
 }
 
 export interface AdminOrganization {
@@ -95,6 +100,11 @@ export interface AdminAuditQuery {
 
 export interface StaffIdentity {
     userId: string;
+    /**
+     * Their team record (admin console U22), for Your page. Null for
+     * break-glass access; older API builds leave it out.
+     */
+    platformAdminId?: string | null;
     email: string;
     roles: AdminRole[];
     permissions: AdminPermission[];
@@ -108,7 +118,8 @@ export type AdminRole =
     | "OPERATIONS"
     | "BILLING"
     | "RELEASE_MANAGER"
-    | "AUDITOR";
+    | "AUDITOR"
+    | "ACCOUNT_MANAGER";
 
 export type AdminPermission =
     | "platform:read"
@@ -143,7 +154,16 @@ export type AdminPermission =
     | "reports:resolve"
     | "organization:legal-hold:lift"
     | "saroh-billing:read"
-    | "saroh-billing:act";
+    | "saroh-billing:act"
+    | "team:read"
+    | "team:write"
+    | "accounts:read"
+    | "accounts:assign"
+    | "saroh-leads:read"
+    | "saroh-leads:write"
+    | "team:pay"
+    | "commission:rates"
+    | "people:sign-in-help";
 
 export type ControlPlaneResult<T> =
     | { ok: true; data: T }

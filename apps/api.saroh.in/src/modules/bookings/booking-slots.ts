@@ -25,6 +25,7 @@ import {
     outsideClosures,
     staffSlots,
     weeklyIntervals,
+    widen,
     withinIntervals,
     workingIntervals,
 } from "./availability";
@@ -53,7 +54,38 @@ import {
  * one-to-one it is everyone free for that start; for a class, its
  * instructor, shown beside it.
  */
-export type AvailableSlot = Slot & { staffIds?: string[] };
+export type AvailableSlot = Slot & {
+    staffIds?: string[];
+    /** A class's places still open at that start (U8); absent otherwise. */
+    placesLeft?: number;
+};
+
+/**
+ * A class's open starts with how many places each still has (U8, New
+ * booking's "4 places left"), counted as the capacity check counts them:
+ * confirmed bookings, course seats and waitlist holds overlapping the
+ * start's guarded span. Anything else is returned as it is.
+ */
+export async function withPlacesLeft(
+    service: Service,
+    slots: AvailableSlot[],
+): Promise<AvailableSlot[]> {
+    if (service.capacity <= 1 || slots.length === 0) return slots;
+    const availService = toAvailabilityService(service);
+    const spans = slots.map((slot) => guarded(slot, availService));
+    const from = new Date(
+        Math.min(...spans.map((span) => span.startAt.getTime())),
+    );
+    const to = new Date(Math.max(...spans.map((span) => span.endAt.getTime())));
+    const busy = await busyOverlapping(service.id, from, to);
+    return slots.map((slot, i) => ({
+        ...slot,
+        placesLeft: Math.max(
+            0,
+            service.capacity - countOverlapping(spans[i] ?? slot, busy),
+        ),
+    }));
+}
 
 /**
  * How a service is staffed (U3). `perPerson` is a one-to-one somebody takes:
@@ -287,6 +319,20 @@ export async function resolvePerson(
                 field: "staffId",
             });
         }
+        // Their gap between bookings (DEC-170, #1038).
+        const gap = person.gapMinutes ?? 0;
+        if (
+            gap > 0 &&
+            countOverlapping(
+                widen(guarded(slot, availService), gap),
+                person.busy,
+            ) > 0
+        ) {
+            throw new ConflictException({
+                message: `${named.name} needs ${gap} min between bookings. Pick another time.`,
+                field: "startAt",
+            });
+        }
     }
     // A public booker whose start was a real one — inside somebody's
     // hours, but booked meanwhile, or off — hears it went, as a conflict:
@@ -388,6 +434,13 @@ export function toAvailabilityService(service: Service): AvailabilityService {
     };
 }
 
+/**
+ * The longest range one availability read may ask for. Every slot in it is
+ * worked out on each read, and the public route takes it from a stranger, so
+ * a century-long range would tie the API up. The pickers ask for 14 days.
+ */
+export const MAX_RANGE_DAYS = 62;
+
 export function parseRange(
     fromISO: string,
     toISO: string,
@@ -399,6 +452,11 @@ export function parseRange(
     }
     if (from.getTime() >= to.getTime()) {
         throw new BadRequestException("from must be before to");
+    }
+    if (to.getTime() - from.getTime() > MAX_RANGE_DAYS * 86_400_000) {
+        throw new BadRequestException(
+            `from/to may span at most ${MAX_RANGE_DAYS} days`,
+        );
     }
     return { from, to };
 }

@@ -1,5 +1,6 @@
 import { Transform } from "class-transformer";
 import {
+    IsIn,
     IsInt,
     IsISO8601,
     IsObject,
@@ -9,6 +10,10 @@ import {
     Min,
     MinLength,
 } from "class-validator";
+
+import type { InsightsPeriod } from "./period";
+import { INSIGHTS_PERIODS } from "./period";
+import { LINK_NAME_MAX } from "./site-links";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -57,4 +62,61 @@ export class IngestAnalyticsEventDto {
     @IsOptional()
     @IsISO8601()
     occurredAt?: string;
+}
+
+/**
+ * Insights' one period for the page (DEC-171): `7d`, `4w` or `3m`, each
+ * against the same number of days before it (`period.ts`). Absent means
+ * the default, the last 4 weeks; anything else is a 400.
+ */
+export class InsightsPeriodQueryDto {
+    @IsOptional()
+    @IsIn(INSIGHTS_PERIODS, {
+        message: `period must be one of ${INSIGHTS_PERIODS.join(", ")}`,
+    })
+    period?: InsightsPeriod;
+}
+
+/**
+ * Insights' sources (plan U16, #1101): the period, and the website chosen
+ * on Where customers come from, absent for every website together. A
+ * website not the business's reads as no visits; the read names the
+ * business on every query.
+ */
+export class InsightsSourcesQueryDto extends InsightsPeriodQueryDto {
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MinLength(1)
+    @MaxLength(64)
+    siteId?: string;
+}
+
+/**
+ * Make a link on Insights › Where customers come from (DEC-181): the name
+ * the team reads ("Diwali post") and, when the person changed it, the
+ * label the link carries. Left out, the label is made from the name. The
+ * label's rules are the service's (`site-links.ts`), said in words. The
+ * site is one of the business's, checked by the service.
+ */
+export class CreateSiteLinkDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(1)
+    @MaxLength(64)
+    siteId!: string;
+
+    @Transform(trim)
+    @IsString()
+    @MinLength(1, { message: "Name the link" })
+    @MaxLength(LINK_NAME_MAX, {
+        message: `Keep the name to ${LINK_NAME_MAX} characters`,
+    })
+    name!: string;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(64)
+    label?: string;
 }

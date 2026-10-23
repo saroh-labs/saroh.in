@@ -30,12 +30,18 @@ export function initialTimeOf(value: unknown): string | null {
  * The start the link named, if the booking page still offers it: the same
  * day and wall-clock time in the business's zone, and for a class a place
  * left. `null` when it has gone.
+ *
+ * A full class stays choosable while it has a waitlist (`waitlistOn`), as
+ * it does on the page (A12): a waitlist offer's claim link (#1149) opens on
+ * the very session whose place is held for them, which reads as full to
+ * everyone else, and someone sent to a full class can join its line.
  */
 export function findInitialStart(
     days: BookingDays,
     date: string,
     time: string,
     isClass: boolean,
+    waitlistOn = false,
 ): BookingStart | null {
     const zone = days.timezone;
     const day = days.days.find((d) => d.date === date);
@@ -45,6 +51,6 @@ export function findInitialStart(
             timeIn(s.startAt, zone) === time,
     );
     if (!found) return null;
-    if (isClass && (found.placesLeft ?? 0) <= 0) return null;
+    if (isClass && !waitlistOn && (found.placesLeft ?? 0) <= 0) return null;
     return found;
 }

@@ -103,6 +103,27 @@ export function formatMoneyMajor(
     return amountWords(value, currency, options);
 }
 
+/**
+ * An amount the API sent as a Decimal string, in minor units: "1125.50" →
+ * 112550, "7" → 700, "-480.5" → -48050. Exact: whole paise from the
+ * digits, never a float sum. Null when absent or not an amount. The one
+ * rupees-to-paise parser for amounts read from the API; a price being
+ * typed into a box is read by that box's own rules.
+ */
+export function minorOf(amount: string | null | undefined): number | null {
+    if (amount === undefined || amount === null) return null;
+    const m = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(amount.trim());
+    if (!m) return null;
+    const [, sign, whole, cents = ""] = m as unknown as [
+        string,
+        string,
+        string,
+        string | undefined,
+    ];
+    const minor = Number(whole) * 100 + Number(cents.padEnd(2, "0"));
+    return sign ? -minor : minor;
+}
+
 /** A plain number, grouped as money is: 1204 → "1,204", 2044971 → "20,44,971". */
 export function formatNumber(value: number): string {
     return new Intl.NumberFormat(NUMBER_LOCALE).format(value);

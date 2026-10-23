@@ -1,16 +1,26 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    clashWords,
     dayCount,
-    offButtonLabel,
-    offLineLabel,
+    offAdded,
+    offDates,
     offLines,
-    offNote,
+    offRowWords,
+    offSpan,
+    quickDates,
     withClosures,
 } from "./time-off";
 import type { StaffList, TimeOff } from "./types";
 
 const IST = "Asia/Kolkata";
+
+/** A line's words with the dot's no-break spaces as plain ones. */
+function words(...args: Parameters<typeof offRowWords>) {
+    const w = offRowWords(...args);
+    const plain = (t: string) => t.replace(/\u00a0/g, " ");
+    return { title: plain(w.title), sub: plain(w.sub) };
+}
 
 function row(over: Partial<TimeOff> & { id: string }): TimeOff {
     return {
@@ -44,9 +54,10 @@ describe("offLines", () => {
             allDay: true,
             closed: true,
         });
-        expect(offLineLabel(line)).toBe(
-            "2 Nov to 6 Nov · 5 days · all day · business closed",
-        );
+        expect(words(line, null, "2026-10-19")).toEqual({
+            title: "Diwali · 2 to 6 Nov",
+            sub: "Whole business closed",
+        });
     });
 
     it("joins a part-day range's rows, one per day, into one line", () => {
@@ -61,9 +72,10 @@ describe("offLines", () => {
         );
         expect(lines).toHaveLength(1);
         expect(lines[0].ids).toEqual(["a", "b", "c"]);
-        expect(offLineLabel(lines[0])).toBe(
-            "2 Nov to 4 Nov · 3 days · 2:00 to 6:00 pm",
-        );
+        expect(words(lines[0], "Meera Iyer", "2026-10-19")).toEqual({
+            title: "Meera · 2 to 4 Nov",
+            sub: "Course · 2 to 6 pm · 3 days",
+        });
     });
 
     it("keeps rows apart across a gap, other hours, or another reason", () => {
@@ -77,7 +89,10 @@ describe("offLines", () => {
             false,
         );
         expect(lines.map((l) => l.ids)).toEqual([["a"], ["b"], ["c"]]);
-        expect(offLineLabel(lines[0])).toBe("Mon 2 Nov · 2:00 to 6:00 pm");
+        expect(words(lines[0], "Arjun Rao", "2026-10-19")).toEqual({
+            title: "Arjun · Mon 2 Nov",
+            sub: "Course · 2 to 6 pm",
+        });
     });
 
     it("names a single all-day with its weekday", () => {
@@ -92,53 +107,71 @@ describe("offLines", () => {
             IST,
             false,
         );
-        expect(offLineLabel(line)).toBe("Mon 2 Nov · all day");
+        expect(words(line, "Dr. Neha Kapoor", "2026-10-19")).toEqual({
+            title: "Neha · Mon 2 Nov",
+            sub: "Diwali · all day",
+        });
     });
 });
 
-describe("the form's words", () => {
+describe("Add time off's words (U17)", () => {
     it("counts days inclusively", () => {
         expect(dayCount("2026-11-02", "2026-11-06")).toBe(5);
         expect(dayCount("2026-11-02", "2026-11-02")).toBe(1);
     });
 
-    it.each([
-        [{ days: 5, closed: true, partOfDay: false }, "Close for 5 days"],
-        [{ days: 1, closed: true, partOfDay: true }, "Close that day"],
-        [{ days: 3, closed: false, partOfDay: true }, "Add 3 days off"],
-        [{ days: 1, closed: false, partOfDay: true }, "Add time off"],
-        [{ days: 1, closed: false, partOfDay: false }, "Add day off"],
-    ])("labels the button for %j as %s", (input, label) => {
-        expect(offButtonLabel(input)).toBe(label);
+    it("runs over the new year, with the year said where it isn't this one (BA-03)", () => {
+        expect(dayCount("2026-12-30", "2027-01-02")).toBe(4);
+        expect(offDates("2026-12-30", "2027-01-02", "2026-10-19")).toBe(
+            "30 Dec to 2 Jan 2027",
+        );
+        expect(offSpan("2026-12-30", "2027-01-02", null)).toBe("4 days.");
     });
 
-    it("says why it can't, what is booked, or what closing means", () => {
-        expect(
-            offNote({
-                refusal: "The end has to be after the start.",
-                taken: 3,
-                closed: false,
-            }),
-        ).toEqual({
-            text: "The end has to be after the start.",
-            tone: "danger",
-        });
-        expect(offNote({ refusal: null, taken: 3, closed: true })).toEqual({
-            text: "3 bookings fall in this time. They're kept. Move or cancel them from the calendar.",
-            tone: "warn",
-        });
-        expect(
-            offNote({ refusal: null, taken: 1, closed: false }).text,
-        ).toMatch(/^1 booking falls/);
-        expect(offNote({ refusal: null, taken: 0, closed: true }).text).toBe(
-            "Nobody can be booked then, and the booking page and calendar show it as closed.",
+    it("says the month once inside one month", () => {
+        expect(offDates("2026-10-27", "2026-10-29", "2026-10-19")).toBe(
+            "27 to 29 Oct",
         );
-        expect(offNote({ refusal: null, taken: 0, closed: false }).text).toBe(
-            "Nothing booked then.",
+        expect(offDates("2026-10-30", "2026-10-30", "2026-10-19")).toBe(
+            "Fri 30 Oct",
         );
-        expect(
-            offNote({ refusal: null, taken: null, closed: false }).text,
-        ).toBe("Bookings then couldn't be checked.");
+    });
+
+    it("gives today and tomorrow as one-day ranges", () => {
+        expect(quickDates("today", "2026-10-19")).toEqual({
+            from: "2026-10-19",
+            to: "2026-10-19",
+        });
+        expect(quickDates("tomorrow", "2026-12-31")).toEqual({
+            from: "2027-01-01",
+            to: "2027-01-01",
+        });
+    });
+
+    it("says how long, and that nobody can be booked when the business is closed", () => {
+        expect(offSpan("2026-10-20", "2026-10-20", null)).toBe("One day.");
+        expect(offSpan("2026-10-27", "2026-10-29", "Kaya Physio")).toBe(
+            "3 days. Nobody at Kaya Physio can be booked.",
+        );
+    });
+
+    it("says how many bookings fall in it, and that they stay", () => {
+        expect(clashWords(2)).toBe("2 bookings fall in this time.");
+        expect(clashWords(1)).toBe("1 booking falls in this time.");
+        expect(offAdded(2)).toBe(
+            "Time off added. 2 bookings in it stay booked.",
+        );
+        expect(offAdded(1)).toBe(
+            "Time off added. 1 booking in it stays booked.",
+        );
+        expect(offAdded(0)).toBe("Time off added.");
+    });
+
+    it("says no reason in plain words", () => {
+        const [line] = offLines([row({ id: "e", reason: null })], IST, true);
+        expect(words(line, null, "2026-10-19").title).toBe(
+            "Closed · 2 to 6 Nov",
+        );
     });
 });
 

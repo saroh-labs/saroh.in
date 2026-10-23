@@ -2,15 +2,34 @@ import { describe, expect, it } from "vitest";
 
 import {
     emailPrompt,
+    emailPromptMissed,
     emailRefusalNote,
     INVOICE_EMAIL_WORDS,
 } from "./email-setup";
 
+// The API's `emailSetupMissed`, word for word (its `email-setup.spec.ts`).
 const MISSED =
-    "No email provider is connected, so invoices, booking and order updates and review invitations aren't emailed. Your customers see their updates only in their account.";
+    "No email provider is connected, so invoices, booking and order updates and review invitations aren't emailed, and your customers don't hear about them.";
+const MISSED_ACCOUNT =
+    "No email provider is connected, so invoices, booking and order updates and review invitations aren't emailed. Customers with an account on your site see booking and order updates there.";
+const MISSED_UNKNOWN =
+    "No email provider is connected, so invoices, booking and order updates and review invitations aren't emailed.";
 const all = { connect: true, plans: true };
-const none = { connected: false, canConnect: true };
-const free = { connected: false, canConnect: false };
+const none = { connected: false, canConnect: true, accountUpdates: false };
+const free = { connected: false, canConnect: false, accountUpdates: false };
+
+describe("what the customers miss, true for this business (U5)", () => {
+    it("names the account only where customers see updates there", () => {
+        expect(emailPromptMissed(true)).toBe(MISSED_ACCOUNT);
+        expect(emailPromptMissed(false)).toBe(MISSED);
+        expect(emailPromptMissed(null)).toBe(MISSED_UNKNOWN);
+        expect(emailPromptMissed(undefined)).toBe(MISSED_UNKNOWN);
+        expect(emailPrompt({ ...none, accountUpdates: true }, all)?.text).toBe(
+            MISSED_ACCOUNT,
+        );
+        expect(emailPrompt(none, all)?.text).not.toMatch(/account/);
+    });
+});
 
 describe("emailPrompt (DEC-011, 7 Oct)", () => {
     it("says what the customers miss, and offers Connect", () => {

@@ -32,7 +32,7 @@ import type { AccountTab, AccountTabKey } from "./model";
 export { ACCOUNT_TAB_HREF, currentTab };
 
 /** The design's icons, 24px grid, stroked. */
-const ICON: Record<AccountTabKey, string> = {
+export const ICON: Record<AccountTabKey, string> = {
     home: "M4 11 L12 4 L20 11 V20 H14 V14 H10 V20 H4 Z",
     bookings: "M5 6 H19 V20 H5 Z M5 10 H19 M9 3 V7 M15 3 V7",
     orders: "M6 7 H18 L17 20 H7 Z M9 7 A3 3 0 0 1 15 7",
@@ -98,7 +98,7 @@ export function AccountTabBar({
                                 aria-hidden="true"
                                 className={cn(
                                     "shrink-0 md:size-[18px]",
-                                    on ? "text-site-accent" : undefined,
+                                    on ? "text-site-accent-text" : undefined,
                                 )}
                             >
                                 <path

@@ -1,0 +1,352 @@
+"use client";
+
+import { Badge } from "@saroh/ui/badge";
+import { Button } from "@saroh/ui/button";
+import {
+    EmptyState,
+    FailedState,
+    PermissionDeniedState,
+} from "@saroh/ui/data-state";
+import { showError, showSuccess } from "@saroh/ui/toast";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
+import { Section as Rows } from "@/components/shared/page/settings-rows";
+import { useHold } from "@/components/shared/undo/use-hold";
+import {
+    removeMember,
+    revokeInvitation,
+    updateMemberRole,
+} from "@/lib/members/actions";
+import type { MemberRole } from "@/lib/members/service";
+import { LOCATION_SECTIONS } from "@/lib/stores/location-readiness";
+import type { LocationPeople } from "@/lib/stores/people";
+import {
+    LOCATION_ROLES,
+    onlyOwnerHere,
+    onlyOwnerWords,
+    peopleNote,
+    personName,
+    roleLabel,
+    shownInvitations,
+} from "@/lib/stores/people";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
+import { OptionSelect } from "@saroh/ui/option-select";
+
+import { runAction } from "@/lib/api/run-action";
+import { Notice } from "@saroh/ui/notice";
+import { InvitePersonSheet } from "./invite-person-sheet";
+import { Note, Section } from "./storefront-section";
+
+/** One person or invitation: who on the left, what can be done on the right. */
+const PERSON =
+    "flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3";
+
+const ROLE_OPTIONS = LOCATION_ROLES.map((r) => ({
+    value: r,
+    label: roleLabel(r),
+}));
+
+/**
+ * People: who works at this location, read first (owner, 10 Oct; it was a
+ * page of its own that led with a boxed invite form). One line on what
+ * being here means, then the people as rows (name, email, role) and, under
+ * them, the invitations still out. "Invite someone" is the tab's one
+ * action and opens a side sheet, as Delivery's Edit does.
+ *
+ * What each person may do is unchanged from that page: the location's owner
+ * changes roles, removes people and revokes invitations; inviting also
+ * needs the team's invite, because whoever accepts joins the team (DEC-048,
+ * F16). A roster that couldn't be read says so here, on its own tab.
+ */
+export function PeopleSection({
+    store,
+    people,
+}: {
+    store: { id: string; name: string };
+    /** `null` when the roster couldn't be read. */
+    people: LocationPeople | null;
+}) {
+    const router = useRouter();
+    const [inviting, setInviting] = useState(false);
+    // Removing someone cannot be undone from here (bringing them back means
+    // a new invitation they have to accept), so it asks first.
+    const [removing, setRemoving] = useState<{
+        userId: string;
+        name: string;
+    } | null>(null);
+    const [busy, setBusy] = useState<string | null>(null);
+    // An invitation cancelled here: gone from the list at once, and
+    // cancelled for real when its ten seconds are up (`useHold`).
+    const { hold } = useHold();
+    const [cancelled, setCancelled] = useState<readonly string[]>([]);
+
+    const frame = (children: React.ReactNode) => (
+        <Section
+            title={LOCATION_SECTIONS.people.label}
+            id={LOCATION_SECTIONS.people.id}
+        >
+            {children}
+        </Section>
+    );
+
+    if (!people) {
+        return frame(
+            <FailedState
+                size="panel"
+                title={couldntLoad("the people here")}
+                onRetry={() => router.refresh()}
+            />,
+        );
+    }
+    if (people.members.length === 0) {
+        // The API shows a location's people to its owner and to those who
+        // work here, and answers anyone else with none.
+        return frame(
+            <PermissionDeniedState
+                data-ph-mask=""
+                title="You can't see who works here"
+                description={`${store.name}'s people are shown to its owner and to the people who work here.`}
+                note="Its owner can invite you to this location."
+            />,
+        );
+    }
+
+    const { members, canManage, canInvite } = people;
+    const invitations = shownInvitations(people).filter(
+        (inv) => !cancelled.includes(inv.id),
+    );
+    const alone = onlyOwnerHere(people);
+
+    async function onChangeRole(userId: string, next: MemberRole) {
+        const res = await runAction(
+            () => updateMemberRole(store.id, userId, next),
+            { setBusy: (on) => setBusy(on ? userId : null) },
+        );
+        if (!res) return;
+        if (!res.ok) {
+            showError(res.error);
+            return;
+        }
+        showSuccess("Role saved.");
+        router.refresh();
+    }
+
+    async function onRemove(userId: string): Promise<ConfirmResult> {
+        const res = await runAction(() => removeMember(store.id, userId), {
+            setBusy: (on) => setBusy(on ? userId : null),
+        });
+        if (!res) return;
+        if (!res.ok) return { ok: false, error: res.error };
+        showSuccess("Person removed.");
+        router.refresh();
+    }
+
+    /**
+     * The API can't put a cancelled invitation back, so it is held: gone
+     * at once with Undo, and cancelled when the ten seconds are up.
+     */
+    function onCancelInvitation(invitationId: string) {
+        const back = () =>
+            setCancelled((ids) => ids.filter((id) => id !== invitationId));
+        setCancelled((ids) => [...ids, invitationId]);
+        hold(
+            `invitation:${invitationId}`,
+            "Invitation cancelled.",
+            async () => {
+                const res = await revokeInvitation(store.id, invitationId);
+                if (!res.ok) {
+                    showError("The invitation wasn't cancelled.", res.error);
+                    back();
+                }
+                router.refresh();
+            },
+            back,
+        );
+    }
+
+    const invite = canInvite ? (
+        <Button
+            id="invite-someone"
+            variant="brand"
+            size="sm"
+            aria-haspopup="dialog"
+            onClick={() => setInviting(true)}
+        >
+            Invite someone
+        </Button>
+    ) : null;
+
+    return frame(
+        <>
+            {/* The line, the action at its right, then the roster. On a
+                phone the action sits under the roster, where the thumb is. */}
+            <div className="grid gap-x-4 gap-y-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+                <Note>{peopleNote(store.name)}</Note>
+                {invite && !alone ? (
+                    <div className="order-last sm:order-none">{invite}</div>
+                ) : null}
+                <div className="grid min-w-0 gap-5 sm:col-span-2">
+                    {canManage && !canInvite ? (
+                        <Notice>
+                            Inviting someone here also adds them to your team,
+                            and your role can&apos;t invite people to the team.
+                            Ask an owner or admin to invite them.
+                        </Notice>
+                    ) : null}
+
+                    {alone ? (
+                        <EmptyState
+                            size="panel"
+                            data-ph-mask=""
+                            title="No one else works here yet"
+                            description={onlyOwnerWords(people, store.name)}
+                            action={invite ?? undefined}
+                        />
+                    ) : (
+                        <Rows title="At this location">
+                            <ul
+                                data-testid="location-people"
+                                className="divide-y divide-border"
+                            >
+                                {members.map((m) => {
+                                    const name = personName(m);
+                                    return (
+                                        <li
+                                            key={`${m.kind}-${m.userId}`}
+                                            className={PERSON}
+                                        >
+                                            <div className="min-w-0 flex-[1_1_180px]">
+                                                <p className="text-sm font-medium [overflow-wrap:anywhere]">
+                                                    {name}
+                                                </p>
+                                                {name === m.email ? null : (
+                                                    <p className="text-[12.5px] text-muted-foreground [overflow-wrap:anywhere]">
+                                                        {m.email}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div className="flex shrink-0 items-center gap-2">
+                                                {m.kind === "owner" ||
+                                                !canManage ? (
+                                                    <Badge variant="neutral">
+                                                        {roleLabel(m.role)}
+                                                    </Badge>
+                                                ) : (
+                                                    <>
+                                                        <OptionSelect
+                                                            aria-label={`Role for ${m.email}`}
+                                                            size="sm"
+                                                            value={
+                                                                m.role as MemberRole
+                                                            }
+                                                            disabled={
+                                                                busy ===
+                                                                m.userId
+                                                            }
+                                                            onValueChange={(
+                                                                v,
+                                                            ) =>
+                                                                onChangeRole(
+                                                                    m.userId,
+                                                                    v,
+                                                                )
+                                                            }
+                                                            options={
+                                                                ROLE_OPTIONS
+                                                            }
+                                                            className="w-32"
+                                                        />
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            aria-label={`Remove ${name}`}
+                                                            disabled={
+                                                                busy ===
+                                                                m.userId
+                                                            }
+                                                            onClick={() =>
+                                                                setRemoving({
+                                                                    userId: m.userId,
+                                                                    name,
+                                                                })
+                                                            }
+                                                        >
+                                                            Remove
+                                                        </Button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </Rows>
+                    )}
+
+                    {invitations.length > 0 ? (
+                        <Rows title="Invited">
+                            <ul
+                                data-testid="location-invited"
+                                className="divide-y divide-border"
+                            >
+                                {invitations.map((inv) => (
+                                    <li key={inv.id} className={PERSON}>
+                                        <div className="min-w-0 flex-[1_1_180px]">
+                                            <p className="text-sm font-medium [overflow-wrap:anywhere]">
+                                                {inv.email}
+                                            </p>
+                                            <p className="text-[12.5px] text-muted-foreground">
+                                                Invited as{" "}
+                                                {roleLabel(
+                                                    inv.role,
+                                                ).toLowerCase()}
+                                            </p>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="shrink-0"
+                                            aria-label={`Cancel the invitation to ${inv.email}`}
+                                            onClick={() =>
+                                                onCancelInvitation(inv.id)
+                                            }
+                                        >
+                                            Cancel invitation
+                                        </Button>
+                                    </li>
+                                ))}
+                            </ul>
+                        </Rows>
+                    ) : null}
+                </div>
+            </div>
+
+            {canInvite ? (
+                <InvitePersonSheet
+                    storeId={store.id}
+                    locationName={store.name}
+                    open={inviting}
+                    onOpenChange={setInviting}
+                />
+            ) : null}
+            {removing ? (
+                <ConfirmDialog
+                    open
+                    onOpenChange={(o) => {
+                        if (!o) setRemoving(null);
+                    }}
+                    title={`Remove ${removing.name}?`}
+                    description="They lose access to this location's products and orders straight away. They stay on your team. Remove them there to take that away too. Bringing them back here means inviting them again. This cannot be undone."
+                    confirmLabel="Remove person"
+                    keepLabel="Keep person"
+                    onConfirm={() => onRemove(removing.userId)}
+                />
+            ) : null}
+        </>,
+    );
+}

@@ -287,11 +287,12 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
             state: "Maharashtra",
             postalCode: "400050",
         },
-        organizationId: "org_1",
+        billingProfileId: "bprof_1",
+        ownerUserId: "user_1",
         businessSlug: "ammi-ki-barni",
     };
 
-    it("makes the business a Razorpay customer once: name, email, phone, GSTIN; only its ids in the notes", async () => {
+    it("makes the billing profile a Razorpay customer once: name, email, phone, GSTIN; only its ids in the notes", async () => {
         const { provider, calls } = recorded([
             { status: 200, body: { id: "cust_1" } },
         ]);
@@ -310,7 +311,8 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
                 // Notes are create-only: only what never changes, so the
                 // dashboard never shows a stale name, GSTIN or address.
                 notes: {
-                    organizationId: "org_1",
+                    billing_profile_id: "bprof_1",
+                    saroh_owner: "user_1",
                     saroh_business: "ammi-ki-barni",
                 },
             },
@@ -365,9 +367,17 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
         const { provider, calls } = recorded([
             {
                 status: 200,
-                body: { id: "cust_1", notes: { organizationId: "org_1" } },
+                body: {
+                    id: "cust_1",
+                    notes: { billing_profile_id: "bprof_1", saroh_owner: "u" },
+                },
             },
             { status: 200, body: { id: "cust_9", notes: [] } },
+            // Made for one business before profiles (DEC-165).
+            {
+                status: 200,
+                body: { id: "cust_5", notes: { organizationId: "org_1" } },
+            },
         ]);
         await expect(
             provider.customers.existingCustomer(customer, {
@@ -375,7 +385,8 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
             }),
         ).resolves.toEqual({
             providerCustomerId: "cust_1",
-            organizationId: "org_1",
+            billingProfileId: "bprof_1",
+            organizationId: null,
         });
         expect(calls[0]).toMatchObject({
             url: "https://api.razorpay.com/v1/customers",
@@ -389,7 +400,17 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
             }),
         ).resolves.toEqual({
             providerCustomerId: "cust_9",
+            billingProfileId: null,
             organizationId: null,
+        });
+        await expect(
+            provider.customers.existingCustomer(customer, {
+                withContact: true,
+            }),
+        ).resolves.toEqual({
+            providerCustomerId: "cust_5",
+            billingProfileId: null,
+            organizationId: "org_1",
         });
     });
 
@@ -410,6 +431,7 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
             provider.customers.findCustomer("cust_old"),
         ).resolves.toEqual({
             providerCustomerId: "cust_old",
+            billingProfileId: null,
             organizationId: "org_1",
         });
         expect(calls[0]).toMatchObject({
@@ -499,7 +521,7 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
         }
     });
 
-    it("puts who is billed in a subscription's notes", async () => {
+    it("puts who is billed in a subscription's notes, naming the business and its billing profile", async () => {
         const { provider, calls } = recorded([
             { status: 200, body: { id: "sub_1", status: "created" } },
         ]);
@@ -511,9 +533,19 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
             interval: "month",
             organizationId: "org_1",
             providerPlanId: "plan_1",
-            customer,
+            customer: {
+                ...customer,
+                businessSlug: "ammi-foods",
+                billingProfileId: "bp_1",
+            },
+            providerCustomerId: "cust_1",
         });
-        expect((calls[0]?.body as { notes: unknown }).notes).toMatchObject({
+        const body = calls[0]?.body as { notes: unknown; customer_id: unknown };
+        expect(body.customer_id).toBe("cust_1");
+        expect(body.notes).toMatchObject({
+            organizationId: "org_1",
+            saroh_business: "ammi-foods",
+            billing_profile_id: "bp_1",
             billing_name: "Ammi & Sons Foods Pvt. Ltd.",
             gstin: "27AAPFU0939F1ZV",
             billing_address: "12 Hill Road, Mumbai, Maharashtra, 400050",
@@ -1131,6 +1163,7 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
 
     it("puts an item on a subscription's next charge, GST included, with Saroh's reference (U16)", async () => {
         const { provider, calls } = recorded([
+            { status: 200, body: { items: [] } },
             { status: 200, body: { id: "ao_1" } },
         ]);
         await expect(
@@ -1142,7 +1175,10 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
                 currency: "INR",
             }),
         ).resolves.toEqual({ providerChargeId: "ao_1" });
-        expect(calls[0]).toEqual({
+        expect(calls[0]?.url).toBe(
+            "https://api.razorpay.com/v1/addons?count=100&skip=0",
+        );
+        expect(calls[1]).toEqual({
             url: "https://api.razorpay.com/v1/subscriptions/sub_9/addons",
             method: "POST",
             body: {
@@ -1155,6 +1191,45 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
                 quantity: 1,
             },
         });
+    });
+
+    it("never adds an item twice: a repeat finds the add-on already made under its reference (U16)", async () => {
+        const { provider, calls } = recorded([
+            {
+                status: 200,
+                body: {
+                    items: [
+                        // Another subscription's item with the same reference
+                        // text, and this one's other item: neither is it.
+                        {
+                            id: "ao_other_sub",
+                            subscription_id: "sub_8",
+                            item: { description: "saroh_ref:row_1" },
+                        },
+                        {
+                            id: "ao_other_row",
+                            subscription_id: "sub_9",
+                            item: { description: "saroh_ref:row_2" },
+                        },
+                        {
+                            id: "ao_made",
+                            subscription_id: "sub_9",
+                            item: { description: "saroh_ref:row_1" },
+                        },
+                    ],
+                },
+            },
+        ]);
+        await expect(
+            provider.charges.addToNextCharge({
+                providerSubscriptionId: "sub_9",
+                reference: "row_1",
+                name: "More things (add-on)",
+                amountPaise: 262,
+                currency: "INR",
+            }),
+        ).resolves.toEqual({ providerChargeId: "ao_made" });
+        expect(calls.map((c) => c.method)).toEqual(["GET"]);
     });
 
     it("reads when an event happened, its phase and the period it paid to", () => {

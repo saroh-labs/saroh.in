@@ -116,6 +116,8 @@ describe("giving a diary person a login (#868)", () => {
             "booking:read",
             "booking:write",
             "service:read",
+            // Their own alerts (DEC-170, #1038); never hours:write.
+            "notification:read-own",
         ]);
     });
 

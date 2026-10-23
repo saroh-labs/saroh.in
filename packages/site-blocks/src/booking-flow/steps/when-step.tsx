@@ -1,3 +1,5 @@
+import type { LookId } from "@saroh/block-contract";
+
 import { destructiveAlertClasses } from "../../alert";
 import { cn } from "../../lib/utils";
 import type { BusinessReach } from "../../reach-links";
@@ -15,30 +17,7 @@ import { OneToOne } from "./one-to-one";
 import { Sessions } from "./sessions";
 import { StepHead } from "./step-head";
 
-/** Step 2: when — a day and a start, or a class session. */
-export function WhenStep({
-    daysState,
-    days,
-    isClass,
-    day,
-    sessions,
-    more,
-    zone,
-    service,
-    chosen,
-    business,
-    onRetry,
-    onDay,
-    onStart,
-    onMore,
-    waitlist,
-    person = null,
-    onPerson,
-    skip = 0,
-    later = null,
-    onSkip,
-    reach = null,
-}: {
+export interface WhenProps {
     daysState: DaysState;
     days: BookingDays | null;
     isClass: boolean;
@@ -69,18 +48,60 @@ export function WhenStep({
     onSkip?: (skip: number) => void;
     /** A call and a message, offered when nothing is free. */
     reach?: BusinessReach | null;
-}) {
-    const weeks = { skip, later, onSkip };
+    /** A look's frame: its own day strip and time chips. */
+    look?: LookId;
+}
+
+/** Step 2: when — a day and a start, or a class session. */
+export function WhenStep(props: WhenProps) {
     return (
         <div className={card}>
             <StepHead
                 n={2}
                 title={
-                    visitsOf(service) > 1
+                    visitsOf(props.service) > 1
                         ? "When is your first visit?"
                         : "When?"
                 }
             />
+            <WhenBody {...props} />
+        </div>
+    );
+}
+
+/**
+ * What the when step shows under its heading: the times' loading shape,
+ * a read that failed, a one-to-one's days and times, or a class's
+ * sessions. Classic draws it in its card (`WhenStep`); a look's frames
+ * draw it under their own heading (U10).
+ */
+export function WhenBody({
+    daysState,
+    days,
+    isClass,
+    day,
+    sessions,
+    more,
+    zone,
+    service,
+    chosen,
+    business,
+    onRetry,
+    onDay,
+    onStart,
+    onMore,
+    waitlist,
+    person = null,
+    onPerson,
+    skip = 0,
+    later = null,
+    onSkip,
+    reach = null,
+    look,
+}: WhenProps) {
+    const weeks = { skip, later, onSkip };
+    return (
+        <>
             {daysState.kind === "loading" ? (
                 // The shape of what is coming: the label, two weeks of
                 // days, a row of times. The card holds its height while
@@ -158,6 +179,7 @@ export function WhenStep({
                     onPerson={onPerson}
                     weeks={weeks}
                     reach={reach}
+                    look={look}
                 />
             ) : days ? (
                 <Sessions
@@ -173,6 +195,6 @@ export function WhenStep({
                     reach={reach}
                 />
             ) : null}
-        </div>
+        </>
     );
 }

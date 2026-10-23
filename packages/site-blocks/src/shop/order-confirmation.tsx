@@ -71,6 +71,11 @@ export interface OrderConfirmationData {
      * collect" or "Pay on delivery". Null once paid, or paid online.
      */
     toPay: string | null;
+    /**
+     * Paid online at the checkout and not refunded (DEC-181): the page
+     * then counts the visit's `site.paid` step. Absent from an older API.
+     */
+    paidOnline?: boolean;
     /** How they hear about it; absent from an older API: nothing promised. */
     reach?: NoticeReach | null;
     /** The address an email goes to: the account's own. */

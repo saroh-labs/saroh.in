@@ -100,7 +100,7 @@ export default async function OperationPage({
             <PageContainer>
                 <AutoRefresh active={running} />
                 <PageHeader
-                    breadcrumb={["Operations", title]}
+                    breadcrumb={["Keep it running", title]}
                     title={title}
                     description={operation.reason}
                     actions={

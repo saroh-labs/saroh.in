@@ -41,6 +41,9 @@ import { ModuleSetupService } from "./setup/module-setup.service";
         OrganizationGuard,
     ],
     exports: [
+        // Bookings makes the booking page when a first service customers
+        // can book online is added (DEC-175).
+        ModuleSetupService,
         ModuleReadinessRegistry,
         ModuleAvailabilityService,
         ModuleLifecycleService,

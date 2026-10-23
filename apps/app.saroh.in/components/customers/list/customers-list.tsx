@@ -5,6 +5,7 @@ import { rememberPageSize } from "@saroh/ui/page-sizes";
 import { Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { useCallback, useTransition } from "react";
 
 import { importCustomersHref, newCustomerHref } from "@/lib/customers/links";
@@ -17,7 +18,7 @@ import {
     pageText,
 } from "@/lib/customers/list";
 
-import { ListPaging } from "@/components/shared/list-toolbar";
+import { ListPaging } from "@/components/shared/lists/list-toolbar";
 import { Filters } from "./filters";
 import { NoMatch, Rows } from "./rows";
 import { ListFirstRun, ListHeading, ListNote } from "./states";
@@ -41,6 +42,8 @@ export function CustomersList({
     stores,
     contacts,
     canLink,
+    tabs = null,
+    banner = null,
 }: {
     query: ListQuery;
     page: CustomersPage;
@@ -50,6 +53,10 @@ export function CustomersList({
     contacts: number | null;
     /** `contact:write`: link a paying store customer from the review. */
     canLink: boolean;
+    /** Customers · Requests (DEC-172), for whoever can act on requests. */
+    tabs?: ReactNode;
+    /** The one banner while removal requests are open (DEC-172). */
+    banner?: ReactNode;
 }) {
     const router = useRouter();
     const [navigating, startNavigation] = useTransition();
@@ -82,10 +89,14 @@ export function CustomersList({
     );
 
     const heading = (
-        <ListHeading
-            count={page.everyone > 0 ? customersText(page.everyone) : null}
-            actions={actions}
-        />
+        <>
+            <ListHeading
+                count={page.everyone > 0 ? customersText(page.everyone) : null}
+                actions={actions}
+            />
+            {tabs ? <div className="mb-4">{tabs}</div> : null}
+            {banner}
+        </>
     );
     const notice = (
         <UnlinkedNotice

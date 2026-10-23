@@ -4,7 +4,7 @@ import { cache } from "react";
 import type { SellContext } from "@/components/class-packs/pack-detail/pack-detail";
 import { PackDetailScreen } from "@/components/class-packs/pack-detail/pack-detail";
 import { PackEditorState } from "@/components/class-packs/pack-editor/editor-states";
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import {
     canReadPacks,
     canSellPacks,

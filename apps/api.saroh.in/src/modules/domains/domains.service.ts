@@ -59,6 +59,9 @@ export interface DnsTxtInstructions {
     value: string; // the verificationToken
 }
 
+/** Days another org's unproved claim holds a hostname before it lapses. */
+export const CLAIM_LAPSE_DAYS = 7;
+
 /**
  * Subdomain / custom-domain claim + verification (S2-007).
  *
@@ -139,11 +142,29 @@ export class DomainsService {
 
         // Globally-unique guard: a hostname claimed by ANY org (this one or
         // another) blocks a new claim. Pre-check for a clear 409; the unique
-        // index is the real backstop against a race.
+        // index is the real backstop against a race. Another org's claim it
+        // never proved lapses after CLAIM_LAPSE_DAYS, or anyone could hold
+        // someone's domain for good by claiming it first.
         const existing = await prisma.domain.findUnique({
             where: { hostname },
         });
-        if (existing) {
+        const lapsed =
+            existing &&
+            existing.organizationId !== ctx.organizationId &&
+            existing.status !== "VERIFIED" &&
+            existing.hostingId === null &&
+            Date.now() - existing.createdAt.getTime() >
+                CLAIM_LAPSE_DAYS * 86_400_000;
+        if (lapsed) {
+            // Fenced on what was read, so a claim verified meanwhile stays.
+            await prisma.domain.deleteMany({
+                where: {
+                    id: existing.id,
+                    status: { not: "VERIFIED" },
+                    hostingId: null,
+                },
+            });
+        } else if (existing) {
             throw new ConflictException(
                 `Hostname "${hostname}" is already claimed`,
             );

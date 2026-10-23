@@ -17,7 +17,7 @@ import { demoUser, ignoreHTTPSErrors, urls } from "../playwright.config";
  * a film set, which no test writes to, so what the API said a moment ago is
  * still what the screen draws. Northwind's orders are made and moved by the
  * order specs running beside this one. The writes here — a step and its
- * Undo, a new pay link — go to Northwind, on orders each test makes itself
+ * Undo, a new payment link — go to Northwind, on orders each test makes itself
  * (`fixtures/own-data.ts`).
  */
 
@@ -659,7 +659,7 @@ test.describe("orders list filters (B4)", () => {
 /**
  * The quick view and the row menu (plan B, B5), at the desk. Opening,
  * reading and closing are read-only; the writes (a step and its Undo, a new
- * pay link) happen on Northwind only, never on a demo store.
+ * payment link) happen on Northwind only, never on a demo store.
  */
 test.describe("orders quick view and row menu (B5)", () => {
     test.beforeEach(async ({ page }, testInfo) => {
@@ -803,7 +803,7 @@ test.describe("orders quick view and row menu (B5)", () => {
         await expect(grid(page)).toBeVisible();
     });
 
-    test("the kitchen's quick view and menu have no money, refund or pay link", async ({
+    test("the kitchen's quick view and menu have no money, refund or payment link", async ({
         browser,
     }) => {
         const page = await memberPage(browser);
@@ -821,7 +821,9 @@ test.describe("orders quick view and row menu (B5)", () => {
             const menu = page.getByRole("menu");
             await expect(menu).toBeVisible();
             await expect(
-                menu.getByRole("menuitem", { name: /Refund|pay link|Cancel/ }),
+                menu.getByRole("menuitem", {
+                    name: /Refund|payment link|Cancel/,
+                }),
             ).toHaveCount(0);
             await page.keyboard.press("Escape");
 
@@ -834,16 +836,16 @@ test.describe("orders quick view and row menu (B5)", () => {
             // Payment line stays, with no amount and nothing to refund or pay.
             await expect(panel.getByText(/₹/)).toHaveCount(0);
             await expect(
-                panel.getByRole("button", { name: /Refund|pay link/i }),
+                panel.getByRole("button", { name: /Refund|payment link/i }),
             ).toHaveCount(0);
             await expect(
-                panel.getByRole("link", { name: /Refund|pay link/i }),
+                panel.getByRole("link", { name: /Refund|payment link/i }),
             ).toHaveCount(0);
         }
         await page.close();
     });
 
-    test("New pay link shows a new address once, and the old one stops working", async ({
+    test("New payment link shows a new address once, and the old one stops working", async ({
         page,
     }) => {
         await signIn(page);
@@ -863,7 +865,7 @@ test.describe("orders quick view and row menu (B5)", () => {
         );
         test.skip(
             !first.ok(),
-            "Northwind has no provider that can take a pay link.",
+            "Northwind has no provider that can take a payment link.",
         );
         const old = ((await first.json()) as { url: string }).url;
         const oldToken = old.split("/").at(-1) ?? "";
@@ -874,7 +876,7 @@ test.describe("orders quick view and row menu (B5)", () => {
                 name: `More actions for order #${target.orderId}`,
             })
             .click();
-        await page.getByRole("menuitem", { name: "New pay link" }).click();
+        await page.getByRole("menuitem", { name: "New payment link" }).click();
         await expect(
             page.getByText(
                 "The link you sent before stops working straight away.",
@@ -882,7 +884,7 @@ test.describe("orders quick view and row menu (B5)", () => {
         ).toBeVisible();
         await page.getByRole("button", { name: "Make a new link" }).click();
         const shown = page.getByRole("dialog", {
-            name: `Pay link for #${target.orderId}`,
+            name: `Payment link for #${target.orderId}`,
         });
         await expect(shown).toBeVisible();
         const fresh = (await shown.locator("code").textContent()) ?? "";

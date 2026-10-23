@@ -15,7 +15,7 @@
 
 | Audit finding (July 20)                                   | Status                  | Evidence                                                                                                                               |
 | --------------------------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Flat horizontal nav overflows at 8+ items (D-05)          | ✅ Resolved             | Persistent left `AppSidebar` + `MobileNav` drawer — `components/shared/app-sidebar.tsx`, `mobile-nav.tsx`                              |
+| Flat horizontal nav overflows at 8+ items (D-05)          | ✅ Resolved             | Persistent left `AppSidebar` + `MobileNav` drawer — `components/shared/shell/app-sidebar.tsx`, `mobile-nav.tsx`                        |
 | Object-named nav, not goal-based (D-02)                   | ✅ Resolved             | Goal groups in `nav-items.tsx` (Customers/Appointments/Website/Insights); now also module-gated (#116)                                 |
 | No command palette / >2-click fallback                    | ✅ Resolved             | ⌘K `CommandMenu` (`command-menu.tsx`)                                                                                                  |
 | Inconsistent page headers / empty states                  | ✅ Resolved             | Shared `PageHeader` + `EmptyState` adopted across index pages (#96, sites/leads/etc.)                                                  |

@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { EnrolDialog } from "@/components/courses/enrol-dialog";
-import type { ContactOption } from "@/components/shared/contact-picker";
+import type { ContactOption } from "@/components/shared/fields/contact-picker";
 import type { Course, Enrollment } from "@/lib/courses/service";
 import type { GstAsk } from "@/lib/gst/item-words";
 

@@ -1,13 +1,14 @@
 import type { Prisma } from "@saroh/database";
 
+import type { NoticeTemplate as NoticeKind } from "../communications/transactional";
 import { siteOriginOf } from "../sites/site-origin";
 import { accountAreaOn } from "./account-area";
-import type { NoticeKind } from "./notify-templates";
 
 /**
  * The way back from a notice's email to what it is about, on the
  * business's own site: the order's page for an order just placed, the
- * booking's page for a booking made or moved.
+ * booking's page for a booking made or moved, the booking page for a hold
+ * that lapsed (#1137), their Messages for a team reply (U14).
  *
  * - **The customer's own site.** The one they last signed in on (a business
  *   may have more than one), at its primary address: its verified custom
@@ -36,31 +37,44 @@ export async function noticeLink(
         contactId: string;
         orderId?: string;
         bookingId?: string;
+        serviceId?: string;
     },
 ): Promise<string | null> {
     const path = pathOf(subject);
     if (!path) return null;
     try {
-        const session = await db.customerSession.findFirst({
-            where: {
-                organizationId,
-                account: { contactId: subject.contactId },
-            },
-            orderBy: { createdAt: "desc" },
-            select: { siteId: true },
-        });
-        const origin =
-            (session
-                ? await siteOriginOf(
-                      organizationId,
-                      { siteId: session.siteId },
-                      db,
-                  )
-                : null) ?? (await siteOriginOf(organizationId, {}, db));
+        const origin = await contactSiteOrigin(
+            db,
+            organizationId,
+            subject.contactId,
+        );
         return origin ? `${origin}${path}` : null;
     } catch {
         return null;
     }
+}
+
+/**
+ * The business's site a contact's emails lead back to: the one they last
+ * signed in on, else its first published one, at its primary address
+ * (`siteOriginOf`). Null when there is no published site. Shared by every
+ * notice's link (the waitlist offer's claim link too, `waitlist-claim.ts`).
+ */
+export async function contactSiteOrigin(
+    db: Db,
+    organizationId: string,
+    contactId: string,
+): Promise<string | null> {
+    const session = await db.customerSession.findFirst({
+        where: { organizationId, account: { contactId } },
+        orderBy: { createdAt: "desc" },
+        select: { siteId: true },
+    });
+    return (
+        (session
+            ? await siteOriginOf(organizationId, { siteId: session.siteId }, db)
+            : null) ?? (await siteOriginOf(organizationId, {}, db))
+    );
 }
 
 /** The page a notice leads back to; null for a notice with none. */
@@ -68,6 +82,7 @@ export function pathOf(subject: {
     kind: NoticeKind;
     orderId?: string;
     bookingId?: string;
+    serviceId?: string;
 }): string | null {
     if (subject.kind === "ORDER_PLACED" && subject.orderId) {
         const order = encodeURIComponent(subject.orderId);
@@ -85,6 +100,21 @@ export function pathOf(subject: {
     ) {
         // The booking's own page (DEC-142), so the email opens the thing.
         return `/account/bookings/${encodeURIComponent(subject.bookingId)}`;
+    }
+    if (subject.kind === "THREAD_REPLY" && accountAreaOn()) {
+        // A team reply (U14): their Messages, where they read and answer
+        // it. Only while the account area is on, as the thread is.
+        return "/account/messages";
+    }
+    if (subject.kind === "MEMBERSHIP_ENDING" && accountAreaOn()) {
+        // A membership ending in a week (U19): a member can't keep it from
+        // their account, so their Messages, to ask the business to.
+        return "/account/messages";
+    }
+    if (subject.kind === "BOOKING_LAPSED" && subject.serviceId) {
+        // A lapsed hold (#1137): the booking page, on the service, to book
+        // again. It served the hold minutes ago, so it is there.
+        return `/book?service=${encodeURIComponent(subject.serviceId)}`;
     }
     return null;
 }

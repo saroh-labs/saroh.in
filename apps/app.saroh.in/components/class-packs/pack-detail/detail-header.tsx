@@ -8,7 +8,7 @@ import { packCrumbs } from "../pack-editor/pack-crumbs";
 
 import type { DetailHeader } from "@/lib/class-packs/pack-detail";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { Notice } from "@saroh/ui/notice";
 import { Segmented } from "@saroh/ui/segmented";
 /** The page's gutter: the page container's own, 26px and 16px on a phone. */

@@ -1,12 +1,12 @@
 import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
 
-import { ActivityList } from "@/components/settings/activity-list";
+import { ActivityList } from "@/components/settings/activity/activity-list";
 import {
     SettingsPanel,
     SettingsPanelHeader,
-} from "@/components/settings/settings-panel";
-import { navCan } from "@/components/shared/nav-items";
-import { whoCanChange } from "@/components/shared/who-can-change";
+} from "@/components/settings/page/settings-panel";
+import { navCan } from "@/components/shared/navigation/nav-items";
+import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { listRoles } from "@/lib/organizations/roles";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { getOrganizationSettings } from "@/lib/organizations/settings-service";

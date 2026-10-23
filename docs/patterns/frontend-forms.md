@@ -22,27 +22,33 @@ save bar, the header's hint, the jump dots, Save all and the leave dialog.
 Section patches send only their own fields; the API judges the whole product
 after the patch.
 
-**Current** — **A short editor saves once** (E2): the Service Editor
-(`components/services/service-editor/`) has one Save in its sticky header,
-as its design draws. The page holds one draft; its rules, the problems
-strip, what Save sends and the leave dialog's section names are pure
-functions in `lib/services/service-editor.ts`, tested with vitest. It
-replaced the service dialog and the two react-hook-form service forms.
-What takes effect as it is flipped is not part of that Save: "Taking
-bookings" is a switch beside it (`use-taking-bookings.ts`, 12 Oct 2026)
-that saves at once with Undo and moves the saved state and the draft
-together, so the page is never "unsaved" because of it. A length people
-mostly pick from a few values is chips with Custom (`length-field.tsx`),
-over the same string the number field held.
+**Current** — **A short create saves once; a saved record is changed a
+part at a time** (E2, U16 #1032). New service
+(`components/services/service-editor/new-service.tsx`) asks five plain
+questions with a live line saying whether customers could book it, keeps
+everything else under More details (a row each, opening its own panel
+whose button puts the panel's draft back into the page's: "Use this"), and
+has one sticky Discard / Add service; Discard asks "Discard what you
+typed?" once something is typed. A saved service (`edit-service.tsx`) is
+read first: three cards, each opening a side panel (`detail-panel.tsx`, a
+`FormSheet bottomOnPhone`) with its own Save, so there is never a page of
+unsaved changes. What takes effect as it is pressed is not part of any
+Save: "Who can book it" (DEC-170, Q5) is two ticks that save at once with
+Undo (`use-taking-bookings.ts` `setBookers`), and More's Pause unticks
+both. The rules, the live line, the rows and what Save sends are pure, in
+`lib/services/service-editor.ts` and `lib/services/service-form.ts`. A
+length people mostly pick from a few values is chips with Other
+(`length-field.tsx`), over the same string the number field held.
 
 **Current** — **One Save may be several calls, and says so when one
 fails** (10 Oct). The Service Editor's Save sends the service, then who
 takes it, then its own weekly hours (`PUT …/rules`, which replaces the
 set). The hours are rows of the same draft
-(`lib/services/service-hours-draft.ts`, `hours-field.tsx`): there is no
-"Save availability". They sit in a card of their own, "When it can be
-booked" (`hours-card.tsx`), which says whose hours a one-to-one someone
-takes books in, with the way to Availability. A new service starts from the business's opening
+(`lib/services/service-hours-draft.ts`, `hours-field.tsx`, the 12-hour
+picker of Hours and time off): there is no "Save availability". They sit
+under "When it can be booked" (a More details row on a new service, the
+Time and place panel on a saved one), which says whose hours a one-to-one
+someone does books in, with the way to Hours and time off. A new service starts from the business's opening
 hours where its own hours are what gives it times (nobody on the diary
 takes it, or it is a class); a one-to-one someone takes starts with none,
 because its own hours only narrow that person's. When the service is saved
@@ -77,6 +83,45 @@ Editor's rules (problems, the save blocker, "When you publish" lines) are pure
 in `lib/subscriptions/plan-editor.ts`, and `plan-editor-adapter.ts` turns the
 typed form into the API's values and back.
 
+**Current** — **A form with no publish step saves as it is typed on the
+shell's autosave alone** (New invoice A, DEC-173 U14 #1126). An invoice
+draft has no revision and nothing to publish, so it doesn't take the whole
+`EditorShell`: `components/invoices/new-invoice/use-invoice-draft.ts`
+drives the shell's `Autosave` (`lib/editor-shell/autosave.ts`) from the
+react-hook-form's `watch`, sends nothing while the zod schema refuses the
+values (the form says what, on leaving a field, as before), makes the
+draft on the first save and changes it after, and puts the draft's own
+address in the bar (`/billing/invoices/<id>/edit`) with
+`history.replaceState`, so a reload never starts a second draft. The pill
+beside the title is the save state ("Draft · saved", "Saving…", "Not
+saved" with Try again). The leave guard takes `flush` (and `save`, which
+says what is wrong), so leaving asks only when the save can't go. Save
+draft and Issue flush first and then go on with the draft the server has.
+A live preview beside such a form is drawn from the typed values with the
+API's rule mirrored in a pure module (`lib/invoices/new-invoice-lines.ts`
+`previewSums`), never sent.
+
+**Current** — **A record edited "on the paper" is the same form, pressed
+where it prints** (New invoice on the paper, DEC-173 U15 #1127).
+`?mode=paper` (`useTabParam`, "Form" / "On the paper" in the header) swaps
+the form's columns for `components/invoices/paper-editor/`, under the same
+`useForm` and the same autosave, so switching keeps everything typed and
+the draft's address keeps the mode. The paper (`PaperPreview`) takes an
+`editing` seam: each part is wrapped in a control laid OVER it (the words
+stay the paper's for a screen reader; the press has its own name, "Change
+line 2: Butter croissant") that opens the part's editor in a popover on
+the desk and a sheet from the foot of a phone (`HeaderOverlay`). Each
+editor writes the form's own fields (`register`, `setValue`), so the paper,
+the totals and the save follow every keystroke; a line typed but not yet
+priced is drawn as "Set its quantity and price" so it can be finished.
+What the record can't change here says where it comes from instead (the
+seller, the number). A particular the law requires (CGST Rule 46) carries
+a label on the paper ("Next in series", "Set from the customer",
+"Required") and has no way off in any style. What the paper changes for
+the whole business (the logo, How to pay us, the default look) opens that
+setting's own sheet in place, for those who may (`org:update`), and is
+never a link away mid-task.
+
 **Current** — **An editor never opens in an error state over a rule newer
 than the record** (UX audit, 12 Oct). A plan or pack published before a GST
 rate was asked for opens with a plain note beside the field ("This plan has
@@ -93,18 +138,18 @@ and a new record's are said as before. Give any new publish rule a `note`.
 Every overlay in `app.saroh.in` is one of three components, by the size of
 the task. Never write a `SheetContent`, a `DialogContent` or an
 `AlertDialog` and a footer by hand for something that saves:
-`components/shared/overlay-frames.test.ts` reads the app and fails a copy
+`components/shared/forms/overlay-frames.test.ts` reads the app and fails a copy
 (what is not a form, such as a quick look or a picker, is on its short
 list with its reason).
 
-| Component       | For                                | File                                   |
-| --------------- | ---------------------------------- | -------------------------------------- |
-| `FormSheet`     | More than three fields             | `components/shared/form-sheet.tsx`     |
-| `FormDialog`    | One to three fields, or one choice | `components/shared/form-dialog.tsx`    |
-| `ConfirmDialog` | Only what cannot be undone         | `components/shared/confirm-dialog.tsx` |
+| Component       | For                                | File                                           |
+| --------------- | ---------------------------------- | ---------------------------------------------- |
+| `FormSheet`     | More than three fields             | `components/shared/forms/form-sheet.tsx`       |
+| `FormDialog`    | One to three fields, or one choice | `components/shared/forms/form-dialog.tsx`      |
+| `ConfirmDialog` | Only what cannot be undone         | `components/shared/confirm/confirm-dialog.tsx` |
 
 The sheet and the dialog share one set of rules
-(`components/shared/overlay-form.tsx`):
+(`components/shared/forms/overlay-form.tsx`):
 
 - **Width.** A sheet is the screen on a phone and 448px beside the page,
   512px with `wide`. A dialog is `size="sm" | "md" | "lg"` (420, 460,
@@ -116,7 +161,7 @@ The sheet and the dialog share one set of rules
   full width with the button on top. **This replaces "Save then Cancel on
   the left".**
 - **Labels.** "Save" for an edit, on a page as in an overlay (the Service
-  Editor, the discount code form, Availability, the QR maker). Verb and
+  Editor, the discount code form, the QR maker). Verb and
   thing for a create or an action
   ("Add note", "Send invite"). Never "Save changes", "Update" or "Done",
   except `doneOnly` on a sheet that only lists things. The way out is
@@ -155,6 +200,28 @@ has no way back in the API but need not be final is **held**: gone at once,
 written when its ten seconds are up (`useHold`, an invitation cancelled, a
 course session removed). See `frontend-error-feedback.md`.
 
+**Current** — **Money recorded by hand is one sheet, written at once
+with Undo** (DEC-173, U10 #1122). Record payment
+(`components/invoices/payments/record-payment-sheet.tsx`) is the one way an
+invoice's payment is written down, opened from the page, the details
+sheet, the list and the customer's Invoices tab; it takes an invoice
+already read (`PaymentTarget`, `paymentTargetOf`) or an id, and reads the
+rest on opening. The amount starts at what is left; less is a part
+payment and says what stays to pay; more is refused on Record with what
+was typed kept and the way out beside it ("Record ₹8,400"). The button
+names the amount. The write happens at once and `showUndo` removes it;
+the receipt is held by the API past the Undo window (`RECEIPT_HOLD_MS`),
+so the sheet never holds it. It opens through the details' seam
+(`useRecordPaymentFlow` in `components/invoices/details/flows.tsx`). A
+cheque's next steps are `cheque-dialogs.tsx`: in the bank is a
+`FormDialog` (with no email provider its toast offers the receipt on
+WhatsApp), Bounced is the one confirm, since the API can't take it back,
+with "Tell Vivek on WhatsApp after"; Remove payment is the details'
+`remove-payment-dialog.tsx`, whose Undo records it again. WhatsApp is opened on the
+press (`whatsapp-share.ts`), so a tab is never blocked; Saroh sends
+nothing itself. The words and rules are pure, in
+`lib/invoices/record-payment.ts`.
+
 **Current** — **Nobody is sent away from an overlay.** A task finishes in
 the sheet or dialog that opened. Add a lead and Add contact stay on the
 list, and the toast has the way to the new record
@@ -162,10 +229,28 @@ list, and the toast has the way to the new record
 has to stay (a product's full editor, a record to compare) is the quiet
 action at the far side of the foot, never the main one.
 
+**Current** — **A record's details open from its row in a side sheet, and
+its page draws the same view** (DEC-173, invoices U9 #1121). An invoice's
+row opens `components/invoices/details/invoice-details-sheet.tsx`
+(`QuickLook` widened to 512px, the whole screen on a phone, `?invoice=` in
+the address so a reload keeps it); `/billing/invoices/[id]` renders the
+same `InvoiceDetailsView` as a page, from the same server read
+(`lib/invoices/details.ts`), so a deep link and the sheet can't differ.
+Which buttons a state has is `actionsFor` (one main, what sits beside it,
+Share, More); what each does is one hook (`use-details-actions.tsx`), and
+every action opens its own frame over the details and comes back to them:
+after a write the sheet reads the record again in place and the list
+behind it refreshes. Flows other units own are opened through one seam
+each (`details/flows.tsx`: `useRecordPaymentFlow`, `useShareFlow`,
+`useCancelFlow`, each `open(…)` plus `overlays`), so a new sheet replaces
+the hook's body and nothing in the view changes. Previous and Next walk
+the list as filtered without closing. The money card says one thing and
+holds at most one note.
+
 **Current** — **A settings row is read first and edited in a side sheet**
 (owner, 10 Oct): a location's tabs (`components/stores/`) and every tab of
 Settings › Business (`components/organizations/`) draw `Row`s from
-`components/sites/settings-rows.tsx` — label, a sentence of what is saved,
+`components/shared/page/settings-rows.tsx` — label, a sentence of what is saved,
 Edit — and each Edit opens its own `FormSheet` with one Save
 (`PlaceSheetFrame` names it by a location's row): the fields scroll, Cancel
 then Save sit at the foot, nothing saves until Save, a refusal keeps the
@@ -174,7 +259,7 @@ the draft, it can't be dismissed while saving, each opening is a fresh
 draft (a `key` per opening) and the keyboard returns to the row's Edit. A link opens one with `?edit=` (`lib/stores/place-rows.ts`).
 Product settings' lists (`components/commerce/product-settings/`) are the
 same rule for a list you manage: `NameDialog`
-(`components/shared/name-dialog.tsx`, a `FormDialog` with one field) for a
+(`components/shared/forms/name-dialog.tsx`, a `FormDialog` with one field) for a
 one-field add or rename, a `FormSheet` with a `trigger` for anything with
 more (an option's name and values, a field, a merge), so the keyboard
 returns to the button that opened it. A delete that can be undone asks
@@ -186,7 +271,7 @@ No row turns into a form, and the task finishes inside what opened.
 nothing has changed. Once the draft differs from what it opened with, a
 press outside does nothing, and Cancel, Escape and the close button are the
 ways out. The frame reads that from its own fields
-(`components/shared/use-draft-changed.ts`: boxes, ticks, chips, what a
+(`components/shared/forms/use-draft-changed.ts`: boxes, ticks, chips, what a
 picker shows, a picture, a rich text box), so an overlay passes nothing.
 One whose work the fields can't show passes `dirty`, or calls
 `useFormSheetDraft` / `useFormSheetDirty` from a draft under the frame.
@@ -207,11 +292,18 @@ ten seconds (a refund, a cancel) closes its sheet into the hold card on
 the page, where its Undo is.
 
 The same goes for adding to a list: the list, then one button that opens
-the sheet, never fields left open under the rows. Where the screen has its
-own Save bar (Availability's Time off, `add-time-off-sheet.tsx`), the
-sheet's button adds to the page's draft and the sheet says so. One or two
-short choices inside a dense grid (a time range in a week's row,
-`weekly-hours.tsx`) open in a popover over the row, so no other row moves.
+the sheet, never fields left open under the rows. One or two short
+choices inside a dense grid open in a popover over the row, so no other
+row moves.
+
+**Current** — **Hours and time off save as they change** (U17, DEC-170):
+no Save bar and no draft on the page. A day row opens its sheet
+(`components/bookings/availability/hours-panel.tsx`: a bottom sheet on a
+phone, a right-hand panel on a desk), each control in it saves the
+person's week at once with a toast and Undo (`use-hours.ts`), and "Done"
+closes it; a save that is refused puts the control back and says nothing
+has changed. Adding something with several fields (time off, several days
+at once) is still a `FormSheet` whose button saves, with Undo after.
 Two addresses that show the same records are one screen with a segmented
 switch on both (`bookings-view-switch.tsx`, `leads-view-switch.tsx`), not a
 loose button to the other. And a small job is finished where it started:
@@ -242,13 +334,13 @@ the row's Edit. A link opens one with `?edit=` (`lib/stores/place-rows.ts`,
 `businessEditHref`). With the draft in a sheet, the page needs no
 leave-with-unsaved-changes guard. **What a row needs is done in its sheet**
 (owner, 10 Oct): an Edit never sends someone to another page, so an upload
-sits in the sheet itself (`components/shared/logo-upload.tsx`, a logo field
+sits in the sheet itself (`components/shared/fields/logo-upload.tsx`, a logo field
 with no page state; a location's own logo uses it too, with the business
 logo standing in until it has one, DEC-123) and a field another row owns
 joins the sheet that needs it (turning GST on asks for the registered
 address there). The same goes for a prompt on another screen: the QR
 maker's "Add your logo" opens the business logo's sheet in place
-(`components/qr/qr-add-logo.tsx`), never a link to Settings. Where a preview
+(`components/qr/maker/qr-add-logo.tsx`), never a link to Settings. Where a preview
 sits beside the rows it shows what is saved; the sheet draws the same
 preview under its fields, from the draft.
 
@@ -288,11 +380,11 @@ preview under its fields, from the draft.
   is the reversible one** (UX audit, 10 Oct). A step that can't be taken
   back (issuing an invoice numbers it and locks its lines) is a
   `type="button"` with its own press, never the form's submit: the invoice
-  form's one submit is Save as draft. Where the primary is reversible (a
+  form's one submit is Save draft. Where the primary is reversible (a
   course), it is the submit, so Enter runs it.
 - **Current** — **One leave guard, one question** (UX audit, 10 Oct). Every
   create and edit flow mounts `useLeaveGuard({ dirty, lost, save? })` from
-  `components/shared/use-leave-guard.tsx` and draws its `dialog`: "Leave
+  `components/shared/forms/use-leave-guard.tsx` and draws its `dialog`: "Leave
   without saving?", one sentence saying what would be lost (`lostNew`,
   `lostChanges`, or the flow's own), then Stay (the default) or Leave, and
   Save and leave only where a draft can be kept. It catches every link, the
@@ -360,6 +452,23 @@ preview under its fields, from the draft.
   moment (a new order before its location is read) the box is a plain
   decimal `Input` until it is. Gap: a lead's Worth has no sign, because a
   lead has no currency (the Leads list draws none either).
+- **Current** — **One phone field** (#1036): `PhoneInput`
+  (`@saroh/ui/phone-input`) in the workspace, accounts, admin and saroh.in,
+  and `SitePhoneInput` (`packages/site-blocks/src/phone-input.tsx`) on a
+  merchant's site, drawn with the `--site-*` tokens only. Both are a
+  country-code picker (the business's country, else India) and the number
+  as typed; a whole number pasted ("+44 …", "0091 …", "098765 43210")
+  picks its country. The value is E.164 ("+919876543210") or "". In
+  `app.saroh.in` use `BusinessPhoneInput`
+  (`components/shared/fields/business-phone-input.tsx`), which starts on the
+  active business's country. What a number means is one pure module,
+  `packages/block-contract/src/phone.ts` (`normalisePhoneNumber`,
+  `phoneNumberProblem`, `phoneLabel`), which the API's
+  `normalisePublicPhone` re-exports; `PHONE_CASES` there pins the API and
+  both fields to the same answers. A saved number is shown with
+  `phoneLabel`, grouped ("+91 98765 43210"). An edit checks a phone only
+  once it is changed (`phoneSchemaKeeping`), so one saved before numbers
+  were checked never stops the rest saving. Never a bare `type="tel"`.
 - **Current** — **Saving from the keyboard**
   (`lib/hooks/keyboard-save.ts`): Cmd/Ctrl+Enter sends the form the
   keyboard is in (`submitOnModEnter` on a `<form>`; the overlay frames
@@ -376,7 +485,7 @@ preview under its fields, from the draft.
   Undo** (UX audit, 10 Oct): a reminder or an invoice sent, a message, a
   team or location invite, review invitations, a booking or an order
   cancelled from a list, a subscription cancelled. `useHold().send` in
-  `components/shared/use-hold.ts` is the one way: "Sending in 10 seconds",
+  `components/shared/undo/use-hold.ts` is the one way: "Sending in 10 seconds",
   then "Sent to {name}.". The overlay closes keeping what was typed, and a
   refusal or an Undo opens it again with that. Money out stays as built.
 - **Current** — **shadcn controls, never native pickers.** A list is a
@@ -398,13 +507,13 @@ preview under its fields, from the draft.
   (10 Oct). All but the tick are a radio group to a screen reader and a
   keyboard: one tab stop, and the arrows move the choice.
 
-    | Piece         | For                                              | File                                 |
-    | ------------- | ------------------------------------------------ | ------------------------------------ |
-    | `Segmented`   | A two- or three-way switch of view or mode       | `@saroh/ui/segmented`                |
-    | `ChipGroup`   | A short list of short names (a kind, a courier)  | `components/shared/choice-group.tsx` |
-    | `RadioCards`  | Choices that are a sentence, or carry a note     | `components/shared/choice-group.tsx` |
-    | `ChoiceGroup` | The same group drawn the screen's own way        | `components/shared/choice-group.tsx` |
-    | `CheckRow`    | A tick with its words (`SwitchRow` for a switch) | `components/shared/check-row.tsx`    |
+    | Piece         | For                                              | File                                        |
+    | ------------- | ------------------------------------------------ | ------------------------------------------- |
+    | `Segmented`   | A two- or three-way switch of view or mode       | `@saroh/ui/segmented`                       |
+    | `ChipGroup`   | A short list of short names (a kind, a courier)  | `components/shared/fields/choice-group.tsx` |
+    | `RadioCards`  | Choices that are a sentence, or carry a note     | `components/shared/fields/choice-group.tsx` |
+    | `ChoiceGroup` | The same group drawn the screen's own way        | `components/shared/fields/choice-group.tsx` |
+    | `CheckRow`    | A tick with its words (`SwitchRow` for a switch) | `components/shared/fields/check-row.tsx`    |
 
     `ChoiceGroup` is for what the first three can't draw (colour swatches,
     photo thumbnails, times under day headings with `layout`, a card with
@@ -413,6 +522,23 @@ preview under its fields, from the draft.
     `Chip as="toggle"`. Never a hand-made `role="radio"`, `role="checkbox"`
     or `role="switch"` button.
 
+- **Current** — **A GST rate is always chosen with `GstRatePicker`**
+  (`components/shared/fields/gst-rate-picker.tsx`, DEC-176, 20 Oct), never a
+  dropdown, a typed box or chips of a screen's own. Its main row is GST's
+  slabs since GST 2.0, 0%, 5%, 18% and 40% (`MAIN_GST_RATES`); "Other
+  rate" is a disclosure beside them (`aria-expanded`, not a radio) that
+  opens 0.25%, 1.5%, 3%, 12% and 28% in place. The chosen rate's own chip
+  is the one lit, in whichever row it sits, and a saved rate from the
+  second row opens with that row shown. `optional` adds "Not set" for a
+  field that may be left empty, and only there. Inside a `Field`, use its
+  function child with `pickerWiring(control)` so the label, the hint and
+  the one error line are the Field's. Unit tests press rates with
+  `gst-rate-picker.testing.ts`, browser specs with `e2e/fixtures/gst-rate.ts`.
+  `lib/consistency/shared-pieces.test.ts` fails a file outside
+  `lib/invoices/gst.ts` that reads `GST_RATE_OPTIONS` or `GST_RATE_CHOICES`.
+- **Current** — **A chip set in error takes the keyboard.**
+  `focusFirstError` puts it on a radio group's one tab stop (the chosen
+  chip, else the first), so a missing rate is reached like a missing box.
 - **Current** — **The label is above a choice strip, and the strip is as
   wide as its words.** `Segmented` is a block of its own (`flex w-fit`),
   so after a label it drops to the next line and in a grid or a stacked

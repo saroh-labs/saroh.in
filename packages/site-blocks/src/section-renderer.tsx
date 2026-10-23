@@ -1,4 +1,5 @@
 import type {
+    LookId,
     RenderedBooking,
     RenderedContact,
     RenderedCtaSection,
@@ -20,7 +21,11 @@ import type {
     RenderedTimetable,
     RenderedVisitUs,
 } from "@saroh/block-contract";
-import { resolveVariant, sectionFrameOf } from "@saroh/block-contract";
+import {
+    isSectionType,
+    resolveVariant,
+    sectionFrameOf,
+} from "@saroh/block-contract";
 
 import BookingSection from "./blocks/booking";
 import ContactSection from "./blocks/contact";
@@ -36,6 +41,7 @@ import { heroLevels } from "./blocks/hero-level";
 import HoursSection from "./blocks/hours";
 import type { JournalFeed } from "./blocks/journal";
 import JournalSection from "./blocks/journal";
+import type { FrontDoor, PageProof } from "./blocks/look-front";
 import type { PacksFeed } from "./blocks/packs";
 import PacksSection from "./blocks/packs";
 import PersonSection from "./blocks/person";
@@ -49,6 +55,9 @@ import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
 import TimetableSection from "./blocks/timetable";
 import VisitUsSection from "./blocks/visit-us";
+import type { CreditFor } from "./booking-flow/api";
+import type { LookProps } from "./look-context";
+import { lookOf } from "./look-context";
 import type { ModulePageTopContent } from "./module-page-top";
 import { ModulePageTop } from "./module-page-top";
 import type { PricesActions } from "./prices/api";
@@ -100,8 +109,32 @@ export default function SectionRenderer({
     first = false,
     heroLevel = 1,
     siteName,
-}: {
+    look,
+    isOwnerPreview = false,
+    frontDoor = null,
+    proof = null,
+    credit,
+    beside = null,
+}: LookProps & {
     section: Section;
+    /**
+     * A Plans section's cards drawn first in its row: Live's class packs
+     * (VB01), which `PageSections` folds in. Absent elsewhere.
+     */
+    beside?: React.ReactNode;
+    /**
+     * Under a look, the signed-in customer's class credit (the booking
+     * page's own read, through the site's server with their session), for
+     * the Timetable's "1 pack class" (U7). Called only in the browser.
+     */
+    credit?: CreditFor;
+    /**
+     * Under a look, for the page's first hero: its way in beside its
+     * button (the booking page or the shop) and the page's proof line
+     * (U6). `PageSections` works both out; elsewhere they are absent.
+     */
+    frontDoor?: FrontDoor | null;
+    proof?: PageProof | null;
     /**
      * Which heading a hero's headline is: `1` for the page's first hero,
      * `2` for a later one (`hero-level.ts`). A section drawn on its own is
@@ -187,11 +220,17 @@ export default function SectionRenderer({
     // A pinned moment (`SiteFixtures.now`); undefined on a live site, where
     // each block reads the clock.
     const now = fixtures?.now ? new Date(fixtures.now) : undefined;
+    // The look (DEC-172): every block is told it, and whether this is the
+    // owner's preview. A Classic section's content is handed on untouched,
+    // so it draws exactly as before.
+    const site: LookProps = { look: lookOf(look), isOwnerPreview };
+    const content = withLookVariant(section, site.look);
     switch (section.type) {
         case "hero":
             return (
                 <HeroSection
-                    content={section.content as RenderedHero}
+                    {...site}
+                    content={content as RenderedHero}
                     apiUrl={apiUrl}
                     bookHref={bookHref}
                     siteId={siteId}
@@ -200,30 +239,38 @@ export default function SectionRenderer({
                     now={now}
                     priority={first}
                     level={heroLevel}
+                    frontDoor={frontDoor}
+                    proof={proof}
                 />
             );
         case "richText":
             return (
                 <RichTextSection
-                    content={section.content as RenderedRichText}
+                    {...site}
+                    content={content as RenderedRichText}
                     align={modulePage ? "cards" : "column"}
                 />
             );
         case "cta":
             return (
                 <CtaSection
-                    content={section.content as RenderedCtaSection}
+                    {...site}
+                    content={content as RenderedCtaSection}
                     siteName={siteName}
                 />
             );
         case "gallery":
             return (
-                <GallerySection content={section.content as RenderedGallery} />
+                <GallerySection
+                    {...site}
+                    content={content as RenderedGallery}
+                />
             );
         case "enquiry":
             return (
                 <EnquirySection
-                    content={section.content as RenderedEnquiry}
+                    {...site}
+                    content={content as RenderedEnquiry}
                     apiUrl={apiUrl}
                     thread={thread}
                 />
@@ -231,21 +278,24 @@ export default function SectionRenderer({
         case "features":
             return (
                 <FeaturesSection
-                    content={section.content as RenderedFeatures}
+                    {...site}
+                    content={content as RenderedFeatures}
                 />
             );
         case "faq":
-            return <FaqSection content={section.content as RenderedFaq} />;
+            return <FaqSection {...site} content={content as RenderedFaq} />;
         case "testimonials":
             return (
                 <TestimonialsSection
-                    content={section.content as RenderedTestimonials}
+                    {...site}
+                    content={content as RenderedTestimonials}
                 />
             );
         case "servicesList":
             return (
                 <ServicesListSection
-                    content={section.content as RenderedServicesList}
+                    {...site}
+                    content={content as RenderedServicesList}
                     apiUrl={apiUrl}
                     bookHref={bookHref}
                     services={fixtures?.services}
@@ -253,12 +303,16 @@ export default function SectionRenderer({
             );
         case "contact":
             return (
-                <ContactSection content={section.content as RenderedContact} />
+                <ContactSection
+                    {...site}
+                    content={content as RenderedContact}
+                />
             );
         case "visitUs":
             return (
                 <VisitUsSection
-                    content={section.content as RenderedVisitUs}
+                    {...site}
+                    content={content as RenderedVisitUs}
                     apiUrl={apiUrl}
                     siteId={siteId}
                     visit={fixtures?.visit}
@@ -268,7 +322,8 @@ export default function SectionRenderer({
         case "journal":
             return (
                 <JournalSection
-                    content={section.content as RenderedJournal}
+                    {...site}
+                    content={content as RenderedJournal}
                     feed={journal}
                     apiUrl={apiUrl}
                     siteId={siteId}
@@ -278,17 +333,21 @@ export default function SectionRenderer({
         case "plans":
             return (
                 <PlansSection
-                    content={section.content as RenderedPlans}
+                    {...site}
+                    content={content as RenderedPlans}
                     feed={plans}
                     prices={prices}
                     apiUrl={apiUrl}
                     siteId={siteId}
+                    beside={beside}
                 />
             );
         case "packs":
             return (
                 <PacksSection
-                    content={section.content as RenderedPacks}
+                    {...site}
+                    content={content as RenderedPacks}
+                    plansOnPage={(plans?.plans.length ?? 0) > 0}
                     feed={packs}
                     prices={prices}
                     apiUrl={apiUrl}
@@ -298,7 +357,8 @@ export default function SectionRenderer({
         case "productGrid":
             return (
                 <ProductGridSection
-                    content={section.content as RenderedProductGrid}
+                    {...site}
+                    content={content as RenderedProductGrid}
                     feed={productGrid}
                     apiUrl={apiUrl}
                     siteId={siteId}
@@ -307,23 +367,27 @@ export default function SectionRenderer({
         case "projects":
             return (
                 <ProjectsSection
-                    content={section.content as RenderedProjects}
+                    {...site}
+                    content={content as RenderedProjects}
                 />
             );
         case "timetable":
             return (
                 <TimetableSection
-                    content={section.content as RenderedTimetable}
+                    {...site}
+                    content={content as RenderedTimetable}
                     apiUrl={apiUrl}
                     siteId={siteId}
                     bookHref={bookHref}
                     timetable={fixtures?.timetable}
+                    credit={site.look ? credit : undefined}
                 />
             );
         case "hours":
             return (
                 <HoursSection
-                    content={section.content as RenderedHours}
+                    {...site}
+                    content={content as RenderedHours}
                     apiUrl={apiUrl}
                     siteId={siteId}
                     visit={fixtures?.visit}
@@ -332,12 +396,13 @@ export default function SectionRenderer({
             );
         case "person":
             return (
-                <PersonSection content={section.content as RenderedPerson} />
+                <PersonSection {...site} content={content as RenderedPerson} />
             );
         case "booking":
             return (
                 <BookingSection
-                    content={section.content as RenderedBooking}
+                    {...site}
+                    content={content as RenderedBooking}
                     apiUrl={apiUrl}
                     bookHref={bookHref}
                     reach={reach}
@@ -375,11 +440,30 @@ function paddingOverride(content: unknown): React.CSSProperties | undefined {
  * the mark (`site-chrome.tsx`), so a page that does not open with one keeps
  * the header exactly as it was.
  */
-export function opensOverPhoto(section: Section): boolean {
+export function opensOverPhoto(section: Section, look?: LookId): boolean {
     return (
         section.type === "hero" &&
-        resolveVariant("hero", section.content) === "fullBleed"
+        resolveVariant("hero", section.content, lookOf(look)) === "fullBleed"
     );
+}
+
+/**
+ * A section's content with the look's layout written in (KD2), where the
+ * section chose none and the look's default differs from what the block
+ * would draw without a look: every block, and every helper inside it that
+ * asks `resolveVariant(type, content)`, then draws the look's layout
+ * without being told the look. A section's own variant always wins, and
+ * Classic's content is returned untouched (the same object).
+ */
+export function withLookVariant(section: Section, look?: LookId): unknown {
+    const { type, content } = section;
+    if (!look || !isSectionType(type)) return content;
+    if (content === null || typeof content !== "object") return content;
+    const named = (content as { variant?: unknown }).variant;
+    if (typeof named === "string" && named.trim() !== "") return content;
+    const chosen = resolveVariant(type, content, look);
+    if (chosen === resolveVariant(type, content)) return content;
+    return { ...content, variant: chosen };
 }
 
 /**
@@ -420,8 +504,20 @@ export function PageSections({
     modulePage = top !== null,
     reach,
     siteName,
-}: {
+    look,
+    isOwnerPreview = false,
+    frontDoor = null,
+    credit,
+}: LookProps & {
     sections: Section[];
+    /** The signed-in customer's class credit, for a look's Timetable (U7). */
+    credit?: CreditFor;
+    /**
+     * Under a look: the way in the page's first hero offers beside its
+     * button (U6), worked out by the live site from what it serves now
+     * (the booking page, else the shop). Absent: no slot.
+     */
+    frontDoor?: FrontDoor | null;
     /** Whose site this is, for the closing band's composed heading. */
     siteName?: string | null;
     /** How to reach the business, for the blocks that offer it. */
@@ -479,6 +575,26 @@ export function PageSections({
         titled: top !== null,
         skip: nothing,
     });
+    // Under a look, the page's first hero carries its way in and one proof
+    // line from the page's own testimonials (U6). Classic gets neither.
+    const lookId = lookOf(look);
+    const proof = lookId ? pageProof(sections) : null;
+    const opener = lookId
+        ? sections.findIndex(
+              (s, i) => s.type === "hero" && levels[i] === 1 && !nothing(i),
+          )
+        : -1;
+    // Under Live, plans with class packs straight after them are one row
+    // of cards, the packs first (VB01's "Come once, or every day"). Only
+    // with both feeds: the editor's canvas draws each on its own.
+    const joinsPacks = (i: number) =>
+        lookId === "live" &&
+        sections[i]?.type === "plans" &&
+        sections[i + 1]?.type === "packs" &&
+        plans !== undefined &&
+        packs !== undefined &&
+        !nothing(i) &&
+        !nothing(i + 1);
     return (
         <>
             {top ? <ModulePageTop title={top.title} lead={top.lead} /> : null}
@@ -488,7 +604,7 @@ export function PageSections({
                 // no wrapper and so no anchor to jump to. The layout already
                 // left its entry out of the menu, and the header drops one
                 // whose target is missing.
-                if (nothing(i)) return null;
+                if (nothing(i) || (i > 0 && joinsPacks(i - 1))) return null;
                 const style = paddingOverride(section.content);
                 // Close under the page's title, not a section's padding away.
                 const className = top && i === 0 ? "[&>*]:!pt-5" : undefined;
@@ -510,6 +626,27 @@ export function PageSections({
                         first={i === 0}
                         heroLevel={levels[i]}
                         siteName={siteName}
+                        look={look}
+                        isOwnerPreview={isOwnerPreview}
+                        credit={credit}
+                        {...(i === opener ? { frontDoor, proof } : {})}
+                        beside={
+                            joinsPacks(i) ? (
+                                <PacksSection
+                                    look={lookId}
+                                    isOwnerPreview={isOwnerPreview}
+                                    content={
+                                        sections[i + 1].content as RenderedPacks
+                                    }
+                                    plansOnPage
+                                    feed={packs}
+                                    prices={prices}
+                                    apiUrl={apiUrl}
+                                    siteId={siteId}
+                                    bare
+                                />
+                            ) : null
+                        }
                     />
                 );
                 return (
@@ -521,7 +658,7 @@ export function PageSections({
                         data-site-section=""
                         data-site-band={frame.band}
                         data-site-first-hero={
-                            !top && i === 0 && opensOverPhoto(section)
+                            !top && i === 0 && opensOverPhoto(section, look)
                                 ? "fullBleed"
                                 : undefined
                         }
@@ -532,4 +669,30 @@ export function PageSections({
             })}
         </>
     );
+}
+
+/**
+ * The page's one proof line under a look (U6): the first quote of its
+ * first testimonials section, as the owner wrote it. Null when the page
+ * has none: a proof line is never composed.
+ */
+export function pageProof(sections: readonly Section[]): PageProof | null {
+    for (const section of sections) {
+        if (section.type !== "testimonials") continue;
+        const items = (section.content as { items?: unknown } | null)?.items;
+        if (!Array.isArray(items)) continue;
+        for (const item of items) {
+            const quote = (item as { quote?: unknown } | null)?.quote;
+            const name = (item as { name?: unknown } | null)?.name;
+            if (
+                typeof quote === "string" &&
+                quote.trim() !== "" &&
+                typeof name === "string" &&
+                name.trim() !== ""
+            ) {
+                return { quote: quote.trim(), name: name.trim() };
+            }
+        }
+    }
+    return null;
 }

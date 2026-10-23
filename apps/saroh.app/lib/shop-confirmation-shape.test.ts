@@ -28,6 +28,7 @@ const BODY = {
     },
     refunded: false,
     toPay: null,
+    paidOnline: true,
     // How they hear about it (the API's notice reach), and where.
     reach: "NONE",
     email: "asha@example.com",
@@ -115,6 +116,19 @@ describe("an order paid at the handover (2026-10-06)", () => {
         ).toBe("Pay at pick-up");
         const { toPay: _gone, ...older } = BODY;
         expect(confirmationOf(older)?.toPay).toBeNull();
+    });
+});
+
+describe("paid online (DEC-181)", () => {
+    it("is true only when the API says so; an older API reads as not", () => {
+        expect(confirmationOf({ ...BODY, paidOnline: true })?.paidOnline).toBe(
+            true,
+        );
+        expect(confirmationOf({ ...BODY, paidOnline: "yes" })?.paidOnline).toBe(
+            false,
+        );
+        const { paidOnline: _gone, ...older } = BODY;
+        expect(confirmationOf(older)?.paidOnline).toBe(false);
     });
 });
 

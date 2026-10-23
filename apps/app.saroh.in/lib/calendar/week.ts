@@ -52,16 +52,20 @@ export function weekDates(from: string): string[] {
 
 /**
  * The design's title: "14–20 Sep 2026"; across two months "28 Sep–4 Oct
- * 2026"; across two years "29 Dec 2025–4 Jan 2026".
+ * 2026"; across two years "29 Dec 2025–4 Jan 2026". Given today, a week
+ * wholly in this year leaves the year off, as the Calendar week boards
+ * write it ("19 to 25 Oct", bookings U14).
  */
-export function weekTitle(from: string): string {
+export function weekTitle(from: string, today?: string): string {
     const to = addDays(from, 6);
     const sameYear = from.slice(0, 4) === to.slice(0, 4);
     const sameMonth = sameYear && from.slice(5, 7) === to.slice(5, 7);
+    const thisYear =
+        !!today && sameYear && from.slice(0, 4) === today.slice(0, 4);
     const start = sameMonth
         ? String(Number(from.slice(8, 10)))
         : formatDay(from, { year: sameYear ? "never" : "always" });
-    return `${start} to ${formatDay(to, { year: "always" })}`;
+    return `${start} to ${formatDay(to, { year: thisYear ? "never" : "always" })}`;
 }
 
 /**

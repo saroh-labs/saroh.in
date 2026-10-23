@@ -49,7 +49,7 @@ type Tx = Prisma.TransactionClient;
 type ProviderAlert = Extract<TeamAlertPayload, { event: "provider" }>;
 
 /** How a provider is named in an alert. */
-const PROVIDER_NAMES: Partial<Record<string, string>> = {
+export const PROVIDER_NAMES: Partial<Record<string, string>> = {
     RAZORPAY: "Razorpay",
     CASHFREE: "Cashfree",
     RESEND: "Resend",

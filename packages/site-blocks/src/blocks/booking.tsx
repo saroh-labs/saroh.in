@@ -17,6 +17,7 @@ import {
     timeIn,
 } from "../booking-flow/model";
 import { timeWords } from "../lib/clock";
+import type { LookProps } from "../look-context";
 import { useQrSource, withQrSource } from "../qr-source";
 import type { BusinessReach } from "../reach-links";
 import { ReachLinks } from "../reach-links";
@@ -106,7 +107,7 @@ export default function BookingSection({
     slots: givenSlots,
     bookHref,
     reach = null,
-}: {
+}: LookProps & {
     content: RenderedBooking;
     /** Base URL of the public API. See {@link DEFAULT_API_URL}. */
     apiUrl?: string;

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { fetchInvoicesExport } from "@/lib/billing";
-import { readGstin, readMonth } from "@/lib/billing-words";
+import { readGstin, readInvoiceStatus, readMonth } from "@/lib/billing-words";
 import { param } from "@/lib/params";
 
 /**
- * "Download CSV for GST" on Admin › Billing › Invoices (DEC-163): one
+ * "Export for the CA" on Admin › Billing › Invoices (DEC-179): one
  * month's invoices, made by the API. A proxy: the operator's session is
  * attached server-side and the API decides, with `saroh-billing:read`.
  */
@@ -30,6 +30,7 @@ export async function GET(request: Request) {
         month,
         q: param(search.get("q") ?? undefined),
         gstin: readGstin(search.get("gstin") ?? undefined),
+        status: readInvoiceStatus(search.get("status") ?? undefined),
     });
     if (!res.ok) {
         return NextResponse.json(

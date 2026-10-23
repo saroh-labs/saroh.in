@@ -9,11 +9,12 @@ import {
     FormSheet,
     FormSheetBody,
     FormSheetFoot,
-} from "@/components/shared/form-sheet";
+} from "@/components/shared/forms/form-sheet";
 import { BLOCKER_COPY } from "@/lib/modules/blocker-copy";
 import type { ModuleView } from "@/lib/modules/schema";
 import { listWords } from "@/lib/modules/switch-plan";
 import {
+    bookingPageLine,
     comesWithLines,
     CONNECT_KEYS,
     GIVES,
@@ -25,7 +26,7 @@ import type { ConnectLock } from "@/lib/providers/connect-lock";
 import { connectLockFor, connectLockLine } from "@/lib/providers/connect-lock";
 
 import { PlanWay } from "@/components/billing/plan-way";
-import { Refusal } from "@/components/shared/refusal";
+import { Refusal } from "@/components/shared/states/refusal";
 import { Notice } from "@saroh/ui/notice";
 import { TextLink } from "@saroh/ui/text-link";
 import { BookingsFields } from "./bookings-fields";
@@ -151,6 +152,9 @@ function TurnOnBody({
                   "Selling online needs a website for your online shop, so Website comes with it.",
               ]
             : []),
+        ...[bookingPageLine(plan, t.bookingPage)].flatMap((line) =>
+            line ? [line] : [],
+        ),
     ];
 
     const shopNote = !draft

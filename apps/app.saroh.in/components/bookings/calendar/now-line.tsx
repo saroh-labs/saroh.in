@@ -1,11 +1,13 @@
 "use client";
 
 import { formatClock } from "@/lib/format/datetime";
+import { cn } from "@saroh/ui/lib/utils";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 
 import type { Span } from "@/lib/services/diary";
 import { localMinuteOf } from "@/lib/services/diary";
 
+import { firstName } from "@/lib/names";
 import { at, tall } from "./geometry";
 
 // The clock is an external thing, so it is read as a store: the server and
@@ -41,20 +43,31 @@ export function useNowMinute(timezone: string, on: boolean): number | null {
 const inside = (minute: number | null, [from, to]: Span): minute is number =>
     minute !== null && minute >= from && minute <= to;
 
-/** The thin line across a column at now. Decoration: the rail says the time. */
+/**
+ * The line across a column at now. Decoration: the rail says the time. The
+ * day draws it 2px with a dot at its start on a phone (`dot`), as the
+ * boards do (BKMBookingsDay, BKDCalendarDay).
+ */
 export function NowLine({
     minute,
     span,
+    dot = false,
 }: {
     minute: number | null;
     span: Span;
+    dot?: boolean;
 }) {
     if (!inside(minute, span)) return null;
     return (
         <div
             aria-hidden
             data-now-line=""
-            className="pointer-events-none absolute inset-x-0 z-[3] h-px bg-destructive"
+            className={cn(
+                "pointer-events-none absolute inset-x-0 z-[3] bg-destructive",
+                dot
+                    ? "h-0.5 max-[759px]:before:absolute max-[759px]:before:-left-[5px] max-[759px]:before:-top-1 max-[759px]:before:size-2.5 max-[759px]:before:rounded-full max-[759px]:before:bg-destructive max-[759px]:before:content-['']"
+                    : "h-px",
+            )}
             style={{ top: at(minute, span[0]) }}
         />
     );
@@ -80,7 +93,7 @@ export function NowTime({
         >
             <span className="absolute -top-2 right-1 whitespace-nowrap rounded-[4px] bg-destructive px-1 text-[11px] font-semibold tabular-nums leading-4 text-destructive-foreground">
                 <span className="sr-only">Now, {full}</span>
-                <span aria-hidden>{full.split(" ")[0]}</span>
+                <span aria-hidden>{firstName(full)}</span>
             </span>
         </div>
     );

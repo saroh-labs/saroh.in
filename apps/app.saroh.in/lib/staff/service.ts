@@ -10,6 +10,10 @@ import type {
     OfferedDays,
     OfferedRead,
     OffRangeInput,
+    PersonRulesSaved,
+    PersonRulesView,
+    RuleChanges,
+    RuleRequest,
     StaffList,
     StaffView,
     WeeklyRange,
@@ -50,6 +54,42 @@ export async function readBookingPayment(): Promise<BookingPaymentView | null> {
         const res = await apiFetch(`${base}/booking-rules/payment`);
         if (!res.ok) return null;
         return asBookingPayment(await res.json());
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * One person's own booking rules and the request about them (DEC-170,
+ * #1038), or null when they couldn't be told: an API older than them, a
+ * role that can't read them, or the API down. A bare fetch: a 403 here is
+ * "couldn't tell", never the page's own forbidden.
+ */
+export async function readPersonRules(
+    staffId: string,
+): Promise<PersonRulesView | null> {
+    return softRead<PersonRulesView>(
+        `/staff/${encodeURIComponent(staffId)}/booking-rules`,
+    );
+}
+
+/**
+ * The requests to change someone's booking rules that are waiting: every
+ * one for an owner or admin, else the caller's own (#1038). Null when
+ * they couldn't be read, as {@link readPersonRules}.
+ */
+export async function readRuleRequests(): Promise<RuleRequest[] | null> {
+    const list = await softRead<RuleRequest[]>("/booking-rule-requests");
+    return Array.isArray(list) ? list : null;
+}
+
+async function softRead<T>(path: string): Promise<T | null> {
+    try {
+        const base = await orgBase();
+        if (!base) return null;
+        const res = await apiFetch(`${base}${path}`);
+        if (!res.ok) return null;
+        return (await res.json()) as T;
     } catch {
         return null;
     }
@@ -307,5 +347,33 @@ export function updateBookingRules(input: Partial<BookingRules>) {
         "PUT",
         input,
         "Couldn't save the booking rules.",
+    );
+}
+
+/**
+ * Change someone's own booking rules (#1038): applied at once, or a
+ * request waiting for approval (`applied` says). Undo of an applied change
+ * sends `previous` back the same way.
+ */
+export function updatePersonRules(staffId: string, input: RuleChanges) {
+    return send<PersonRulesSaved>(
+        `/staff/${encodeURIComponent(staffId)}/booking-rules`,
+        "PUT",
+        input,
+        "Couldn't save the booking rules.",
+    );
+}
+
+/** A move on a request: approve, turn down (with a reason), withdraw, or OK. */
+export function moveRuleRequest(
+    requestId: string,
+    move: "approve" | "turn-down" | "withdraw" | "dismiss",
+    reason?: string,
+) {
+    return send<RuleRequest>(
+        `/booking-rule-requests/${encodeURIComponent(requestId)}/${move}`,
+        "POST",
+        move === "turn-down" ? (reason ? { reason } : {}) : {},
+        "Couldn't change that request.",
     );
 }

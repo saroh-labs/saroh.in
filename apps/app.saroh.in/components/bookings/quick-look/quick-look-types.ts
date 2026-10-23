@@ -1,0 +1,72 @@
+import type { ReassignScope } from "@/components/bookings/sheets/change-who";
+import type { NoticeChannels } from "@/lib/messages/notice-reach";
+import type { DiaryBooking } from "@/lib/services/booking-calendar";
+import type { BookingRules } from "@/lib/staff/types";
+
+/**
+ * What the calendar's quick look and its pieces share: the actions the
+ * screen gives them and what they read.
+ */
+
+/** What the quick look can do; the screen holds each change for its Undo. */
+export interface QuickLookActions {
+    checkIn: (b: DiaryBooking) => void;
+    noShow: (b: DiaryBooking) => void;
+    cancel: (b: DiaryBooking) => void;
+    /**
+     * Cancel the whole class, with the reason its customers are told
+     * (DEC-178, #1172).
+     */
+    cancelClass: (seats: DiaryBooking[], title: string, reason: string) => void;
+}
+
+/** Undo for a booking whose change is still held, or null. */
+export type HeldFor = (bookingId: string) => (() => void) | null;
+
+export interface QuickLookContext {
+    timezone: string;
+    /** The clock, read once by the page — never in render. */
+    now: number;
+    money: boolean;
+    rules: BookingRules | null;
+    canBook: boolean;
+    /**
+     * `payment:manage`: may change what the business's policy does with
+     * the money when a paid booking is cancelled (DEC-170, Q14).
+     */
+    canRefund?: boolean;
+    /** `service:write`: "Edit this class" in a class's More. */
+    canEditService?: boolean;
+    /**
+     * Who the viewer may give bookings to (#1157); left out, anyone's to
+     * anyone (the API still decides).
+     */
+    reassign?: ReassignScope;
+    /** `order:read`: a treatment's order is a link, else words (E10). */
+    canReadOrder?: boolean;
+    /**
+     * Taking payment at the desk (P2): `booking:write` and `invoice:write`,
+     * and whether a payment link can be sent instead (a provider connected).
+     */
+    desk?: {
+        canTake: boolean;
+        canLink: boolean;
+        /** The plan takes payment online (R33); else no link is offered. */
+        online?: boolean;
+    };
+    /**
+     * What the business can tell its customers with (A14); null when it
+     * couldn't be read.
+     */
+    notices?: NoticeChannels | null;
+}
+
+/**
+ * The free-cancel hours that apply to a booking: the business's, whoever
+ * takes it (free cancelling follows its refund policy; DEC-170, 20 Oct).
+ */
+export function freeCancelOf(
+    ctx: Pick<QuickLookContext, "rules">,
+): number | null {
+    return ctx.rules?.freeCancelHours ?? null;
+}

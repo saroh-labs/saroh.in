@@ -85,6 +85,12 @@ describe("module pages on the live site (G15)", () => {
         expect(isBookingDeepLink({})).toBe(false);
     });
 
+    it("treats a step of the flow as the flow, so Back and a reload stay in it (U9)", () => {
+        expect(isBookingDeepLink({ step: "what" })).toBe(true);
+        expect(isBookingDeepLink({ step: "done", ref: "bk_1" })).toBe(true);
+        expect(isBookingDeepLink({ staff: "staff_1" })).toBe(true);
+    });
+
     it("says it isn't available while Appointments is off, not a 404", () => {
         expect(moduleRoute([HOME, BOOK], { BOOK: "off" }, "BOOK")).toEqual({
             draw: "unavailable",

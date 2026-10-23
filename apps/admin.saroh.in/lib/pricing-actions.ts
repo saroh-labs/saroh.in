@@ -93,7 +93,7 @@ export async function pricingImpactAction(): Promise<
     } catch {
         return {
             ok: false,
-            error: "What this draft does could not be worked out.",
+            error: "Who this draft reaches could not be worked out.",
         };
     }
 }

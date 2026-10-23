@@ -117,18 +117,28 @@ export function moduleRoute<P extends KindedPage>(
 
 /**
  * Whether `/book` was opened into the flow: a service, a day and time
- * (On today, G18), or a class to move (A6). Only a plain `/book` draws the
- * Book page.
+ * (On today, G18), a class to move (A6), or a step of the flow with what
+ * it was choosing (U9: `?step=`, `?staff=`, a booked `?ref=`). Only a plain
+ * `/book` draws the Book page.
  */
 export function isBookingDeepLink(params: {
     service?: string | string[];
     date?: string | string[];
     start?: string | string[];
     move?: string | string[];
+    step?: string | string[];
+    staff?: string | string[];
+    ref?: string | string[];
 }): boolean {
-    return [params.service, params.date, params.start, params.move].some(
-        (v) => v !== undefined,
-    );
+    return [
+        params.service,
+        params.date,
+        params.start,
+        params.move,
+        params.step,
+        params.staff,
+        params.ref,
+    ].some((v) => v !== undefined);
 }
 
 /**

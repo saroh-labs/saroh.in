@@ -43,9 +43,9 @@ export default async function AuditPage({
         <AdminShell staff={staff}>
             <PageContainer width="wide">
                 <PageHeader
-                    breadcrumb={["Instance", "Audit trail"]}
+                    breadcrumb={["Keep it running", "Audit trail"]}
                     title="What operators did"
-                    description="Every operator action on this instance, and none can be edited. Sensitive request details are never shown."
+                    description="Every action Saroh's team took in this console, and none can be edited. Sensitive request details are never shown."
                     actions={
                         (query.actorUserId !== undefined ||
                             query.organizationId !== undefined ||

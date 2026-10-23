@@ -39,9 +39,7 @@ describe("NotAuthorized", () => {
         render(element);
         expect(screen.getByTestId("shell")).toBeTruthy();
         expect(screen.getByText("Not authorized")).toBeTruthy();
-        expect(
-            screen.getByRole("link", { name: "Go to the overview" }),
-        ).toBeTruthy();
+        expect(screen.getByRole("link", { name: "Go to Home" })).toBeTruthy();
         // Sign out lives in the shell's header, not in the panel.
         expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
     });
@@ -60,14 +58,14 @@ describe("NotAuthorized", () => {
 });
 
 describe("NoAccessPanel", () => {
-    it("says nothing about why and points to the overview", () => {
+    it("says nothing about why and points to Home", () => {
         render(<NoAccessPanel email="support@example.com" />);
         expect(
             screen.getByText(/does not have access to this area/),
         ).toBeTruthy();
         expect(
             screen
-                .getByRole("link", { name: "Go to the overview" })
+                .getByRole("link", { name: "Go to Home" })
                 .getAttribute("href"),
         ).toBe("/");
     });

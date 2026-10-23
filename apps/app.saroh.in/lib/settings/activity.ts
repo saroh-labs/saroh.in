@@ -1,5 +1,10 @@
+import {
+    customerEmailLabel,
+    overdueTimingChange,
+} from "@/lib/communications/customer-emails";
 import { formatNumber } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import { insightsHref } from "@/lib/insights/period";
 import { ALERT_CHANNELS, ALERTS } from "@/lib/notifications/preferences";
 import { productHref } from "@/lib/products/links";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
@@ -89,6 +94,9 @@ export const ACTIVITY_ACTIONS = [
     "customer.details.changed",
     "customer.removed",
     "member.alerts.update",
+    // One of the business's automatic emails to its customers turned on
+    // or off (DEC-174, U4 #1135), on Settings › Providers.
+    "customer-notices.setting",
     // A GST rate chosen for a service, a product or a course from the rates
     // sheet, as it was written before price history (12 Oct 2026). The
     // sheet writes `price.changed` now; rows already written still read.
@@ -97,6 +105,11 @@ export const ACTIVITY_ACTIONS = [
     // its price, MRP, GST rate or "GST on this price", from any screen.
     // (An item's first entry, `price.set`, is its own history's.)
     "price.changed",
+    // A link to share a website made, archived or brought back on Insights
+    // › Where customers come from (DEC-181, #1099).
+    "site-link.created",
+    "site-link.archived",
+    "site-link.restored",
 ] as const;
 
 /** Someone an event names, as they are now; `null` when they are gone. */
@@ -161,6 +174,26 @@ const TEAM = (view: "people" | "roles" = "people") => ({
 const MODULES = { label: "Modules", href: "/settings/modules" };
 const PRODUCTS = { label: "Products", href: "/commerce/products" };
 const PLAN = { label: "Plan and billing", href: "/settings/billing" };
+/** Where the links made in Saroh live (DEC-181), for the link's website. */
+const links = (siteId: string | null) => ({
+    label: "Insights",
+    href: insightsHref({ tab: "from", siteId }),
+});
+
+/**
+ * A link to share a website made, archived or brought back (DEC-181), as
+ * the rest of a sentence: "made the link Diwali post (diwali-post)".
+ */
+function siteLinkWhat(action: string, meta: Record<string, unknown>): string {
+    const name = text(meta.name);
+    const label = text(meta.label);
+    const which = name
+        ? `the link ${name}${label ? ` (${label})` : ""}`
+        : "a link";
+    if (action === "site-link.archived") return `archived ${which}`;
+    if (action === "site-link.restored") return `brought back ${which}`;
+    return `made ${which}`;
+}
 /** A storefront's own settings, or the list when it isn't named. */
 const STOREFRONTS_HREF = (storeId: string | null) =>
     storeId ? storefrontHref(storeId) : "/commerce/locations";
@@ -231,6 +264,29 @@ function alertWhat(meta: Record<string, unknown>): string {
     return `turned ${how} ${after ? "on" : "off"} for ${alert}, for themselves`;
 }
 
+/**
+ * One of the business's automatic customer emails turned on or off
+ * (DEC-174), as the rest of a sentence: "turned Membership emails off for
+ * customers". A kind this page doesn't know is said generally.
+ */
+function customerEmailWhat(meta: Record<string, unknown>): string {
+    const label = customerEmailLabel(meta.kind);
+    if (
+        label &&
+        recordedChanges(meta)?.some((c) => overdueTimingChange(c) !== null)
+    ) {
+        // When overdue reminders go (DEC-178, #1169).
+        return `changed when ${label} go`;
+    }
+    const after = recordedChanges(meta)?.find(
+        (c) => c.field === "noticeOn",
+    )?.after;
+    if (!label || typeof after !== "boolean") {
+        return "changed which emails customers get";
+    }
+    return `turned ${label} ${after ? "on" : "off"} for customers`;
+}
+
 export function personName(person: AuditPerson | null): string | null {
     if (!person) return null;
     // A blank name is no name: say the email instead.
@@ -293,6 +349,11 @@ export function activityLine(
             return line(alertWhat(meta), {
                 label: "Alerts",
                 href: "/settings/profile",
+            });
+        case "customer-notices.setting":
+            return line(customerEmailWhat(meta), {
+                label: "Providers",
+                href: "/settings/providers",
             });
         case "storefront.fulfilment.update": {
             // How orders leave, or when they count as late (B17).
@@ -432,6 +493,13 @@ export function activityLine(
         // Their page is gone (C11): the line leads to the list.
         case "customer.removed":
             return line(removedWhat(meta), customerPlace(null));
+        case "site-link.created":
+        case "site-link.archived":
+        case "site-link.restored":
+            return line(
+                siteLinkWhat(event.action, meta),
+                links(text(meta.siteId)),
+            );
         default:
             return null;
     }

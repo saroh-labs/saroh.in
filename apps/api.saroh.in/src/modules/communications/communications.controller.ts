@@ -23,7 +23,10 @@ import {
     SendMessageDto,
     SetAccountUpdatesDto,
     SetConsentDto,
+    SetNoticeSettingDto,
+    SetOverdueTimingDto,
 } from "./dto";
+import { NoticeSettingsService } from "./notice-settings.service";
 
 /**
  * Org communications endpoints (S6-001), scoped to
@@ -38,7 +41,10 @@ import {
 @Controller("organizations/:organizationId")
 @UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
 export class CommunicationsController {
-    constructor(private readonly comms: CommunicationsService) {}
+    constructor(
+        private readonly comms: CommunicationsService,
+        private readonly noticeSettings: NoticeSettingsService,
+    ) {}
 
     // ---- Providers ----
     /*
@@ -60,16 +66,6 @@ export class CommunicationsController {
     @Get("comms-providers")
     listProviders(@OrgContext() ctx: OrganizationContext) {
         return this.comms.listProviders(ctx);
-    }
-
-    /**
-     * Saroh sending the business's booking emails while it has no email of
-     * its own (DEC-086): OFF, SENDING, NEAR, PAUSED or UNREAD. Not
-     * module-gated: it says what is sent, which is also "nothing".
-     */
-    @Get("comms-providers/saroh-email")
-    sarohEmail(@OrgContext() ctx: OrganizationContext) {
-        return this.comms.sarohEmail(ctx);
     }
 
     /**
@@ -177,5 +173,44 @@ export class CommunicationsController {
         @Body() dto: SetAccountUpdatesDto,
     ) {
         return this.comms.setAccountUpdates(ctx, dto.on);
+    }
+
+    /**
+     * The business's switches for its automatic customer notices (DEC-174,
+     * U1 #1132): each kind whose module is on, with whether it is on, its
+     * default, and whether it can be changed now (and why not). Anyone in
+     * the business reads it; changing one needs `comms:manage`. Not
+     * module-gated, as "Updates in Messages": turning a notice off must
+     * work with Communications off.
+     */
+    @Get("customer-notices/settings")
+    noticeSettingsRead(@OrgContext() ctx: OrganizationContext) {
+        return this.noticeSettings.read(ctx);
+    }
+
+    @Patch("customer-notices/settings")
+    noticeSettingsUpdate(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: SetNoticeSettingDto,
+    ) {
+        return this.noticeSettings.update(ctx, { kind: dto.kind, on: dto.on });
+    }
+
+    /**
+     * When overdue reminders go (DEC-178, #1169): the two days after the
+     * due date and the hours, all four at once. `comms:manage`; answers
+     * with the switches, as the PATCH above.
+     */
+    @Patch("customer-notices/overdue-timing")
+    overdueTimingUpdate(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: SetOverdueTimingDto,
+    ) {
+        return this.noticeSettings.updateOverdueTiming(ctx, {
+            firstDay: dto.firstDay,
+            secondDay: dto.secondDay,
+            fromHour: dto.fromHour,
+            untilHour: dto.untilHour,
+        });
     }
 }

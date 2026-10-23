@@ -16,12 +16,14 @@
  *   accounts:/<route>  a route of accounts.saroh.in
  *   web:/<route>       a route of the marketing site, saroh.in (apps/saroh.in,
  *                      the `web` package)
+ *   admin:/<route>     a route of the operator console, admin.saroh.in
  *   api:<module>       a folder of apps/api.saroh.in/src/modules
  *   pkg:<package>      a folder of packages/
  *
  * This maps changed files to those keys and prints the specs that name one:
  *
- *   - a file of app.saroh.in, saroh.app, accounts.saroh.in or saroh.in (a page, a
+ *   - a file of app.saroh.in, saroh.app, accounts.saroh.in, saroh.in or
+ *     admin.saroh.in (a page, a
  *     component, a lib module) → the routes whose files import it, directly
  *     or through other files (an import scan of the app). A route's layout
  *     reaches the routes beneath it; a spec on `app:/customers` is reached by
@@ -54,6 +56,8 @@
  *   … | node scripts/e2e-affected.mjs --stdin         paths on stdin (prepush)
  *   node scripts/e2e-affected.mjs --check             every spec of both suites
  *                                                     names valid keys
+ *   node scripts/e2e-affected.mjs --check-keys k1 k2  these keys are valid
+ *                                                     (scripts/e2e-affected.test.mjs)
  *   --suite permissions (before --files)               the permission suite
  *
  * Prints the selected spec paths on stdout (relative to e2e/, one per line)
@@ -100,6 +104,9 @@ const SURFACES = [
     // The marketing site (plan U29): its content/ and redirects.js are
     // outside app/, components/ and lib/, so they reach every web: spec.
     { key: "web", dir: "apps/saroh.in", dropSegments: [] },
+    // The operator console (admin plan U23). A run that picks an `admin:`
+    // spec also builds and starts it (on 3006, at E2E_ADMIN_URL).
+    { key: "admin", dir: "apps/admin.saroh.in", dropSegments: [] },
 ];
 const API_DIR = "apps/api.saroh.in";
 const API_MODULES = `${API_DIR}/src/modules`;
@@ -342,6 +349,21 @@ function validKeys() {
     return valid;
 }
 
+const KEY_HINT =
+    "  // @covers app:/<route> site:/<route> accounts:/<route> web:/<route> admin:/<route> api:<module> pkg:<package>";
+
+/** `--check-keys`: whether each key given names a real route, module or package. */
+function checkKeys(keys) {
+    const valid = validKeys();
+    const bad = keys.filter((k) => !valid.has(k));
+    if (bad.length) {
+        console.error(`unknown key ${bad.join(", unknown key ")}`);
+        console.error(KEY_HINT);
+        process.exit(1);
+    }
+    console.error(`e2e @covers: ${keys.length} keys, every one is real`);
+}
+
 function check() {
     const valid = validKeys();
     const bad = [];
@@ -356,7 +378,7 @@ function check() {
         console.error("e2e @covers check failed:\n  " + bad.join("\n  "));
         console.error(
             "\nEvery browser spec names what it exercises (scripts/e2e-affected.mjs):\n" +
-                "  // @covers app:/<route> site:/<route> accounts:/<route> web:/<route> api:<module> pkg:<package>",
+                KEY_HINT,
         );
         process.exit(1);
     }
@@ -649,6 +671,10 @@ function select(changed, suite) {
 const args = process.argv.slice(2);
 if (args.includes("--check")) {
     check();
+    process.exit(0);
+}
+if (args[0] === "--check-keys") {
+    checkKeys(args.slice(1));
     process.exit(0);
 }
 let changed;

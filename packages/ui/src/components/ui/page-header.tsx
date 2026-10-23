@@ -55,6 +55,13 @@ export interface PageHeaderProps extends Omit<
      * crumb is the page itself and reads in Ink; the rest are muted.
      */
     breadcrumb?: React.ReactNode[];
+    /**
+     * On a phone, the compact top bar (the Payments audit, DEC-173): no
+     * breadcrumb, a smaller title, and the actions on the title's line
+     * rather than under it, so the list starts high on the screen. The
+     * desk is unchanged. For a list whose phone screen is the list.
+     */
+    compactOnPhone?: boolean;
 }
 
 /**
@@ -89,6 +96,7 @@ export function PageHeader({
     actions,
     breadcrumb,
     holdsData = false,
+    compactOnPhone = false,
     className,
     ...props
 }: PageHeaderProps) {
@@ -101,7 +109,12 @@ export function PageHeader({
     const crumbs = breadcrumb?.length ? (
         <nav
             aria-label="Breadcrumb"
-            className="mb-[9px] flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground [&_a:active]:text-muted-foreground [&_a:hover]:text-foreground [&_a]:rounded-sm [&_a]:transition-colors"
+            className={cn(
+                "mb-[9px] flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground [&_a:active]:text-muted-foreground [&_a:hover]:text-foreground [&_a]:rounded-sm [&_a]:transition-colors",
+                // The phone's compact bar has none: the shell's top bar
+                // already says where this is.
+                compactOnPhone && "max-sm:hidden",
+            )}
         >
             {breadcrumb.map((crumb, i) => (
                 <React.Fragment key={i}>
@@ -157,7 +170,14 @@ export function PageHeader({
                 button at three heights. The row starts both at the top;
                 `ACTIONS_ON_TITLE` then centres the buttons on the title's
                 first line. */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div
+                className={cn(
+                    "flex gap-3 sm:flex-row sm:items-start sm:justify-between",
+                    compactOnPhone
+                        ? "flex-row items-center justify-between"
+                        : "flex-col",
+                )}
+            >
                 <div
                     className={cn(
                         "min-w-0",
@@ -190,7 +210,10 @@ export function PageHeader({
                         >
                             <h1
                                 {...mark("title")}
-                                className="min-w-0 text-balance font-display text-[30px] font-semibold leading-[1.1] tracking-[-0.03em] [overflow-wrap:anywhere]"
+                                className={cn(
+                                    "min-w-0 text-balance font-display text-[30px] font-semibold leading-[1.1] tracking-[-0.03em] [overflow-wrap:anywhere]",
+                                    compactOnPhone && "max-sm:text-[24px]",
+                                )}
                             >
                                 {title}
                             </h1>
@@ -227,6 +250,9 @@ export function PageHeader({
                         className={cn(
                             "flex min-w-0 flex-wrap items-center gap-x-3.5 gap-y-2 sm:justify-end",
                             ACTIONS_ON_TITLE,
+                            // Beside the title on a phone: as wide as its
+                            // button, never squeezing the title off.
+                            compactOnPhone && "max-sm:shrink-0",
                         )}
                     >
                         {meta ? (

@@ -52,6 +52,14 @@ in; about 150 UI sign-ins a run became four.
   in through the form in a fresh context instead, as `auth.spec.ts` does.
 - **Choosing a business is safe.** The open business is the workspace's own
   cookie, written into that spec's context only.
+- **Staff for the operator console** is `useSession(page, "staff")`:
+  `staff@saroh.dev`, a Platform owner by a recorded grant (not the
+  `ADMIN_ALLOWLIST` break-glass), in no business. The seed writes them on a
+  database on this machine or CI's only (`packages/database/src/seed/staff.ts`).
+  They sign in through the same form as everyone else. A console spec opens
+  `urls.ADMIN_URL`; to see a refusal, open it as the owner, never by revoking
+  Sam's grant (every other console spec shares it). See
+  `admin-smoke.spec.ts`.
 - A new person: add them to `people` in `fixtures/sessions.ts`; the setup
   project picks them up.
 
@@ -61,6 +69,13 @@ No `waitForTimeout`. Wait on something that happens: `expect(...)` on the
 screen, `expect.poll` on the API or on a measurement that must settle, and
 for a timer in the page (a ten-second hold, an Undo toast) install
 `page.clock` before the page loads and `runFor` past it.
+
+**The first press on a page after a `goto` or `reload` goes through
+`pressUntil(button, answer)`** (`e2e/fixtures/press.ts`). A server-drawn
+button pressed before React hydrates does nothing, and on CI a page's own
+content can hydrate well after the shell. It presses until `answer` (a
+Locator that shows, or a check such as `aria-pressed`) holds, and never
+presses again once it does (DEV_LEARNINGS, 19 Oct 2026).
 
 Never read the page once with `page.evaluate` and assert on the result: CI's
 runners are slower than this Mac, and a single look can land between two
@@ -115,6 +130,24 @@ and fail when `innerWidth` has grown, as `phone-reflow.spec.ts` does. Test
 with the values merchants have: a 60-character email with no hyphen (a
 hyphen is a line break the layout didn't earn), and long names.
 
+**What the looks' first run caught (DEV_LEARNINGS, 20 Oct 2026).**
+
+- A colour read once right after a click lands mid-transition: poll it.
+  Two `boundingBox` calls on something animating land at two heights: read
+  both rects in one `evaluate`.
+- `getByLabel("Code")` matches "Country code" too: `{ exact: true }`.
+- A block drawn twice (desk columns and phone tabs, CSS shows one) needs
+  `.filter({ visible: true })` before a strict assertion.
+- A live fact swaps its link when the read lands: wait for
+  `data-live-state` to leave `loading` before reading its `href`, and never
+  `.first()` a link inside one when you mean the hero's own button
+  (`[data-site-primary]`).
+- `if ((await x.count()) > 0)` before something has drawn skips the step:
+  click it and let it wait.
+- The seed is not the demo: Northwind has no public phone or place, no
+  storefront chosen for its site, online storefronts only and a short home.
+  Give it what the test needs and put it back.
+
 **A flaky harness gets ignored, which is worse than none.** Poll for readiness
 rather than sleeping a fixed number of seconds; a cold Next server on a runner
 is not reliably up in any particular time.
@@ -137,6 +170,9 @@ changes reach; CI runs them all.
 - `web:/<route>`: a route of the marketing site, saroh.in. A run that
   picks a `web:` spec also builds and starts that site (on 3002, at
   `E2E_WEB_URL`; `marketing.spec.ts`).
+- `admin:/<route>`: a route of the operator console, admin.saroh.in. A run
+  that picks an `admin:` spec also builds and starts the console (on 3006,
+  at `E2E_ADMIN_URL`); CI always does. Name `api:admin` beside it.
 - `api:<module>`: each module behind a screen it drives or an endpoint it
   calls, by folder under `apps/api.saroh.in/src/modules`.
 - `pkg:<package>`: a shared package it renders, such as `pkg:site-blocks`
@@ -166,6 +202,10 @@ the `@serial` tests one at a time. Every new spec follows these rules:
   first Preparing order". An order's line is `ORDER_LINE`, an untracked
   product the setup project makes once, so no order holds stock another
   test counts.
+- **Sign in before making data.** `northwind(page.request)` carries the
+  page's cookies, so `useSession(page)` comes first; the `request`
+  fixture has none (`check:e2e-signed-in-request`). An overdue invoice
+  of your own is `issueOverdue`: the API never issues one already late.
 - **Unique stamps.** Names, emails and notes carry `stamp(testInfo)` —
   project, worker, time and a random tail — never a bare `Date.now()`,
   which desk and phone can hit in the same millisecond. A phone number is

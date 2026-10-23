@@ -5,7 +5,8 @@ import { planLabel } from "@saroh/ui/lib/state-copy";
  * A business's messages to its customers — invoices, booking and order
  * updates, review invitations — go only through its own connected email
  * provider (DEC-011, amended 2026-10-07). Without one its customers get no
- * emails and see their updates only in their account. This is what the
+ * emails; those with an account on its site see booking and order updates
+ * there only where Saroh posts them (U5, #1136). This is what the
  * workspace says about it, and to whom:
  *
  * - **The prompt** (`emailPrompt`): Settings › Providers, and Home's Needs
@@ -28,6 +29,12 @@ export interface EmailSetup {
      * connect itself goes ahead.
      */
     canConnect: boolean | null;
+    /**
+     * When it has none: whether customers with an account on its site see
+     * their updates there. Null, or absent from an API before U5, claims
+     * neither.
+     */
+    accountUpdates?: boolean | null;
 }
 
 /** What this person may do about it. */
@@ -39,8 +46,24 @@ export interface EmailMay {
 }
 
 export const EMAIL_PROMPT_TITLE = "Your customers get no emails from you";
-export const EMAIL_PROMPT_MISSED =
-    "No email provider is connected, so invoices, booking and order updates and review invitations aren't emailed. Your customers see their updates only in their account.";
+const NOT_EMAILED =
+    "No email provider is connected, so invoices, booking and order updates and review invitations aren't emailed";
+
+/**
+ * What the customers miss, true for this business — the API's
+ * `emailSetupMissed` (`communications/email-setup.ts`), word for word.
+ */
+export function emailPromptMissed(
+    accountUpdates: boolean | null | undefined,
+): string {
+    if (accountUpdates === true) {
+        return `${NOT_EMAILED}. Customers with an account on your site see booking and order updates there.`;
+    }
+    if (accountUpdates === false) {
+        return `${NOT_EMAILED}, and your customers don't hear about them.`;
+    }
+    return `${NOT_EMAILED}.`;
+}
 export const EMAIL_PROMPT_PLAN =
     "Connecting your own email comes with a paid plan.";
 
@@ -84,7 +107,7 @@ export function emailPrompt(
         return {
             kind: "plans",
             title: EMAIL_PROMPT_TITLE,
-            text: `${EMAIL_PROMPT_MISSED} ${EMAIL_PROMPT_PLAN}`,
+            text: `${emailPromptMissed(setup.accountUpdates)} ${EMAIL_PROMPT_PLAN}`,
             action: { href: SEE_PLANS_HREF, label: planLabel() },
         };
     }
@@ -92,7 +115,7 @@ export function emailPrompt(
     return {
         kind: "connect",
         title: EMAIL_PROMPT_TITLE,
-        text: EMAIL_PROMPT_MISSED,
+        text: emailPromptMissed(setup.accountUpdates),
         action: { href: connectHref, label: "Connect your email" },
     };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { PartialRead } from "@/components/shared/failed-read";
+import { PartialRead } from "@/components/shared/states/failed-read";
 
 import type { CalendarMonth } from "@/lib/calendar/types";
 

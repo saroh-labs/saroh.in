@@ -3,7 +3,13 @@
 import { revalidatePath } from "next/cache";
 
 import { linesWithRates } from "./line-rates";
-import type { InvoiceInput, PaymentInput } from "./service";
+import type { ReminderAsk } from "./remind-all";
+import type {
+    CreditExpect,
+    InvoiceInput,
+    PaymentInput,
+    ShareAsk,
+} from "./service";
 import * as api from "./service";
 
 /** Thin: the API decides who may and what an invoice may become. */
@@ -15,16 +21,37 @@ function refresh(id?: string) {
     revalidatePath("/billing/subscriptions");
 }
 
+/**
+ * Money on an invoice moved: Home's owed figures and cheques line, and the
+ * customer's page, read it too.
+ */
+function refreshMoney(id: string) {
+    refresh(id);
+    revalidatePath("/");
+    revalidatePath("/contacts", "layout");
+}
+
 export async function createInvoice(input: InvoiceInput) {
     const res = await api.createInvoice(input);
     if (res.ok) refresh();
     return res;
 }
 
+/**
+ * The editor's later saves, made as it is typed (`use-invoice-draft.ts`),
+ * revalidate nothing, not even the list's path. Any revalidation makes the
+ * router read the page it is on again, and once a new draft has its own
+ * address (`/<id>/edit`) that is another page than the one drawn (`/new`):
+ * the editor was thrown away and drawn again on its second save, closing
+ * a phone's Style sheet under the finger, with whatever else was open or
+ * focused (20 Oct). The first save (`createInvoice`) still revalidates, on
+ * `/new`, where the page read again is the one drawn. A screen opened
+ * afterwards reads the draft from the API (no fetch is cached,
+ * `lib/api/http.ts`); one brought back by the browser's Back can show it
+ * as it was until it is read again.
+ */
 export async function updateInvoice(id: string, input: InvoiceInput) {
-    const res = await api.updateInvoice(id, input);
-    if (res.ok) refresh(id);
-    return res;
+    return api.updateInvoice(id, input);
 }
 
 export async function deleteInvoice(id: string) {
@@ -74,15 +101,49 @@ export async function voidInvoice(id: string, reason: string) {
     return res;
 }
 
-export async function creditInvoice(id: string, reason: string) {
-    const res = await api.creditInvoice(id, reason);
+export async function creditInvoice(
+    id: string,
+    reason: string,
+    expect?: CreditExpect,
+) {
+    const res = await api.creditInvoice(id, reason, expect);
+    if (res.ok) refresh(id);
+    return res;
+}
+
+export async function reissueInvoice(id: string, reason: string) {
+    const res = await api.reissueInvoice(id, reason);
+    if (res.ok) refresh(id);
+    return res;
+}
+
+/** The sheet's preview of the credit note: a read, nothing revalidated. */
+export async function readCreditPreview(id: string) {
+    return api.readCreditPreview(id);
+}
+
+/** Cancel and write a correct one: the invoice, its credit note and the draft. */
+export async function creditAndRewriteInvoice(
+    id: string,
+    reason: string,
+    expect?: CreditExpect,
+) {
+    const res = await api.creditAndRewriteInvoice(id, reason, expect);
+    if (res.ok) refresh(id);
+    return res;
+}
+
+/** Write a void invoice again: a draft with its lines. */
+export async function writeInvoiceAgain(id: string) {
+    const res = await api.writeInvoiceAgain(id);
     if (res.ok) refresh(id);
     return res;
 }
 
 /**
- * One invoice with its lines, for a quick look opened from a list. A read,
- * so nothing is revalidated; a failure comes back as a message to show.
+ * One invoice, for Record payment opened with only its id (the customer's
+ * Invoices tab). A read, so nothing is revalidated; a failure comes back as
+ * a message to show.
  */
 export async function readInvoice(id: string) {
     try {
@@ -101,14 +162,49 @@ export async function readInvoice(id: string) {
     }
 }
 
-export async function reissueInvoice(id: string, reason: string) {
-    const res = await api.reissueInvoice(id, reason);
-    if (res.ok) refresh(id);
+/** Record money taken by hand: all that is left, part of it, or a cheque. */
+export async function recordPayment(id: string, input: PaymentInput) {
+    const res = await api.recordPayment(id, input);
+    if (res.ok) refreshMoney(id);
     return res;
 }
 
-export async function recordPayment(id: string, input: PaymentInput) {
-    const res = await api.recordPayment(id, input);
+/** Remove a payment recorded by mistake (DEC-173); kept in the history. */
+export async function removePayment(
+    id: string,
+    paymentId: string,
+    reason?: string,
+) {
+    const res = await api.removePayment(id, paymentId, reason);
+    if (res.ok) refreshMoney(id);
+    return res;
+}
+
+/** A waiting cheque is in the bank. */
+export async function chequeCleared(
+    id: string,
+    paymentId: string,
+    clearedAt?: string,
+) {
+    const res = await api.chequeCleared(id, paymentId, clearedAt);
+    if (res.ok) refreshMoney(id);
+    return res;
+}
+
+/** A waiting cheque bounced: what it paid is owed again. */
+export async function chequeBounced(
+    id: string,
+    paymentId: string,
+    input: { bouncedAt?: string; reason?: string } = {},
+) {
+    const res = await api.chequeBounced(id, paymentId, input);
+    if (res.ok) refreshMoney(id);
+    return res;
+}
+
+/** Share it by hand: WhatsApp, a link, the PDF, print, or a receipt by email. */
+export async function shareInvoice(id: string, ask: ShareAsk) {
+    const res = await api.shareInvoice(id, ask);
     if (res.ok) refresh(id);
     return res;
 }
@@ -134,5 +230,20 @@ export async function sendInvoice(id: string) {
 export async function remindInvoice(id: string) {
     const res = await api.remindInvoice(id);
     if (res.ok) refresh(id);
+    return res;
+}
+
+/** Remind all's list (Home plan U8): a read, through an action for the sheet. */
+export async function previewReminders(ask: ReminderAsk) {
+    return api.previewReminders(ask);
+}
+
+/** Remind all: Home and the invoices read again, with the reminders sent. */
+export async function sendReminders(ask: ReminderAsk) {
+    const res = await api.sendReminders(ask);
+    if (res.ok) {
+        refresh();
+        revalidatePath("/");
+    }
     return res;
 }

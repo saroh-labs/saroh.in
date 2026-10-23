@@ -5,7 +5,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import { useRef } from "react";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import type {
     ShellActions,
     ShellTone,

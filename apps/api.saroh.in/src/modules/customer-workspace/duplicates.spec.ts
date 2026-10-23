@@ -1,3 +1,4 @@
+import { PHONE_CASES } from "@saroh/block-contract";
 import {
     reservedAccountEmail,
     reservedMergedEmail,
@@ -47,6 +48,16 @@ describe("normalisePhone", () => {
         expect(normalisePhone("+91 98765 43210")).toBe(ten);
         expect(normalisePhone("91-98765-43210")).toBe(ten);
         expect(normalisePhone("98765 43210")).toBe(ten);
+        // A trunk 0 and 0091, as the shared phone rule reads them (#1036).
+        expect(normalisePhone("098765 43210")).toBe(ten);
+        expect(normalisePhone("0091 98765 43210")).toBe(ten);
+    });
+
+    it("agrees with the shared phone rule on every Indian case it keeps", () => {
+        for (const c of PHONE_CASES) {
+            if (c.country !== "IN" || !c.stored) continue;
+            expect(normalisePhone(c.typed)).toBe(normalisePhone(c.stored));
+        }
     });
 
     it("keeps a 91 that is part of a ten-digit number", () => {

@@ -8,16 +8,16 @@
 
 The plan does **not** start from zero. The following foundations landed this session and are treated as **complete**; milestones build on them rather than re-doing them.
 
-| Shipped                                                                          | Evidence                                                                         |
-| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Shared `AppHeader` app-shell (brand, org switcher, nav, sign-out, notifications) | `components/shared/app-header.tsx`, rendered once in `app/layout.tsx` (#98, #99) |
-| Design tokens wired into Tailwind (`--brand`)                                    | Tailwind preset (#91, #92)                                                       |
-| Route-level loading / error / not-found boundaries                               | `app/loading.tsx`, `app/error.tsx`, `app/not-found.tsx` (#100)                   |
-| Self-hosted Inter (variable)                                                     | `localFont(InterVariable-latin.woff2)` in `app/layout.tsx` (#96)                 |
-| Shared `ThemeProvider` (light default, system enabled)                           | `@saroh/ui/theme-provider` in `app/layout.tsx` (#95)                             |
-| Single-source Wordmark (was 4 copies)                                            | `@saroh/ui/wordmark` (#93)                                                       |
-| `@saroh/ui` source-consumption contract                                          | `packages/ui` (#94)                                                              |
-| Component gallery app                                                            | `apps/ui.saroh.in/*` (#97)                                                       |
+| Shipped                                                                          | Evidence                                                                               |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Shared `AppHeader` app-shell (brand, org switcher, nav, sign-out, notifications) | `components/shared/shell/app-header.tsx`, rendered once in `app/layout.tsx` (#98, #99) |
+| Design tokens wired into Tailwind (`--brand`)                                    | Tailwind preset (#91, #92)                                                             |
+| Route-level loading / error / not-found boundaries                               | `app/loading.tsx`, `app/error.tsx`, `app/not-found.tsx` (#100)                         |
+| Self-hosted Inter (variable)                                                     | `localFont(InterVariable-latin.woff2)` in `app/layout.tsx` (#96)                       |
+| Shared `ThemeProvider` (light default, system enabled)                           | `@saroh/ui/theme-provider` in `app/layout.tsx` (#95)                                   |
+| Single-source Wordmark (was 4 copies)                                            | `@saroh/ui/wordmark` (#93)                                                             |
+| `@saroh/ui` source-consumption contract                                          | `packages/ui` (#94)                                                                    |
+| Component gallery app                                                            | `apps/ui.saroh.in/*` (#97)                                                             |
 
 **Implication:** M1 is a _hardening/systematizing_ pass on tokens (not a green-field build), and M2 can extend an existing shell instead of inventing one.
 
@@ -80,7 +80,7 @@ Total ≈ **100–135 person-days**. Milestones are largely sequential (each dep
 - **Breadcrumbs** on nested store routes via `@saroh/ui/breadcrumb` — D‑18.
 - **Touch targets** ≥44px in nav; **responsive form** reflow at 320/390 — D‑48, D‑59.
 
-**Affected files:** `app/layout.tsx`, `components/shared/app-header.tsx` (→ split into `sidebar.tsx` + `topbar.tsx`), new `command-palette.tsx`, `mobile-nav.tsx`, `app/stores/[storeId]/layout.tsx`, `packages/ui/src/components/ui/{command,breadcrumb,sheet}.tsx`.
+**Affected files:** `app/layout.tsx`, `components/shared/shell/app-header.tsx` (→ split into `sidebar.tsx` + `topbar.tsx`), new `command-palette.tsx`, `mobile-nav.tsx`, `app/stores/[storeId]/layout.tsx`, `packages/ui/src/components/ui/{command,breadcrumb,sheet}.tsx`.
 
 **Acceptance criteria:**
 

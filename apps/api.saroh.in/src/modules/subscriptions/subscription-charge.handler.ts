@@ -19,6 +19,18 @@ import {
     earliestDebitAt,
     MandateChargesService,
 } from "../payments/mandate-charges.service";
+import { enqueueAutopayFailedNotice } from "../site-accounts/notices/autopay-failed";
+import type { PreDebitMissing } from "../site-accounts/notices/pre-debit";
+import {
+    cancelPreDebitNoticeInTx,
+    enqueuePreDebitNoticeInTx,
+    preDebitNoticeState,
+} from "../site-accounts/notices/pre-debit";
+import {
+    SAROH_NOTICE_MIN_HOURS,
+    sarohNoticeAt,
+    sarohSendsNotice,
+} from "./autopay-timing";
 import type { ChargeJobPayload } from "./charge-job";
 import {
     chargeKey,
@@ -34,6 +46,7 @@ import {
 } from "./charge-job";
 import type { EarlyDropReason } from "./early-renewal";
 import { dropEarlyRenewalInTx } from "./early-renewal";
+import { sendRenewalUnlessCharged } from "./renewal-send";
 import { JOB, subscriptionEventLog } from "./subscription-events";
 
 export { SUBSCRIPTION_CHARGE_TYPE } from "./charge-job";
@@ -55,7 +68,21 @@ export { SUBSCRIPTION_CHARGE_TYPE } from "./charge-job";
  *
  * What came of it is written by `mandate-charge-outcome.ts`: CHARGED,
  * RENEWAL_FAILED (the pay link opens again; the team is told of a
- * decline), or MANDATE_LIMIT_LOW. Saroh sends the customer nothing.
+ * decline), or MANDATE_LIMIT_LOW.
+ *
+ * **An eMandate is announced, or not debited** (DEC-180). Neither Razorpay
+ * nor the bank tells the customer before an eMandate debit, so Saroh does:
+ * once the charge is prepared, `AUTOPAY_PRE_DEBIT` is queued for
+ * `PRE_DEBIT_LEAD_HOURS` (26 h) before the planned debit, which is never
+ * less than that after the prepare (`earliestDebit`). The debit step
+ * reads whether it went (`preDebitNoticeState`): sent, it debits no
+ * sooner than `SAROH_NOTICE_MIN_HOURS` (24 h) after the email went, so a
+ * late email moves the debit, never shortens the notice; not sent (no
+ * email provider, no address, email turned off, or simply not gone),
+ * that period isn't taken by autopay: the charge is CANCELLED,
+ * NOT_CHARGED_NO_NOTICE is written with why, and the renewal invoice goes
+ * as it would without autopay (`sendRenewalUnlessCharged`, U10). Card and
+ * UPI are unchanged.
  */
 @Injectable()
 export class SubscriptionChargeHandler {
@@ -128,14 +155,26 @@ export class SubscriptionChargeHandler {
                             ? result.debitAfter
                             : now
                         : result.debitAfter;
-                await prisma.$transaction((tx) =>
-                    enqueueChargeStepInTx(
+                const announce = await this.sarohAnnounces(
+                    organizationId,
+                    p.mandateId,
+                );
+                await prisma.$transaction(async (tx) => {
+                    // An eMandate: Saroh's own notice, a day ahead (DEC-180).
+                    if (announce) {
+                        await enqueuePreDebitNoticeInTx(tx, organizationId, {
+                            invoiceId: p.invoiceId,
+                            paymentIntentId: result.intentId,
+                            runAt: sarohNoticeAt(result.debitAfter, now),
+                        });
+                    }
+                    await enqueueChargeStepInTx(
                         tx,
                         organizationId,
                         { ...p, step: "DEBIT", tries: 0 },
                         debitAt,
-                    ),
-                );
+                    );
+                });
                 return;
             }
             case "UNKNOWN": {
@@ -192,6 +231,29 @@ export class SubscriptionChargeHandler {
         }
         if (!(await this.stillCharging(organizationId, p, intent.id, now))) {
             return;
+        }
+        // An eMandate is debited only after Saroh's notice went (DEC-180).
+        if (await this.sarohAnnounces(organizationId, p.mandateId)) {
+            const notice = await preDebitNoticeState(
+                prisma,
+                organizationId,
+                intent.id,
+            );
+            if (!notice.went) {
+                return this.notTold(
+                    organizationId,
+                    p,
+                    intent.id,
+                    notice.why,
+                    now,
+                );
+            }
+            const told = new Date(
+                notice.sentAt.getTime() +
+                    SAROH_NOTICE_MIN_HOURS * 60 * 60 * 1000,
+            );
+            // The email went late: the debit waits a full day after it.
+            if (now < told) return this.next(organizationId, p, told);
         }
 
         const result = await this.charges.charge({
@@ -425,6 +487,66 @@ export class SubscriptionChargeHandler {
         });
     }
 
+    /** Whether Saroh itself announces this mandate's debits (DEC-180). */
+    private async sarohAnnounces(
+        organizationId: string,
+        mandateId: string,
+    ): Promise<boolean> {
+        const mandate = await prisma.paymentMandate.findFirst({
+            where: { id: mandateId, organizationId },
+            select: { method: true },
+        });
+        return sarohSendsNotice(mandate?.method);
+    }
+
+    /**
+     * No notice, no debit (DEC-180): the eMandate charge whose notice
+     * didn't go is CANCELLED, so autopay doesn't take this period; the
+     * subscription's history says why (NOT_CHARGED_NO_NOTICE with
+     * `data.reason`); and the renewal invoice goes to the customer as it
+     * would without autopay (U10's auto-send, under its own switch). Not a
+     * decline: the team's "Payment failed" alert and the customer's
+     * failed-charge email aren't sent. Once: a run that finds the charge
+     * already let go writes nothing.
+     */
+    private async notTold(
+        organizationId: string,
+        p: ChargeJobPayload,
+        intentId: string,
+        why: PreDebitMissing,
+        now: Date,
+    ): Promise<void> {
+        const done = await prisma.$transaction(async (tx) => {
+            const { count } = await tx.paymentIntent.updateMany({
+                where: {
+                    id: intentId,
+                    organizationId,
+                    status: { in: ["CREATED", "REQUIRES_PAYMENT"] },
+                },
+                data: { status: "CANCELLED" },
+            });
+            if (count === 0) return false;
+            await cancelPreDebitNoticeInTx(tx, organizationId, intentId);
+            await recordChargeEventInTx(
+                tx,
+                organizationId,
+                p.invoiceId,
+                "NOT_CHARGED_NO_NOTICE",
+                { reason: why },
+            );
+            await sendRenewalUnlessCharged(tx, organizationId, p.invoiceId, {
+                charge: { status: "NONE" },
+                now,
+            });
+            return true;
+        });
+        if (done) {
+            this.logger.log(
+                `subscription_charge_no_pre_debit_notice org=${organizationId} intent=${intentId} reason=${why}`,
+            );
+        }
+    }
+
     /** A charge not yet asked for is let go: CANCELLED, so the pay link opens. */
     private async letGo(organizationId: string, intentId: string) {
         await prisma.paymentIntent.updateMany({
@@ -493,6 +615,12 @@ export class SubscriptionChargeHandler {
                 event: "failed",
                 invoiceId,
                 paymentIntentId: intentId,
+            });
+            // And the customer, with a link to pay (U10).
+            await enqueueAutopayFailedNotice(tx, organizationId, {
+                invoiceId,
+                paymentIntentId: intentId,
+                reason,
             });
         });
     }

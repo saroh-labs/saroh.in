@@ -1,10 +1,9 @@
 import type { Prisma } from "@saroh/database";
 
-import {
-    CAPTURED_NEEDS_REFUND,
-    ONLINE_PAYMENT_METHOD,
-} from "../invoices/invoice-state";
+import { recordOnlinePaymentInTx } from "../invoices/invoice-ledger";
+import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
+import { enqueueAutopayFailedNotice } from "../site-accounts/notices/autopay-failed";
 import type { SubscriptionEventKind } from "../subscriptions/subscription-events";
 import {
     JOB,
@@ -24,8 +23,9 @@ import { providerName } from "./mandate-rules";
  * - **Charged:** CHARGED on the subscription's log (actor JOB).
  * - **Failed:** RENEWAL_FAILED (`data.reason`); Home's failed-renewal
  *   source reads it ("Payment failed"), the pay link opens again, and a
- *   decline tells the team as a failed pay link does (F14). Saroh sends
- *   the customer nothing.
+ *   decline tells the team as a failed pay link does (F14), and the
+ *   customer with a link to pay (`AUTOPAY_FAILED`, automatic notices U10),
+ *   when the business sends it.
  * - **Limit too low:** MANDATE_LIMIT_LOW (`data.limit`, `data.amount`), and
  *   nothing is charged.
  */
@@ -60,7 +60,10 @@ export async function recordChargeEventInTx(
     invoiceId: string,
     kind: Extract<
         SubscriptionEventKind,
-        "CHARGED" | "RENEWAL_FAILED" | "MANDATE_LIMIT_LOW"
+        | "CHARGED"
+        | "RENEWAL_FAILED"
+        | "MANDATE_LIMIT_LOW"
+        | "NOT_CHARGED_NO_NOTICE"
     >,
     data?: Record<string, string | number>,
 ): Promise<boolean> {
@@ -83,7 +86,8 @@ export async function recordChargeEventInTx(
 /**
  * A charge's debit was declined: the intent moves to FAILED (only from an
  * open state, so a capture committed meanwhile stands), RENEWAL_FAILED is
- * written and the team is told. Returns whether it moved.
+ * written, the team is told, and so is the customer when the business
+ * sends "Failed autopay charges" (U10). Returns whether it moved.
  */
 export async function failMandateChargeInTx(
     tx: Tx,
@@ -116,6 +120,11 @@ export async function failMandateChargeInTx(
         invoiceId: intent.invoiceId,
         paymentIntentId: intentId,
     });
+    await enqueueAutopayFailedNotice(tx, organizationId, {
+        invoiceId: intent.invoiceId,
+        paymentIntentId: intentId,
+        reason,
+    });
     return true;
 }
 
@@ -123,8 +132,11 @@ export async function failMandateChargeInTx(
  * A charge the provider says was captured, found by a look-up rather than
  * its webhook (Retry, or the job's last look): settled as the webhook
  * would — intent, then invoice (the lock order) — so the webhook arriving
- * later finds it done. An invoice no longer ISSUED keeps the money as owed
- * back (CAPTURED_NEEDS_REFUND), exactly as the webhook records it.
+ * later finds it done. The payment goes on the invoice's ledger (DEC-173,
+ * `recordOnlinePaymentInTx`): one ONLINE row for the intent's amount. An
+ * invoice no longer ISSUED, or with less left to pay than the charge
+ * (paid by hand meanwhile), keeps the money as owed back
+ * (CAPTURED_NEEDS_REFUND), exactly as the webhook records it.
  */
 export async function settleCapturedChargeInTx(
     tx: Tx,
@@ -141,33 +153,31 @@ export async function settleCapturedChargeInTx(
             invoiceId: true,
             provider: true,
             providerIntentId: true,
+            amountCents: true,
         },
     });
     if (!intent?.invoiceId || locked[0]?.status === "SUCCEEDED") {
         return "ALREADY";
     }
     const invoiceId = intent.invoiceId;
-    await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${invoiceId} AND "organizationId" = ${organizationId} FOR UPDATE`;
-    const invoice = await tx.invoice.findFirst({
-        where: { id: invoiceId, organizationId },
-        select: { status: true },
-    });
     await tx.paymentIntent.update({
         where: { id: intentId },
         data: { status: "SUCCEEDED" },
     });
-    if (invoice?.status === "ISSUED") {
-        await tx.invoice.update({
-            where: { id: invoiceId },
-            data: {
-                status: "PAID",
-                paidAt: now,
-                paymentMethod: ONLINE_PAYMENT_METHOD,
-                paymentReference:
-                    providerPaymentRef ?? intent.providerIntentId ?? null,
-                paymentNote: `Paid online through ${providerName(intent.provider)}`,
-            },
-        });
+    const outcome = await recordOnlinePaymentInTx(
+        tx,
+        organizationId,
+        invoiceId,
+        {
+            paymentIntentId: intentId,
+            amountCents: intent.amountCents,
+            reference: providerPaymentRef ?? intent.providerIntentId ?? null,
+            note: `Paid online through ${providerName(intent.provider)}`,
+            receivedAt: now,
+        },
+    );
+    if (outcome.applied) {
+        if (outcome.replayed) return "ALREADY";
         await tx.paymentAttempt.create({
             data: {
                 organizationId,
@@ -187,7 +197,7 @@ export async function settleCapturedChargeInTx(
             provider: intent.provider,
             providerRef: providerPaymentRef,
             status: CAPTURED_NEEDS_REFUND,
-            rawResponse: { invoiceStatus: invoice?.status ?? "MISSING" },
+            rawResponse: { invoiceStatus: outcome.found },
         },
     });
     return "OWED_BACK";

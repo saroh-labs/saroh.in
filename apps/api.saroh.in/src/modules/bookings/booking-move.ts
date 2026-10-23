@@ -3,9 +3,15 @@ import type { Booking, Service } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import { isSerializationFailure } from "../../common/prisma-errors";
+import { retrySerializable } from "../../common/serializable-retry";
 import { guarded, guardMinutes, isValidSlotStart } from "./availability";
 import { BookingEventType } from "./booking-event-type";
 import { holdsPlace } from "./booking-hold";
+import {
+    refuseIfBusy,
+    refuseUnreassignable,
+    tellStaffInTx,
+} from "./booking-reassign";
 import {
     loadStaffing,
     refuseIfClosed,
@@ -41,6 +47,12 @@ import { acceptWaitlistInTx, offerFreedPlaceInTx } from "./waitlist-queue";
  * - A visit of a treatment (E9) takes its order's lock first (order →
  *   booking, the documented order); the customer's move is refused once
  *   the treatment's order is cancelled or refunded (`refuseClosedTreatment`).
+ * - Given to someone else (#1157, `reassign`): the new person must take
+ *   the service, work then and be free (a clash says when they are busy),
+ *   checked as a move within their diary is. Only `staffId` and the time
+ *   change, so money, pack credit, waitlist and series stay; one
+ *   REASSIGNED line names both people, one notice tells the customer and
+ *   the two people get their own alerts (`booking-reassign.ts`).
  */
 
 /** Who is moving it, as the booking's history needs. */
@@ -63,7 +75,16 @@ export interface MoveOptions {
     slotTaken?: string;
     /** Refuse a visit of a treatment whose order is closed (E9). */
     refuseClosedTreatment?: boolean;
+    /**
+     * Give it to this person too (#1157): someone in the business, found
+     * by the caller, who has checked the caller may.
+     */
+    reassign?: { staffId: string; name: string };
 }
+
+/** What a move says when it lost every try to concurrent writes (#33). */
+export const BUSY_RIGHT_NOW =
+    "Lots of people are booking right now. Try again.";
 
 /** Move `booking` of `service` to `startAt`. See the file comment. */
 export async function moveFoundBooking(
@@ -102,11 +123,35 @@ export async function moveFoundBooking(
     // A booking with a person moves within that person's diary (U3):
     // one-to-one, to one of their free starts; a class, on the class's
     // own grid with its instructor checked for a clash.
-    const staffing = booking.staffId
-        ? await loadStaffing(service)
-        : { people: [], perPerson: false, zone: null };
+    const reassign = options.reassign ?? null;
+    const staffing =
+        booking.staffId || reassign
+            ? await loadStaffing(service)
+            : { people: [], perPerson: false, zone: null };
     let person: ReserveWith = { staffId: null, perPerson: false };
-    if (booking.staffId && staffing.perPerson) {
+    if (reassign) {
+        // A class's instructor is the class's to change; a service nobody
+        // takes has nobody to give it to.
+        refuseUnreassignable(staffing, service);
+        // Busy is said with when, before whether they work then.
+        await refuseIfBusy(
+            service,
+            staffing,
+            booking,
+            { id: reassign.staffId, name: reassign.name },
+            startAt,
+        );
+        person = await resolvePerson(
+            service,
+            rules,
+            staffing,
+            startAt,
+            reassign.staffId,
+            "team",
+            booking.id,
+            opening,
+        );
+    } else if (booking.staffId && staffing.perPerson) {
         try {
             person = await resolvePerson(
                 service,
@@ -145,149 +190,220 @@ export async function moveFoundBooking(
     const clear = guarded({ startAt, endAt }, availService);
 
     try {
-        return await prisma.$transaction(
-            async (tx) => {
-                // A visit's order first (E9): the documented lock order.
-                // Closed since it was read, the treatment moves no more.
-                if (booking.orderId) {
-                    const [order] = await tx.$queryRaw<
-                        { status: string; paymentStatus: string }[]
-                    >`SELECT status::text AS status, "paymentStatus"::text AS "paymentStatus"
+        // Lost a race with a concurrent booking: tried again, up to three
+        // times with jitter, as a site booking is (review #33).
+        return await retrySerializable(() =>
+            prisma.$transaction(
+                async (tx) => {
+                    // A visit's order first (E9): the documented lock order.
+                    // Closed since it was read, the treatment moves no more.
+                    if (booking.orderId) {
+                        const [order] = await tx.$queryRaw<
+                            { status: string; paymentStatus: string }[]
+                        >`SELECT status::text AS status, "paymentStatus"::text AS "paymentStatus"
                       FROM "Order" WHERE id = ${booking.orderId} FOR UPDATE`;
-                    if (options.refuseClosedTreatment) {
-                        refuseClosedTreatment(order);
+                        if (options.refuseClosedTreatment) {
+                            refuseClosedTreatment(order);
+                        }
                     }
-                }
-                if (!person.perPerson) {
-                    const count = await tx.booking.count({
-                        where: {
-                            serviceId: service.id,
-                            ...holdsPlace(new Date()),
-                            startAt: { lt: clear.endAt },
-                            endAt: { gt: clear.startAt },
-                            // Itself is not a competitor for its own seat.
-                            id: { not: booking.id },
-                        },
+                    if (!person.perPerson) {
+                        const count = await tx.booking.count({
+                            where: {
+                                serviceId: service.id,
+                                ...holdsPlace(new Date()),
+                                startAt: { lt: clear.endAt },
+                                endAt: { gt: clear.startAt },
+                                // Itself is not a competitor for its own seat.
+                                id: { not: booking.id },
+                            },
+                        });
+                        // With what courses and waitlist offers hold (A12) —
+                        // a place held for this very person is theirs to take.
+                        const held = await seatsHeld(
+                            tx,
+                            service.id,
+                            clear.startAt,
+                            clear.endAt,
+                            { exceptContactId: booking.contactId },
+                        );
+                        if (count + held >= service.capacity) {
+                            throw taken(
+                                new ConflictException(
+                                    "That time is fully booked.",
+                                ),
+                            );
+                        }
+                    }
+                    try {
+                        await assertPersonFreeInTx(
+                            tx,
+                            person,
+                            service.id,
+                            startAt,
+                            endAt,
+                            booking.id,
+                            guardMinutes(availService),
+                        );
+                    } catch (err) {
+                        throw taken(err);
+                    }
+                    // A class paid with a pack is only paid while the pack
+                    // is good on the day (ADR-007): the same rule as spending.
+                    const paid = await tx.packRedemption.findFirst({
+                        where: { bookingId: booking.id, reversedAt: null },
+                        select: { purchase: { select: { expiresAt: true } } },
                     });
-                    // With what courses and waitlist offers hold (A12) —
-                    // a place held for this very person is theirs to take.
-                    const held = await seatsHeld(
-                        tx,
-                        service.id,
-                        clear.startAt,
-                        clear.endAt,
-                        { exceptContactId: booking.contactId },
-                    );
-                    if (count + held >= service.capacity) {
-                        throw taken(
-                            new ConflictException("That time is fully booked."),
+                    if (paid && paid.purchase.expiresAt <= startAt) {
+                        throw new ConflictException(
+                            options.audience === "public"
+                                ? "The class pack that paid for this booking runs out before then. Pick an earlier time."
+                                : "The class pack that paid for this booking expires before that time. Pick an earlier time, or take the pack off the booking first.",
                         );
                     }
-                }
-                try {
-                    await assertPersonFreeInTx(
-                        tx,
-                        person,
-                        service.id,
-                        startAt,
-                        endAt,
-                        booking.id,
-                        guardMinutes(availService),
-                    );
-                } catch (err) {
-                    throw taken(err);
-                }
-                // A class paid with a pack is only paid while the pack
-                // is good on the day (ADR-007): the same rule as spending.
-                const paid = await tx.packRedemption.findFirst({
-                    where: { bookingId: booking.id, reversedAt: null },
-                    select: { purchase: { select: { expiresAt: true } } },
-                });
-                if (paid && paid.purchase.expiresAt <= startAt) {
-                    throw new ConflictException(
-                        options.audience === "public"
-                            ? "The class pack that paid for this booking runs out before then. Pick an earlier time."
-                            : "The class pack that paid for this booking expires before that time. Pick an earlier time, or take the pack off the booking first.",
-                    );
-                }
-                // A membership's class is one of the month it lands in
-                // (#508): moved into another month, it needs a class
-                // left there, on a membership still active. The booking
-                // itself is not counted, so a move within its month fits.
-                if (
-                    booking.paidWith === "MEMBERSHIP" &&
-                    booking.subscriptionId
-                ) {
-                    await useMembershipInTx(tx, {
-                        organizationId: actor.organizationId,
-                        bookingId: booking.id,
-                        contactId: booking.contactId ?? "",
-                        subscriptionId: booking.subscriptionId,
-                        startAt,
-                    });
-                }
-
-                const moved = await tx.booking.update({
-                    where: { id: booking.id },
-                    data: { startAt, endAt },
-                });
-                // The place it left is free for the old session's line,
-                // and a place they were in line for here is taken (A12).
-                if (booking.startAt.getTime() !== startAt.getTime()) {
-                    await offerFreedPlaceInTx(tx, {
-                        organizationId: actor.organizationId,
-                        serviceId: service.id,
-                        startAt: booking.startAt,
-                    });
-                }
-                if (booking.contactId) {
-                    await acceptWaitlistInTx(tx, {
-                        serviceId: service.id,
-                        startAt,
-                        contactId: booking.contactId,
-                        bookingId: booking.id,
-                        now: new Date(),
-                    });
-                }
-                // No actor is the customer themselves ("by the customer").
-                const event = await tx.bookingEvent.create({
-                    data: {
-                        bookingId: booking.id,
-                        organizationId: actor.organizationId,
-                        type: BookingEventType.Rescheduled,
-                        actorUserId: actor.userId,
-                        fromStartAt: booking.startAt,
-                        toStartAt: startAt,
-                    },
-                    select: { id: true },
-                });
-                // Same transactional outbox as booking: a committed move
-                // always has its notice queued, so a failed send cannot
-                // drop it. A14's `booking-notify.handler.ts` tells the
-                // customer, and the team when the customer moved it.
-                await tx.job.create({
-                    data: {
-                        organizationId: actor.organizationId,
-                        type: "booking.notify",
-                        payload: {
+                    // A membership's class is one of the month it lands in
+                    // (#508): moved into another month, it needs a class
+                    // left there, on a membership still active. The booking
+                    // itself is not counted, so a move within its month fits.
+                    if (
+                        booking.paidWith === "MEMBERSHIP" &&
+                        booking.subscriptionId
+                    ) {
+                        await useMembershipInTx(tx, {
+                            organizationId: actor.organizationId,
                             bookingId: booking.id,
+                            contactId: booking.contactId ?? "",
+                            subscriptionId: booking.subscriptionId,
+                            startAt,
+                        });
+                    }
+
+                    const moved = await tx.booking.update({
+                        where: { id: booking.id },
+                        data: reassign
+                            ? { startAt, endAt, staffId: reassign.staffId }
+                            : { startAt, endAt },
+                    });
+                    // The place it left is free for the old session's line,
+                    // and a place they were in line for here is taken (A12).
+                    if (booking.startAt.getTime() !== startAt.getTime()) {
+                        await offerFreedPlaceInTx(tx, {
+                            organizationId: actor.organizationId,
                             serviceId: service.id,
+                            startAt: booking.startAt,
+                        });
+                    }
+                    if (booking.contactId) {
+                        await acceptWaitlistInTx(tx, {
+                            serviceId: service.id,
+                            startAt,
                             contactId: booking.contactId,
-                            reason: "rescheduled",
-                            eventId: event.id,
+                            bookingId: booking.id,
+                            now: new Date(),
+                        });
+                    }
+                    // No actor is the customer themselves ("by the customer").
+                    const event = await tx.bookingEvent.create({
+                        data: {
+                            bookingId: booking.id,
+                            organizationId: actor.organizationId,
+                            type: reassign
+                                ? BookingEventType.Reassigned
+                                : BookingEventType.Rescheduled,
+                            actorUserId: actor.userId,
+                            fromStartAt: booking.startAt,
+                            toStartAt: startAt,
+                            ...(reassign
+                                ? {
+                                      fromStaffId: booking.staffId,
+                                      toStaffId: reassign.staffId,
+                                  }
+                                : {}),
                         },
-                    },
-                    select: { id: true },
-                });
-                return moved;
-            },
-            { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+                        select: { id: true },
+                    });
+                    if (reassign) {
+                        const from = booking.staffId
+                            ? await tx.staffMember.findFirst({
+                                  where: {
+                                      id: booking.staffId,
+                                      organizationId: actor.organizationId,
+                                  },
+                                  select: { id: true, name: true },
+                              })
+                            : null;
+                        await tellStaffInTx(tx, {
+                            organizationId: actor.organizationId,
+                            bookingId: booking.id,
+                            actorUserId: actor.userId,
+                            who: await bookerNameInTx(tx, booking),
+                            service: service.name,
+                            startAt,
+                            timeZone: staffing.zone ?? booking.timezone,
+                            from,
+                            to: { id: reassign.staffId, name: reassign.name },
+                        });
+                    }
+                    // Same transactional outbox as booking: a committed move
+                    // always has its notice queued, so a failed send cannot
+                    // drop it. A14's `booking-notify.handler.ts` tells the
+                    // customer, and the team when the customer moved it.
+                    await tx.job.create({
+                        data: {
+                            organizationId: actor.organizationId,
+                            type: "booking.notify",
+                            payload: {
+                                bookingId: booking.id,
+                                serviceId: service.id,
+                                contactId: booking.contactId,
+                                reason: reassign ? "reassigned" : "rescheduled",
+                                eventId: event.id,
+                                // Still a hold awaiting its payment (#1137):
+                                // the customer hears the time when it is
+                                // paid, not "has moved" now.
+                                ...(moved.status === "PENDING"
+                                    ? { held: true }
+                                    : {}),
+                            },
+                        },
+                        select: { id: true },
+                    });
+                    return moved;
+                },
+                {
+                    isolationLevel:
+                        Prisma.TransactionIsolationLevel.Serializable,
+                },
+            ),
         );
     } catch (err) {
-        // Lost the race with a concurrent booking for the same seat.
+        // Lost every try: nobody showed the time was full, only that
+        // others were writing at once. Said as it is, never "fully booked".
         if (isSerializationFailure(err)) {
-            throw taken(new ConflictException("That time is fully booked."));
+            throw new ConflictException({
+                message: BUSY_RIGHT_NOW,
+                details: { reason: "busy" },
+            });
         }
         throw err;
     }
+}
+
+/** "Asha Rao", the booker's name, or "A customer". */
+async function bookerNameInTx(
+    tx: Prisma.TransactionClient,
+    booking: Booking,
+): Promise<string> {
+    const contact = booking.contactId
+        ? await tx.contact.findFirst({
+              where: { id: booking.contactId },
+              select: { firstName: true, lastName: true },
+          })
+        : null;
+    const name = [contact?.firstName, contact?.lastName]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+    // `||`, not `??`: an empty name falls through too.
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+    return name || booking.bookerName?.trim() || "A customer";
 }

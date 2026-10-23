@@ -25,7 +25,6 @@ const tx = {
     site: { count: jest.fn() },
     media: { aggregate: jest.fn() },
     analyticsDailyAggregate: { aggregate: jest.fn() },
-    delivery: { count: jest.fn() },
 };
 const $transaction = jest.fn((fn: (t: typeof tx) => unknown) => fn(tx));
 
@@ -148,7 +147,6 @@ describe("which rows metering counts", () => {
             sites: "sites",
             storage: "storageGb",
             visits: "visitsPerMonth",
-            "saroh-emails": "sarohEmailsPerMonth",
         });
         expect(meteredKeyOf("roles")).toBeNull();
     });
@@ -196,24 +194,6 @@ describe("what each count asks", () => {
                 status: "CONFIRMED",
                 courseEnrollmentId: null,
                 bookedOnline: true,
-            },
-        });
-    });
-
-    it("counts this month's emails Saroh queued, not those stopped or out of tries (DEC-086)", async () => {
-        tx.delivery.count.mockResolvedValue(3);
-        expect(
-            await countUsage(tx as never, "org", "sarohEmailsPerMonth", now),
-        ).toBe(3);
-        expect(tx.delivery.count).toHaveBeenCalledWith({
-            where: {
-                organizationId: "org",
-                provider: "SAROH",
-                createdAt: { gte: start },
-                NOT: [
-                    { status: "STOPPED" },
-                    { status: "FAILED", attempts: { gte: 5 } },
-                ],
             },
         });
     });
@@ -437,101 +417,6 @@ describe("crossing a notice's line", () => {
             title: "You're past your 2 orders a month on Plan A",
             body: "Your site kept taking orders, so no customer was turned away. Plan B raises the limit.",
         });
-    });
-
-    it("leads Saroh's emails with connecting the business's own, says when the month restarts, and offers no add-on (DEC-086)", () => {
-        const row = { plan: "Plan A", upgradeTo: "Plan B" };
-        const warn = limitNoticeWords(
-            row,
-            "sarohEmailsPerMonth",
-            10,
-            8,
-            "warn",
-        );
-        expect(warn.title).toBe(
-            "You've used 8 of 10 emails Saroh sends for you a month on Plan A",
-        );
-        expect(warn.body).toMatch(
-            /^You'll be stopped at 10\. Connect your own email/,
-        );
-        const full = limitNoticeWords(
-            row,
-            "sarohEmailsPerMonth",
-            10,
-            10,
-            "full",
-            "1 Nov",
-        );
-        expect(full.body).toBe(
-            "Saroh has stopped sending your booking emails for this month. It starts again on 1 Nov. Connect your own email and your booking emails go through it, with no monthly limit. Or Plan B raises the limit.",
-        );
-        const over = limitNoticeWords(
-            row,
-            "sarohEmailsPerMonth",
-            10,
-            12,
-            "over",
-        );
-        expect(over.body).not.toMatch(/add-on/);
-        expect(over.body).toMatch(/Connect your own email/);
-    });
-
-    it("leads Saroh's emails with a higher plan when the business can't connect its own (DEC-086)", () => {
-        const row = { plan: "Plan A", upgradeTo: "Plan B" };
-        const higher =
-            "A higher plan lets you connect your own email, and then your booking emails go through it with no monthly limit.";
-        const warn = limitNoticeWords(
-            row,
-            "sarohEmailsPerMonth",
-            10,
-            8,
-            "warn",
-            undefined,
-            false,
-        );
-        expect(warn.body).toBe(
-            `You'll be stopped at 10. Plan B gives you more. ${higher}`,
-        );
-        const full = limitNoticeWords(
-            row,
-            "sarohEmailsPerMonth",
-            10,
-            10,
-            "full",
-            "1 Nov",
-            false,
-        );
-        expect(full.body).toBe(
-            `Saroh has stopped sending your booking emails for this month. It starts again on 1 Nov. Plan B raises the limit. ${higher}`,
-        );
-        const over = limitNoticeWords(
-            row,
-            "sarohEmailsPerMonth",
-            10,
-            12,
-            "over",
-            undefined,
-            false,
-        );
-        expect(over.body).toBe(
-            `Saroh has stopped sending your booking emails for this month. Plan B raises the limit. ${higher}`,
-        );
-        // Unread: neither connecting nor its plan is claimed.
-        const unread = limitNoticeWords(
-            row,
-            "sarohEmailsPerMonth",
-            10,
-            10,
-            "full",
-            "1 Nov",
-            null,
-        );
-        expect(unread.body).toBe(
-            "Saroh has stopped sending your booking emails for this month. It starts again on 1 Nov. Plan B raises the limit.",
-        );
-        for (const b of [warn.body, full.body, over.body, unread.body]) {
-            expect(b).not.toMatch(/Connect your own email|add-on/);
-        }
     });
 
     it("never tells a soft cap it will be stopped", () => {

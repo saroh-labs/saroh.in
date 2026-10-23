@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Billing opens on its invoices (DEC-163). */
+/** Billing lands on its subscriptions (R25). */
 export default function BillingPage(): never {
-    redirect("/billing/invoices");
+    redirect("/billing/subscriptions");
 }

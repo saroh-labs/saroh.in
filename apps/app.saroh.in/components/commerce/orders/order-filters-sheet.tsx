@@ -5,7 +5,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 
-import { QuickLook } from "@/components/shared/quick-look";
+import { QuickLook } from "@/components/shared/forms/quick-look";
 import type { OrderFilterOptions } from "@/lib/orders/business-service";
 import { filtersOn, NO_FILTERS } from "@/lib/orders/list-filters";
 import type { OrdersQuery } from "@/lib/orders/list-query";

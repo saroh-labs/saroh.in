@@ -19,7 +19,7 @@ jest.mock("../../env", () => ({
 }));
 
 import { ConflictException, NotFoundException } from "@nestjs/common";
-import { prisma } from "@saroh/database";
+import { backfillInvoicePayments, prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
 import { giveBusinessDetails } from "../../../test/business-details";
@@ -396,5 +396,188 @@ describe("paying an invoice online (real database)", () => {
                 })
             ).status,
         ).toBe("PAID");
+    });
+});
+
+describe("the pay link and the payments ledger (DEC-173, real database)", () => {
+    const ledgerOf = (invoiceId: string) =>
+        prisma.invoicePayment.findMany({
+            where: { invoiceId },
+            orderBy: { createdAt: "asc" },
+            select: {
+                amountCents: true,
+                method: true,
+                reference: true,
+                paymentIntentId: true,
+                recordedById: true,
+                removedAt: true,
+            },
+        });
+    const stateOf = (id: string) =>
+        prisma.invoice.findUniqueOrThrow({
+            where: { id },
+            select: { status: true, paidCents: true, paymentMethod: true },
+        });
+
+    it("writes one ONLINE payment for the intent, and a replay never doubles it", async () => {
+        const id = await issued();
+        const { token } = await invoices.createPayLink(owner, id);
+        const intent = await startPaying(token, "ledger-1");
+        const success = {
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId: intent.providerIntentId,
+            providerPaymentRef: "pay_ledger_1",
+        };
+        await webhook(success);
+        // Razorpay's second event for the same payment, and the first again.
+        await webhook({ ...success, eventType: "order.paid" });
+        await webhook(success);
+
+        expect(await ledgerOf(id)).toEqual([
+            {
+                amountCents: 140000,
+                method: "ONLINE",
+                reference: "pay_ledger_1",
+                paymentIntentId: intent.paymentIntentId,
+                recordedById: null,
+                removedAt: null,
+            },
+        ]);
+        expect(await stateOf(id)).toEqual({
+            status: "PAID",
+            paidCents: 140000,
+            paymentMethod: "ONLINE",
+        });
+        // Noted on the invoice's history, as Saroh's.
+        const audit = await prisma.auditEvent.findFirstOrThrow({
+            where: {
+                targetType: "invoice",
+                targetId: id,
+                action: "invoice.payment.recorded",
+            },
+            select: { actorUserId: true },
+        });
+        expect(audit.actorUserId).toBe("system:online-payment");
+    });
+
+    it("charges only what is left on a partly paid invoice, and that payment settles it", async () => {
+        const id = await issued();
+        await invoices.recordPayment(owner, id, {
+            method: "CASH",
+            amount: "1000.00",
+        });
+        const { token } = await invoices.createPayLink(owner, id);
+
+        const page = await publicInvoices.read(token);
+        expect(page).toMatchObject({
+            total: "1400.00",
+            paidSoFar: "1000.00",
+            leftToPay: "400.00",
+            status: "ISSUED",
+        });
+
+        const intent = await startPaying(token, "rest-1");
+        expect(intent.amountCents).toBe(40000);
+        expect(
+            await prisma.paymentIntent.findUniqueOrThrow({
+                where: { id: intent.paymentIntentId },
+                select: { amountCents: true },
+            }),
+        ).toEqual({ amountCents: 40000 });
+
+        await webhook({
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId: intent.providerIntentId,
+            providerPaymentRef: "pay_rest_1",
+        });
+        expect(
+            (await ledgerOf(id)).map((p) => [p.method, p.amountCents]),
+        ).toEqual([
+            ["CASH", 100000],
+            ["ONLINE", 40000],
+        ]);
+        expect(await stateOf(id)).toEqual({
+            status: "PAID",
+            paidCents: 140000,
+            paymentMethod: "ONLINE",
+        });
+        const paid = await publicInvoices.read(token);
+        expect(paid).toMatchObject({
+            status: "PAID",
+            paidSoFar: "1400.00",
+            leftToPay: "0.00",
+        });
+    });
+
+    it("owes back a checkout opened for the whole total when part was paid by hand meanwhile, with no second payment", async () => {
+        const id = await issued();
+        const { token } = await invoices.createPayLink(owner, id);
+        const intent = await startPaying(token, "whole-1");
+        expect(intent.amountCents).toBe(140000);
+        await invoices.recordPayment(owner, id, {
+            method: "UPI",
+            amount: "1000.00",
+        });
+
+        await webhook({
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId: intent.providerIntentId,
+            providerPaymentRef: "pay_whole_1",
+        });
+
+        expect((await ledgerOf(id)).map((p) => p.method)).toEqual(["UPI"]);
+        expect(await stateOf(id)).toEqual({
+            status: "ISSUED",
+            paidCents: 100000,
+            paymentMethod: null,
+        });
+        const row = await prisma.paymentIntent.findUniqueOrThrow({
+            where: { id: intent.paymentIntentId },
+            include: { attempts: true },
+        });
+        expect(row.status).toBe("SUCCEEDED");
+        expect(
+            row.attempts.find((a) => a.status === "CAPTURED_NEEDS_REFUND")
+                ?.rawResponse,
+        ).toEqual({ invoiceStatus: "MORE_THAN_LEFT" });
+    });
+
+    it("a payment arriving after the invoice was settled by hand is owed back, and not added", async () => {
+        const id = await issued();
+        const { token } = await invoices.createPayLink(owner, id);
+        const intent = await startPaying(token, "late-cash");
+        await invoices.recordPayment(owner, id, { method: "CASH" });
+
+        await webhook({
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId: intent.providerIntentId,
+        });
+
+        expect((await ledgerOf(id)).map((p) => p.method)).toEqual(["CASH"]);
+        expect(await stateOf(id)).toEqual({
+            status: "PAID",
+            paidCents: 140000,
+            paymentMethod: "CASH",
+        });
+    });
+});
+
+describe("the ledger backfill after the new paths (DEC-173)", () => {
+    it("finds every invoice paid online or by hand here already has its payments, and writes nothing", async () => {
+        const paid = await prisma.invoice.count({
+            where: { organizationId: owner.organizationId, status: "PAID" },
+        });
+        // The cases above paid several, online and by hand.
+        expect(paid).toBeGreaterThan(0);
+        const report = await backfillInvoicePayments(prisma, {
+            organizationIds: [owner.organizationId],
+            dryRun: true,
+        });
+        expect(report.written).toBe(0);
+        expect(report.skipped).toEqual([]);
     });
 });

@@ -1,6 +1,6 @@
 import { PageHeader } from "@saroh/ui/page-header";
 
-import { ModuleGoalPicker } from "@/components/modules/module-goal-picker";
+import { ModuleGoalPicker } from "@/components/modules/goal-picker/module-goal-picker";
 import { listModules } from "@/lib/modules/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";

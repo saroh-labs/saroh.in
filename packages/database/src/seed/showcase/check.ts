@@ -11,6 +11,11 @@ import { checkRyeProductPage } from "./check-product-page";
 import type { RyeStockCounts } from "./check-stock";
 import { checkRyeStock } from "./check-stock";
 import { TIMEZONE } from "./data";
+import {
+    describeInvoiceStates,
+    invoiceStateCounts,
+    RYE_COLOUR,
+} from "./invoice-states";
 import { istAt } from "./people";
 import type { Interval } from "./periods";
 import { boundary } from "./periods";
@@ -499,6 +504,143 @@ export async function checkShowcase(
     // row's stock log adds up to what is on it. A row promising units no
     // line holds is the state that made a cancel give back, or a fulfilment
     // sell, units nobody promised.
+    // The invoice ledger (DEC-173): every paid invoice but an order's has
+    // its payments, and `paidCents` is what its live payments add up to.
+    fail(
+        "paid invoices with no payment in the ledger",
+        await prisma.$queryRaw<Row[]>`
+            SELECT i.id, i."organizationId", i.number FROM "Invoice" i
+            WHERE i."organizationId" = ANY(${orgs})
+              AND i.status = 'PAID' AND i."orderId" IS NULL
+              AND i.kind <> 'CREDIT_NOTE' AND i.total > 0
+              AND NOT EXISTS (
+                  SELECT 1 FROM "InvoicePayment" p
+                  WHERE p."invoiceId" = i.id AND p."removedAt" IS NULL
+              )`,
+    );
+    fail(
+        "invoices whose paidCents is not what their live payments add up to",
+        await prisma.$queryRaw<Row[]>`
+            SELECT i.id, i."paidCents", COALESCE(l.live, 0) AS live
+            FROM "Invoice" i
+            LEFT JOIN (
+                SELECT "invoiceId", SUM("amountCents")::int AS live
+                FROM "InvoicePayment"
+                WHERE "removedAt" IS NULL
+                  AND "bankStatus" IS DISTINCT FROM 'BOUNCED'
+                GROUP BY "invoiceId"
+            ) l ON l."invoiceId" = i.id
+            WHERE i."organizationId" = ANY(${orgs})
+              AND i."paidCents" <> COALESCE(l.live, 0)`,
+    );
+    // The ledger's rows are ones the API writes (DEC-173, #1129): a cheque
+    // has its number and a bank status, WAITING until it cleared or
+    // bounced (a bounced cheque may keep the day it went in: banks return
+    // cheques after they were banked); nothing else has either. Every
+    // amount is above 0.
+    fail(
+        "invoice payments whose cheque fields don't fit",
+        await prisma.$queryRaw<Row[]>`
+            SELECT p.id, p.method, p."bankStatus" FROM "InvoicePayment" p
+            WHERE p."organizationId" = ANY(${orgs}) AND NOT (
+                p."amountCents" > 0 AND
+                CASE WHEN p.method = 'CHEQUE' THEN
+                    p."chequeNumber" IS NOT NULL
+                    AND p."bankStatus" IN ('WAITING', 'CLEARED', 'BOUNCED')
+                    AND (p."bankStatus" <> 'CLEARED' OR p."clearedAt" IS NOT NULL)
+                    AND (p."clearedAt" IS NULL OR p."bankStatus" IN ('CLEARED', 'BOUNCED'))
+                    AND (p."bankStatus" = 'BOUNCED') = (p."bouncedAt" IS NOT NULL)
+                    AND COALESCE(p."clearedAt", p."bouncedAt", p."receivedAt") >= p."receivedAt"
+                ELSE p."bankStatus" IS NULL AND p."chequeNumber" IS NULL
+                    AND p."clearedAt" IS NULL AND p."bouncedAt" IS NULL
+                END)`,
+    );
+    // Money comes in on an invoice's own paper once it is out: never on a
+    // draft, an order's invoice (the order is its ledger) or a credit note,
+    // never before it was issued or after now, in the invoice's currency.
+    fail(
+        "invoice payments on paper that doesn't take them, or out of time",
+        await prisma.$queryRaw<Row[]>`
+            SELECT p.id, i.number, i.status FROM "InvoicePayment" p
+            JOIN "Invoice" i ON i.id = p."invoiceId"
+            WHERE p."organizationId" = ANY(${orgs}) AND (
+                i."organizationId" <> p."organizationId"
+                OR i."orderId" IS NOT NULL OR i.kind = 'CREDIT_NOTE'
+                OR i."issuedAt" IS NULL OR p."receivedAt" < i."issuedAt"
+                OR p."receivedAt" > ${at}::timestamp
+                OR p.currency <> i.currency
+                OR (p."removedAt" IS NULL AND p."bankStatus" IS DISTINCT FROM 'BOUNCED'
+                    AND i.status NOT IN ('ISSUED', 'PAID')))`,
+    );
+    // The status follows the ledger: PAID once what counts reaches the
+    // total, ISSUED (partly paid, when some has) below it, never more.
+    fail(
+        "invoices whose status doesn't follow their payments",
+        await prisma.$queryRaw<Row[]>`
+            SELECT i.id, i.number, i.status, i."paidCents", i.total FROM "Invoice" i
+            WHERE i."organizationId" = ANY(${orgs})
+              AND i."orderId" IS NULL AND i.kind <> 'CREDIT_NOTE'
+              AND i.status IN ('ISSUED', 'PAID') AND i.total > 0
+              AND (i."paidCents" > i.total * 100
+                   OR (i.status = 'PAID') <> (i."paidCents" >= i.total * 100))`,
+    );
+    fail(
+        "paid invoices whose paid date isn't their last payment's",
+        await prisma.$queryRaw<Row[]>`
+            SELECT i.id, i.number, i."paidAt", l.last FROM "Invoice" i
+            JOIN (
+                SELECT "invoiceId", MAX("receivedAt") AS last
+                FROM "InvoicePayment"
+                WHERE "removedAt" IS NULL
+                  AND "bankStatus" IS DISTINCT FROM 'BOUNCED'
+                GROUP BY "invoiceId"
+            ) l ON l."invoiceId" = i.id
+            WHERE i."organizationId" = ANY(${orgs}) AND i.status = 'PAID'
+              AND i."paidAt" IS DISTINCT FROM l.last`,
+    );
+    // Shared or emailed only once it went out, and never after now.
+    fail(
+        "invoice shares or emails before the invoice went out, or after now",
+        await prisma.$queryRaw<Row[]>`
+            SELECT x.id, i.number FROM (
+                SELECT id, "invoiceId", "createdAt" FROM "InvoiceShare"
+                WHERE "organizationId" = ANY(${orgs})
+                UNION ALL
+                SELECT id, "invoiceId", "createdAt" FROM "Message"
+                WHERE "organizationId" = ANY(${orgs})
+                  AND template IN ('INVOICE_SENT', 'INVOICE_REMINDER')
+                  AND "invoiceId" IS NOT NULL
+            ) x JOIN "Invoice" i ON i.id = x."invoiceId"
+            WHERE i."issuedAt" IS NULL OR x."createdAt" < i."issuedAt"
+               OR x."createdAt" > ${at}::timestamp`,
+    );
+    // Written again (DEC-173, U13) only from a void or credited invoice of
+    // the same business, after it was cancelled.
+    fail(
+        "invoices written again from one that wasn't cancelled",
+        await prisma.$queryRaw<Row[]>`
+            SELECT w.id, r.status FROM "Invoice" w
+            JOIN "Invoice" r ON r.id = w."reissuedFromId"
+            WHERE w."organizationId" = ANY(${orgs}) AND (
+                r."organizationId" <> w."organizationId"
+                OR r.status NOT IN ('VOID', 'CREDITED') OR r.kind <> 'INVOICE'
+                OR w."createdAt" < COALESCE(r."voidedAt", r."issuedAt"))`,
+    );
+    // A look the API would store (U6): one of the three styles, a colour
+    // as #RRGGBB in capitals; a draft's own or one frozen at issue.
+    fail(
+        "invoice papers in a style or colour the API wouldn't store",
+        await prisma.$queryRaw<Row[]>`
+            SELECT id, "paperStyle", "paperColour" FROM "Invoice"
+            WHERE "organizationId" = ANY(${orgs}) AND (
+                COALESCE("paperStyle", 'CLASSIC') NOT IN ('CLASSIC', 'BAND', 'COMPACT')
+                OR "paperColour" !~ '^#[0-9A-F]{6}$')
+            UNION ALL
+            SELECT "organizationId", "invoiceStyle", "invoiceColour" FROM "BusinessProfile"
+            WHERE "organizationId" = ANY(${orgs}) AND (
+                COALESCE("invoiceStyle", 'CLASSIC') NOT IN ('CLASSIC', 'BAND', 'COMPACT')
+                OR "invoiceColour" !~ '^#[0-9A-F]{6}$')`,
+    );
     const held = await heldStockMismatches(prisma, orgs);
     fail(
         "shelf rows whose promised is not what open orders hold",
@@ -637,6 +779,8 @@ export interface RyeCounts extends RyeStockCounts, RyeProductPageCounts {
     possibleMatches: number;
     allergyOrders: number;
     series: string;
+    /** The rebuilt invoice screens' states (DEC-173, #1129). */
+    invoiceStates: string;
 }
 
 /**
@@ -891,10 +1035,33 @@ export async function checkRye(
         )
             .map((s) => `${s.series} → ${s.lastNumber}`)
             .join(", "),
+        invoiceStates: "",
     };
 
     const has = async (rows: Promise<Row[]>) => (await one(rows)) >= 1;
+    // The rebuilt invoice screens' states (DEC-173, #1129).
+    const states = await invoiceStateCounts(prisma, orgId, now);
+    counts.invoiceStates = describeInvoiceStates(states);
     const missing = Object.entries({
+        "a partly paid invoice": states.partlyPaid >= 1,
+        "two cheques waiting for the bank, ₹5,600 and ₹8,400":
+            states.chequesWaiting.join(",") === "5600,8400",
+        "a cheque in the bank": states.chequesCleared >= 1,
+        "a cheque that bounced, owed again": states.bouncedOwedAgain >= 1,
+        "invoices overdue a week, a month and longer":
+            states.overdueAges.week >= 1 &&
+            states.overdueAges.month >= 1 &&
+            states.overdueAges.older >= 1,
+        "an invoice shared on WhatsApp": states.sharedOnWhatsApp >= 1,
+        "reminders by email and on WhatsApp":
+            states.remindedByEmail >= 1 && states.remindedOnWhatsApp >= 1,
+        "a receipt shared on WhatsApp": states.receiptsShared >= 1,
+        "an invoice credited and written again":
+            states.creditedAndWrittenAgain >= 1,
+        "paper in Classic, Band and Compact":
+            states.styles.join(",") === "BAND,CLASSIC,COMPACT",
+        "Band in Rye's colour as its default":
+            states.defaultLook === `BAND ${RYE_COLOUR}`,
         "eleven products with a GST rate": counts.products >= 11,
         "an order placed today in each kitchen stage": [
             "NEW",

@@ -62,12 +62,35 @@ const PROJECT_NAME_RULES = [
     },
 ];
 
+/**
+ * No sleeps in a browser spec (`saroh-browser-tests` skill): wait on what
+ * happens, or run `page.clock` past a hold. Two 11-second sleeps slipped
+ * past the written rule (review #24); this makes it a check.
+ */
+const NO_SLEEP_RULES = [
+    {
+        selector: "CallExpression[callee.property.name='waitForTimeout']",
+        message:
+            "No waitForTimeout: wait on a condition, or page.clock.install() before goto and page.clock.runFor(ms) past a hold.",
+    },
+];
+
 export default [
     ...config,
     {
         files: ["**/*.ts"],
         rules: {
             "no-restricted-syntax": ["error", ...PROJECT_NAME_RULES],
+        },
+    },
+    {
+        files: ["tests/**/*.ts", "fixtures/**/*.ts"],
+        rules: {
+            "no-restricted-syntax": [
+                "error",
+                ...PROJECT_NAME_RULES,
+                ...NO_SLEEP_RULES,
+            ],
         },
     },
 ];

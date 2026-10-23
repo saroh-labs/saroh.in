@@ -2,7 +2,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
 import { useId } from "react";
 
-import { Chip } from "@/components/shared/chip";
+import { Chip } from "@/components/shared/lists/chip";
 
 /*
  * The Pack Editor's small parts, after the design: a titled card, a label

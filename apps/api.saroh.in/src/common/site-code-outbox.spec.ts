@@ -5,7 +5,9 @@ import path from "node:path";
 import {
     siteCodeOutboxPath,
     siteCodesFakeAllowed,
+    staffInviteOutboxPath,
     writeSiteCodeOutbox,
+    writeStaffInviteOutbox,
 } from "./site-code-outbox";
 
 /**
@@ -33,6 +35,30 @@ describe("the site code outbox", () => {
     it("never throws when it can't write", () => {
         expect(() =>
             writeSiteCodeOutbox("a@b.in", "123456", "/dev/null/not-a-dir"),
+        ).not.toThrow();
+    });
+});
+
+describe("the staff invite outbox (admin plan U24)", () => {
+    let dir: string;
+    beforeEach(() => {
+        dir = mkdtempSync(path.join(tmpdir(), "outbox-spec-"));
+    });
+    afterEach(() => {
+        rmSync(dir, { recursive: true, force: true });
+    });
+
+    it("keeps the last link per address, apart from the codes", () => {
+        writeStaffInviteOutbox("Asha@Example.com", "https://a/1", dir);
+        writeStaffInviteOutbox("asha@example.com", "https://a/2", dir);
+        const file = staffInviteOutboxPath("ASHA@example.com", dir);
+        expect(readFileSync(file, "utf8")).toBe("https://a/2");
+        expect(file).not.toBe(siteCodeOutboxPath("asha@example.com", dir));
+    });
+
+    it("never throws when it can't write", () => {
+        expect(() =>
+            writeStaffInviteOutbox("a@b.in", "x", "/dev/null/not-a-dir"),
         ).not.toThrow();
     });
 });

@@ -3,10 +3,11 @@ import type { SiteStyle, StyleRow, StyleScalar } from "@saroh/templates";
 import {
     DEFAULT_FONT_PAIR,
     defaultSiteStyle,
-    FONT_PAIRS,
     isFontPairKey,
+    parseLook,
     parsePalette,
     parseTypeScale,
+    PICKABLE_FONT_PAIRS,
     STYLE_ROW_KEYS,
     STYLE_ROW_LABELS,
     STYLE_ROWS,
@@ -63,6 +64,7 @@ export function parseSiteStyle(input: unknown): SiteStyle {
         fontPair?: unknown;
         palette?: unknown;
         type?: unknown;
+        look?: unknown;
     };
 
     if (raw.colours !== undefined) {
@@ -134,6 +136,19 @@ export function parseSiteStyle(input: unknown): SiteStyle {
         if (!parsed.ok) throw styleProblems(parsed.problems);
         if (Object.keys(parsed.type).length > 0) base.type = parsed.type;
     }
+
+    // The site's look (DEC-172): refused, not coerced, like a font pair.
+    // Null is Classic, as absent. WHETHER this business may choose one is
+    // the rollout's rule (`SITE_LOOKS`), checked where a merchant saves
+    // (`assertLookAllowed`); this is only whether it is a look at all.
+    const look = parseLook(raw.look);
+    if (!look.ok) {
+        throw new BadRequestException({
+            message: look.message,
+            details: { field: "look" },
+        });
+    }
+    if (look.look) base.look = look.look;
 
     return base;
 }
@@ -235,7 +250,11 @@ export function siteStyleOptions(
             // The slider's floor is the merchant's, not the template's.
             return { key, ...bounds, min: pickerMin ?? bounds.min };
         }),
-        fontPairs: FONT_PAIRS.map((p) => ({ key: p.key, name: p.name })),
+        // A look's pair comes with its look (DEC-172), so it is not offered.
+        fontPairs: PICKABLE_FONT_PAIRS.map((p) => ({
+            key: p.key,
+            name: p.name,
+        })),
         colourways,
         startColourway: startOf(colourways, startColourway),
     };

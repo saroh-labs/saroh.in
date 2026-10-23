@@ -25,6 +25,16 @@ jest.mock("../invoices/business-details", () => ({
     assertBusinessDetails: jest.fn().mockResolvedValue(undefined),
 }));
 
+// The member's notice (U11) is queued with each event; it has its own
+// specs (`membership-notices.db.spec.ts`), so it is stubbed here.
+jest.mock("./membership-notices", () => ({
+    queueMembershipNotice: jest.fn().mockResolvedValue("none"),
+}));
+// The renewal's automatic send (U10) has its own specs
+// (`subscriptions.renew.db.spec.ts`), so it is stubbed here.
+jest.mock("./renewal-send", () => ({
+    sendRenewalUnlessCharged: jest.fn().mockResolvedValue(false),
+}));
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const tx = {
@@ -794,6 +804,7 @@ describe("what a subscription owes", () => {
                 status: "PAID",
                 subscriptionId: "sub_1",
                 total: decimal("1200"),
+                paidCents: 0,
                 dueAt: at("2026-08-08T00:00:00Z"),
                 paidAt: at("2026-08-02T00:00:00Z"),
             },
@@ -803,6 +814,7 @@ describe("what a subscription owes", () => {
                 status: "ISSUED",
                 subscriptionId: "sub_1",
                 total: decimal("1200"),
+                paidCents: 0,
                 dueAt: at("2026-09-08T00:00:00Z"),
                 paidAt: null,
             },
@@ -812,6 +824,7 @@ describe("what a subscription owes", () => {
                 status: "ISSUED",
                 subscriptionId: "sub_1",
                 total: decimal("1200"),
+                paidCents: 0,
                 dueAt: at("2026-10-08T00:00:00Z"),
                 paidAt: null,
             },
@@ -854,6 +867,7 @@ describe("what a subscription owes", () => {
                 status: "ISSUED",
                 subscriptionId: "sub_1",
                 total: decimal("1200"),
+                paidCents: 0,
                 dueAt: at("2026-09-08T00:00:00Z"),
                 paidAt: null,
             },
@@ -1999,6 +2013,7 @@ describe("a failed charge", () => {
         status: "PAID",
         subscriptionId: "sub_1",
         total: decimal("1200"),
+        paidCents: 0,
         dueAt: at("2026-08-08T00:00:00Z"),
         paidAt: at("2026-08-02T00:00:00Z"),
     };
@@ -2008,6 +2023,7 @@ describe("a failed charge", () => {
         status: "ISSUED",
         subscriptionId: "sub_1",
         total: decimal("1200"),
+        paidCents: 0,
         dueAt: at("2026-09-08T00:00:00Z"),
         paidAt: null,
     };

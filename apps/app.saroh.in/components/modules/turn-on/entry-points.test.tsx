@@ -10,14 +10,14 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { FirstRunJobs } from "@/components/home/first-run-jobs";
-import { AlsoSell } from "@/components/services/also-sell";
+import { FirstRunJobs } from "@/components/home/dashboard/first-run-jobs";
+import { AlsoSell } from "@/components/services/list/also-sell";
 import { firstRunJobs } from "@/lib/home/first-run";
 import type { ModuleView } from "@/lib/modules/schema";
 
-import { ModuleCatalog } from "../module-catalog";
-import { ModuleGoalPicker } from "../module-goal-picker";
-import { ModuleList } from "../module-list";
+import { ModuleCatalog } from "@/components/modules/catalog/module-catalog";
+import { ModuleList } from "@/components/modules/catalog/module-list";
+import { ModuleGoalPicker } from "@/components/modules/goal-picker/module-goal-picker";
 
 // The sheet itself is `turn-on-sheet.test.tsx`; here, only what opens it.
 vi.mock("@/components/modules/turn-on/turn-on-sheet", () => ({

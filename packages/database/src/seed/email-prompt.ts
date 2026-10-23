@@ -17,7 +17,7 @@ import { SEED_ENTRY_PLAN_ID, SEED_PLAN_ID, seedPlanId } from "./pricing";
  * Communications is on — rolled out (`MODULE_COMMUNICATIONS`, which only
  * staff set in production, through `/admin`) and enabled — since the
  * prompt asks only while it is. Both flags stay off by default (registered
- * dark, as `saroh-email.ts` registers them), with overrides on for these
+ * dark, as the module flags are), with overrides on for these
  * businesses alone, so every other business reads what it did. No
  * provider, no contact email: a re-seed puts them back.
  */

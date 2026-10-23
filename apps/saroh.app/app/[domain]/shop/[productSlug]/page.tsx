@@ -5,6 +5,9 @@ import type { SignInOptions } from "@saroh/site-blocks";
 import {
     AddToBag,
     AskAboutOrdering,
+    BackInStock,
+    LookAddToBag,
+    lookOf,
     NotTakingOrders,
     ProductPage,
     reachOf,
@@ -12,6 +15,7 @@ import {
     ShopUnavailable,
 } from "@saroh/site-blocks";
 
+import { VisitStep } from "@/components/visit-step";
 import { getCatalogueProduct } from "@/lib/catalogue";
 import { moduleLabel, NOT_FOR_SEARCH } from "@/lib/module-pages";
 import { dontCachePage, showsProduct } from "@/lib/page-cache/site-rules";
@@ -24,6 +28,7 @@ import {
 } from "@/lib/publication";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 import { enquiryPagePath } from "@/lib/shop-checkout-shape";
+import { shopCutOff } from "@/lib/shop-cut-off";
 import { getSignInOptions } from "@/lib/sign-in";
 import { getSiteContact } from "@/lib/site-contact";
 import { canonical, productDescription } from "@/lib/site-meta";
@@ -32,6 +37,7 @@ import { shareable } from "@/lib/test-metadata";
 import PostPage, {
     generateMetadata as postMetadata,
 } from "../../[slug]/[postSlug]/page";
+import { backInStockOffer, stopWaiting, watchBackInStock } from "../actions";
 
 /**
  * One product on a merchant's site (round-2 G11): `/shop/<product>`, drawn
@@ -129,6 +135,7 @@ export default async function ShopProductPage({
             <ShopUnavailable
                 business={resolved.snapshot.site.name}
                 retryHref={`/shop/${encodeURIComponent(productSlug)}`}
+                look={lookOf(resolved.snapshot.site.look)}
                 // The layout's own read, shared through `cache`.
                 reach={reachOf(await getSiteContact(resolved.siteId))}
             />
@@ -138,30 +145,76 @@ export default async function ShopProductPage({
     // Its price and stock are on this page (#863).
     showsProduct(resolved.siteId, product.productId);
     const business = resolved.snapshot.site.name;
+    // Folio, Quiet or Live (DEC-172, U11): the look's Add to bag and its
+    // − 1 + stepper; absent, Classic's.
+    const look = lookOf(resolved.snapshot.site.look);
+    // "Tell me when it's back" (DEC-174, U24, #1155): drawn only for a
+    // sold-out option the API says it may be offered for, asked in the
+    // browser, so the cached page holds nothing of it.
+    const tellMe = product.productId ? (
+        <BackInStock
+            api={{
+                offer: backInStockOffer,
+                watch: watchBackInStock,
+                stop: stopWaiting,
+            }}
+            productId={product.productId}
+            business={business}
+            look={look}
+        />
+    ) : null;
     const action =
         checkout?.canOrder && product.listingId ? (
-            <AddToBag site={resolved.siteId} listingId={product.listingId} />
+            look ? (
+                <>
+                    {/* The form leads; "Ask about it" and the way back
+                        follow it. */}
+                    {tellMe}
+                    <LookAddToBag
+                        look={look}
+                        site={resolved.siteId}
+                        listingId={product.listingId}
+                        askHref={enquiryPagePath(resolved.snapshot)}
+                    />
+                </>
+            ) : (
+                <>
+                    {/* "Sold out" on the button, then the form under it. */}
+                    <AddToBag
+                        site={resolved.siteId}
+                        listingId={product.listingId}
+                    />
+                    {tellMe}
+                </>
+            )
         ) : checkout?.notTakingOrders ? (
             // Stopped taking orders for now (#800): nothing to ask about.
             <NotTakingOrders />
         ) : (
-            <AskAboutOrdering
-                enquiryHref={enquiryPagePath(resolved.snapshot)}
-                phone={
-                    (
-                        await getSignInOptions().catch(
-                            (): SignInOptions | null => null,
-                        )
-                    )?.phone ?? null
-                }
-                businessName={business}
-            />
+            <>
+                <AskAboutOrdering
+                    enquiryHref={enquiryPagePath(resolved.snapshot)}
+                    phone={
+                        (
+                            await getSignInOptions().catch(
+                                (): SignInOptions | null => null,
+                            )
+                        )?.phone ?? null
+                    }
+                    businessName={business}
+                />
+                {/* Sold out where orders are taken by asking: still worth
+                    an email when it's back. */}
+                {tellMe}
+            </>
         );
     // The page's own width, as the header's and every block's: at a desk
     // the product sits under the menu rather than across the whole screen.
     // The page's main landmark (UX-082): the header and footer sit outside.
     return (
         <main className="mx-auto w-full max-w-site-content">
+            {/* The visit looked at a product (U15): once a visit, its source only. */}
+            <VisitStep step="looked" />
             {/* Product structured data (#473), from what this page shows. */}
             <script
                 type="application/ld+json"
@@ -188,9 +241,18 @@ export default async function ShopProductPage({
                 // location's checkout offers now.
                 facts={
                     checkout?.canOrder && product.listingId
-                        ? shopFactsLine(checkout)
+                        ? look
+                            ? // The owner's cut-off line leads, said once.
+                              [
+                                  shopCutOff(resolved.snapshot),
+                                  shopFactsLine(checkout),
+                              ]
+                                  .filter(Boolean)
+                                  .join(". ") || null
+                            : shopFactsLine(checkout)
                         : null
                 }
+                look={look}
             />
         </main>
     );

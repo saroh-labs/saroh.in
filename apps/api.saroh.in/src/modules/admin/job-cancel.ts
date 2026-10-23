@@ -40,6 +40,10 @@ export const CANCEL_REFUSED: Readonly<Record<string, string>> = {
         "The Insights rollup runs itself again; cancelling a run would only hide it",
     "organization.deletion":
         "The deletion sweep runs itself again; cancelling a run would only hide it",
+    "class-packs.expiring":
+        "The pack expiry sweep runs itself again; cancelling a run would only hide it",
+    "invoice.overdue-remind":
+        "The overdue reminder sweep runs itself again; cancelling a run would only hide it",
     "subscription.charge":
         "A step of an autopay charge; cancelling it would strand the charge",
     "site.go_live":

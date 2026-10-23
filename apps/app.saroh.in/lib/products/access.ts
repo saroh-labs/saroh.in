@@ -20,3 +20,13 @@ export function canStockProducts(organization: Org): boolean {
     if (canWriteProducts(organization)) return true;
     return organization?.actions?.includes("inventory:write") ?? false;
 }
+
+/**
+ * See the orders (`order:read`): the stock quick look links a short
+ * product's open orders, where each customer can be told (U5).
+ */
+export function canReadOrders(organization: Org): boolean {
+    return organization?.actions
+        ? organization.actions.includes("order:read")
+        : organization?.role === "OWNER" || organization?.role === "ADMIN";
+}

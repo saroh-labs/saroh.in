@@ -12,7 +12,7 @@ import {
     bookingRow,
 } from "@/lib/customer-workspace/view";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { Chips, Empty, ROW_LINK } from "./parts";
 
 /**
@@ -36,7 +36,7 @@ export function BookingsTab({
         { key: "past", label: "Past", count: lists.past.list.length },
         {
             key: "issue",
-            label: "No-shows and late cancels",
+            label: "Didn't come or cancelled late",
             count: lists.issue.list.length,
         },
     ];

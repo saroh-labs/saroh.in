@@ -398,7 +398,7 @@ export function joinAnd(items: string[]): string {
 
 /**
  * What "Leave without saving?" says would be lost, in one sentence
- * (`components/shared/use-leave-guard.tsx` asks the question).
+ * (`components/shared/forms/use-leave-guard.tsx` asks the question).
  */
 export function leaveCopy(input: {
     save: SaveState;

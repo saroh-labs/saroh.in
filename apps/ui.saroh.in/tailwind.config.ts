@@ -4,6 +4,7 @@ import {
     siteColors,
     siteFontFamily,
     siteMaxWidth,
+    siteRadius,
 } from "@saroh/site-blocks/tailwind-preset";
 
 import sharedConfig from "../../tooling/tailwind-config/tailwind.config";
@@ -46,6 +47,12 @@ const config = {
             // max-w-site-content: the page's column, a template's width or
             // today's 1280px.
             maxWidth: siteMaxWidth,
+            // rounded-site, -site-s and -site-photo: a look's corners
+            // (DEC-172); each falls back to --site-radius under Classic.
+            borderRadius: {
+                ...sharedConfig.theme?.extend?.borderRadius,
+                ...siteRadius,
+            },
         },
     },
 } satisfies Config;

@@ -3,20 +3,22 @@ import {
     createViewLink,
     remindInvoice,
     sendInvoice,
+    shareInvoice,
 } from "./actions";
 import { forgetLink, rememberLink } from "./minted-links";
+import type { ShareAsk } from "./service";
 
 /**
  * Every way this app replaces an invoice's link token, with the tab's
  * memory of it kept in step (UX-048, #870). The API keeps one token per
- * invoice: a new pay link, a view link, a send and a reminder each make a
- * new one and end the one before. So a pay link made here is remembered to
+ * invoice: a new payment link, a view link, a send and a reminder each make a
+ * new one and end the one before. So a payment link made here is remembered to
  * show again, and anything else that replaces it forgets it — otherwise
  * "Show link again" would show a dead link. Call these, never the actions
  * behind them, from a screen.
  */
 
-/** A new pay link, remembered. `updatedAt`: the invoice's, as known now. */
+/** A new payment link, remembered. `updatedAt`: the invoice's, as known now. */
 export async function newPayLink(id: string, updatedAt?: string | null) {
     const res = await createPayLink(id);
     if (res.ok) {
@@ -25,7 +27,7 @@ export async function newPayLink(id: string, updatedAt?: string | null) {
     return res;
 }
 
-/** A link to view it (#833): it replaces the pay link this tab made. */
+/** A link to view it (#833): it replaces the payment link this tab made. */
 export async function newViewLink(id: string) {
     const res = await createViewLink(id);
     if (res.ok) forgetLink(id);
@@ -47,5 +49,26 @@ export async function sendWithLink(id: string) {
 export async function remindWithLink(id: string) {
     const res = await remindInvoice(id);
     if (res.ok) forgetLink(id);
+    return res;
+}
+
+/**
+ * Share it by hand (DEC-173, U11): WhatsApp and Link make a fresh link and
+ * end the one before, as a send does. A payment link made here is
+ * remembered to show again; a view link, or PDF and print, which make
+ * none, leave the memory as it is or clear it. `updatedAt`: the invoice's,
+ * as known now.
+ */
+export async function shareWithLink(
+    id: string,
+    ask: ShareAsk,
+    updatedAt?: string | null,
+) {
+    const res = await shareInvoice(id, ask);
+    if (res.ok && res.data.url) {
+        if (res.data.payOnline) {
+            rememberLink(id, res.data.url, updatedAt);
+        } else forgetLink(id);
+    }
     return res;
 }

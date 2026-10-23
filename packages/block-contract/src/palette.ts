@@ -57,9 +57,27 @@ export type PaletteRole = (typeof PALETTE_ROLES)[number];
 export const PALETTE_STATUS_ROLES = ["status", "statusInverse"] as const;
 export type PaletteStatusRole = (typeof PALETTE_STATUS_ROLES)[number];
 
+/**
+ * The colours a look derives for safety (KD4, `safe-colours.ts`): the
+ * accent set as text, a tint of it, the edge a control draws and the quiet
+ * text on the footer. OPTIONAL: no template writes them and a Classic site
+ * never has them, so every palette and publication before looks is
+ * unchanged. When a palette carries them, {@link parsePalette} holds each
+ * to its own ratio ({@link PALETTE_SAFE_PAIRS}), and the accent itself
+ * becomes a fill held to 3:1, because links then read `accentText`.
+ */
+export const PALETTE_SAFE_ROLES = [
+    "accentText",
+    "accentSoft",
+    "rule",
+    "footerMuted",
+] as const;
+export type PaletteSafeRole = (typeof PALETTE_SAFE_ROLES)[number];
+
 /** A complete palette: every role, each `#RRGGBB` in capitals. */
 export type SitePalette = Record<PaletteRole, string> &
-    Partial<Record<PaletteStatusRole, string>>;
+    Partial<Record<PaletteStatusRole, string>> &
+    Partial<Record<PaletteSafeRole, string>>;
 
 /**
  * What a template writes. Four roles are required; the rest fall back as
@@ -118,6 +136,14 @@ export const PALETTE_STATUS_VARIABLES: Record<PaletteStatusRole, string> = {
     statusInverse: "--site-status-inverse",
 };
 
+/** The `--site-*` property each safe role sets, when a palette has it. */
+export const PALETTE_SAFE_VARIABLES: Record<PaletteSafeRole, string> = {
+    accentText: "--site-accent-text",
+    accentSoft: "--site-accent-soft",
+    rule: "--site-rule",
+    footerMuted: "--site-footer-muted",
+};
+
 /** WCAG 2.1's 1.4.11 for a graphic: what a status dot must reach. */
 export const PALETTE_GRAPHIC_CONTRAST = 3;
 
@@ -163,6 +189,74 @@ export const PALETTE_CONTRAST_PAIRS: readonly {
         label: "Text on the call-to-action band",
     },
     { text: "footerFg", ground: "footerBg", label: "Text on the footer" },
+];
+
+/**
+ * The pairs the safe roles answer for, checked only when the palette has
+ * the role (`text` is the role drawn, `ground` what it is drawn on).
+ * Accent text is text (4.5:1, on the page and on a card); a control's edge
+ * is a graphic (3:1, WCAG 1.4.11); the page's text sits on the accent's
+ * tint, and the footer's quiet text on the footer.
+ */
+export const PALETTE_SAFE_PAIRS: readonly {
+    text: PaletteRole | PaletteSafeRole;
+    ground: PaletteRole | PaletteSafeRole;
+    /** The safe role whose presence asks for this pair. */
+    when: PaletteSafeRole;
+    min: number;
+    label: string;
+}[] = [
+    {
+        text: "accentText",
+        ground: "bg",
+        when: "accentText",
+        min: PALETTE_MIN_CONTRAST,
+        label: "Accent text on the page",
+    },
+    {
+        text: "accentText",
+        ground: "surface",
+        when: "accentText",
+        min: PALETTE_MIN_CONTRAST,
+        label: "Accent text on a card",
+    },
+    {
+        text: "rule",
+        ground: "bg",
+        when: "rule",
+        min: PALETTE_GRAPHIC_CONTRAST,
+        label: "A control's edge on the page",
+    },
+    {
+        text: "rule",
+        ground: "surface",
+        when: "rule",
+        min: PALETTE_GRAPHIC_CONTRAST,
+        label: "A control's edge on a card",
+    },
+    {
+        text: "fg",
+        ground: "accentSoft",
+        when: "accentSoft",
+        min: PALETTE_MIN_CONTRAST,
+        label: "Text on the accent's tint",
+    },
+    {
+        text: "footerMuted",
+        ground: "footerBg",
+        when: "footerMuted",
+        min: PALETTE_MIN_CONTRAST,
+        label: "Quiet text on the footer",
+    },
+];
+
+/**
+ * The accent as a fill, once links read `accentText`: a button or a dot on
+ * the page and on a card, a graphic at 3:1.
+ */
+const ACCENT_FILL_PAIRS: readonly { ground: PaletteRole; label: string }[] = [
+    { ground: "bg", label: "The accent on the page" },
+    { ground: "surface", label: "The accent on a card" },
 ];
 
 /** One refused role, by its field path, and why in plain words. */
@@ -212,7 +306,7 @@ export function contrastRatio(a: string, b: string): number {
 }
 
 /** `ratio` of the way from `from` to `to`, channel by channel. */
-function mixHex(from: string, to: string, ratio: number): string {
+export function mixHex(from: string, to: string, ratio: number): string {
     const a = channels(from);
     const b = channels(to);
     return toHex(
@@ -233,7 +327,13 @@ function mixHex(from: string, to: string, ratio: number): string {
  * palette in one pass. An unknown role is refused too, rather than dropped:
  * it is a typo for a role that then silently falls back.
  */
-export function parsePalette(input: unknown): PaletteResult {
+export function parsePalette(
+    input: unknown,
+    /** What the accent as a fill must reach (a look's `accentFillContrast`). */
+    {
+        accentFillContrast = PALETTE_GRAPHIC_CONTRAST,
+    }: { accentFillContrast?: number } = {},
+): PaletteResult {
     if (input === null || typeof input !== "object" || Array.isArray(input)) {
         return {
             ok: false,
@@ -244,7 +344,11 @@ export function parsePalette(input: unknown): PaletteResult {
     }
     const raw = input as Record<string, unknown>;
     const problems: PaletteProblem[] = [];
-    const known = new Set<string>([...PALETTE_ROLES, ...PALETTE_STATUS_ROLES]);
+    const known = new Set<string>([
+        ...PALETTE_ROLES,
+        ...PALETTE_STATUS_ROLES,
+        ...PALETTE_SAFE_ROLES,
+    ]);
     for (const key of Object.keys(raw)) {
         if (!known.has(key)) {
             problems.push({
@@ -290,6 +394,20 @@ export function parsePalette(input: unknown): PaletteResult {
         }
         status[role] = hex;
     }
+    const safe: Partial<Record<PaletteSafeRole, string>> = {};
+    for (const role of PALETTE_SAFE_ROLES) {
+        const value = raw[role];
+        if (value === undefined) continue;
+        const hex = normalizeHex(value);
+        if (!hex) {
+            problems.push({
+                field: `palette.${role}`,
+                message: `${role} must be a colour written #RRGGBB`,
+            });
+            continue;
+        }
+        safe[role] = hex;
+    }
     if (problems.length > 0) return { ok: false, problems };
 
     const palette = { ...given } as SitePalette;
@@ -302,7 +420,12 @@ export function parsePalette(input: unknown): PaletteResult {
             : mixHex(palette.bg, palette.fg, 0.11); // border
     }
 
+    Object.assign(palette, safe);
+    // With its own text colour, the accent is a fill: links read
+    // `accentText`, held to 4.5:1 below, and the accent to a graphic's 3:1.
+    const accentIsFill = safe.accentText !== undefined;
     for (const pair of PALETTE_CONTRAST_PAIRS) {
+        if (accentIsFill && pair.text === "accent") continue;
         const ratio = contrastRatio(palette[pair.text], palette[pair.ground]);
         if (ratio < PALETTE_MIN_CONTRAST) {
             problems.push({
@@ -323,6 +446,30 @@ export function parsePalette(input: unknown): PaletteResult {
         }
         palette[pair.role] = colour;
     }
+    if (accentIsFill) {
+        for (const pair of ACCENT_FILL_PAIRS) {
+            const ratio = contrastRatio(palette.accent, palette[pair.ground]);
+            if (ratio < accentFillContrast) {
+                problems.push({
+                    field: "palette.accent",
+                    message: `${pair.label} reads at ${ratio.toFixed(2)}:1; it needs ${accentFillContrast}:1`,
+                });
+            }
+        }
+    }
+    for (const pair of PALETTE_SAFE_PAIRS) {
+        if (safe[pair.when] === undefined) continue;
+        const text = palette[pair.text];
+        const ground = palette[pair.ground];
+        if (!text || !ground) continue;
+        const ratio = contrastRatio(text, ground);
+        if (ratio < pair.min) {
+            problems.push({
+                field: `palette.${pair.when}`,
+                message: `${pair.label} reads at ${ratio.toFixed(2)}:1; it needs ${pair.min}:1`,
+            });
+        }
+    }
     return problems.length > 0
         ? { ok: false, problems }
         : { ok: true, palette };
@@ -332,7 +479,8 @@ export function parsePalette(input: unknown): PaletteResult {
 export function samePalette(a: SitePalette, b: SitePalette): boolean {
     return (
         PALETTE_ROLES.every((role) => a[role] === b[role]) &&
-        PALETTE_STATUS_ROLES.every((role) => a[role] === b[role])
+        PALETTE_STATUS_ROLES.every((role) => a[role] === b[role]) &&
+        PALETTE_SAFE_ROLES.every((role) => a[role] === b[role])
     );
 }
 
@@ -362,6 +510,26 @@ export function hexToHslTriple(hex: string): string {
     return `${round(h * 60)} ${round(s * 100)}% ${round(l * 100)}%`;
 }
 
+/**
+ * The `#RRGGBB` colour an HSL triple (`"18 45% 45%"`, the `--site-*`
+ * notation) names, or null for anything that is not one. The inverse of
+ * {@link hexToHslTriple}, to the nearest channel.
+ */
+export function hslTripleToHex(triple: string): string | null {
+    const parts = triple.trim().split(/\s+/);
+    if (parts.length !== 3) return null;
+    const h = Number.parseFloat(parts[0] ?? "");
+    const s = Number.parseFloat(parts[1] ?? "") / 100;
+    const l = Number.parseFloat(parts[2] ?? "") / 100;
+    if (![h, s, l].every(Number.isFinite)) return null;
+    const k = (n: number) => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = (n: number) =>
+        l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    const clamp = (v: number) => Math.min(255, Math.max(0, v * 255));
+    return toHex([clamp(f(0)), clamp(f(8)), clamp(f(4))]);
+}
+
 /** A complete palette as `--site-*` custom properties. */
 export function paletteVariables(palette: SitePalette): Record<string, string> {
     const vars: Record<string, string> = Object.fromEntries(
@@ -374,6 +542,12 @@ export function paletteVariables(palette: SitePalette): Record<string, string> {
     for (const role of PALETTE_STATUS_ROLES) {
         const hex = palette[role];
         if (hex) vars[PALETTE_STATUS_VARIABLES[role]] = hexToHslTriple(hex);
+    }
+    // Only a look's derived colours (`safe-colours.ts`): a Classic site's
+    // variables are what they always were.
+    for (const role of PALETTE_SAFE_ROLES) {
+        const hex = palette[role];
+        if (hex) vars[PALETTE_SAFE_VARIABLES[role]] = hexToHslTriple(hex);
     }
     return vars;
 }

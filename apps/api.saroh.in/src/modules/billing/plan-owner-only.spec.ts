@@ -32,7 +32,9 @@ import {
 } from "../organizations/organization-policy";
 import { LaunchOfferService } from "../waitlist/launch-offer.service";
 import { AddonsService } from "./addons.service";
+import { BillingProfilesService } from "./billing-profiles.service";
 import type { BillingWebhookService } from "./billing-webhook.service";
+import { BusinessBillingProfileService } from "./business-billing-profile.service";
 import { CheckoutConfirmService } from "./checkout-confirm.service";
 import { CheckoutService } from "./checkout.service";
 import { PlansService } from "./plans.service";
@@ -46,6 +48,10 @@ const providers = new FakeBillingProviderFactory(
     new FakeBillingProvider("RAZORPAY"),
 );
 const user = { id: "user_1", email: "asha@example.com" } as never;
+const billingProfile = new BusinessBillingProfileService(
+    new BillingProfilesService(),
+    new CheckoutService(new PlansService(), providers),
+);
 
 /** Each write that changes what the business pays, by its route. */
 const WRITES: Record<string, (ctx: OrganizationContext) => Promise<unknown>> = {
@@ -66,6 +72,23 @@ const WRITES: Record<string, (ctx: OrganizationContext) => Promise<unknown>> = {
     "POST cancel": (ctx) => new SubscriptionsService().cancel(ctx),
     "POST launch-offer": (ctx) =>
         new LaunchOfferService().redeem(ctx, user, "token"),
+    // Who Saroh bills for the business (DEC-167, U5).
+    "POST profile/choose": (ctx) => billingProfile.choose(ctx, "bprof_1"),
+    "POST profile": (ctx) =>
+        billingProfile.create(
+            ctx,
+            { legalName: "Asha Foods", billingEmail: "a@example.com" },
+            true,
+        ),
+    "PATCH profile/:profileId": (ctx) =>
+        billingProfile.update(ctx, "bprof_1", { city: "Pune" }),
+};
+
+/** Routes of the business's billing profile, by their controller's own path. */
+const PROFILE_ROUTES: Record<string, string> = {
+    "POST choose": "POST profile/choose",
+    POST: "POST profile",
+    "PATCH :profileId": "PATCH profile/:profileId",
 };
 
 function member(over: Partial<OrganizationContext>): OrganizationContext {
@@ -190,6 +213,23 @@ describe("reading Plan and billing is unchanged", () => {
     });
 });
 
+describe("a billing profile is the owner's alone, reads included (AE6)", () => {
+    it.each(Object.keys(REFUSED))(
+        "refuses %s the profile view before reading anything",
+        async (who) => {
+            await expect(
+                billingProfile.view(REFUSED[who]!),
+            ).rejects.toMatchObject({ status: 403, ...refusal });
+        },
+    );
+
+    it("lets the Owner read it", async () => {
+        await expect(billingProfile.view(OWNERS["the Owner"]!)).rejects.toThrow(
+            "reached the database",
+        );
+    });
+});
+
 describe("every write route is on the list above", () => {
     // A new write under `…/billing` fails here until it is named in WRITES,
     // which is where its guard is proven.
@@ -202,8 +242,15 @@ describe("every write route is on the list above", () => {
             `${verb!.toUpperCase()} ${path ?? ""}`.trim(),
         );
 
-    it("billing.controller.ts", () => {
-        expect(routes("billing.controller.ts").sort()).toEqual(
+    it("billing.controller.ts and the business's billing profile", () => {
+        expect(
+            [
+                ...routes("billing.controller.ts"),
+                ...routes("business-billing-profile.controller.ts").map(
+                    (r) => PROFILE_ROUTES[r] ?? r,
+                ),
+            ].sort(),
+        ).toEqual(
             Object.keys(WRITES)
                 .filter((r) => r !== "POST launch-offer")
                 .sort(),

@@ -31,6 +31,7 @@ function periodInvoice(over: Partial<Record<string, unknown>> = {}) {
         status: "ISSUED",
         subscriptionId: "sub_1",
         total: "1200",
+        paidCents: 0,
         currency: "INR",
         issuedAt: ago(9 * DAY),
         dueAt: ago(2 * DAY + 60 * 60 * 1000),
@@ -51,6 +52,8 @@ function moneyDb(opts: {
         unpaid.map((u) => ({ id: u.id, subscriptionId: u.subscriptionId }));
     const findMany = jest.fn((args: { where: Record<string, unknown> }) => {
         const where = args.where;
+        // Money in's order paper paid in a window (`money-in.ts`): none.
+        if ("paidAt" in where) return Promise.resolve([]);
         if ("dueAt" in where) return Promise.resolve(opts.overdue ?? []);
         if (where.status === "ISSUED") return Promise.resolve(unpaid);
         return Promise.resolve(latest);
@@ -60,6 +63,10 @@ function moneyDb(opts: {
         subscriptionEvent: { findMany: jest.fn().mockResolvedValue([]) },
         // D13: no autopay charge under way.
         paymentIntent: { findMany: jest.fn().mockResolvedValue([]) },
+        // U8: no bill reminded this week.
+        message: { findMany: jest.fn().mockResolvedValue([]) },
+        customerThreadMessage: { findMany: jest.fn().mockResolvedValue([]) },
+        invoiceShare: { findMany: jest.fn().mockResolvedValue([]) },
         invoice: {
             findMany,
             count: jest
@@ -310,6 +317,7 @@ describe("overdueInvoices", () => {
         id: "inv_1",
         number: "INV-0007",
         total: "4000",
+        paidCents: 0,
         currency: "INR",
         dueAt: ago(2 * DAY + 60_000),
         billToName: "Café Mocha",
@@ -610,6 +618,7 @@ const handOverdue = () => ({
     id: "inv_1",
     number: "INV-0007",
     total: "4000",
+    paidCents: 0,
     currency: "INR",
     dueAt: ago(2 * DAY + 3600_000, new Date()),
     billToName: "Café Mocha",
@@ -686,8 +695,16 @@ describe("HomeService with the F1 sources", () => {
         const { service, db } = home([PAYMENTS], {
             overdue: [handOverdue()],
         });
-        // The renewal read is the first findMany on invoices.
-        db.invoice.findMany.mockRejectedValueOnce(new Error("timeout"));
+        // The renewal read: the one invoice read that selects the
+        // subscription's plan (picked by shape, not by call order, since
+        // a build now starts the overdue where first, review #16).
+        const answer = db.invoice.findMany.getMockImplementation();
+        db.invoice.findMany.mockImplementation(
+            (args: { select?: { subscription?: unknown } }) =>
+                args?.select?.subscription
+                    ? Promise.reject(new Error("timeout"))
+                    : answer?.(args),
+        );
         const model = await service.build(OWNER);
 
         expect(model.unavailable).toEqual([

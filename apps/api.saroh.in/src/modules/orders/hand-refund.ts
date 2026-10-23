@@ -18,7 +18,7 @@ import { BadRequestException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
 import { recordOrderRefundedInTx } from "../analytics/order-events";
-import type { PaymentMethod } from "../invoices/invoice-state";
+import type { HandPaymentMethod } from "../invoices/invoice-state";
 import {
     creditPartOfOrder,
     creditRestOfOrder,
@@ -160,7 +160,7 @@ export async function recordHandRefundInTx(
         orderId: string;
         organizationId: string | null;
         userId: string;
-        how: PaymentMethod | undefined;
+        how: HandPaymentMethod | undefined;
         plan: HandRefundPlan;
     },
 ): Promise<void> {

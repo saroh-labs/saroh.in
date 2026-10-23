@@ -10,10 +10,10 @@ import {
     ListPaging,
     ListToolbar,
     MoreFilters,
-} from "@/components/shared/list-toolbar";
-import { SinceNotice } from "@/components/shared/since-notice";
-import { useArrivals } from "@/components/shared/use-arrivals";
-import { StorefrontFilter } from "@/components/stores/storefront-filter";
+} from "@/components/shared/lists/list-toolbar";
+import { useArrivals } from "@/components/shared/live-refresh/use-arrivals";
+import { SinceNotice } from "@/components/shared/notices/since-notice";
+import { StorefrontFilter } from "@/components/stores/locations/storefront-filter";
 import type { CustomerPick } from "@/lib/customers/picker";
 import { useNarrow } from "@/lib/hooks/use-narrow";
 import type {
@@ -477,7 +477,7 @@ export function OrdersScreen({
                     noMoneyAt={newOrder.places
                         ?.filter((p) => !p.money)
                         .map((p) => p.id)}
-                    // A new order's pay link is `order:create`'s (B16).
+                    // A new order's payment link is `order:create`'s (B16).
                     canLink={can.create}
                     online={newOrder.online ?? true}
                     canSearch={newOrder.canSearch}

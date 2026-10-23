@@ -9,7 +9,7 @@ import {
     useState,
 } from "react";
 
-import { useLeaveGuard } from "@/components/shared/use-leave-guard";
+import { useLeaveGuard } from "@/components/shared/forms/use-leave-guard";
 import { count } from "@/lib/format/plural";
 import type { SettingsTab } from "@/lib/products/links";
 import { productSettingsHref } from "@/lib/products/links";

@@ -31,12 +31,12 @@ what the API allows.
 `OrgRole` has four values (`common/types/organization-context.ts`), and
 `organization-policy.ts` maps each to a closed set of actions.
 
-| Role       | What it may do                                                                                                                                                                                                                                                                                                          |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `OWNER`    | Everything, including `org:delete`.                                                                                                                                                                                                                                                                                     |
-| `ADMIN`    | Everything except the owner-only powers: `org:delete`, `org:address:update` and `billing:manage` (it reads Plan and billing with `billing:read`).                                                                                                                                                                       |
-| `MEMBER`   | The read-only floor: `org:read`, `member:read`, `store:read`, `site:read`, `media:read`, `module:read`, and the diary — `booking:read`, `service:read`, `contact:read` (DEC-020) — plus `order:stage` (DEC-024, adopted): an order's kitchen view without money, and moving its stage. No leads, no pipeline, no money. |
-| `REVIEWER` | `site:read`, `site:comment`, `site:approve` — and nothing else, not even the floor.                                                                                                                                                                                                                                     |
+| Role       | What it may do                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OWNER`    | Everything, including `org:delete`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `ADMIN`    | Everything except the owner-only powers: `org:delete`, `org:address:update` and `billing:manage` (it reads Plan and billing with `billing:read`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `MEMBER`   | The read-only floor: `org:read`, `member:read`, `store:read`, `site:read`, `media:read`, `module:read`, and the diary — `booking:read`, `service:read`, `contact:read` (DEC-020) — plus `order:stage` (DEC-024, adopted): an order's kitchen view without money, and moving its stage; and the front desk (DEC-170): `booking:write` (book, mark Came / Didn't come, move, cancel) and `hours:write` (anyone's weekly hours, extra hours and time off); and `notification:read-own` (the alerts addressed to them alone, DEC-170). No leads, no pipeline, no money: "Paid now", desk payments and pay links also ask `invoice:write`. |
+| `REVIEWER` | `site:read`, `site:comment`, `site:approve` — and nothing else, not even the floor.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 - **Current** — **REVIEWER is enumerated, never derived** (#276). The read-only
   floor includes the roster, the stores and the media library; a reviewer is an
@@ -122,6 +122,57 @@ what the API allows.
   "Your role can't …" (`bookings/booking-access.ts`).
   `booking-permissions.db.spec.ts` pins one row per endpoint; a new booking,
   service or pack endpoint adds its row there.
+- **Current** (DEC-170, owner 19 Oct) — **Hours are their own power.**
+  `hours:write` ("Set hours and time off") covers a person's weekly hours,
+  extra hours and time off; adding or removing people, their services, the
+  services, closures and booking rules stay `service:write`, which implies
+  `hours:write` (a role saved before the split keeps setting hours), and
+  `hours:write` implies `service:read`. A Member holds it. "Paid now" on a
+  booking made by hand asks `mayTakeDeskPayment` like a desk payment, and
+  with `paidBy` writes the booking and its desk payment in one transaction.
+  A cancelled paid booking's refund or keep follows the business's policy
+  whoever cancels (Q14); only the by-hand refund beyond the policy asks
+  `payment:manage`. `book-by-hand.db.spec.ts` pins the front desk.
+- **Current** (DEC-170, #1038) — **Each person's own booking rules.** A
+  person's timing rules (notice, booking ahead, gap between bookings,
+  cancelling) live on `StaffMember`, null meaning "same as the business";
+  paying and refunds stay business-wide (`bookings/person-rules.ts`).
+  No new key: `hours:write` changes the holder's **own** rules (their
+  diary's `membership.userId` is the caller), `service:write` anyone's,
+  the business's rules, "Gap between bookings" and the switch "Members'
+  rule changes need approval" (on for every business). With the switch on,
+  a change made without `service:write` is a `StaffRuleRequest` (one
+  waiting per person; asking again replaces it) that changes nothing until
+  someone with `service:write` approves it; Turn down takes an optional
+  reason; only the person who asked withdraws it or clears the outcome.
+  Off, it applies at once and Undo is the same `PUT` with `previous`. A
+  Reviewer and Calendar only change nobody's; Calendar only reads its own.
+  A request tells everyone who may approve it (`service:write`: the owners
+  and admins) in the inbox (`hours.rule-request`) and by email; an approval
+  or a turn-down tells the person who asked in their own alerts
+  (`hours.rule-answer`) and by email, with the reason (DEC-170,
+  `notifications/ask-alerts.ts`). Every change and move is in the history
+  (`staff.booking-rules.*`, `booking-rules.update`). `staff-rules.db.spec.ts`
+  and `rule-request-alerts.db.spec.ts` pin it, and
+  `booking-permissions.db.spec.ts` has a row per endpoint.
+- **Current** (DEC-170, #1038) — **Everyone reads their own alerts; only
+  owners and admins read the business's.** A `Notification` with no
+  `userId` is the business's, read with `notification:read` (Owner and
+  Admin); one with a `userId` is that person's alone, read with
+  `notification:read-own`, and nobody else sees it — owners included — so
+  someone else's id is a 404. Every role that signs in holds
+  `notification:read-own` but the Reviewer, who has no bell: Owner and
+  Admin through `notification:read`, which implies it; Member and Calendar
+  only in their lists; the roles a business made gained it in
+  `20261204120000_notification_for_one_person`, and a role made since is
+  offered it. Opening one's own, and "Mark all as read" or its Undo over
+  them, is part of reading them: no write key; the business's still ask
+  `notification:write`. `NotificationsService` builds every read and
+  write from one filter (`visibleTo`), and the app opens the bell for
+  either key (`NOTIFICATIONS_NAV`). A permission request to owners and
+  admins writes its notice and queues its email on its own transaction
+  (`team.alert` `{ event: "ask" }`); the booking rules request is the only
+  one today, and a new kind adds its `about` to `ask-alerts.ts`.
 - **Current** (DEC-098, 2026-10-07) — **Money follows permissions, never
   role names.** Seeing amounts, taking a desk payment, marking an invoice
   paid, recording an order's payment and refunding are asked of the role's
@@ -134,6 +185,15 @@ what the API allows.
   (and Mark paid, Paid in cash) **disabled with why**, never hidden.
   Guarded by `organizations/money-by-permission.spec.ts` (API) and
   `lib/organizations/money-by-permission.test.ts` (app).
+- **Current** (#1157, 2026-10-20) — **Changing who a booking is with is
+  narrower than moving it.** `POST services/bookings/:id/reassign` asks
+  `booking:write`; giving someone else's booking away also asks
+  `service:write` (who takes what is set-up, as approving another person's
+  booking rules is, #1038). Without it — a Member at the front desk,
+  Calendar only — a person hands over a booking from their own diary, or
+  takes one that has nobody, and only for themselves; anything else is a
+  403 in words. Another business's booking or person is a 404.
+  `bookings/booking-reassign.ts`, `booking-reassign.db.spec.ts`.
 - **Current** (DEC-106, 2026-10-07) — **Storefront roles follow permissions
   for money too.** A storefront Admin, Manager or Editor still takes and
   changes its storefront's orders (DEC-048), but recording or taking a
@@ -166,9 +226,11 @@ what the API allows.
   (`payment:read`, `invoice:read`, `subscription:read`); the API omits them,
   it does not send them for the screen to hide. `billing:read` is Saroh's own
   billing (DEC-014), not the merchant's.
-- **Adopted** — **Who writes the new settings** (ADR-008): staff, their hours,
-  time off and booking rules need `service:write`; GST registration, state and
-  rates need Owner/Admin. A Member is refused both.
+- **Adopted** — **Who writes the new settings** (ADR-008): staff and booking
+  rules need `service:write`, their hours and time off `hours:write`
+  (DEC-170); GST registration, state and rates need Owner/Admin. A Member
+  sets hours and time off, and their own booking rules (#1038, waiting for
+  approval while the business asks for it), and is refused the rest.
 - **Current** — **Membership is assignable, and invitations are hashed.**
   `OrganizationInvitation` holds the role, a reviewer's sites, and a sha256 of
   the token; the plaintext exists only in the invitee's email. Seven-day expiry,
@@ -464,6 +526,26 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   existing things stay readable and editable; only adding is refused. A
   new write that adds a metered thing, or a new switch row, gets its call
   and a row in `billing/plan-limits.db.spec.ts`.
+- **Current** (20 Oct 2026, DEC-177) — **A look, typeface or colourway is
+  free or paid, and the catalogue says which.** The live catalogue's
+  `freeStyles` (`{ looks, fontPairs, colourways }`, ids only, a colourway as
+  `template:colourway`; `freeStylesOf` in `@saroh/pricing-catalog`) lists the
+  free ones, ticked in admin › Plans and modules (`FreeStyles`, under the
+  modules matrix) and published like any other change. A style save
+  (`SitesService.updateStyle`) asks `assertStyleChoicesAllowed`
+  (`sites/site-style-free.ts`): every part it changes must be free, or the
+  plan must include `themes`, else the plan's 403 `MODULE_LOCKED`. Always
+  free, whatever the catalogue says: the system font, the site's own
+  template typefaces and the colourway it was made in, Classic, and
+  whatever the draft (or, for a look, the live site) already has. Swatches
+  and sliders are never paid. It reads the live version, not the business's
+  own, so a published list applies to everyone at once; a save of free parts
+  reads no catalogue and no plan. The editor's read serves the same answer
+  as `styleAccess`, so the panel refuses in place what the save would.
+  Publishing refuses a free id the build has no style for
+  (`pricing/free-style-choices.ts`, which also serves admin its choices). It
+  sits beside `assertLookAllowed` (`SITE_LOOKS`), which is unchanged. The
+  `themes` row still guards picking another template.
 - **Current** (plan shape of 5 Oct) — **A plan without online payments
   stops new money online, never what a business already has.** The
   `payments` and `subscriptions` rows (registry PAYMENTS) are asked where a
@@ -516,6 +598,20 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   enables each first. Whether Saroh has rolled a module out is one function,
   `moduleRolledOut`, which also treats a `hidden` module (Automations) as not
   rolled out. `modules/capabilities/README.md` has the payloads.
+- **Current** (DEC-175, #1158) — **Bookings makes the booking page, as
+  selling online makes the shop.** After Bookings is switched on (any way:
+  the sheet, the plain switch) and after a service customers can book online
+  is added or opened to them, `ModuleSetupService.makeBookingSite` makes the
+  starter site on the business's address, Website switched on with it
+  through Website's own setup, not published. It asks `site:create` and
+  `module:manage` of the person (Owner, Admin): anyone else adds the service
+  and no site. It never makes a second site, nor brings back a deleted one,
+  and it never refuses its caller (`capabilities/setup/booking-site.ts`).
+  `GET|POST organizations/:id/booking-page` and `POST …/booking-page/publish`
+  (`sites/booking-page.controller.ts`, gated on APPOINTMENTS, not WEBSITE)
+  read it, make it and publish the business's website through
+  `SitesService.publishSite`, so `site:publish` and "Publishing needs
+  approval" hold as in Website. `sites/booking-page.db.spec.ts`.
 - **Current** — **State-changing requests are origin-checked.** `OriginGuard`
   rejects an untrusted **or missing** `Origin` (falling back to `Referer`) on
   POST, PUT, PATCH and DELETE (#50). **A frontend's server-side call to the
@@ -548,7 +644,7 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   D2). The admin services (`admin-organizations`, `admin-people`,
   `admin-machinery`, `admin-waitlist`, `admin-metrics`, `admin-usage`
   (storage per business, #798), `admin-billing` (Saroh's invoices and
-  subscriptions, DEC-163), and the pricing
+  subscriptions, DEC-179), and the pricing
   catalogue's `ImpactService`) read across every
   business with no organization context, so the `org_isolation` policies take
   their permissive branch. Each says **CROSS-TENANT READ** in its doc comment,
@@ -566,7 +662,7 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   `organization:pii:read`. It is read-only and adds no permission. The
   public write (`POST /public/contact-messages`) is guardless, rate-limited
   per visitor and answers nothing back; rows go after 12 months.
-- **Current** (DEC-163) — **Saroh's own billing across businesses**
+- **Current** (DEC-179) — **Saroh's own billing across businesses**
   (`/admin/billing/*`: every Saroh invoice, its PDF, the month's GST CSV,
   every business's Saroh subscription, its checkouts and the provider's
   events) needs `saroh-billing:read`, which only Platform Owners and Billing
@@ -584,6 +680,176 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   key, checked on the route and again in the service
   (`assertSarohBillingActor`), and on the admin ledger. No support-access
   session: Support, even with one open, is refused (403).
+- **Current** (DEC-169, admin console U18) — **The Account manager role sees
+  only its own.** `ACCOUNT_MANAGER` holds `accounts:read`,
+  `saroh-leads:read` and `saroh-leads:write`, never `organization:read`,
+  `accounts:assign`, `team:write` or `staff:grant`
+  (`admin-permissions.spec.ts`). Every read of leads, contact logs, a team
+  view's businesses, the overview, module state, search or a member page
+  calls `scopeForStaff(staff, permission)` (`modules/admin/staff-scope.ts`):
+  `{kind: "all"}` when any role the person holds grants that permission
+  unscoped, `{kind: "own", platformAdminId}` when only the Account manager
+  role grants it. For own scope, `maySeeOrganization` answers yes only while
+  the business's open `AccountManagerLink` names them (U19). Each such route has a spec:
+  an Account manager reading something not theirs gets 403. A teammate's tax
+  id is sealed under `STAFF_PII_ENC_KEY` and shown only as set, or its last
+  4 characters to `team:pay` holders, each read on the ledger. The role
+  CHECK in the migrations equals `AdminRole` (`admin-role-check.spec.ts`).
+  Team permissions no route requires yet are listed in `AWAITING_ENDPOINT`
+  with the unit that wires them (since U21 only `accounts:read`);
+  `admin.controller.permissions.spec.ts` fails on any other unused
+  permission.
+- **Current** (DEC-169, admin console U22) — **A teammate's page**
+  (`GET admin/team/members/:id`, `admin-team-member.ts`) is admitted by
+  `accounts:read` (every role holding `team:read` holds it, and so does
+  the Account manager) and decided by `memberAccess` before anything is
+  read: `team:read` opens anyone's, anyone else only their own, else 403
+  (so an id that names nobody says nothing). The profile is
+  `getProfile`'s, with its tax id rule. Leads, a lead's name and what a
+  call said go only to the teammate themself and to staff for whom
+  `saroh-leads:read` is unscoped (`seesLeadWork`); Billing and Auditor get
+  counts and when. A call with a business
+  (`POST admin/organizations/:id/contact-log`, `saroh-leads:write`) is a
+  `SarohContactLog` row on the business, scoped by `scopeForStaff` and
+  `assertMaySeeOrganization`, on the ledger as `business.contact-logged`
+  against it with no words of the call. `GET admin/me` carries the
+  caller's own `platformAdminId` (null for break-glass), for Your page.
+- **Current** (DEC-169, admin console U19) — **Who brought a business in**
+  is decided once, in its create transaction, by `recordManagerInTx`
+  (`modules/organizations/account-manager.ts`) under a savepoint: anything
+  that fails is rolled back to it and logged (`account_manager_link_failed`),
+  and the business is made with no manager. The first proof wins: the
+  `?am=` link (`saroh_am` cookie, sent by the workspace as
+  `managerLinkCode`/`managerLinkSetAt`), then a code the owner typed
+  (`managerCode`), then the owner's **self**-verified email
+  (`emailVerifiedBySelf`) on a lead the manager owns, recorded before the
+  business's `createdAt`. Only a teammate holding the Account manager role
+  now counts (unrevoked grant, unrevoked and unexpired assignment), never
+  for their own business; an unknown or revoked code names nobody, silently.
+  `AccountManagerLink` is append-only (a trigger lets an open link only be
+  ended), one open link per business (partial unique index), the manager a
+  bare `platformAdminId`, the proof in `evidence` (code, cookie time, lead
+  and when its email was recorded; never an email), and it carries the
+  org-isolation policy. A business referral (DEC-156) is recorded beside it.
+- **Current** (DEC-169, admin console U25) — **Staff give a business its
+  manager; a link ends with the role.** `accounts:assign` (Support and
+  Platform owner only; never an Account manager, refused on the route and
+  again in `AdminAccountManagersService`) gives a business a manager
+  (`POST admin/organizations/:id/manager`), moves it, ends the link
+  (`DELETE …/manager`, a reason) or shares businesses out
+  (`POST admin/team/share-out`). Each takes a reason and an idempotency key
+  and is on the ledger against the business (`account-manager.assigned`,
+  `.reassigned`, `.ended`; `.shared-out` for the whole share-out). A move
+  ends the open link and starts a new ASSIGNED one in one transaction, so a
+  business brought in becomes assigned once moved, and the old link keeps
+  its evidence. Only someone holding the Account manager role now, who
+  doesn't own the business, can be given it; a deleted business takes
+  nobody. Share out evenly gives businesses with no manager that Saroh still
+  bills (active or suspended), paying ones first, to whoever is an Account
+  manager **and** on commission and looks after the fewest, stopping at
+  their capacity (`admin/share-out.ts`). Every write on one business holds
+  its `account-manager:<id>` lock. **A link lasts only while its manager
+  holds the role**: revoking their access, or an amend that takes the role
+  away, ends their links in the same transaction (`manager-links.ts`); the
+  hourly `account-managers.link-sweep` ends any left (an assignment that
+  ran out, or a change made outside the console) at the moment the role
+  ended, named on the ledger as `system:manager-link-sweep`. A change of
+  the role's expiry alone keeps them.
+- **Current** (DEC-169, admin console U21) — **What the team is owed**
+  (`admin-commission.controller.ts`) needs `team:pay` (Platform owner and
+  Billing): the month's statement (`GET admin/team/payouts?month=`), its
+  CSV (`…/export`), Mark paid (`POST admin/team/payouts`, a reference, a
+  reason and an idempotency key) and a teammate's earnings
+  (`GET admin/staff/:id/earnings`). The rates (`GET`/`POST
+admin/commission/rates`) need `commission:rates` (Platform owner only).
+  The service checks each again. Nobody marks their own commission paid
+  (403, the caller's `platformAdminId` is the payee's). Reads are on the
+  ledger as reads (`commission.statement.read`, `.export`,
+  `.earnings.read`, `.rates.read`), writes in their transaction
+  (`commission.payout.paid`, `commission.rate.set`); neither carries a rate
+  or an amount in its metadata. Cross-tenant, with no organization context:
+  `CommissionLine` carries the org-isolation policy, `CommissionRate` and
+  `CommissionPayout` are in `NOT_TENANT_OWNED`.
+- **Current** (DEC-169, admin console U20) — **Saroh's own sales leads**
+  (`/admin/saroh-leads`, `modules/saroh-leads/`) belong to no business:
+  `SarohLead` is in `NOT_TENANT_OWNED`, and `SarohContactLog` (a call or
+  visit, on a lead or a business) carries the org-isolation policy. Reads
+  need `saroh-leads:read` and writes `saroh-leads:write`, each scoped by
+  `scopeForStaff`: an Account manager reaches only the leads they own
+  (another's, or an unowned one, is a 403), and only Support and Platform
+  owner give unowned leads out (`assign`, a reason, never to oneself:
+  there is no claim). The first to record an email owns the lead (its
+  email and sign-up email are unique, merged by the waitlist's key); a
+  manager adding one that is taken is told whose. Won names a business
+  (an Account manager only one owned by the lead's email), Lost a reason.
+  A saroh.in question ("A question before signing up") and a waitlist
+  entry (not a tool's email gate) make or merge a lead after their own
+  write and never fail it (`lead-intake.ts`); an unconverted website lead
+  goes with its enquiry's 12 months once no waitlist entry holds it, and
+  with a waitlist entry its owner asked to remove (`lead-retention.ts`).
+  Every write is on the ledger with no email in its metadata.
+- **Current** (admin console U9) — **Sign-in help** (`people:sign-in-help`,
+  Platform owners and Support, with `organization:pii:read`;
+  `admin/admin-sign-in-help.service.ts`). Every write takes a reason and an
+  idempotency key and is on the admin ledger in its transaction.
+    - **Send a sign-in code** goes through the API's own Better Auth
+      (`auth.api.sendVerificationOTP`, type `sign-in`, via
+      `common/auth/sign-in-code-sender.ts`), never a mail of the console's.
+      At most 3 to one person and 20 from one staff member an hour, counted
+      from the ledger under `admin-sign-in-code:<userId>`; a refusal is a
+      429 saying when, on the ledger as DENIED.
+    - **Mark verified** sets `emailVerified` and stamps
+      `User.emailVerifiedByStaffAt`. **Staff-verified is never the
+      person's own**: self-verified is `emailVerified &&
+emailVerifiedByStaffAt === null`, read through `emailVerifiedBySelf`
+      (`common/auth/email-verification.ts`). An account manager's
+      attribution and a staff invite's acceptance read that, never
+      `emailVerified` alone. The stamp is cleared when the person next
+      proves the mailbox with a code (`@saroh/auth` `onMailboxProven`, on
+      `/sign-in/email-otp` and `/email-otp/verify-email` only) and when staff
+      change the address.
+    - **Change sign-in email** (`PUT people/:id/email`) is the takeover
+      path, so: an address another account uses is refused (409); an owner
+      of a business on a paid plan (live subscription billed by a provider
+      or on a priced plan) is changed only by a Platform owner (403,
+      DENIED on the ledger); the new address starts unverified and every
+      session ends; the old address is told with the new one masked; and a
+      `SignInEmailChange` row holds the new address for 24 hours. While it
+      holds, Better Auth sends it no code (`verification-otp.ts`) and starts
+      the person no session by any way in (`@saroh/auth` `mayStartSession`,
+      `sign-in-holds.ts`). A second, different staff member may confirm
+      (`POST people/:id/email/confirm`, CHECKed in the migration), which
+      sends the code at once; otherwise `people.sign-in-email.release`
+      sends it when the hold ends.
+- **Current** (admin console U24, R32) — **Staff invites** add a teammate
+  with no Saroh account (`admin/admin-staff-invites.service.ts`). Create,
+  resend and withdraw need `staff:grant` (`POST/DELETE admin/staff/invites…`,
+  a reason and an idempotency key, on the ledger); an invite never carries a
+  role with a permission the sender lacks (`rolesBeyondReach`, DENIED on the
+  ledger). `StaffInvite` stores only the token's sha256; the token is in the
+  email alone, valid 7 days, and a resend replaces it. The link opens
+  accounts' `/staff-invite/open`, which swaps the token for an httpOnly
+  cookie scoped to `/staff-invite` and redirects to the clean address (no
+  referrer, left out of error tracking by `lib/untracked-pages.ts`). The
+  preview is `POST /public/staff-invites/preview` and the accept
+  `POST /staff-invites/accept` on the session alone (`modules/staff-invites/`,
+  outside `AdminModule`), both with the token in the body. Accepting needs
+  the session's email to be the invite's and `emailVerifiedBySelf`, and the
+  last sender to still hold `staff:grant` and reach every role; it then makes
+  the grant (reopening a revoked one), the roles and the profile with a ledger
+  row in `guardedStaffChange`. A second accept by the same person answers
+  `already-joined` and writes nothing; anyone already on the team is refused
+  (`ALREADY_ON_TEAM`).
+- **Current** (admin console U5) — **A staff override is a gift.** The
+  offer sheet gives a plan until a date, a custom price (`pricing:override`
+  and `pricing:publish`), one module, a higher limit or a longer trial
+  (`subscription:override`; a trial only while TRIALING and not billed by a
+  provider), each checked first by `POST organizations/:id/overrides/preview`
+  (`admin-offer-preview.ts`), which runs the write's checks and reads the
+  business through `CatalogueAccessService.resolve(…, whatIf)` without
+  writing anything. Taking a module away (`kind: "remove"`) is a Platform
+  owner's alone and refused for a row the plan they pay for, or an add-on
+  they bought, includes (`assertMayTakeAway`, in the write and the dry run).
 - **Current** — **Operators act through the business's own services, as
   themselves.** A module change, a role change or a removal goes through
   `ModuleLifecycleService` / `OrganizationMembersService` with an operator

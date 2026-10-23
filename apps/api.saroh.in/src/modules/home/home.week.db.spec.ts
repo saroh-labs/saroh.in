@@ -9,6 +9,7 @@
  */
 import { prisma } from "@saroh/database";
 
+import { onTheLedger } from "../../../test/ledger-paid";
 import { readWeek } from "./home-week";
 
 const tag = `${process.pid}-${Date.now()}`;
@@ -72,17 +73,19 @@ describe("Home F7 This week (DB)", () => {
         organizationId: string,
         data: Record<string, unknown>,
     ) {
-        return prisma.invoice.create({
-            data: {
-                organizationId,
-                status: "PAID",
-                currency: "INR",
-                subtotal: "1000",
-                total: "1000",
-                issuedAt: ago(10 * 24),
-                ...data,
-            },
-        });
+        return onTheLedger(
+            await prisma.invoice.create({
+                data: {
+                    organizationId,
+                    status: "PAID",
+                    currency: "INR",
+                    subtotal: "1000",
+                    total: "1000",
+                    issuedAt: ago(10 * 24),
+                    ...data,
+                },
+            }),
+        );
     }
 
     beforeAll(async () => {
@@ -306,6 +309,8 @@ describe("Home F7 This week (DB)", () => {
             { takings: false, bookings: true, orders: false, owed: false },
             clock,
         );
+        // The cheques line (DEC-173) is HomeService's own read, beside the
+        // week, never part of it (`home.cheques.db.spec.ts`).
         expect(Object.keys(week).sort()).toEqual([
             "bookings",
             "startDate",

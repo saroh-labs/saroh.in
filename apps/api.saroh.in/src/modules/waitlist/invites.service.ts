@@ -61,7 +61,7 @@ export class WaitlistInvitesService {
         if (!offer) {
             return {
                 ready: false,
-                reason: "The launch offer isn't set on this instance, and the invite promises it. Set LAUNCH_OFFER_DAYS on the API.",
+                reason: "The launch offer isn't set up yet, and the invite promises it. Set LAUNCH_OFFER_DAYS on the API.",
             };
         }
         return { ready: true, signupBase, offer };
@@ -214,7 +214,7 @@ export class WaitlistInvitesService {
             status: "FAILED",
             detail:
                 outcome === "not-configured"
-                    ? "No email is set up on this instance; still waiting"
+                    ? "Saroh can't send email yet; still waiting"
                     : "The email did not leave; still waiting",
         };
     }

@@ -90,10 +90,12 @@ const mandate = (maxAmountCents: number | null = 200_000) => ({
 });
 
 /** A renewal invoice: ₹2,000 at 18% with GST added is ₹2,360 to pay. */
-const renewal = (total = "2360.00") => ({
+const renewal = (total = "2360.00", paidCents = 0) => ({
     id: "inv_1",
     status: "ISSUED",
     total: decimal(total),
+    // The ledger's paid so far (DEC-173).
+    paidCents,
     currency: "INR",
     subscriptionId: "sub_1",
 });
@@ -216,6 +218,25 @@ describe("a renewal within the mandate's limit", () => {
             status: "CREATED",
         });
         expect(recordChargeEventInTx).not.toHaveBeenCalled();
+    });
+
+    it("charges only what is left when part was paid by hand (DEC-173)", async () => {
+        db.invoice!.findFirst!.mockResolvedValue(renewal("2360.00", 100_000));
+        db.paymentMandate!.findFirst!.mockResolvedValue(mandate(300_000));
+        await expect(queue()).resolves.toMatchObject({ status: "QUEUED" });
+        expect(db.paymentIntent!.create.mock.calls[0][0].data).toMatchObject({
+            invoiceId: "inv_1",
+            amountCents: 136_000,
+        });
+    });
+
+    it("queues a partly paid renewal whose rest is inside the limit, though its total is not", async () => {
+        db.invoice!.findFirst!.mockResolvedValue(renewal("2360.00", 100_000));
+        db.paymentMandate!.findFirst!.mockResolvedValue(mandate(150_000));
+        await expect(queue()).resolves.toMatchObject({ status: "QUEUED" });
+        expect(db.paymentIntent!.create.mock.calls[0][0].data).toMatchObject({
+            amountCents: 136_000,
+        });
     });
 });
 

@@ -87,8 +87,13 @@ export interface Service {
      * of the amount to pay; null for none.
      */
     depositCents: number | null;
-    /** Whether the booking page offers it; staff book it either way. */
+    /** Whether the booking page offers it: Who can book it's "Customers". */
     showOnBookingPage: boolean;
+    /**
+     * Whether the team books it by hand (DEC-170): Who can book it's "Your
+     * team". Neither ticked reads as paused; bookings already made stay.
+     */
+    bookableByTeam: boolean;
 }
 
 /** One recurring weekly availability window (in the Service's timezone). */
@@ -165,11 +170,37 @@ export interface BookingEvent {
         | "CANCELLED"
         | "ATTENDED"
         | "NO_SHOW"
-        | "PAID_AT_DESK";
+        | "PAID_AT_DESK"
+        | "REASSIGNED"
+        // An unpaid hold whose time ran out, and the money paid online
+        // going back or refused (#1137): nobody's hand, no actor.
+        | "LAPSED"
+        | "REFUNDED"
+        | "REFUND_FAILED";
     /** Null when the booker did it themselves through the public form. */
     actor: { name: string | null } | null;
     fromStartAt: string | null;
     toStartAt: string | null;
+    /**
+     * On REASSIGNED (#1157): who it was with (null: nobody) and who it is
+     * with now; a person since removed reads null too.
+     */
+    fromStaff?: { name: string } | null;
+    toStaff?: { name: string } | null;
+    /**
+     * On REFUNDED and REFUND_FAILED (#1137): the refund's amount. On the
+     * CANCELLED of a place in a class cancelled as a whole: that it was
+     * the class, and the reason the business gave (DEC-178, #1172), which
+     * a cancel made before has none of.
+     */
+    data?: {
+        amountCents?: number;
+        currency?: string;
+        refundId?: string;
+        outcome?: string;
+        classCancelled?: boolean;
+        reason?: string;
+    } | null;
     createdAt: string;
 }
 
@@ -204,6 +235,13 @@ export interface BookingDetail extends Omit<Booking, "contact"> {
 export interface Slot {
     startAt: string;
     endAt: string;
+    /**
+     * Who is free at that start, for a service somebody takes (U3); a
+     * class's teacher. Absent for a service nobody takes.
+     */
+    staffIds?: string[];
+    /** A class's places still open at that start (U8); absent otherwise. */
+    placesLeft?: number;
 }
 
 /** A booking joined with a light snapshot of its owning Service. */
@@ -246,6 +284,7 @@ export interface CreateServiceInput {
     visits?: number;
     depositMode?: DepositMode;
     showOnBookingPage?: boolean;
+    bookableByTeam?: boolean;
 }
 
 /** Update a Service (PATCH semantics — every field optional). */
@@ -270,6 +309,7 @@ export interface UpdateServiceInput {
     visits?: number;
     depositMode?: DepositMode;
     showOnBookingPage?: boolean;
+    bookableByTeam?: boolean;
 }
 
 /** One availability window to persist (no id — position is not meaningful). */
@@ -480,12 +520,21 @@ const REGISTER_REACH_MS = 365 * 86_400_000;
  * read fails.
  */
 export async function listAllBookings(): Promise<BookingWithService[]> {
+    const calendar = await readBookingsRegister();
+    return calendar ? flattenCalendar(calendar) : [];
+}
+
+/**
+ * The register's read whole (All bookings, U11): a year each way, with the
+ * business's zone and who each is with. Null when it couldn't be read, so
+ * the page says so rather than showing no bookings.
+ */
+export async function readBookingsRegister(): Promise<BookingsCalendar | null> {
     const now = Date.now();
-    const calendar = await readBookingsCalendar(
+    return readBookingsCalendar(
         new Date(now - REGISTER_REACH_MS).toISOString(),
         new Date(now + REGISTER_REACH_MS).toISOString(),
     );
-    return calendar ? flattenCalendar(calendar) : [];
 }
 
 /**
@@ -588,13 +637,21 @@ export type BookByHandInput = {
     idempotencyKey?: string;
     /** Pay with this class pack (ADR-007); needs `pack:sell`. */
     packPurchaseId?: string;
-    /** Who takes it (U3); absent, whoever is free. */
+    /** Who does it (U3); absent, whoever is free. */
     staffId?: string;
-    /** How it is paid (U3). Left out for a pay link (E4): unpaid until paid. */
+    /** How it is paid (U3). Left out for a payment link (E4): unpaid until paid. */
     paidWith?: "PAID" | "DESK";
+    /**
+     * How "Paid now" was paid at the desk (DEC-170), saved with the booking.
+     * Only with `paidWith: "PAID"`; needs payment permission.
+     */
+    paidBy?: "CASH" | "UPI" | "CARD";
 } & (
     | { contactId: string }
     | { bookerEmail: string; bookerName?: string; bookerPhone?: string }
+    // A caller who gave just a name and phone (DEC-170): the customer with
+    // that phone, else a new one kept by it.
+    | { bookerPhone: string; bookerName: string }
 );
 
 /**
@@ -630,7 +687,7 @@ export function bookVisit(
 }
 
 /**
- * "Send a pay link" (E4): issue the booking's invoice and get its pay link,
+ * "Send a payment link" (E4): issue the booking's invoice and get its payment link,
  * to copy and send. Needs `booking:write` and `invoice:write`.
  */
 export function createBookingPayLink(
@@ -640,7 +697,7 @@ export function createBookingPayLink(
         `/bookings/${bookingId}/pay-link`,
         "POST",
         undefined,
-        "Couldn't make the pay link",
+        "Couldn't make the payment link",
     );
 }
 
@@ -669,9 +726,103 @@ export function rescheduleBooking(
     );
 }
 
+/**
+ * Change who a booking is with, or give one that has nobody a person
+ * (#1157), at a new time when `startAt` is given. 409 when they're booked
+ * then (saying when), 400 when they don't take it or aren't working.
+ */
+export function reassignBooking(
+    bookingId: string,
+    input: { staffId: string; startAt?: string },
+): Promise<CrmResult<Booking>> {
+    return send<Booking>(
+        `/bookings/${encodeURIComponent(bookingId)}/reassign`,
+        "POST",
+        input,
+        "Couldn't change who the booking is with.",
+    );
+}
+
+/** One person a booking could be given to, and whether they can then. */
+export interface ReassignCandidate {
+    id: string;
+    name: string;
+    /** It is with them now, they're free, booked then, or not working. */
+    state: "current" | "free" | "busy" | "off";
+    busyFrom?: string;
+    busyTo?: string;
+}
+
+/**
+ * Who could take a booking at `startAt` (its own start when left out):
+ * the Change who picker's list. Null when it couldn't be read; a failed
+ * read is never an empty list.
+ */
+export async function readReassignCandidates(
+    bookingId: string,
+    startAt?: string,
+): Promise<{ startAt: string; people: ReassignCandidate[] } | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    const query = startAt
+        ? `?${new URLSearchParams({ startAt }).toString()}`
+        : "";
+    const res = await apiFetch(
+        `${base}/services/bookings/${encodeURIComponent(bookingId)}/people${query}`,
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as {
+        startAt: string;
+        people: ReassignCandidate[];
+    };
+}
+
+/**
+ * Turn down a booking awaiting payment (Home's A7, review #11): the
+ * booking's own cancel, refused by the API with 409 and `details.reason`
+ * "paid" when the customer paid in the meantime — the ten seconds Undo
+ * was offered. That refusal comes back as `paid`, so the row can say
+ * "They just paid" rather than show an error.
+ */
+export async function turnDownBooking(
+    bookingId: string,
+): Promise<
+    ApiResult<CancelledBooking> | { ok: false; error: string; paid: true }
+> {
+    const base = await orgBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(
+        `${base}/services/bookings/${encodeURIComponent(bookingId)}?ifUnpaid=true`,
+        { method: "DELETE" },
+    );
+    const data: unknown = await res.json().catch(() => null);
+    if (res.ok) return { ok: true, data: (data ?? {}) as CancelledBooking };
+    const failure = toFailure(data, "Couldn't turn the booking down.");
+    if (res.status === 409 && justPaid(data)) {
+        return { ok: false, error: failure.error, paid: true };
+    }
+    return failure;
+}
+
+/** The API's "They just paid" refusal: `error.details.reason` is "paid". */
+export function justPaid(body: unknown): boolean {
+    if (!body || typeof body !== "object") return false;
+    const { error } = body as { error?: { details?: { reason?: unknown } } };
+    return error?.details?.reason === "paid";
+}
+
 export function cancelBooking(
     bookingId: string,
-    options: { returnCredit?: boolean; closesClass?: boolean } = {},
+    options: {
+        returnCredit?: boolean;
+        closesClass?: boolean;
+        /** Why the whole class is cancelled (DEC-178, #1172). */
+        reason?: string;
+    } = {},
 ): Promise<CrmResult<CancelledBooking>> {
     // The business calling a class off gives a pack's class back even inside
     // the free-cancellation window (U15), and — for someone who may refund —
@@ -681,10 +832,16 @@ export function cancelBooking(
     if (options.returnCredit) params.set("returnCredit", "true");
     if (options.closesClass) params.set("closesClass", "true");
     const query = params.size > 0 ? `?${params.toString()}` : "";
+    // The class's reason travels in the body, never the address: the
+    // customers are told it, in the business's own words.
+    const body =
+        options.closesClass && options.reason
+            ? { reason: options.reason }
+            : undefined;
     return send<CancelledBooking>(
         `/bookings/${bookingId}${query}`,
         "DELETE",
-        undefined,
+        body,
         "Couldn't cancel the booking.",
     );
 }

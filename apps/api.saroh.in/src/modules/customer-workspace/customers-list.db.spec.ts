@@ -7,6 +7,8 @@
  */
 import { prisma } from "@saroh/database";
 
+import { onTheLedger } from "../../../test/ledger-paid";
+
 import { analyzeAsOwner } from "../../../test/analyze";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -125,20 +127,23 @@ async function paidInvoice(
     total: string,
     extra: { orderId?: string; kind?: string; status?: string } = {},
 ) {
-    await prisma.invoice.create({
-        data: {
-            organizationId,
-            contactId,
-            orderId: extra.orderId,
-            kind: extra.kind ?? "INVOICE",
-            status: extra.status ?? "PAID",
-            number: `INV-${next()}`,
-            currency: "INR",
-            subtotal: total,
-            total,
-            paidAt: new Date(),
-        },
-    });
+    // Paid on its ledger (DEC-173): Spent reads the money-in rule.
+    await onTheLedger(
+        await prisma.invoice.create({
+            data: {
+                organizationId,
+                contactId,
+                orderId: extra.orderId,
+                kind: extra.kind ?? "INVOICE",
+                status: extra.status ?? "PAID",
+                number: `INV-${next()}`,
+                currency: "INR",
+                subtotal: total,
+                total,
+                paidAt: new Date(),
+            },
+        }),
+    );
 }
 
 function ownerCtx(organizationId: string, userId: string): OrganizationContext {
@@ -594,8 +599,15 @@ describe("Customers list paging (DB)", () => {
                 currency: "INR",
                 subtotal: "100",
                 total: "100",
+                paidAt: new Date(),
             })),
         });
+        // Each paid on its ledger (DEC-173).
+        for (const paid of await prisma.invoice.findMany({
+            where: { organizationId: org },
+        })) {
+            await onTheLedger(paid);
+        }
 
         const first = await list.list(ctx, { sort: "name" });
         expect(first.rows).toHaveLength(50);

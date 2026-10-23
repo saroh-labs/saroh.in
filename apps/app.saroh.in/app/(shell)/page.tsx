@@ -1,13 +1,18 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import type { HomeSetup } from "@/components/home/home-dashboard";
-import { HomeDashboard } from "@/components/home/home-dashboard";
-import { HomeHeader } from "@/components/home/home-header";
-import { ReviewerHome } from "@/components/home/reviewer-home";
-import { StaffHome } from "@/components/home/staff-home";
-import { Moment } from "@/components/shared/moment";
-import { PageContainer } from "@/components/shared/page-container";
+import type { HomeSetup } from "@/components/home/dashboard/home-dashboard";
+import { HomeDashboard } from "@/components/home/dashboard/home-dashboard";
+import { ReviewerHome } from "@/components/home/dashboard/reviewer-home";
+import { StaffHome } from "@/components/home/dashboard/staff-home";
+import { HomeHeader } from "@/components/home/header/home-header";
+import { NewSpace } from "@/components/home/header/new-sheet";
+import {
+    homeNewFor,
+    homeNewModuleKeys,
+} from "@/components/shared/navigation/quick-actions";
+import { Moment } from "@/components/shared/notices/moment";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 import type { InvoiceJobFacts } from "@/lib/home/first-run";
 import { mayWriteInvoices } from "@/lib/home/first-run";
@@ -17,6 +22,7 @@ import { listModules } from "@/lib/modules/service";
 import { homeMoment } from "@/lib/moments/read";
 import type { OrganizationKind } from "@/lib/organizations/kind";
 import { firstRunOrder, INVOICE_JOB, kindOf } from "@/lib/organizations/kind";
+import { permits } from "@/lib/organizations/permits";
 import type { Organization } from "@/lib/organizations/service";
 import {
     organizationsOnce,
@@ -78,10 +84,20 @@ export default async function Home() {
         );
     }
 
-    // A business with nothing on is asked what it wants to do first, and the
-    // question needs to know what may be turned on and by whom. Everyone
-    // else never pays for the read.
-    const modules = home.hasAnyModule ? null : await listModules();
+    // What is turned on, read once: New offers only what the business does
+    // (a failed read leaves that to the permissions alone), and a business
+    // with nothing on is asked what it wants to do first, which needs to
+    // know what may be turned on and by whom.
+    const allModules = await listModules().catch(() => null);
+    const modules = home.hasAnyModule
+        ? null
+        : (allModules ?? (await listModules()));
+    // New (DEC-171, A17): by the permissions the API resolved for this
+    // person, never by their role's name.
+    const newMenu = homeNewFor({
+        moduleKeys: allModules ? homeNewModuleKeys(allModules) : null,
+        actions: business?.actions,
+    });
 
     // A staff member's Home (F11): their storefronts and their own diary,
     // each part as their role allows. No setup checklist to read.
@@ -93,6 +109,7 @@ export default async function Home() {
                     modules={modules}
                     name={session.user.name}
                     businessName={business?.name ?? "This business"}
+                    newMenu={newMenu}
                 />
             </PageContainer>
         );
@@ -104,6 +121,15 @@ export default async function Home() {
     const invoicing = home.hasAnyModule
         ? undefined
         : await loadInvoicing(business, kind);
+    // "See how the month went" (DEC-171): for someone Insights is open to,
+    // while the business has it on (a failed module read leaves that to
+    // the permission).
+    const insights =
+        permits(business, "analytics:read") &&
+        (allModules === null ||
+            allModules.some(
+                (m) => m.key === "INSIGHTS" && m.readiness !== "DISABLED",
+            ));
     // The first order or booking, in its first day (wave G), said once.
     const moment = home.hasAnyModule ? await homeMoment(home, business) : null;
 
@@ -121,6 +147,9 @@ export default async function Home() {
                 kind={kind}
                 // The line under the greeting follows the checklist below.
                 subject={setup ? checklistSubject(setup.list) : null}
+                newMenu={newMenu}
+                // The phone Home says it in the day sheet (U17).
+                sinceOnPhone={!home.hasAnyModule}
             />
             {moment ? <Moment moment={moment} className="mt-5" /> : null}
             <div className="mt-5">
@@ -131,8 +160,10 @@ export default async function Home() {
                     setup={setup}
                     kind={kind}
                     invoicing={invoicing}
+                    insights={insights}
                 />
             </div>
+            {newMenu.items.length > 0 ? <NewSpace /> : null}
         </PageContainer>
     );
 }

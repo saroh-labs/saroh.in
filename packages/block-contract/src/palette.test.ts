@@ -4,6 +4,7 @@ import {
     PALETTE_ROLES,
     contrastRatio,
     hexToHslTriple,
+    hslTripleToHex,
     normalizeHex,
     paletteVariables,
     parsePalette,
@@ -250,5 +251,94 @@ describe("status roles (template round 2)", () => {
         if (!a.ok || !b.ok) throw new Error("palette refused");
         expect(samePalette(a.palette, b.palette)).toBe(false);
         expect(samePalette(a.palette, a.palette)).toBe(true);
+    });
+});
+
+describe("a look's safe roles (KD4)", () => {
+    it("accepts them when each reads, and writes their variables", () => {
+        const parsed = parsePalette({
+            ...CERAMICS,
+            accentText: "#1F3D2B",
+            accentSoft: "#E2E8E0",
+            rule: "#857F72",
+            footerMuted: "#6E685E",
+        });
+        expect(parsed.ok).toBe(true);
+        if (!parsed.ok) return;
+        const vars = paletteVariables(parsed.palette);
+        expect(vars["--site-accent-text"]).toBe(hexToHslTriple("#1F3D2B"));
+        expect(vars["--site-rule"]).toBe(hexToHslTriple("#857F72"));
+        expect(vars["--site-accent-soft"]).toBeDefined();
+        expect(vars["--site-footer-muted"]).toBeDefined();
+    });
+
+    it("writes none of them for a palette without them", () => {
+        const parsed = parsePalette(CERAMICS);
+        if (!parsed.ok) throw new Error("palette refused");
+        expect(Object.keys(paletteVariables(parsed.palette))).not.toContain(
+            "--site-rule",
+        );
+    });
+
+    it("holds accent text to 4.5:1 and a control's edge to 3:1", () => {
+        const parsed = parsePalette({
+            ...CERAMICS,
+            accentText: "#8FA897",
+            rule: "#D0CCC0",
+        });
+        expect(parsed.ok).toBe(false);
+        if (parsed.ok) return;
+        const fields = parsed.problems.map((p) => p.field);
+        expect(fields).toContain("palette.accentText");
+        expect(fields).toContain("palette.rule");
+        expect(
+            parsed.problems.find((p) => p.field === "palette.rule")?.message,
+        ).toMatch(/needs 3:1/);
+    });
+
+    it("holds the accent to 3:1 as a fill once links read accentText", () => {
+        // 3.6:1 on the page: too light for a link, enough for a button.
+        const fill = { ...CERAMICS, accent: "#6E8A78", accentFg: "#000000" };
+        expect(parsePalette(fill).ok).toBe(false);
+        expect(parsePalette({ ...fill, accentText: "#1F3D2B" }).ok).toBe(true);
+        // Under 3:1 is refused even then.
+        const faint = { ...fill, accent: "#A9BDAF", accentText: "#1F3D2B" };
+        const parsed = parsePalette(faint);
+        expect(parsed.ok).toBe(false);
+        if (!parsed.ok) {
+            expect(parsed.problems[0]?.field).toBe("palette.accent");
+        }
+    });
+
+    it("refuses a safe role that is not #RRGGBB", () => {
+        const parsed = parsePalette({ ...CERAMICS, rule: "grey" });
+        expect(parsed.ok).toBe(false);
+    });
+
+    it("tells two palettes apart by their safe roles", () => {
+        const a = parsePalette({ ...CERAMICS, rule: "#857F72" });
+        const b = parsePalette({ ...CERAMICS, rule: "#7A7567" });
+        if (!a.ok || !b.ok) throw new Error("palette refused");
+        expect(samePalette(a.palette, b.palette)).toBe(false);
+    });
+});
+
+describe("hslTripleToHex", () => {
+    it("turns hexToHslTriple's triple back into its colour", () => {
+        for (const hex of [
+            "#F4F1E8",
+            "#1F3D2B",
+            "#D7FF3E",
+            "#000000",
+            "#FFFFFF",
+        ]) {
+            expect(hslTripleToHex(hexToHslTriple(hex))).toBe(hex);
+        }
+    });
+
+    it("reads a row's triple, and refuses what is not one", () => {
+        expect(hslTripleToHex("0 0% 100%")).toBe("#FFFFFF");
+        expect(hslTripleToHex("not a colour")).toBeNull();
+        expect(hslTripleToHex("1 2%")).toBeNull();
     });
 });

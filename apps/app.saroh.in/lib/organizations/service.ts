@@ -7,6 +7,7 @@ import { shownRoleLabel } from "@/lib/organizations/storefront-team";
 
 import { pickActive } from "./choose";
 import type { OrganizationKind } from "./kind";
+import type { NewBillingProfileInput } from "./setup-billing";
 
 /**
  * Organization data access for app.saroh.in. Organization is the tenant root
@@ -55,6 +56,12 @@ export interface Organization {
      * calls either India's.
      */
     timeZone?: string | null;
+    /**
+     * The business's country, an ISO code ("IN"), so a phone field starts
+     * on its calling code (#1036). Null when never set, absent from an older
+     * API: `PhoneInput` then starts on India's.
+     */
+    country?: string | null;
     /**
      * `ACTIVE`, or the state an operator put it in (`SUSPENDED`,
      * `PENDING_DELETION`, `DELETED_RETAINED`): read-only, not gone. The
@@ -108,12 +115,47 @@ export interface CreateOrganizationInput {
      * decides what it means.
      */
     referralCode?: string;
+    /**
+     * An account manager's `?am=` link the browser carried from saroh.in
+     * (DEC-169), and when it was kept: added by the create action from its
+     * cookie, never by a form.
+     */
+    managerLinkCode?: string;
+    managerLinkSetAt?: string;
+    /**
+     * The code of the Saroh teammate helping them, typed at setup
+     * (DEC-169). Optional; the API decides whether it names anyone.
+     */
+    managerCode?: string;
+    /**
+     * Who Saroh bills for it (DEC-167, R7): one of the owner's billing
+     * profiles, or a new one. An owner with a profile must send one; the
+     * API names `billingProfile` when they don't.
+     */
+    billingProfileId?: string;
+    newBillingProfile?: NewBillingProfileInput;
 }
+
+/** The fields a create's refusal can be about, as the API names them. */
+const CREATE_FIELDS = [
+    "name",
+    "address",
+    // Who Saroh bills (DEC-167): the choice, and a new profile's fields.
+    "billingProfile",
+    "legalName",
+    "billingEmail",
+    "gstin",
+    "gstState",
+    "addressLine1",
+    "addressLine2",
+    "city",
+    "postalCode",
+] as const;
+export type CreateField = (typeof CREATE_FIELDS)[number];
 
 /** Discriminated result so the UI can surface field errors inline. */
 export type OrganizationResult<T> =
-    | { ok: true; data: T }
-    | { ok: false; error: string; field?: "name" | "address" };
+    { ok: true; data: T } | { ok: false; error: string; field?: CreateField };
 
 /** Whether an address can be reserved at setup, and why not. */
 export interface AddressAvailability {
@@ -196,6 +238,38 @@ export async function getOrganization(
 }
 
 /**
+ * Who at Saroh looks after the business (DEC-169, U26): their name and the
+ * work email on their staff profile, never the email they sign in with, and
+ * no phone. Both can be null, never both at once.
+ */
+export interface AccountManager {
+    name: string | null;
+    workEmail: string | null;
+}
+
+/**
+ * The business's Saroh contact for the account menu, or null while no
+ * manager is linked. An aid like the shell's other reads: null too when it
+ * can't be read, and the menu then simply doesn't show the card.
+ */
+export async function accountManagerOrNull(
+    organizationId: string,
+): Promise<AccountManager | null> {
+    try {
+        const res = await apiFetch(`/organizations/${organizationId}`);
+        if (!res.ok) return null;
+        const read = (await res.json()) as {
+            accountManager?: AccountManager | null;
+        };
+        const manager = read.accountManager;
+        if (!manager || (!manager.name && !manager.workEmail)) return null;
+        return { name: manager.name, workEmail: manager.workEmail };
+    } catch {
+        return null;
+    }
+}
+
+/**
  * Onboarding: create an organization. The caller becomes OWNER (ownership is
  * derived from the session server-side, never trusted from the client).
  */
@@ -219,10 +293,11 @@ export async function createOrganization(
     return {
         ok: false,
         error: failure.error,
-        field:
-            failure.field === "name" || failure.field === "address"
-                ? failure.field
-                : undefined,
+        field: (CREATE_FIELDS as readonly string[]).includes(
+            failure.field ?? "",
+        )
+            ? (failure.field as CreateField)
+            : undefined,
     };
 }
 

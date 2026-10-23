@@ -27,7 +27,8 @@ export const UNANSWERED_HOLD_GRACE_MS = 60 * 60 * 1000;
 
 /**
  * Releases pay-now holds nobody paid for (U19): each PENDING booking whose
- * hold ran out is cancelled and its draft invoice voided (`releaseHoldInTx`).
+ * hold ran out lapses — recorded as LAPSED, its booker told (#1137) — and
+ * its draft invoice is voided (`releaseHoldInTx`).
  * Each run also voids the online pack drafts nobody paid within 24 hours
  * (A11, `class-packs/pack-checkout.ts`) and the online plan joins nobody
  * paid (G20, `subscriptions/plan-join.ts`), ends waitlist offers nobody
@@ -172,7 +173,9 @@ export class ReleaseHoldsHandler {
                 // confirmed it a moment ago wins, and nothing is released.
                 if (
                     await prisma.$transaction((tx) =>
-                        releaseHoldInTx(tx, id, now),
+                        releaseHoldInTx(tx, id, now, null, {
+                            why: "lapsed",
+                        }),
                     )
                 ) {
                     released += 1;

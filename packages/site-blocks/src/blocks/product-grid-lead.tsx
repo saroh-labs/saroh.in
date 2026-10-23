@@ -106,7 +106,10 @@ function LeadCard({
                     <img
                         src={p.image.url}
                         alt={p.image.alt}
-                        {...siteImage(lead ? "above" : "below")}
+                        {...siteImage(lead ? "above" : "below", {
+                            src: p.image.url,
+                            sizes: "(min-width: 1024px) 33vw, 50vw",
+                        })}
                         className="bg-site-surface aspect-[4/5] w-full rounded-[var(--site-radius)] object-cover"
                     />
                 ) : (
@@ -163,7 +166,7 @@ function LeadCard({
                 </span>
             ) : null}
             {show.label ? (
-                <span className="text-site-accent text-sm font-semibold underline-offset-4 group-hover:underline">
+                <span className="text-site-accent-text text-sm font-semibold underline-offset-4 group-hover:underline">
                     {show.label}
                 </span>
             ) : null}

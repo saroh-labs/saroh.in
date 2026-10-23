@@ -56,6 +56,12 @@ export interface TurnOnPlan {
  * Selling online makes the website (DEC-069): when Sell sells by delivery
  * or shipping and Website is off, Website turns on after Sell, so the
  * location it sells from exists when the site is made.
+ *
+ * Bookings makes its booking page (DEC-175): turned on with no website, the
+ * API makes the starter site itself. So when Website turns on in the same
+ * sheet it goes before Bookings, and the site is the one its fields say;
+ * Bookings then adds its Book page to it. Nothing needs Website, so moving
+ * it earlier never puts a module before what it needs.
  */
 export function turnOnPlan({
     picked,
@@ -91,6 +97,12 @@ export function turnOnPlan({
     ) {
         order.splice(commerceAt + 1, 0, "WEBSITE");
         websiteForShop = true;
+    }
+    const websiteAt = order.indexOf("WEBSITE");
+    const bookingsAt = order.indexOf("APPOINTMENTS");
+    if (websiteAt > bookingsAt && bookingsAt >= 0) {
+        order.splice(websiteAt, 1);
+        order.splice(bookingsAt, 0, "WEBSITE");
     }
     return {
         order,
@@ -144,6 +156,21 @@ export const GIVES_OFFLINE: Readonly<Record<string, string>> = {
         "Invoices, payments you record, and How to pay us for customers who pay you directly.",
 };
 
+/**
+ * "What comes with it" for Bookings turned on with no website (DEC-175):
+ * its booking page, at the address the API said. Only when the API said
+ * one is coming, and Website isn't turned on in the same sheet (then the
+ * site is the one its fields make).
+ */
+export function bookingPageLine(
+    plan: TurnOnPlan,
+    bookingPage: { address: string } | null | undefined,
+): string | null {
+    if (!bookingPage || !plan.order.includes("APPOINTMENTS")) return null;
+    if (plan.order.includes("WEBSITE")) return null;
+    return `Your booking page comes with it, at ${bookingPage.address}.saroh.app/book. Customers can open it once you publish it from Bookings › Services.`;
+}
+
 /** What turning each one on gives, said once in the sheet. Only what is true. */
 export const GIVES: Readonly<Record<string, string>> = {
     COMMERCE: "Orders, products and customers, sold from your first location.",
@@ -151,7 +178,7 @@ export const GIVES: Readonly<Record<string, string>> = {
     CRM: "Contacts, leads and a pipeline, ready to use.",
     WEBSITE: "A starter site at your web address, ready for you to publish.",
     PAYMENTS:
-        "Subscriptions, plans, and pay links on your invoices. Online payment stays off until you connect a provider.",
+        "Subscriptions, plans, and payment links on your invoices. Online payment stays off until you connect a provider.",
     COMMUNICATIONS:
         "Email and WhatsApp to your customers and leads. Nothing is sent until you connect a provider.",
     INSIGHTS: "Figures across whatever else is turned on.",

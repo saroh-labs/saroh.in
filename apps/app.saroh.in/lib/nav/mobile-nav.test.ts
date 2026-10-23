@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { navFor } from "@/components/shared/nav-items";
+import { navFor } from "@/components/shared/navigation/nav-items";
 
 import {
     buildMobileNav,
@@ -32,13 +32,13 @@ const ownerNav = (moduleKeys: string[] | null = EVERYTHING) =>
 const labels = (tabs: { label: string }[]) => tabs.map((t) => t.label);
 
 describe("seats", () => {
-    it("seats Home, Sell, Overview and Insights by default", () => {
-        // Notifications is in the top bar (2026-09-25); Overview has its seat.
+    it("seats Home, Sell, Calendar and Insights by default", () => {
+        // Notifications is in the top bar (2026-09-25); Calendar has its seat.
         const nav = buildMobileNav({ groups: ownerNav(), pathname: "/" });
         expect(labels(nav.tabs)).toEqual([
             "Home",
             "Sell",
-            "Overview",
+            "Calendar",
             "Insights",
         ]);
         expect(nav.tabs).toHaveLength(TAB_SEATS);
@@ -53,7 +53,7 @@ describe("seats", () => {
             "Home",
             "Payments",
             "Sell",
-            "Overview",
+            "Calendar",
         ]);
     });
 
@@ -80,7 +80,7 @@ describe("seats", () => {
         expect(seatPreference("Sell")).toEqual([
             "Home",
             "Sell",
-            "Overview",
+            "Calendar",
             "Insights",
         ]);
         const nav = buildMobileNav({
@@ -88,23 +88,23 @@ describe("seats", () => {
             pathname: "/commerce/orders",
         });
         const tabs = labels(nav.tabs);
-        expect(tabs).toEqual(["Home", "Sell", "Overview", "Insights"]);
+        expect(tabs).toEqual(["Home", "Sell", "Calendar", "Insights"]);
         expect(new Set(tabs).size).toBe(tabs.length);
         expect(tabs).toHaveLength(TAB_SEATS);
     });
 
-    it("seats Overview second while you are on it, then Sell", () => {
+    it("seats Calendar second while you are on it, then Sell", () => {
         const nav = buildMobileNav({
             groups: ownerNav(),
             pathname: "/calendar",
         });
         expect(labels(nav.tabs)).toEqual([
             "Home",
-            "Overview",
+            "Calendar",
             "Sell",
             "Insights",
         ]);
-        expect(nav.tabs.find((t) => t.label === "Overview")?.current).toBe(
+        expect(nav.tabs.find((t) => t.label === "Calendar")?.current).toBe(
             true,
         );
     });
@@ -121,7 +121,7 @@ describe("seats", () => {
         expect(labels(nav.tabs)).toEqual([
             "Home",
             "Sell",
-            "Overview",
+            "Calendar",
             "Website",
         ]);
     });
@@ -186,9 +186,9 @@ describe("the sheet", () => {
         const nav = buildMobileNav({ groups, pathname: "/" });
         const bookings = nav.groups.find((g) => g.label === "Bookings");
         expect(bookings?.rows.map((r) => r.label)).toEqual([
-            "Calendar",
+            "Bookings",
             "Services",
-            "Availability",
+            "Hours and time off",
             "Courses",
             "Class packs",
         ]);
@@ -251,7 +251,7 @@ describe("where you are", () => {
             pathname: "/bookings",
         });
         const rows = nav.groups.flatMap((g) => g.rows).filter((r) => r.current);
-        expect(rows.map((r) => r.label)).toEqual(["Calendar"]);
+        expect(rows.map((r) => r.label)).toEqual(["Bookings"]);
     });
 
     it("marks Home only on Home", () => {

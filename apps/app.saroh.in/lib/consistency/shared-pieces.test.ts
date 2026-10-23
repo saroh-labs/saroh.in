@@ -61,7 +61,7 @@ function stale(pattern: RegExp, allow: Record<string, string>) {
 describe("one of each small piece", () => {
     it("no hand-rolled tab strip: role=tablist belongs to TabStrip", () => {
         const allow = {
-            "components/shared/section-list.tsx":
+            "components/shared/page/section-list.tsx":
                 "the one vertical list of sections, shared by Settings and Website › Settings",
         };
         const pattern = /role="tablist"/;
@@ -79,13 +79,13 @@ describe("one of each small piece", () => {
         const allow = {
             "components/commerce/orders/bulk-bar.tsx":
                 "the bulk bar's ten-second hold, a floating toolbar with Undo and Send now",
-            "components/invoices/source-filter.tsx":
+            "components/invoices/list/source-filter.tsx":
                 "the chip that says a list is narrowed to one pack or course",
             "components/sites/settings/publish-bar.tsx":
                 "the sticky publish bar: an action bar that also says what is waiting",
             "components/subscriptions/subscription-detail/panels.tsx":
                 "a list's last line (\"Couldn't load more\"), ruled off above, not a box",
-            "components/subscriptions/subscription-quick-look.tsx":
+            "components/subscriptions/list/subscription-quick-look.tsx":
                 "a list's last line, ruled off above, not a box",
         };
         // An element with an alert, status or note role that also draws
@@ -98,15 +98,17 @@ describe("one of each small piece", () => {
 
     it("no uppercase outside the .label utility", () => {
         const allow = {
-            "components/invoices/invoice-form.tsx":
+            "components/invoices/new-invoice/customer-block.tsx":
                 "the HSN/SAC code field: a code is typed and kept in capitals",
-            "components/organizations/business-tax-fields.tsx":
+            "components/organizations/tax/business-tax-fields.tsx":
                 "the GSTIN field: a registration number is capitals",
+            "components/organizations/setup/setup-billing-step.tsx":
+                "a new billing profile's GSTIN field: a registration number is capitals",
             "components/settings/plan-billing/invoice-details.tsx":
                 "the GSTIN field: a registration number is capitals",
             "components/settings/plan-billing/plan-chooser.tsx":
                 "the offer code field: a code is capitals",
-            "components/stores/discount-form.tsx":
+            "components/stores/discounts/discount-form.tsx":
                 "the discount code field: a code is capitals",
         };
         const pattern = /(?<![\w-])uppercase(?![\w-])/;
@@ -116,9 +118,9 @@ describe("one of each small piece", () => {
 
     it("Saffron is the menu's current-page marker and Button variant=highlight, nothing else", () => {
         const allow = {
-            "components/shared/app-sidebar.tsx":
+            "components/shared/shell/app-sidebar.tsx":
                 "the menu's current-page marker and label, at the desk",
-            "components/shared/tab-bar.tsx":
+            "components/shared/shell/tab-bar.tsx":
                 "the menu's current-page marker, on a phone",
         };
         const pattern =
@@ -133,6 +135,19 @@ describe("one of each small piece", () => {
                 /(?<![\w-])(?:transition-all|animate-pulse|ease-linear|duration-(?:75|100|150|200|300|500|700|1000))(?![\w-])/,
             ),
         ).toEqual([]);
+    });
+
+    it("a GST rate is chosen with GstRatePicker, never a box (DEC-176)", () => {
+        // The rate lists are read by the picker (through `MAIN_GST_RATES`
+        // and `OTHER_GST_RATE_CHOICES`) and nowhere else: a screen that
+        // takes `GST_RATE_OPTIONS` or `GST_RATE_CHOICES` is drawing the
+        // rates its own way, a dropdown or chips of its own.
+        const allow = {
+            "lib/invoices/gst.ts": "where the one list of rates is written",
+        };
+        const pattern = /\bGST_RATE_(?:OPTIONS|CHOICES)\b/;
+        expect(offenders(pattern, allow)).toEqual([]);
+        expect(stale(pattern, allow)).toEqual([]);
     });
 
     it("the old pill, tab and segmented pieces stay deleted", () => {

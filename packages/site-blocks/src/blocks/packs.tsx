@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import type { RenderedPacks } from "@saroh/block-contract";
+import type { LookId, RenderedPacks } from "@saroh/block-contract";
 
 import { BuyPackSheet } from "../account/buy-pack-sheet";
 import type { AccountPackOnSale } from "../account/packs-api";
 import { DEFAULT_API_URL } from "../api-url";
 import { gstUnderWords } from "../lib/gst-price";
 import { cn } from "../lib/utils";
+import type { LookProps } from "../look-context";
 import type { PricesActions } from "../prices/api";
 import { PricesDone, useSignInFirst } from "../prices/flow";
 import type { PublicPack } from "../prices/pack-words";
@@ -21,6 +22,13 @@ import {
 } from "../prices/pack-words";
 import { askAboutHref } from "../shop/ask-about-ordering";
 import { NotTakingOrders } from "../shop/not-taking-orders";
+import {
+    PriceFrame,
+    PriceParts,
+    priceButton,
+    priceColumn,
+    priceList,
+} from "./prices-look";
 
 /**
  * `packs` v1 — the business's class packs on sale, read live (G20; Saroh
@@ -121,8 +129,22 @@ export default function PacksSection({
     prices = null,
     siteId,
     apiUrl = DEFAULT_API_URL,
-}: {
+    look,
+    plansOnPage = false,
+    bare = false,
+}: LookProps & {
     content: RenderedPacks;
+    /**
+     * Under a look, only the packs' cards (and their sheets), for the
+     * plans' row they join (Live, VB01: `PageSections`). With a feed only.
+     */
+    bare?: boolean;
+    /**
+     * Under a look (U7): the page also lists plans on sale. Their Join is
+     * then the page's one filled button, and the packs say a membership is
+     * used before a pack (as the booking page spends them). Absent: false.
+     */
+    plansOnPage?: boolean;
     /** The packs, read by the page that serves the site. */
     feed?: PacksFeed;
     /** Buy's actions, from the live site when the account area is on. */
@@ -176,6 +198,9 @@ export default function PacksSection({
                 feed={feed}
                 prices={prices}
                 apiUrl={apiUrl}
+                look={look}
+                plansOnPage={plansOnPage}
+                bare={bare}
             />
         );
     }
@@ -236,6 +261,8 @@ export default function PacksSection({
                 askHref: null,
             }}
             canvas
+            look={look}
+            plansOnPage={plansOnPage}
         />
     );
 }
@@ -244,7 +271,7 @@ const focusRing =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent focus-visible:ring-offset-2 focus-visible:ring-offset-site-bg";
 
 const textButton = cn(
-    "cursor-pointer rounded-[var(--site-radius)] text-sm font-semibold text-site-accent underline-offset-4 transition-opacity hover:underline active:opacity-70",
+    "cursor-pointer rounded-[var(--site-radius)] text-sm font-semibold text-site-accent-text underline-offset-4 transition-opacity hover:underline active:opacity-70",
     focusRing,
 );
 
@@ -314,6 +341,9 @@ function PackCards({
     prices = null,
     canvas = false,
     apiUrl,
+    look,
+    plansOnPage = false,
+    bare = false,
 }: {
     content: RenderedPacks;
     title: string;
@@ -323,6 +353,12 @@ function PackCards({
     apiUrl?: string;
     /** Drawn in the editor: the button shows its words but goes nowhere. */
     canvas?: boolean;
+    /** The site's look (DEC-172, U7); absent is Classic. */
+    look?: LookId;
+    /** The page also lists plans on sale (U7). */
+    plansOnPage?: boolean;
+    /** Only the cards, for the plans' row (`PacksSection`'s `bare`). */
+    bare?: boolean;
 }) {
     // Not taking orders (#800): nothing to click that cannot work, not even
     // "Ask about this pack".
@@ -342,6 +378,127 @@ function PackCards({
         flow.signedIn(
             () => setBuying(pack),
             `the customer signs in here and pays ${packPayPrice(pack)} for ${pack.name}`,
+        );
+    }
+
+    // Buy's sheets, the same under every look.
+    const sheets = buys ? (
+        <>
+            {flow.sheet}
+            {flow.customer ? (
+                <BuyPackSheet
+                    open={buying !== null}
+                    onClose={() => setBuying(null)}
+                    onSale={{
+                        payOnline: true,
+                        packs: buying ? [onSale(buying)] : [],
+                    }}
+                    businessName={prices.businessName}
+                    customer={flow.customer}
+                    api={prices.packs}
+                    apiUrl={apiUrl}
+                    onBought={(message) => {
+                        setBuying(null);
+                        setDone(message);
+                    }}
+                />
+            ) : null}
+        </>
+    ) : null;
+
+    // Under a look (DEC-172, U7): the look's columns. Every Buy is an
+    // outline beside plans (their Join is the filled one); alone on the
+    // page, the first Buy is the page's own action.
+    if (look) {
+        const columns = feed.packs.map((pack, index) => {
+            const primary = !plansOnPage && index === 0;
+            const classes = priceButton(look, primary);
+            const mark = primary ? { "data-site-primary": "" } : {};
+            const action = canvas ? (
+                <span className={classes}>{label}</span>
+            ) : buys ? (
+                <button
+                    type="button"
+                    onClick={() => buy(pack)}
+                    aria-label={`${label}: ${pack.name}`}
+                    className={classes}
+                    {...mark}
+                >
+                    {label}
+                </button>
+            ) : feed.askHref && !stopped ? (
+                <a
+                    href={askAboutHref(feed.askHref, pack.name, "pack")}
+                    aria-label={`${label}: ${pack.name}`}
+                    className={classes}
+                    {...mark}
+                >
+                    {label}
+                </a>
+            ) : null;
+            return (
+                <li
+                    key={pack.id}
+                    data-pack-column=""
+                    className={priceColumn(look, false)}
+                >
+                    <PriceParts
+                        look={look}
+                        eyebrow={packEyebrow(pack)}
+                        name={pack.name}
+                        price={
+                            buyWords
+                                ? packPayPrice(pack)
+                                : packBrowsePrice(pack)
+                        }
+                        gst={
+                            buyWords
+                                ? gstUnderWords(pack.gst, pack.currency)
+                                : null
+                        }
+                        lines={[
+                            packPerClass(pack),
+                            showDescriptions ? said(pack.description) : null,
+                        ]}
+                        rules={[
+                            plansOnPage
+                                ? "A membership is used before a pack."
+                                : null,
+                        ]}
+                        action={action}
+                    />
+                </li>
+            );
+        });
+        const notes = (
+            <>
+                {done && prices ? (
+                    <PricesDone
+                        message={done}
+                        accountHref={prices.accountHref}
+                    />
+                ) : null}
+                {stopped ? <NotTakingOrders /> : null}
+            </>
+        );
+        if (bare) {
+            return (
+                <>
+                    {columns}
+                    {/* The row's own messages, across it, and Buy's sheets. */}
+                    <li className="contents [&>*]:col-span-full">
+                        {notes}
+                        {sheets}
+                    </li>
+                </>
+            );
+        }
+        return (
+            <PriceFrame content={content} look={look} title={title}>
+                {notes}
+                <ul className={priceList(look)}>{columns}</ul>
+                {sheets}
+            </PriceFrame>
         );
     }
 
@@ -426,29 +583,7 @@ function PackCards({
                     );
                 })}
             </ul>
-            {buys ? (
-                <>
-                    {flow.sheet}
-                    {flow.customer ? (
-                        <BuyPackSheet
-                            open={buying !== null}
-                            onClose={() => setBuying(null)}
-                            onSale={{
-                                payOnline: true,
-                                packs: buying ? [onSale(buying)] : [],
-                            }}
-                            businessName={prices.businessName}
-                            customer={flow.customer}
-                            api={prices.packs}
-                            apiUrl={apiUrl}
-                            onBought={(message) => {
-                                setBuying(null);
-                                setDone(message);
-                            }}
-                        />
-                    ) : null}
-                </>
-            ) : null}
+            {sheets}
         </PacksFrame>
     );
 }

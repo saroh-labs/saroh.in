@@ -1,3 +1,7 @@
+import {
+    customerEmailLabel,
+    overdueTimingChange,
+} from "@/lib/communications/customer-emails";
 import { formatDateTime, timeZoneName } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
 import {
@@ -241,6 +245,31 @@ function detailRows(
                         shown(c.field, c.after),
                     ),
                 ),
+                withoutValues: false,
+            };
+        }
+        case "customer-notices.setting": {
+            // One of the business's automatic customer emails (DEC-174):
+            // "Membership emails", On or Off.
+            const label =
+                customerEmailLabel(meta.kind) ?? "An email to customers";
+            // Or when overdue reminders go (DEC-178): "Overdue reminders,
+            // first reminder", "3 days after it's due" → "5 days …".
+            return {
+                rows: (recordedChanges(meta) ?? []).map((c) => {
+                    const timed = overdueTimingChange(c);
+                    return timed
+                        ? row(
+                              `${label}, ${timed.what}`,
+                              timed.before,
+                              timed.after,
+                          )
+                        : row(
+                              label,
+                              shown(c.field, c.before),
+                              shown(c.field, c.after),
+                          );
+                }),
                 withoutValues: false,
             };
         }

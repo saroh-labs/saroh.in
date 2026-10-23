@@ -1,6 +1,12 @@
 import { cn } from "../../lib/utils";
 import { focusRing, inputFill } from "../styles";
 
+/** A booking field's box: its edge, height, radius and fill. */
+export const fieldBox = cn(
+    "border-site-border text-site-fg placeholder:text-site-muted mt-1.5 block h-[45px] w-full rounded-[calc(var(--site-radius)+7px)] border px-3.5 text-base",
+    inputFill,
+);
+
 export function Field({
     id,
     label,
@@ -40,11 +46,7 @@ export function Field({
                 onChange={(e) => onChange(e.target.value)}
                 aria-invalid={error ? true : undefined}
                 aria-describedby={error ? `${id}-error` : undefined}
-                className={cn(
-                    "border-site-border text-site-fg placeholder:text-site-muted mt-1.5 block h-[45px] w-full rounded-[calc(var(--site-radius)+7px)] border px-3.5 text-base",
-                    inputFill,
-                    focusRing,
-                )}
+                className={cn(fieldBox, focusRing)}
             />
             {error ? (
                 <p

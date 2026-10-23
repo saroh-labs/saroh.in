@@ -12,6 +12,345 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Seed — a seed's must-show item left to chance broke on 21 Oct
+
+**Symptom**: 21 Oct 2026, the gate's `db:seed:showcase` stopped with
+`[seed] Aarohan Academy is missing what its demo shows: an upcoming demo
+class` and exit 1. Nothing in the seed had changed since it last passed.
+**Cause**: the diary is drawn at random (`planBookings`, a fixed rng,
+`fromDay: -90` to `toDay: 14` relative to `now`), and the demo class runs
+only Saturday 16:00 and Sunday 11:00 — four slots in the fortnight ahead.
+Whether one of them drew a booking that `bookingRows` then wrote as
+confirmed depended on the date: with the rng fixed and `now` moving, 18 of
+120 runs over 60 days had none. Desk 42's "day passes / the room / the booth
+booked ahead" were drawn the same way, just with better odds.
+**Fix**: `planBookings` takes `showAhead`, the services the demo must show
+booked ahead. After the draws, a service with nothing confirmed after `now`
+gets one booking chosen without chance (`guaranteeAhead`): its first slot
+from tomorrow, in the business's zone and hours, with room left after the
+courses' places, for a free prospect (or regular), rolled to be confirmed.
+The status thresholds `bookingRows` uses are named once (`confirmsAhead`).
+Aarohan (`SA_DIARY`) and Desk 42 (`DK_DIARY`) pass theirs.
+`showcase/show-ahead.test.ts` plans both diaries at two hours of every day
+for 60 days and proves each must-show booking is there, confirmed, on a
+real slot, within its room, with nobody double-booked.
+**Rule**: anything a seed's check requires (`requireStates`, a minimum) is
+placed on purpose, never left to the draws; a seed planned relative to
+`now` gets a test that plans it for many `now`s (`bakery-any-day.test.ts`,
+`clinic.test.ts`, `show-ahead.test.ts`).
+
+## Sites — closing a look's booking left the hold standing, and the panel and the save disagreed on paid styles
+
+**Symptom**: 20 Oct 2026, review of the looks release (#20, #22). On a
+look's pay step, Escape or Close left for the page the booking came from
+and the time stayed held for 15 minutes, free to nobody; pressed mid-Book,
+the answer landed on a page that had gone, and a reload booked again under
+a new idempotency key. Separately, Website › Style could mark a typeface or
+colourway "Paid plans" and refuse it while the save would have taken it, or
+the other way round.
+**Cause**: the frames' Close called the router directly, with no idea of a
+hold; the attempt's key lived in a ref, gone with the component. The
+free/paid rule was written twice: the app took a saved style's default
+pair from the options list's first and matched a colourway by colours and
+type, the API used `DEFAULT_FONT_PAIR` and the exact palette.
+**Fix**: Close and Escape run `letGoToLeave` first (paid meanwhile, the
+ticket shows; a hold that won't let go stays and says so) and do nothing
+mid-Book; the key is kept in `sessionStorage` (`saroh.booking-attempt`,
+nothing about the person) until its answer comes. The style rule lives once
+in `@saroh/block-contract` (`style-access.ts`), and `STYLE_ACCESS_CASES`
+run through the API's and the app's tests alike.
+**Rule**: a rule both the app and the API apply is one function in a shared
+package, with one set of fixtures both sides' tests run; leaving a flow
+lets go of what the flow holds.
+
+## E2E — the data-removal specs passed by skipping themselves
+
+**Symptom**: 20 Oct 2026, review of the looks release (#25).
+`customers-data-requests.spec.ts` and `site-account-data-request.spec.ts`
+were green in CI and in the gate, and had never run: each skips unless
+`SITE_ACCOUNT_AREA === "on"` in the runner's env, which neither CI's e2e
+job nor `scripts/prepush.sh` set. So did `site-account.spec.ts`'s signed-in
+half, `site-account-looks`, `customer-detail`'s account test and the
+account half of `site-looks-chrome`.
+**Cause**: the account area ships dark behind an environment switch, and
+the specs were written for a stack started with it on. Production and
+development have had it on since 14 Oct; the e2e stacks were never moved.
+**Fix**: `SITE_ACCOUNT_AREA=on` in CI's e2e env and in prepush's e2e
+exports, which the API, saroh.app and the runner all read, as
+`NEXT_PUBLIC_TEMPLATES` and `E2E_DOMAIN_HOSTING` are. `site-account.spec`'s
+"area off" test now skips instead; the off path stays covered by the API's
+db specs (every account route a 404).
+**Rule**: a spec that skips on a switch names a switch the e2e stack sets,
+in `ci.yml` and `prepush.sh` both; turn the stack's switch on when
+production's is.
+
+## Database — a new migration dated before development's would not apply
+
+**Symptom**: 20 Oct 2026, the looks release. The data-removal requests
+migration was written as `20261029…`, while development already held
+migrations stamped in December. Caught by eye at the merge and renamed by
+hand to `20261220100000` (review #39).
+**Cause**: Prisma replays migration folders in name order. A database that
+has run development's later migrations sees an older-dated new one as out
+of order, and `migrate deploy` refuses it or applies it after schema it was
+written before. `check:migration-ids` only checked that each stamp was
+unique.
+**Fix**: `scripts/check-migration-ids.mjs` now also fails a migration
+folder that is new on the branch and sorts before the latest one on the
+base branch (`MIGRATION_BASE`, else `origin/development`; CI passes the
+PR's base). Without that ref it says the order wasn't checked.
+**Rule**: `.agents/skills/saroh-migrations/SKILL.md`: a new migration's
+stamp is later than every one already on development; take it when the
+unit is merged into the batch, not when the unit started.
+
+## Docs — DECISIONS.md had three decisions twice after a merge
+
+**Symptom**: 20 Oct 2026, review of the looks release (#23). DEC-171,
+DEC-173 and DEC-174 were each written twice, the second copies after
+DEC-172, DEC-173 ended in eleven stacked "Rules:" lines, DEC-174 carried one
+of DEC-173's, and DEC-172 had a copy of DEC-170's owner answers (the
+commission paragraph). Nobody could tell which copy was the decision.
+**Cause**: each unit appended its own Rules line to the same decision, and
+the batch merges resolved the conflicts by keeping both sides. Nothing
+checked that a decision number appears once.
+**Fix**: one copy of each, in number order; DEC-173 keeps its fullest
+Rules line (U17's "as built"), plus U15's and U16's own; DEC-176 is
+marked reserved for the GST branch (PR #1164). `pnpm run
+check:decision-ids` fails on a DEC heading written twice, in prepush and CI.
+DEC-163 was allowed twice until 21 Oct, when the owner had Admin Billing
+renumbered DEC-179 (its citations moved with it); no number is exempt now.
+**Rule**: a unit that adds rules to a decision rewrites the one Rules line,
+never appends another; resolve a DECISIONS.md conflict by hand, never by
+keeping both sides. `scripts/check-decision-ids.mjs`.
+
+## Bookings — a free time called fully booked when bookings landed together
+
+**Symptom**: 20 Oct 2026, the looks release gate. `public-booking.spec.ts`
+failed now and then, desk or phone: after signing in, "That time is fully
+booked." for a time the page still showed free, and no payment intent. The
+API answered 409 in 352ms beside four other Northwind bookings.
+**Cause**: the reservation is a serializable transaction, and Postgres
+aborts the loser of any overlap it sees, a booking of another time too
+(P2034). A site booking without a credit or a treatment did not retry, so
+the lost race was told to the visitor as "fully booked". The parallel
+specs book Northwind at once, which a busy business does too.
+**Fix**: a site booking always tries once more after a lost race
+(`retryOnce: true` in `public-bookings.service.ts`); the second attempt's
+capacity check gives the true answer. Its unit spec books on one P2034 and
+answers 409 on two.
+**Also**: `page.waitForURL` throws `net::ERR_ABORTED` when a navigation on
+the way is replaced by the next (accounts' sign-in redirects), though the
+page lands where it should: `auth.spec.ts` polls the URL instead.
+**Rule**: `backend-billing-and-classes.md` → Race safety already said a
+lost race is retried once; a plain site booking now follows it. In a spec,
+assert where the page ends up, not each navigation on the way.
+
+## Sites — the looks' first browser run: 45 serial failures, five app bugs
+
+**Symptom**: 20 Oct 2026, the Saroh looks release (batch-2026-10-20-3). The
+look specs had been written by agents that could not run Playwright, so the
+local gate was their first run: 45 serial failures and a parallel one on
+every try (`site-booking-steps` "a pay-now hold survives a step back": Back
+from paying landed on When, not Your details).
+**Cause**, the app (five):
+
+- `StickyActions` counted every `[data-site-primary]` on the page as the
+  page's own button, and the root itself carries `data-site-primary` to say
+  whether one is shown. Once a rescan watched `<html>`, it was always in
+  view and the phone's Book bar never came.
+- The hero's next free slot reserved 64px; the fresh line's mixed faces
+  made its line box 21px, not its 20px line-height, so the slot grew to 67.
+- Closing the booking put focus back on the link that opened it by `href`,
+  but the hero's way in is a live fact: "See times" while the read is out,
+  then "Book this time" with another `href`. Focus landed nowhere.
+- Quiet's step button sits under the column on a desk, so a fortnight of
+  times pushed the step's one filled button out of the first view.
+- The step-in-the-address hook writes with `history.pushState`, which
+  Next's router follows. Signing in with the code is a Server Action that
+  sets a cookie, so Next refreshes at the address its router last knew,
+  and its history sync pushed an earlier step's address over the one on
+  screen. Next also copies its `__NA` mark into every write that passes its
+  patch, so the mark alone can't tell its writes from the page's.
+  **Cause**, the specs: one read of a colour right after a click, while the
+  button eased into the accent (150ms); two `boundingBox` reads of a banner
+  mid-rise; `getByLabel("Code")` also matching "Country code"; a selector
+  that matched both the desk's and the phone's copy (CSS shows one); `if
+(count > 0)` skipping a choice that hadn't drawn yet; `main a[...]` on a site
+  page, which has no `<main>`; and assumptions about the seed (Northwind has
+  no public phone or place, so no "Visit us"; its site's storefront is
+  unanswered; its storefronts are online, so no Pick-up; its home is too short
+  for the Book bar to show).
+  **Fix**: `[data-site-primary]:not(html)`; the slot's line held to `h-5` and
+  66px reserved; return focus follows the live slot's link for 8 s unless the
+  visitor moves it (`book-return.ts`); Quiet's desk bar is sticky at the foot;
+  `useStepHistory` wraps the History API while the page is up and keeps a
+  router write of an address it has left on the current one, in place,
+  passing its own writes through (`writingOwn`). Each has a unit test. The
+  specs poll, read both boxes in one frame, match labels exactly, filter to
+  the visible copy, wait for the choice, and give Northwind what each test
+  needs and put it back (a phone, the site's storefront, a pick-up place,
+  three more text sections).
+  **Rule**: the saroh-browser-tests skill's Traps. A spec is not done until
+  it has run once against the stack; an agent that cannot run Playwright says
+  so in its hand-off and the spec is marked unrun.
+
+## E2E — the product editor's Sections strip and a long field value failed a new phone check
+
+**Symptom**: 21 Oct 2026. The new `gst-rate-picker.spec.ts` failed on
+phone-serial only, in `expectNothingHiddenSideways`: at 320px on the product
+editor `nav.flex.flex-wrap.gap-1 730>320` and `input.flex.w-full.rounded-md
+241>226`, and at 412px on a new invoice `input.flex.w-full.rounded-md
+341>294`. Desk passed, and so did every other phone spec.
+**Root cause**: Two things. (1) The editor's Sections links turn into one
+row below the desk with a bare `overflow-x-auto`: a strip that means to
+scroll, but with no fade and no `data-scroll-x`, so nothing on a phone said
+there was more, and the check took it as hidden content. No spec had run the
+check on the product editor before, so it had been there on development all
+along. (2) A text field whose value is longer than the field scrolls the
+value inside itself (`scrollWidth > clientWidth`); the test's names ("E2E GST
+1.5 phone-serial", "Cut diamond <stamp>") were longer than a phone's field.
+The fields themselves fitted their columns.
+**Fix**: The Sections `nav` takes `useEdgeFade` and `data-scroll-x`, as
+`SectionList`'s phone row does (UX-079): it still scrolls, now fading the
+side with more. The spec passes `{ allow: ["input"] }`, as
+`qr-code-maker.spec.ts` does: a field scrolling its own value is the
+field's job; anything laid out wider than its column is still caught on its
+parent.
+**Rule**: A row that scrolls itself on a phone uses `useEdgeFade` +
+`data-scroll-x` (or `ScrollX`), never a bare `overflow-x-auto`. A phone spec
+that types long values into fields allows `input` and says why
+(`docs/patterns/frontend-verification.md`, `e2e/fixtures/hidden-sideways.ts`).
+**Category**: e2e · layout · `apps/app.saroh.in/components/commerce/product-editor-v2/editor-shell.tsx`
+
+## Home — Turn down's Undo was drawn and pulled away in the same moment
+
+**Symptom**: 20 Oct 2026. `home-needs-groups.spec.ts` "Turn down is held
+with Undo" (desk) failed on both tries in two local gates in a row, and
+passed on CI and alone. The row said "Turning down in 10 seconds", then the
+Undo click timed out: "element is not stable", then "element was detached
+from the DOM". Looped alone it failed in 33 of 36 runs.
+**Cause**: a Needs you group whose every row is done here folds to "All
+done", and `need-groups.tsx` folded it in a `useEffect`. An effect runs
+after paint, so the screen first drew the open group with the held row and
+its Undo, then closed it and unmounted the row. The spec read that one
+frame ("Turning down…" was there, so the group needed no re-opening),
+pressed Undo, and the row was gone, closed for good. It only folds when
+the test's booking is the group's only row. On CI and in short runs, the
+spec's two sibling tests ran on other workers at the same moment, and
+their bookings kept the group from folding. In the full gate they rarely
+overlapped. Nothing refreshed Home.
+**Fix**: the fold is decided while rendering, in the same render that
+marks the last row done (React's "adjust state while rendering":
+`foldedKey` state, compared with `emptiedKey`, then `setOpen`). React
+re-renders before committing, so no frame shows the row it is folding
+away. `need-groups.test.tsx` watches the DOM with a MutationObserver and
+fails if the held row is ever inserted into the group that folds. It also
+checks that a re-opened group stays open with its Undo when Home is read
+again.
+**Rule**: state that follows from props or other state on the same screen
+(open, folded, selected) is set during render or derived, never in a
+`useEffect` after paint. An effect leaves a frame where a control is drawn
+and then taken away.
+
+## New order — the sheet scrolled sideways on a phone, only in the full gate
+
+**Symptom**: 20 Oct 2026. `phone-reflow.spec.ts` "the New order sheet keeps
+its create button on the screen" failed at 320px in 4 of 5 local gates and
+on every retry ("Northwind Supply Store [-5–169 of 320]": the Taken at chip
+moved ~30px left), but passed alone, on CI on development, and by hand.
+**Cause**: the customer picker shows the 8 most recently seen customers
+before anything is typed, as `Chip`s, which are `whitespace-nowrap
+shrink-0`. The release's invoice specs record payments for customers like
+"Vivek Pay phone0-mvgpdxmd70h1-bounce", whose paid invoice made them
+recent; that one chip, wider than the sheet, set the sheet body's grid
+column to its width (317px in a 279px body). The body is `overflow-y-auto`,
+so it scrolled sideways, and a tap's scroll-into-view moved the whole form
+27px left. Which customers are recent depended on what else had run, so
+the spec alone never saw it.
+**Fix**: the picker's chips for a person or what was typed wrap, and break
+an address with nowhere to break (`PERSON_CHIP` in
+`components/customers/customer-picker.tsx`). The spec now finds a long-named
+customer of its own in the sheet before measuring, so the chip is always
+there. `overflow-x-hidden` on the sheet body was not added: an
+`overflow: hidden` box still scrolls for focus and scroll-into-view, so it
+would only hide the next overflow from this spec.
+**Rule**: a chip whose words come from a merchant or a customer (a name, an
+email, a product) wraps; `Chip`'s nowrap is for Saroh's own short words.
+
+## Invoices gate — 30 browser failures, two of them the app
+
+**Symptom**: 20 Oct 2026, the invoices release gate again. Bulk remind and
+Share failed in ~90ms with 401 "Invalid or expired session"; once signed
+in, with 400 "The due date has passed". Cancel and write a correct one
+left the page on the cancelled invoice. A phone's Style sheet on the paper
+closed by itself. The journey's "Owed to you" dropped by ₹1,00,000 for a
+₹1,000 payment.
+**Cause and fix**, each:
+
+- **A helper used `page.request` before the page was signed in**
+  (`ownThree`, `ownInvoice`); a test passed the signed-out `request`
+  fixture although the last entry below already said so. Helpers that make
+  data call `useSession(page)` first. `pnpm run check:e2e-signed-in-request`
+  (prepush and CI) now fails a test that signs its page in and passes the
+  `request` fixture on, and `northwind()`'s 401 says to sign in.
+- **An invoice is never born overdue**: the API refuses to issue one past
+  its due date, and nothing moves a due date after issue, so a spec can't
+  make one "13 days late". `issueOverdue` (`fixtures/own-data.ts`) issues
+  with the due time a few seconds ahead and waits for Overdue.
+- **`pressUntil` answered by the wrong thing.** Its answer was any
+  `listbox`; the one for "Who it's for" was still closing, so the product
+  pick was never pressed. An answer names what this press opens.
+- **`innerText` runs inline spans together**: "Owed to you₹1,18,50019
+  invoices", so `₹([\d,]+)` read the count into the amount. Read the
+  amount's own element.
+- **The app (1): any revalidation re-reads the page the router is on.**
+  After the draft's address became `/<id>/edit`, the next save's
+  `revalidatePath` drew the edit page in place of `/new`, throwing the
+  editor away. The editor's later saves revalidate nothing
+  (`lib/invoices/actions.ts`).
+- **The app (2): an `onDone={() => onDone()}` dropped the sheet's
+  outcome**, so the corrected draft never opened from the details
+  (`details/flows.tsx`). Pass the outcome through.
+
+---
+
+## Next router — an address written in place went back to the old one
+
+**Symptom**: 20 Oct 2026, the invoices release gate. New invoice saved its
+draft as it was typed ("Draft · saved" on screen), but the address stayed
+`/billing/invoices/new?…` instead of becoming the draft's `/edit`, so a
+reload opened an empty form and a second draft (`invoices-journey.spec`).
+**Cause**: the draft hook wrote the address with
+`history.replaceState(window.history.state, "", url)`. Next 16 patches
+`replaceState` so its router follows a write, unless the state passed
+carries its own marker (`__NA`), which `window.history.state` always does.
+The router never heard of the new address; on its next commit (the Server
+Action's answer) it wrote its own `canonicalUrl`, `/new`, back. Five other
+places wrote the address the same way (the invoice list's `?invoice=`, a
+post's address, an order's `?panel=`, a post category, the console's plans
+nav).
+**Fix**: pass `null` (Next copies its own state across itself), and keep
+only `?mode=` on the draft's address. `pnpm run check:history-state`
+(`scripts/check-history-state.mjs`, in prepush and CI) fails on
+`history.replaceState(window.history.state` or `pushState` the same way.
+
+Two more misses from the same gate, both in specs:
+
+- **Playwright's `request` fixture is not signed in.** `useSession(page)`
+  adds the saved cookies to the page's context; the test's `request`
+  fixture is a context of its own with none, so the API answers 401
+  "Invalid or expired session". Call the API as the person through
+  `page.request` (`northwind(page.request)`).
+- **A modal editor takes the page out of `getByRole`.** A Radix popover
+  with `modal` or a sheet sets `aria-hidden` on everything else, so
+  `getByRole("article")` finds nothing behind it although it is on screen.
+  Check the name once with nothing open, then read it with
+  `includeHidden: true` (`invoices-paper-editor.spec.ts`). And a helper
+  that counts buttons waits for the screen first: right after `goto` the
+  route's loading state is showing (`pressInvoiceAction`).
+
+---
+
 ## Session replay — every recording played back as a blank black screen
 
 **Symptom**: 14 Oct 2026, four days after session replay went on in
@@ -5134,6 +5473,13 @@ leaving queue it too.
 writes its source, including writes another library makes
 (`backend-integrations.md`, Razorpay customer).
 
+**Since (18 Oct 2026).** DEC-167 replaced DEC-165's customer per business
+with one per billing profile, which holds its own billing email: an
+account email change and a change of owners no longer touch billing, so
+`onUserEmailChanged` and the owner-change queueing were taken out, and
+the customer follows the profile's saves (`billing.profile.sync`). The
+rule stands for the profile's own fields.
+
 ### The contact form's focus test flaked on CI (17 Oct 2026)
 
 **Symptom.** `contact-form.test.tsx` "send another message" failed on CI (focus still on `<body>`) and passed locally and on development.
@@ -5153,3 +5499,395 @@ writes its source, including writes another library makes
 **Fix.** The spec presses until the panel opens (`expect(...).toPass`, as `business-settings.spec.ts`'s `openSheet`).
 
 **Rule.** A browser spec that opens a sheet or dialog presses again until it shows, never once and waits (`saroh-browser-tests` skill).
+
+### The release PR showed a conflict that wasn't there (18 Oct 2026)
+
+**Symptom.** Release PR #976 (development → main) showed "conflicting" on GitHub and ran no CI, although a local merge of development into main was clean.
+
+**Cause.** Main and development had two merge bases. The demo-business units of #972 were cut on 16 Oct from main (its #956 release merge commit) instead of from the batch, so that main-only commit reached development, while development's own history (#973) had reached main through #971. GitHub's mergeability check fails on such a criss-cross even when git merges it cleanly.
+
+**Fix.** The release went from a branch that is development with main merged in (#977), so GitHub saw no conflict. Once it merged, main contains development again, and the next release has one base. Main is never merged into development (owner).
+
+**Rule.** Work branches start from development or a batch made from it, never from main; unit worktrees are created from the batch branch by name. `pnpm run check:branch-base` (in `scripts/prepush.sh`) refuses a branch holding a commit main has and development doesn't (`docs/patterns/devops-tooling-and-deploy.md` › Branches, batches and pull requests).
+
+### A job with no business was refused under RLS (18 Oct 2026)
+
+**Symptom.** The batch gate's integration run under RLS failed 276 tests with `new row violates row-level security policy for table "Job"`, plus a CHECK on `BillingProfile` and one on `BillingCheckout`; the plain integration run passed.
+
+**Cause.** `billing.profile.sync` was queued with no `organizationId`, since a billing profile spans businesses, but it is queued inside a business's transaction, where the Job policy takes only that business's rows. Two specs made rows the migrations' CHECKs refuse (a profile with an empty email, an UPGRADE checkout with no start). The unit agents ran their specs only without RLS, and `db push` has no CHECKs.
+
+**Fix.** The enqueue reads the transaction's business (`current_setting('app.current_organization_id')`) and records it on the job, or none outside one; the specs were made true to the constraints.
+
+**Rule.** A job written inside a business's transaction carries that business's id, even when its work spans businesses. Every unit's specs are run with `TEST_RLS=on` before the unit lands, not only in the gate (`docs/patterns/backend-jobs.md`, `.agents/skills/saroh-migrations/SKILL.md`).
+
+### Billing profiles: six holes the code review found (18 Oct 2026)
+
+**Symptom.** The DEC-167 review found: a renewal moving a business to a profile deleted with its owner's account failed on `Organization_billingProfileId_fkey` on every webhook and sweep; a switch dropped a running coupon; a business left without a profile couldn't upgrade until its renewal; an Admin's `GET checkout` handed out the profile's email, phone and GSTIN; an app from before profiles couldn't create a second business; and the migration's data move had never met a row.
+
+**Cause.** `BillingCheckout.billingProfileId` has no foreign key, so it outlives the profile; the switch rule treated "no profile" as a profile to move from; the handoff was built for every `billing:read` caller; the onboarding refused a missing choice even when there was only one; the replay runs migrations on an empty database.
+
+**Fix.** The repoint checks the profile exists (else adopts, leaves the pointer and raises `billing_profile_gone`), account deletion raises `billing_profile_owner_left`; `discount-running` 409; no profile applies at once; handoff and quote profile gated on `billing:manage` and ownership; one profile is the default; `pnpm run check:migration-fold` runs the migration on fixtures.
+
+**Rule.** A data migration that moves rows gets a check against fixtures beside the replay (`check:migration-fold` is the example); an id column without a foreign key is checked before it is written to one that has one (`docs/patterns/backend-billing-and-classes.md`).
+
+### A profile was refused the customer its owner's other business already had (18 Oct 2026)
+
+**Symptom.** On saroh.io the billing-profile backfill's second run still queued one profile, whose sync failed with "the provider has a customer with these details": the seeded demo owner's profile (no phone, one of the owner's twelve businesses on it).
+
+**Cause.** Under DEC-165 each business had its own Razorpay customer, with the owner's email. The profile's create was refused as a duplicate, and the customer Razorpay handed back named, in its notes, another business of the same owner that is on no profile yet. Adoption took a customer only for a business on the profile, so this one counted as someone else's; without a phone to withhold, the retry was refused too.
+
+**Fix.** A profile may also adopt a customer for a business its owner owns (OWNER membership) that is on no profile yet. Never one naming another profile, another owner's business or a business on another profile, nor one another profile holds (`billing/billing-customer.ts`, `isOwn`). The owner's memberships are read outside the business's RLS context (`outsideOrgContext`), because a checkout runs scoped to one business and Membership is isolated per business, so inside it only that business's membership would be seen. The fake provider now refuses the same email with no phone as Razorpay does.
+
+**Rule.** A read that spans an owner's businesses (memberships, anything org-isolated) is made with `outsideOrgContext`, and its spec runs one path scoped to a single business under `TEST_RLS=on`. A job runs with no context, so a job-only test passes either way (`docs/patterns/backend-data-and-money.md`, cross-business reads).
+
+### The console said a module was On while its release was off (18 Oct 2026)
+
+**Symptom.** A business page's "What they see" listed Bookings under "On" for a business whose Bookings release was off for everyone: the business saw no Bookings, and the operator was told it had them. A module outside their plan with plan limits enforced read On the same way.
+
+**Cause.** The console worded only the business's own switch (`OrganizationModule.status` in the business page's `modules` panel). Whether a business can use a module is `ModuleAvailabilityService.evaluate()`: the release, their switch, the project, the plan and readiness, in that order. The console re-derived the answer from one of those gates.
+
+**Fix.** `GET /admin/organizations/:id/modules/state` (`admin/admin-business-modules.service.ts`, `organization:read`, no support session) runs `evaluate()` for every module that isn't hidden, as the business's owner role, and returns On, Off or Locked with the gate in the way, its reason in words, the fix, dependencies as information, and "Plan limits not enforced yet" once per business. `lib/what-they-see.ts` only words that answer. Hidden modules are left out by `moduleHidden` in `capabilities/module-registry.ts`, the source `moduleRolledOut` reads.
+
+**Rule.** A console or app screen that says whether a business can use a module reads `evaluate()`'s answer through the API, never one gate's row; dependencies are information, never a blocker the workspace doesn't enforce (`.agents/skills/saroh-module-capability/SKILL.md` › Rules; `admin-business-modules.db.spec.ts` checks the release-off case).
+
+### A component test stalled for ten seconds on a ⋯ menu (18 Oct 2026)
+
+**Symptom.** In the Releases component tests (U7), opening a dialog from a Radix `DropdownMenu` item blocked the event loop for 2 to 11 seconds a test, enough to time out. The same dialog opened from a plain button took milliseconds.
+
+**Cause.** When the menu closes, Radix looks for somewhere to put the focus, and every candidate is checked with `getComputedStyle`. In jsdom that cascades jsdom's whole built-in stylesheet through `nwsapi` for each element, which is slow. A browser does it in microseconds, so the screen itself is fine.
+
+**Fix.** `components/releases/releases.test.tsx` mocks `@saroh/ui/dropdown-menu` with plain buttons (`role="menuitem"`). The real menu is covered by the browser spec `e2e/tests/admin-releases.spec.ts`. A dialog opened from a menu is a controlled `OperatorDialog` (`open`, `onOpenChange`, no `trigger`), and the menu doesn't hand the focus back to ⋯ while one is open (`onCloseAutoFocus`).
+
+**Rule.** A vitest that opens a Radix menu mocks the menu, and leaves the real menu to the browser spec. A test that suddenly takes seconds is usually jsdom's `getComputedStyle`: profile it with `--pool=forks --execArgv=--cpu-prof` before raising the timeout.
+
+### Mark verified kept a password nobody had proven (19 Oct 2026)
+
+**Symptom.** The owner, reviewing U9's Mark verified, asked what happens if the account wasn't the person's own. Anyone can sign up with someone else's email and set a password; Better Auth then refuses that password until the address is proven. When staff pressed Mark verified, `emailVerified` became true and the stranger's password started working. When the real owner later signed in with a code, nothing was removed, because Better Auth's `revokeUnprovenAccountAccess` only runs for an address that is still unverified.
+
+**Cause.** Mark verified set `emailVerified` and nothing else. Staff can check the mailbox is the caller's; they can't know who set the password on an address nobody had proven. Nothing records who set a password, so there is nothing to "track"; the only safe answer is to treat it as unproven.
+
+**Fix.** `markVerified` (`admin/admin-sign-in-help.service.ts`) does what a first code sign-in does: in the same transaction it deletes the `credential` account and every session, and the ledger row says whether a password was removed (`unprovenSignInRemoved`, `sessionsEnded`). Provider accounts stay. The dialog tells staff the person signs in with a code and can set a new password. `admin-people.db.spec.ts` checks it, plain and under `TEST_RLS=on`.
+
+**Rule.** Anything outside Better Auth that marks an address verified removes the password and sessions set before the address was proven, as `revokeUnprovenAccountAccess` does. An audit metadata key never contains `password`, `credential`, `token` or `secret` (`SECRET_BEARING_KEY` refuses the write).
+
+### A redesign took away per-plan counting (19 Oct 2026)
+
+**Symptom.** In the admin plan editor's new feature sheet (U12), how a feature's limit is counted (in total or each month) could only be set for every plan at once. Before, each plan set its own. The owner: "we should have full control, I thought we are only improving the UI and not changing the functionality".
+
+**Cause.** The unit's agent folded the per-plan "Counted" select into one "on every plan" control to match the mock, and flagged it only in its report.
+
+**Fix.** Each plan's line in the feature sheet has "Counted on <plan>" again (`components/plans/plans/module-row.tsx`); "Counted, for every plan at once" stays as a shortcut and shows "Differs by plan" when they differ. `sheets.test.tsx` checks a single plan can count differently.
+
+**Rule.** A redesign changes how a screen looks and reads, never what it can do. Every control the old screen had is still reachable on the new one; a unit that thinks a capability should go stops and asks the owner before building it, and the brief says so.
+
+### Billing profiles passed every test and still needed fixing in a browser (19 Oct 2026)
+
+**Symptom.** #1015's pages passed unit, component and db tests. Tried by hand on the local stack (owner: "the UI has to be verified"), saves from accounts.saroh.in were refused until U24 sent an `Origin` header with server-side writes, and four smaller problems showed: a 10-digit Indian phone was refused ("Start with + and the country code") although the box shows +91; a saved phone read "+919876543210"; the Move dialog's "+ A new billing profile" lost the business being moved; the Move dialog said "pays for 0"; and the State list was in GST-code order, not by name.
+
+**Cause.** Component tests mock the server actions and the API, so nothing exercised the real request; the phone rule asked for a + that an owner in India never types.
+
+**Fix.** `normalisePublicPhone` (API) and `phoneProblem` (app) read a number typed without + as Indian (10 digits, a trunk 0, or 91 / 0091 in front); accounts shows phones grouped (`phoneLabel`); the Move dialog's link carries `&bill=<business>` so the new profile bills it; "pays for nothing yet"; states by name.
+
+**Rule.** A unit with a form that writes is not done until one save of each kind has been made in a browser on the local stack (`docs/patterns/frontend-verification.md`); a phone field takes the number as an owner says it.
+
+### A saved plans draft listed add-ons nobody touched (19 Oct 2026)
+
+**Symptom.** On the admin Plans screen, after one price edit was undone, the draft bar said "0 changes, not live yet" and then "14 businesses on Grow and Pro would move at their renewal"; "Changes in this draft" listed eight "Add-on changed" rows.
+
+**Cause.** `draftChanges` (`components/plans/preview/changes.ts`) compared add-ons with `JSON.stringify(was) !== JSON.stringify(now)`. A draft read back from the API has its keys in another order and empty fields filled in, so equal add-ons looked different. The bar's count came from the API check, which compares field by field, so the two halves of one sentence disagreed.
+
+**Fix.** `sameValue` compares by what a value says: key order doesn't count, and a missing field equals null or undefined. `preview.test.tsx` has an add-on read back in another order. The empty draft now says "No changes in this draft yet."
+
+**Rule.** Never compare objects with `JSON.stringify`; a value that made a round trip through the API changes key order. Use a field-by-field or order-blind compare (`sameValue`, `sameCell`, `samePlan`).
+
+### Hidden words for screen readers widened whole pages on a phone (19 Oct 2026)
+
+**Symptom.** At 390px, every admin Billing page measured 420px wide. The tab strip scrolled and clipped correctly, so nothing visible ran off the edge, but the document was wider than the screen.
+
+**Cause.** A tab's count badge carries `sr-only` words ("1 open"). `sr-only` is `position: absolute`. The strip's scroller (`ScrollX`) had `overflow-x: auto` but no positioning of its own, so the absolute text was placed against the page, not the scroller, and its clipping didn't apply.
+
+**Fix.** `ScrollX`'s scroller is `relative` (`packages/ui/src/components/ui/scroll-x.tsx`). That fixes every tab strip and wide table built on it. Found by loading every admin route at 390px and checking `scrollWidth`; the cause was found by hiding one section at a time.
+
+**Rule.** An element that clips with `overflow` must also be the positioning parent (`relative`) if anything inside it can be absolutely positioned, including `sr-only` text. A phone check measures `documentElement.scrollWidth`, not only what looks cut off.
+
+### "You're on the team" turned into "can't be used" the moment someone joined (19 Oct 2026)
+
+**Symptom.** The browser test for a staff invite reached Join the team, the API accepted (200), and the page then showed no "You're on the team". A real invitee would have read that their invite can no longer be used, right after joining.
+
+**Cause.** `acceptStaffInviteAction` deleted the invite's cookie once the invite was over. In Next, a server action that sets or deletes a cookie re-renders the page, so the server page ran again: with no token, and an invite now used, it drew "gone" over the client's answer. Final refusals ("You're already on the team") were lost the same way. Unit tests mocked the action, so none saw the re-render.
+
+**Fix.** The action leaves a ten-minute `saroh_staff_invite_done` cookie (joined or the final refusal's code) in place of the token, and the page draws that outcome before anything else (`app/staff-invite/page.tsx`, `doneAfterAccept` / `doneWords`).
+
+**Rule.** A server action that changes a cookie re-renders its page. Whatever answer the client is showing must survive that render: let the page draw it from the server state, not only from the client's `useState`.
+
+### Staff invites failed with a 500 when two were sent at once (19 Oct 2026)
+
+**Symptom.** Under the parallel browser run, `POST /admin/staff/invites` answered 500 `TransactionWriteConflict`.
+
+**Cause.** Invite, resend and withdraw run Serializable transactions with no retry; another staff write at the same moment (any test granting access) failed the snapshot. Accept already retried.
+
+**Fix.** All three go through `serializable()` in `admin-staff-invites.service.ts`, which runs again on `isSerializationFailure`; the checks inside run again, so a real conflict is still refused.
+
+**Rule.** Every `isolationLevel: "Serializable"` transaction retries a serialization failure a few times (`isSerializationFailure`), or says why it must not.
+
+### A seed test passed locally and failed in CI on DATABASE_URL (19 Oct 2026)
+
+**Symptom.** PR #1037's Unit tests job failed on `seed/staff.test.ts` ("grants no console access on a database that isn't on this machine"): `Cannot read properties of undefined (reading 'upsert')`. `pnpm prepush --all` had passed.
+
+**Cause.** The test called `seedStaff(prisma, undefined)` to mean "no URL", but an `undefined` argument takes the default, `process.env.DATABASE_URL`. CI's unit job sets that to a localhost name, so the seed ran against the stub; the local gate had no DATABASE_URL, so it returned null.
+
+**Fix.** The test stubs `DATABASE_URL` (`vi.stubEnv`) instead of passing `undefined`. The next CI run then failed `user-menu.test.tsx`, which expected `https://accounts.saroh.in/…` while CI sets `NEXT_PUBLIC_ACCOUNTS_URL` to a local address; it now compares with `billingProfilesUrl`. `scripts/prepush.sh` runs the vitest and seed steps with CI's unit job environment (`CI_UNIT_ENV`), so both read the same values.
+
+**Rule.** Passing `undefined` never tests "not set" for a parameter with a default. A test that depends on an environment variable sets it itself; the local gate runs unit tests with CI's environment.
+
+### Clearing a saved phone "didn't save" in a hand check, and the product was fine (19 Oct 2026)
+
+**Symptom.** Settings › Business › Contact › Phone on your website: with a phone saved, the number box was emptied with chrome-devtools `fill` and Save pressed. The sheet closed with no request and no toast, and the phone stayed. Changing it to another number saved.
+
+**Cause.** The checking tool, not the field. Puppeteer's `Locator.fill(value)` (what chrome-devtools `fill` runs) empties a text box by setting `input.value = ""` in the page and then types what is new; for `""` there is nothing to type, so no `input` event fires. React tracks a controlled input's value through that same property, so it never hears the change: `PhoneInput` keeps its number, react-hook-form stays clean, and the sheet's `!isDirty` path closes it without a request. Any controlled field emptied that way behaves the same; another number "worked" only because it was typed key by key. A person's Select all + Delete or Backspace fires `input` with `""`, and `PhoneInput` sends `""`, the sheet sends `{ profile: { phone: "" } }`, and the API clears it. Every other edit form with a phone was read for the same bug (customer edit sheet, customer form, invoice details, site Contact and CTA fields, accounts billing profile, admin lead and teammate profile, the site's Me sheet): each sends `""` or `null` for an emptied phone.
+
+**Fix.** No product change. Pinned instead: `business-field-sheet.test.tsx` ("clearing a saved phone and saving sends it empty") and `phone-input.test.tsx` (a saved number emptied sends `""` and stays empty after the box is left). The same test with the box emptied the way `fill("")` does it (`el.value = ""`, no event) reproduces the browser's "nothing sent".
+
+**Rule.** In a hand check, empty a field the way a person does: click it, Select all (Meta+A), Backspace (`press_key`), never `fill("")`. Before calling a "clearing doesn't save" bug, read the field's value back from React's side (the form's request, or the field after a re-render), not the box. `docs/patterns/frontend-verification.md`.
+
+### A held Came or cancel that never got there stayed on screen (19 Oct 2026)
+
+**Symptom.** Review of the Bookings rebuild: Came, Didn't come, a cancel and a class cancel on the calendar, All bookings and the booking page are held ten seconds, then written. When the write threw (offline, a deploy mid-request) the row stayed Came or Cancelled with no message and nothing saved; a refused first mark also wiped a newer mark made inside the ten seconds. Several Undos had the same shape: Undo sent a whole snapshot (the week as the sheet opened, all four person rules, every "Who can book it" box) over changes made since.
+
+**Cause.** `startHold` ends a hold whose commit throws as `failed`, and `useHold` only dropped it: no `onUndo`, no toast. Each screen's refusal branch restored its "was" value unconditionally. And Undos were written as "put back the state before", not "take back this change".
+
+**Fix.** `useHold` catches a commit that throws (`UNREACHED`) or answers `{ ok: false }` (the API's reason), says it and runs `onUndo`; callers return the action's result and their `onUndo` restores only while their own mark is still shown (`use-calendar-actions.ts`, `bookings-view.tsx`, `use-outcome-mark.ts`). Undos send only what their change changed: person rules the one key, "Every <weekday>" the week as saved minus its range, "Who can book it" its own fields merged into what is shown; and a new change dismisses the previous Undo toast.
+
+**Rule.** A held commit returns its result to `useHold` and never swallows a throw itself; its `onUndo` takes back only its own change. An Undo sends the inverse of its change, never a snapshot of the whole thing. `docs/patterns/frontend-error-feedback.md` → the ten-second hold.
+
+### Review of the Bookings rebuild: races a sequential spec never sees (19 Oct 2026)
+
+**Symptom.** The code review of batch-2026-10-19-1 found, with every spec green: asking again for a rules change could overwrite an approval or turn-down that committed first (a 500 against the decided-reason check); two people saving different rules of one person lost one change, and Undo put back a change someone else made; two `PUT saved-views` at once left two "opens on" rows; a backdated own rate over a replaced one hit the table's trigger (500); the sweep re-picked an invoice forever when the month's first later manager was off commission; and booking a new phone could make a second contact beside a walk-in order's.
+
+**Cause.** Read-then-write by id at Read Committed (`findFirst` then `update where id`) re-checks only the id after waiting on a lock. Saves wrote a whole object built from a row read outside the transaction. A replace (deleteMany + create) had no lock and no unique index. An ended `BusinessCommissionRate` row is immutable, but the overlap rule still tried to end it. The sweep's SQL and `linkForPaymentInTx` described "the later manager" differently. And in a Serializable transaction the snapshot is taken by its first statement, so an advisory lock taken later in it does not make a Read Committed writer's commit visible; under the RLS proxy, even the ambient `prisma` inside a `$transaction` callback joins that transaction.
+
+**Fix.** Lock the row (`FOR UPDATE`) or guard the write (`updateMany where status = 'WAITING'`, act on `count`); re-read under the lock and write only the changed columns, returning only those as `previous`; `pg_advisory_xact_lock` on the replace's key; refuse a new own rate over an ended one with a 409 naming its days, and only cut (not end) a rate replaced from a day to come; one SQL rule for the sweep equal to `linkForPaymentInTx`; after taking the phone lock, read the phone's contact on its own connection (`outsideOrgContext`) and retry the reservation when it exists. The month's lines on assigning a manager are written after the link commits, one short transaction per business. Each has a db spec that runs the two writers at once or holds one lock by hand (plain and `TEST_RLS=on`).
+
+**Rule.** A spec for a write that can race runs the race: `Promise.allSettled` of the two writers, or one writer held on the lock in a test transaction while the other starts. Two code paths that pick "the same" row (a job and its sweep) share one written rule and a test of its edge case. `docs/patterns/backend-data-and-money.md`.
+
+### A sideways strip in a flex row zooms the phone out (19 Oct 2026)
+
+- **Symptom:** on All bookings on a phone, the floating New booking button and row menus sat in the wrong place; browser specs tapped the wrong thing.
+- **Cause:** the view-chip strip (`overflow-x-auto`) sat in a flex item without `min-w-0`, so the item grew to the chips' full width (816px) and the phone zoomed the whole page out.
+- **Fix:** wrap the strip in a `min-w-0` item (`components/bookings/bookings-view.tsx`).
+- **Rule:** any horizontally scrolling strip inside a flex or grid item needs `min-w-0` on that item; `expectNothingHiddenSideways` in phone specs catches it.
+
+### CI-only unit timeouts on drawn sheets (19 Oct 2026)
+
+- **Symptom:** `profile-list.test.tsx` (accounts) timed out at 5s on CI; 1s locally.
+- **Cause:** the first sheet open in jsdom loads the shared phone field's country picker; CI runners are several times slower.
+- **Fix:** `testTimeout: 15_000` in `apps/accounts.saroh.in/vitest.config.ts`.
+
+### Two phone specs on development after #1039: a press before hydration, and a business picked by name (19 Oct 2026)
+
+- **Symptom:** development CI (run 39274313584, shard 3/4) failed `bookings-desk.spec.ts` "a booking paid online is cancelled with the refund choice" on the phone, first try and retry (`Cancel booking` never showed after More), and `calendar-month.spec.ts` "What to show rises from the foot" once (no dialog). Both had passed on the PR and in the local gate.
+- **Cause:** (1) #846's lost click again. In both traces the press landed on the server-drawn button before the page's own client components had hydrated: the shell's links prefetched before the click, the page's own (`/bookings/all`, `/calendar?month=…`) only after it. On a slow runner, a page's own content can hydrate well after the shell. (2) The refund spec read the first showcase business, by name, with an upcoming booking paid online. That day it was CarePoint Clinic, where the demo user is a Member (front desk), not the owner whose refund choice the spec reads.
+- **Fix:** `e2e/fixtures/press.ts` `pressUntil(button, answer)` presses until a Locator shows or a check holds, and never presses again once it has (a toggle or a late sheet isn't pressed shut). Both specs use it for every first press after a load: More, New booking, Came, What to show, a day. The refund spec reads only businesses where the demo user holds `payment:manage` and `booking:write`. `calendar-month.spec.ts`'s sideways check polls, and measures against the width set, not `innerWidth`.
+- **Rule:** the first press on a page after `goto` or `reload` goes through `pressUntil` (`saroh-browser-tests` → Waiting). A spec that reads a showcase business it doesn't name picks it by what the session may do there, never by list order. No lint catches a bare first click, because a click after an awaited state change is fine. The older specs' inline `toPass` loops do the same job; new code uses the helper.
+
+### Insights drew money from before the period as the period (20 Oct 2026)
+
+**Symptom**: Northwind, Insights › Overview, Last 4 weeks (22 Sep to 19 Oct):
+the sentence said "₹5,48,284 came in over the last 4 weeks", and the chart's
+"Last 4 weeks" bar for the week of 21 Sep read ₹8.3L, more than the whole
+period.
+**Cause**: the twelve bars were calendar weeks (Monday to Sunday), each marked
+PERIOD when four of its days fell inside the window. The 21 Sep week held one
+day from before the period and all of its money was drawn as "now"; the dark
+bars never added up to the sentence.
+**Fix**: the bars are rolling weeks ending today (`moneyBuckets`,
+`apps/api.saroh.in/src/modules/analytics/period.ts`): each window's bars hold
+exactly its days (a 3-month window's oldest bar holds the days over whole
+weeks, and is never "best week"), so the PERIOD bars add up to money in and
+the BEFORE bars to the period before.
+**Rule**: a picture of a window is cut on that window's own days.
+`money.db.spec.ts` asserts the PERIOD and BEFORE bars sum to `moneyIn` for
+7 days, 4 weeks and 3 months, and that the day before the period sits in a
+BEFORE bar; `period.spec.ts` checks the bars cover each window exactly.
+
+### The Home and Insights release gate: four app bugs no spec had reached (20 Oct 2026)
+
+**Symptom.** The first `pnpm prepush --all` on batch-2026-10-20-1 failed 34 browser tests. Most were the new specs' own mistakes (below), but four were the app: What sells answered "Couldn't load Insights" on every business; Calendar only's New on Home named only "Sending invoices" as outside their role; Needs you's "24 more orders" link was 17px tall on a phone; a phone's Bookings opened from Home's Book someone dropped `?new=1` from the address under the open flow; and a booking made by hand beside another answered 500 under load.
+
+**Cause.** (1) `best-customers.tsx`, a server component, called `avatarInitials()` from `@saroh/ui/avatar`, a "use client" module: on the server that import is a client reference and calling it throws. Its unit test renders it in jsdom, where it is a plain function. (2) Home's New dropped every module whose readiness read DISABLED, and readiness is DISABLED for a role the module doesn't reach (`UNAUTHORIZED`) as well as for a module the business has off. (3) `coarse:min-h-11` on a `TextLink` inside a `<p>`: an inline `<a>` ignores min-height. (4) `useOpeningView` replaced the address with List's and kept nothing else. (5) A serialization failure inside a `$queryRaw` arrives as `P2010` "Raw query failed. Code: `40001`", which `isSerializationFailure` did not read, so `reserve` threw it as a 500 instead of "That changed while you were booking. Try again."
+
+**Fix.** (1) `initials` from `@/lib/names` (`@saroh/ui/lib/names` underneath); `share-image-thumb.tsx` takes `webImageUrl` from `@saroh/ui/lib/share-facts` too. (2) `homeNewModuleKeys` counts a module that is on for the business but closed to the role only by `UNAUTHORIZED`, so the role line names it. (3) `coarse:inline-flex coarse:items-center` beside the min height. (4) `withArrival` carries `new` and `contactId` onto the List address. (5) `prisma-errors.ts` reads P2010 with 40001 (in `meta` or the message) as P2034.
+
+The specs' own mistakes, for the next unit that writes one: Insights specs read Rye & Co., which has no Insights module (now Pulse Fitness, read only); `home-needs-groups` made its records with the bare `request` fixture, which carries no session (401), and asserted on every row of a group other tests share; geometry of a sheet or the phone's + was measured while it slid in (poll the box); Home's `<main>` is one when settled, but while it streams the loading frame's `<main>` sits beside it, so wait for the greeting, not `locator("main")`; `.or()` of two parts of the same card matches both; a stretched link's own box is its line of text, its target the row; a group of Needs you whose last row is acted on folds to "All done" while the hold runs (by design, `need-groups.test.tsx`), so a spec opens it again to reach the row's Undo; and `bookings.spec`'s "Book on this day" looked for the day's number in the whole New booking sheet, which matched a recent customer's phone number on some days and nothing on others.
+
+**Rule.** A server component calls no function from a "use client" module (`pnpm run check:client-calls`, in prepush and CI). A module's readiness says what this person can do, not what the business does: read `lifecycle` and the blockers when the question is the business's. `min-h` on a link needs a block or flex box. A page that rewrites its own address keeps the arrival's parameters. Every Postgres 40001 is a lost race, whichever Prisma code carries it.
+
+### PR #1159's first CI run: a replayed Enter, and two jsdom files past 5s (20 Oct 2026)
+
+- **Symptom:** run 39383484916 failed `home-new-menu.spec.ts` "Enter opens it on the first row…" (desk, first try and retry: the menu was open, its first row never focused), `shop.test.tsx` "the bag through a reload … finds the way…" (5088ms) and `new-booking-flow.test.tsx` "books a caller…" (5103ms) with the 29 tests after it. All passed in the local gate; this branch touched none of the unit-tested code.
+- **Cause:** (1) The trace has one Enter, ~250ms after the page loaded, while the page's own routes still prefetched. React replayed the pre-hydration keydown on the trigger, which opened the menu, but Radix's document-level keydown listener (attached in an effect) had not seen it, so it treated the open as a pointer's and left focus on the menu, not its first row. The spec's `toPass` only waited for the menu to show. (2) Both files walk whole sheets in jsdom with real settle waits, ~2s a test locally. A test that times out leaves its `act()` running ("overlapping act() calls"), which fails every later test in the file.
+- **Fix:** the spec presses Escape and Enter again until the first row holds focus (`toBeFocused` inside `toPass`). Both New booking describes and the bag-through-a-reload describe get `{ timeout: 15_000 }`.
+- **Rule:** a keyboard spec's first press after a load waits for the focus it expects, not only for the menu or sheet to show: a replayed press can open it in pointer mode. A jsdom file whose tests take over a second locally sets a describe timeout, so one slow test can't fail the file.
+
+### Demo invoices would have kept their emails after a re-seed (20 Oct 2026)
+
+- **Symptom:** while giving Rye & Co. and Pulse invoices that were emailed and reminded (#1129), a second `db:seed:showcase` run would have left the first run's `INVOICE_SENT` and `INVOICE_REMINDER` messages behind, with no invoice, in Messages.
+- **Cause:** `Message.invoice` is `onDelete: SetNull`, so deleting a seeded invoice keeps its emails. The ledger rows and the share log cascade with the invoice; the emails don't.
+- **Fix:** both clears (`bakery.ts` `clearVolume`, `run.ts` `clearVolume`) delete `Message` rows on the business's seeded id prefix. Invoice states are planned in one place (`seed/showcase/invoice-states.ts`), and an invoice's status and paid columns come from its planned ledger through `settleLedger`, the API's settle rules, never typed beside it.
+- **Rule:** a seed that writes rows a parent's delete only unlinks (`SetNull`) clears them by its own ids. `check.ts` now fails on a status that doesn't follow the payments, a paid date that isn't the last payment's, cheque fields that don't fit, a payment, share or email out of the invoice's life, a rewrite from paper that wasn't cancelled, and a style the API wouldn't store (`backend-billing-and-classes.md` → Payments on an invoice are a ledger → Demo data).
+
+### A backfill run inside the API's container restarted it (20 Oct 2026)
+
+- **Symptom:** running the invoice-payments backfill with `docker exec` in the development API's container (saroh-api-dev) ended with exit 137, and the API restarted once.
+- **Cause:** the container has a 448 MB memory limit and the API already uses about half of it. `tsx` compiling the backfill beside it went over the limit, and Docker killed the container.
+- **Fix:** run a backfill in a one-off container from the same image: `docker run --rm --network coolify --env-file <the API container's env, written to a mode-600 temp file and removed on exit> --memory 2g -w /repo/packages/database <image> …`. `DATABASE_TARGET_CONFIRM` is read from the URL's database name inside that container, so no value is printed. Dry run first, the real run, then a dry run again that must write 0.
+- **Rule:** never run tooling inside a serving container; it shares the container's memory limit with the app.
+
+### Invoice screens: four races and a page that threw its own editor away (20 Oct 2026)
+
+- **Symptom:** the 20 Oct code review (#12–#15) found, on the invoice screens: Remind many could send an older pick (Next, Back, untick, Next, and the first preview answered last); Home's Remind all could show the read from an earlier opening; a double tap on "Email the receipt" sent two; "Share receipt on WhatsApp", offered ten seconds after a payment, did nothing once the details had closed, or opened the next invoice's share sheet once they had moved on; and on a new invoice "Make this my default", the logo or How to pay us sheet, or the business-details step before Issue closed the Style sheet and lost the last 800 ms of typing.
+- **Cause:** (1) a read set state on whatever it answered, with no check that it was still the newest. (2) The receipt send had no busy guard and its button stayed on. (3) The offer's toast is a module timer that called the share-sheet opener of the screen that offered it, whatever that screen was showing by then. (4) Those saves went through `saveOrganizationSettings` / `saveBusinessLogo`, which revalidate; any revalidation makes the router read the page it is on again, and a new invoice's address is already `/<id>/edit` while the `/new` tree is drawn, so the form remounted.
+- **Fix:** `useLatestCall` (`components/shared/use-latest-call.ts`) drops an answer that is no longer the newest; Back, close and reopen drop what is in flight. The receipt send runs through `runAction` with a ref guard, and its item says "Sending…" and is off. `RecordPaymentSheet` answers whether it is still mounted and on that invoice (`useShareHere`); if not, the toast opens WhatsApp itself. The editor saves the draft first (`saving.flush()`), then uses `saveOrganizationSettingsInPlace` / `saveBusinessLogoInPlace` (`inPlace` on the logo, How to pay us and business-details sheets), which revalidate nothing.
+- **Rule:** a screen that can read twice keeps only the newest answer. Anything that sends to a customer has a busy guard. A callback kept past a timer checks its owner is still there and on the same thing. Nothing saved from the invoice editor revalidates (`components/invoices/paper-editor/no-redraw.test.ts` scans the actions and the editor's files).
+
+### Home, reminders and Change who: a paid booking turned down, a shell that built all of Home, and a request of 3,000 queries (20 Oct 2026)
+
+- **Symptom:** the 20 Oct code review found: Home's Turn down cancelled a booking the customer paid during its ten-second Undo (#11); every page's rail badges ran the full Home build, about 20 sources, with the unpaid bills read twice and the overdue-bills where built twice (#16); Remind many with 100 bills made about 3,000 serial queries in one request (#17), and one unexpected error failed every row (#34); Change who answered a lost serialization race with "That time is fully booked." and no retry (#33); two Home specs slept 11 seconds (#24), and the signed-in-request check missed `openNorthwindAs` and `request.get(…)` (#37).
+- **Cause:** (1) The cancel after the hold carried nothing about what the merchant had seen, so a payment that landed meanwhile was overwritten. (2) The shell called `getHome()` because Home's actions were the badges' source, and `cache()` only joined it with Home's page on Home itself. (3) Remind many asked `channelsFor` and `remind` per invoice, each re-reading the business's provider, plan, thread switch and zone, and the per-invoice reads one at a time; the send loop rethrew anything that wasn't an `HttpException`. (4) `booking-move.ts` read any 40001 as "full". (5) The no-sleep rule was prose only.
+- **Fix:** `DELETE bookings/:id?ifUnpaid=true` re-checks under the booking's locks and refuses 409 "They just paid" (`details.reason: "paid"`); Home's row says it. `GET home?parts=rail` (`HomeService.rail`) returns the ranked actions alone and the shell reads it (`getHomeRail`); a full build shares `unpaidBillsOnce` and one overdue where. `channelsForMany` hoists the business reads, batches the per-invoice ones with IN and reads addresses five at a time (`mapLimit`); Send reminds five at a time with the hoisted reads, and a non-HTTP error is logged and that row says "Couldn't send this one just now." `retrySerializable` tries a move three times with 20–80 ms jitter, then says "Lots of people are booking right now. Try again."
+- **Rule:** a held write that runs after Undo carries the state the person saw, and the API refuses when it changed. Every-page reads ask only for what they draw. A batch over records reads business-wide facts once and per-record facts with IN, and each record answers for itself. A serializable write's lost race is retried before it is reported, and reported as busy, not full. `e2e/eslint.config.mjs` now fails `waitForTimeout` in `tests/` and `fixtures/`, and `check-e2e-signed-in-request` also catches `openNorthwindAs` and direct `request.*(…)` calls (a deliberate signed-out call says "signed out on purpose").
+- **Also:** integration specs must run with `maxWorkers: 1` (the config's own): `--maxWorkers=2` on the command line overrides it, and two files then TRUNCATE each other's rows mid-test (seen as 11 RLS failures that passed alone).
+
+### The invoice ledger's hand routes skipped guards the others made (code review, 20 Oct 2026)
+
+- **Symptom:** a review of the invoice ledger (#1113–#1129) found money moving where it shouldn't: Cancel credited an invoice a pay link had just paid (#2); a cheque could be marked in the bank on a credited invoice and sent a "paid" receipt, a credit went through while a cheque could still bounce, and credited invoices stayed in "Cheques not in the bank" (#5); two real ₹500 cash payments within ten minutes recorded once, and Undo on the second removed the first (#6); a banked cheque could never bounce (#7); Record payment ran while autopay was charging (#8); Email receipt went out for a cheque not in the bank and stopped its real receipt (#9); Undo after removing a bounced cheque brought it back live (#10).
+- **Cause:** each route was written on its own, and one of four skipped the check the others made (`cleared` had no `assertMoneyCanMove`, `record` no `chargeUnderWayOn`). The credit re-checked under the lock only what the API had read a moment before, not what the merchant saw. Repeats were matched on fields (method, amount, reference), which can't tell a retry from a second real payment. "Live" (`isLive`) was used where "in hand" was meant.
+- **Fix:** the guards on every route; Cancel and Refund send `expectStatus` / `expectPaidSoFar` and the credit compares them under the ledger lock ("This invoice was just paid. Reload it."), and refuses while a cheque waits; Record payment sends an idempotency key per opening of the sheet (`InvoicePayment.idempotencyKey`, unique per invoice, migration `20261222100000`), and the app says "Already recorded" with no Undo; CLEARED → BOUNCED is allowed and keeps `clearedAt` (the cheque CHECK now allows it); receipts skip a waiting cheque; a bounced cheque is not removable, and Undo puts one back bounced.
+- **Rule:** a guard that one ledger route needs, every route that moves the same money needs: `invoice-payments.guard.spec.ts` reads the service and fails a route without `assertMoneyCanMove` or a record without the autopay check. A destructive action re-checks what the person saw, not what the server read. Dedupe a retry on a key the client made, never on matching fields. `backend-billing-and-classes.md` → Payments on an invoice are a ledger.
+
+### Money in was worked out three ways, and the desk read paid from the last method (code review, 20 Oct 2026)
+
+- **Symptom:** a review of #1159/#1162 found (1) the Invoices strip's Paid this month counted ledger payments by `receivedAt`, while Home (Money in today, This week, How it's going, the last 24 hours) and Insights' takings counted an invoice's whole total on its `paidAt`, and Insights only once PAID: a part payment showed nowhere but the strip until the last rupee, then the full total landed on that day; a bounced cheque dropped a whole total out of a past week; a back-dated payment moved it. (2) At the desk, a ₹1,000 booking whose pay link invoice was paid ₹400 by hand on Invoices and ₹600 online read as ₹400 still to take: paid online counted the intents, paid at the desk counted PAID paper whose last method was by hand, and the last method read ONLINE. (3) How it's going and Insights compared part of today with a whole day seven (or 28) days back.
+- **Cause:** the ledger (DEC-173) changed what "paid" means, and the readers written before it kept their own reading: the invoice's total and paid date, and the legacy `paymentMethod`, which names only the last payment. Each surface had its own copy of the rule, so nothing made them agree.
+- **Fix:** one rule, `invoices/money-in.ts` (`readMoneyIn` for Prisma, `moneyInPaymentSql()` for SQL), read by the strip, Home and Insights; `money-in.db.spec.ts` pins all of them to one figure for a part-paid invoice, a bounced cheque on a paid invoice and a back-dated payment. The desk take, the booking's Due and the calendar's Due read the paper's ledger (`paidOnPaperCents`). The earlier window of a "so far" comparison ends at the same time of day (`beforeSoFar`, `withDaySoFar`). One zone reader (`businessTimezone`), one owed `where` (`OWED_VIEW_WHERE`, `isPastDue`), and one paise parser in the app (`minorOf`, `lib/format/money`).
+- **Rule:** money that came in is the ledger by `receivedAt` (an order's paper by `paidAt`), read through `money-in.ts` and nowhere else; what a booking has paid is its paper's ledger, never a payment method; a new money surface joins `money-in.db.spec.ts`. A db spec that writes a PAID invoice gives it its ledger row (`test/ledger-paid.ts`). `pnpm run check:formats` now fails `Math.round(Number(x) * 100)` in the app's invoice, Home and Insights libraries (`backend-billing-and-classes.md` → Money in is one rule).
+
+### A customer's Spent still read PAID invoices after money in moved to the ledger (21 Oct 2026)
+
+- **Symptom:** a customer who had paid ₹4,000 of an ₹8,400 bill showed ₹0 spent (and was not on the Customers list at all if that was their only bill); a bounced cheque on a paid bill dropped the whole bill out of Spent, not just the cheque. Insights' best customers and "came back" read the same way, on the bill's `paidAt`.
+- **Cause:** the money-in rule (`invoices/money-in.ts`) moved the strip, Home and takings to the ledger, but `spent.sql.ts` kept `PAID_NON_ORDER_INVOICE` (`i.status = 'PAID'`, the whole total), and the Customers list's "has paid" and Insights' best customers reused it. PAID only means "the ledger covers the total".
+- **Fix:** `spentLedgerRowsSql` reads each payment that counts (`moneyInPaymentSql()`), net of credit notes latest payment first; Spent, the list's "has paid on an invoice", best customers' bills (payments received in the period) and "came back" (`paidOnInvoiceSql`) all read it. `PAID_NON_ORDER_INVOICE` is gone. `customer-spent.money-in.db.spec.ts` pins the list, Customer Detail and Insights to `readMoneyIn` for a part-paid bill, a bounced cheque on a paid bill and an order, plain and under RLS.
+- **Rule:** nothing works out money a customer paid from an invoice's status or total; it reads the ledger through `money-in.ts` / `spent.sql.ts`. `spent.sql.spec.ts` fails if Spent or the Customers list's people read `i.status = 'PAID'` (`backend-billing-and-classes.md` → Money in is one rule).
+
+### The live "today" read fanned out per service, per tab, uncached (review #4, #21; 20 Oct 2026)
+
+- **Symptom:** On today and the Timetable, polled `no-store` every 30 s by every open tab, worked each site's answer out from scratch: `publicDays` once per service for today, and again over 13 days for every service whenever nothing was free today (every evening, closed days, full days). About 12 queries a call, so 15 services and 50 tabs came to some 20,000 queries a minute for one site. The Live shop polled the whole catalogue (photos, prices, terms) for its "N left".
+- **Cause:** each read was written as the booking page's read, per service, and nothing was shared: not between services in one read (the zone, rules, closures and hours were read again for each), nor between visitors, whose answers are identical.
+- **Fix:** `LiveReadCache` (`common/live-read-cache.ts`): one answer per site kept 30 s, single-flight, bounded, never a failure, retired early when a start it names begins or the business's day turns. `publicDays` takes a per-read `once` (`onceReads()`) for the business's own reads. On today reads each service's window once (no second fan-out). A success says `public, max-age=0, s-maxage=<what is left of the 30 s>` and its CORS answer is `*` (`EDGE_KEPT_READ`), so a shared cache may keep it without serving one site's origin to another; a 404 or 429 stays `no-store`. Pages poll once a minute (`POLL_EVERY_MS`), a count shows for 75 s (`FRESH_FOR_MS`, longer than a poll plus its slowest read). The Live shop polls `GET /public/sites/:id/shop/stock`.
+- **What a visitor sees:** an answer at most 30 s old at the API, then up to a minute and a bit in the page. A time booked or a place taken in that window may still show as free until the next read, and booking it is refused honestly by the booking, which never reads the cache.
+- **Rule:** a public read every visitor polls is worked out once per site and shared (`LiveReadCache`), and its several services share the business's reads. `public-today.db.spec.ts` and `public-timetable.db.spec.ts` bound `publicDays` calls per read and per window; a new live read gets the same test.
+
+### A removed customer's name stayed on their done data request (review #19; 20 Oct 2026)
+
+- **Symptom:** after a privacy removal marked a customer's "Ask to remove my data" request DONE, Customers › Requests still named them, and the request kept their email for good.
+- **Cause:** the list fell back to `requesterName` when the contact was anonymised, and `markRequestsDoneInTx` left both requester fields as they were; `personal-data.ts` called them kept.
+- **Fix:** `markRequestsDoneInTx` clears `requesterName`; the "done" email handler clears `requesterEmail` once that email has gone (migration `20261221120000_data_request_email_cleared` makes it nullable, with a CHECK that only a DONE request may have none). The API names nobody on a DONE row and the list says "A removed customer". `personal-data.ts` marks both cleared.
+- **Rule:** a record kept after a removal keeps only what its purpose still needs, for as long as it needs it: say when each field goes in `personal-data.ts`.
+
+### A busy booking page told visitors a free time was fully booked (review #33; 20 Oct 2026)
+
+- **Symptom:** when several people booked at once, a visitor could be told "That time is fully booked." for a time that had room.
+- **Cause:** the site's reservation tried once more after a lost serializable race, with no wait; two losses in a row threw the race's message, "fully booked", though no try had seen the time full.
+- **Fix:** `reserve` takes `tries` (the site's is 3), 20 to 80 ms apart (`RACE_RETRY_WAIT_MS`), and `busy`, said when every try lost: "Lots of people are booking right now. Try again." A full time is still refused by the capacity check, with its own words.
+- **Rule:** a lost race is not an answer: retry with jitter, and when the tries run out say it is busy, never what no read saw.
+
+### Account specs had never run, and a refused form said nothing under the React Compiler (review #25; 20 Oct 2026)
+
+- **Symptom:** the first gate with `SITE_ACCOUNT_AREA=on` failed ten tests. Most were stale specs: an email matched twice on Your details (the emails card says it in a sentence), the Move sheet's first radio was a disabled day, the header's account link had gained "My account", and a DONE data request no longer names anyone (#19). One was a real bug: pressing Close request with no reason showed no "Say why you're closing it", though the jsdom test saw it.
+- **Cause:** the specs skipped themselves on every stack without the flag, so they drifted with the screens. The bug: the app builds with `reactCompiler: true`, and the shadcn `useFormField` read errors from the context's `formState`, which only updates when the form's owner re-renders into the field. The compiler memoizes a field whose JSX doesn't change, so after a refused submit React Hook Form held the error and nothing drew it. Vitest runs without the compiler, so the unit test passed.
+- **Fix:** `useFormField` (`packages/ui/src/components/ui/form.tsx`) subscribes to its own field with `useFormState({ name })`, as current shadcn does. The specs scope to the region they mean, pick a time by its name, and tell a done request apart by count.
+- **Rule:** a spec behind a flag runs on a stack with the flag, or it is not a test; a form's error state comes from a subscription the field owns, never from a parent re-render the compiler can skip. Only a production build (the e2e stack) shows compiler-only bugs.
+
+### Pay at the desk after a failed payment went back to choosing on a busy stack (21 Oct 2026)
+
+- **Symptom:** the gate's phone run of `public-booking.spec.ts` "pay now falls back to the desk" failed twice in a row: after the double tap on "Book it to pay at the desk" the hold was let go, but nothing was booked, no message showed and the page was back on choosing. It passed alone, with its file and with every booking spec at once; only the full suite's load hit it.
+- **Cause:** signing in sets the session cookie in a server action, so Next draws the page again in the action's answer, now with `?service=` in the address; `useTimes` loads that service's days again. The Book press is pressed meanwhile. When the days read reaches the database after the hold is written, the customer's own held time is no longer offered, and `chosenStart` (a chosen start _still offered_) falls to null. `leaveHold("desk")` booked `chosenStart`, so with none it quietly went back to choosing. Not from the money batch: `hold-actions.ts` was unchanged; the looks release's day picking only moved which time the test held.
+- **Fix:** the desk booking books the start the hold was made for (`times.start`, when it is the held booking's `startAt`), with its person, never the start the public list still offers. `booking-flow.test.tsx` draws the page again with `initialServiceId` while the hold stands and its days no longer offer the time.
+- **Rule:** what follows a hold (book it at the desk, pay it, let it go) reads the hold and the choice it was made from, never the public list of free times, which the hold itself empties. A spec that only fails under the full suite is a race to find in the trace's request order, not a flake to retry.
+
+### The waitlist claim link chose a class the list kept behind "Show more" (notices U18; 21 Oct 2026)
+
+- **Symptom:** the batch gate's `site-waitlist-claim.spec.ts` could not find the held class ("Held for you until …") on the booking page the claim link opens, though the summary already said "When: Fri 23 Oct at 11:00 am".
+- **Cause:** the class list shows the first `SESSIONS_SHOWN` (10) sessions and offers "Show more classes"; a session chosen by the address (`?service=&date=&start=`) two days out sat past the tenth, so it was chosen but not on the page. The unit flow test used a short list, and the spec had never run before the gate.
+- **Fix:** `sessionsOnShow` (`booking-flow/use-times.ts`) shows never fewer sessions than reach the chosen one; both booking layouts (`choose-steps.tsx`, `look-body.tsx`) use it; `sessions-on-show.test.ts`.
+- **Rule:** a choice made by the address is always on the page it was made on: a paged or collapsed list opens far enough to show what is chosen. A unit's browser spec is run before its unit is called done, not first in the batch gate.
+
+### "Bring in my details" put the same staff on the page twice, and a look's Preview palette was dropped without a word (DEC-182, DEC-172; 22 Oct 2026)
+
+- **Symptom:** a review asked for the DEC-182 db spec to run before the push; its second fill run filled again instead of finding nothing. With fewer staff than the sample's people, the first run filled the first places and the second started from the first member of staff again, so a team block showed the same people twice. Separately, Live's Preview drew in the gym's dark colours, not its board's.
+- **Cause:** `fillPerson` counted staff from the start on every run, never asking who the block already showed; the agent that wrote it couldn't run db specs (they reset a database, which Prisma refuses an agent without the owner's word), so the spec that would have shown it never ran. The palette: `presetSiteStyle` keeps a palette only when `parsePalette` passes, and the board's lime accent reads 1.10:1 as link text; the look-showcase tests checked the palette existed, not that it was kept.
+- **Fix:** `fill-details.ts` skips staff already on the block (unit test "finds nothing to fill the second time"); a test that every `LOOK_SHOWCASE_PALETTE` parses.
+- **Rule:** a fill or migration-like write is idempotent and its spec runs the same action twice; a db spec an agent couldn't run is run by the owner's consent before the unit is called done, not left to the gate. A style value that can be silently dropped is tested for being kept, not for being present.
+
+### The People drawer carried one owner's unsaved extras to the next person (organizations refactor audit; 22 Oct 2026)
+
+- **Symptom:** open an owner (with another owner in the business) in Settings › Team › People, tick an extra permission, press "Remove from {business}", Keep in the confirm, then Edit anyone else: their drawer showed the first owner's tick as an unsaved change.
+- **Cause:** `MemberDrawer` is one sheet that is never remounted between people. `close()` reset both drafts, the role and the extras (`useMemberExtras`), but the owner's Remove path reset only the role.
+- **Fix:** Remove resets the extras too (`team/member-drawer.tsx`); `team/member-drawer.test.tsx` ticks, removes, opens another person and checks nothing is ticked. Keying the drawer by person would also fix it but remounts the sheet on close and loses its closing animation.
+- **Rule:** a sheet that is reused for one record after another clears every draft it holds on each way out, not only on Close; a test opens it for a second record after each exit.
+
+### Nine trust-boundary gaps a whole-repo audit found (ponytail audit; 22 Oct 2026)
+
+- **Symptom:** a read-only audit, checked line by line against the code, found input from strangers or merchants reaching places it shouldn't: a sign-in `redirect=/\evil.example` (or `/<tab>/evil.example`) leaving Saroh; a public availability read for a century of slots; a merchant's email or WhatsApp relay `baseUrl` aimed at the API's own network; every sign-in behind Cloudflare and Traefik sharing one rate-limit bucket; a GitHub account with an unverified copy of someone's address linking to their account; a public enquiry rewriting a known customer's phone; an unproved domain claim holding a hostname for good; stored IP hashes a laptop can reverse; invitation tokens in request logs.
+- **Cause:** each check covered the case its author pictured: `//` but not the `\` and tab the browser rewrites into it; a range checked for order, not length; a relay field added for SendGrid bridges with no address rule; Better Auth's IP reader (which refuses a multi-address `X-Forwarded-For` without trusted proxies) never told our proxies; GitHub listed with Google as always-verified; "fill what was supplied" on a form anyone can send; a claim that never expires; sha256 over a four-billion-value space; new token routes not added to the redaction list.
+- **Fix:** `safeDestination` and `safeArrival` refuse `\`, tab, CR and LF; `parseRange` caps a read at `MAX_RANGE_DAYS`; `relayBase` sends a relay through the link-preview SSRF guard on connect and on every send; `trustedProxyRanges` hands Better Auth the proxies Express trusts; `trustedProviders` is Google only; an enquiry fills only empty contact fields; another org's unproved claim lapses after `CLAIM_LAPSE_DAYS`; `hashClientIp` is an HMAC with the server secret; the three invitation routes are in `TOKEN_PATHS`. Each has a test.
+- **Rule:** an address, range or hostname that comes from outside is checked against what the platform will do with it (the browser's URL parser, the proxy chain, DNS), not against the string as typed. A new public route with a secret in its path goes into `TOKEN_PATHS` in the same commit. A stored hash of a small value space is keyed.
+
+### A merchant webhook that hit a passing error was kept FAILED for good (money review; 22 Oct 2026)
+
+- **Symptom:** a refund.processed or a mandate event that met a lock timeout or a dropped connection stayed FAILED in the inbox; the provider's redelivery was answered "duplicate" and nothing applied it until staff replayed it by hand.
+- **Cause:** `WebhooksService.handle` committed the inbox row first, then on any reconcile error marked it FAILED and answered 200. The row's unique key then turned every redelivery into a no-op. A 5xx is no answer either: Razorpay and Cashfree switch a merchant's webhook off after enough failures, and only the business can switch it back on.
+- **Fix:** store, answer, then apply. The inbox row commits with a `webhook.process` job (12 tries, the queue's backoff). The request tries once; an unexpected error answers 200 `queued` and the job retries. A 4xx refusal (an illegal state move) or the job's last try keeps the row FAILED for replay. Only a row that could not be stored is a 5xx. Each try claims the RECEIVED row in its own transaction, so the request and the job never both apply it. `webhooks.service.spec.ts` ("stores, answers 200, then applies"), `webhooks.inbox.db.spec.ts`.
+- **Rule:** `backend-integrations.md` › Inboxes are idempotent: a merchant webhook is acknowledged once stored, and a passing error is retried from the inbox, never by the provider.
+
+### A second tab's payment on a paid order was counted, not owed back (money review; 22 Oct 2026)
+
+- **Symptom:** a customer with the order's pay page open in two tabs paid in both; the order showed paid once, but both payments counted as taken and nothing asked for a refund.
+- **Cause:** the pay page makes a fresh intent per tab. When the second capture arrived, `applySuccess` saw PAID → PAID as a no-op, took it for an edit's difference, and marked the intent SUCCEEDED with a CAPTURED attempt. Only superseded charges and the invoice path recorded money that arrived for something already settled.
+- **Fix:** under the order's lock, a capture on a paid order with nothing left to take (`dueCentsOf` ≤ 0) marks its intent SUPERSEDED and goes through `applySupersededSuccess`: CAPTURED_NEEDS_REFUND, invoiced, shown as owed back, never counted. A balance or a difference charge still has money due and settles as before. `webhooks.service.spec.ts` ("a second tab's payment on an order paid in full is owed back").
+- **Rule:** `backend-integrations.md` › Money that arrives for something already settled is kept, not lost: an order's too, decided by what is due, not by the intent's kind.
+
+### Cashfree refused every second payment on the same Order or Invoice (money review; 22 Oct 2026)
+
+- **Symptom:** on a Cashfree business, paying again after a failed try, paying an edit's difference or a balance link, or retrying after a create that timed out answered the customer with a 503 ("online payment is down").
+- **Cause:** `CashfreeProvider.createOrderIntent` sent the Order's or Invoice's id as `order_id`, which Cashfree requires to be unique, so the second order on one target was refused. Refunds and refund look-ups also posted to `/orders/<cf_order_id>/…`, while Cashfree's refund API takes the merchant `order_id`.
+- **Fix:** each intent sends `<target id>_<12 hex>` and keeps it as `providerIntentId`; refunds, refund look-ups, payment look-ups and the webhook's `providerIntentId` all use it. Intents made before (a numeric `cf_order_id`, no `_`) fall back to their Order's or Invoice's id, passed as `merchantRef` (`cashfreeOrderId`). `cashfree.provider.spec.ts` ("order ids (one per intent)"), `webhook-provider.spec.ts`.
+- **Rule:** `backend-integrations.md` › A provider order id Saroh chooses is unique per intent.
+
+### A Razorpay add-on could be put on a business's next charge twice (money review; 22 Oct 2026)
+
+- **Symptom:** found by reading, not seen live: an add-on charge whose Razorpay answer was lost (a timeout, a 5xx) or whose SENT mark failed would be posted again by the job's retry, and the business charged for it twice.
+- **Cause:** `billing.addons.sync` moves a row QUEUED → SENT only after `POST /subscriptions/:id/addons` answers. An UNKNOWN answer is rethrown and the row stays QUEUED, and Razorpay has no idempotency key for add-ons, so the retry made a second one.
+- **Fix:** `RazorpayBillingProvider.addToNextCharge` first reads the newest add-ons (`GET /addons`, as `findPlan` reads plans) for one on the same subscription whose description is `saroh_ref:<row id>`, and returns it without posting. The lookup decides, so no SENDING state was needed. `billing-provider.spec.ts` ("never adds an item twice").
+- **Rule:** `backend-jobs.md` › `billing.addons.sync`: a provider call with no idempotency key looks for its own reference before it creates.
+
+### A job could run twice when it waited behind a long one in the same batch (money review; 22 Oct 2026)
+
+- **Symptom:** found by reading: with two API containers (or two overlapping during a deploy), a job that sat late in a batch could be run by both, so a refund send, a charge or a notice could go out twice.
+- **Cause:** `claimDue` claims up to ten jobs under one `lockedAt`, and the worker runs them one by one. While the first ran past `JOB_VISIBILITY_MS` (5 min), the rest of the batch looked abandoned, and another worker reclaimed and ran them while this one still meant to.
+- **Fix:** before running each job the worker renews its lease (`JobQueue.renew`: `lockedAt = now` where it is still PROCESSING and `lockedBy` this worker) and skips it, with a WARN, when no row changes. `job-worker.service.spec.ts` ("skips a job of the batch whose lease another worker took"), `prisma-job-queue.db.spec.ts` ("renewing a claimed job's lease").
+- **Rule:** `backend-jobs.md` › Terminal writes are fenced on the lease: a claim that covers several jobs is renewed per job before it runs.
+
+### The looks' showcase changed and its db and browser specs never ran until the gate (DEC-182, DEC-172; 22 Oct 2026)
+
+- **Symptom:** the batch gate failed the starter-content db spec (it still copied Live's Gym) and 13 browser tests across the looks' specs; behind them were three real bugs: Folio's next-free sentence read "free on today", Folio's timetable Book link was 30px wide, and a phone's Brand sheet closed when starter content restarted the editor.
+- **Cause:** the showcase moved to Prana and the boards' changes landed through agents that ran unit tests only; the db spec and the looks' browser specs, which pin exactly these words and sizes, first ran in the gate. The unit test for the sentence had the same "on today" baked in.
+- **Fix:** `next-free-sentence.ts` says "on" only before a date; the Book link is `min-w-11`; the open sheet carries across an editor restart (`use-editor-layout.ts`); the specs read Prana and the boards' intended words.
+- **Rule:** a change to what a look or a template draws runs the browser specs that cover it (`pnpm prepush --e2e`) and its db specs before the unit is called done; a unit test's expected words are read as a customer would read them, not copied from the output.
+
+## A Next.js bump failed the local browser gate, and a bookings spec broke by the calendar date (23 Oct 2026)
+
+- **Symptom:** after Next.js 16.3.8 → 16.4.2 (two critical advisories), `prepush --all` failed to build saroh.app: "Can't resolve '@vercel/turbopack-next/internal/font/google/font'", 30 times. A fresh `next build` in the worktree passed. Separately, `bookings.spec.ts` "open extra hours on a closed stretch" failed on phone twice in a row, though it passed the day before.
+- **Cause:** not the bump. `next/font/google` downloads each font's CSS from Google at build time, and Turbopack fails ("next/font/google queries have exactly one entry") when Google answers in a shape it doesn't expect (vercel/next.js#99114). It comes and goes with Google's answer: the same tree failed on CI and passed locally an hour later. Clearing the gate worktree's `.next` on a new lockfile is kept as hygiene, but it was not the fix. The spec opened the phone's day without a person, and a seeded booking with no one on it, placed relative to today, put the Unassigned lane on that day instead of the test's diary.
+- **Fix:** the spec opens `&person=${person.id}`. The font failure needs the merchant-site fonts self-hosted (`next/font/local`) so no build depends on Google's answer; until then a failed build is re-run.
+- **Rule:** a spec that looks at one person's day on a phone names the person in the URL (as `bookings-day.spec.ts` does).

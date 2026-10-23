@@ -99,6 +99,7 @@ test("a QR code's short link counts the scan and opens the booking page", async 
         const headers = visitor(testInfo);
 
         // A scan: 302, an absolute Location on the address asked, the tag.
+        // The request fixture: signed out on purpose, a visitor's scan.
         const first = await request.get(short, { maxRedirects: 0, headers });
         expect(first.status()).toBe(302);
         const location = first.headers().location;
@@ -111,6 +112,7 @@ test("a QR code's short link counts the scan and opens the booking page", async 
         await expect
             .poll(async () => (await mine(made.id))?.scans.total)
             .toBe(1);
+        // The request fixture: signed out on purpose, a visitor's scan.
         const second = await request.get(short, { maxRedirects: 0, headers });
         expect(second.status()).toBe(302);
         await expect
@@ -118,6 +120,7 @@ test("a QR code's short link counts the scan and opens the booking page", async 
             .toEqual({ total: 2, last7Days: 2 });
 
         // Asking only for the headers forwards the same way, uncounted.
+        // The request fixture: signed out on purpose, a visitor's scan.
         const head = await request.head(short, { maxRedirects: 0, headers });
         expect(head.status()).toBe(302);
         expect(head.headers().location).toBe(location);
@@ -125,6 +128,7 @@ test("a QR code's short link counts the scan and opens the booking page", async 
 
         // A code the site doesn't have still reaches the business: its
         // home page, untagged, never a bare "Not found".
+        // The request fixture: signed out on purpose, a visitor's scan.
         const unknown = await request.get(`${LIVE}/q/zzzzzz`, {
             maxRedirects: 0,
             headers,
@@ -144,6 +148,7 @@ test("a QR code's short link counts the scan and opens the booking page", async 
         const total = (await mine(made.id))?.scans.total ?? 0;
         const retired = await nw.post<QrCode>(`${codes}/${made.id}/retire`);
         expect(retired.retired).toBe(true);
+        // The request fixture: signed out on purpose, a visitor's scan.
         const after = await request.get(short, { maxRedirects: 0, headers });
         expect(after.status()).toBe(302);
         expect(after.headers().location).toBe(`${LIVE}/`);
@@ -237,7 +242,7 @@ test("a booking made on the page a scan opened is counted on the code", async ({
         await time.click();
         await expect(time).toHaveAttribute("aria-checked", "true");
 
-        // The steps never leave the address the scan opened.
+        // The steps stay on the page the scan opened, its tag kept.
         await phone.getByRole("radio", { name: /Pay at the desk/ }).click();
         await phone
             .getByRole("button", { name: "Continue to sign in" })
@@ -249,7 +254,12 @@ test("a booking made on the page a scan opened is counted on the code", async ({
         await expect(
             phone.getByRole("heading", { name: "You're booked, Asha." }),
         ).toBeVisible({ timeout: 15_000 });
-        await expect(phone).toHaveURL(`${LIVE}/book?src=qr-${made.code}`);
+        // The steps move in the address (U9), and the scan's tag stays on
+        // it through every one of them.
+        const landed = new URL(phone.url());
+        expect(landed.pathname).toBe("/book");
+        expect(landed.searchParams.get("src")).toBe(`qr-${made.code}`);
+        expect(landed.searchParams.get("step")).toBe("done");
 
         // The tag was the address's alone: the site kept nothing of it.
         const kept = await phone.evaluate(() =>

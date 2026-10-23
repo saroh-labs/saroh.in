@@ -56,6 +56,30 @@ export function trustedProxies(mode: TrustProxyMode): string[] | false {
     }
 }
 
+/** {@link PRIVATE} as address ranges, for code that can't read Express's names. */
+const PRIVATE_RANGES = [
+    "127.0.0.0/8",
+    "::1/128",
+    "169.254.0.0/16",
+    "fe80::/10",
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+    "fc00::/7",
+];
+
+/**
+ * The same proxies as address ranges, for Better Auth's sign-in rate limit,
+ * which reads `X-Forwarded-For` itself. Without them it refuses a list of
+ * more than one address, and behind Cloudflare and Traefik every request
+ * has one, so every sign-in would share one bucket.
+ */
+export function trustedProxyRanges(mode: string | undefined): string[] {
+    if (mode === "cloudflare") return [...PRIVATE_RANGES, ...CLOUDFLARE_RANGES];
+    if (mode === "private") return PRIVATE_RANGES;
+    return [];
+}
+
 /**
  * Trust proxies by address, not by count, on the Express instance under Nest
  * — what `@Ip()` and every rate limiter keyed on it see. Express walks

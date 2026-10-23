@@ -12,22 +12,54 @@ import { resolveCapabilities } from "../organizations/organization-policy";
 import { cleanBusinessName } from "../site-accounts/sender-name";
 import type { AlertEvent } from "./alert-preferences";
 import { alertOn, mayHearAbout } from "./alert-preferences";
+import { wordAsk } from "./ask-alerts";
+import { wordBookingMine } from "./booking-mine-alerts";
+import { wordDataRequest } from "./data-request-alerts";
 import { wordDomain } from "./domain-alerts";
+import { wordMember } from "./member-alerts";
+import {
+    hasMismatch,
+    wordOrderPaidByLink,
+    wordOrderPaymentFailed,
+    wordPaymentMismatch,
+} from "./money-alerts";
 import { noticeHeadOf, noticeOf } from "./notice-target";
 import { wordProvider } from "./provider-alerts";
+import { wordRefund } from "./refund-alerts";
 import { wordReview } from "./review-alerts";
 import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
 import { TEAM_ALERT_TYPE } from "./team-alerts";
 import { putOffUntilDue, wordUncollected } from "./uncollected-alert";
+import { wordWebhook } from "./webhook-alerts";
 
+export { DATA_REQUEST_NOTIFICATION_TYPE } from "./data-request-alerts";
 export {
     DOMAIN_BACK_NOTIFICATION_TYPE,
     DOMAIN_DOWN_NOTIFICATION_TYPE,
 } from "./domain-alerts";
 export {
+    MEMBER_AUTOPAY_OFF_NOTIFICATION_TYPE,
+    MEMBER_CANCELLED_NOTIFICATION_TYPE,
+    MEMBER_PAUSED_NOTIFICATION_TYPE,
+} from "./member-alerts";
+export {
+    INVOICE_PAYMENT_MISMATCH_NOTIFICATION_TYPE,
+    ORDER_PAID_BY_LINK_NOTIFICATION_TYPE,
+    ORDER_PAYMENT_FAILED_NOTIFICATION_TYPE,
+    PAYMENT_MISMATCH_NOTIFICATION_TYPE,
+} from "./money-alerts";
+export {
     PROVIDER_ATTENTION_NOTIFICATION_TYPE,
     PROVIDER_BACK_NOTIFICATION_TYPE,
 } from "./provider-alerts";
+export {
+    REFUND_FAILED_BOOKING_NOTIFICATION_TYPE,
+    REFUND_FAILED_INVOICE_NOTIFICATION_TYPE,
+    REFUND_FAILED_NOTIFICATION_TYPE,
+    REFUND_REFUSED_BOOKING_NOTIFICATION_TYPE,
+    REFUND_REFUSED_INVOICE_NOTIFICATION_TYPE,
+    REFUND_REFUSED_NOTIFICATION_TYPE,
+} from "./refund-alerts";
 export { TEAM_ALERT_TYPE } from "./team-alerts";
 export { ORDER_UNCOLLECTED_NOTIFICATION_TYPE } from "./uncollected-alert";
 
@@ -49,6 +81,9 @@ const ROW_LABEL: Record<AlertEvent, string> = {
     failed: "Payment failed",
     team: "Someone joins the team",
     site: "Your website",
+    request: "Data removal requests",
+    mine: "Bookings with you",
+    member: "Members",
 };
 
 const BUILT_IN_LABEL: Partial<Record<string, string>> = {
@@ -78,11 +113,14 @@ export interface AlertEmail {
 /**
  * Consumer for `team.alert` (round-2 F14): tells the business's team about
  * a new order, a booking the customer made, moved or cancelled, a failed
- * payment, someone joining, a scheduled go-live of the website that ran
+ * payment (an invoice's or, #1139, an order's), money captured at the wrong
+ * amount, a team-made order paid by its link, someone joining, a scheduled go-live of the website that ran
  * (DEC-071, T10), a website order to pay on handover nobody came for in
  * three days (R34, on the New order row), or a live custom domain that
  * stopped reaching the site and came back (#917, on the Your website
- * row), as each person chose in Settings › Your profile.
+ * row), as each person chose in Settings › Your profile; and a permission
+ * request and its answer (DEC-170, `ask-alerts.ts`), to exactly the people
+ * it names, whatever they chose.
  *
  * On one transaction, in the business's RLS context:
  *  1. What it is about is read again now, and worded. Something that no
@@ -175,6 +213,8 @@ export async function tellTeam(
         const notification = await tx.notification.create({
             data: {
                 organizationId,
+                // One person's own alert (#1138), or the business's.
+                ...(alert.forUserId ? { userId: alert.forUserId } : {}),
                 // The type with what it opens; throws for a notice that
                 // would open nothing.
                 ...noticeHeadOf(alert),
@@ -207,6 +247,12 @@ async function whoToEmail(
     if (alert.emailReviewersOf) {
         return reviewersToEmail(tx, organizationId, alert);
     }
+    if (alert.emailUserIds) {
+        return namedToEmail(tx, organizationId, alert, alert.emailUserIds);
+    }
+    const event = alert.event;
+    // A request has no row to choose from: it names who is emailed.
+    if (event === "ask") return [];
     const [members, roles, choices, org] = await Promise.all([
         tx.membership.findMany({
             where: { organizationId },
@@ -222,7 +268,7 @@ async function whoToEmail(
             select: { key: true, actions: true },
         }),
         tx.notificationPreference.findMany({
-            where: { organizationId, event: alert.event, channel: "email" },
+            where: { organizationId, event, channel: "email" },
             select: {
                 userId: true,
                 event: true,
@@ -239,12 +285,14 @@ async function whoToEmail(
     const recipients = members.filter((m) => {
         if (!m.user.email.trim()) return false;
         if (m.userId === alert.skipUserId) return false;
+        // A personal alert (#1138) is emailed to its one person alone.
+        if (alert.forUserId && m.userId !== alert.forUserId) return false;
         if (m.userId === alert.alwaysUserId) return true;
         const actions = resolveCapabilities(
             m.role,
             roles.find((r) => r.key === m.role)?.actions ?? null,
         );
-        if (!mayHearAbout(alert.event, (a) => actions.has(a), m.role)) {
+        if (!mayHearAbout(event, (a) => actions.has(a), m.role)) {
             return false;
         }
         const own = choices.filter((c) => c.userId === m.userId);
@@ -257,7 +305,7 @@ async function whoToEmail(
         ) {
             return true;
         }
-        return alertOn(own, alert.event, "email");
+        return alertOn(own, event, "email");
     });
     if (recipients.length === 0) return [];
 
@@ -317,12 +365,47 @@ async function reviewersToEmail(
 }
 
 /**
+ * Exactly the people an alert names (DEC-170: a request's approvers, an
+ * answer's asker), still on the team, with an email, never `skipUserId`.
+ * Their alert choices aren't asked: being asked, or having asked, is it.
+ */
+async function namedToEmail(
+    tx: Tx,
+    organizationId: string,
+    alert: WordedAlert,
+    userIds: readonly string[],
+): Promise<AlertEmail[]> {
+    if (userIds.length === 0) return [];
+    const [members, org] = await Promise.all([
+        tx.membership.findMany({
+            where: { organizationId, userId: { in: [...userIds] } },
+            select: { userId: true, user: { select: { email: true } } },
+            orderBy: { userId: "asc" },
+        }),
+        tx.organization.findUnique({
+            where: { id: organizationId },
+            select: { name: true },
+        }),
+    ]);
+    const recipients = members.filter(
+        (m) => m.user.email.trim() && m.userId !== alert.skipUserId,
+    );
+    if (recipients.length === 0) return [];
+    const mail = renderAlertEmail(alert, cleanName(org?.name, "Your business"));
+    return recipients.map((m) => ({
+        userId: m.userId,
+        to: m.user.email.trim(),
+        mail,
+    }));
+}
+
+/**
  * The email: the alert's email words (fixed, with the business's cleaned
  * names), a link, and why they got it. `business` is already cleaned.
  */
 export function renderAlertEmail(
     alert: Pick<WordedAlert, "event" | "mail" | "path"> &
-        Partial<Pick<WordedAlert, "cta" | "emailReviewersOf">>,
+        Partial<Pick<WordedAlert, "cta" | "emailReviewersOf" | "footer">>,
     business: string,
 ): TeamAlertMail {
     return {
@@ -331,10 +414,24 @@ export function renderAlertEmail(
         body: alert.mail.body,
         url: alert.path ? `${appBase()}${alert.path}` : null,
         ...(alert.cta ? { cta: alert.cta } : {}),
-        footer: alert.emailReviewersOf
-            ? `You get this because you review the website of ${business} in Saroh.`
-            : `You get this because email is on for “${ROW_LABEL[alert.event]}” in your alerts at ${business}. You can change it in Saroh, in Settings under Your profile.`,
+        footer: footerOf(alert, business),
     };
+}
+
+/** Why they got it: the alert's own words, a site's review, or a row's choice. */
+function footerOf(
+    alert: Pick<WordedAlert, "event"> &
+        Partial<Pick<WordedAlert, "emailReviewersOf" | "footer">>,
+    business: string,
+): string {
+    if (alert.footer) return alert.footer.replaceAll("{business}", business);
+    if (alert.emailReviewersOf) {
+        return `You get this because you review the website of ${business} in Saroh.`;
+    }
+    if (alert.event === "ask") {
+        return `You get this because you are on the team at ${business}.`;
+    }
+    return `You get this because email is on for “${ROW_LABEL[alert.event]}” in your alerts at ${business}. You can change it in Saroh, in Settings under Your profile.`;
 }
 
 /** What the alert is about, read now and worded; null when it no longer stands. */
@@ -349,6 +446,14 @@ export async function wordAlert(
             return wordOrder(tx, organizationId, payload);
         case "failed":
             return wordFailed(tx, organizationId, payload);
+        case "order-failed":
+            return wordOrderPaymentFailed(tx, organizationId, payload);
+        case "mismatch":
+            return wordPaymentMismatch(tx, organizationId, payload);
+        case "paid-by-link":
+            return wordOrderPaidByLink(tx, organizationId, payload);
+        case "refund":
+            return wordRefund(tx, organizationId, payload);
         case "team":
             return wordJoined(tx, organizationId, payload);
         case "booking":
@@ -363,6 +468,16 @@ export async function wordAlert(
             return wordReview(tx, organizationId, payload);
         case "domain":
             return wordDomain(tx, organizationId, payload);
+        case "webhook":
+            return wordWebhook(tx, organizationId, payload);
+        case "ask":
+            return wordAsk(tx, organizationId, payload);
+        case "request":
+            return wordDataRequest(tx, organizationId, payload);
+        case "booking-mine":
+            return wordBookingMine(tx, organizationId, payload);
+        case "member":
+            return wordMember(tx, organizationId, payload);
     }
 }
 
@@ -448,9 +563,19 @@ async function wordFailed(
             },
         }),
     ]);
-    // Paid since, or gone: nothing failed that still matters.
+    // Paid since (online, or in cash before this ran), voided, credited in
+    // full, or gone: nothing failed that still matters.
     if (intent?.status !== "FAILED" || !invoice) return null;
-    if (invoice.status === "PAID" || invoice.status === "VOID") return null;
+    if (
+        invoice.status === "PAID" ||
+        invoice.status === "VOID" ||
+        invoice.status === "CREDITED"
+    ) {
+        return null;
+    }
+    // Taken at the wrong amount (PAY-06): the mismatch alert says so, with
+    // both figures, rather than "didn't go through".
+    if (await hasMismatch(tx, p.paymentIntentId)) return null;
     const contact = [invoice.contact?.firstName, invoice.contact?.lastName]
         .filter(Boolean)
         .join(" ")
@@ -470,12 +595,12 @@ async function wordFailed(
         // An autopay charge (D13) has no link they tried: the merchant retries.
         body: intent.viaMandateId
             ? `${who}'s autopay charge of ${amount} didn't go through. Try it again, or send them a pay link.`
-            : `${who}'s payment of ${amount} didn't go through. They can try again from the same link.`,
+            : `${who}'s payment of ${amount} didn't go through. They'll need a new link: open the invoice to share one.`,
         mail: {
             heading: `Payment failed on invoice ${invoice.number ?? "(draft)"}`,
             body: intent.viaMandateId
                 ? `An autopay charge of ${amount} didn't go through. Try it again, or send the customer a pay link.`
-                : `A payment of ${amount} didn't go through. The customer can try again from the same link.`,
+                : `A payment of ${amount} didn't go through. The customer will need a new link: open the invoice to share one.`,
         },
         path: `/billing/invoices/${invoice.id}`,
         skipUserId: null,
@@ -640,6 +765,41 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
             return str("notificationId") ? (p as TeamAlertPayload) : null;
         case "uncollected":
             return str("orderId") ? (p as TeamAlertPayload) : null;
+        case "order-failed":
+        case "paid-by-link":
+            return str("orderId") && str("paymentIntentId")
+                ? (p as TeamAlertPayload)
+                : null;
+        case "mismatch":
+            return str("paymentIntentId") && str("attemptId")
+                ? (p as TeamAlertPayload)
+                : null;
+        case "refund":
+            return str("refundId") &&
+                (p.change === "failed" || p.change === "refused")
+                ? (p as TeamAlertPayload)
+                : null;
+        case "request":
+            return str("requestId") ? (p as TeamAlertPayload) : null;
+        case "webhook":
+            return str("webhookEventId") ? (p as TeamAlertPayload) : null;
+        case "member":
+            return str("subscriptionId") &&
+                (((p.change === "cancelled" || p.change === "paused") &&
+                    str("eventId")) ||
+                    (p.change === "autopay_off" && str("mandateId")))
+                ? (p as TeamAlertPayload)
+                : null;
+        case "booking-mine":
+            return str("bookingId") &&
+                str("eventId") &&
+                str("userId") &&
+                (p.change === "new" ||
+                    p.change === "moved" ||
+                    p.change === "moved-away" ||
+                    p.change === "cancelled")
+                ? (p as TeamAlertPayload)
+                : null;
         case "provider":
             return str("providerId") &&
                 str("since") &&
@@ -659,6 +819,13 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
             return str("domainId") &&
                 str("at") &&
                 (p.change === "down" || p.change === "back")
+                ? (p as TeamAlertPayload)
+                : null;
+        case "ask":
+            return p.about === "rules" &&
+                str("requestId") &&
+                str("notificationId") &&
+                (p.step === "asked" || p.step === "answered")
                 ? (p as TeamAlertPayload)
                 : null;
         case "site":

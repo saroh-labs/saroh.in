@@ -3,7 +3,8 @@
 import { unstable_rethrow } from "next/navigation";
 
 import type { ApiResult } from "@/lib/api/failure";
-import { addStock } from "@/lib/stock/service";
+import { addStock, getWaitingCount } from "@/lib/stock/service";
+import type { WaitingCount } from "@/lib/stock/waiting";
 
 import type { CatalogueFilter, CataloguePage } from "./service";
 import { duplicateProduct, listCataloguePage } from "./service";
@@ -51,4 +52,14 @@ export async function duplicateListedProduct(
     storeId: string | null,
 ) {
     return duplicateProduct(productId, storeId);
+}
+
+/**
+ * How many customers wait for it to be back (DEC-174, U24), for the quick
+ * look's Stock line. Null when it can't be said: the line is left out.
+ */
+export async function loadWaitingCount(
+    productId: string,
+): Promise<WaitingCount | null> {
+    return getWaitingCount(productId);
 }

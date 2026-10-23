@@ -9,7 +9,6 @@ import { FALLBACK_TIMEZONE } from "../bookings/staff-availability";
 import type { MeterDb, MeteredLimitKey } from "./metering";
 import {
     bytesToGb,
-    countedSarohEmails,
     countSeats,
     loginlessStaff,
     monthFirstDay,
@@ -132,8 +131,7 @@ export async function countUsageAcross(
                 "organizationId",
             );
         case "ordersPerMonth":
-        case "bookingsPerMonth":
-        case "sarohEmailsPerMonth": {
+        case "bookingsPerMonth": {
             const zones = await zonesOf(db, ids);
             const byZone = new Map<string, string[]>();
             for (const [org, zone] of zones) {
@@ -142,21 +140,6 @@ export async function countUsageAcross(
             const out = new Map<string, number>();
             for (const [zone, orgs] of byZone) {
                 const { start } = monthWindow(now, zone);
-                if (key === "sarohEmailsPerMonth") {
-                    tally(
-                        await db.delivery.groupBy({
-                            by: ["organizationId"],
-                            where: {
-                                organizationId: { in: orgs },
-                                ...countedSarohEmails(start),
-                            },
-                            _count: { _all: true },
-                        }),
-                        "organizationId",
-                        out,
-                    );
-                    continue;
-                }
                 if (key === "bookingsPerMonth") {
                     tally(
                         await db.booking.groupBy({

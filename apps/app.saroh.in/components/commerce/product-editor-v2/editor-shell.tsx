@@ -6,6 +6,7 @@ import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { planLabel } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
+import { useEdgeFade } from "@saroh/ui/scroll-x";
 import type { ToastId } from "@saroh/ui/toast";
 import { dismissToast, showErrorToast, showSuccess } from "@saroh/ui/toast";
 import { ChevronLeft } from "lucide-react";
@@ -14,7 +15,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
-import { useLeaveGuard } from "@/components/shared/use-leave-guard";
+import { useLeaveGuard } from "@/components/shared/forms/use-leave-guard";
 import { pausedWords, PLAN_AND_BILLING_HREF } from "@/lib/billing/paused";
 import { createProduct } from "@/lib/products/actions";
 import { readOnlyBanner, sectionJumps } from "@/lib/products/editor-labels";
@@ -38,7 +39,8 @@ import { effectiveDefaults } from "@/lib/products/settings-actions";
 import { trackingControl } from "@/lib/products/tracking";
 
 import { PlanWay } from "@/components/billing/plan-way";
-import { StatusBadge } from "@/components/shared/status-badge";
+import { VariantsSection } from "@/components/commerce/product-variants/variants-section";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { UNREACHED } from "@/lib/api/unreached";
 import { TextLink } from "@saroh/ui/text-link";
 import { BasicsSection } from "./basics-section";
@@ -50,7 +52,6 @@ import { ProductEditorProvider, useEditor } from "./editor-state";
 import { MadeBySection } from "./made-by-section";
 import { PhotosSection } from "./photos-section";
 import { StockSection } from "./stock-section";
-import { VariantsSection } from "./variants-section";
 import { VisibilitySection } from "./visibility-section";
 
 export interface ProductEditorProps {
@@ -182,6 +183,10 @@ function EditorBody({
     // take it for the fields the merchant hasn't touched.
     const [defaults, setDefaults] = useState(initialDefaults);
     const categoryAsked = useRef("");
+    // The section links are one row on a phone that scrolls sideways: it
+    // fades the side with more, as the Settings strip does (UX-079).
+    const jumpStrip = useRef<HTMLElement>(null);
+    const jumpFade = useEdgeFade(jumpStrip);
 
     async function categoryChanged(categoryId: string) {
         if (!creating) return;
@@ -385,7 +390,10 @@ function EditorBody({
                 ) : null}
 
                 <nav
+                    ref={jumpStrip}
                     aria-label="Sections"
+                    data-scroll-x=""
+                    style={jumpFade}
                     className="flex flex-wrap gap-1 border-b border-border px-4 py-2 max-desk:flex-nowrap max-desk:overflow-x-auto"
                 >
                     {jumps.map((k) => (

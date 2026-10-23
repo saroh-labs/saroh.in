@@ -68,6 +68,15 @@ function draw(over: Partial<PlansData> = {}) {
     return render(<PlansShell data={data(over)} impact={null} tab="offers" />);
 }
 
+/** What the draft changes, as Review and publish lists it. */
+function changeWords(): string[] {
+    fireEvent.click(screen.getByRole("button", { name: "Review and publish" }));
+    const list = screen.getByRole("region", { name: "Changes in this draft" });
+    return Array.from(list.querySelectorAll("[data-change]")).map(
+        (el) => el.textContent,
+    );
+}
+
 async function confirmWithReason(submit: string) {
     const dialog = screen.getByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText(/Reason/), {
@@ -100,16 +109,16 @@ describe("the Offers tab", () => {
         fireEvent.click(
             screen.getByRole("checkbox", { name: "Yearly billing" }),
         );
-        expect(screen.getByText("Draft · 1 change")).toBeTruthy();
-        expect(
-            screen.getByText(/Yearly billing on: pay for 10 months, get 12/),
-        ).toBeTruthy();
+        expect(screen.getByText("1 change, not live yet.")).toBeTruthy();
         await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS));
         expect(actions.savePricingDraftAction).toHaveBeenCalledTimes(1);
         const sent = actions.savePricingDraftAction.mock.calls[0]?.[0] as {
             catalog: { yearly: unknown };
         };
         expect(sent.catalog.yearly).toEqual({ on: true, paid: 10 });
+        expect(changeWords()).toEqual([
+            "Yearly billing on: pay for 10 months, get 12",
+        ]);
     });
 
     it("sets how many charges one autopay covers as a draft change (DEC-161)", async () => {
@@ -123,14 +132,14 @@ describe("the Offers tab", () => {
         fireEvent.focus(field);
         fireEvent.change(field, { target: { value: "60" } });
         fireEvent.blur(field);
-        expect(
-            screen.getByText("One autopay covers 12 → 60 monthly charges"),
-        ).toBeTruthy();
         await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS));
         const sent = actions.savePricingDraftAction.mock.calls[0]?.[0] as {
             catalog: { autopay: unknown };
         };
         expect(sent.catalog.autopay).toEqual({ charges: 60 });
+        expect(changeWords()).toEqual([
+            "One autopay covers 12 → 60 monthly charges",
+        ]);
     });
 
     it("keeps the autopay count within what Razorpay takes", () => {
@@ -154,13 +163,12 @@ describe("the Offers tab", () => {
         fireEvent.focus(field);
         fireEvent.change(field, { target: { value: "13" } });
         // Not taken while it's out of range…
-        expect(screen.queryByText(/^Draft ·/)).toBeNull();
+        expect(screen.queryByRole("region", { name: "Draft" })).toBeNull();
         fireEvent.blur(field);
         // …and clamped when the operator moves on.
         expect((field as HTMLInputElement).value).toBe("12");
-        expect(
-            screen.getByText(/Yearly billing: pay for 10 → 12 months|Draft ·/),
-        ).toBeTruthy();
+        // Taken into the draft (yearly is off, so the log has no line yet).
+        expect(screen.getByRole("region", { name: "Draft" })).toBeTruthy();
     });
 
     it("offers trials only on plans that cost something", () => {
@@ -199,10 +207,6 @@ describe("the Offers tab", () => {
         expect(
             within(panel).getByText("On Plan B and Plan C, up to 4 a business"),
         ).toBeTruthy();
-        expect(
-            screen.getByText(/New add-on: Extra products on Plan B and Plan C/),
-        ).toBeTruthy();
-
         await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS));
         const sent = () =>
             (
@@ -221,6 +225,7 @@ describe("the Offers tab", () => {
         await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS));
         expect(sent()).not.toHaveProperty("plans");
         expect(sent()).not.toHaveProperty("max");
+        expect(changeWords()).toContain("New add-on: Extra products");
     });
 
     it("warns where two add-ons for the same thing share a plan", () => {

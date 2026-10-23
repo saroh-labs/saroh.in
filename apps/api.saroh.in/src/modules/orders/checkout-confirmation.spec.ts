@@ -70,7 +70,27 @@ describe("confirmationView (P4)", () => {
             },
             refunded: false,
             toPay: null,
+            paidOnline: true,
         });
+    });
+
+    it("says it was paid online only for a checkout paid there, not refunded (DEC-181)", () => {
+        expect(
+            confirmationView(row({ paymentStatus: "PAID" })).paidOnline,
+        ).toBe(true);
+        expect(
+            confirmationView(row({ paymentStatus: "REFUNDED" })).paidOnline,
+        ).toBe(false);
+        expect(
+            confirmationView(
+                row({ payOnHandover: true, paymentStatus: "PAID" }),
+            ).paidOnline,
+        ).toBe(false);
+        expect(
+            confirmationView(
+                row({ payOnHandover: true, paymentStatus: "UNPAID" }),
+            ).paidOnline,
+        ).toBe(false);
     });
 
     it("says what is still to pay on an order paid at the handover", () => {

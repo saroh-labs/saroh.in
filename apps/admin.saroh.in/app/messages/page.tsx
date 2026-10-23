@@ -45,7 +45,7 @@ export default async function MessagesPage({
         <AdminShell staff={staff}>
             <PageContainer>
                 <PageHeader
-                    breadcrumb={["Instance", "Messages"]}
+                    breadcrumb={["Help customers", "Messages"]}
                     title="Messages"
                     description="What people wrote from saroh.in/contact. Reply from the team's mailbox. Each is deleted 12 months after it arrived."
                 />

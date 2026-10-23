@@ -1,4 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
+import { isPrivateSitePath } from "@saroh/block-contract";
+
+import { isVisitSource, visitRefOf } from "./visit-source";
 
 /**
  * Versioned analytics event contract (S7-002).
@@ -20,9 +23,6 @@ export const ANALYTICS_RETENTION_DAYS = 400;
 
 /** Max length for a free-form path/URL-ish string property. */
 const MAX_PATH_LEN = 2048;
-/** Max length for a short text property (title, etc.). */
-const MAX_TEXT_LEN = 1024;
-
 /** A pure validator: given raw props, return the normalized props or throw. */
 export type EventValidator = (
     props: Record<string, unknown>,
@@ -97,20 +97,57 @@ function requireNumber(props: Record<string, unknown>, field: string): number {
 }
 
 /**
+ * A page's path as it may be kept: cut at the query and the fragment (a
+ * pay link's token or a test release's key travels there), `/` when that
+ * leaves nothing.
+ */
+export function sitePathOnly(path: string): string {
+    return path.split(/[?#]/)[0] || "/";
+}
+
+/**
+ * A referrer as it may be kept: its origin (`https://l.instagram.com`),
+ * never the address it was on. Undefined when it isn't an http(s) address.
+ */
+export function referrerOriginOf(referrer: string): string | undefined {
+    try {
+        const url = new URL(referrer);
+        if (url.protocol !== "http:" && url.protocol !== "https:") {
+            return undefined;
+        }
+        return url.origin;
+    } catch {
+        return undefined;
+    }
+}
+
+/**
  * The `site.view` contract (v1): a page view on a published site.
- * `path` is required (≤2048); `referrer` and `title` are optional.
+ *
+ * The site's beacon already sends only this (`apps/saroh.app/lib/
+ * site-view.ts`); the server holds the same promises, so a forged or older
+ * beacon can't break them (U15 privacy review):
+ *
+ * - `path` is required (≤2048) and kept only up to its `?` or `#`;
+ * - a path under one of the private pages (`PRIVATE_PATH_PREFIXES`, one
+ *   list with the site, from `@saroh/block-contract`) is refused: those
+ *   paths name one customer's order, booking or token;
+ * - `referrer` is kept as its origin only, or dropped;
+ * - `title` is never kept (a page's title can name an order or a person).
  */
 const siteViewV1: EventValidator = (props) => {
-    const out: Record<string, unknown> = {
-        path: requireString(props, "path", MAX_PATH_LEN),
-    };
-    const referrer = optionalString(props, "referrer", MAX_PATH_LEN);
-    if (referrer !== undefined) {
-        out.referrer = referrer;
+    const path = sitePathOnly(requireString(props, "path", MAX_PATH_LEN));
+    if (isPrivateSitePath(path)) {
+        throw new BadRequestException(
+            `"path" is a private page; its views are not counted`,
+        );
     }
-    const title = optionalString(props, "title", MAX_TEXT_LEN);
-    if (title !== undefined) {
-        out.title = title;
+    const out: Record<string, unknown> = { path };
+    const referrer = optionalString(props, "referrer", MAX_PATH_LEN);
+    const origin =
+        referrer !== undefined ? referrerOriginOf(referrer) : undefined;
+    if (origin !== undefined) {
+        out.referrer = origin;
     }
     return out;
 };
@@ -120,6 +157,45 @@ const enquirySubmittedV1: EventValidator = (props) => ({
     formId: requireString(props, "formId", 128),
     leadId: requireString(props, "leadId", 128),
 });
+
+/**
+ * Where a visit came from (U15, #1099): one of the five groups, required,
+ * and the merchant's own link label, optional. A group that isn't one of
+ * the five, or a label that isn't the allowed shape (`visit-source.ts`), is
+ * refused: nothing else from the visitor's address may be stored.
+ */
+function visitOriginProps(
+    props: Record<string, unknown>,
+): Record<string, unknown> {
+    const source = props.source;
+    if (!isVisitSource(source)) {
+        throw new BadRequestException(`"source" must be a known source`);
+    }
+    const out: Record<string, unknown> = { source };
+    if (props.ref !== undefined && props.ref !== null) {
+        const ref = visitRefOf(props.ref);
+        if (ref === null) {
+            throw new BadRequestException(`"ref" is not an allowed label`);
+        }
+        out.ref = ref;
+    }
+    return out;
+}
+
+/**
+ * The four steps of a visit (U15; `site.paid` since DEC-181), each sent at
+ * most once per visit by the site's own beacon and carrying only where the
+ * visit came from: no path, no product, no order, no amount, no visitor
+ * (`AnalyticsService.ingestPublic` stores no visitor hash for them).
+ *
+ * - `site.visit`: a visit began (its first page on the site);
+ * - `site.looked`: it opened a product or the booking page;
+ * - `site.started`: it opened the checkout;
+ * - `site.paid`: its own confirmation page showed a successful online
+ *   payment (DEC-181: paid is counted from the visit, never from the
+ *   order, so nothing about a visit is kept on an order).
+ */
+const visitStepV1: EventValidator = (props) => visitOriginProps(props);
 
 /** The `order.paid` contract (v1): an org-internal commerce event. */
 const orderPaidV1: EventValidator = (props) => ({
@@ -288,12 +364,37 @@ export const ORDER_PAID_TYPE = "order.paid";
 export const ORDER_REFUNDED_TYPE = "order.refunded";
 
 /**
- * The set of event types a public visitor may ingest. Only `site.view` is
- * publicly ingestable — org-internal types (`enquiry.submitted`, `order.paid`,
- * `order.refunded`) are produced server-side and MUST be rejected on the public endpoint.
+ * A visit's steps (U15): began, looked, started and, since DEC-181, paid.
+ * Public, from the site.
+ */
+export const SITE_VISIT_TYPE = "site.visit";
+export const SITE_LOOKED_TYPE = "site.looked";
+export const SITE_STARTED_TYPE = "site.started";
+export const SITE_PAID_TYPE = "site.paid";
+
+/** The visit steps, which carry a source and never a visitor. */
+export const VISIT_STEP_TYPES: ReadonlySet<string> = new Set([
+    SITE_VISIT_TYPE,
+    SITE_LOOKED_TYPE,
+    SITE_STARTED_TYPE,
+    SITE_PAID_TYPE,
+]);
+
+/**
+ * Every event type that carries where a visit came from: the steps only.
+ * No order carries a source (DEC-181).
+ */
+export const VISIT_ORIGIN_TYPES: ReadonlySet<string> = VISIT_STEP_TYPES;
+
+/**
+ * The set of event types a public visitor may ingest: a page view and the
+ * visit's four steps. Org-internal types (`enquiry.submitted`,
+ * `order.paid`, `order.refunded`) are produced server-side and MUST be
+ * rejected on the public endpoint: a visitor can't forge a paid order.
  */
 export const PUBLIC_INGESTABLE_TYPES: ReadonlySet<string> = new Set([
     SITE_VIEW_TYPE,
+    ...VISIT_STEP_TYPES,
 ]);
 
 /** The `(type, schemaVersion)` → validator registry. */
@@ -302,6 +403,10 @@ const REGISTRY = new Map<string, EventValidator>([
     [key(ENQUIRY_SUBMITTED_TYPE, 1), enquirySubmittedV1],
     [key(ORDER_PAID_TYPE, 1), orderPaidV1],
     [key(ORDER_REFUNDED_TYPE, 1), orderRefundedV1],
+    [key(SITE_VISIT_TYPE, 1), visitStepV1],
+    [key(SITE_LOOKED_TYPE, 1), visitStepV1],
+    [key(SITE_STARTED_TYPE, 1), visitStepV1],
+    [key(SITE_PAID_TYPE, 1), visitStepV1],
     // Activation (#176) — server-produced only; absent from
     // PUBLIC_INGESTABLE_TYPES on purpose.
     [key(ORGANIZATION_CREATED_TYPE, 1), organizationCreatedV1],

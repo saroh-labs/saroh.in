@@ -297,6 +297,12 @@ export const CAPABILITIES: readonly Capability[] = [
         label: "Change services, hours, time off and booking rules",
         note: "Setting up how the business takes bookings, not the day's bookings. Whoever can change services also sees them.",
     },
+    {
+        action: "hours:write",
+        group: "schedule",
+        label: "Set hours and time off",
+        note: "Weekly hours, extra hours and time off for anyone who takes bookings, and their own booking rules (waiting for approval when the business asks for it). Adding people, changing services and anyone else's booking rules still need Change services, hours, time off and booking rules.",
+    },
     { action: "course:read", group: "schedule", label: "See courses" },
     {
         action: "course:write",
@@ -387,6 +393,12 @@ export const CAPABILITIES: readonly Capability[] = [
         action: "notification:read",
         group: "messaging",
         label: "See notifications",
+    },
+    {
+        action: "notification:read-own",
+        group: "messaging",
+        label: "See their own alerts",
+        note: "Answers meant for this person alone, such as whether a change they asked for was approved. Never the business's notifications.",
     },
     {
         action: "notification:write",

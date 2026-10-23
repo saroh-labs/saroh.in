@@ -42,7 +42,31 @@ export const siteColors = {
     // dot is the accent where it is drawn, as it always was.
     status: "hsl(var(--site-status, var(--site-accent)))",
     "status-inverse": "hsl(var(--site-status-inverse, var(--site-accent)))",
+    /*
+     * The roles a look adds (DEC-172, KD3/KD4), derived by the publisher
+     * for a site with a look (`safe-colours.ts`): the accent as TEXT, held
+     * to 4.5:1 on the page and a card; a tint of the accent for a chosen
+     * row; a control's edge, held to 3:1; and the footer's quieter text.
+     * Classic never sets them, so each falls back to the role it refines
+     * and a class using one still draws in the site's colours.
+     */
+    "accent-text": "hsl(var(--site-accent-text, var(--site-accent)))",
+    "accent-soft": "hsl(var(--site-accent-soft, var(--site-surface)))",
+    rule: "hsl(var(--site-rule, var(--site-border)))",
+    "footer-muted": "hsl(var(--site-footer-muted, var(--site-footer-fg)))",
 } as const;
+
+/**
+ * A look's corners (DEC-172, KD3): `rounded-site` for buttons and inputs
+ * (a pill under Quiet, square under Folio), `rounded-site-s` for small
+ * things (a chip, a time), `rounded-site-photo` for photographs. Classic
+ * sets only `--site-radius`, which the other two fall back to.
+ */
+export const siteRadius = {
+    site: "var(--site-radius)",
+    "site-s": "var(--site-radius-s, var(--site-radius))",
+    "site-photo": "var(--site-radius-photo, var(--site-radius))",
+};
 
 /**
  * The neutral system stack a merchant's text is set in until they choose fonts
@@ -104,6 +128,7 @@ export const siteBlocksPreset = {
             colors: { site: siteColors },
             fontFamily: siteFontFamily,
             maxWidth: siteMaxWidth,
+            borderRadius: siteRadius,
         },
     },
 } satisfies Partial<Config>;

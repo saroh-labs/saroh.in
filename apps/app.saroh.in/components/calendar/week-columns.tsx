@@ -8,6 +8,8 @@ import type { WeekColumn } from "@/lib/calendar/week-columns";
 
 import { Tip } from "@saroh/ui/tooltip";
 import { TONE_FILL } from "./tones";
+import type { DayExtra } from "./week-day-head";
+import { ClosedCard, DayHead, NO_EXTRA } from "./week-day-head";
 
 /** Closed, or the person picked is off: the month's stripes (E24). */
 export const STRIPED =
@@ -26,20 +28,22 @@ export function weekDayButton(date: string): HTMLButtonElement | null {
  * and went out, and who is off; under it the day's named problem and a
  * card per dated thing in time order — the time (or its layer), what it is,
  * a flag, and for a money role its amount — each opening its record. The
- * header opens the day's panel as a sheet. Past days are dimmed, today
- * carries a Saffron edge on top, and the picked day is tinted.
- *
- * Wider than a phone, so the columns scroll sideways inside their frame
- * rather than squeeze; the page itself never scrolls sideways.
+ * head (`DayHead`, with Book or "Closed", bookings U14) opens the day's
+ * panel as a sheet. Past days are dimmed, today carries a dark edge on top,
+ * and the picked day is tinted. The desk's only: a phone gets the strip and
+ * the day's list instead (`WeekStrip`).
  */
 export function WeekColumns({
     title,
     columns,
+    extras,
     onPick,
 }: {
     /** "14–20 Sep 2026", for the week's label. */
     title: string;
     columns: WeekColumn[];
+    /** Each day's Book, or why it is closed (bookings U14). */
+    extras: Map<string, DayExtra>;
     onPick: (date: string) => void;
 }) {
     return (
@@ -65,64 +69,14 @@ export function WeekColumns({
                                   : col.off?.striped
                                     ? STRIPED
                                     : "bg-card",
-                            col.isToday &&
-                                "shadow-[inset_0_2px_0_hsl(var(--foreground))]",
                         )}
                     >
-                        <button
-                            type="button"
-                            data-day={col.date}
-                            onClick={() => onPick(col.date)}
-                            disabled={col.outside}
-                            aria-label={col.label}
-                            aria-haspopup="dialog"
-                            aria-current={col.isToday ? "date" : undefined}
-                            className={cn(
-                                "grid w-full gap-0.5 border-b border-foreground/10 bg-transparent px-2.5 pb-2 pt-[9px] text-left font-sans text-foreground transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-                                col.outside
-                                    ? "cursor-default"
-                                    : "cursor-pointer hover:bg-muted/60 active:bg-muted",
-                            )}
-                        >
-                            <span className="flex items-baseline gap-1.5">
-                                <span className="label">{col.dow}</span>
-                                <span
-                                    className={cn(
-                                        "font-display text-[17px] font-semibold",
-                                        col.outside
-                                            ? "text-neutral-400 dark:text-muted-foreground"
-                                            : col.isToday
-                                              ? "text-foreground"
-                                              : col.past
-                                                ? "text-muted-foreground"
-                                                : "text-foreground",
-                                    )}
-                                >
-                                    {col.n}
-                                </span>
-                            </span>
-                            {/* In, then out; the header's label says both. */}
-                            <span
-                                aria-hidden
-                                className="flex min-h-[14px] gap-1.5 text-[11px] font-semibold tabular-nums"
-                            >
-                                <span className="text-neutral-600 dark:text-muted-foreground">
-                                    {col.moneyIn}
-                                </span>
-                                <span className="font-medium text-destructive-subtle-foreground">
-                                    {col.moneyOut}
-                                </span>
-                            </span>
-                            {col.off ? (
-                                <span
-                                    aria-hidden
-                                    title={col.off.title}
-                                    className="truncate text-[10.5px] font-semibold text-muted-foreground"
-                                >
-                                    {col.off.text}
-                                </span>
-                            ) : null}
-                        </button>
+                        <DayHead
+                            column={col}
+                            extra={extras.get(col.date) ?? NO_EXTRA}
+                            onPick={onPick}
+                            className="border-b border-foreground/10"
+                        />
                         <div className="grid grid-cols-[minmax(0,1fr)] gap-1 p-1.5">
                             {col.problem ? (
                                 <span className="truncate rounded-[4px] bg-destructive-subtle px-1.5 py-0.5 text-[11px] font-bold text-destructive-subtle-foreground">
@@ -186,7 +140,13 @@ export function WeekColumns({
                                     {col.more} more. Open the day
                                 </Button>
                             ) : null}
-                            {col.empty ? (
+                            {col.cards.length === 0 ? (
+                                <ClosedCard
+                                    extra={extras.get(col.date) ?? NO_EXTRA}
+                                    className="mt-1"
+                                />
+                            ) : null}
+                            {col.empty && !extras.get(col.date)?.closed ? (
                                 <span className="px-0.5 py-1 text-[11.5px] text-muted-foreground">
                                     {col.empty}
                                 </span>

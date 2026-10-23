@@ -1,26 +1,27 @@
 "use client";
 
+import type { LookId } from "@saroh/block-contract";
+import { resolveVariant } from "@saroh/block-contract";
 import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { Lock, PanelBottom, PanelTop } from "lucide-react";
 import { useId, useState } from "react";
 
-import { AddBlockPanel } from "@/components/sites/add-block-panel";
-import { SECTION_ICONS } from "@/components/sites/block-icons";
-import { EditorTabs, railRowState } from "@/components/sites/editor-chrome";
-import {
-    SECTION_LABELS,
-    sectionTitle,
-} from "@/components/sites/editor-constants";
+import { AddBlockPanel } from "@/components/sites/blocks/add-block-panel";
+import { SECTION_ICONS } from "@/components/sites/blocks/block-icons";
+import type { HeldBackSection } from "@/components/sites/blocks/saveable-sections";
 import type {
     EditorRailTab,
     FixedPart,
 } from "@/components/sites/editor/use-editor-selection";
-import type { HeldBackSection } from "@/components/sites/saveable-sections";
-import { StylePanel } from "@/components/sites/style-panel";
+import type { LookChoices } from "@/components/sites/looks/look-picker";
+import { StylePanel } from "@/components/sites/looks/style-panel";
 import type { Flag, Section, SectionType } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
+import type { StyleChoiceRules } from "@/lib/sites/style-access";
 import { Tip } from "@saroh/ui/tooltip";
+import { EditorTabs, railRowState } from "./editor-chrome";
+import { SECTION_LABELS, sectionTitle } from "./editor-constants";
 
 export type RailTab = "page" | "add" | "brand";
 
@@ -28,7 +29,6 @@ export type RailTab = "page" | "add" | "brand";
 export const RAIL_TABS: readonly { key: RailTab; label: string }[] = [
     { key: "page", label: "Page" },
     { key: "add", label: "Add" },
-    // Today's Style panel until the Brand panel (plan H) replaces it.
     { key: "brand", label: "Brand" },
 ];
 
@@ -45,6 +45,9 @@ export function EditorRail({
     setStyle,
     resetStyle,
     styleSaving,
+    styleDirty = false,
+    tryStyle,
+    phone = false,
     styleOptions,
     adding,
     setAdding,
@@ -63,13 +66,29 @@ export function EditorRail({
     notedKeys,
     shopOpen = false,
     packsOpen = false,
+    looks,
+    styleRules,
 }: {
+    /** The Brand tab's Look row (DEC-172, U16); absent draws none. */
+    looks?: LookChoices;
+    /** Which looks, typefaces and colourways are paid (DEC-177). */
+    styleRules?: StyleChoiceRules;
     rail: EditorRailTab;
     setRail: (next: EditorRailTab) => void;
     style: SiteStyle;
     setStyle: (next: SiteStyle) => void;
     resetStyle: () => void;
     styleSaving: boolean;
+    /** The style has a change not saved yet, or one refused. */
+    styleDirty?: boolean;
+    /** Draw a style on the page unsaved (a typeface tried); null ends it. */
+    tryStyle?: (next: SiteStyle | null) => void;
+    /**
+     * In the phone's sheet: the bar at the foot carries Page · Add ·
+     * Brand, so the rail draws no tabs of its own, and the Brand tab's
+     * pickers open inside the sheet (DEC-184).
+     */
+    phone?: boolean;
     styleOptions: SiteStyleOptions;
     /** The rail shows the Add block tab instead of this page's blocks (#337). */
     adding: boolean;
@@ -109,13 +128,15 @@ export function EditorRail({
         selectRailTab(next, setRail, setAdding);
 
     return (
-        <aside className="flex min-h-0 flex-col">
-            <EditorTabs
-                label="Editor panels"
-                tabs={RAIL_TABS}
-                value={tab}
-                onSelect={selectTab}
-            />
+        <aside className="flex min-h-0 flex-1 flex-col">
+            {phone ? null : (
+                <EditorTabs
+                    label="Editor panels"
+                    tabs={RAIL_TABS}
+                    value={tab}
+                    onSelect={selectTab}
+                />
+            )}
             {tab === "brand" ? (
                 <StylePanel
                     style={style}
@@ -123,6 +144,12 @@ export function EditorRail({
                     onChange={setStyle}
                     onReset={resetStyle}
                     saving={styleSaving}
+                    dirty={styleDirty}
+                    looks={looks}
+                    rules={styleRules}
+                    onTry={tryStyle}
+                    heroInText={heroDrawsInText(sections, style.look)}
+                    inline={phone}
                 />
             ) : (
                 <>
@@ -372,6 +399,23 @@ export function EditorRail({
                 </>
             )}
         </aside>
+    );
+}
+
+/**
+ * The page's heroes all draw in the text colour (the full-bleed hero, on
+ * Classic: a look draws its own), so the Brand tab's Hero row changes
+ * nothing on this page (Brand tab audit, DEC-184).
+ */
+export function heroDrawsInText(
+    sections: Section[],
+    look: LookId | undefined,
+): boolean {
+    if (look) return false;
+    const heroes = sections.filter((s) => s.type === "hero" && !s.hidden);
+    return (
+        heroes.length > 0 &&
+        heroes.every((s) => resolveVariant("hero", s.content) === "fullBleed")
     );
 }
 

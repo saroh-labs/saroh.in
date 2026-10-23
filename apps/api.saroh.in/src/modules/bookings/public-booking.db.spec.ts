@@ -652,7 +652,7 @@ describe("a hold's lifecycle under the team and the webhook (#508, real database
         // once the release has started — the booking's. A release that
         // locked the booking first would now hold what the webhook wants
         // while waiting for what the webhook has: a deadlock.
-        const { booking } = await heldAndPaying("between@example.in");
+        const { booking, intent } = await heldAndPaying("between@example.in");
         const invoice = await prisma.invoice.findFirstOrThrow({
             where: { bookingId: booking.id },
         });
@@ -670,10 +670,13 @@ describe("a hold's lifecycle under the team and the webhook (#508, real database
                     invoiceId: invoice.id,
                     organizationId: owner.organizationId,
                     now: new Date(),
+                    // Its one ONLINE payment on the ledger (DEC-173).
                     payment: {
-                        paymentMethod: "ONLINE",
-                        paymentReference: "pay_between",
-                        paymentNote: "Paid online",
+                        paymentIntentId: intent.paymentIntentId,
+                        amountCents: intent.amountCents,
+                        reference: "pay_between",
+                        note: "Paid online",
+                        receivedAt: new Date(),
                     },
                 });
             },
@@ -696,6 +699,11 @@ describe("a hold's lifecycle under the team and the webhook (#508, real database
                 })
             ).status,
         ).toBe("PAID");
+        expect(
+            await prisma.invoicePayment.count({
+                where: { invoiceId: invoice.id, method: "ONLINE" },
+            }),
+        ).toBe(1);
     });
 
     it("the release sweep and the payment webhook on one hold never deadlock, and one of them wins", async () => {

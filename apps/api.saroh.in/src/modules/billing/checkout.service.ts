@@ -22,6 +22,7 @@ import type { BillingCycle, Catalog } from "@saroh/pricing-catalog";
 import {
     autopayCharges,
     catalogPlanIdForKey,
+    gstPaise,
     withGstPaise,
 } from "@saroh/pricing-catalog";
 
@@ -35,13 +36,12 @@ import {
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { gstinProblem, stateCode, stateName } from "../invoices/gst-states";
 import { assertWorkspaceWrite } from "../organizations/organization-lifecycle.gate";
-import { authorize } from "../organizations/organization-policy";
+import { allows, authorize } from "../organizations/organization-policy";
 import { findUsableCoupon } from "../pricing/coupons.service";
 import { clearAddonsInTx } from "./addon-charges";
 import type { EndingAddon } from "./addons-ending";
 import { addonsEndingWith } from "./addons-ending";
 import { BillingCustomers } from "./billing-customer";
-import { enqueueBillingCustomerSync } from "./billing-customer-sync";
 import type {
     BillingDetail,
     BillingDetailsSent,
@@ -57,6 +57,8 @@ import {
     nonEmpty,
     readBillingParty,
 } from "./billing-details";
+import { enqueueBillingProfileSync } from "./billing-profile-sync";
+import { BILLING_EMAIL_TAKEN } from "./billing-profiles.service";
 import type { Term } from "./billing-term";
 import {
     isOneTime,
@@ -87,6 +89,7 @@ import {
     planTrialDays,
 } from "./offers";
 import { PlansService } from "./plans.service";
+import { profileSwitchStateInTx, renewalProfileOf } from "./profile-switch";
 import { enqueueProviderCancel } from "./provider-cancel.job";
 import { CATALOGUE_BILLING_PROVIDER } from "./provider-plan-sync.service";
 import type {
@@ -101,17 +104,37 @@ import {
 } from "./providers/billing-provider.port";
 import { billingNotes } from "./providers/razorpay.provider";
 
-/** The quote's word on who is billed: what is missing, and a phone. */
+/**
+ * The quote's word on who is billed: the billing profile (its id and legal
+ * name; null when the business has none, and must be given one before a
+ * paid checkout), what is missing, and a phone.
+ */
 function billingDetailsView(
     party: BillingParty,
 ): Pick<ChangePlanQuoteView, "registeredAddress" | "billingDetails"> {
     return {
         registeredAddress: addressComplete(party.profile),
         billingDetails: {
+            profile: party.profile
+                ? { id: party.profile.id, legalName: party.profile.legalName }
+                : null,
             missing: missingBillingDetails(party),
             phone: Boolean(nonEmpty(party.profile?.phone)),
         },
     };
+}
+
+/** The notes that name no person: the profile's id and the business. */
+const NON_PERSONAL_NOTES = ["billing_profile_id", "saroh_business"] as const;
+
+function nonPersonalNotes(
+    notes: Record<string, string>,
+): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const key of NON_PERSONAL_NOTES) {
+        if (notes[key]) out[key] = notes[key];
+    }
+    return out;
 }
 
 type Tx = Prisma.TransactionClient;
@@ -126,6 +149,10 @@ export const CHECKOUT_TTL_MS = 24 * 60 * 60 * 1000;
  */
 export const COUPON_TRIES_PER_ORG = 10;
 export const COUPON_TRIES_PER_ADDRESS = 30;
+
+/** A checkout refused for changing another owner's billing profile. */
+export const PROFILE_NOT_YOURS =
+    "This billing profile is another owner's, so only they can change it. Choose one of your own profiles in Plan & billing.";
 
 /** Who is asking, for the coupon limit: the caller's address, hashed. */
 export interface CheckoutClient {
@@ -182,18 +209,25 @@ export interface ChangePlanQuoteView {
      */
     addonsEnding: EndingAddon[];
     /**
-     * Whether the business has its registered address on its profile,
-     * whole (first line, city, six-digit PIN). Without one the dialog asks
-     * for it: Saroh's invoice prints it (CGST Rule 46(e)).
+     * Whether the business's billing profile has its address whole (first
+     * line, city, six-digit PIN). Without one the dialog asks for it:
+     * Saroh's invoice prints it (CGST Rule 46(e)).
      */
     registeredAddress: boolean;
     /**
      * Who Saroh bills, before it charges or sets up autopay (17 Oct 2026,
-     * `billing-details.ts`): what is still missing — the dialog asks for
-     * each, and a paid checkout is refused until they're given — and
-     * whether the business has a phone (asked for, optional, when not).
+     * `billing-details.ts`): the business's billing profile (DEC-167; null
+     * when it has none, `missing` then `["profile"]` and a paid checkout
+     * refused with `billing-profile` until one is chosen), what is still
+     * missing on it — the dialog asks for each, and a paid checkout is
+     * refused until they're given — and whether it has a phone (asked for,
+     * optional, when not).
      */
-    billingDetails: { missing: BillingDetail[]; phone: boolean };
+    billingDetails: {
+        profile: { id: string; legalName: string } | null;
+        missing: BillingDetail[];
+        phone: boolean;
+    };
 }
 
 /** A checkout as the business sees it; never the provider's link. */
@@ -343,7 +377,7 @@ export class CheckoutService {
         this.customers = new BillingCustomers(providers, this.logger);
     }
 
-    /** The business's one customer at the provider (DEC-165). */
+    /** The business's billing profile's customer at the provider (DEC-167). */
     private readonly customers: BillingCustomers;
 
     async quote(
@@ -359,14 +393,16 @@ export class CheckoutService {
             input,
             now,
         );
-        const party = await readBillingParty(
-            prisma,
-            ctx.organizationId,
-            ctx.userId,
-        );
+        const party = await this.partyFor(ctx.organizationId, quote.kind);
+        const details = billingDetailsView(party);
         return {
             ...this.quoteView(target, quote, coupon, addonsEnding),
-            ...billingDetailsView(party),
+            ...details,
+            // A profile is its owner's (R2): only those who change what the
+            // business pays are told which one bills it.
+            billingDetails: allows(ctx, "billing:manage")
+                ? details.billingDetails
+                : { ...details.billingDetails, profile: null },
         };
     }
 
@@ -393,10 +429,14 @@ export class CheckoutService {
             return row ? checkoutView(row, row.plan) : null;
         };
         const openRow = rows.find((r) => r.status === "OPEN");
+        // The handoff carries the billing profile's contact details for
+        // the provider's window: only for whoever can pay (billing:manage).
         const open = openRow
             ? {
                   ...checkoutView(openRow, openRow.plan),
-                  handoff: await this.handoff(ctx, openRow, payNowOf(openRow)),
+                  handoff: allows(ctx, "billing:manage")
+                      ? await this.handoff(ctx, openRow, payNowOf(openRow))
+                      : null,
               }
             : null;
         const term = await this.termOfSubscription(subscription, now);
@@ -448,9 +488,9 @@ export class CheckoutService {
 
     /**
      * What the browser opens the provider's checkout window with: the
-     * provider's public key, the subscription or order, and the owner's
-     * email and the business's phone, pre-filled. Null when the provider
-     * has no window (its page link is used instead).
+     * provider's public key, the subscription or order, and the billing
+     * profile's email and phone, pre-filled. Null when the provider has no
+     * window (its page link is used instead).
      */
     private async handoff(
         ctx: OrganizationContext,
@@ -460,6 +500,7 @@ export class CheckoutService {
             | "providerSubscriptionId"
             | "providerPlanId"
             | "providerCustomerId"
+            | "billingProfileId"
             | "billToGstin"
             | "billToEmail"
             | "billToPhone"
@@ -477,6 +518,14 @@ export class CheckoutService {
         if (!keyId) return null;
         const customer = await this.billingCustomer(ctx, row);
         const oneTime = isOneTime(row);
+        // Another owner's profile (a co-owner paying for a business billed
+        // to it): its email, phone, GSTIN and address stay its owner's
+        // (R2), so the window is prefilled with none of them and the notes
+        // name only the profile and the business.
+        const theirs = await this.profileOfAnother(
+            ctx,
+            customer.billingProfileId ?? null,
+        );
         return {
             provider: row.provider,
             keyId,
@@ -486,25 +535,42 @@ export class CheckoutService {
             currency: "INR",
             prefill: {
                 name: customer.name,
-                email: customer.email,
-                contact: customer.contact,
+                email: theirs ? null : customer.email,
+                contact: theirs ? null : customer.contact,
             },
             // Razorpay's window takes a customer with an order; a
             // subscription's customer is the one it authorises.
             customerId: oneTime ? (row.providerCustomerId ?? null) : null,
-            notes: billingNotes(customer),
+            notes: theirs
+                ? nonPersonalNotes(billingNotes(customer))
+                : billingNotes(customer),
         };
     }
 
+    /** Whether the profile is someone else's than the caller's. */
+    private async profileOfAnother(
+        ctx: OrganizationContext,
+        billingProfileId: string | null,
+    ): Promise<boolean> {
+        if (!billingProfileId) return false;
+        const profile = await prisma.billingProfile.findUnique({
+            where: { id: billingProfileId },
+            select: { ownerUserId: true },
+        });
+        return Boolean(profile) && profile?.ownerUserId !== ctx.userId;
+    }
+
     /**
-     * Who Saroh bills: the legal name (else the business's), the owner's
-     * email (else one given at checkout), the business's phone (else one
-     * given at checkout), the GSTIN given at checkout (else the profile's)
-     * and the registered address.
+     * Who Saroh bills (DEC-167): the checkout's billing profile (else the
+     * business's) — its legal name (else the business's name), billing
+     * email, phone, GSTIN and address — with the business and the profile
+     * named for the provider's notes. What a checkout made before profiles
+     * kept of an email, phone or GSTIN fills what there is no profile for.
      */
     private async billingCustomer(
         ctx: OrganizationContext,
         given: {
+            billingProfileId?: string | null;
             billToGstin: string | null;
             billToEmail?: string | null;
             billToPhone?: string | null;
@@ -513,15 +579,15 @@ export class CheckoutService {
         const party = await readBillingParty(
             prisma,
             ctx.organizationId,
-            ctx.userId,
+            given.billingProfileId,
         );
         const profile = party.profile;
         return {
-            name: billingName(party) ?? party.userName ?? "",
+            name: billingName(party) ?? "",
             businessName: party.orgName,
-            email: billingEmail(party) ?? given.billToEmail ?? null,
-            contact: nonEmpty(profile?.phone) ?? given.billToPhone ?? null,
-            gstin: given.billToGstin ?? profile?.taxId ?? null,
+            email: billingEmail(party) ?? nonEmpty(given.billToEmail),
+            contact: nonEmpty(profile?.phone) ?? nonEmpty(given.billToPhone),
+            gstin: profile ? profile.gstin : given.billToGstin,
             address: profile?.addressLine1
                 ? {
                       line1: profile.addressLine1,
@@ -532,6 +598,8 @@ export class CheckoutService {
                   }
                 : null,
             organizationId: ctx.organizationId,
+            businessSlug: party.orgSlug,
+            billingProfileId: profile?.id ?? null,
         };
     }
 
@@ -544,6 +612,8 @@ export class CheckoutService {
             billingState?: string | null;
             gstin?: string | null;
             coupon?: string | null;
+            /** "This changes Saroh's invoices for N businesses.": seen. */
+            confirmSharedProfile?: boolean | null;
         } & BillingDetailsSent,
         now: Date = new Date(),
         client: CheckoutClient = {},
@@ -553,11 +623,7 @@ export class CheckoutService {
         this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
         const { target, quote, subscription, coupon, addonsEnding } =
             await this.resolve(ctx.organizationId, input, now);
-        const party = await readBillingParty(
-            prisma,
-            ctx.organizationId,
-            ctx.userId,
-        );
+        const party = await this.partyFor(ctx.organizationId, quote.kind);
         const view = {
             ...this.quoteView(target, quote, coupon, addonsEnding),
             ...billingDetailsView(party),
@@ -595,25 +661,32 @@ export class CheckoutService {
         )) {
             await assertWorkspaceWrite(ctx.organizationId, "new");
         }
-        // Every other kind charges or sets up autopay: who is billed is
-        // whole first (owner, 17 Oct 2026), refused by field before
-        // anything is made at the provider. What was missing and given here
-        // is kept: the address, state and name on the business's profile
-        // (never over what it has), an email or phone on the checkout.
-        const details = checkoutDetails(party, input, billTo.billToState);
+        // Every other kind charges or sets up autopay: the business has a
+        // billing profile (DEC-167) and who it bills is whole first (owner,
+        // 17 Oct 2026), refused by field before anything is made at the
+        // provider. What was missing and given here, and a GSTIN given, is
+        // saved to the profile: never to Settings › Business, the
+        // business's own seller identity.
+        const details = checkoutDetails(party, input, {
+            state: billTo.billToState,
+            gstin: billTo.billToGstin,
+        });
+        const profileId = party.profile?.id;
+        if (!profileId) throw new Error("checkoutDetails passed no profile");
         if (Object.keys(details.profile).length) {
-            await this.saveBillingProfile(ctx, details.profile);
+            await this.assertMayChangeProfile(
+                ctx,
+                profileId,
+                input.confirmSharedProfile === true,
+            );
+            await this.saveBillingProfile(ctx, profileId, details.profile);
         }
         // Whole now: nothing is missing any more.
         view.registeredAddress = true;
         view.billingDetails = {
+            ...view.billingDetails,
             missing: [],
-            phone: view.billingDetails.phone || Boolean(details.billToPhone),
-        };
-        const withDetails: CheckoutBillTo = {
-            ...billTo,
-            billToEmail: details.billToEmail,
-            billToPhone: details.billToPhone,
+            phone: view.billingDetails.phone || Boolean(details.profile.phone),
         };
         return this.checkout(
             ctx,
@@ -621,31 +694,181 @@ export class CheckoutService {
             quote,
             view,
             now,
-            withDetails,
+            { ...billTo, billingProfileId: profileId },
             coupon,
         );
     }
 
     /**
-     * What a checkout filled in of the business's profile: its registered
-     * address, state or legal name, each only where it had none.
+     * Who a change is billed to: the business's billing profile, or —
+     * for a change that starts at the renewal while the business is
+     * moving to another profile then (U6) — that one, so one scheduled
+     * checkout carries both (`profile-switch.ts`).
+     */
+    private async partyFor(
+        organizationId: string,
+        kind: ChangeKind,
+    ): Promise<BillingParty> {
+        const atRenewal = kind === "SCHEDULED" || kind === "RENEW";
+        const moving = atRenewal
+            ? renewalProfileOf(
+                  await profileSwitchStateInTx(prisma, organizationId),
+              )
+            : null;
+        return readBillingParty(prisma, organizationId, moving);
+    }
+
+    /**
+     * Move a paid business to another of its owner's billing profiles at
+     * its next renewal (DEC-167, R13, U6; `profile-switch.ts` decided it):
+     * a SCHEDULED checkout for `plan` — the plan it is on, or the one it
+     * is already moving to — starting at `startAt`, on the new profile's
+     * customer. Authorised like any other checkout; the business stays on
+     * its profile until the renewal applies it.
+     */
+    async startProfileSwitch(
+        ctx: OrganizationContext,
+        input: { billingProfileId: string; plan: Plan; startAt: Date },
+        now: Date = new Date(),
+    ): Promise<Extract<ChangePlanResult, { checkout: CheckoutView }>> {
+        authorize(ctx, "billing:manage");
+        const { plan, startAt } = input;
+        const party = await readBillingParty(
+            prisma,
+            ctx.organizationId,
+            input.billingProfileId,
+        );
+        const missing = missingBillingDetails(party);
+        if (missing.length) {
+            throw new BadRequestException({
+                message: `That billing profile needs its ${missing.join(", ")} before Saroh can bill it. Edit it, then choose it again.`,
+                details: { field: "billingProfile", missing },
+            });
+        }
+        const price = plan.priceCents;
+        const oneTime = plan.interval === "year";
+        const total = withGstPaise(price);
+        const catalog = await catalogueOfVersion(prisma, plan.version);
+        // The plan's next charge, as it is today, from the date: nothing
+        // is taken now but autopay's refundable check.
+        const quote: ChangeQuote = {
+            kind: "SCHEDULED",
+            pricePaise: price,
+            gstPaise: gstPaise(price),
+            totalPaise: total,
+            chargeNowPaise: 0,
+            chargeNowGstPaise: 0,
+            chargeNowTotalPaise: 0,
+            startAt,
+            effectiveAt: startAt,
+            trialEndsAt: null,
+            firstMonth: null,
+            discountPaise: 0,
+            discountCharges: 0,
+            firstChargePaise: price,
+            firstChargeGstPaise: gstPaise(price),
+            firstChargeTotalPaise: total,
+            discountTotalPaise: 0,
+            payment: oneTime ? "ONE_TIME" : "AUTOPAY",
+            termCharges: oneTime ? 1 : autopayCharges(catalog),
+            payNowTotalPaise: oneTime ? total : 0,
+            mandateCheck: oneTime ? "NONE" : "REFUNDED",
+        };
+        const view = {
+            ...this.quoteView(plan, quote),
+            ...billingDetailsView(party),
+        };
+        const result = await this.checkout(ctx, plan, quote, view, now, {
+            billToState: null,
+            billToGstin: null,
+            billingProfileId: input.billingProfileId,
+        });
+        if (result.kind === "TO_FREE")
+            throw new Error("a switch is a checkout");
+        return result;
+    }
+
+    /**
+     * A checkout may change the billing profile it bills (anything it fills
+     * in or replaces) only as Plan & billing's Edit would (owner, 18 Oct
+     * 2026): the profile is its owner's, so no one else changes it here;
+     * and one billing more than one business is changed only once the
+     * owner has seen "This changes Saroh's invoices for N businesses." —
+     * the same words as Edit's — and confirmed. Refused before anything is
+     * written or asked of the provider.
+     */
+    private async assertMayChangeProfile(
+        ctx: OrganizationContext,
+        billingProfileId: string,
+        confirmed: boolean,
+    ): Promise<void> {
+        const profile = await prisma.billingProfile.findUnique({
+            where: { id: billingProfileId },
+            select: {
+                ownerUserId: true,
+                _count: {
+                    select: {
+                        organizations: { where: { deletedRetainedAt: null } },
+                    },
+                },
+            },
+        });
+        if (!profile) throw new Error("the checkout's profile is gone");
+        if (profile.ownerUserId !== ctx.userId) {
+            throw new ConflictException({
+                message: PROFILE_NOT_YOURS,
+                details: { field: "billingProfile", code: "profile-not-yours" },
+            });
+        }
+        const businesses = profile._count.organizations;
+        if (businesses > 1 && !confirmed) {
+            throw new ConflictException({
+                message: `This changes Saroh's invoices for ${businesses} businesses.`,
+                details: {
+                    field: "billingProfile",
+                    code: "profile-shared",
+                    businesses,
+                },
+            });
+        }
+    }
+
+    /**
+     * What a checkout filled in of the business's billing profile: what it
+     * was missing, and a GSTIN given, once `assertMayChangeProfile` allows
+     * it. Its customer at the provider is brought up to date by the sync
+     * queued with it.
      */
     private async saveBillingProfile(
         ctx: OrganizationContext,
+        billingProfileId: string,
         fields: CheckoutDetails["profile"],
     ): Promise<void> {
-        await prisma.businessProfile.upsert({
-            where: { organizationId: ctx.organizationId },
-            create: { organizationId: ctx.organizationId, ...fields },
-            update: fields,
-        });
+        try {
+            await prisma.$transaction(async (tx) => {
+                await tx.billingProfile.update({
+                    where: { id: billingProfileId },
+                    data: fields,
+                });
+                await enqueueBillingProfileSync(tx, billingProfileId);
+            });
+        } catch (error) {
+            // The owner already bills another profile to that email.
+            if (prismaErrorCode(error) === "P2002") {
+                throw new ConflictException({
+                    message: BILLING_EMAIL_TAKEN,
+                    details: { field: "billingEmail" },
+                });
+            }
+            throw error;
+        }
         await this.audit?.record({
             action: AuditAction.ProfileUpdate,
             actorUserId: ctx.userId,
             actorRoleKey: ctx.roleKey,
             organizationId: ctx.organizationId,
-            targetType: "organization",
-            targetId: ctx.organizationId,
+            targetType: "billing_profile",
+            targetId: billingProfileId,
             outcome: AuditOutcome.Success,
             metadata: {
                 fields: Object.keys(fields),
@@ -1015,16 +1238,19 @@ export class CheckoutService {
         const expiresAt = checkoutExpiresAt(stored, quote.startAt, now);
         const provider = this.providers.get(CATALOGUE_BILLING_PROVIDER);
         const customer = await this.billingCustomer(ctx, billTo);
-        // Every checkout's order or subscription is linked to the business's
-        // one customer at the provider (DEC-165: made at sign-up, made now
-        // if it hasn't been), so its dashboard shows who it bills from the
-        // start, paid or not. A refusal leaves the notes and the window's
-        // prefill to say it; a provider that can't answer stops here, as a
+        // Every checkout's order or subscription is linked to the customer
+        // of the billing profile the business is billed to (DEC-167: made
+        // by a job when the profile was, made now if it hasn't been), so
+        // the provider's dashboard shows who it bills from the start, paid
+        // or not. A refusal leaves the notes and the window's prefill to
+        // say it; a provider that can't answer stops here, as a
         // subscription made without the customer would have the provider
         // make a second one of its own.
         let customerId: string | null;
         try {
-            customerId = await this.customers.idFor(ctx.organizationId);
+            customerId = await this.customers.idFor(
+                billTo.billingProfileId ?? null,
+            );
         } catch (error) {
             this.logger.warn(
                 `billing_checkout_customer_failed org=${ctx.organizationId}: ${error instanceof Error ? error.message : "unknown"}`,
@@ -1138,8 +1364,10 @@ export class CheckoutService {
             providerPlanId: oneTime
                 ? ONE_TIME_PAYMENT
                 : providerPlan.providerPlanId,
-            // The business's one customer (DEC-165), else what the provider made.
+            // The billing profile's customer (DEC-167), else what the
+            // provider made.
             providerCustomerId: customerId ?? made.providerCustomerId ?? null,
+            billingProfileId: billTo.billingProfileId ?? null,
             pricePaise: target.priceCents,
             chargeNowPaise: quote.chargeNowPaise,
             chargeNowGstPaise: quote.chargeNowGstPaise,
@@ -1149,15 +1377,22 @@ export class CheckoutService {
             startAt: stored === "NEW" ? null : quote.startAt,
             expiresAt,
             createdByUserId: ctx.userId,
-            ...billTo,
+            billToState: billTo.billToState,
+            billToGstin: billTo.billToGstin,
         };
         let row: BillingCheckout;
         try {
             row = await prisma.$transaction(async (tx) => {
                 await assertBillingMayStart(tx, ctx.organizationId);
                 await this.dropOpenCheckout(tx, ctx.organizationId);
-                // Details given at checkout reach the provider's customer.
-                await enqueueBillingCustomerSync(tx, ctx.organizationId);
+                // The profile's customer brought up to date with what it
+                // has now, details given here included.
+                if (billTo.billingProfileId) {
+                    await enqueueBillingProfileSync(
+                        tx,
+                        billTo.billingProfileId,
+                    );
+                }
                 return tx.billingCheckout.create({ data });
             });
         } catch (error) {
@@ -1250,15 +1485,14 @@ export function checkoutExpiresAt(
 }
 
 /**
- * Who Saroh's invoice for a checkout is billed to (U17): the state and
- * GSTIN given at checkout, and an email or phone given there because the
- * business had none (17 Oct 2026).
+ * What a checkout records of who it bills: the state and GSTIN given at
+ * checkout (U17; saved to the profile too), and the billing profile it is
+ * made on (DEC-167).
  */
 export interface CheckoutBillTo {
     billToState: string | null;
     billToGstin: string | null;
-    billToEmail?: string | null;
-    billToPhone?: string | null;
+    billingProfileId?: string | null;
 }
 
 /**

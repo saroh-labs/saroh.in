@@ -1,3 +1,4 @@
+import type { LookId } from "@saroh/block-contract";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Fragment } from "react";
@@ -57,6 +58,7 @@ export function AccountHome({
     doors,
     api,
     now,
+    look,
 }: {
     account: AccountView;
     home: Home;
@@ -74,6 +76,11 @@ export function AccountHome({
     api: { payInvoice: PayInvoice; leaveLine: LeaveLine };
     /** When the page was drawn (ISO); now, when left out. */
     now?: string;
+    /**
+     * The site's look (DEC-172, U12): orders read in the customer's
+     * words. The blocks and their order are the same in every look.
+     */
+    look?: LookId;
 }) {
     const clinic = account.bookingsLabel === "Appointments";
     const business = account.businessName;
@@ -182,6 +189,7 @@ export function AccountHome({
                                     key={order.ref}
                                     order={order}
                                     details={false}
+                                    look={look}
                                 />
                             ))
                         ) : (

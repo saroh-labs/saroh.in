@@ -21,9 +21,17 @@ export function PlanCards({ plans }: { plans: PlanCardView[] }) {
     );
 }
 
+/** A part the draft changed, on the staff preview with "Show what changed". */
+const MARK = "rounded-[6px] bg-mk-soon px-1 text-foreground";
+
+function Changed() {
+    return <span className="sr-only"> (changed)</span>;
+}
+
 function PlanCard({ plan: p }: { plan: PlanCardView }) {
     const f = p.featured;
     const muted = f ? "text-mk-on-ink-muted" : "text-muted-foreground";
+    const ch = p.changed;
     return (
         <div
             data-plan={p.id}
@@ -36,7 +44,8 @@ function PlanCard({ plan: p }: { plan: PlanCardView }) {
         >
             <div className="grid gap-1">
                 <h3 className="m-0 text-[17px] font-semibold leading-normal">
-                    {p.name}
+                    <span className={cn(ch?.name && MARK)}>{p.name}</span>
+                    {ch?.name ? <Changed /> : null}
                 </h3>
                 {p.tagline ? (
                     <span className={cn("text-[14.5px]", muted)}>
@@ -45,19 +54,25 @@ function PlanCard({ plan: p }: { plan: PlanCardView }) {
                 ) : null}
             </div>
             <div className="grid gap-1.5">
-                <span className="font-display text-mk-price-lg font-bold">
+                <span
+                    className={cn(
+                        "font-display text-mk-price-lg font-bold",
+                        ch?.price && MARK,
+                    )}
+                >
                     {p.price}
                     {p.per ? (
                         <span
                             className={cn(
                                 "font-sans text-[15px] font-medium tracking-normal",
-                                muted,
+                                ch?.price ? "text-muted-foreground" : muted,
                             )}
                         >
                             {" "}
                             {p.per}
                         </span>
                     ) : null}
+                    {ch?.price ? <Changed /> : null}
                 </span>
                 <span className={cn("text-mk-note", muted)}>{p.sub}</span>
             </div>
@@ -105,7 +120,13 @@ function PlanCard({ plan: p }: { plan: PlanCardView }) {
                     </li>
                 ) : null}
                 {p.lines.map((l) => (
-                    <li key={l.t} className="flex gap-2.5">
+                    <li
+                        key={l.t}
+                        className={cn(
+                            "flex gap-2.5",
+                            ch?.lines.includes(l.t) && MARK,
+                        )}
+                    >
                         <span
                             aria-hidden
                             className={cn(
@@ -116,6 +137,7 @@ function PlanCard({ plan: p }: { plan: PlanCardView }) {
                             ✓
                         </span>
                         {l.t}
+                        {ch?.lines.includes(l.t) ? <Changed /> : null}
                     </li>
                 ))}
             </ul>

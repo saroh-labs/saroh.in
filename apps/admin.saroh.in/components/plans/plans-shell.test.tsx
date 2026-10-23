@@ -96,23 +96,42 @@ afterEach(() => {
     vi.clearAllMocks();
 });
 
-describe("the status bar", () => {
-    it("shows Live with no draft, and the Draft banner after an edit", async () => {
+/** The draft bar at the foot of the screen; null with no draft. */
+function bar() {
+    return screen.queryByRole("region", { name: "Draft" });
+}
+
+/** The draft bar, which must be there. */
+function theBar() {
+    return screen.getByRole("region", { name: "Draft" });
+}
+
+describe("the header and the draft bar", () => {
+    it("says what is live with no draft, and shows the bar after an edit", async () => {
         actions.savePricingDraftAction.mockResolvedValue({
             ok: true,
             data: { revision: 1, valid: true, errors: [], changes: [] },
         });
         render(<PlansShell data={data()} impact={null} tab="plans" />);
 
-        expect(screen.getByText("Live")).toBeTruthy();
-        expect(screen.getByText("Version 1")).toBeTruthy();
-        expect(screen.queryByText(/^Draft ·/)).toBeNull();
+        expect(
+            screen.getByRole("heading", {
+                level: 1,
+                name: "Plans and modules",
+            }),
+        ).toBeTruthy();
+        expect(screen.getByText(/^Live: version 1, published/)).toBeTruthy();
+        expect(bar()).toBeNull();
 
         fireEvent.click(screen.getByRole("button", { name: "Change Plan B" }));
-        expect(screen.getByText("Draft · 1 change")).toBeTruthy();
-        expect(screen.queryByText("Live")).toBeNull();
         expect(
-            screen.getByRole("tab", { name: "Review & publish · 1" }),
+            within(theBar()).getByText("1 change, not live yet."),
+        ).toBeTruthy();
+        expect(
+            screen.getByRole("tab", { name: "Review and publish 1" }),
+        ).toBeTruthy();
+        expect(
+            screen.getByRole("tab", { name: "Plans 1 changed" }),
         ).toBeTruthy();
 
         // Autosaved, debounced, as a new draft (revision 0).
@@ -126,7 +145,38 @@ describe("the status bar", () => {
                 baseVersion: 1,
             },
         );
-        expect(screen.getByText("Saved")).toBeTruthy();
+        expect(
+            within(theBar()).getByRole("button", { name: "Saved" }),
+        ).toBeTruthy();
+    });
+
+    it("says who would move at renewal, by plan", () => {
+        render(
+            <PlansShell
+                data={data(
+                    {},
+                    fakePricing({
+                        plans: [
+                            {
+                                planId: "b",
+                                name: "Plan B",
+                                retired: false,
+                                businesses: 2,
+                                olderVersion: 0,
+                            },
+                        ],
+                    }),
+                )}
+                impact={null}
+                tab="plans"
+            />,
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Change Plan B" }));
+        expect(
+            within(theBar()).getByText(
+                "2 businesses on Plan B would move at their renewal.",
+            ),
+        ).toBeTruthy();
     });
 
     it("saves the next edit on the revision the last save returned", async () => {
@@ -141,7 +191,7 @@ describe("the status bar", () => {
                 tab="plans"
             />,
         );
-        expect(screen.getByText(/^Draft ·/)).toBeTruthy();
+        expect(bar()).toBeTruthy();
 
         fireEvent.click(screen.getByRole("button", { name: "Change Plan B" }));
         await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS));
@@ -169,11 +219,13 @@ describe("the status bar", () => {
         fireEvent.click(screen.getByRole("button", { name: "Change Plan B" }));
         await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS));
 
-        expect(
-            screen.getByText(
-                "Ravi saved the draft since. Reload the draft to see their changes.",
-            ),
-        ).toBeTruthy();
+        // One notice: the 409 takes the bar's words, not a second box.
+        const alert = within(theBar()).getByRole("alert");
+        expect(alert.textContent).toBe(
+            "Ravi saved the draft since. Reload the draft to see their changes.",
+        );
+        expect(within(theBar()).queryByText(/not live yet/)).toBeNull();
+        expect(screen.getAllByRole("alert")).toHaveLength(1);
         fireEvent.click(screen.getByRole("button", { name: "Reload draft" }));
         expect(refresh).toHaveBeenCalled();
 
@@ -204,7 +256,9 @@ describe("the status bar", () => {
             await vi.advanceTimersByTimeAsync(0);
         });
         expect(actions.savePricingDraftAction).toHaveBeenCalledTimes(2);
-        expect(screen.getByText("Saved")).toBeTruthy();
+        expect(
+            within(theBar()).getByRole("button", { name: "Saved" }),
+        ).toBeTruthy();
     });
 
     it("names the draft's other editors before discarding it (D-2)", async () => {
@@ -219,7 +273,7 @@ describe("the status bar", () => {
                 tab="plans"
             />,
         );
-        fireEvent.click(screen.getByRole("button", { name: "Discard draft" }));
+        fireEvent.click(screen.getByRole("button", { name: "Discard…" }));
         expect(screen.getByText(/Ravi has edited this draft too/)).toBeTruthy();
 
         await act(async () => {
@@ -234,12 +288,12 @@ describe("the status bar", () => {
             expect.objectContaining({ revision: 3 }),
         );
         expect(screen.getByText("Draft discarded")).toBeTruthy();
-        expect(screen.getByText("Live")).toBeTruthy();
+        expect(bar()).toBeNull();
     });
 });
 
 describe("without pricing:edit", () => {
-    it("edits nothing and offers no Review & publish or Discard", () => {
+    it("edits nothing and offers no Review and publish or Discard", () => {
         render(
             <PlansShell
                 data={data(
@@ -257,11 +311,9 @@ describe("without pricing:edit", () => {
             />,
         );
         expect(
-            screen.queryByRole("button", { name: "Review & publish" }),
+            screen.queryByRole("button", { name: "Review and publish" }),
         ).toBeNull();
-        expect(
-            screen.queryByRole("button", { name: "Discard draft" }),
-        ).toBeNull();
+        expect(screen.queryByRole("button", { name: "Discard…" })).toBeNull();
         expect(
             screen
                 .getByRole("button", { name: "Change Plan B" })
@@ -269,7 +321,7 @@ describe("without pricing:edit", () => {
         ).toBe(true);
     });
 
-    it("says the live bar is read only", () => {
+    it("says in the header that it is read only", () => {
         render(
             <PlansShell
                 data={data({
@@ -284,7 +336,7 @@ describe("without pricing:edit", () => {
             />,
         );
         expect(
-            screen.getByText("You can see pricing here but not change it."),
+            screen.getByText(/You can see pricing here but not change it$/),
         ).toBeTruthy();
     });
 });
@@ -294,7 +346,7 @@ describe("the tabs", () => {
         render(<PlansShell data={data()} impact={null} tab="versions" />);
         expect(
             screen
-                .getByRole("tab", { name: "Versions · 1" })
+                .getByRole("tab", { name: "Versions 1" })
                 .getAttribute("aria-selected"),
         ).toBe("true");
     });
@@ -308,12 +360,12 @@ describe("the tabs", () => {
             />,
         );
         fireEvent.click(
-            screen.getByRole("button", { name: "Review & publish" }),
+            screen.getByRole("button", { name: "Review and publish" }),
         );
         expect(window.location.search).toBe("?tab=publish");
         expect(
             screen
-                .getByRole("tab", { name: /^Review & publish/ })
+                .getByRole("tab", { name: /^Review and publish/ })
                 .getAttribute("aria-selected"),
         ).toBe("true");
     });
@@ -444,9 +496,10 @@ describe("a version published while the page sat open", () => {
             />,
         );
         // Version 1 is live, and the editor shows and copies version 2.
-        expect(screen.getByText("Version 1")).toBeTruthy();
         expect(
-            screen.getByText("What you see and edit below is version 2."),
+            screen.getByText(
+                /^Live: version 1.* · Version 2 is waiting for billing · You edit from version 2$/,
+            ),
         ).toBeTruthy();
         expect(screen.getByText("Price of Plan B: 33300")).toBeTruthy();
 
@@ -562,9 +615,13 @@ describe("a version published while the page sat open", () => {
         expect(
             screen.queryByRole("button", { name: /^Start again/ }),
         ).toBeNull();
+        expect(screen.getByRole("button", { name: "Discard…" })).toBeTruthy();
+        // It can't be sent to Review and publish from the bar either.
         expect(
-            screen.getByRole("button", { name: "Discard draft" }),
-        ).toBeTruthy();
+            within(theBar()).queryByRole("button", {
+                name: "Review and publish",
+            }),
+        ).toBeNull();
     });
 });
 
@@ -592,7 +649,7 @@ describe("coming back to the page", () => {
                 tab="plans"
             />,
         );
-        expect(screen.getByText("Version 2")).toBeTruthy();
+        expect(screen.getByText(/^Live: version 2,/)).toBeTruthy();
         expect(screen.getByText("Price of Plan B: 33300")).toBeTruthy();
     });
 
@@ -665,7 +722,7 @@ describe("coming back to the page", () => {
         );
         fireEvent.click(screen.getByRole("button", { name: "Change Plan B" }));
         await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS));
-        expect(screen.getByText(/^Draft ·/)).toBeTruthy();
+        expect(bar()).toBeTruthy();
 
         // Read at 00:00 on the 3rd, before the save at 10:00: no draft yet.
         view.rerender(
@@ -675,7 +732,7 @@ describe("coming back to the page", () => {
                 tab="plans"
             />,
         );
-        expect(screen.getByText(/^Draft ·/)).toBeTruthy();
+        expect(bar()).toBeTruthy();
         expect(screen.getByText("Price of Plan B: 22200")).toBeTruthy();
     });
 });
@@ -832,7 +889,7 @@ describe("Save draft", () => {
             />,
         );
         expect(screen.getByText("Price of Plan B: 22200")).toBeTruthy();
-        expect(screen.getByText(/^Draft ·/)).toBeTruthy();
+        expect(bar()).toBeTruthy();
         expect(button("Saved").hasAttribute("disabled")).toBe(true);
         expect(screen.getByText(/^Saved 3 Oct, /)).toBeTruthy();
     });

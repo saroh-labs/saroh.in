@@ -1,4 +1,5 @@
 import { Logger } from "@nestjs/common";
+import { randomBytes } from "node:crypto";
 
 import {
     cashfreeBaseUrl,
@@ -70,6 +71,10 @@ export class CashfreeProvider implements MerchantProvider {
         input: CreateOrderIntentInput,
     ): Promise<CreateOrderIntentResult> {
         const { amountCents, currency, orderId, credentials } = input;
+        // Cashfree refuses an `order_id` it has seen, so each intent gets its
+        // own: a retry, a balance or a difference on the same Order or
+        // Invoice is a new Cashfree order (3-45 of [A-Za-z0-9_-]).
+        const merchantOrderId = `${orderId}_${randomBytes(6).toString("hex")}`;
 
         let res: Response;
         try {
@@ -82,7 +87,7 @@ export class CashfreeProvider implements MerchantProvider {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    order_id: orderId,
+                    order_id: merchantOrderId,
                     // Cashfree expects major units with 2 decimals.
                     order_amount: Number((amountCents / 100).toFixed(2)),
                     order_currency: currency,
@@ -109,18 +114,12 @@ export class CashfreeProvider implements MerchantProvider {
         }
 
         const body = (await res.json()) as {
-            cf_order_id?: string | number;
-            order_id?: string;
             payment_session_id?: string;
         };
 
-        const providerIntentId =
-            body.cf_order_id != null ? String(body.cf_order_id) : body.order_id;
-        if (!providerIntentId) {
-            throw new Error(
-                "Cashfree order creation failed: missing order id in response",
-            );
-        }
+        // The order id Saroh sent: what Cashfree's refunds, look-ups and
+        // webhooks (`order_id`) name the order by, unlike its `cf_order_id`.
+        const providerIntentId = merchantOrderId;
 
         return {
             providerIntentId,
@@ -137,8 +136,8 @@ export class CashfreeProvider implements MerchantProvider {
 
     /**
      * Refund via `POST /orders/{order_id}/refunds` (Cashfree's `refund_amount`
-     * is in MAJOR units, so `amountCents` is divided by 100). `providerIntentId`
-     * is the order id the intent was created against.
+     * is in MAJOR units, so `amountCents` is divided by 100), against the
+     * merchant order id the intent was created under ({@link cashfreeOrderId}).
      *
      * Saroh's reference is the merchant `refund_id` Cashfree requires: unique
      * per refund, echoed by the refund webhook. Cashfree has no idempotent
@@ -149,12 +148,12 @@ export class CashfreeProvider implements MerchantProvider {
      * body.
      */
     async refund(input: RefundInput): Promise<RefundResult> {
-        const { reference, providerIntentId, amountCents, credentials } = input;
+        const { reference, amountCents, credentials } = input;
 
         let res: Response;
         try {
             res = await fetch(
-                `${this.baseUrl}/orders/${providerIntentId}/refunds`,
+                `${this.baseUrl}/orders/${cashfreeOrderId(input)}/refunds`,
                 {
                     method: "POST",
                     headers: this.headers(credentials),
@@ -199,12 +198,12 @@ export class CashfreeProvider implements MerchantProvider {
      * none; anything else that is not an answer is `UNKNOWN`.
      */
     async findRefund(input: FindRefundInput): Promise<RefundResult | null> {
-        const { reference, providerIntentId, credentials } = input;
+        const { reference, credentials } = input;
 
         let res: Response;
         try {
             res = await fetch(
-                `${this.baseUrl}/orders/${providerIntentId}/refunds/${reference}`,
+                `${this.baseUrl}/orders/${cashfreeOrderId(input)}/refunds/${encodeURIComponent(reference)}`,
                 { headers: this.headers(credentials) },
             );
         } catch {
@@ -234,20 +233,23 @@ export class CashfreeProvider implements MerchantProvider {
 
     /**
      * The payments on an order (`GET /orders/{order_id}/payments`, P1),
-     * looked up by the merchant order id Saroh made it under (the Order's
-     * or Invoice's id — what `createOrderIntent` sent as `order_id`).
+     * looked up by the merchant order id Saroh made it under
+     * ({@link cashfreeOrderId}).
      * Cashfree's drop-in returns no signature, so this read is all its
      * return is checked by. Amounts are rupees, read as decimal text.
      */
     async findOrderPayments(
         input: FindOrderPaymentsInput,
     ): Promise<OrderPayment[]> {
-        const { merchantRef, credentials } = input;
-        if (!merchantRef) return [];
+        const { credentials } = input;
+        // An older intent with no Order or Invoice: nothing names its order.
+        if (!input.providerIntentId.includes("_") && !input.merchantRef) {
+            return [];
+        }
         let res: Response;
         try {
             res = await fetch(
-                `${this.baseUrl}/orders/${encodeURIComponent(merchantRef)}/payments`,
+                `${this.baseUrl}/orders/${cashfreeOrderId(input)}/payments`,
                 {
                     headers: this.headers(credentials),
                     signal: providerCallSignal(),
@@ -287,6 +289,23 @@ export class CashfreeProvider implements MerchantProvider {
             "Content-Type": "application/json",
         };
     }
+}
+
+/**
+ * The `order_id` Saroh gave Cashfree for an intent, URL-encoded. Since
+ * 22 Oct 2026 it is the intent's `providerIntentId` (`<target>_<hex>`).
+ * An intent made before kept Cashfree's numeric `cf_order_id` there and
+ * was sent under its Order's or Invoice's id, the `merchantRef`.
+ */
+export function cashfreeOrderId(input: {
+    providerIntentId: string;
+    merchantRef?: string | null;
+}): string {
+    const { providerIntentId, merchantRef } = input;
+    const id = providerIntentId.includes("_")
+        ? providerIntentId
+        : (merchantRef ?? providerIntentId);
+    return encodeURIComponent(id);
 }
 
 interface CashfreeRefund {

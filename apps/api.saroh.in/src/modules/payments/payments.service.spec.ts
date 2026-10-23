@@ -36,6 +36,8 @@ jest.mock("@saroh/database", () => {
         // Active autopay memberships per provider (#921): none here.
         paymentMandate: { groupBy: jest.fn(async () => []) },
         job: { create: jest.fn() },
+        // The business's notice switches (U12): none stored, so on.
+        customerNoticeSetting: { findUnique: jest.fn() },
         customerNotice: { findFirst: jest.fn() },
         paymentIntent: {
             findUnique: jest.fn(),

@@ -18,6 +18,11 @@ const QUIET: Record<string, Table> = {
     customerSubscription: { count: 0, findMany: [] },
     // F2: no booking-page note waiting (`home-people-sources.ts`).
     contactAttention: { count: 0, findMany: [] },
+    // Home A (DEC-171): no shelf running low, nothing sold from one.
+    stockLevel: { findMany: [] },
+    orderItem: { groupBy: [] },
+    // DEC-173: no cheque waiting for the bank (`home-cheques.ts`).
+    invoicePayment: { groupBy: [] },
 };
 
 type Rows = (
@@ -33,6 +38,9 @@ export function quietLastDay<T extends object>(db: T): T {
             table[method] ??= () => Promise.resolve(value);
         }
     }
+    // Running low compares two columns (a Prisma field reference).
+    const shelves = tables.stockLevel as Record<string, unknown>;
+    shelves.fields ??= { lowStockAlert: "lowStockAlert" };
     // Open orders are picked in one raw read (`home-open-orders.ts`, H-1):
     // answer it from the spec's own order mocks — its rows, as given, and
     // its count — so a spec that mocks `order.findMany` and `order.count`

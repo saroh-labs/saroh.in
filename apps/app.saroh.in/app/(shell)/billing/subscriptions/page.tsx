@@ -1,6 +1,6 @@
-import { PaymentsLocked } from "@/components/invoices/payments-locked";
-import { PageContainer } from "@/components/shared/page-container";
-import { SubscriptionsScreen } from "@/components/subscriptions/subscriptions-screen";
+import { PaymentsLocked } from "@/components/invoices/locked/payments-locked";
+import { PageContainer } from "@/components/shared/page/page-container";
+import { SubscriptionsScreen } from "@/components/subscriptions/list/subscriptions-screen";
 import { membershipPlansLock, onlinePaymentsLock } from "@/lib/billing/access";
 import { readMissingRates } from "@/lib/gst-rates/service";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";

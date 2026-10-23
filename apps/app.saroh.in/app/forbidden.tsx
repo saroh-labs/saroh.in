@@ -1,4 +1,4 @@
-import { AccessDenied } from "@/components/shared/access-denied";
+import { AccessDenied } from "@/components/shared/states/access-denied";
 
 /**
  * App-root 403, for a `forbidden()` outside `(shell)` and `(editor)`, which

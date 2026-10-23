@@ -1,15 +1,27 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { unpaidBillsOnce } from "../analytics/owed-by-age";
 import { planConnectsOwnAccounts } from "../billing/online-payments-plan";
+import {
+    businessTimezone,
+    FALLBACK_TIMEZONE,
+} from "../bookings/staff-availability";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
+import {
+    overdueBillIds,
+    overdueBillsWhere,
+    REMIND_ALL_QUIET_DAYS,
+} from "../invoices/overdue-bills";
 import { accountAreaOn } from "../site-accounts/account-area";
 import { ThreadsService } from "../site-accounts/threads.service";
 import { StockChecksService } from "../stock/stock-checks.service";
 import { businessDetailsGap } from "./home-business-details";
+import { readHomeCheques } from "./home-cheques";
 import { overdueFollowUps } from "./home-crm-sources";
 import { noEmailProvider } from "./home-email-setup";
+import { groupNeeds } from "./home-groups";
 import { HomeInlineService } from "./home-inline";
 import { lastDayHeader, readLastDay } from "./home-last-day";
 import {
@@ -21,6 +33,8 @@ import type {
     HomeEvidence,
     HomeInput,
     HomeModel,
+    HomeParts,
+    HomeRail,
     HomeSeverity,
     HomeUnavailable,
 } from "./home-model";
@@ -33,7 +47,7 @@ import {
     refundReasonWords,
     refundsOwedTitle,
 } from "./home-money-sources";
-import { flattenNeeds, HOME_DEFAULT_ZONE } from "./home-needs";
+import { flattenNeeds } from "./home-needs";
 import type { OpenOrders } from "./home-open-orders";
 import { readOpenOrders } from "./home-open-orders";
 import { pausesWaitingOnPayments } from "./home-pause-sources";
@@ -50,20 +64,28 @@ import type { HomeSchedule } from "./home-schedule";
 import { NO_SCHEDULE, readSchedule } from "./home-schedule";
 import { sitesNotLive, stockShort } from "./home-site-stock-sources";
 import { isStaffView, readStaffNarrow, WHOLE_BUSINESS } from "./home-staff";
+import { buildTiles } from "./home-tiles";
 import { readToday, todayScope } from "./home-today";
+import { readTodayFirst } from "./home-today-first";
 import { uncollectedOrders } from "./home-uncollected";
 import { readWeek, weekScope } from "./home-week";
 
 export type {
     HomeAction,
     HomeBooking,
+    HomeChequesWaiting,
     HomeEvidence,
+    HomeGoing,
+    HomeGoingOwed,
     HomeInline,
     HomeInlineKind,
     HomeInput,
     HomeLastDay,
     HomeModel,
     HomeNeed,
+    HomeNeedGroup,
+    HomeNeedKind,
+    HomeRail,
     HomeRetryVia,
     HomeReviewPage,
     HomeReviewSite,
@@ -71,6 +93,7 @@ export type {
     HomeSinceItem,
     HomeStaff,
     HomeStaffStore,
+    HomeTiles,
     HomeToday,
     HomeTodayItem,
     HomeTone,
@@ -179,6 +202,31 @@ export class HomeService {
         if (input.organizationRole === "REVIEWER") {
             return this.buildReviewer(input);
         }
+        const { model } = await this.compose(input, "all");
+        // `compose("all")` always draws the page.
+        if (!model) throw new Error("Home's full build drew no page");
+        return model;
+    }
+
+    /**
+     * The rail's badges (review #16): the ranked actions alone. The shell
+     * reads this on every page, hard load and refresh, so it asks only the
+     * sources that make actions, and none of Home A's (DEC-171), the day,
+     * the last 24 hours or the week, which only Home's own page draws. A
+     * Reviewer has no badges, so nothing is read for them.
+     */
+    async rail(input: HomeInput): Promise<HomeRail> {
+        if (input.organizationRole === "REVIEWER") {
+            return { actions: [], unavailable: [] };
+        }
+        return (await this.compose(input, "rail")).rail;
+    }
+
+    private async compose(
+        input: HomeInput,
+        parts: HomeParts,
+    ): Promise<{ rail: HomeRail; model: HomeModel | null }> {
+        const full = parts === "all";
 
         // NOT guarded. Availability decides what Home is even allowed to show;
         // without it there is no page to degrade, and guessing would risk
@@ -299,28 +347,18 @@ export class HomeService {
         const viewer = viewerOf(input);
         const scope = todayScope(input, available);
         const week = weekScope(input, available);
+        // Read once and shared (review #16): This week's owed and How it's
+        // going's owed by age fold the same unpaid bills, and the overdue
+        // bills row and Remind all's bills pick by the same where.
+        const unpaid = unpaidBillsOnce(this.db, input.organizationId);
+        const overdueWhere = canReadInvoices
+            ? overdueBillsWhere(this.db, input.organizationId, now)
+            : null;
+        // Asked by the guarded read below, which names its failure; this
+        // only keeps a rejection from going unheard before then.
+        overdueWhere?.catch(() => undefined);
 
-        const [
-            overdue,
-            open,
-            schedule,
-            today,
-            lastDay,
-            owed,
-            renewals,
-            waiting,
-            overdueInvoiceAction,
-            short,
-            notLive,
-            thisWeek,
-            reviews,
-            notes,
-            messages,
-            refundsFailed,
-            detailsGap,
-            uncollected,
-            noEmail,
-        ] = await Promise.all([
+        const reads = Promise.all([
             active.has("CRM") && canReadLeads
                 ? guard(
                       { moduleKey: "CRM", label: "Overdue follow-ups" },
@@ -345,7 +383,9 @@ export class HomeService {
                       noOpenOrders,
                   )
                 : skip<OpenOrders>(noOpenOrders),
-            available.has("APPOINTMENTS")
+            // The schedule, the day, the last 24 hours and the week are
+            // Home's page's alone: the rail's badges never read them (#16).
+            full && available.has("APPOINTMENTS")
                 ? guard<HomeSchedule>(
                       { moduleKey: "APPOINTMENTS", label: "Schedule" },
                       () =>
@@ -360,7 +400,7 @@ export class HomeService {
                 : skip(NO_SCHEDULE),
             // The business's day, in its zone (F5): bookings, classes,
             // pick-ups.
-            scope
+            full && scope
                 ? guard(
                       {
                           moduleKey: scope.bookings
@@ -381,18 +421,20 @@ export class HomeService {
                 : skip(null),
             // The greeting's clock and the last 24 hours (F6), in the same
             // zone.
-            guard(
-                { moduleKey: "HOME", label: "The last 24 hours" },
-                () =>
-                    readLastDay(
-                        this.db,
-                        input,
-                        available,
-                        { now, zone },
-                        stores,
-                    ),
-                lastDayHeader(now, zone),
-            ),
+            full
+                ? guard(
+                      { moduleKey: "HOME", label: "The last 24 hours" },
+                      () =>
+                          readLastDay(
+                              this.db,
+                              input,
+                              available,
+                              { now, zone },
+                              stores,
+                          ),
+                      lastDayHeader(now, zone),
+                  )
+                : skip(lastDayHeader(now, zone)),
             // Money taken through an invoice's pay link after the invoice
             // was already paid or voided (U13). The customer is owed it
             // back, so it is ATTENTION: already wrong, and only the merchant
@@ -446,7 +488,14 @@ export class HomeService {
             canReadInvoices
                 ? guard(
                       { moduleKey: "PAYMENTS", label: "Overdue invoices" },
-                      () => overdueInvoices(this.db, input.organizationId, now),
+                      () =>
+                          overdueInvoices(
+                              this.db,
+                              input.organizationId,
+                              now,
+                              zone,
+                              overdueWhere ?? undefined,
+                          ),
                       null,
                   )
                 : skip(null),
@@ -477,7 +526,7 @@ export class HomeService {
                   )
                 : skip(null),
             // This week (F7): each figure for whoever holds its read.
-            week
+            full && week
                 ? guard(
                       { moduleKey: "HOME", label: "This week" },
                       () =>
@@ -487,6 +536,7 @@ export class HomeService {
                               week,
                               { now, zone },
                               stores,
+                              unpaid,
                           ),
                       null,
                   )
@@ -586,6 +636,56 @@ export class HomeService {
                   )
                 : skip(null),
         ]);
+        // Home A's sources (DEC-171), asked at once with the rest; their
+        // slots come after today's, so `unavailable` keeps its order. Home's
+        // page's alone: the rail never reads them (#16).
+        const todayFirst = full
+            ? readTodayFirst(this.db, guard, {
+                  input,
+                  available,
+                  now,
+                  zone,
+                  narrow,
+                  today: scope,
+                  week,
+                  unpaid,
+              })
+            : skip([null, null, null, null] as const);
+        // "Cheques not in the bank" (DEC-173, Home U18): read on its own, so
+        // a failure is named "Cheques" ("Couldn't check cheques just now")
+        // and the week's other figures still come. Only for someone who
+        // reads both money and invoices (`weekScope`).
+        const chequesRead =
+            full && week?.cheques
+                ? guard(
+                      { moduleKey: "PAYMENTS", label: "Cheques" },
+                      () => readHomeCheques(this.db, input.organizationId),
+                      null,
+                  )
+                : skip(null);
+        const [
+            overdue,
+            open,
+            schedule,
+            today,
+            lastDay,
+            owed,
+            renewals,
+            waiting,
+            overdueInvoiceAction,
+            short,
+            notLive,
+            thisWeek,
+            reviews,
+            notes,
+            messages,
+            refundsFailed,
+            detailsGap,
+            uncollected,
+            noEmail,
+        ] = await reads;
+        const [awaiting, low, moneyIn, going] = await todayFirst;
+        const cheques = await chequesRead;
         const unavailable = slots.flat();
 
         if (overdue.count > 0) {
@@ -687,10 +787,68 @@ export class HomeService {
         actions.sort(
             (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity],
         );
+        // The rail counts the ranked actions; nothing past here is its.
+        if (!full) return { rail: { actions, unavailable }, model: null };
         // What each row offers in place (F4), for whoever may do it.
         await this.inline?.decorate(actions, input, now);
 
-        return {
+        // Home A (DEC-171): Needs you grouped, with the two sources only
+        // the groups carry, and the tiles. Amounts only with `payment:read`.
+        const money = holds(input, "payment:read");
+        const grouped = groupNeeds(
+            [
+                ...actions,
+                ...(awaiting ? [awaiting] : []),
+                ...(low ? [low] : []),
+            ],
+            zone,
+            {
+                money,
+                extra: {
+                    bills: going?.owed
+                        ? { totals: going.owed.totals, all: going.owed.bills }
+                        : null,
+                    awaiting: awaiting?.totals ?? null,
+                },
+            },
+        );
+        // Remind all (DEC-171, U8): the bills it reminds, for someone who
+        // may send a reminder. A failed read leaves the group without the
+        // button, never Home without its groups.
+        const bills = grouped.needGroups.find((g) => g.kind === "BILLS");
+        if (bills && holds(input, "invoice:write")) {
+            try {
+                const invoiceIds = await overdueBillIds(
+                    this.db,
+                    input.organizationId,
+                    now,
+                    overdueWhere ?? undefined,
+                );
+                if (invoiceIds.length > 0) {
+                    bills.remind = {
+                        invoiceIds,
+                        quietDays: REMIND_ALL_QUIET_DAYS,
+                    };
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `Remind all's bills couldn't be read: ${(error as Error).message}`,
+                );
+            }
+        }
+        const openRead =
+            available.has("COMMERCE") &&
+            (holds(input, "order:read") || holds(input, "order:stage")) &&
+            !unavailable.some((u) => u.label === "Open orders");
+        const tiles = buildTiles({
+            now,
+            today,
+            upcoming,
+            open: openRead ? open : null,
+            moneyIn,
+        });
+
+        const model: HomeModel = {
             // A staff member's Home is the business's rows, narrowed (F11).
             ...(staffView
                 ? { view: "staff" as const, staff: staffView.staff }
@@ -705,8 +863,17 @@ export class HomeService {
             ordersInProgress: active.has("COMMERCE") ? open.later : 0,
             today,
             lastDay,
-            week: thisWeek,
+            // The cheques line rides on the week (`week.chequesWaiting`):
+            // null while none waits, when its read failed, and for a
+            // viewer without both reads.
+            week: thisWeek
+                ? { ...thisWeek, chequesWaiting: cheques }
+                : thisWeek,
+            tiles,
+            ...grouped,
+            going,
         };
+        return { rail: { actions, unavailable }, model };
     }
 
     /**
@@ -748,27 +915,22 @@ export class HomeService {
     }
 
     /**
-     * The zone the business keeps its days in, or India's when it has set
-     * none (as invoicing reads it). Not a source of its own: when it can't be
-     * read, the default only moves "Due today" by the zones' difference, and
-     * saying Home is missing a part would be untrue.
+     * The zone the business keeps its days in: `businessTimezone`, the one
+     * reader every surface uses (its own setting, else its first service's,
+     * else India's). Not a source of its own: when it can't be read, the
+     * fallback only moves "Due today" by the zones' difference, and saying
+     * Home is missing a part would be untrue.
      */
     private async businessZone(organizationId: string): Promise<string> {
         try {
-            const profile = await this.db.businessProfile.findUnique({
-                where: { organizationId },
-                select: { timezone: true },
-            });
-            // "" included, as older rows stored it.
-            const zone = profile?.timezone?.trim() ?? "";
-            return zone.length > 0 ? zone : HOME_DEFAULT_ZONE;
+            return await businessTimezone(this.db, organizationId);
         } catch (error) {
             this.logger.warn(
                 `Home could not read the business's time zone: ${
                     error instanceof Error ? error.message : String(error)
                 }`,
             );
-            return HOME_DEFAULT_ZONE;
+            return FALLBACK_TIMEZONE;
         }
     }
 

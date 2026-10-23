@@ -2,23 +2,18 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
-import { BusinessDate } from "@/components/shared/business-zone";
+import { BusinessDate } from "@/components/shared/dates/business-zone";
 import { cardAttention } from "@/lib/orders/attention";
 import type { Shipment } from "@/lib/orders/courier";
 import type { AllergyNote, OrderAttention, OrderRead } from "@/lib/orders/read";
 
+import { initials } from "@/lib/names";
+import { phoneLabel } from "@/lib/organizations/business-phone";
 import { Notice } from "@saroh/ui/notice";
 import { FOCUS, Panel } from "./parts";
 
-export function initials(name: string): string {
-    const letters = name
-        .split(/[\s&@.]+/)
-        .filter((w) => /^[A-Za-zÀ-ÿ0-9]/.test(w))
-        .slice(0, 2)
-        .map((w) => w.charAt(0).toUpperCase())
-        .join("");
-    return letters || "?";
-}
+/** The one rule for initials (`lib/names.ts`). */
+export { initials };
 
 /**
  * Who it is for: name (to their page), how long they have ordered here,
@@ -115,7 +110,13 @@ export function CustomerCard({
                 {customer.email ? (
                     <span className="break-all">{customer.email}</span>
                 ) : null}
-                {contact ? <span>{customer.phone ?? "No phone"}</span> : null}
+                {contact ? (
+                    <span>
+                        {customer.phone
+                            ? phoneLabel(customer.phone)
+                            : "No phone"}
+                    </span>
+                ) : null}
                 {address ? (
                     <span className="whitespace-pre-line text-muted-foreground">
                         {address}

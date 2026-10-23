@@ -40,6 +40,69 @@
   `--site-body-size` and `--site-measure` with today's value as the fallback,
   and marks a section title `data-site-title` (the eyebrow rule `SiteTheme`
   writes from `--site-label-style`). Section headings use `font-site-heading`.
+- **Current** (20 Oct 2026, DEC-172) — **A look is data, chosen per site**
+  (`looks.ts` in `@saroh/block-contract`): Folio, Quiet or Live, stored as
+  `Site.style.look`. Absent is Classic and is never written out, so a style
+  with no look is byte for byte what it was. A look carries tokens (corners,
+  margins, measure), its font pair, a type scale, the layout each block takes
+  where its section chose none (`resolveVariant(type, content, look)`), how
+  booking is framed (Folio a panel, Quiet a page, Live sheets) and its motion
+  ceiling. Colours are never a look's: they are the business's, **made safe,
+  never refused** (`safe-colours.ts`): the accent is moved toward the text
+  until it reads, and an accent that is the ink itself is drawn as an
+  outline. Blocks are told `LookProps` (`look`, `isOwnerPreview`;
+  `site-blocks/src/look-context.ts`) as props, and the page's root wears
+  `data-site-look` for CSS. **Look code is inert for Classic**: every look
+  branch leaves Classic's markup and motion as they were, held by the
+  `classic-pin` tests; a change to Classic is its own decision. "No photo
+  yet" and other notes on what is missing show only where `isOwnerPreview`
+  is true. A state page under a look (404, the page that didn't load, a
+  module off) is `SitePageMessage` given the `look`
+  (`site-page-message.tsx`); paused booking is `booking-flow/look-closed.tsx`.
+  Loading shapes wait 300 ms
+  (`HELD_AFTER_MS`, `look-theme.ts`), then stand still. The flag and its
+  rollout: `docs/architecture/runbooks/SITE_LOOKS_ROLLOUT.md`.
+  **A look matches its boards** (DEC-172 amendment, 22 Oct 2026): Folio
+  board VA, Quiet VD, Live VB on the Website v2 canvas, on every page. Its
+  corners, spacing, weights and faces are the board's; **its width is
+  Classic's** (page margins and content width stay as they are). The
+  look's own CSS (`lookRules`) carries what a token can't: a hairline over
+  every section after the first under Folio and after the second under
+  Quiet, Quiet's bold drawn at 500 (its body face has no heavier weight),
+  and Live's Classic-markup cards at its 24px card radius
+  (`--site-radius-photo`). Folio keeps full padding between sections (no
+  halved neighbour gap, `rhythm` in `site-craft.ts`). Live tints the page,
+  not its cards: white cards on a grey ground (`safe-colours.ts`).
+- **Current** (20 Oct 2026, DEC-177) — **A paid style is refused in the
+  Style panel, and every look can be previewed.** Website › Style takes
+  `rules` (`styleChoiceRules` in `lib/sites/style-access.ts`, from the site
+  read's `styleAccess` and the style the server holds): a paid look,
+  typeface or colourway carries a small "Paid plans" tag; on a plan without
+  "Themes, fonts and templates" choosing one calls nothing, the previous
+  choice stays chosen and drawn, and one line where it was pressed says why
+  with See plans (`PaidRefusal`, `role="alert"`, never a toast). Colours
+  and spacing are never marked. Each look in the Look row has its own
+  "Preview {look}" button beside the radio, never inside it (`ChoiceGroup`'s
+  `layout`), a 44px target on a coarse pointer. It opens `LookPreview`: the
+  shared Dialog, large, on a desk; the shared Sheet from the bottom, full
+  height, on a phone (`useNarrow`). Inside, the look's showcase template
+  drawn for its sample business with the gallery's sample words
+  (`LookShowcase`, DEC-182: `LOOK_SHOWCASE_TEMPLATE`, the gallery's own
+  `templateRender`) in its board's colours (`LOOK_SHOWCASE_PALETTE`; the
+  template's Classic colourways are untouched) and pages: every look
+  previews Prana Yoga, the studio its home board draws (a showcase-only
+  manifest, `templates/prana.ts`), its board's sections in its board's
+  words (`withLookShowcase`, DEC-182 amended 22 Oct), the hero's next free
+  time from the sample's today, inert, with a Desk and Phone switch, the look's name
+  and `suits`, Close, "Use this look", and, for someone who may change the
+  site, "Use this look with its starter content". That one first says, in
+  the dialog's foot, which pages it replaces and adds and that the words
+  are a sample business's, waits while the editor has unsaved work, then
+  copies the template's pages into the draft (`starterContentActions`):
+  the editor starts afresh on it (`SiteEditorHost`) and a toast offers
+  Undo. Both follow the same paid rule. Nothing saves and the draft and
+  canvas don't change until one is pressed; closing hands the keyboard
+  back to the Preview button.
 - **Current** — **A section's frame and the page's column** (industry
   templates, polish pass). Every section may carry `anchor`, `navLabel` and
   `band` beside its own fields (`section-frame.ts` in `@saroh/block-contract`;
@@ -183,26 +246,26 @@
   draws its own; the scan in `apps/app.saroh.in/lib/consistency/shared-pieces.test.ts`
   fails when one does, and its allowlists are the record of what is left.
 
-    | Piece                                                                       | Where                                                                | The rule                                                                                                                                                                                                                                                                                                               |
-    | --------------------------------------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-    | `TabStrip`                                                                  | `@saroh/ui/tabs`                                                     | The one tab look, for a screen's VIEWS only (never a status filter: that is a `ListFilter`): Ink underline, 14px, optional count, one line inside `ScrollX` on a phone, 44px on touch. Links (`href`, `aria-current="page"`) or buttons (`role="tab"`, arrows move).                                                   |
-    | `SectionList`                                                               | `components/shared/section-list.tsx`                                 | The one vertical list of sections (Settings, Website › Settings).                                                                                                                                                                                                                                                      |
-    | `Segmented`                                                                 | `@saroh/ui/segmented`                                                | The one either/or: a grey track, the chosen option Ink. A radio group, or a `nav` of links. A block as wide as its words, under its label; `block` fills the row.                                                                                                                                                      |
-    | `Chip`, `chipClass`                                                         | `@saroh/ui/chip` (also `components/shared/chip.tsx`)                 | A choice among a few (radio) or a filter (`as="toggle"`). One size.                                                                                                                                                                                                                                                    |
-    | `ListToolbar`, `ListFilter`, `MoreFilters`, `AttentionToggle`, `ListPaging` | `@saroh/ui/list-toolbar` (also `components/shared/list-toolbar.tsx`) | The one toolbar of a list, in one row (slots `tabs`, `search`, `filters`, `more`, `attention`, `onClear`, `end`, `count`). Every filter is a `ListFilter` dropdown, at most three in the row and the rest behind `MoreFilters`. One `AttentionToggle` at most. `ListPaging` is how a paged list ends.                  |
-    | `listTable`, `ListTable`, `ListTableHead`                                   | `@saroh/ui/list-table` (also `components/shared/list-toolbar.tsx`)   | The one table look for a list a screen draws itself: the card, the tinted head band, rows ruled edge to edge, figures, a time that never wraps. `DataView` draws the same.                                                                                                                                             |
-    | `ChipGroup`, `RadioCards`, `ChoiceGroup`                                    | `components/shared/choice-group.tsx`                                 | One of several: pills, rows with a radio dot, or the screen's own drawing. One tab stop, arrows move the choice (`frontend-forms.md`).                                                                                                                                                                                 |
-    | `CheckRow`, `SwitchRow`                                                     | `components/shared/check-row.tsx`                                    | A tick or a switch with its words: the shared `Checkbox` or `Switch`, the words take the press, 44px on touch.                                                                                                                                                                                                         |
-    | `ListSearch`                                                                | `@saroh/ui/list-search`                                              | "Search {things}" (required), icon, 38px, ONE width (320px, full width on a phone: a call site never sets one), `describe` for what it looks through, 180ms, Escape clears, "/" focuses, "Searching…" while the list is read. First in `ListToolbar`'s row. DataView draws it.                                         |
-    | `StatusBadge`, `Badge`                                                      | `components/shared/status-badge.tsx`, `@saroh/ui/badge`              | Sentence case, words always, never pressed. `size="sm"` is 11px, `dot` adds a dot.                                                                                                                                                                                                                                     |
-    | `CountBadge`                                                                | `@saroh/ui/count-badge`                                              | Unread and tab counts. `neutral` is a plain tally. `strong` (Ink) and `danger` only when the number means "needs you now", with `says` ("need you") so its name says so. `null` is "—", never 0. A count in a dropdown filter is not this piece.                                                                       |
-    | `AbsentValue`, `AbsentOr`, `absentText`                                     | `@saroh/ui/absent-value`, `@saroh/ui/lib/absent`                     | A value that isn't there, in a cell, a stat tile, a row's meta or a quick look: a muted dash, `aria-hidden`, with `says` ("None", "Not set", "Not known") as the visually hidden word. `absentText()` is the dash for a plain string. Never typed by hand (`check:copy`). A Settings read row says "Not set" in words. |
-    | `Notice`                                                                    | `@saroh/ui/notice`                                                   | `tone`, `title`, `action`, `role`, `layout` (`card`, `banner`). The `-subtle` tokens, never an alpha tint. `ReadOnlyNote` and `SinceNotice` are thin wrappers.                                                                                                                                                         |
-    | `TextLink`, `textLinkClass`                                                 | `@saroh/ui/text-link`                                                | Ink, underlined at rest, focus ring. `external` adds the glyph and the new tab.                                                                                                                                                                                                                                        |
-    | `IconButton`, `Tip`                                                         | `@saroh/ui/icon-button`, `@saroh/ui/tooltip`                         | `label` is required: the name and the tooltip. `Tip` replaces `title=` and is the control's `aria-description`.                                                                                                                                                                                                        |
-    | `CopyButton`, `ShareLink`, `copyText`                                       | `@saroh/ui/copy-button`                                              | "Copied" in the label for 1.6s, no toast. One failure sentence, with the value shown selected. `ShareLink` opens the phone's share sheet. The only code that touches the clipboard.                                                                                                                                    |
-    | `ProgressBar`, `doneOf`                                                     | `@saroh/ui/progress-bar`                                             | `value`, `max`, `size`, `tone`, `label` (required). A checklist's count is "2 of 4 done".                                                                                                                                                                                                                              |
-    | `.label`                                                                    | `packages/ui/src/globals.css`                                        | 11px, 600, uppercase at 0.1em: every table and list header and eyebrow. The only `uppercase` in the app (code fields excepted).                                                                                                                                                                                        |
+    | Piece                                                                       | Where                                                                      | The rule                                                                                                                                                                                                                                                                                                               |
+    | --------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+    | `TabStrip`                                                                  | `@saroh/ui/tabs`                                                           | The one tab look, for a screen's VIEWS only (never a status filter: that is a `ListFilter`): Ink underline, 14px, optional count, one line inside `ScrollX` on a phone, 44px on touch. Links (`href`, `aria-current="page"`) or buttons (`role="tab"`, arrows move).                                                   |
+    | `SectionList`                                                               | `components/shared/page/section-list.tsx`                                  | The one vertical list of sections (Settings, Website › Settings).                                                                                                                                                                                                                                                      |
+    | `Segmented`                                                                 | `@saroh/ui/segmented`                                                      | The one either/or: a grey track, the chosen option Ink. A radio group, or a `nav` of links. A block as wide as its words, under its label; `block` fills the row.                                                                                                                                                      |
+    | `Chip`, `chipClass`                                                         | `@saroh/ui/chip` (also `components/shared/lists/chip.tsx`)                 | A choice among a few (radio) or a filter (`as="toggle"`). One size.                                                                                                                                                                                                                                                    |
+    | `ListToolbar`, `ListFilter`, `MoreFilters`, `AttentionToggle`, `ListPaging` | `@saroh/ui/list-toolbar` (also `components/shared/lists/list-toolbar.tsx`) | The one toolbar of a list, in one row (slots `tabs`, `search`, `filters`, `more`, `attention`, `onClear`, `end`, `count`). Every filter is a `ListFilter` dropdown, at most three in the row and the rest behind `MoreFilters`. One `AttentionToggle` at most. `ListPaging` is how a paged list ends.                  |
+    | `listTable`, `ListTable`, `ListTableHead`                                   | `@saroh/ui/list-table` (also `components/shared/lists/list-toolbar.tsx`)   | The one table look for a list a screen draws itself: the card, the tinted head band, rows ruled edge to edge, figures, a time that never wraps. `DataView` draws the same.                                                                                                                                             |
+    | `ChipGroup`, `RadioCards`, `ChoiceGroup`                                    | `components/shared/fields/choice-group.tsx`                                | One of several: pills, rows with a radio dot, or the screen's own drawing. One tab stop, arrows move the choice (`frontend-forms.md`).                                                                                                                                                                                 |
+    | `CheckRow`, `SwitchRow`                                                     | `components/shared/fields/check-row.tsx`                                   | A tick or a switch with its words: the shared `Checkbox` or `Switch`, the words take the press, 44px on touch.                                                                                                                                                                                                         |
+    | `ListSearch`                                                                | `@saroh/ui/list-search`                                                    | "Search {things}" (required), icon, 38px, ONE width (320px, full width on a phone: a call site never sets one), `describe` for what it looks through, 180ms, Escape clears, "/" focuses, "Searching…" while the list is read. First in `ListToolbar`'s row. DataView draws it.                                         |
+    | `StatusBadge`, `Badge`                                                      | `components/shared/lists/status-badge.tsx`, `@saroh/ui/badge`              | Sentence case, words always, never pressed. `size="sm"` is 11px, `dot` adds a dot.                                                                                                                                                                                                                                     |
+    | `CountBadge`                                                                | `@saroh/ui/count-badge`                                                    | Unread and tab counts. `neutral` is a plain tally. `strong` (Ink) and `danger` only when the number means "needs you now", with `says` ("need you") so its name says so. `null` is "—", never 0. A count in a dropdown filter is not this piece.                                                                       |
+    | `AbsentValue`, `AbsentOr`, `absentText`                                     | `@saroh/ui/absent-value`, `@saroh/ui/lib/absent`                           | A value that isn't there, in a cell, a stat tile, a row's meta or a quick look: a muted dash, `aria-hidden`, with `says` ("None", "Not set", "Not known") as the visually hidden word. `absentText()` is the dash for a plain string. Never typed by hand (`check:copy`). A Settings read row says "Not set" in words. |
+    | `Notice`                                                                    | `@saroh/ui/notice`                                                         | `tone`, `title`, `action`, `role`, `layout` (`card`, `banner`). The `-subtle` tokens, never an alpha tint. `ReadOnlyNote` and `SinceNotice` are thin wrappers.                                                                                                                                                         |
+    | `TextLink`, `textLinkClass`                                                 | `@saroh/ui/text-link`                                                      | Ink, underlined at rest, focus ring. `external` adds the glyph and the new tab.                                                                                                                                                                                                                                        |
+    | `IconButton`, `Tip`                                                         | `@saroh/ui/icon-button`, `@saroh/ui/tooltip`                               | `label` is required: the name and the tooltip. `Tip` replaces `title=` and is the control's `aria-description`.                                                                                                                                                                                                        |
+    | `CopyButton`, `ShareLink`, `copyText`                                       | `@saroh/ui/copy-button`                                                    | "Copied" in the label for 1.6s, no toast. One failure sentence, with the value shown selected. `ShareLink` opens the phone's share sheet. The only code that touches the clipboard.                                                                                                                                    |
+    | `ProgressBar`, `doneOf`                                                     | `@saroh/ui/progress-bar`                                                   | `value`, `max`, `size`, `tone`, `label` (required). A checklist's count is "2 of 4 done".                                                                                                                                                                                                                              |
+    | `.label`                                                                    | `packages/ui/src/globals.css`                                              | 11px, 600, uppercase at 0.1em: every table and list header and eyebrow. The only `uppercase` in the app (code fields excepted).                                                                                                                                                                                        |
 
 - **Current** (10 Oct 2026) — **"Draft" and "Live" for every kind of
   thing.** Whether customers can get a product, plan, course, pack, post,
@@ -301,7 +364,7 @@
   breadcrumb, so the title does not move. No bordered breadcrumb strip, no hand-written `<h1>`
   and no hand-written `aria-label="Breadcrumb"`: a screen that needs
   something the header lacks adds a slot to it.
-  `components/shared/page-chrome.test.ts` fails on either. A Settings
+  `components/shared/page/page-chrome.test.ts` fails on either. A Settings
   section's header is `SettingsPanelHeader`, which draws the same component
   with "Settings › {section}". An editor's sticky bar holds it too
   (`components/editor-shell/publish-banner.tsx`).
@@ -314,7 +377,7 @@
   lists side by side (Stock, Customers, Discount codes, Locations) each
   had their own toolbar order, search width, tabs or chips, count style
   and table head. Every list in `app.saroh.in` is laid out the same now,
-  from the top, and `components/shared/list-screens.test.ts` fails a
+  from the top, and `components/shared/lists/list-screens.test.ts` fails a
   screen that draws its own (its allow-lists need a reason each):
 
     ```
@@ -345,7 +408,7 @@
       chosen ("Open 3"): leave it out when it isn't known, pass 0 when
       zero is a fact. An option may also carry a `hint` and the list a
       `footer`. A server component hands addresses to `LinkFilter`
-      (`components/shared/link-filter.tsx`).
+      (`components/commerce/product-page/link-filter.tsx`).
     - **An unnarrowed filter reads "All {plural}"**, in the thing's own
       noun, so the box says what it filters: "All orders", "All
       locations", "All categories", "All statuses", "All dates", "All
@@ -427,6 +490,26 @@
     - **A notice about the page sits under its header**, above the
       toolbar, never above the title.
     - **A time never wraps** (see Numbers and dates).
+    - **Figures over a list are filters, said once** (DEC-173, Invoices
+      U8 #1120). A strip of figures above the toolbar (Invoices' Owed,
+      Overdue, Paid this month, Drafts) takes the place of a header
+      summary and a banner saying the same thing: each figure is a button
+      with `aria-pressed`, pressing it sets the list's filter (the one the
+      API named, never one the app builds), pressing it again shows
+      everything, and an on figure has a thicker Ink edge as well as its
+      word. A figure that is also a status sets the same `?tab=` as the
+      status dropdown, so the two never disagree. A role without money
+      sees counts; a strip whose read failed says "Couldn't load totals"
+      with Try again (`FailedRead`) and never a row of ₹0, and the list
+      under it still loads. On a phone the strip sits in a bare `ScrollX`,
+      two in view.
+    - **A list's phone screen may take the compact bar**:
+      `PageHeader compactOnPhone` hides the breadcrumb below `sm`, sets
+      the title at 24px and keeps the primary on the title's line
+      ("New", with the desk's words as its accessible name). Phone rows
+      are cards of 64 to 72px: two lines that never wrap (who, then
+      "0106 · 13 days late"), the figure on the right, and what the desk's
+      other columns say given to a screen reader.
 
     Hand-built before this, and on the shared classes now: Stock (Levels
     and Log), Customers, Invoices, Subscriptions, Team and its
@@ -448,7 +531,7 @@
     `lib/subscriptions/view.ts` puts that view first, and the header
     leads with it), and a plan's Archive and Sell again are in its row's
     menu. What is set once for every plan is a group of read-first rows
-    under the list (`components/subscriptions/plan-settings.tsx`). Stock's
+    under the list (`components/subscriptions/plans/plan-settings.tsx`). Stock's
     three lists (Levels, Log, Checks) end with `ListPaging`, each with its
     own page and size in the address (`lib/stock/list-query.ts`); Levels
     pages by product, so its footer counts products, not rows. A list
@@ -460,14 +543,14 @@
   page runs edge to edge). No inner `max-w-*` wrapper narrows a list inside
   a wider container. A settings-style screen made of rows (Sell › Location,
   Website › Settings, Settings › Business) lays out through
-  `SettingsColumns` (`components/shared/settings-columns.tsx`): rows at
+  `SettingsColumns` (`components/shared/page/settings-columns.tsx`): rows at
   760px, growing to 1040px from a 1440px window, with the one "what's left"
   card above the tabs and to their right from 1440px (1760px where a list
   already sits beside the rows). The other Settings sections share that
   measure through `SettingsPanel` (`rows`), or take the panel (`full`) for
   a table.
 - **Current** (10 Oct 2026) — **One setup checklist: `SetupChecklist`**
-  (`components/shared/setup-checklist.tsx`, rules in
+  (`components/shared/setup-checklist/setup-checklist.tsx`, rules in
   `lib/setup-checklist.ts`). Home's and Settings › Business's "Finish
   setup", a location's and the website's "Before you share your site" are
   all it, each passing its own rows. A title, "2 of 4 done" (`doneOf`), the
@@ -481,7 +564,11 @@
   server. The checklist on Home and Settings is named **Finish setup**
   wherever it is referred to (`FINISH_SETUP`, `checklistWords` in
   `lib/settings/ready.ts`), with a line saying what its steps are for.
-  Never draw a fifth checklist by hand.
+  Never draw a fifth checklist by hand. On Home A at a desk, once most of
+  it is done, it is ONE line (`compact`, `setup-line.tsx`, DEC-171): the
+  count, the bar, the next step and its button, and "Show the 5 done
+  steps"; hidden, Settings › Business offers "Show setup on Home"
+  (`ShowSetupOnHome`, A4).
 - **Current** — **`desk:` is 760px**, where the rail appears and the phone
   layouts end, and `max-desk:` is its exact complement. New code uses them.
   The older `min-[760px]:` and `max-[759px]:` mean the same and are not yet
@@ -660,8 +747,24 @@ results), mark it `data-ph-mask`; a picture inside it is left out too, and
   one rule**, `siteImage()` (`site-blocks/src/lib/site-image.ts`), spread
   onto a plain `<img>`: lazy below the fold, decoded off the main thread,
   the first section's hero fetched first. Give the `<img>` its width and
-  height, or a box with an aspect ratio. No `srcset`: storage keeps one
-  file per photo and nothing resizes on request.
+  height, or a box with an aspect ratio.
+- **Current** (19 Oct 2026, #1043) — **A photo is sized for the screen
+  through `siteImage(place, { src, width, sizes })`.** Pass the address the
+  `<img>` draws, the file's own width when the snapshot has it, and how wide
+  the block draws it (`sizes`, `100vw` unsaid). A photo in the business's
+  public media (`org/<id>/site-image|product-image|business-logo/…`, JPEG,
+  PNG, WebP or AVIF) then gets `srcset` over a fixed ladder (320, 480, 780,
+  1200, 1600, 1920; nothing wider than the file) through the Worker's
+  `/_img/<width>/<key>` route (`apps/saroh.app/lib/images/resize.ts`), which
+  resizes it with the `IMAGES` binding as AVIF or WebP and keeps the result.
+  The first hero is preloaded from the head with the same sources. The
+  route serves only the site's own organization's image keys, fetched only
+  from the public media address; anything else is a 404, and a failed
+  resize serves the original. It is on only in builds with
+  `NEXT_PUBLIC_SITE_MEDIA_URL` (the Worker's `wrangler.jsonc`); elsewhere,
+  and for any other address, the `<img>` keeps its own `src`. The ladder
+  and the key rules are one module, `@saroh/site-blocks/image-sizes`, which
+  the page and the route both import.
 - **Current** (12 Oct 2026) — **A product with no photo never leaves an
   empty frame on a merchant's site**, and "No photo yet" never reaches a
   customer (it is a note for the owner, said in the workspace). Where
@@ -774,6 +877,29 @@ results), mark it `data-ph-mask`; a picture inside it is left out too, and
   plus a loader in both files; tests hold the three in step. A pair may name a
   third, `mono` face (`archivo-narrow`: IBM Plex Mono; `geist`: JetBrains
   Mono), emitted as `--site-font-mono` only when it has one.
+- **Current** — **A look's pair (DEC-172, `folio`, `quiet`, `live`) names
+  its weights, styles and subsets** (or, for a face its board sets on an
+  axis, its `axes` and the full variable range: Folio's Newsreader with
+  `opsz`, Live's Bricolage with `wdth` for its 80% width, 22 Oct), and is
+  marked `look: true`: it comes with
+  its look, so the Typeface picker (`PICKABLE_FONT_PAIRS`) does not offer it.
+  Each face has its own loader with exactly those options, filed in
+  `SITE_FACES` under the face's `load` key (`quiet:heading`), never its family,
+  because a family may be loaded twice (Folio's trimmed Newsreader beside the
+  `newsreader` pair's full one). Two families per look, no mono. Add
+  `latin-ext` only for a face that draws ₹ there (checked against the files).
+  Every face stays `preload: false`: `next/font` preloads per layout file, not
+  per request, so a preloaded look face would reach every Classic site.
+- **Current** (19 Oct 2026, DEC-172 U4) — **A look's ₹ is a sans, from the
+  device.** Prices sit in a look's body face, as the boards draw them. Where
+  that face has no ₹ (Quiet's Jost, Folio's Hanken Grotesk), `SiteTheme`
+  puts a rupee-only face, `"Site Rupee"`, right after it in
+  `--site-font-body`: an `@font-face` with `unicode-range: U+20B9` built
+  from `local()` sans faces that draw one (Arial, Roboto, Segoe UI, Noto
+  Sans, Liberation Sans, DejaVu Sans), regular and bold. No download, no
+  third family; never the look's serif display face. A face whose pair
+  loads `latin-ext` (Live's Figtree) draws its own and gets none, and
+  Classic never has it (`look-theme.ts`).
 - **Current** — **The mark is one SVG master** in `packages/ui/brand`, with
   `<Wordmark>` / `<SarohSymbol>` from `@saroh/ui/wordmark`. Never re-draw it.
   The stroke is never Saffron, and the dot drops below 20px. Every brand app
@@ -803,6 +929,43 @@ results), mark it `data-ph-mask`; a picture inside it is left out too, and
   `ease-linear` and a literal `duration-200` fail the scan. Exit faster than entry, and never animate position and size
   together. Motion only explains a change, so there is no decorative, looping,
   parallax or bounce motion on product surfaces.
+- **Current** (19 Oct 2026, DEC-172 U4) — **A merchant site's motion under a
+  look** is written by `craftRules(at, variables, look)`: fade or rise of 8px
+  or less, 200ms or less, `--site-ease` (no value over 1), no loops. Nothing
+  moves on scroll and nothing is hidden at rest. A block asks for an entrance
+  with `data-site-rise` (fade and rise, 200ms) or `data-site-fade` (140ms);
+  the phone menu takes 200ms and link colours 140ms. Under
+  `prefers-reduced-motion: reduce` every one of them is a 120ms fade. Classic
+  (no look) keeps its own motion unchanged. Corners are `rounded-site`
+  (buttons and inputs), `rounded-site-s` (chips, times) and
+  `rounded-site-photo`; the new colour roles are `site-accent-text`,
+  `site-accent-soft`, `site-rule` and `site-footer-muted`, each falling back
+  to the role it refines on a Classic site. The accent drawn as text (a
+  link, "Shop →", a price in the accent, `prose-a`) is always
+  `text-site-accent-text`, never `text-site-accent`, which is for fills
+  (22 Oct 2026): on Classic the two are the same colour; under a look the
+  fill may be a colour no text could be read in, like Live's lime. A palette
+  that names its own `accentText` keeps it (board VB's #4C6300), and under
+  Live its accent fill may then sit under a graphic's 3:1 against the page
+  (`LOOKS.live.colour.accentFillContrast`, `parsePalette`'s option),
+  because Live only fills what carries its own 4.5:1 text. A business's own
+  colours never name one, so they are made safe as before.
+- **Current** (20 Oct 2026, DEC-172 U5) — **A look's chrome keeps one filled
+  button per view and one fixed bar on a phone, in one place**
+  (`sticky-actions.tsx`). A block marks the page's own main action
+  `data-site-primary` (the accent's fill and the closing band's count too);
+  while one is on screen the page's root says `data-site-primary="shown"`,
+  and the header's Book and the dock's Book stay outlines until it says
+  `"gone"`. On a phone the header scrolls away; the Book bar (Folio, Quiet)
+  or the dock (Live) is the one bar, and it waits while the consent banner
+  (`data-site-consent`), a sheet or the menu (`role="dialog"` with
+  `aria-modal`) is open, and never draws on `/book`, a product or checkout.
+  A new fixed bar on a merchant page goes through it, never beside it.
+  Phone and desk differ by `max-[699px]:` and `min-[700px]:` only. Every
+  control in a look's header, menu, footer, bar and dock is 44×44 on every
+  pointer. Account links in a look's footer and menu are drawn only in the
+  browser (`footer-session-links.tsx`), so a cached page names no one.
+  Classic's chrome is pinned in `classic-pin.test.tsx`.
 - **Adopted** — **Motion comes from the primitives and the shared Tailwind
   config, not per-app `@keyframes`** (15 §3). Gap, and a contradiction to
   resolve rather than copy: `accounts.saroh.in/app/auth.css` defines 8 keyframes

@@ -65,7 +65,7 @@ accent is used sparingly, exactly per [01 P1](./01_PRODUCT_DESIGN_PHILOSOPHY.md)
 There is **no** success / warning / info token today. Components improvise with raw
 Tailwind palette colours — `border-amber-400`, `border-blue-400`, `border-emerald-400`
 in `components/crm/activity-timeline.tsx` and `text-amber-700 dark:text-amber-400` in
-`components/stores/order-payments.tsx`. That is the "rainbow creep" that
+`components/commerce/order-payment/order-payments.tsx`. That is the "rainbow creep" that
 [01 §3](./01_PRODUCT_DESIGN_PHILOSOPHY.md) forbids and is un-themeable. Add these to
 `globals.css` and the Tailwind config so status colour becomes a token, not a guess.
 
@@ -94,7 +94,7 @@ Then extend `tailwind.config.ts` `colors` with `success`/`warning`/`info`
 variable file for the whole product. Loaded with `display: "swap"` so text never blocks
 on the font ([01 P5](./01_PRODUCT_DESIGN_PHILOSOPHY.md)). `font-feature-settings` for
 tabular numbers where columns of figures appear (orders, prices) — the app already reaches
-for `tabular-nums` in `components/stores/order-payments.tsx`.
+for `tabular-nums` in `components/commerce/order-payment/order-payments.tsx`.
 
 **Type scale** (the only sizes allowed; map to Tailwind utilities):
 
@@ -282,7 +282,7 @@ arbitrary values like `min-w-[8rem]` are acceptable):
 | Violation                                                                                | File                                                                                    | Fix                                                                                                                              |
 | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | Raw palette status colours `border-amber-400` / `border-blue-400` / `border-emerald-400` | `apps/app.saroh.in/components/crm/activity-timeline.tsx`                                | Replace with `border-warning` / `border-info` / `border-success` (§2)                                                            |
-| Raw palette `text-amber-700 dark:text-amber-400`                                         | `apps/app.saroh.in/components/stores/order-payments.tsx`                                | Replace with `text-warning` (§2) — and it drops the manual dark override                                                         |
+| Raw palette `text-amber-700 dark:text-amber-400`                                         | `apps/app.saroh.in/components/commerce/order-payment/order-payments.tsx`                | Replace with `text-warning` (§2) — and it drops the manual dark override                                                         |
 | Arbitrary type `text-[10px]`                                                             | `apps/app.saroh.in/components/stores/store-nav.tsx` (Soon badge)                        | Use `text-xs` (12) or a defined caption token                                                                                    |
 | Arbitrary min-width `min-w-[200px]`                                                      | `apps/app.saroh.in/components/stores/members-manager.tsx`                               | Round to a spacing token (`min-w-48` = 192px / `min-w-52` = 208px)                                                               |
 | **Duplicate primitive set**                                                              | `apps/app.saroh.in/components/ui/*` exists **alongside** consuming `@saroh/ui`          | Consolidate on `@saroh/ui` so tokens can't drift between two copies (also flagged in [01 P6](./01_PRODUCT_DESIGN_PHILOSOPHY.md)) |

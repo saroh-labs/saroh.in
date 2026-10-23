@@ -1,5 +1,18 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+} from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+
+import { BackInStock } from "../shop/back-in-stock";
+import type {
+    BackInStockApi,
+    WatchResult,
+    WatchTaken,
+} from "../shop/back-in-stock-shape";
 
 import type { ProductPageData } from "./product-page";
 import ProductPage, {
@@ -699,4 +712,254 @@ describe("the saving against the MRP is true", () => {
         );
         expect(struck(container)).toBeNull();
     });
+});
+
+/**
+ * "Tell me when it's back" in the action slot (DEC-174, U24, #1155): asked
+ * of the API for the sold-out option on screen, drawn only when offered,
+ * in the site's own look.
+ */
+describe("Tell me when it's back", () => {
+    function api(overrides: Partial<BackInStockApi> = {}): BackInStockApi & {
+        offer: ReturnType<typeof vi.fn>;
+        watch: ReturnType<typeof vi.fn>;
+        stop: ReturnType<typeof vi.fn>;
+    } {
+        return {
+            offer: vi.fn(() =>
+                Promise.resolve({
+                    ok: true as const,
+                    data: { offered: true, why: null },
+                }),
+            ),
+            watch: vi.fn(() =>
+                Promise.resolve({
+                    ok: true as const,
+                    data: { state: "waiting" as const, stopToken: "v1.w1.sig" },
+                }),
+            ),
+            stop: vi.fn(() =>
+                Promise.resolve({
+                    ok: true as const,
+                    data: {
+                        state: "stopped" as const,
+                        business: "Tanvi Studio",
+                        product: "Linen Wrap Dress (S)",
+                    },
+                }),
+            ),
+            ...overrides,
+        } as never;
+    }
+
+    function page(a: BackInStockApi, look?: "folio" | "quiet" | "live") {
+        return render(
+            <ProductPage
+                product={dress}
+                preview={false}
+                look={look}
+                action={
+                    <BackInStock
+                        api={a}
+                        productId="prd_dress"
+                        business="Tanvi Studio"
+                        look={look}
+                    />
+                }
+            />,
+        );
+    }
+
+    async function soldOut(
+        a: BackInStockApi,
+        look?: "folio" | "quiet" | "live",
+    ) {
+        page(a, look);
+        // A look draws the options as radios (DEC-172).
+        fireEvent.click(
+            screen.getByRole(look ? "radio" : "button", {
+                name: "S (sold out)",
+            }),
+        );
+        return screen.findByRole("button", { name: "Tell me when it's back" });
+    }
+
+    it("draws nothing, and asks nothing, while the option can be bought", () => {
+        const a = api();
+        page(a);
+        expect(screen.queryByLabelText("Your email")).toBeNull();
+        expect(a.offer).not.toHaveBeenCalled();
+    });
+
+    it("asks for the sold-out option on screen and shows the form with the consent line", async () => {
+        const a = api();
+        await soldOut(a);
+        expect(a.offer).toHaveBeenCalledWith("prd_dress", "s");
+        expect(screen.getByLabelText("Your email")).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                "Tanvi Studio will email you now and when it's back. Nothing else.",
+            ),
+        ).toBeInTheDocument();
+    });
+
+    it("draws nothing when the business doesn't offer it", async () => {
+        const a = api({
+            offer: vi.fn(() =>
+                Promise.resolve({
+                    ok: true as const,
+                    data: { offered: false, why: "SWITCHED_OFF" as const },
+                }),
+            ),
+        });
+        page(a);
+        fireEvent.click(screen.getByRole("button", { name: "S (sold out)" }));
+        await waitFor(() => expect(a.offer).toHaveBeenCalled());
+        await act(() => Promise.resolve());
+        expect(screen.queryByLabelText("Your email")).toBeNull();
+    });
+
+    it("draws nothing when the question fails", async () => {
+        const a = api({ offer: vi.fn(() => Promise.reject(new Error("x"))) });
+        page(a);
+        fireEvent.click(screen.getByRole("button", { name: "S (sold out)" }));
+        await act(() => Promise.resolve());
+        expect(screen.queryByLabelText("Your email")).toBeNull();
+    });
+
+    it("says a typo under the field and sends nothing", async () => {
+        const a = api();
+        const button = await soldOut(a);
+        fireEvent.change(screen.getByLabelText("Your email"), {
+            target: { value: "asha@example" },
+        });
+        fireEvent.click(button);
+        expect(
+            await screen.findByText("Enter an email like name@example.com."),
+        ).toBeInTheDocument();
+        expect(screen.getByLabelText("Your email")).toHaveAttribute(
+            "aria-invalid",
+            "true",
+        );
+        expect(a.watch).not.toHaveBeenCalled();
+    });
+
+    it("takes a valid address for the option, then says where it will email", async () => {
+        const a = api();
+        const button = await soldOut(a);
+        fireEvent.change(screen.getByLabelText("Your email"), {
+            target: { value: "  Asha@Example.com " },
+        });
+        fireEvent.click(button);
+        expect(
+            await screen.findByText("We'll email you at asha@example.com."),
+        ).toBeInTheDocument();
+        expect(a.watch).toHaveBeenCalledWith({
+            productId: "prd_dress",
+            variantId: "s",
+            email: "asha@example.com",
+        });
+        expect(screen.queryByLabelText("Your email")).toBeNull();
+    });
+
+    it("offers Stop waiting while it waits, and says it won't email after", async () => {
+        const a = api();
+        const button = await soldOut(a);
+        fireEvent.change(screen.getByLabelText("Your email"), {
+            target: { value: "asha@example.com" },
+        });
+        fireEvent.click(button);
+        fireEvent.click(
+            await screen.findByRole("button", { name: "Stop waiting" }),
+        );
+        expect(
+            await screen.findByText("You won't be emailed about it."),
+        ).toBeInTheDocument();
+        expect(a.stop).toHaveBeenCalledWith("v1.w1.sig");
+    });
+
+    it("an address already waiting gets no way to stop it", async () => {
+        const a = api({
+            watch: vi.fn((): Promise<WatchResult<WatchTaken>> =>
+                Promise.resolve({
+                    ok: true,
+                    data: { state: "waiting", stopToken: null },
+                }),
+            ),
+        });
+        const button = await soldOut(a);
+        fireEvent.change(screen.getByLabelText("Your email"), {
+            target: { value: "asha@example.com" },
+        });
+        fireEvent.click(button);
+        await screen.findByText("We'll email you at asha@example.com.");
+        expect(
+            screen.queryByRole("button", { name: "Stop waiting" }),
+        ).toBeNull();
+    });
+
+    it.each([
+        [
+            "test-release",
+            "This is a test release. Nothing here is ordered, booked or paid.",
+        ],
+        ["busy", "Too many tries. Wait a minute and try again."],
+        ["error", "We couldn't save that. Try again."],
+    ] as const)(
+        "says a %s refusal in plain words and keeps the form",
+        async (reason, message) => {
+            const a = api({
+                watch: vi.fn(() =>
+                    Promise.resolve({ ok: false as const, reason, message }),
+                ),
+            });
+            const button = await soldOut(a);
+            fireEvent.change(screen.getByLabelText("Your email"), {
+                target: { value: "asha@example.com" },
+            });
+            fireEvent.click(button);
+            expect(await screen.findByRole("alert")).toHaveTextContent(message);
+            expect(screen.getByLabelText("Your email")).toBeInTheDocument();
+        },
+    );
+
+    it("a refusal because it's back says so in place of the form", async () => {
+        const a = api({
+            watch: vi.fn(() =>
+                Promise.resolve({
+                    ok: false as const,
+                    reason: "not-offered" as const,
+                    message:
+                        "This is in stock now. Refresh the page to buy it.",
+                }),
+            ),
+        });
+        const button = await soldOut(a);
+        fireEvent.change(screen.getByLabelText("Your email"), {
+            target: { value: "asha@example.com" },
+        });
+        fireEvent.click(button);
+        expect(
+            await screen.findByText(
+                "This is in stock now. Refresh the page to buy it.",
+            ),
+        ).toBeInTheDocument();
+        expect(screen.queryByLabelText("Your email")).toBeNull();
+    });
+
+    it.each(["folio", "quiet", "live"] as const)(
+        "under %s, draws the look's own field and button, from --site-* only",
+        async (look) => {
+            const button = await soldOut(api(), look);
+            const field = screen.getByLabelText("Your email");
+            expect(field.className).toContain("rounded-site-s");
+            expect(button.className).toContain("rounded-site");
+            expect(button.className).toContain("bg-site-accent");
+            for (const el of [field, button]) {
+                expect(el.className).not.toMatch(
+                    /(^|\s)(bg|text|border)-(primary|accent|foreground|muted)(\s|$)/,
+                );
+            }
+        },
+    );
 });

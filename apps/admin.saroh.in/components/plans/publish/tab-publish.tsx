@@ -4,12 +4,14 @@ import { Button } from "@saroh/ui/button";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { pricingImpactAction } from "@/lib/pricing-actions";
-import { upcomingVersions } from "@/lib/pricing-draft";
+import { changeCount, upcomingVersions } from "@/lib/pricing-draft";
 import type { Impact } from "@/lib/pricing-types";
 
 import { useDraft } from "../draft-store";
 import { usePlans } from "../plans-context";
 import { usePlansNav } from "../plans-nav";
+import { ChangeList } from "../preview/change-list";
+import { draftChanges } from "../preview/changes";
 import { nextVersion } from "../versions/versions";
 import { CompareTable } from "./compare-table";
 import type { ImpactState } from "./impact-list";
@@ -17,10 +19,12 @@ import { ImpactList } from "./impact-list";
 import { PublishPanel } from "./publish-panel";
 
 /**
- * Review & publish (plans catalogue U10): what the draft does to real
- * businesses, live and draft side by side, and the publish panel. The
- * impact is the API's, worked out for the saved revision: opening the tab
- * saves what is on screen first, so it never describes an older draft.
+ * Review and publish (plans catalogue U10; admin redesign U13, R24): each
+ * change with its plan, who it reaches, Edit and Undo; who comes out better
+ * off, worse off or on a new price, with each effect and its businesses;
+ * live and draft side by side; and the publish panel. The impact is the
+ * API's, worked out for the saved revision: opening the tab saves what is
+ * on screen first, so it never describes an older draft.
  */
 export function TabPublish() {
     const { pricing, access } = usePlans();
@@ -53,7 +57,9 @@ export function TabPublish() {
                 return;
             }
             if (!r.data) {
-                setFailed("What this draft does can't be worked out just now.");
+                setFailed(
+                    "Who this draft reaches can't be worked out just now.",
+                );
                 return;
             }
             // An answer for an older revision waits for the next one.
@@ -122,20 +128,30 @@ export function TabPublish() {
         );
     }
 
+    const nextV = nextVersion(pricing.versions);
+    const priceTitles = new Set(
+        draftChanges(live, draft.catalog)
+            .filter((c) => c.key.startsWith("plan-price:"))
+            .map((c) => c.what),
+    );
     return (
         <div className="grid gap-3.5 text-[13.5px]">
+            <p className="text-muted-foreground">
+                {draft.live
+                    ? `${changeCount(check.changes.length)} ${check.changes.length === 1 ? "becomes" : "become"} version ${nextV} when you publish.`
+                    : `This draft becomes version ${nextV}, the first one, when you publish.`}
+            </p>
+            <ChangeList variant="review" />
             <ImpactList
                 state={state}
                 onRetry={() => setAttempt((n) => n + 1)}
+                priceTitles={priceTitles}
             />
             {draft.catalog && (
                 <CompareTable live={live} draft={draft.catalog} />
             )}
             {access.canPublish ? (
-                <PublishPanel
-                    nextV={nextVersion(pricing.versions)}
-                    blocked={blocked}
-                />
+                <PublishPanel nextV={nextV} blocked={blocked} />
             ) : (
                 <p className="rounded-[14px] border border-border bg-card px-4 py-3.5 text-[12.5px] text-muted-foreground">
                     Publishing needs permission to publish pricing. Someone who

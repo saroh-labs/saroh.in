@@ -1,36 +1,30 @@
-import { buttonVariants } from "@saroh/ui/button";
-import { EmptyState, FailedState } from "@saroh/ui/data-state";
-import { PageContainer } from "@saroh/ui/page-container";
-import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
+import { PermissionDeniedState } from "@saroh/ui/data-state";
 
-import { AdminShell } from "@/components/admin-shell";
-import { ActionList, FailedJobList } from "@/components/billing/action-list";
-import { BillingTabs } from "@/components/billing/billing-tabs";
+import { NeedsActionQueue } from "@/components/billing/needs-action-queue";
 import { NumberPager } from "@/components/billing/number-pager";
+import { EmptyPanel } from "@/components/states/empty-panel";
+import { FailedPanel } from "@/components/states/failed-panel";
 import { listBillingActions } from "@/lib/billing";
-import {
-    ACTION_STATES,
-    RAZORPAY_LINK_HINT,
-    readActionState,
-} from "@/lib/billing-action-words";
+import { readActionState } from "@/lib/billing-action-words";
 import { billingHref, readPage } from "@/lib/billing-words";
 import { can, requireStaff } from "@/lib/console";
+import { param } from "@/lib/params";
 
 export const metadata = { title: "Needs action · Billing" };
 
 const BASE = "/billing/actions";
-
-const STATE_LABEL = { open: "Open", resolved: "Resolved" } as const;
 
 /**
  * Everything about Saroh's billing an operator must act on by hand
  * (DEC-166), across every business, oldest open first: a refund owed, a
  * cancel the provider keeps refusing, a payment Saroh never matched, an
  * invoice whose total isn't what was taken, a credit note to ask the CA
- * about. Reading needs `saroh-billing:read`; Mark resolved and Check the
- * refund again need `saroh-billing:act`. The failed billing jobs follow,
- * since the Billing role has no Jobs screen.
+ * about. Open or resolved, and the search, are picked in Billing's
+ * toolbar. Each row says what happened in one sentence and offers its one
+ * fix (R28, `lib/billing-action-words.ts`). Reading needs
+ * `saroh-billing:read`; Mark resolved and Check the refund again need
+ * `saroh-billing:act`. The failed billing jobs follow: Retry (`jobs:retry`)
+ * runs one again in place, and Open in Jobs (`jobs:read`) goes to it.
  */
 export default async function BillingActionsPage({
     searchParams,
@@ -41,122 +35,67 @@ export default async function BillingActionsPage({
     if (!gate.ok) return gate.screen;
     const { staff } = gate;
     const canAct = can(staff, "saroh-billing:act");
+    const canRetry = can(staff, "jobs:retry");
+    const canOpenJobs = can(staff, "jobs:read");
 
     const raw = await searchParams;
     const state = readActionState(raw.state);
+    const q = param(raw.q);
     const page = readPage(raw.page);
-    const result = await listBillingActions({ state, page }).catch(
+    const result = await listBillingActions({ state, q, page }).catch(
         () => undefined,
     );
+    const stateParam = state === "open" ? undefined : state;
+
+    if (result === undefined) return <FailedPanel things="what needs action" />;
+    if (result === null) {
+        return (
+            <PermissionDeniedState
+                size="panel"
+                title="Needs action is not open to you"
+                description="Your access does not cover Saroh's billing."
+            />
+        );
+    }
+
+    const empty =
+        page !== 1 ? (
+            <EmptyPanel
+                title="Nothing on this page"
+                description="Go back to the first page."
+            />
+        ) : q ? (
+            <EmptyPanel
+                kind="no-results"
+                things="billing problems"
+                cause="search"
+                query={q}
+                clearHref={billingHref(BASE, { state: stateParam })}
+            />
+        ) : state === "resolved" ? (
+            <EmptyPanel
+                title="Nothing resolved yet"
+                description="A row moves here once someone marks it resolved, with what they did."
+            />
+        ) : undefined;
 
     return (
-        <AdminShell staff={staff}>
-            <PageContainer width="wide">
-                <PageHeader
-                    breadcrumb={["Billing", "Needs action"]}
-                    title="Needs action"
-                    description="What Saroh's billing couldn't settle by itself, across every business, oldest first. Dates are in India time."
-                />
-                <BillingTabs current="/billing/actions" />
-
-                <nav
-                    aria-label="Open or resolved"
-                    className="flex flex-wrap items-center gap-2"
-                >
-                    {ACTION_STATES.map((value) => (
-                        <Link
-                            key={value}
-                            href={billingHref(BASE, {
-                                state: value === "open" ? undefined : value,
-                            })}
-                            aria-current={value === state ? "page" : undefined}
-                            className={buttonVariants({
-                                variant:
-                                    value === state ? "secondary" : "ghost",
-                                size: "sm",
-                            })}
-                        >
-                            {STATE_LABEL[value]}
-                            {value === "open" && result
-                                ? ` · ${result.openCount.toLocaleString("en-IN")}`
-                                : ""}
-                        </Link>
-                    ))}
-                </nav>
-
-                {result === undefined ? (
-                    <FailedState
-                        title="Needs action could not be loaded"
-                        description="The API did not answer. Nothing has changed; try again in a moment."
-                    />
-                ) : result === null ? (
-                    <FailedState
-                        title="Needs action is not open to you"
-                        description="Your access does not cover Saroh's billing."
-                    />
-                ) : (
-                    <>
-                        {result.items.length === 0 && page === 1 ? (
-                            <EmptyState
-                                title={
-                                    state === "open"
-                                        ? "Nothing needs action"
-                                        : "Nothing resolved yet"
-                                }
-                                description="A row appears when Saroh's billing meets something it can't settle by itself."
-                            />
-                        ) : (
-                            <>
-                                <p className="text-sm text-muted-foreground">
-                                    {RAZORPAY_LINK_HINT}
-                                </p>
-                                <ActionList
-                                    items={result.items}
-                                    canAct={canAct}
-                                />
-                                <NumberPager
-                                    page={result.page}
-                                    pages={Math.max(
-                                        1,
-                                        Math.ceil(result.total / result.limit),
-                                    )}
-                                    hasNext={
-                                        result.page * result.limit <
-                                        result.total
-                                    }
-                                    href={(p) =>
-                                        billingHref(BASE, {
-                                            state:
-                                                state === "open"
-                                                    ? undefined
-                                                    : state,
-                                            page: p,
-                                        })
-                                    }
-                                />
-                            </>
-                        )}
-
-                        <section className="grid gap-2">
-                            <h2 className="font-medium">Failed billing jobs</h2>
-                            {result.failedJobs.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    No billing job has failed.
-                                </p>
-                            ) : (
-                                <>
-                                    <p className="text-sm text-muted-foreground">
-                                        They are retried from Operations › Jobs,
-                                        which Billing doesn&apos;t open: ask
-                                        Operations or a Platform Owner.
-                                    </p>
-                                    <FailedJobList jobs={result.failedJobs} />
-                                </>
-                            )}
-                        </section>
-                    </>
-                )}
-            </PageContainer>
-        </AdminShell>
+        <NeedsActionQueue
+            items={result.items}
+            failedJobs={result.failedJobs}
+            canAct={canAct}
+            canRetry={canRetry}
+            canOpenJobs={canOpenJobs}
+            empty={empty}
+        >
+            <NumberPager
+                page={result.page}
+                pages={Math.max(1, Math.ceil(result.total / result.limit))}
+                hasNext={result.page * result.limit < result.total}
+                href={(p) =>
+                    billingHref(BASE, { state: stateParam, q, page: p })
+                }
+            />
+        </NeedsActionQueue>
     );
 }

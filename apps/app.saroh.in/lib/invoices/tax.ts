@@ -78,7 +78,7 @@ export async function getInvoiceBusiness(): Promise<InvoiceBusiness | null> {
 
 /**
  * Whether a payment provider is connected that can open the checkout
- * window, so issuing can make a pay link. A Razorpay connection still
+ * window, so issuing can make a payment link. A Razorpay connection still
  * missing its public key id can't (DEC-054), so it doesn't count: a link it
  * would take could only fail on the customer's phone. False when it could
  * not be found out: the form then offers "Issue it", and the invoice's own

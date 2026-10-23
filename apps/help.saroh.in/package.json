@@ -15,7 +15,7 @@
   "dependencies": {
     "@saroh/ui": "workspace:*",
     "@t3-oss/env-nextjs": "^0.13.11",
-    "next": "^16.3.6",
+    "next": "^16.4.2",
     "nextra": "^4.6.1",
     "nextra-theme-docs": "^4.6.1",
     "react": "catalog:react19",
@@ -23,7 +23,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@next/eslint-plugin-next": "^16.3.6",
+    "@next/eslint-plugin-next": "^16.4.2",
     "@saroh/eslint-config": "workspace:*",
     "@saroh/tsconfig": "workspace:*",
     "@types/node": "catalog:",

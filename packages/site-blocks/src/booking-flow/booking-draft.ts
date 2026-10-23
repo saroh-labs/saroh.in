@@ -62,7 +62,8 @@ export interface BookingDraft {
 }
 
 /**
- * The address's query as the draft is kept under: without the tag a QR
+ * The address's query as the draft is kept under: without the step it is
+ * on (U9), and without the tag a QR
  * code's scan adds (`src`, `qr-source.ts`), which is never stored anywhere,
  * and without the tracking tags an ad or a share adds.
  */
@@ -70,6 +71,11 @@ export function draftSearch(search: string): string {
     const params = new URLSearchParams(search);
     for (const name of Array.from(params.keys())) {
         if (
+            // The step and a booked reference are where the page is, not
+            // what was chosen (U9): a reload on another step is the same
+            // booking.
+            name === "step" ||
+            name === "ref" ||
             name === "src" ||
             name.startsWith("utm_") ||
             name === "fbclid" ||
@@ -186,3 +192,73 @@ export function keptText(input: {
 /** Said after a reload when a note had been typed (it is never stored). */
 export const NOTE_NOT_KEPT =
     "Your note wasn't kept, so add it again if you need to.";
+
+const ATTEMPT_KEY = "saroh.booking-attempt";
+
+/** What a booking attempt is made of: another of these is another attempt. */
+export interface BookingAttempt {
+    serviceId: string;
+    startAt: string;
+    staffId: string | null;
+    pay: BookPay | null;
+}
+
+const sameAttempt = (a: BookingAttempt, b: Record<string, unknown>) =>
+    a.serviceId === b.serviceId &&
+    a.startAt === b.startAt &&
+    a.staffId === (b.staffId ?? null) &&
+    a.pay === (b.pay ?? null);
+
+/**
+ * The idempotency key of a Book press whose answer never came (review
+ * #20): the page closed, reloaded or was left mid-Book. Kept for the visit
+ * beside the draft, so the same choice booked again sends the same key and
+ * the API answers with what the first press made, never a second booking
+ * or hold. Only the key and what it was for: nothing about the person.
+ */
+export function keptAttemptKey(attempt: BookingAttempt): string | null {
+    try {
+        const raw = window.sessionStorage.getItem(ATTEMPT_KEY);
+        if (!raw) return null;
+        const stored: unknown = JSON.parse(raw);
+        if (typeof stored !== "object" || stored === null) return null;
+        const s = stored as Record<string, unknown>;
+        const savedAt = typeof s.savedAt === "number" ? s.savedAt : NaN;
+        const now = Date.now();
+        if (!(now >= savedAt && now - savedAt <= BOOKING_DRAFT_MS)) {
+            return null;
+        }
+        if (!sameAttempt(attempt, s)) return null;
+        return typeof s.key === "string" && ID.test(s.key) ? s.key : null;
+    } catch {
+        return null;
+    }
+}
+
+/** Keep the key of the press under way, until its answer comes. */
+export function keepAttemptKey(attempt: BookingAttempt, key: string): void {
+    try {
+        window.sessionStorage.setItem(
+            ATTEMPT_KEY,
+            JSON.stringify({
+                serviceId: attempt.serviceId,
+                startAt: attempt.startAt,
+                staffId: attempt.staffId,
+                pay: attempt.pay,
+                key,
+                savedAt: Date.now(),
+            }),
+        );
+    } catch {
+        // Kept in the flow's ref for this page only.
+    }
+}
+
+/** The press was answered, or the choice changed: a new attempt next. */
+export function clearAttemptKey(): void {
+    try {
+        window.sessionStorage.removeItem(ATTEMPT_KEY);
+    } catch {
+        // Nothing was kept.
+    }
+}

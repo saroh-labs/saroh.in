@@ -8,6 +8,7 @@ import type {
     BookingRules,
     OfferedRead,
     OffRangeInput,
+    RuleChanges,
     WeeklyRange,
 } from "./service";
 import * as staff from "./service";
@@ -36,15 +37,18 @@ export async function addPerson(input: { name: string; title?: string }) {
  * "It's just me": the signed-in person on the diary in one press, with the
  * opening hours as their week and every service that takes bookings as
  * theirs, so customers can book them at once. Answers with which week they
- * started with, for the toast to say.
+ * started with, for the toast to say. `hours`, when given, is the week they
+ * chose instead (Hours and time off's "Choose different hours", U17).
  */
-export async function addMyself(): Promise<ApiResult<AddedSelf>> {
+export async function addMyself(
+    hours?: WeeklyRange[],
+): Promise<ApiResult<AddedSelf>> {
     const [opening, services] = await Promise.all([
         staff.readOpeningHours(),
         listServices().catch(() => []),
     ]);
     const res = await staff.addSelf({
-        hours: startingWeek(opening),
+        hours: hours ?? startingWeek(opening),
         serviceIds: services
             .filter((s) => s.status === "ACTIVE")
             .map((s) => s.id),
@@ -119,4 +123,24 @@ export async function previewOff(input: OffRangeInput & { staffId?: string }) {
 
 export async function updateBookingRules(input: Partial<BookingRules>) {
     return staff.updateBookingRules(input);
+}
+
+export async function updatePersonRules(staffId: string, input: RuleChanges) {
+    return staff.updatePersonRules(staffId, input);
+}
+
+export async function approveRuleRequest(requestId: string) {
+    return staff.moveRuleRequest(requestId, "approve");
+}
+
+export async function turnDownRuleRequest(requestId: string, reason?: string) {
+    return staff.moveRuleRequest(requestId, "turn-down", reason);
+}
+
+export async function withdrawRuleRequest(requestId: string) {
+    return staff.moveRuleRequest(requestId, "withdraw");
+}
+
+export async function dismissRuleRequest(requestId: string) {
+    return staff.moveRuleRequest(requestId, "dismiss");
 }

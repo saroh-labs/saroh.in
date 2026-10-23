@@ -84,6 +84,8 @@ export interface ProductListItem extends Product {
      */
     gstRate?: string | null;
     gstPriceMode?: GstPriceMode | null;
+    /** Its HSN code; New invoice's product picker fills a line with it. */
+    hsnCode?: string | null;
     storeId: string;
     updatedAt: string;
     variantCount: number;
