@@ -5,6 +5,7 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import { LayoutGrid, PanelBottom, PanelTop } from "lucide-react";
+import { useState } from "react";
 
 import {
     SECTION_HINTS,
@@ -12,6 +13,7 @@ import {
     addableSections,
 } from "@/components/sites/editor/editor-constants";
 import type { SectionType } from "@/lib/sites/service";
+import { Input } from "@saroh/ui/input";
 import { SECTION_ICONS } from "./block-icons";
 import { addBlockGroups } from "./block-kinds";
 
@@ -32,7 +34,10 @@ export function AddBlockPanel({
     onBrowse,
     shopOpen = false,
     packsOpen = false,
+    search = false,
 }: {
+    /** A search over the blocks' names and lines (a phone's sheet, DEC-185). */
+    search?: boolean;
     /** A block was chosen. `looks` says whether a look still has to be picked. */
     onPick: (type: SectionType, looks: number) => void;
     /**
@@ -45,12 +50,29 @@ export function AddBlockPanel({
     /** Class packs is rolled out and on: its block is offered (DEC-057). */
     packsOpen?: boolean;
 }) {
+    const [query, setQuery] = useState("");
+    const q = query.trim().toLowerCase();
     const { structure, business } = addBlockGroups(
-        addableSections(shopOpen, packsOpen),
+        addableSections(shopOpen, packsOpen).filter(
+            (t) =>
+                q === "" ||
+                `${SECTION_LABELS[t]} ${SECTION_HINTS[t]}`
+                    .toLowerCase()
+                    .includes(q),
+        ),
     );
 
     return (
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-2 pb-4 pt-4">
+            {search ? (
+                <Input
+                    type="search"
+                    aria-label="Search blocks"
+                    placeholder="Search blocks"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                />
+            ) : null}
             <Button
                 type="button"
                 variant="outline"
@@ -61,42 +83,57 @@ export function AddBlockPanel({
                 <LayoutGrid aria-hidden className="size-4" />
                 Browse with previews
             </Button>
-            <Group label="Structure">
-                {structure.map((t) => (
+            {q !== "" && structure.length + business.length === 0 ? (
+                <p className="px-2 text-sm text-muted-foreground">
+                    No block matches “{query.trim()}”.
+                </p>
+            ) : null}
+            {structure.length === 0 ? null : (
+                <Group label="Structure">
+                    {structure.map((t) => (
+                        <Entry
+                            key={t}
+                            icon={SECTION_ICONS[t]}
+                            label={SECTION_LABELS[t]}
+                            hint={SECTION_HINTS[t]}
+                            looks={BLOCK_META[t].variants.length}
+                            onClick={() =>
+                                onPick(t, BLOCK_META[t].variants.length)
+                            }
+                        />
+                    ))}
+                </Group>
+            )}
+            {business.length === 0 ? null : (
+                <Group label="From your business">
+                    {business.map((t) => (
+                        <Entry
+                            key={t}
+                            icon={SECTION_ICONS[t]}
+                            label={SECTION_LABELS[t]}
+                            hint={SECTION_HINTS[t]}
+                            looks={BLOCK_META[t].variants.length}
+                            onClick={() =>
+                                onPick(t, BLOCK_META[t].variants.length)
+                            }
+                        />
+                    ))}
+                </Group>
+            )}
+            {q === "" ? (
+                <Group label="Every page">
                     <Entry
-                        key={t}
-                        icon={SECTION_ICONS[t]}
-                        label={SECTION_LABELS[t]}
-                        hint={SECTION_HINTS[t]}
-                        looks={BLOCK_META[t].variants.length}
-                        onClick={() => onPick(t, BLOCK_META[t].variants.length)}
+                        icon={PanelTop}
+                        label="Header"
+                        hint="Already on this page."
                     />
-                ))}
-            </Group>
-            <Group label="From your business">
-                {business.map((t) => (
                     <Entry
-                        key={t}
-                        icon={SECTION_ICONS[t]}
-                        label={SECTION_LABELS[t]}
-                        hint={SECTION_HINTS[t]}
-                        looks={BLOCK_META[t].variants.length}
-                        onClick={() => onPick(t, BLOCK_META[t].variants.length)}
+                        icon={PanelBottom}
+                        label="Footer"
+                        hint="Already on this page."
                     />
-                ))}
-            </Group>
-            <Group label="Every page">
-                <Entry
-                    icon={PanelTop}
-                    label="Header"
-                    hint="Already on this page."
-                />
-                <Entry
-                    icon={PanelBottom}
-                    label="Footer"
-                    hint="Already on this page."
-                />
-            </Group>
+                </Group>
+            ) : null}
         </div>
     );
 }

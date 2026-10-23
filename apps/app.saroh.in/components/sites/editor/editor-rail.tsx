@@ -22,6 +22,7 @@ import type { StyleChoiceRules } from "@/lib/sites/style-access";
 import { Tip } from "@saroh/ui/tooltip";
 import { EditorTabs, railRowState } from "./editor-chrome";
 import { SECTION_LABELS, sectionTitle } from "./editor-constants";
+import { PhoneBlocks } from "./phone-blocks";
 
 export type RailTab = "page" | "add" | "brand";
 
@@ -68,7 +69,10 @@ export function EditorRail({
     packsOpen = false,
     looks,
     styleRules,
+    onPicked,
 }: {
+    /** A block was chosen from a phone's list: the page scrolls to it. */
+    onPicked?: (index: number) => void;
     /** The Brand tab's Look row (DEC-172, U16); absent draws none. */
     looks?: LookChoices;
     /** Which looks, typefaces and colourways are paid (DEC-177). */
@@ -155,6 +159,7 @@ export function EditorRail({
                 <>
                     {adding ? (
                         <AddBlockPanel
+                            search={phone}
                             shopOpen={shopOpen}
                             packsOpen={packsOpen}
                             onBrowse={() => setBrowsing(true)}
@@ -162,6 +167,20 @@ export function EditorRail({
                                 if (looks > 1) setLookFor(type);
                                 else addSection(type);
                             }}
+                        />
+                    ) : phone ? (
+                        <PhoneBlocks
+                            sections={sections}
+                            selectedIndex={selectedIndex}
+                            selectedChrome={selectedChrome}
+                            onSelect={(index) => {
+                                setSelectedIndex(index);
+                                onPicked?.(index);
+                            }}
+                            onSelectChrome={selectChrome}
+                            moveTo={moveTo}
+                            flagsBySection={flagsBySection}
+                            notedKeys={notedKeys}
                         />
                     ) : (
                         <>

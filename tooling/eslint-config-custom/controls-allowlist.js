@@ -228,6 +228,8 @@ export const RAW_ALLOWED = {
     "components/sites/editor/edit-pill.tsx": ["button"],
     // button: a bottom sheet's grip, pulled or pressed to make it taller
     "components/sites/editor/editor-sheet.tsx": ["button"],
+    // button: a row of a phone's block list, one button, and its drag grip
+    "components/sites/editor/phone-blocks.tsx": ["button"],
     // button: a row of a phone's ⋯ More sheet, one button (DEC-185)
     "components/sites/editor/more-sheet.tsx": ["button"],
     // button: the preview width toggles, a row or card that is one button

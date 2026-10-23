@@ -2,6 +2,7 @@
 
 import { AddSectionDialog } from "@/components/sites/blocks/add-section-dialog";
 import { useAddBlock } from "@/components/sites/blocks/use-add-block";
+import { queryCanvas } from "@/components/sites/canvas/device-frame";
 import {
     canvasChromeFor,
     EditorCanvas,
@@ -24,6 +25,7 @@ import { styleChoiceRules } from "@/lib/sites/style-access";
 import { publishOverScheduleWarning } from "@/lib/sites/test-releases";
 import type { LookId } from "@saroh/block-contract";
 import { useEffect, useRef, useState } from "react";
+import { BlockToolbar } from "./block-toolbar";
 import { SECTION_LABELS } from "./editor-constants";
 import { EditorPanels } from "./editor-panels";
 import { EditorRail } from "./editor-rail";
@@ -218,6 +220,33 @@ export function SiteEditor({
     });
 
     const active = activeSection(selection.selectedIndex, sections);
+    /** Bring a block to the top of the page, after the render that moves it. */
+    const scrollToBlock = (index: number) =>
+        requestAnimationFrame(() => {
+            const canvas = viewport.canvasRef.current;
+            if (canvas) {
+                queryCanvas(
+                    canvas,
+                    `[data-block-index="${index}"]`,
+                )?.scrollIntoView({ block: "start", behavior: "smooth" });
+            }
+        });
+    // A tapped block's toolbar on a phone (DEC-185): each with Undo.
+    const blockTools =
+        layout === "phone"
+            ? (index: number) => (
+                  <BlockToolbar
+                      index={index}
+                      count={sections.length}
+                      onMove={(delta) => {
+                          edits.move(index, delta);
+                          setSelectedIndex(index + delta);
+                          scrollToBlock(index + delta);
+                      }}
+                      onRemove={() => edits.removeAt(index)}
+                  />
+              )
+            : undefined;
     // The site's flags for the open page, by section: the rail's dots.
     const flagsBySection = flagsByScreenPosition(
         publish.siteFlags.flags,
@@ -319,6 +348,7 @@ export function SiteEditor({
                 rail={
                     <EditorRail
                         phone={layout === "phone"}
+                        onPicked={scrollToBlock}
                         {...selection}
                         {...siteStyle}
                         {...draft}
@@ -361,6 +391,7 @@ export function SiteEditor({
                             pages,
                             styleOptions,
                         }}
+                        blockTools={blockTools}
                         // A typeface being tried draws on the page unsaved.
                         style={siteStyle.trying ?? style}
                         trying={triedFace(siteStyle.trying, styleOptions)}

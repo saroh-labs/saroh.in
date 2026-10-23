@@ -1735,7 +1735,9 @@ describe("SiteEditor narrow and phone (G4)", () => {
         render();
         click(button("Blocks"));
         expect(sheet()?.textContent).toContain("Blocks on Home");
-        click(button("Our story"));
+        // Each block with its first line; the header and footer Fixed.
+        expect(sheet()?.textContent).toContain("FooterOn every pageFixed");
+        click(button(/^HeroOur story/));
         // One sheet at a time: the list makes way for the block's fields.
         expect($$("[role=dialog]")).toHaveLength(1);
         expect(
@@ -1758,6 +1760,78 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(
             sheet()?.querySelector("aside[aria-label=Inspector]"),
         ).not.toBeNull();
+    });
+
+    it("moves a block from the list's grip, with Undo", () => {
+        atWidth(390);
+        render();
+        click(button("Blocks"));
+        act(() => {
+            button(/^Move Hero/).dispatchEvent(
+                new KeyboardEvent("keydown", {
+                    key: "ArrowDown",
+                    bubbles: true,
+                }),
+            );
+        });
+        expect(toast.showUndo).toHaveBeenLastCalledWith(
+            "Hero moved down",
+            expect.any(Function),
+            expect.anything(),
+        );
+    });
+
+    it("finds a block to add by searching", () => {
+        atWidth(390);
+        render();
+        click(button("Add a block"));
+        const search = sheet()?.querySelector<HTMLInputElement>(
+            "input[aria-label='Search blocks']",
+        );
+        if (!search) throw new Error("No search");
+        type(search, "contact");
+        expect(sheet()?.textContent).toContain("Contact");
+        expect(sheet()?.textContent).not.toContain("Every page");
+        type(search, "zzzz");
+        expect(sheet()?.textContent).toContain("No block matches");
+    });
+
+    it("gives a tapped block a toolbar: move and remove at once, each with Undo", () => {
+        atWidth(390);
+        render();
+        click(button(/^Hero block, 1 of 2/));
+        const tools = $("[role=toolbar][aria-label='Block actions']");
+        expect(tools).not.toBeNull();
+        // Its settings rise with no scrim, so the toolbar stays in reach.
+        expect($("[data-editor-scrim]")).toBeNull();
+        const inTools = (name: string) => {
+            const b = tools?.querySelector<HTMLButtonElement>(
+                `button[aria-label='${name}']`,
+            );
+            if (!b) throw new Error(`No ${name}`);
+            return b;
+        };
+        expect(inTools("Move up").disabled).toBe(true);
+        click(inTools("Move down"));
+        expect(toast.showUndo).toHaveBeenLastCalledWith(
+            "Hero moved down",
+            expect.any(Function),
+            expect.anything(),
+        );
+        // It moved, and stays selected in its new place.
+        expect(button(/^Hero block, 2 of 2, selected/)).toBeTruthy();
+        const after = $("[role=toolbar][aria-label='Block actions']");
+        const remove = after?.querySelector<HTMLButtonElement>(
+            "button[aria-label='Remove']",
+        );
+        if (!remove) throw new Error("No Remove");
+        click(remove);
+        expect($$("[data-block-index]")).toHaveLength(1);
+        expect(toast.showUndo).toHaveBeenLastCalledWith(
+            "Hero taken off this page",
+            expect.any(Function),
+            expect.anything(),
+        );
     });
 
     it("switches page from the page's sheet", () => {

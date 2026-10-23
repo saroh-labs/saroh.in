@@ -2,7 +2,7 @@
 
 import { inPageNavigation, mergeInPageNavigation } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
-import type { RefObject, UIEvent } from "react";
+import type { ReactNode, RefObject, UIEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import type { HeldBackSection } from "@/components/sites/blocks/saveable-sections";
@@ -135,7 +135,10 @@ export function EditorCanvas({
     dirty,
     onlyHeldBack,
     heldBack,
+    blockTools,
 }: {
+    /** A phone's toolbar on the selected block (DEC-185). */
+    blockTools?: (index: number) => ReactNode;
     canvasRef: RefObject<HTMLDivElement | null>;
     onCanvasScroll: (e: UIEvent<HTMLDivElement>) => void;
     /** Someone else saved this page while this editor was open (#285). */
@@ -225,6 +228,7 @@ export function EditorCanvas({
                   }
                 : {
                       selectedIndex,
+                      blockTools,
                       onSelect: (index: number) => {
                           setRail("sections");
                           setSelectedIndex(index);

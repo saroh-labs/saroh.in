@@ -104,7 +104,7 @@ async function inspectorToggle(page: Page) {
             .getByRole("listitem")
             .nth(1)
             .getByRole("button")
-            .last()
+            .first()
             .click();
     }
     await expect(toggle).toBeVisible({ timeout: 30_000 });
