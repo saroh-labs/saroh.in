@@ -1076,7 +1076,7 @@ describe("SiteEditor shell", () => {
         expect(actions.saveDraftSections).toHaveBeenCalledTimes(1);
     });
 
-    it("names what goes live in the check, and reads Published after", async () => {
+    it("names what goes live in the Publish sheet, and reads Published after", async () => {
         render({
             initialPendingChanges: 1,
             initialPendingSiteChanges: ["footer"],
@@ -1085,9 +1085,9 @@ describe("SiteEditor shell", () => {
             "Not published · 1 block, footer",
         );
         await press(button("Publish"));
-        expect(document.body.textContent).toContain(
-            "Publishing puts live: 1 section and the footer.",
-        );
+        // Two areas: one row each (DEC-185).
+        expect(document.body.textContent).toContain("Going live · 2 changes");
+        expect(document.body.textContent).toContain("1 block changed");
         const go = Array.from(
             document.querySelectorAll<HTMLButtonElement>("button"),
         ).filter((b) => b.textContent.startsWith("Publish"));
@@ -1114,12 +1114,14 @@ describe("SiteEditor shell", () => {
         await press(button("Publish"));
         await press(button("Publish without approval"));
         expect(actions.publishSite).toHaveBeenCalledTimes(1);
-        expect(toast.showSuccess).toHaveBeenCalledWith(
-            "Flour & Ferment is live at flour.saroh.app. Recorded as published without approval.",
+        // The sheet turns into the result, with the record (DEC-185).
+        expect(document.body.textContent).toContain("Flour & Ferment is live");
+        expect(document.body.textContent).toContain(
+            "Recorded as published without approval.",
         );
     });
 
-    it("publishes through the check and says where the site is live", async () => {
+    it("publishes through the sheet and says where the site is live", async () => {
         const { siteId } = render();
         await press(button("Publish"));
         expect(actions.getSiteFlags).toHaveBeenCalledWith(siteId);
@@ -1134,13 +1136,12 @@ describe("SiteEditor shell", () => {
         expect(go.length).toBeGreaterThan(1);
         await press(go[go.length - 1]);
         expect(actions.publishSite).toHaveBeenCalledTimes(1);
-        expect(toast.showSuccess).toHaveBeenCalledWith(
-            "Flour & Ferment is live at flour.saroh.app.",
-        );
+        expect(document.body.textContent).toContain("Flour & Ferment is live");
+        expect(document.body.textContent).toContain("flour.saroh.app");
         expect(actions.getReviewState).toHaveBeenCalled();
     });
 
-    it("keeps the check open on where the site is, the first time it goes live", async () => {
+    it("keeps the sheet open on where the site is, the first time it goes live", async () => {
         render({
             neverPublished: true,
             initialPendingChanges: null,
@@ -1149,17 +1150,17 @@ describe("SiteEditor shell", () => {
         await press(button("Publish"));
         await press(button("Publish site"));
         expect(actions.publishSite).toHaveBeenCalledTimes(1);
-        // The finished state says it, with the address as a link: no toast.
+        // The result says it, with Open site on the address: no toast.
         expect(toast.showSuccess).not.toHaveBeenCalled();
-        expect(document.body.textContent).toContain("Flour & Ferment is live.");
-        const address = document.querySelector<HTMLAnchorElement>(
+        expect(document.body.textContent).toContain("Anyone can open it now.");
+        const open = document.querySelector<HTMLAnchorElement>(
             'a[href="https://flour.saroh.app"]',
         );
-        expect(address?.textContent).toContain("flour.saroh.app");
-        // And it leaves like the check does.
-        await press(button("Back to editing"));
+        expect(open?.textContent).toContain("Open site");
+        // Done drops back on the page, still editing.
+        await press(button("Done"));
         expect(document.body.textContent).not.toContain(
-            "Flour & Ferment is live.",
+            "Anyone can open it now.",
         );
     });
 
@@ -1304,9 +1305,7 @@ describe("SiteEditor header and footer text (G6)", () => {
             document.querySelectorAll<HTMLButtonElement>("button"),
         ).filter((b) => b.textContent.startsWith("Publish"));
         await press(go[go.length - 1]);
-        expect(toast.showSuccess).toHaveBeenCalledWith(
-            "Rye & Co. is live at flour.saroh.app.",
-        );
+        expect(document.body.textContent).toContain("Rye & Co. is live");
     });
 
     it("never saves a blank name, and says why", async () => {

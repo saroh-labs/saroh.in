@@ -1,4 +1,4 @@
-import { showError, showSuccess } from "@saroh/ui/toast";
+import { showError } from "@saroh/ui/toast";
 import { useCallback, useRef, useState } from "react";
 
 import type { HeldBackSection } from "@/components/sites/blocks/saveable-sections";
@@ -20,13 +20,16 @@ export interface DraftReadiness {
 }
 
 /**
- * The first time a site goes live (wave G): what the check's finished state
- * says. `record` is the line about approval, when the publish left one.
+ * A publish that went through: what the Publish sheet's result says
+ * (wave G; every publish since DEC-185). `record` is the line about
+ * approval, when the publish left one.
  */
 export interface WentLive {
     /** "flour.saroh.app"; null when this person isn't shown the address. */
     address: string | null;
     record: string | null;
+    /** The site's name as it went live. */
+    siteName: string;
 }
 
 /**
@@ -66,6 +69,13 @@ export function usePublish({
     onLiveChanged?: () => void;
 }) {
     const [needsApproval, setNeedsApproval] = useState(initialNeedsApproval);
+    // The address can be chosen inside the Publish sheet (DEC-185).
+    const [siteAddress, setSiteAddress] = useState(address ?? null);
+    // Why the last publish didn't go, said in the sheet's foot (DEC-185).
+    const [publishError, setPublishError] = useState<{
+        message: string;
+        detail?: string;
+    } | null>(null);
     const [publishing, setPublishing] = useState(false);
     /*
      * Flags come from the server and settle after each save rather than
@@ -108,9 +118,9 @@ export function usePublish({
      */
     const [neverPublished, setNeverPublished] = useState(initialNeverPublished);
     /*
-     * The site's first publish (wave G). It happens once, so the check
-     * stays open on a finished state that says where the site is and how
-     * to pass it on, where every later publish closes with a toast.
+     * A publish that went through (wave G). The Publish sheet stays open on
+     * its result, which says where the site is and how to pass it on
+     * (DEC-185: every publish, not only the first).
      */
     const [wentLive, setWentLive] = useState<WentLive | null>(null);
 
@@ -201,6 +211,7 @@ export function usePublish({
             );
             return;
         }
+        setPublishError(null);
         setChecking(true);
         // Re-read rather than trusting what was loaded: the merchant may have
         // been editing for an hour, and a stale check is worse than none.
@@ -215,6 +226,7 @@ export function usePublish({
 
     /** `siteName` is the name as it is now: the inspector can change it (G6). */
     async function onPublish(siteName: string) {
+        setPublishError(null);
         setPublishing(true);
         // With the setting on, only an owner's Publish goes through, and it
         // is sent as the override it is, so the record is written (T9).
@@ -228,29 +240,18 @@ export function usePublish({
                 // Turned on since the editor loaded: the bar says so now,
                 // and the way on is a test release someone approves.
                 setNeedsApproval(true);
-                showError(
-                    res.error,
-                    canOverride
+                setPublishError({
+                    message: res.error,
+                    detail: canOverride
                         ? "Make a test release and get it approved, or publish without approval."
                         : "Make a test release and get it approved, then go live with it.",
-                );
+                });
                 return;
             }
-            showError(res.error);
+            // In the sheet's foot, beside the button that was pressed.
+            setPublishError({ message: res.error });
             return;
         }
-        // Whether this was the first time anything went live (wave G).
-        const first = neverPublished;
-        if (!first) setChecking(false);
-        /*
-         * The live state names the business and its address, per the spec —
-         * "Flour & Ferment is live at flour-and-ferment.saroh.app". A bare
-         * "Published" leaves the merchant to go and check what happened.
-         */
-        const live =
-            address === null || address === undefined
-                ? `${siteName} is live.`
-                : `${siteName} is live at ${address}.`;
         // Bypassing is recorded, not prevented (#199) — and said, so the
         // record is never a surprise in version history later.
         const record = override
@@ -258,10 +259,9 @@ export function usePublish({
             : res.data.bypassed
               ? "Recorded as published without approval."
               : null;
-        // The first publish says it in the check's finished state instead,
-        // with the address as a link and a way to share it.
-        if (first) setWentLive({ address: address ?? null, record });
-        else showSuccess(record ? `${live} ${record}` : live);
+        // The sheet turns into the result: where the site is, and how to
+        // pass it on. The site's name is the one on screen (G6).
+        setWentLive({ address: siteAddress, record, siteName });
         /*
          * Everything the bar counted just went live, so the count is zero —
          * set here rather than left for the next autosave to recount, which
@@ -303,10 +303,16 @@ export function usePublish({
     function closeCheck() {
         setChecking(false);
         setWentLive(null);
+        setPublishError(null);
     }
 
     return {
         wentLive,
+        publishError,
+        siteAddress,
+        setSiteAddress,
+        pendingChanges,
+        pendingSiteChanges,
         closeCheck,
         needsApproval,
         canOverride,

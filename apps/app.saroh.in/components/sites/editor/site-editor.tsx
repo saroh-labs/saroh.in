@@ -9,7 +9,7 @@ import {
 import { useEditorViewport } from "@/components/sites/canvas/use-editor-viewport";
 import { starterContentActions } from "@/components/sites/looks/starter-content-actions";
 import { useEditorStyle } from "@/components/sites/looks/use-editor-style";
-import { PrePublishCheck } from "@/components/sites/publish/pre-publish-check";
+import { PublishSheet } from "@/components/sites/publish/publish-sheet";
 import { usePublish } from "@/components/sites/publish/use-publish";
 import {
     testReleaseActions,
@@ -81,6 +81,7 @@ export function SiteEditor({
     livePublishedAt = null,
     reloadDraft,
     initialSheet = null,
+    webAddressFix = null,
 }: SiteEditorProps) {
     const review = useEditorReview({
         siteId,
@@ -390,10 +391,10 @@ export function SiteEditor({
             />
 
             {/*
-             * The pre-publish check (below) is rendered inside the editor
-             * rather than on its own route so nothing is torn down and rebuilt
-             * behind it — the merchant goes back to exactly the editing state
-             * they left, including unsaved selection and scroll.
+             * Publish (below) is a sheet over the editor rather than its own
+             * route, so nothing is torn down and rebuilt behind it: the
+             * merchant goes back to exactly the editing state they left
+             * (DEC-185).
              */}
             {/*
              * Choosing a look before the block goes in (#267). Keyed on the
@@ -416,35 +417,42 @@ export function SiteEditor({
                 packsOpen={packsOpen}
             />
 
-            {publish.checking ? (
-                <PrePublishCheck
-                    siteName={chrome.displayName}
-                    pages={pages}
-                    flags={publish.siteFlags.flags}
-                    awaitingNavigation={publish.siteFlags.awaitingNavigation}
-                    publishing={publish.publishing}
-                    unsaved={unsaved}
-                    neverPublished={publish.neverPublished}
-                    pendingSummary={publish.pendingSummary}
-                    pendingKnown={publish.pendingKnown}
-                    review={review.review}
-                    needsApproval={publish.needsApproval}
-                    canOverride={publish.canOverride}
-                    // KTD-14: a scheduled go-live won't run over this.
-                    scheduledWarning={
-                        releases.scheduledRelease
-                            ? publishOverScheduleWarning(
-                                  releases.scheduledRelease,
-                                  releases.zone,
-                              )
-                            : null
-                    }
-                    wentLive={publish.wentLive}
-                    onPublish={() => void publish.onPublish(chrome.displayName)}
-                    onClose={publish.closeCheck}
-                    onJump={jumpToFlag}
-                />
-            ) : null}
+            <PublishSheet
+                open={publish.checking}
+                phone={layout === "phone"}
+                pages={pages}
+                flags={publish.siteFlags.flags}
+                awaitingNavigation={publish.siteFlags.awaitingNavigation}
+                publishing={publish.publishing}
+                unsaved={unsaved}
+                neverPublished={publish.neverPublished}
+                pendingSummary={publish.pendingSummary}
+                pendingKnown={publish.pendingKnown}
+                pendingChanges={publish.pendingChanges}
+                pendingSiteChanges={publish.pendingSiteChanges}
+                review={review.review}
+                needsApproval={publish.needsApproval}
+                canOverride={publish.canOverride}
+                // KTD-14: a scheduled go-live won't run over this.
+                scheduledWarning={
+                    releases.scheduledRelease
+                        ? publishOverScheduleWarning(
+                              releases.scheduledRelease,
+                              releases.zone,
+                          )
+                        : null
+                }
+                wentLive={publish.wentLive}
+                error={publish.publishError}
+                addressFix={webAddressFix}
+                onAddressSaved={(host) => {
+                    publish.setSiteAddress(host);
+                    void publish.refreshFlags();
+                }}
+                onPublish={() => void publish.onPublish(chrome.displayName)}
+                onClose={publish.closeCheck}
+                onJump={jumpToFlag}
+            />
             {leaveGuard.dialog}
         </div>
     );

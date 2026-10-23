@@ -133,8 +133,8 @@ async function closeOverlays(page: Page) {
 }
 
 /**
- * Publish from the editor, through the pre-publish check, and wait until it
- * has happened. Returns what the success toast said.
+ * Publish from the editor, through the Publish sheet, and wait until it
+ * has happened. Returns what the sheet's result said.
  *
  * Waited for, not counted: the check opens a beat after the click, so the
  * `if (await confirm.count())` this replaces read 0, skipped the publish, and
@@ -154,12 +154,14 @@ async function publishFromEditor(page: Page): Promise<string> {
         await expect(confirm).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 30_000 });
     await confirm.click();
-    const live = page
-        .getByText(/ is live/)
-        .locator("visible=true")
-        .first();
-    await expect(live).toBeVisible({ timeout: 30_000 });
-    return live.innerText();
+    // The Publish sheet turns into its result (DEC-185): the site is live,
+    // and what was recorded, if anything.
+    const live = page.locator("[data-publish-sheet] [role=status]");
+    await expect(live).toContainText(" is live", { timeout: 30_000 });
+    const said = await live.innerText();
+    await page.getByRole("button", { name: "Done" }).click();
+    await expect(page.locator("[data-publish-sheet]")).toHaveCount(0);
+    return said;
 }
 
 test.describe("publishing past a change request", { tag: "@serial" }, () => {
