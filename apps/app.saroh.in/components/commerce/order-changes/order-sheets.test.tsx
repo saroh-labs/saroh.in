@@ -370,7 +370,8 @@ describe("Order Detail is read first", () => {
             );
             expect(dialog()).toBe(null);
         }
-    });
+        // Four sheets open and close: past 5s on a busy CI runner (23 Oct).
+    }, 15_000);
 
     it("opens Hand to courier from the next step, and says where it goes", async () => {
         render(readyToShip());
