@@ -131,7 +131,8 @@ function fillFacts(
     filled: Set<FilledKind>,
 ): string {
     return html.replace(
-        /<dt>([\s\S]*?)<\/dt><dd>([\s\S]*?)<\/dd>/g,
+        // Plain text only (no tag inside): nothing to backtrack over (CodeQL).
+        /<dt>([^<]*)<\/dt><dd>([^<]*)<\/dd>/g,
         (whole, label: string, value: string) => {
             const text = unescapeHtml(value);
             if (!isGallerySample(text)) return whole;

@@ -38,14 +38,17 @@ function strings(value: unknown): string[] {
 
 /** Text compared as its words: spacing and entities folded. */
 function folded(text: string): string {
-    return text
-        .replace(/&amp;/g, "&")
-        .replace(/&lt;/g, "<")
-        .replace(/&gt;/g, ">")
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;|&apos;/g, "'")
-        .replace(/\s+/g, " ")
-        .trim();
+    return (
+        text
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;|&apos;/g, "'")
+            // Last, so "&amp;lt;" stays "&lt;" (CodeQL: double unescaping).
+            .replace(/&amp;/g, "&")
+            .replace(/\s+/g, " ")
+            .trim()
+    );
 }
 
 /**

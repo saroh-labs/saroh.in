@@ -72,7 +72,7 @@ export function galleryTemplates(): TemplateManifest[] {
 
 /** A page's name in a capture's file name: `/` is `home`, `/a/b` is `a-b`. */
 export function pageFileName(path: string): string {
-    const name = path.replace(/^\/+|\/+$/g, "").replace(/\//g, "-");
+    const name = path.split("/").filter(Boolean).join("-");
     return name === "" ? "home" : name;
 }
 
