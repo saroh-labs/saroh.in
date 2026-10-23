@@ -223,7 +223,7 @@ export function EditorTopBar({
             <>
                 <header
                     data-editor-bar=""
-                    className="flex h-[52px] shrink-0 items-center gap-1 border-b px-1.5"
+                    className="flex h-14 shrink-0 items-center gap-1 border-b px-1.5"
                 >
                     <Link
                         href={`/sites/${siteId}/pages`}
@@ -237,9 +237,9 @@ export function EditorTopBar({
                         aria-haspopup="dialog"
                         aria-label={`Page: ${activePage?.title ?? "Page"}. Choose another page to edit`}
                         onClick={() => setSheet?.("pages")}
-                        className="flex h-11 min-w-0 items-center gap-1.5 rounded-lg border bg-card px-2.5 text-sm font-semibold transition-colors duration-fast hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="flex h-11 min-w-0 max-w-[40%] shrink-0 items-center gap-1.5 rounded-lg border bg-card px-2.5 text-sm font-semibold transition-colors duration-fast hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
-                        <span className="max-w-[7.5rem] truncate">
+                        <span className="min-w-0 truncate">
                             {activePage?.title ?? "Page"}
                         </span>
                         <ChevronDown

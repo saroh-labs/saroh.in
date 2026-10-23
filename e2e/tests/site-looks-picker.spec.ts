@@ -2,7 +2,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { lookGallery, openFromPill } from "../fixtures/phone-editor";
+import { brandTab, lookGallery, openFromPill } from "../fixtures/phone-editor";
 import { useSession } from "../fixtures/sessions";
 import { setNorthwindLook } from "../fixtures/site-look";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
@@ -108,8 +108,11 @@ test.describe("the Look row", { tag: "@serial" }, () => {
 
             // Quiet: drawn on the canvas at once, saved to the draft.
             await (await choice("quiet")).click();
-            // Every other control stays, the gallery having closed.
+            // Every other control stays: beside the card on a desk, the
+            // gallery having closed; in the Type tab on a phone (DEC-185).
+            if (phone) await brandTab(page, "Type");
             await expect(page.locator("[data-typeface-current]")).toBeVisible();
+            if (phone) await brandTab(page, "Look");
             await expect(lookCard(page)).toHaveAttribute(
                 "data-look-current",
                 "quiet",

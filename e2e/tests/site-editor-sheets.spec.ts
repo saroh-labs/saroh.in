@@ -70,17 +70,23 @@ test.describe("Publish is a sheet", { tag: "@serial" }, () => {
         const sheet = await openPublish(page);
 
         // From the right on a desk, over the inspector; from the foot on a
-        // phone. Either way the page is still there behind it.
-        const box = await sheet.boundingBox();
+        // phone. Either way the page is still there behind it. Read once
+        // it has slid in.
         const view = page.viewportSize();
-        if (!box || !view) throw new Error("No sheet");
-        if (onPhone(testInfo)) {
-            expect(Math.round(box.y + box.height)).toBe(view.height);
-            expect(Math.round(box.width)).toBe(view.width);
-        } else {
-            expect(Math.round(box.x + box.width)).toBe(view.width);
-            expect(box.width).toBeLessThanOrEqual(440);
-        }
+        if (!view) throw new Error("No viewport");
+        const phone = onPhone(testInfo);
+        await expect
+            .poll(async () => {
+                const box = await sheet.boundingBox();
+                if (!box) return null;
+                return phone
+                    ? [Math.round(box.y + box.height), Math.round(box.width)]
+                    : [
+                          Math.round(box.x + box.width),
+                          Math.min(Math.round(box.width), 440),
+                      ];
+            })
+            .toEqual(phone ? [view.height, view.width] : [view.width, 440]);
         await expect(sheet.locator("[data-going-live]").first()).toBeVisible();
 
         await sheet

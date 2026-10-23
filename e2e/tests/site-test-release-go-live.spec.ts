@@ -3,6 +3,7 @@ import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { northwind, stamp } from "../fixtures/own-data";
+import { openMore } from "../fixtures/phone-editor";
 import { useSession } from "../fixtures/sessions";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
 
@@ -29,20 +30,10 @@ interface Section {
 
 const onPhone = (page: Page) => (page.viewportSize()?.width ?? 1440) < 760;
 
-/** The phone's ⋯ More sheet (DEC-185), opened until it shows. */
+/** A choice in the phone's ⋯ More sheet (DEC-185), the sheet opened first. */
 async function openPhoneMenu(page: Page, inside: string | RegExp) {
-    const target = page
-        .getByRole("dialog")
-        .getByRole("button", { name: inside })
-        .or(page.getByRole("button", { name: inside }).locator("visible=true"))
-        .first();
-    await expect(async () => {
-        if (!(await target.isVisible())) {
-            await page.getByRole("button", { name: /^More: preview/ }).click();
-        }
-        await expect(target).toBeVisible({ timeout: 2_000 });
-    }).toPass({ timeout: 30_000 });
-    return target;
+    // In the sheet only: the ⋯ button's own name says "preview" too.
+    return (await openMore(page)).getByRole("button", { name: inside }).first();
 }
 
 /** "Make a test release": the split's main half, or the phone's menu. */

@@ -253,8 +253,9 @@ test.describe("free and paid styles", { tag: "@serial" }, () => {
             // Still marked: a paid look is marked on every plan.
             await expect(looks).toContainText(/Paid plans.*Quiet/);
             await quiet.click();
-            // Taken: the gallery closes and the card says Quiet.
-            await expect(looks).toHaveCount(0);
+            // Taken: the card says Quiet. A desk's gallery closes; a phone's
+            // Look tab is the gallery, and stays (DEC-185).
+            if (!phone) await expect(looks).toHaveCount(0);
             await expect(lookCard(page)).toHaveAttribute(
                 "data-look-current",
                 "quiet",

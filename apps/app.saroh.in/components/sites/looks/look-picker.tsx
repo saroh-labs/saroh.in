@@ -386,7 +386,7 @@ export function LookPicker({
 
     return (
         <section className="space-y-2" aria-labelledby={headingId}>
-            <h3 id={headingId} className="label">
+            <h3 id={headingId} className={inSheet ? "sr-only" : "label"}>
                 Look
             </h3>
             {inSheet ? (

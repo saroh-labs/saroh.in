@@ -27,7 +27,7 @@ export function BlockToolbar({
             aria-label="Block actions"
             data-block-toolbar=""
             onClick={(e) => e.stopPropagation()}
-            className="absolute right-2 top-2 z-20 flex gap-0.5 rounded-xl bg-foreground p-0.5 font-sans text-background shadow-lg"
+            className="absolute right-2 top-2 z-20 flex gap-0.5 rounded-xl border bg-card p-1 font-sans text-foreground shadow-[0_8px_20px_hsl(var(--shadow-color)/0.18)]"
         >
             <Button
                 type="button"
@@ -36,7 +36,7 @@ export function BlockToolbar({
                 aria-label="Move up"
                 disabled={index === 0}
                 onClick={() => onMove(-1)}
-                className="size-11 text-background hover:bg-background/15 hover:text-background"
+                className="h-11 w-11"
             >
                 <ArrowUp aria-hidden />
             </Button>
@@ -47,7 +47,7 @@ export function BlockToolbar({
                 aria-label="Move down"
                 disabled={index >= count - 1}
                 onClick={() => onMove(1)}
-                className="size-11 text-background hover:bg-background/15 hover:text-background"
+                className="h-11 w-11"
             >
                 <ArrowDown aria-hidden />
             </Button>
@@ -57,7 +57,7 @@ export function BlockToolbar({
                 size="icon"
                 aria-label="Remove"
                 onClick={onRemove}
-                className="size-11 text-background hover:bg-background/15 hover:text-background"
+                className="h-11 w-11"
             >
                 <Trash2 aria-hidden />
             </Button>

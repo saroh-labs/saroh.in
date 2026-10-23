@@ -2,7 +2,6 @@
 
 import { Button } from "@saroh/ui/button";
 import { CopyButton } from "@saroh/ui/copy-button";
-import { cn } from "@saroh/ui/lib/utils";
 import { Check, ExternalLink } from "lucide-react";
 
 import { ShareLinkButton } from "@/components/shared/share-link/share-link-button";
@@ -77,35 +76,36 @@ export function PublishLiveFoot({
         "site",
     ]);
     const open = url ? (
-        <Button asChild className={cn(phone && "w-full")}>
+        <Button asChild>
             <a href={url} target="_blank" rel="noreferrer">
                 <ExternalLink aria-hidden />
                 Open site
             </a>
         </Button>
     ) : null;
-    return (
-        <div
-            className={cn(
-                "flex gap-2",
-                phone ? "flex-col" : "flex-wrap items-center justify-end",
-            )}
-        >
-            {phone ? open : null}
-            <div
-                className={cn(
-                    "flex flex-wrap items-center gap-2",
-                    phone && "[&>*]:flex-1",
-                )}
-            >
-                {share ? (
-                    <ShareLinkButton link={share} className="mt-0" />
-                ) : null}
-                <Button type="button" variant="outline" onClick={onDone}>
-                    Done
-                </Button>
+    const shareRow = share ? (
+        <ShareLinkButton link={share} className="mt-0 justify-start" />
+    ) : null;
+    const done = (
+        <Button type="button" variant="outline" onClick={onDone}>
+            Done
+        </Button>
+    );
+    // A phone: Open site under the thumb first. A desk: passing it on,
+    // then Done and Open site at the right.
+    return phone ? (
+        <div className="flex flex-col gap-2 [&>*]:w-full">
+            {open}
+            {shareRow}
+            {done}
+        </div>
+    ) : (
+        <div className="flex flex-col gap-2">
+            {shareRow}
+            <div className="flex justify-end gap-2">
+                {done}
+                {open}
             </div>
-            {phone ? null : open}
         </div>
     );
 }

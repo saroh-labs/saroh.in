@@ -161,6 +161,9 @@ export function EditorSheet({
                                         ? "Make the sheet smaller"
                                         : "Make the sheet taller"
                                 }
+                                // A grip for the thumb; the keyboard starts on
+                                // Close, and the sheet scrolls either way.
+                                tabIndex={-1}
                                 onClick={() => setTall(!tall)}
                                 className="mx-auto flex h-5 w-16 items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             >

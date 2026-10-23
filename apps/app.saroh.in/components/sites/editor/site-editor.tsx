@@ -221,16 +221,30 @@ export function SiteEditor({
     });
 
     const active = activeSection(selection.selectedIndex, sections);
-    /** Bring a block to the top of the page, after the render that moves it. */
+    /**
+     * Bring a block to the top of the canvas, after the render that moves
+     * it. The canvas alone scrolls: `scrollIntoView` would scroll the
+     * phone's whole window too, and the bar with it.
+     */
     const scrollToBlock = (index: number) =>
         requestAnimationFrame(() => {
             const canvas = viewport.canvasRef.current;
-            if (canvas) {
-                queryCanvas(
-                    canvas,
-                    `[data-block-index="${index}"]`,
-                )?.scrollIntoView({ block: "start", behavior: "smooth" });
-            }
+            if (!canvas) return;
+            const block = queryCanvas<HTMLElement>(
+                canvas,
+                `[data-block-index="${index}"]`,
+            );
+            if (!block) return;
+            // A block in the device frame is measured from the frame.
+            const frame = block.ownerDocument.defaultView?.frameElement;
+            const top =
+                block.getBoundingClientRect().top +
+                (frame ? frame.getBoundingClientRect().top : 0) -
+                canvas.getBoundingClientRect().top;
+            canvas.scrollTo({
+                top: canvas.scrollTop + top - 8,
+                behavior: "smooth",
+            });
         });
     // A tapped block's toolbar on a phone (DEC-185): each with Undo.
     const blockTools =

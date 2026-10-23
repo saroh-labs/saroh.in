@@ -486,7 +486,7 @@ export function ViewControls(
                     value: String(z),
                     label: z === "fit" ? "Fit" : `${z}%`,
                 }))}
-                className="w-[4.75rem] tabular-nums text-muted-foreground"
+                className="w-[4.75rem] tabular-nums text-muted-foreground coarse:w-24"
             />
         </div>
     );
