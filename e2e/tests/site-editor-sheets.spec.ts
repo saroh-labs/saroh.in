@@ -268,7 +268,9 @@ test.describe("the phone editor's changes", { tag: "@serial" }, () => {
         const before = await page.locator("[data-block-index]").count();
         const sheet = await openFromPill(page, "Add a block");
         await sheet.getByLabel("Search blocks").fill("contact");
-        await sheet.getByRole("button", { name: /^Add / }).first().click();
+        // By its name: the list filters a beat after typing, and the first
+        // row before it does is Hero.
+        await sheet.getByRole("button", { name: "Add Contact" }).click();
         // Its settings rise; the toolbar is on the new block.
         const tools = page.getByRole("toolbar", { name: "Block actions" });
         await expect(tools).toBeVisible({ timeout: 15_000 });

@@ -6,12 +6,13 @@
  */
 import { act } from "react";
 import type { Root } from "react-dom/client";
-import { createRoot } from "react-dom/client";
+import { createRoot, hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { EditorSelection } from "@/components/sites/editor/use-editor-selection";
 import type { EditorLayout, EditorSheet } from "./use-editor-layout";
-import { useEditorSheets } from "./use-editor-layout";
+import { useEditorSheets, useLayoutKnown } from "./use-editor-layout";
 
 function Probe(props: { layout: EditorLayout; initial: EditorSheet }) {
     const { sheet } = useEditorSheets(
@@ -41,5 +42,24 @@ describe("useEditorSheets: the sheet a fresh editor opens with", () => {
     ] as const)("%s, %s open before: %s", (layout, initial, expected) => {
         act(() => root.render(<Probe layout={layout} initial={initial} />));
         expect(host.querySelector("p")?.dataset.sheet).toBe(expected ?? "none");
+    });
+});
+
+describe("useLayoutKnown: the window is unknown until hydration", () => {
+    function Known() {
+        return <p data-known={String(useLayoutKnown())} />;
+    }
+    it("is false in the server's markup", () => {
+        expect(renderToString(<Known />)).toContain('data-known="false"');
+    });
+    it("is true once hydrated", () => {
+        const server = document.createElement("div");
+        server.innerHTML = renderToString(<Known />);
+        let hydrated: Root | undefined;
+        act(() => {
+            hydrated = hydrateRoot(server, <Known />);
+        });
+        expect(server.querySelector("p")?.dataset.known).toBe("true");
+        act(() => hydrated?.unmount());
     });
 });

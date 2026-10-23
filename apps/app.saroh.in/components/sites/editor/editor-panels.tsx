@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode, RefObject } from "react";
 
 import { queryCanvas } from "@/components/sites/canvas/device-frame";
@@ -16,6 +17,7 @@ import type {
     EditorLayout,
     EditorSheets,
 } from "@/components/sites/editor/use-editor-layout";
+import { useLayoutKnown } from "@/components/sites/editor/use-editor-layout";
 import type { EditorSelection } from "@/components/sites/editor/use-editor-selection";
 import {
     PANEL_DEFAULT,
@@ -91,6 +93,7 @@ export function EditorPanels({
     const { sheet, setSheet } = sheets;
     const wide = layout === "wide";
     const phone = layout === "phone";
+    const known = useLayoutKnown();
     const tools = previewing ? { hidden: true } : { className: "contents" };
     /** Open the rail on one of its tabs, in its phone sheet. */
     const openRail = (tab: RailTab) => {
@@ -115,8 +118,13 @@ export function EditorPanels({
         <>
             <div
                 ref={setBody}
-                data-layout={layout}
-                className="relative grid min-h-0 flex-1 grid-cols-[var(--editor-cols)]"
+                // The server can't know the window: nothing is drawn, nor
+                // named, until hydration has (useLayoutKnown).
+                data-layout={known ? layout : undefined}
+                className={cn(
+                    "relative grid min-h-0 flex-1 grid-cols-[var(--editor-cols)]",
+                    !known && "invisible",
+                )}
                 style={{ "--editor-cols": columns } as React.CSSProperties}
             >
                 {phone ? null : (

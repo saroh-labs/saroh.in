@@ -48,6 +48,22 @@ export function useEditorLayout(): EditorLayout {
     return useSyncExternalStore(subscribe, layoutNow, () => "wide");
 }
 
+const never = () => () => undefined;
+
+/**
+ * False in the server's markup and until hydration, true after. Until then
+ * the layout above is the server's guess (`wide`), so a phone would show
+ * the desk's columns, the inspector among them, and taps on them would do
+ * nothing; the editor's body is held back until the window is known.
+ */
+export function useLayoutKnown(): boolean {
+    return useSyncExternalStore(
+        never,
+        () => true,
+        () => false,
+    );
+}
+
 /**
  * Which overlay is open over the page when the layout is not wide: the
  * inspector (narrow or phone), or one of a phone's own (DEC-185).
