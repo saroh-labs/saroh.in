@@ -39,7 +39,9 @@ export DEV_ACCESS_KEY=ci-placeholder-not-a-secret NEXT_TELEMETRY_DISABLED=1
     CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV=false WRANGLER_SEND_METRICS=false \
     pnpm exec wrangler dev --ip 127.0.0.1 --port "$port" >"$log" 2>&1) &
 wrangler=$!
-trap 'pkill -P $wrangler 2>/dev/null; kill $wrangler 2>/dev/null; pkill -f "wrangler dev --ip 127.0.0.1 --port $port" 2>/dev/null; rm -f "$log"' EXIT
+# Each step may find nothing left to stop; under `set -e` that would turn a
+# pass into exit 1 (it did, on CI's first run), so none of them can fail.
+trap 'pkill -P $wrangler 2>/dev/null || true; kill $wrangler 2>/dev/null || true; pkill -f "wrangler dev --ip 127.0.0.1 --port $port" 2>/dev/null || true; rm -f "$log"' EXIT
 
 ready=""
 for _ in $(seq 1 90); do
