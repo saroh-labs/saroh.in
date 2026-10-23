@@ -1,4 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
+import { expect } from "@playwright/test";
 
 import { pressUntil } from "./press";
 
@@ -12,6 +13,16 @@ import { pressUntil } from "./press";
 export const editPill = (page: Page): Locator =>
     page.getByRole("toolbar", { name: "Edit page" });
 
+/**
+ * Until no sheet is on its way out: one closing still matches by its name
+ * for a moment, and a press on it lands on something leaving the page.
+ */
+async function settled(page: Page): Promise<void> {
+    await expect(
+        page.locator('[role="dialog"][data-state="closed"]'),
+    ).toHaveCount(0);
+}
+
 /** A phone sheet, by its title. */
 export const phoneSheet = (page: Page, name: string | RegExp): Locator =>
     page.getByRole("dialog", { name });
@@ -21,6 +32,7 @@ export async function openFromPill(
     page: Page,
     which: "Blocks" | "Add a block" | "Brand",
 ): Promise<Locator> {
+    await settled(page);
     const sheet = phoneSheet(page, which === "Blocks" ? /^Blocks on / : which);
     if (await sheet.isVisible()) return sheet;
     await pressUntil(
@@ -32,6 +44,7 @@ export async function openFromPill(
 
 /** Open ⋯ More, pressed until it shows. */
 export async function openMore(page: Page): Promise<Locator> {
+    await settled(page);
     const sheet = phoneSheet(page, "More");
     if (await sheet.isVisible()) return sheet;
     await pressUntil(
