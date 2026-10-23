@@ -62,6 +62,11 @@ const restrictedImportOptions = {
         // `importNames`, not the whole module: `Toaster` is the mount point and
         // an app has to import it. Only the imperative `toast` is off-limits.
         { name: "sonner", importNames: ["toast"], message: TOAST_BAN_MESSAGE },
+        {
+            name: "next/font/google",
+            message:
+                "Self-host the face with next/font/local (packages/ui/fonts, or packages/site-blocks/fonts for a merchant's). next/font/google fetches from Google at build time and fails the build when Google answers in a shape Turbopack doesn't expect (vercel/next.js#99114; DEV_LEARNINGS 23 Oct 2026).",
+        },
     ],
     patterns: [
         { group: DB_IMPORT_BAN_PATTERNS, message: DB_IMPORT_BAN_MESSAGE },

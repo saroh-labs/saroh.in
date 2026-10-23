@@ -290,10 +290,13 @@ async function requestedFamilies(page: Page): Promise<string[]> {
         ...new Set(
             families
                 .filter((f) => !/Fallback/i.test(f) && f !== "Site Rupee")
-                // next/font names a face `__Jost_d4c3f2`: one family, however
-                // many weight and subset files it loads.
+                // A face is two families, `jost` and its latin-ext `jostExt`
+                // (`site-fonts.ts`); a hashed `__Jost_d4c3f2` is one too.
                 .map((f) =>
-                    f.replace(/^__/, "").replace(/_[0-9a-f]{4,}$/i, ""),
+                    f
+                        .replace(/^__/, "")
+                        .replace(/_[0-9a-f]{4,}$/i, "")
+                        .replace(/Ext$/, ""),
                 ),
         ),
     ];
