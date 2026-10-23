@@ -235,8 +235,12 @@ test.describe("bookings calendar", () => {
         await page.goto("/bookings?layout=day");
         // No colour key row over the diary any more: it is in the sheet.
         await expect(page.getByRole("list", { name: "Key" })).toHaveCount(0);
-        await page.getByRole("button", { name: /^This day:/ }).click();
         const sheet = page.getByRole("dialog", { name: "This day" });
+        // The first press after a load may land before hydration.
+        await pressUntil(
+            page.getByRole("button", { name: /^This day:/ }),
+            sheet,
+        );
         await expect(
             sheet.getByRole("switch", { name: "Show cancelled bookings" }),
         ).toBeVisible();
@@ -482,9 +486,12 @@ test.describe("bookings calendar", () => {
             // next free day.
             const next = sheet.getByRole("button", { name: /^Next free day/ });
             if (await next.isVisible().catch(() => false)) await next.click();
+            // The day's last free time: parallel specs book Northwind's
+            // earliest (`bookOwn`), and a time taken between showing and
+            // pressing Move is refused ("just booked by someone else").
             await sheet
                 .getByRole("radio", { name: /^\d{1,2}:\d{2} (am|pm)/ })
-                .first()
+                .last()
                 .click();
             await sheet.getByRole("button", { name: /^Move to / }).click();
             await expect(page.getByText(/^Moved .+ to /)).toBeVisible();
@@ -1482,15 +1489,19 @@ test.describe("a booking's page (U12)", () => {
                 page.getByRole("button", { name: "Move", exact: true }),
             ).toBeVisible();
             // More holds Cancel, last.
-            await page
-                .getByRole("button", { name: "More", exact: true })
-                .filter({ visible: true })
-                .first()
-                .click();
             const cancel = page.getByRole("button", {
                 name: "Cancel booking",
             });
-            await expect(cancel).toBeVisible();
+            // The page's own More (the tab bar has one), pressed until it
+            // answers: the first press may land before hydration.
+            await pressUntil(
+                page
+                    .getByRole("main")
+                    .getByRole("button", { name: "More", exact: true })
+                    .filter({ visible: true })
+                    .first(),
+                cancel,
+            );
             await page.keyboard.press("Escape");
             await expect(cancel).toBeHidden();
             // Take payment opens as a sheet, read only: nothing is taken.
@@ -1528,18 +1539,21 @@ test.describe("a booking's page (U12)", () => {
         const booked = await bookOwn(owner, who.id, 2);
         try {
             await page.goto(`/bookings/${booked.id}`);
-            await page
-                .getByRole("button", { name: "Move", exact: true })
-                .click();
             const sheet = page.getByRole("dialog", {
                 name: /^Move .+'s booking$/,
             });
-            await expect(sheet).toBeVisible();
+            await pressUntil(
+                page.getByRole("button", { name: "Move", exact: true }),
+                sheet,
+            );
             const next = sheet.getByRole("button", { name: /^Next free day/ });
             if (await next.isVisible().catch(() => false)) await next.click();
+            // The day's last free time: parallel specs book Northwind's
+            // earliest (`bookOwn`), and a time taken between showing and
+            // pressing Move is refused ("just booked by someone else").
             await sheet
                 .getByRole("radio", { name: /^\d{1,2}:\d{2} (am|pm)/ })
-                .first()
+                .last()
                 .click();
             await sheet.getByRole("button", { name: /^Move to / }).click();
             await expect(page.getByText(/^Moved .+ to /)).toBeVisible();

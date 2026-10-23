@@ -9,6 +9,7 @@ import {
     northwind,
     stamp,
 } from "../fixtures/own-data";
+import { pressUntil } from "../fixtures/press";
 import type { MenuRow } from "../fixtures/roles";
 import {
     asOwner,
@@ -293,14 +294,16 @@ test.describe("a Member", () => {
             await expect(
                 page.getByRole("button", { name: "Move", exact: true }),
             ).toBeVisible();
-            await page
-                .getByRole("button", { name: "More", exact: true })
-                .filter({ visible: true })
-                .first()
-                .click();
-            await expect(
+            // The page's own More (the tab bar has one), pressed until it
+            // answers: the first press may land before hydration.
+            await pressUntil(
+                page
+                    .getByRole("main")
+                    .getByRole("button", { name: "More", exact: true })
+                    .filter({ visible: true })
+                    .first(),
                 page.getByRole("button", { name: "Cancel booking" }),
-            ).toBeVisible();
+            );
             await page.keyboard.press("Escape");
             // Money to take is shown, and is off for a role that can't take
             // it (DEC-098), saying why once: never a live button.
