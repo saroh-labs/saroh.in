@@ -532,7 +532,11 @@ test.describe("bookings calendar", () => {
             let contactId: string | null = null;
             try {
                 // Day, named: a phone with no view chosen opens on List (Q4).
-                await page.goto(`/bookings?date=${day}&layout=day`);
+                // Their own lane: a phone shows one, and a seeded booking
+                // with no one on it that day puts Unassigned there instead.
+                await page.goto(
+                    `/bookings?date=${day}&layout=day&person=${person.id}`,
+                );
                 // Closed time says "Closed · click to open" (a phone: tap)
                 // and opens from the half hour pressed (U4).
                 await page
