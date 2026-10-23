@@ -2393,3 +2393,16 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **Reset style… asks, then offers Undo.** "Reset colours, typeface and spacing?" with "Keep my style" as the safe default; once reset, the house Undo toast "Colours, type and spacing reset." puts every colour, the typeface and the sliders back in one press. An allowed exception to "Undo or confirm, never both", as DEC-182's copy is: it moves the whole style at once.
     - **The Hero row says when it does nothing:** on a Classic page whose heroes are all full-bleed (drawn in the text colour), "This hero uses your text colour. Change it in the hero block."
 - Rules: `apps/app.saroh.in/components/sites/looks/` (`style-panel.tsx`, `look-picker.tsx`, `typeface-picker.tsx`, `colour-picker.tsx`, `brand-picker.tsx`).
+
+## DEC-185 The site editor on a phone has no bottom tabs, and Publish is a sheet on phone and desk
+
+**Status: Accepted — 2026-10-23** · owner · signed off the phone editor and Publish boards (`BRPhoneEditor`, `BRPhoneEditorBlock`, `BRPhoneActions`, `BRDeskPublish`, the Brand sheet `BRPhone*`); plan `docs/plans/2026-10-23-001-feat-phone-editor-publish-sheet-plan.md`
+
+- Context:
+    - On a phone the editor kept a bottom tab bar (Page · Add · Brand · Feedback) under the page, and each tab opened a sheet over most of the page it changed. Publishing, on phone and desk, left the editor for a full-screen check and then a full-screen "is live" page.
+- Decision:
+    - **No bottom tabs on a phone.** The top bar holds ← Website, the page picker, the Draft/Live status, ⋯ (Preview, Feedback with its open notes, Share, Test releases) and Publish. The page fills the screen, with one floating pill: Blocks · + · Brand. A tapped block gets an outline, a toolbar (move up, move down, remove, each with Undo) and its settings in a sheet.
+    - **The Brand sheet on a phone** is one sheet with Look · Type · Colour · Spacing tabs, close at the top right and Reset in its ⋯ (this ends DEC-184's hold on the phone).
+    - **Publish is a sheet**: from the right on a desk, from the bottom on a phone, always the same surface whatever the list's length (a popover for short lists was considered and refused: the same button must open the same place, the count changes while it is open, and fixing, publishing and the result need room). It says what goes live, puts anything that blocks publishing first in red with its fix (Publish greyed out, the foot saying why), lists advice as not stopping you, fixes the web address in place, shows Publishing… and then turns into the result (the address to copy, Open site, Share link, Done).
+    - **Choosing is a popover, committing is a sheet**: look, type and colour choices stay popovers; publish, add a block and settings are sheets.
+- Rules: `apps/app.saroh.in/components/sites/editor/` and `components/sites/publish/`; the patterns file for the editor gets the popover/sheet rule when U6 lands.
