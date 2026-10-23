@@ -61,10 +61,13 @@ async function loadedFamilies(page: Page): Promise<string[]> {
         ...new Set(
             families
                 .filter((f) => !/Fallback/i.test(f) && f !== "Site Rupee")
-                // next/font names a face `__Jost_d4c3f2`: one family, however
-                // many weight and subset files it loads.
+                // A face is two families, `jost` and its latin-ext `jostExt`
+                // (`site-fonts.ts`); a hashed `__Jost_d4c3f2` is one too.
                 .map((f) =>
-                    f.replace(/^__/, "").replace(/_[0-9a-f]{4,}$/i, ""),
+                    f
+                        .replace(/^__/, "")
+                        .replace(/_[0-9a-f]{4,}$/i, "")
+                        .replace(/Ext$/, ""),
                 ),
         ),
     ];
@@ -115,7 +118,7 @@ test.describe("the renderer draws a look", { tag: "@serial" }, () => {
             const stack = await page
                 .locator("#rupee-probe")
                 .evaluate((el) => getComputedStyle(el).fontFamily);
-            expect(stack).toMatch(/Jost[^,]*,\s*"?Site Rupee"?/);
+            expect(stack).toMatch(/Jost[^,]*,\s*"?Site Rupee"?/i);
             await page.evaluate(() => document.fonts.ready);
             const cdp = await page.context().newCDPSession(page);
             await cdp.send("DOM.enable");

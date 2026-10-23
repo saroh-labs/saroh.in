@@ -188,7 +188,9 @@ async function joinLine(
     const name = page.getByLabel("Name");
     await expect(joined.or(name).first()).toBeVisible({ timeout: 15_000 });
     if ((await name.isVisible()) && !(await joined.isVisible())) {
-        await name.fill("Sneha Pillai");
+        // The sheet can join by itself while the name goes in, and the
+        // field leaves mid-fill; the line below waits for either outcome.
+        await name.fill("Sneha Pillai").catch(() => undefined);
         // The sheet may finish joining by itself once it has a name: click
         // Join only while it is still there.
         const join = page
