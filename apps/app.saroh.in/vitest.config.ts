@@ -26,6 +26,10 @@ export default defineConfig({
         // plan notice and lock is still tested. A test of the hidden state
         // mocks `lib/saroh-billing/plans-shown`.
         env: { NEXT_PUBLIC_PLANS: "on" },
+        // A component test that opens a few sheets passes 5s on a busy CI
+        // runner and leaves its dialog open for the tests after it (23 Oct:
+        // order-sheets, then place-section). Locally they take under a second.
+        testTimeout: 15_000,
         // jsdom answers `:modal` slowly enough to time a test out.
         setupFiles: ["./vitest.setup.ts"],
         // Plus the editor's pure helpers that sit beside the component using
