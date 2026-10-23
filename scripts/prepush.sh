@@ -287,6 +287,14 @@ e2e_worktree() {
     fi
     cd "$dir"
     echo "--- worktree $dir at $(git rev-parse --short HEAD)"
+    # A kept .next built by another Next version breaks the build (16.3.8 →
+    # 16.4.2 couldn't resolve its own font loader), so a new lockfile clears it.
+    local lock
+    lock=$(git hash-object pnpm-lock.yaml)
+    if [ "$(cat .prepush-lock 2>/dev/null)" != "$lock" ]; then
+        rm -rf apps/*/.next
+        echo "$lock" >.prepush-lock
+    fi
     pnpm install --frozen-lockfile --prefer-offline
 }
 # Whether a spec of this run opens the operator console: an `admin:` key in

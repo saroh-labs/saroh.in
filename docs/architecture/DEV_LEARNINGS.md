@@ -5884,3 +5884,10 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** the showcase moved to Prana and the boards' changes landed through agents that ran unit tests only; the db spec and the looks' browser specs, which pin exactly these words and sizes, first ran in the gate. The unit test for the sentence had the same "on today" baked in.
 - **Fix:** `next-free-sentence.ts` says "on" only before a date; the Book link is `min-w-11`; the open sheet carries across an editor restart (`use-editor-layout.ts`); the specs read Prana and the boards' intended words.
 - **Rule:** a change to what a look or a template draws runs the browser specs that cover it (`pnpm prepush --e2e`) and its db specs before the unit is called done; a unit test's expected words are read as a customer would read them, not copied from the output.
+
+## A Next.js bump failed the local browser gate, and a bookings spec broke by the calendar date (23 Oct 2026)
+
+- **Symptom:** after Next.js 16.3.8 → 16.4.2 (two critical advisories), `prepush --all` failed to build saroh.app: "Can't resolve '@vercel/turbopack-next/internal/font/google/font'", 30 times. A fresh `next build` in the worktree passed. Separately, `bookings.spec.ts` "open extra hours on a closed stretch" failed on phone twice in a row, though it passed the day before.
+- **Cause:** the browser gate's detached worktree keeps each app's `.next` between runs; one built by the old Next pointed at a file the new one no longer has. The spec opened the phone's day without a person, and a seeded booking with no one on it, placed relative to today, put the Unassigned lane on that day instead of the test's diary.
+- **Fix:** `scripts/prepush.sh` (`e2e_worktree`) clears `apps/*/.next` when the lockfile changes; the spec opens `&person=${person.id}`.
+- **Rule:** a spec that looks at one person's day on a phone names the person in the URL (as `bookings-day.spec.ts` does).
