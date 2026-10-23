@@ -62,15 +62,20 @@ export type EditorSheet = "inspector" | "rail" | null;
  * sheet closes, so turning a phone on its side keeps what was chosen.
  *
  * Nothing opens on its own: a selection remembered from last time stays on
- * the page, outlined, until the merchant chooses again.
+ * the page, outlined, until the merchant chooses again. Only a phone's rail
+ * sheet, open when the editor was started afresh (`initial`, DEC-182), is
+ * open again on the fresh one.
  */
 export function useEditorSheets(
     selection: EditorSelection,
     layout: EditorLayout,
     /** Preview (G5) has no editing tools, so it puts any sheet away. */
     previewing: boolean,
+    initial: EditorSheet = null,
 ) {
-    const [sheet, setSheet] = useState<EditorSheet>(null);
+    const [sheet, setSheet] = useState<EditorSheet>(
+        initial === "rail" && layout === "phone" ? "rail" : null,
+    );
 
     /*
      * Crossing a breakpoint: wide has no sheets, and the rail's sheet only

@@ -3,8 +3,7 @@ import { Notice } from "@saroh/ui/notice";
 import Link from "next/link";
 import { Fragment } from "react";
 
-import { ChangePaymentMethod } from "@/components/settings/change-payment-method";
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import type { NextCharge } from "@/lib/saroh-billing/plan";
 import type { StatusPart } from "@/lib/saroh-billing/plan-status";
 import { nextParts, planMessage } from "@/lib/saroh-billing/plan-status";
@@ -13,6 +12,7 @@ import type {
     PendingCheckout,
     PlanNote,
 } from "@/lib/saroh-billing/plan-view";
+import { ChangePaymentMethod } from "./change-payment-method";
 
 import { CancelPlan } from "./cancel-plan";
 import { CheckoutPending } from "./checkout-pending";

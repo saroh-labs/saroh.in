@@ -114,8 +114,14 @@ export default function SectionRenderer({
     frontDoor = null,
     proof = null,
     credit,
+    beside = null,
 }: LookProps & {
     section: Section;
+    /**
+     * A Plans section's cards drawn first in its row: Live's class packs
+     * (VB01), which `PageSections` folds in. Absent elsewhere.
+     */
+    beside?: React.ReactNode;
     /**
      * Under a look, the signed-in customer's class credit (the booking
      * page's own read, through the site's server with their session), for
@@ -333,6 +339,7 @@ export default function SectionRenderer({
                     prices={prices}
                     apiUrl={apiUrl}
                     siteId={siteId}
+                    beside={beside}
                 />
             );
         case "packs":
@@ -577,6 +584,17 @@ export function PageSections({
               (s, i) => s.type === "hero" && levels[i] === 1 && !nothing(i),
           )
         : -1;
+    // Under Live, plans with class packs straight after them are one row
+    // of cards, the packs first (VB01's "Come once, or every day"). Only
+    // with both feeds: the editor's canvas draws each on its own.
+    const joinsPacks = (i: number) =>
+        lookId === "live" &&
+        sections[i]?.type === "plans" &&
+        sections[i + 1]?.type === "packs" &&
+        plans !== undefined &&
+        packs !== undefined &&
+        !nothing(i) &&
+        !nothing(i + 1);
     return (
         <>
             {top ? <ModulePageTop title={top.title} lead={top.lead} /> : null}
@@ -586,7 +604,7 @@ export function PageSections({
                 // no wrapper and so no anchor to jump to. The layout already
                 // left its entry out of the menu, and the header drops one
                 // whose target is missing.
-                if (nothing(i)) return null;
+                if (nothing(i) || (i > 0 && joinsPacks(i - 1))) return null;
                 const style = paddingOverride(section.content);
                 // Close under the page's title, not a section's padding away.
                 const className = top && i === 0 ? "[&>*]:!pt-5" : undefined;
@@ -612,6 +630,23 @@ export function PageSections({
                         isOwnerPreview={isOwnerPreview}
                         credit={credit}
                         {...(i === opener ? { frontDoor, proof } : {})}
+                        beside={
+                            joinsPacks(i) ? (
+                                <PacksSection
+                                    look={lookId}
+                                    isOwnerPreview={isOwnerPreview}
+                                    content={
+                                        sections[i + 1].content as RenderedPacks
+                                    }
+                                    plansOnPage
+                                    feed={packs}
+                                    prices={prices}
+                                    apiUrl={apiUrl}
+                                    siteId={siteId}
+                                    bare
+                                />
+                            ) : null
+                        }
                     />
                 );
                 return (

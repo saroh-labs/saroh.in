@@ -265,6 +265,16 @@ const SAMPLES: Record<(typeof NOTICE_TEMPLATES)[number], NoticeVars> = {
             payOnline: true,
         },
     },
+    AUTOPAY_PRE_DEBIT: {
+        kind: "AUTOPAY_PRE_DEBIT",
+        debit: {
+            business: "Rye <&> Co.",
+            firstName: "Asha",
+            plan: "Monthly yoga",
+            amount: "₹1,200.00",
+            day: "Tue 6 Oct",
+        },
+    },
     PACK_LOW: {
         kind: "PACK_LOW",
         pack: {
@@ -460,6 +470,25 @@ describe("a notice with a switch is offered on the switches screen (U4)", () => 
             const setting = noticeDefinition(kind).setting;
             if (setting !== null) expect(NOTICE_SENDS[setting]).toBe(true);
         }
+    });
+});
+
+describe("an eMandate's pre-debit notice (DEC-180)", () => {
+    it("says how much leaves their bank account, when, for what, and who to ask; no link, no switch", () => {
+        const vars = SAMPLES.AUTOPAY_PRE_DEBIT;
+        expect(noticeSentence(vars)).toBe(
+            "₹1,200.00 will be taken from your bank account on Tue 6 Oct for Monthly yoga: your membership's renewal, by the autopay you set up. If anything about it looks wrong, ask Rye <&> Co. before then.",
+        );
+        const email = renderNotice(vars);
+        expect(email.subject).toBe(
+            "₹1,200.00 will be taken from your bank account on Tue 6 Oct",
+        );
+        expect(email.body).toContain("Hi Asha,");
+        expect(email.body).not.toContain(SECRET_LINK_SLOT);
+        expect(secretLinkLead(vars)).toBeNull();
+        expect(backLink(withLink(vars, "https://rye.saroh.app/x"))).toBeNull();
+        // Without it the debit doesn't happen: nothing to switch off.
+        expect(noticeDefinition("AUTOPAY_PRE_DEBIT").setting).toBeNull();
     });
 });
 

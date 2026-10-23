@@ -29,6 +29,8 @@ export type SectionBand = (typeof SECTION_BANDS)[number];
 export const ANCHOR_MAX = 40;
 /** The longest menu label: a header entry, not a heading. */
 export const NAV_LABEL_MAX = 30;
+/** How long the small label over a section's heading may run. */
+export const EYEBROW_MAX = 60;
 /** How many sections one page may list in the header. */
 export const IN_PAGE_NAV_MAX = 8;
 
@@ -48,6 +50,12 @@ export interface SectionFrame {
     anchor?: string;
     navLabel?: string;
     band?: Exclude<SectionBand, "none">;
+    /**
+     * The small label over the block's heading ("Classes and services",
+     * DEC-172, 22 Oct): plain text, drawn by the Quiet, Folio and Live looks
+     * as their boards set it. ABSENT draws nothing.
+     */
+    eyebrow?: string;
 }
 
 export interface SectionFrameIssue {
@@ -125,6 +133,18 @@ export function parseSectionFrame(content: unknown): SectionFrameResult {
         }
     }
 
+    const eyebrow = text("eyebrow");
+    if (eyebrow !== undefined) {
+        if (eyebrow.length > EYEBROW_MAX) {
+            issues.push({
+                path: ["eyebrow"],
+                message: `A label can be at most ${EYEBROW_MAX} characters`,
+            });
+        } else {
+            frame.eyebrow = eyebrow;
+        }
+    }
+
     const band = raw.band;
     if (band !== undefined && band !== null) {
         if (!(SECTION_BANDS as readonly unknown[]).includes(band)) {
@@ -159,6 +179,13 @@ export function sectionFrameOf(content: unknown): SectionFrame {
         raw.navLabel.length <= NAV_LABEL_MAX
     ) {
         frame.navLabel = raw.navLabel.trim();
+    }
+    if (
+        typeof raw.eyebrow === "string" &&
+        raw.eyebrow.trim() !== "" &&
+        raw.eyebrow.length <= EYEBROW_MAX
+    ) {
+        frame.eyebrow = raw.eyebrow.trim();
     }
     if (
         typeof raw.band === "string" &&

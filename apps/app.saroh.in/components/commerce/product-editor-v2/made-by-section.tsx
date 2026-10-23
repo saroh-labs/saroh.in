@@ -23,8 +23,8 @@ import { productSettingsHref } from "@/lib/products/links";
 import type { ProductCustomField, ProductDetail } from "@/lib/products/service";
 import type { EffectiveDefaults } from "@/lib/products/settings";
 
-import { RadioCards } from "@/components/shared/choice-group";
-import { StatusBadge } from "@/components/shared/status-badge";
+import { RadioCards } from "@/components/shared/fields/choice-group";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { TextLink } from "@saroh/ui/text-link";
 import { useEditor, useSection } from "./editor-state";
 import { FieldHelp, FieldLabel } from "./fields";

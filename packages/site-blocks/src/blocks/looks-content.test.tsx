@@ -371,6 +371,8 @@ describe.each(LOOKS)("%s: the timetable", (look) => {
         expect(books).toHaveLength(3);
         for (const book of books) {
             expect(book.className).toContain("min-h-11");
+            // Folio's is a text link: as wide as a fingertip too.
+            if (look === "folio") expect(book.className).toContain("min-w-11");
             expect(book.className).not.toContain("bg-site-accent ");
             expect(book).not.toHaveAttribute("data-site-primary");
             expect(book.getAttribute("href")).toMatch(
@@ -416,7 +418,9 @@ describe.each(LOOKS)("%s: the timetable", (look) => {
         expect(w).not.toHaveTextContent("9 places");
         const quiet = w.querySelectorAll('[data-timetable-places=""]');
         expect(quiet.length).toBeGreaterThan(0);
-        quiet.forEach((el) => expect(el.className).toContain("min-h-[20px]"));
+        // Live's tag row is 24 tall (VB09), the others' line 20.
+        const height = look === "live" ? "min-h-[24px]" : "min-h-[20px]";
+        quiet.forEach((el) => expect(el.className).toContain(height));
     });
 
     it("says 1 pack class for a class the signed-in customer's pack covers, asked once a class", async () => {
@@ -583,6 +587,45 @@ describe("Classic's timetable", () => {
         ).toBeNull();
         expect(container).not.toHaveTextContent("Join the waitlist");
         expect(container).not.toHaveTextContent("₹600");
+    });
+});
+
+describe("Live's list: VB01's Next free", () => {
+    it("draws every class in one row of cards, not the week across", () => {
+        const { container } = page(
+            [
+                {
+                    ...timetable,
+                    content: { title: "Next free", variant: "list" },
+                },
+            ],
+            "live",
+            { fixtures: { timetable: WEEK } },
+        );
+        const rail = must(container.querySelector("[data-timetable-rail]"));
+        expect(container.querySelector(".grid-cols-7")).toBeNull();
+        expect(container.querySelector('[role="tablist"]')).toBeNull();
+        const cards = rail.querySelectorAll("[data-timetable-row]");
+        expect(cards).toHaveLength(WEEK.sessions.length);
+        expect(cards[0]).toHaveTextContent("Today");
+        expect(cards[0]).toHaveTextContent("Meera · 1 hr · ₹600");
+        expect(cards[2]).toHaveTextContent("Tomorrow");
+        expect(cards[2]).toHaveTextContent("Full · waitlist open");
+        expect(cards[2]).toHaveTextContent("Join the waitlist");
+        // Folio and Quiet keep the week for the same section.
+        const folio = page(
+            [
+                {
+                    ...timetable,
+                    content: { title: "Next free", variant: "list" },
+                },
+            ],
+            "folio",
+            { fixtures: { timetable: WEEK } },
+        );
+        expect(
+            folio.container.querySelector("[data-timetable-rail]"),
+        ).toBeNull();
     });
 });
 
@@ -776,6 +819,41 @@ describe.each(LOOKS)("%s: plans and packs", (look) => {
     });
 });
 
+describe("Live's plans and packs: one row (VB01)", () => {
+    const feeds = {
+        plans: { plans: PLANS.slice(0, 1), joinHref: "/contact#enquiry" },
+        packs: { packs: [TEN], payOnline: false, askHref: "/contact" },
+    };
+    it("draws the pack, then the ink membership, in the plans' one row", () => {
+        const { container } = page([plans, packs], "live", feeds);
+        const lists = container.querySelectorAll(
+            "[data-site-look-prices] ul:not([data-price-rules])",
+        );
+        expect(lists).toHaveLength(1);
+        const cards = lists[0].querySelectorAll(
+            "[data-pack-column], [data-plan-column]",
+        );
+        expect(cards[0]).toHaveAttribute("data-pack-column");
+        expect(cards[1]).toHaveAttribute("data-plan-column");
+        expect(cards[1].className).toContain("bg-site-cta-bg");
+        // Its one filled button stays the plan's Join.
+        expect(container.querySelectorAll("[data-site-primary]")).toHaveLength(
+            1,
+        );
+        expect(container).not.toHaveTextContent("Class packs");
+    });
+
+    it("keeps two sections under Folio and Quiet", () => {
+        for (const look of ["folio", "quiet"] as const) {
+            const { container, unmount } = page([plans, packs], look, feeds);
+            expect(
+                container.querySelectorAll("[data-site-look-prices]"),
+            ).toHaveLength(2);
+            unmount();
+        }
+    });
+});
+
 // ── Visit us ────────────────────────────────────────────────────────────
 
 const VISIT: PublicVisit = {
@@ -825,13 +903,18 @@ describe.each(LOOKS)("%s: Visit us", (look) => {
 
 describe("the blocks a look restyles by tokens", () => {
     it.each(LOOKS)(
-        "%s: cards and photos take the look's small and photo radius",
+        "%s: cards and photos take the look's card and photo radius",
         (look) => {
             const css = lookRules(":root", look, null);
             expect(css).toContain(
                 '[class*="rounded-[calc(var(--site-radius)*1.4)]"]',
             );
-            expect(css).toContain("border-radius: var(--site-radius-s)");
+            // Live's cards are 24, its photo radius (board VB).
+            expect(css).toContain(
+                look === "live"
+                    ? "border-radius: var(--site-radius-photo)"
+                    : "border-radius: var(--site-radius-s)",
+            );
             expect(css).toContain('img[class*="rounded-[var(--site-radius)]"]');
             expect(css).toContain("border-radius: var(--site-radius-photo)");
         },

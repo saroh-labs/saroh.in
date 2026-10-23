@@ -1,7 +1,7 @@
 import { PageHeader } from "@saroh/ui/page-header";
 
 import { NotificationsInbox } from "@/components/notifications/notifications-inbox";
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { listNotifications } from "@/lib/notifications/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";

@@ -256,3 +256,45 @@ describe("anchorFromLabel", () => {
         expect(anchorFromLabel("!!!")).toBe("");
     });
 });
+
+describe("a section's eyebrow (DEC-172, 22 Oct)", () => {
+    it("rides through any block's schema, trimmed", () => {
+        const result = parseSectionContent(
+            "richText",
+            1,
+            text({ eyebrow: "  Classes and services " }),
+        );
+        expect(result.success && result.data).toMatchObject({
+            eyebrow: "Classes and services",
+        });
+        expect(sectionFrameOf({ eyebrow: "The teachers" }).eyebrow).toBe(
+            "The teachers",
+        );
+    });
+
+    it("refuses one too long, and draws a blank as none", () => {
+        expect(parseSectionFrame({ eyebrow: "x".repeat(61) }).ok).toBe(false);
+        expect(parseSectionFrame({ eyebrow: "  " })).toEqual({
+            ok: true,
+            frame: {},
+        });
+    });
+});
+
+describe("the hero's secondary link (DEC-172, 22 Oct)", () => {
+    it("is kept, and refuses an unsafe address", () => {
+        const ok = parseSectionContent("hero", 2, {
+            heading: "Yoga at your pace.",
+            secondaryCta: { label: "See the timetable", href: "/#timetable" },
+        });
+        expect(ok.success && ok.data).toMatchObject({
+            secondaryCta: { label: "See the timetable", href: "/#timetable" },
+        });
+        expect(
+            parseSectionContent("hero", 1, {
+                heading: "Yoga",
+                secondaryCta: { label: "Go", href: "javascript:alert(1)" },
+            }).success,
+        ).toBe(false);
+    });
+});

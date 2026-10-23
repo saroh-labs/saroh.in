@@ -5,10 +5,10 @@ import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
 
-import { Chip } from "@/components/shared/chip";
+import { Chip } from "@/components/shared/lists/chip";
 import type { CashChange, NewOrderPay } from "@/lib/orders/new-order";
 
-import { CheckRow } from "@/components/shared/check-row";
+import { CheckRow } from "@/components/shared/fields/check-row";
 import { Field } from "@saroh/ui/field";
 import { MoneyInput } from "@saroh/ui/money-input";
 import { Tip } from "@saroh/ui/tooltip";

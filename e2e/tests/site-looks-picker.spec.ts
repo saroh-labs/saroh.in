@@ -14,7 +14,8 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  * panel: the canvas draws Quiet at once, the draft saves it, publishing
  * puts it on the live site, and choosing Classic brings the site back,
  * the row saying it isn't published yet. Each look's Preview (DEC-177)
- * draws the home page in it and closes back to the look as it was.
+ * draws its showcase template (DEC-182) and closes back to the look as it
+ * was.
  *
  * @serial: it changes and publishes Northwind's site style.
  */
@@ -44,6 +45,19 @@ async function openBrand(page: Page, phone: boolean) {
     if ((await brand.getAttribute("aria-selected")) !== "true") {
         await brand.click();
     }
+}
+
+/** The look in force, as the Brand tab's Look card says it (DEC-184). */
+const lookCard = (page: Page) => page.locator("[data-look-current]");
+
+/** The looks' gallery behind the card's Change, opened if it isn't. */
+async function gallery(page: Page) {
+    const dialog = page.getByRole("dialog", { name: "Change look" });
+    if (!(await dialog.isVisible())) {
+        await page.locator("[data-look-change]").click();
+    }
+    await expect(dialog).toBeVisible();
+    return dialog;
 }
 
 /**
@@ -78,29 +92,31 @@ test.describe("the Look row", { tag: "@serial" }, () => {
             await page.goto(`${urls.APP_URL}/sites/${look.siteId}`);
             await openBrand(page, phone);
 
-            const row = page.getByRole("radiogroup", { name: "Look" });
-            await expect(row).toBeVisible();
-            const choice = (id: string) =>
-                row.locator(`[data-look-choice="${id}"]`);
-            // All four, Classic chosen; one of them suggested.
+            await expect(lookCard(page)).toHaveAttribute(
+                "data-look-current",
+                "classic",
+            );
+            const choice = async (id: string) =>
+                (await gallery(page)).locator(`[data-look-choice="${id}"]`);
+            // All four in the gallery, Classic chosen; one suggested.
             for (const id of ["classic", "quiet", "folio", "live"]) {
-                await expect(choice(id)).toBeVisible();
+                await expect(await choice(id)).toBeVisible();
             }
-            await expect(choice("classic")).toHaveAttribute(
+            await expect(await choice("classic")).toHaveAttribute(
                 "aria-checked",
                 "true",
             );
-            await expect(row.getByText(/^Suggested/)).toHaveCount(1);
-            // Every other control stays.
             await expect(
-                page.getByRole("radiogroup", { name: "Typeface" }),
-            ).toBeVisible();
+                (await gallery(page)).getByText(/^Suggested/),
+            ).toHaveCount(1);
 
             // Quiet: drawn on the canvas at once, saved to the draft.
-            await choice("quiet").click();
-            await expect(choice("quiet")).toHaveAttribute(
-                "aria-checked",
-                "true",
+            await (await choice("quiet")).click();
+            // Every other control stays, the gallery having closed.
+            await expect(page.locator("[data-typeface-current]")).toBeVisible();
+            await expect(lookCard(page)).toHaveAttribute(
+                "data-look-current",
+                "quiet",
             );
             await expect.poll(() => canvasLook(page)).toBe("quiet");
             await expect
@@ -136,10 +152,10 @@ test.describe("the Look row", { tag: "@serial" }, () => {
             // Classic is one choice away, and waits for Publish.
             await page.reload();
             await openBrand(page, phone);
-            await choice("classic").click();
-            await expect(choice("classic")).toHaveAttribute(
-                "aria-checked",
-                "true",
+            await (await choice("classic")).click();
+            await expect(lookCard(page)).toHaveAttribute(
+                "data-look-current",
+                "classic",
             );
             await expect(
                 page.getByText(
@@ -178,13 +194,13 @@ test.describe("the Look row", { tag: "@serial" }, () => {
             await page.goto(`${urls.APP_URL}/sites/${look.siteId}`);
             await openBrand(page, phone);
 
-            const row = page.getByRole("radiogroup", { name: "Look" });
-            await expect(row).toBeVisible();
-            const open = page.getByRole("button", { name: "Preview Folio" });
+            const open = (await gallery(page)).getByRole("button", {
+                name: "Preview Folio",
+            });
             await open.click();
 
             // A large dialog on a desk, a full-height sheet on a phone:
-            // the home page in Folio, its name and what it suits.
+            // Folio's showcase template, its name and what it suits.
             const preview = page.getByRole("dialog", { name: "Folio" });
             await expect(preview).toBeVisible();
             await expect(
@@ -204,12 +220,14 @@ test.describe("the Look row", { tag: "@serial" }, () => {
 
             await preview.getByRole("button", { name: "Close" }).last().click();
             await expect(preview).toHaveCount(0);
-            await expect(open).toBeFocused();
+            // The gallery made way for the dialog: back on Change.
+            await expect(page.locator("[data-look-change]")).toBeFocused();
 
             // Nothing chosen and nothing saved: still Classic.
-            await expect(
-                row.locator('[data-look-choice="classic"]'),
-            ).toHaveAttribute("aria-checked", "true");
+            await expect(lookCard(page)).toHaveAttribute(
+                "data-look-current",
+                "classic",
+            );
             await expect.poll(() => canvasLook(page)).toBeNull();
             expect(
                 (await look.owner.get<SiteView>(`/sites/${look.siteId}`)).style
@@ -232,12 +250,8 @@ test.describe("the Look row", { tag: "@serial" }, () => {
             await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
             await page.goto(`${urls.APP_URL}/sites/${look.siteId}`);
             await openBrand(page, phone);
-            await expect(
-                page.getByRole("radiogroup", { name: "Typeface" }),
-            ).toBeVisible();
-            await expect(
-                page.getByRole("radiogroup", { name: "Look" }),
-            ).toHaveCount(0);
+            await expect(page.locator("[data-typeface-current]")).toBeVisible();
+            await expect(lookCard(page)).toHaveCount(0);
         } finally {
             await look.restore();
         }

@@ -117,8 +117,8 @@ checked that a decision number appears once.
 Rules line (U17's "as built"), plus U15's and U16's own; DEC-176 is
 marked reserved for the GST branch (PR #1164). `pnpm run
 check:decision-ids` fails on a DEC heading written twice, in prepush and CI.
-DEC-163 is allowed twice: two decisions took it on 17 Oct and both are cited
-in code.
+DEC-163 was allowed twice until 21 Oct, when the owner had Admin Billing
+renumbered DEC-179 (its citations moved with it); no number is exempt now.
 **Rule**: a unit that adds rules to a decision rewrites the one Rules line,
 never appends another; resolve a DECISIONS.md conflict by hand, never by
 keeping both sides. `scripts/check-decision-ids.mjs`.
@@ -5821,3 +5821,73 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** the class list shows the first `SESSIONS_SHOWN` (10) sessions and offers "Show more classes"; a session chosen by the address (`?service=&date=&start=`) two days out sat past the tenth, so it was chosen but not on the page. The unit flow test used a short list, and the spec had never run before the gate.
 - **Fix:** `sessionsOnShow` (`booking-flow/use-times.ts`) shows never fewer sessions than reach the chosen one; both booking layouts (`choose-steps.tsx`, `look-body.tsx`) use it; `sessions-on-show.test.ts`.
 - **Rule:** a choice made by the address is always on the page it was made on: a paged or collapsed list opens far enough to show what is chosen. A unit's browser spec is run before its unit is called done, not first in the batch gate.
+
+### "Bring in my details" put the same staff on the page twice, and a look's Preview palette was dropped without a word (DEC-182, DEC-172; 22 Oct 2026)
+
+- **Symptom:** a review asked for the DEC-182 db spec to run before the push; its second fill run filled again instead of finding nothing. With fewer staff than the sample's people, the first run filled the first places and the second started from the first member of staff again, so a team block showed the same people twice. Separately, Live's Preview drew in the gym's dark colours, not its board's.
+- **Cause:** `fillPerson` counted staff from the start on every run, never asking who the block already showed; the agent that wrote it couldn't run db specs (they reset a database, which Prisma refuses an agent without the owner's word), so the spec that would have shown it never ran. The palette: `presetSiteStyle` keeps a palette only when `parsePalette` passes, and the board's lime accent reads 1.10:1 as link text; the look-showcase tests checked the palette existed, not that it was kept.
+- **Fix:** `fill-details.ts` skips staff already on the block (unit test "finds nothing to fill the second time"); a test that every `LOOK_SHOWCASE_PALETTE` parses.
+- **Rule:** a fill or migration-like write is idempotent and its spec runs the same action twice; a db spec an agent couldn't run is run by the owner's consent before the unit is called done, not left to the gate. A style value that can be silently dropped is tested for being kept, not for being present.
+
+### The People drawer carried one owner's unsaved extras to the next person (organizations refactor audit; 22 Oct 2026)
+
+- **Symptom:** open an owner (with another owner in the business) in Settings › Team › People, tick an extra permission, press "Remove from {business}", Keep in the confirm, then Edit anyone else: their drawer showed the first owner's tick as an unsaved change.
+- **Cause:** `MemberDrawer` is one sheet that is never remounted between people. `close()` reset both drafts, the role and the extras (`useMemberExtras`), but the owner's Remove path reset only the role.
+- **Fix:** Remove resets the extras too (`team/member-drawer.tsx`); `team/member-drawer.test.tsx` ticks, removes, opens another person and checks nothing is ticked. Keying the drawer by person would also fix it but remounts the sheet on close and loses its closing animation.
+- **Rule:** a sheet that is reused for one record after another clears every draft it holds on each way out, not only on Close; a test opens it for a second record after each exit.
+
+### Nine trust-boundary gaps a whole-repo audit found (ponytail audit; 22 Oct 2026)
+
+- **Symptom:** a read-only audit, checked line by line against the code, found input from strangers or merchants reaching places it shouldn't: a sign-in `redirect=/\evil.example` (or `/<tab>/evil.example`) leaving Saroh; a public availability read for a century of slots; a merchant's email or WhatsApp relay `baseUrl` aimed at the API's own network; every sign-in behind Cloudflare and Traefik sharing one rate-limit bucket; a GitHub account with an unverified copy of someone's address linking to their account; a public enquiry rewriting a known customer's phone; an unproved domain claim holding a hostname for good; stored IP hashes a laptop can reverse; invitation tokens in request logs.
+- **Cause:** each check covered the case its author pictured: `//` but not the `\` and tab the browser rewrites into it; a range checked for order, not length; a relay field added for SendGrid bridges with no address rule; Better Auth's IP reader (which refuses a multi-address `X-Forwarded-For` without trusted proxies) never told our proxies; GitHub listed with Google as always-verified; "fill what was supplied" on a form anyone can send; a claim that never expires; sha256 over a four-billion-value space; new token routes not added to the redaction list.
+- **Fix:** `safeDestination` and `safeArrival` refuse `\`, tab, CR and LF; `parseRange` caps a read at `MAX_RANGE_DAYS`; `relayBase` sends a relay through the link-preview SSRF guard on connect and on every send; `trustedProxyRanges` hands Better Auth the proxies Express trusts; `trustedProviders` is Google only; an enquiry fills only empty contact fields; another org's unproved claim lapses after `CLAIM_LAPSE_DAYS`; `hashClientIp` is an HMAC with the server secret; the three invitation routes are in `TOKEN_PATHS`. Each has a test.
+- **Rule:** an address, range or hostname that comes from outside is checked against what the platform will do with it (the browser's URL parser, the proxy chain, DNS), not against the string as typed. A new public route with a secret in its path goes into `TOKEN_PATHS` in the same commit. A stored hash of a small value space is keyed.
+
+### A merchant webhook that hit a passing error was kept FAILED for good (money review; 22 Oct 2026)
+
+- **Symptom:** a refund.processed or a mandate event that met a lock timeout or a dropped connection stayed FAILED in the inbox; the provider's redelivery was answered "duplicate" and nothing applied it until staff replayed it by hand.
+- **Cause:** `WebhooksService.handle` committed the inbox row first, then on any reconcile error marked it FAILED and answered 200. The row's unique key then turned every redelivery into a no-op. A 5xx is no answer either: Razorpay and Cashfree switch a merchant's webhook off after enough failures, and only the business can switch it back on.
+- **Fix:** store, answer, then apply. The inbox row commits with a `webhook.process` job (12 tries, the queue's backoff). The request tries once; an unexpected error answers 200 `queued` and the job retries. A 4xx refusal (an illegal state move) or the job's last try keeps the row FAILED for replay. Only a row that could not be stored is a 5xx. Each try claims the RECEIVED row in its own transaction, so the request and the job never both apply it. `webhooks.service.spec.ts` ("stores, answers 200, then applies"), `webhooks.inbox.db.spec.ts`.
+- **Rule:** `backend-integrations.md` › Inboxes are idempotent: a merchant webhook is acknowledged once stored, and a passing error is retried from the inbox, never by the provider.
+
+### A second tab's payment on a paid order was counted, not owed back (money review; 22 Oct 2026)
+
+- **Symptom:** a customer with the order's pay page open in two tabs paid in both; the order showed paid once, but both payments counted as taken and nothing asked for a refund.
+- **Cause:** the pay page makes a fresh intent per tab. When the second capture arrived, `applySuccess` saw PAID → PAID as a no-op, took it for an edit's difference, and marked the intent SUCCEEDED with a CAPTURED attempt. Only superseded charges and the invoice path recorded money that arrived for something already settled.
+- **Fix:** under the order's lock, a capture on a paid order with nothing left to take (`dueCentsOf` ≤ 0) marks its intent SUPERSEDED and goes through `applySupersededSuccess`: CAPTURED_NEEDS_REFUND, invoiced, shown as owed back, never counted. A balance or a difference charge still has money due and settles as before. `webhooks.service.spec.ts` ("a second tab's payment on an order paid in full is owed back").
+- **Rule:** `backend-integrations.md` › Money that arrives for something already settled is kept, not lost: an order's too, decided by what is due, not by the intent's kind.
+
+### Cashfree refused every second payment on the same Order or Invoice (money review; 22 Oct 2026)
+
+- **Symptom:** on a Cashfree business, paying again after a failed try, paying an edit's difference or a balance link, or retrying after a create that timed out answered the customer with a 503 ("online payment is down").
+- **Cause:** `CashfreeProvider.createOrderIntent` sent the Order's or Invoice's id as `order_id`, which Cashfree requires to be unique, so the second order on one target was refused. Refunds and refund look-ups also posted to `/orders/<cf_order_id>/…`, while Cashfree's refund API takes the merchant `order_id`.
+- **Fix:** each intent sends `<target id>_<12 hex>` and keeps it as `providerIntentId`; refunds, refund look-ups, payment look-ups and the webhook's `providerIntentId` all use it. Intents made before (a numeric `cf_order_id`, no `_`) fall back to their Order's or Invoice's id, passed as `merchantRef` (`cashfreeOrderId`). `cashfree.provider.spec.ts` ("order ids (one per intent)"), `webhook-provider.spec.ts`.
+- **Rule:** `backend-integrations.md` › A provider order id Saroh chooses is unique per intent.
+
+### A Razorpay add-on could be put on a business's next charge twice (money review; 22 Oct 2026)
+
+- **Symptom:** found by reading, not seen live: an add-on charge whose Razorpay answer was lost (a timeout, a 5xx) or whose SENT mark failed would be posted again by the job's retry, and the business charged for it twice.
+- **Cause:** `billing.addons.sync` moves a row QUEUED → SENT only after `POST /subscriptions/:id/addons` answers. An UNKNOWN answer is rethrown and the row stays QUEUED, and Razorpay has no idempotency key for add-ons, so the retry made a second one.
+- **Fix:** `RazorpayBillingProvider.addToNextCharge` first reads the newest add-ons (`GET /addons`, as `findPlan` reads plans) for one on the same subscription whose description is `saroh_ref:<row id>`, and returns it without posting. The lookup decides, so no SENDING state was needed. `billing-provider.spec.ts` ("never adds an item twice").
+- **Rule:** `backend-jobs.md` › `billing.addons.sync`: a provider call with no idempotency key looks for its own reference before it creates.
+
+### A job could run twice when it waited behind a long one in the same batch (money review; 22 Oct 2026)
+
+- **Symptom:** found by reading: with two API containers (or two overlapping during a deploy), a job that sat late in a batch could be run by both, so a refund send, a charge or a notice could go out twice.
+- **Cause:** `claimDue` claims up to ten jobs under one `lockedAt`, and the worker runs them one by one. While the first ran past `JOB_VISIBILITY_MS` (5 min), the rest of the batch looked abandoned, and another worker reclaimed and ran them while this one still meant to.
+- **Fix:** before running each job the worker renews its lease (`JobQueue.renew`: `lockedAt = now` where it is still PROCESSING and `lockedBy` this worker) and skips it, with a WARN, when no row changes. `job-worker.service.spec.ts` ("skips a job of the batch whose lease another worker took"), `prisma-job-queue.db.spec.ts` ("renewing a claimed job's lease").
+- **Rule:** `backend-jobs.md` › Terminal writes are fenced on the lease: a claim that covers several jobs is renewed per job before it runs.
+
+### The looks' showcase changed and its db and browser specs never ran until the gate (DEC-182, DEC-172; 22 Oct 2026)
+
+- **Symptom:** the batch gate failed the starter-content db spec (it still copied Live's Gym) and 13 browser tests across the looks' specs; behind them were three real bugs: Folio's next-free sentence read "free on today", Folio's timetable Book link was 30px wide, and a phone's Brand sheet closed when starter content restarted the editor.
+- **Cause:** the showcase moved to Prana and the boards' changes landed through agents that ran unit tests only; the db spec and the looks' browser specs, which pin exactly these words and sizes, first ran in the gate. The unit test for the sentence had the same "on today" baked in.
+- **Fix:** `next-free-sentence.ts` says "on" only before a date; the Book link is `min-w-11`; the open sheet carries across an editor restart (`use-editor-layout.ts`); the specs read Prana and the boards' intended words.
+- **Rule:** a change to what a look or a template draws runs the browser specs that cover it (`pnpm prepush --e2e`) and its db specs before the unit is called done; a unit test's expected words are read as a customer would read them, not copied from the output.
+
+## A Next.js bump failed the local browser gate, and a bookings spec broke by the calendar date (23 Oct 2026)
+
+- **Symptom:** after Next.js 16.3.8 → 16.4.2 (two critical advisories), `prepush --all` failed to build saroh.app: "Can't resolve '@vercel/turbopack-next/internal/font/google/font'", 30 times. A fresh `next build` in the worktree passed. Separately, `bookings.spec.ts` "open extra hours on a closed stretch" failed on phone twice in a row, though it passed the day before.
+- **Cause:** not the bump. `next/font/google` downloads each font's CSS from Google at build time, and Turbopack fails ("next/font/google queries have exactly one entry") when Google answers in a shape it doesn't expect (vercel/next.js#99114). It comes and goes with Google's answer: the same tree failed on CI and passed locally an hour later. Clearing the gate worktree's `.next` on a new lockfile is kept as hygiene, but it was not the fix. The spec opened the phone's day without a person, and a seeded booking with no one on it, placed relative to today, put the Unassigned lane on that day instead of the test's diary.
+- **Fix:** the spec opens `&person=${person.id}`. The font failure needs the merchant-site fonts self-hosted (`next/font/local`) so no build depends on Google's answer; until then a failed build is re-run.
+- **Rule:** a spec that looks at one person's day on a phone names the person in the URL (as `bookings-day.spec.ts` does).

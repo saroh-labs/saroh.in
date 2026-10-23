@@ -307,7 +307,7 @@ const PLAN_BRIEF = {
 } as const;
 
 /**
- * Saroh's own billing across every business (DEC-163) — a CROSS-TENANT
+ * Saroh's own billing across every business (DEC-179) — a CROSS-TENANT
  * READ. Every invoice Saroh issued, its PDF and the month's GST export, and
  * every business's Saroh subscription with its checkouts and the provider's
  * events, read with no Organization context, so the `org_isolation`

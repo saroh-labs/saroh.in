@@ -1,11 +1,11 @@
-import { PartialRead } from "@/components/shared/failed-read";
+import { PartialRead } from "@/components/shared/states/failed-read";
 import { FailedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { AvailabilityEditor } from "@/components/bookings/availability/availability-editor";
 
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import type { KeptBooking } from "@/lib/services/availability-rules";

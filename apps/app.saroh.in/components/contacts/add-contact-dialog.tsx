@@ -10,8 +10,8 @@ import { useRouter } from "next/navigation";
 import type { ReactElement } from "react";
 import { useId, useState } from "react";
 
-import { BusinessPhoneInput } from "@/components/shared/business-phone-input";
-import { FormSheet } from "@/components/shared/form-sheet";
+import { BusinessPhoneInput } from "@/components/shared/fields/business-phone-input";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import { createContact } from "@/lib/contacts/create";
 import { personHref } from "@/lib/contacts/person-href";

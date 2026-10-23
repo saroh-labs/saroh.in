@@ -1,6 +1,6 @@
 import { cn } from "@saroh/ui/lib/utils";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import type { RowProgress, StepTone } from "@/lib/orders/list-row";
 
 /**

@@ -16,7 +16,7 @@ import {
 } from "@/lib/class-packs/pack-editor";
 import { formatMoney } from "@/lib/format/money";
 
-import { FailedRead } from "@/components/shared/failed-read";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { PackChip, PackSection } from "./parts";
 
 /**

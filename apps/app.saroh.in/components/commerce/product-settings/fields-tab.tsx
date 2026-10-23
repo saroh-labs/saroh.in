@@ -10,8 +10,8 @@ import { useTransition } from "react";
 import type { CatalogueView, FieldView } from "@/lib/products/settings";
 import { removeField, restoreField } from "@/lib/products/settings-actions";
 
-import { FailedRead } from "@/components/shared/failed-read";
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { runAction } from "@/lib/api/run-action";
 import { FIELD_TYPES, FieldSheet } from "./field-sheet";
 import { SettingsReadOnly, TabIntro } from "./product-settings";

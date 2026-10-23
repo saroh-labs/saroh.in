@@ -5,9 +5,9 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Check, CircleCheck, CircleX, IndianRupee } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { FRONT_DESK_LINE } from "@/components/bookings/calendar/quick-look-one";
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
-import { readOnlyLine } from "@/components/shared/who-can-change";
+import { FRONT_DESK_LINE } from "@/components/bookings/quick-look/quick-look-one";
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
+import { readOnlyLine } from "@/components/shared/states/who-can-change";
 import { formatDate, formatDateTime } from "@/lib/format/datetime";
 import {
     classCancelReason,

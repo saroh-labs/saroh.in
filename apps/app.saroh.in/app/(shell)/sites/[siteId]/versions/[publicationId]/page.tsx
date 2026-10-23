@@ -6,9 +6,9 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { PageContainer } from "@/components/shared/page-container";
-import { PastVersionPreview } from "@/components/sites/past-version-preview";
-import { RestoreVersion } from "@/components/sites/restore-version";
+import { PageContainer } from "@/components/shared/page/page-container";
+import { PastVersionPreview } from "@/components/sites/versions/past-version-preview";
+import { RestoreVersion } from "@/components/sites/versions/restore-version";
 import { activeBusinessZone } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { releaseTitle } from "@/lib/sites/release-review";

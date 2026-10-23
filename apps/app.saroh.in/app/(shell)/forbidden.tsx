@@ -1,4 +1,4 @@
-import { AccessDenied } from "@/components/shared/access-denied";
+import { AccessDenied } from "@/components/shared/states/access-denied";
 
 /**
  * Renders when a read inside the workspace got a 403 and `getJson` called

@@ -9,10 +9,10 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { RadioCards } from "@/components/shared/choice-group";
-import type { ConfirmResult } from "@/components/shared/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { FormDialog } from "@/components/shared/form-dialog";
+import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
+import { RadioCards } from "@/components/shared/fields/choice-group";
+import { FormDialog } from "@/components/shared/forms/form-dialog";
 import { UNREACHED } from "@/lib/api/unreached";
 import { cancelAutopay, sendAutopayLink } from "@/lib/subscriptions/actions";
 import type { AutopayPanel } from "@/lib/subscriptions/autopay";

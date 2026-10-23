@@ -127,6 +127,7 @@ describe("where the door may send someone", () => {
         expect(safeArrival("https://evil.example")).toBe("/");
         expect(safeArrival("//evil.example")).toBe("/");
         expect(safeArrival("/\\evil.example")).toBe("/");
+        expect(safeArrival("/\t/evil.example")).toBe("/");
         expect(safeArrival("javascript:alert(1)")).toBe("/");
         expect(safeArrival("/a\r\nSet-Cookie: x=1")).toBe("/");
         expect(safeArrival(null)).toBe("/");
@@ -184,7 +185,7 @@ vi.mock("@/lib/members/service", () => ({
         acceptLocation(...args) as unknown,
 }));
 vi.mock("@/lib/accounts", () => ({ inviteLandingFor: () => null }));
-vi.mock("@/components/organizations/invitation-problem", () => ({
+vi.mock("@/components/organizations/team/invitation-problem", () => ({
     InvitationProblemView: () => null,
 }));
 

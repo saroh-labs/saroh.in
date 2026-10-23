@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { PostEditor } from "@/components/sites/post-editor";
+import { PostEditor } from "@/components/sites/posts/post-editor";
 import { deniedFor } from "@/lib/access/require-can";
 import { listPostCategories } from "@/lib/content/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";

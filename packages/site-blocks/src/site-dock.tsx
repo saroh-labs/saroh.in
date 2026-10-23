@@ -33,7 +33,7 @@ import { isCurrent } from "./site-header-menu";
 export const DOCK_BAR =
     "bg-site-fg text-site-bg inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] h-[66px] items-center gap-0.5 rounded-[24px] p-1.5 shadow-[0_18px_40px_-16px_hsl(var(--site-fg)/0.55)]";
 export const DOCK_TAB =
-    "focus-visible:ring-site-bg aria-[current=page]:bg-site-bg/15 h-[54px] justify-center rounded-[18px] px-1 text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 aria-[current=page]:font-bold";
+    "focus-visible:ring-site-bg text-site-bg/70 aria-[current=page]:bg-site-bg/15 aria-[current=page]:text-site-bg h-[54px] justify-center rounded-[18px] px-1 text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 aria-[current=page]:font-bold";
 
 export function SiteDock({
     tabs,

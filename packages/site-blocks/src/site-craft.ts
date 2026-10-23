@@ -77,7 +77,7 @@ export function craftRules(
     return [
         tokens(at),
         typography(at, base, variables),
-        rhythm(at),
+        rhythm(at, look),
         states(at, moves ? `${moves.base}ms` : "150ms"),
         moves ? lookMotion(at, moves) : motion(at),
     ].join("");
@@ -223,11 +223,14 @@ function typography(at: string, base: string, variables: Variables): string {
  *
  * A browser without `:has()` skips the second rule and keeps even gaps.
  */
-function rhythm(at: string): string {
-    return `
+function rhythm(at: string, look?: LookId): string {
+    const bands = `
             ${at} [data-site-section][data-site-band] {
                 --site-section-padding: calc(var(--site-section-space) * ${BAND_SPACE});
-            }
+            }`;
+    // Folio rules its sections apart at full padding (board VA).
+    if (look === "folio") return bands;
+    return `${bands}
             ${at} [data-site-section]:not([data-site-band]):not(:empty):not(:has(> [data-site-ground])) + [data-site-section]:not([data-site-band]) > ${PADDED}:not([data-site-ground]) {
                 padding-top: calc(var(--site-section-padding) * ${NEIGHBOUR_SPACE});
             }`;

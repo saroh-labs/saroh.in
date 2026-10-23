@@ -5,10 +5,10 @@ import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
-import type { EditorTestReleases } from "@/components/sites/editor/use-test-releases";
 import { ReleaseRow } from "@/components/sites/test-releases/release-row";
 import { releaseStatusCopy } from "@/lib/sites/test-releases";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
+import type { EditorTestReleases } from "./use-test-releases";
 
 /** How many earlier releases show before "Show all". */
 const EARLIER_SHOWN = 3;

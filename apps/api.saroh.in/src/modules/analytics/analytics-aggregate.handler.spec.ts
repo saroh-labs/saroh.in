@@ -150,6 +150,29 @@ describe("AnalyticsAggregateHandler — org-isolated daily rollups", () => {
         });
     });
 
+    it("rolls no path up for a private page or a query a row stored before the contract cut it (U15 privacy review)", async () => {
+        eventFindMany.mockResolvedValue([
+            view("org_1", "site_1", "/pay/secret-token", "v1", at("09:00")),
+            view("org_1", "site_1", "/account/orders/x", "v1", at("09:10")),
+            view(
+                "org_1",
+                "site_1",
+                "/a?email=a@example.com",
+                "v2",
+                at("10:00"),
+            ),
+        ]);
+        aggregateUpsert.mockResolvedValue({});
+
+        await new AnalyticsAggregateHandler().handle(jobFor("org_1"));
+
+        const paths = aggregateUpsert.mock.calls
+            .map((c) => c[0].create)
+            .filter((row) => row.dimension === "path")
+            .map((row) => row.dimensionValue);
+        expect(new Set(paths)).toEqual(new Set(["/a"]));
+    });
+
     it("ORG ISOLATION: org_2's same-day event never leaks into org_1's rows", async () => {
         wireFindMany();
         const handler = new AnalyticsAggregateHandler();
@@ -236,5 +259,135 @@ describe("AnalyticsAggregateHandler — org-isolated daily rollups", () => {
 
         expect(registry.has("analytics.aggregate")).toBe(true);
         expect(registry.get("analytics.aggregate")).toBe(handler.handle);
+    });
+});
+
+describe("AnalyticsAggregateHandler — where visits came from (U15)", () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        jest.useFakeTimers({
+            now: new Date("2026-07-20T06:00:00Z"),
+            advanceTimers: true,
+        });
+        aggregateUpsert.mockResolvedValue({});
+    });
+    afterEach(() => jest.useRealTimers());
+
+    function step(
+        type: string,
+        properties: Record<string, unknown>,
+        siteId: string | null = "site_1",
+    ) {
+        return {
+            id: `${type}_${Math.random()}`,
+            organizationId: "org_1",
+            siteId,
+            type,
+            visitorHash: null,
+            occurredAt: at("09:30"),
+            properties,
+        };
+    }
+
+    function rowOf(
+        type: string,
+        siteId: string,
+        dimension: string,
+        dimensionValue: string,
+    ) {
+        return aggregateUpsert.mock.calls
+            .map((c) => c[0].create)
+            .find(
+                (r) =>
+                    r.type === type &&
+                    r.siteId === siteId &&
+                    r.dimension === dimension &&
+                    r.dimensionValue === dimensionValue,
+            );
+    }
+
+    it("breaks the visit's four steps down by source and by ref", async () => {
+        eventFindMany.mockResolvedValue([
+            step("site.visit", { source: "instagram", ref: "diwali-post" }),
+            step("site.visit", { source: "instagram" }),
+            step("site.visit", { source: "direct" }),
+            step("site.looked", { source: "instagram", ref: "diwali-post" }),
+            step("site.started", { source: "instagram", ref: "diwali-post" }),
+            step("site.paid", { source: "instagram", ref: "diwali-post" }),
+            // An order's own paid event carries no source (DEC-181).
+            step("order.paid", { orderId: "o2", amountCents: 100 }, null),
+        ]);
+
+        await new AnalyticsAggregateHandler().handle(jobFor("org_1"));
+
+        expect(rowOf("site.visit", "", "source", "instagram")).toMatchObject({
+            count: 2,
+            uniqueCount: 0,
+        });
+        expect(
+            rowOf("site.visit", "site_1", "source", "instagram"),
+        ).toMatchObject({ count: 2 });
+        expect(rowOf("site.visit", "", "source", "direct")).toMatchObject({
+            count: 1,
+        });
+        expect(rowOf("site.visit", "", "ref", "diwali-post")).toMatchObject({
+            count: 1,
+        });
+        expect(rowOf("site.looked", "", "source", "instagram")).toMatchObject({
+            count: 1,
+        });
+        expect(rowOf("site.started", "", "ref", "diwali-post")).toMatchObject({
+            count: 1,
+        });
+        // Paid is the visit's own step, on its site (DEC-181).
+        expect(rowOf("site.paid", "", "source", "instagram")).toMatchObject({
+            count: 1,
+        });
+        expect(
+            rowOf("site.paid", "site_1", "ref", "diwali-post"),
+        ).toMatchObject({ count: 1 });
+        expect(rowOf("order.paid", "", "", "")).toMatchObject({ count: 1 });
+        expect(rowOf("order.paid", "", "source", "instagram")).toBeUndefined();
+        // Nothing is broken down by anything else.
+        const dimensions = new Set(
+            aggregateUpsert.mock.calls.map((c) => c[0].create.dimension),
+        );
+        expect([...dimensions].sort()).toEqual(["", "ref", "source"]);
+    });
+
+    it("drops a source or ref that isn't well formed, never trusting the row", async () => {
+        eventFindMany.mockResolvedValue([
+            step("site.visit", { source: "facebook", ref: "x" }),
+            step("site.visit", { source: "other", ref: "call 9876543210" }),
+        ]);
+
+        await new AnalyticsAggregateHandler().handle(jobFor("org_1"));
+
+        expect(rowOf("site.visit", "", "source", "facebook")).toBeUndefined();
+        expect(rowOf("site.visit", "", "source", "other")).toMatchObject({
+            count: 1,
+        });
+        const refs = aggregateUpsert.mock.calls
+            .map((c) => c[0].create)
+            .filter((r) => r.dimension === "ref");
+        expect(refs).toEqual([]);
+        expect(rowOf("site.visit", "", "", "")).toMatchObject({ count: 2 });
+    });
+
+    it("leaves site.view's own rollups as they were: no source dimension", async () => {
+        eventFindMany.mockResolvedValue([
+            step("site.view", {
+                path: "/a",
+                referrer: "https://www.instagram.com",
+                source: "instagram",
+            }),
+        ]);
+
+        await new AnalyticsAggregateHandler().handle(jobFor("org_1"));
+
+        const dims = aggregateUpsert.mock.calls.map(
+            (c) => c[0].create.dimension,
+        );
+        expect(new Set(dims)).toEqual(new Set(["", "path"]));
     });
 });

@@ -1,4 +1,4 @@
-import { PartialRead } from "@/components/shared/failed-read";
+import { PartialRead } from "@/components/shared/states/failed-read";
 import { count } from "@/lib/format/plural";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
@@ -6,7 +6,7 @@ import Link from "next/link";
 import type { OrderReadLine } from "@/lib/orders/read";
 import { productHref } from "@/lib/products/links";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { Notice } from "@saroh/ui/notice";
 import { FOCUS, PanelTitle } from "./parts";
 

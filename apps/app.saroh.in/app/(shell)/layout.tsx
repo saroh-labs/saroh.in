@@ -3,7 +3,7 @@ import { PageSizes } from "@saroh/ui/page-sizes";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 
-import { AppShell } from "@/components/shared/app-shell";
+import { AppShell } from "@/components/shared/shell/app-shell";
 import { activeBusinessTitle } from "@/lib/organizations/tab-title";
 
 /**

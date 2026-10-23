@@ -28,7 +28,7 @@ import { param } from "@/lib/params";
 export const metadata = { title: "Invoices · Billing" };
 
 /**
- * Every invoice Saroh issued to a business for its plan (DEC-163), newest
+ * Every invoice Saroh issued to a business for its plan (DEC-179), newest
  * first, with the filtered set's totals and the month's CSV for the CA
  * (R29). Paid · Unpaid · Refunded are chips; the month and GSTIN are
  * picked in Billing's toolbar. Each applies at once, and the export keeps

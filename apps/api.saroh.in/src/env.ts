@@ -104,6 +104,14 @@ const envSchema = z.object({
     // The key the destination email and the code are HMAC'd under, so a
     // database read reveals neither who asked nor the code.
     SITE_ACCOUNTS_CODE_SECRET: z.string().min(32).optional(),
+    // The secret a public page view's visitor hash is derived from, by a
+    // salt that changes every day (U15 privacy review): the hash is
+    // sha256(HMAC(secret, the UTC day) : site : address), so a visitor can't
+    // be followed from day to day. Unset: a fixed public value in
+    // development and test, and a random one per process anywhere else
+    // (with a warning; a restart splits a day's unique visitors). Read in
+    // `modules/analytics/visitor-hash.ts`. Never logged.
+    ANALYTICS_IP_SALT: z.string().min(1).optional(),
     // Signs the pricing draft-preview token staff mint in the admin console
     // (plans catalogue KTD-10): at most 15 minutes, bound to one draft
     // revision. API only — saroh.in passes the token through, never checks

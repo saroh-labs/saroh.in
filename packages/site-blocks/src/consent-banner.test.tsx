@@ -232,7 +232,7 @@ describe("CookieNotice", () => {
     it("says so when the site uses none", () => {
         render(<CookieNotice siteName="Rye" tools={[]} />);
         expect(
-            screen.getByText(/uses no analytics or advertising tools/),
+            screen.getByText(/uses no cookies for tracking or advertising/),
         ).toBeTruthy();
     });
 });

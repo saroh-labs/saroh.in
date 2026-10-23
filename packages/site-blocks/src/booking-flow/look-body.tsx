@@ -66,6 +66,7 @@ export function LookStepBody({
         case "what":
             return (
                 <LookWhat
+                    look={look}
                     services={page.services}
                     serviceId={times.serviceId}
                     onPick={choose.service}
@@ -126,6 +127,7 @@ export function LookStepBody({
                             })
                         }
                         reach={callReach}
+                        look={look}
                         onDay={(d) => {
                             times.setDate(d);
                             choose.start(null);
@@ -193,6 +195,7 @@ export function LookStepBody({
                 <>
                     {message}
                     <LookPay
+                        look={look}
                         choices={words.choices}
                         pay={words.pay}
                         onPick={pick.pay}

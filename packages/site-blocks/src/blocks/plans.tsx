@@ -155,8 +155,14 @@ export default function PlansSection({
     siteId,
     apiUrl = DEFAULT_API_URL,
     look,
+    beside = null,
 }: LookProps & {
     content: RenderedPlans;
+    /**
+     * Under a look, cards drawn first in the plans' own row: Live's class
+     * packs (VB01, `PageSections`). Absent: the plans alone.
+     */
+    beside?: React.ReactNode;
     /** The plans, read by the page that serves the site (live or preview). */
     feed?: PlansFeed;
     /**
@@ -218,6 +224,7 @@ export default function PlansSection({
                 prices={prices}
                 apiUrl={apiUrl}
                 look={look}
+                beside={beside}
             />
         );
     }
@@ -304,7 +311,7 @@ const focusRing =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent focus-visible:ring-offset-2 focus-visible:ring-offset-site-bg";
 
 const textButton = cn(
-    "cursor-pointer rounded-[var(--site-radius)] text-sm font-semibold text-site-accent underline-offset-4 transition-opacity hover:underline active:opacity-70",
+    "cursor-pointer rounded-[var(--site-radius)] text-sm font-semibold text-site-accent-text underline-offset-4 transition-opacity hover:underline active:opacity-70",
     focusRing,
 );
 
@@ -377,6 +384,7 @@ function PlanCards({
     canvas = false,
     apiUrl,
     look,
+    beside = null,
 }: {
     content: RenderedPlans;
     title: string;
@@ -388,6 +396,8 @@ function PlanCards({
     canvas?: boolean;
     /** The site's look (DEC-172, U7); absent is Classic. */
     look?: LookId;
+    /** Cards drawn first in the row (`PlansSection`'s `beside`). */
+    beside?: React.ReactNode;
 }) {
     // Not taking orders (#800): nothing to click that cannot work, not even
     // "Ask about joining".
@@ -448,7 +458,12 @@ function PlanCards({
     if (look) {
         const pause = weeksWords(feed.pauseWeeks ?? []);
         return (
-            <PriceFrame look={look} title={title} intro={said(content.intro)}>
+            <PriceFrame
+                content={content}
+                look={look}
+                title={title}
+                intro={said(content.intro)}
+            >
                 {done && prices ? (
                     <PricesDone
                         message={done}
@@ -457,6 +472,7 @@ function PlanCards({
                 ) : null}
                 {stopped ? <NotTakingOrders /> : null}
                 <ul className={priceList(look, content.layout === "list")}>
+                    {beside}
                     {feed.plans.map((plan, index) => {
                         const highlighted = highlightFirst && index === 0;
                         const classes = priceButton(look, highlighted);

@@ -61,7 +61,7 @@ function stale(pattern: RegExp, allow: Record<string, string>) {
 describe("one of each small piece", () => {
     it("no hand-rolled tab strip: role=tablist belongs to TabStrip", () => {
         const allow = {
-            "components/shared/section-list.tsx":
+            "components/shared/page/section-list.tsx":
                 "the one vertical list of sections, shared by Settings and Website › Settings",
         };
         const pattern = /role="tablist"/;
@@ -79,13 +79,13 @@ describe("one of each small piece", () => {
         const allow = {
             "components/commerce/orders/bulk-bar.tsx":
                 "the bulk bar's ten-second hold, a floating toolbar with Undo and Send now",
-            "components/invoices/source-filter.tsx":
+            "components/invoices/list/source-filter.tsx":
                 "the chip that says a list is narrowed to one pack or course",
             "components/sites/settings/publish-bar.tsx":
                 "the sticky publish bar: an action bar that also says what is waiting",
             "components/subscriptions/subscription-detail/panels.tsx":
                 "a list's last line (\"Couldn't load more\"), ruled off above, not a box",
-            "components/subscriptions/subscription-quick-look.tsx":
+            "components/subscriptions/list/subscription-quick-look.tsx":
                 "a list's last line, ruled off above, not a box",
         };
         // An element with an alert, status or note role that also draws
@@ -100,15 +100,15 @@ describe("one of each small piece", () => {
         const allow = {
             "components/invoices/new-invoice/customer-block.tsx":
                 "the HSN/SAC code field: a code is typed and kept in capitals",
-            "components/organizations/business-tax-fields.tsx":
+            "components/organizations/tax/business-tax-fields.tsx":
                 "the GSTIN field: a registration number is capitals",
-            "components/organizations/setup-billing-step.tsx":
+            "components/organizations/setup/setup-billing-step.tsx":
                 "a new billing profile's GSTIN field: a registration number is capitals",
             "components/settings/plan-billing/invoice-details.tsx":
                 "the GSTIN field: a registration number is capitals",
             "components/settings/plan-billing/plan-chooser.tsx":
                 "the offer code field: a code is capitals",
-            "components/stores/discount-form.tsx":
+            "components/stores/discounts/discount-form.tsx":
                 "the discount code field: a code is capitals",
         };
         const pattern = /(?<![\w-])uppercase(?![\w-])/;
@@ -118,9 +118,9 @@ describe("one of each small piece", () => {
 
     it("Saffron is the menu's current-page marker and Button variant=highlight, nothing else", () => {
         const allow = {
-            "components/shared/app-sidebar.tsx":
+            "components/shared/shell/app-sidebar.tsx":
                 "the menu's current-page marker and label, at the desk",
-            "components/shared/tab-bar.tsx":
+            "components/shared/shell/tab-bar.tsx":
                 "the menu's current-page marker, on a phone",
         };
         const pattern =

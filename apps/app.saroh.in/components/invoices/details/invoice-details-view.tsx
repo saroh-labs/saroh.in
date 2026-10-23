@@ -6,18 +6,14 @@ import type { ReactNode } from "react";
 import { useId } from "react";
 
 import { EmailNoteText } from "@/components/communications/email-note";
-import { ConnectedPanel } from "@/components/invoices/connected-panel";
 import { ShareAndMore } from "@/components/invoices/details/action-bar";
 import { DetailsHistory } from "@/components/invoices/details/history";
 import { MoneyCard } from "@/components/invoices/details/money-card";
 import { useDetailsActions } from "@/components/invoices/details/use-details-actions";
-import { InvoicePaper } from "@/components/invoices/invoice-paper";
-import { OfflinePayHint } from "@/components/invoices/offline-pay-hint";
-import { PaymentsToRefund } from "@/components/invoices/pay-link";
-import { UnseenLinkNote } from "@/components/invoices/unseen-link";
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
-import { StatusBadge } from "@/components/shared/status-badge";
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { UnseenLinkNote } from "@/components/invoices/share/unseen-link";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { INVOICE_EMAIL_WORDS } from "@/lib/communications/email-setup";
 import type { InvoiceDetails } from "@/lib/invoices/details";
 import { wasSent } from "@/lib/invoices/send";
@@ -29,6 +25,10 @@ import {
 } from "@/lib/invoices/status";
 import { NEXT_REMINDER_AFTER, REMINDED_TODAY } from "@/lib/invoices/words";
 import { invoiceZone } from "@/lib/invoices/zone";
+import { ConnectedPanel } from "./connected-panel";
+import { InvoicePaper } from "./invoice-paper";
+import { OfflinePayHint } from "./offline-pay-hint";
+import { PaymentsToRefund } from "./pay-link";
 
 /** Where the menus open from: up from a sheet's foot, down from a header. */
 export interface MenuPlace {

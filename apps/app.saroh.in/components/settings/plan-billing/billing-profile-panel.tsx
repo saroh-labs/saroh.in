@@ -7,7 +7,7 @@ import { textLinkClass } from "@saroh/ui/text-link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { billingProfilesUrl } from "@/lib/accounts";
 import type { BusinessBillingProfile } from "@/lib/billing-profiles/view";
 import {

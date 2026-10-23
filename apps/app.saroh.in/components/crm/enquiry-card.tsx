@@ -1,4 +1,4 @@
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import type { EnquiryEntry } from "@/lib/crm/enquiries";
 import { answersToShow, isLongAnswer } from "@/lib/crm/enquiries";
 

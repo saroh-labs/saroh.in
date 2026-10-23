@@ -158,7 +158,7 @@ const MERCHANT_OWN_AD_TAGS = new Set([
     "apps/saroh.app/lib/trackers.ts",
     "apps/saroh.app/lib/trackers.test.ts",
     "apps/saroh.app/components/site-trackers.tsx",
-    "apps/app.saroh.in/components/sites/site-search-tracking.test.tsx",
+    "apps/app.saroh.in/components/sites/search-tracking/site-search-tracking.test.tsx",
 ]);
 
 /** The same shape as RULES, for every root in AD_FREE_ROOTS. */

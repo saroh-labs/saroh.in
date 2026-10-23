@@ -2,8 +2,8 @@
 
 import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
 
-import { StatusBadge } from "@/components/shared/status-badge";
-import { whoCanChange } from "@/components/shared/who-can-change";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
+import { whoCanChange } from "@/components/shared/states/who-can-change";
 import type { UseRow } from "@/lib/class-packs/pack-activity";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 

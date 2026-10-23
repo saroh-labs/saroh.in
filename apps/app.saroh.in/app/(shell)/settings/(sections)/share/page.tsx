@@ -3,12 +3,12 @@ import { EmptyState } from "@saroh/ui/data-state";
 import { QrCode } from "lucide-react";
 import Link from "next/link";
 
-import { ModuleGate } from "@/components/modules/module-gate";
-import { QrShare } from "@/components/qr/qr-share";
+import { ModuleGate } from "@/components/modules/gate/module-gate";
+import { QrShare } from "@/components/qr/share/qr-share";
 import {
     SettingsPanel,
     SettingsPanelHeader,
-} from "@/components/settings/settings-panel";
+} from "@/components/settings/page/settings-panel";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { readQrScreen } from "@/lib/qr/screen";
 import { requireSession } from "@/lib/session";

@@ -1,18 +1,18 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import type { HomeSetup } from "@/components/home/home-dashboard";
-import { HomeDashboard } from "@/components/home/home-dashboard";
-import { HomeHeader } from "@/components/home/home-header";
-import { NewSpace } from "@/components/home/new-sheet";
-import { ReviewerHome } from "@/components/home/reviewer-home";
-import { StaffHome } from "@/components/home/staff-home";
-import { Moment } from "@/components/shared/moment";
-import { PageContainer } from "@/components/shared/page-container";
+import type { HomeSetup } from "@/components/home/dashboard/home-dashboard";
+import { HomeDashboard } from "@/components/home/dashboard/home-dashboard";
+import { ReviewerHome } from "@/components/home/dashboard/reviewer-home";
+import { StaffHome } from "@/components/home/dashboard/staff-home";
+import { HomeHeader } from "@/components/home/header/home-header";
+import { NewSpace } from "@/components/home/header/new-sheet";
 import {
     homeNewFor,
     homeNewModuleKeys,
-} from "@/components/shared/quick-actions";
+} from "@/components/shared/navigation/quick-actions";
+import { Moment } from "@/components/shared/notices/moment";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 import type { InvoiceJobFacts } from "@/lib/home/first-run";
 import { mayWriteInvoices } from "@/lib/home/first-run";

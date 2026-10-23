@@ -125,6 +125,8 @@ export function confirmationOf(body: unknown): OrderConfirmationData | null {
         refunded: body.refunded,
         // Placed to be paid at the handover; absent from an older API.
         toPay: isString(body.toPay) ? body.toPay : null,
+        // Paid online (DEC-181): the page counts the visit's paid step.
+        paidOnline: body.paidOnline === true,
         // How they hear about it, and at which address; absent from an
         // older API, and then the page promises no email.
         reach: reachOrNull(body.reach),

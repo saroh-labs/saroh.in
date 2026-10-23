@@ -7,7 +7,7 @@ import { OptionSelect } from "@saroh/ui/option-select";
 import { TextLink } from "@saroh/ui/text-link";
 import { useEffect, useId, useState } from "react";
 
-import { FailedRead } from "@/components/shared/failed-read";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { formatClock, formatDay } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
 import type { LocalDate } from "@/lib/services/diary";

@@ -293,6 +293,17 @@ const heroV1 = z.object({
      * shown, as every hero has been.
      */
     titleVisible: z.boolean().optional(),
+    /**
+     * A quieter link beside the button ("See the timetable", DEC-172, 22
+     * Oct), drawn by the looks as their boards set it. A plain address, as
+     * a v1 button's: ABSENT draws nothing.
+     */
+    secondaryCta: z
+        .object({
+            label: z.string().trim().min(1).max(60),
+            href: linkHref,
+        })
+        .optional(),
 });
 
 /**

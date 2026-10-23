@@ -16,7 +16,7 @@ The entire authenticated shell is a **single flat top bar**, rendered once in
 the root layout:
 
 - `apps/app.saroh.in/app/layout.tsx` mounts `<AppHeader />` above `{children}`.
-- `apps/app.saroh.in/components/shared/app-header.tsx` renders: `<Wordmark>` →
+- `apps/app.saroh.in/components/shared/shell/app-header.tsx` renders: `<Wordmark>` →
   `OrganizationSwitcher` → a horizontal `<nav>` of 8 links
   (`Stores · Sites · Contacts · Leads · Pipeline · Services · Bookings ·
 Analytics`) → a `Notifications` link with an unread pill → `SignOutButton`.

@@ -1,0 +1,269 @@
+// @vitest-environment jsdom
+/**
+ * "What you hear about" (F14): a switch saves at once with Undo (F12), a
+ * channel that can't deliver can't be switched on, and a refused save goes
+ * back and says so.
+ *
+ * `react-dom/client` + `act` directly, as the section-field tests do.
+ */
+import type { AnchorHTMLAttributes } from "react";
+import { act } from "react";
+import type { Root } from "react-dom/client";
+import { createRoot } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { AlertPreferences } from "@/lib/notifications/preferences";
+
+import { AlertsGrid } from "./alerts-grid";
+
+const saveAlert = vi.fn();
+const undoAlert = vi.fn();
+vi.mock("@/lib/notifications/actions", () => ({
+    saveAlert: (...args: unknown[]) => saveAlert(...args) as unknown,
+    undoAlert: (...args: unknown[]) => undoAlert(...args) as unknown,
+}));
+
+const offer = vi.fn();
+vi.mock(
+    "@/components/organizations/business-settings/use-settings-undo",
+    () => ({
+        useSettingsUndo: () => ({ offer, settle: vi.fn() }),
+    }),
+);
+
+const showError = vi.fn();
+vi.mock("@saroh/ui/toast", () => ({
+    showError: (...args: unknown[]) => showError(...args) as unknown,
+}));
+
+vi.mock("next/link", () => ({
+    default: ({
+        href,
+        children,
+        ...rest
+    }: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => (
+        <a href={href} {...rest}>
+            {children}
+        </a>
+    ),
+}));
+
+let root: Root;
+let host: HTMLDivElement;
+
+function prefs(over: Partial<AlertPreferences> = {}): AlertPreferences {
+    return {
+        alerts: [
+            {
+                key: "order",
+                channels: { bell: true, email: false, whatsapp: false },
+            },
+            {
+                key: "failed",
+                channels: { bell: true, email: true, whatsapp: false },
+            },
+        ],
+        channels: {
+            bell: { available: true },
+            email: { available: true },
+            whatsapp: { available: false, reason: "NO_PROVIDER" },
+        },
+        canConnect: true,
+        ...over,
+    };
+}
+
+function render(p: AlertPreferences) {
+    act(() => {
+        root.render(<AlertsGrid read={{ status: "ok", prefs: p }} />);
+    });
+}
+
+function switchFor(label: string): HTMLButtonElement {
+    const found = Array.from(
+        host.querySelectorAll<HTMLButtonElement>('[role="switch"]'),
+    ).find((el) => el.getAttribute("aria-label")?.startsWith(label));
+    if (!found) throw new Error(`No switch "${label}"`);
+    return found;
+}
+
+beforeEach(() => {
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    vi.clearAllMocks();
+});
+
+afterEach(() => {
+    act(() => root.unmount());
+    host.remove();
+});
+
+describe("AlertsGrid", () => {
+    it("draws the design's heading and the channels that can deliver", () => {
+        render(prefs());
+        expect(host.textContent).toContain("What you hear about");
+        expect(host.textContent).toContain(
+            "Only for you. Your team picks their own.",
+        );
+        const headers = Array.from(
+            host.querySelectorAll('[role="columnheader"]'),
+        ).map((h) => h.textContent);
+        expect(headers).toEqual(["Alert", "Bell", "Email"]);
+    });
+
+    it("a switch saves at once, and offers Undo that puts it back", async () => {
+        saveAlert.mockResolvedValue({ ok: true, data: prefs() });
+        undoAlert.mockResolvedValue({ ok: true, data: prefs() });
+        render(prefs());
+
+        const email = switchFor("New order by Email");
+        expect(email.getAttribute("aria-checked")).toBe("false");
+        await act(async () => {
+            email.click();
+            await Promise.resolve();
+        });
+
+        expect(saveAlert).toHaveBeenCalledWith({
+            alert: "order",
+            channel: "email",
+            on: true,
+        });
+        expect(offer).toHaveBeenCalledTimes(1);
+        const [message, undo] = offer.mock.calls[0] as [
+            string,
+            () => Promise<unknown>,
+        ];
+        expect(message).toBe("Email on for New order");
+        await expect(undo()).resolves.toEqual({ ok: true });
+        expect(undoAlert).toHaveBeenCalledWith({
+            back: { alert: "order", channel: "email", on: false },
+            expect: true,
+        });
+    });
+
+    it("Bookings with you: email off, the bell stays on (#1138)", async () => {
+        const mine = (email: boolean): AlertPreferences =>
+            prefs({
+                alerts: [
+                    {
+                        key: "mine",
+                        channels: { bell: true, email, whatsapp: false },
+                    },
+                ],
+            });
+        saveAlert.mockResolvedValue({ ok: true, data: mine(false) });
+        render(mine(true));
+
+        expect(host.textContent).toContain("Bookings with you");
+        const email = switchFor("Bookings with you by Email");
+        expect(email.getAttribute("aria-checked")).toBe("true");
+        await act(async () => {
+            email.click();
+            await Promise.resolve();
+        });
+
+        expect(saveAlert).toHaveBeenCalledWith({
+            alert: "mine",
+            channel: "email",
+            on: false,
+        });
+        expect(offer.mock.calls[0]?.[0]).toBe(
+            "Email off for Bookings with you",
+        );
+        expect(
+            switchFor("Bookings with you by Bell").getAttribute("aria-checked"),
+        ).toBe("true");
+    });
+
+    it("an Undo refused says why", async () => {
+        saveAlert.mockResolvedValue({ ok: true, data: prefs() });
+        undoAlert.mockResolvedValue({
+            ok: false,
+            error: "Changed since. Reload",
+        });
+        render(prefs());
+        await act(async () => {
+            switchFor("Payment failed by Email").click();
+            await Promise.resolve();
+        });
+        const undo = offer.mock.calls[0]?.[1] as () => Promise<unknown>;
+        await expect(undo()).resolves.toEqual({
+            ok: false,
+            error: "Changed since. Reload",
+        });
+    });
+
+    it("a refused save says so, and offers no Undo", async () => {
+        saveAlert.mockResolvedValue({
+            ok: false,
+            error: "That didn't go through. Try again. saving your alerts.",
+        });
+        render(prefs());
+        await act(async () => {
+            switchFor("New order by Bell").click();
+            await Promise.resolve();
+        });
+        expect(showError).toHaveBeenCalledWith(
+            "That didn't go through. Try again. saving your alerts.",
+            "Your alerts are as they were.",
+        );
+        expect(offer).not.toHaveBeenCalled();
+        // The switch is back as the server has it.
+        expect(
+            switchFor("New order by Bell").getAttribute("aria-checked"),
+        ).toBe("true");
+    });
+
+    it("email can be switched on with no provider, and no line says one is needed", () => {
+        render(
+            prefs({
+                alerts: [
+                    {
+                        key: "order",
+                        channels: { bell: true, email: false, whatsapp: false },
+                    },
+                ],
+                channels: {
+                    bell: { available: true },
+                    email: { available: true },
+                    whatsapp: { available: false, reason: "NO_PROVIDER" },
+                },
+            }),
+        );
+        expect(switchFor("New order by Email").disabled).toBe(false);
+        expect(host.querySelector('a[href="/settings/providers"]')).toBeNull();
+        expect(host.textContent).not.toMatch(/provider/i);
+    });
+
+    it("a connected WhatsApp shows, fixed off, and never saves", () => {
+        render(
+            prefs({
+                channels: {
+                    bell: { available: true },
+                    email: { available: true },
+                    whatsapp: { available: false, reason: "NO_NUMBER" },
+                },
+            }),
+        );
+        const whatsapp = switchFor("New order by WhatsApp");
+        expect(whatsapp.disabled).toBe(true);
+        expect(whatsapp.getAttribute("aria-label")).toBe(
+            "New order by WhatsApp, off. no WhatsApp number for you",
+        );
+        expect(host.textContent).toContain(
+            "Saroh doesn't keep a WhatsApp number for you",
+        );
+    });
+
+    it("every switch that can be pressed shows the pointer, a hover and a focus ring", () => {
+        render(prefs());
+        const bell = switchFor("New order by Bell");
+        expect(bell.className).toContain("cursor-pointer");
+        expect(bell.className).toMatch(/hover:data-\[state=(un)?checked\]:bg-/);
+        expect(bell.className).toMatch(
+            /active:data-\[state=checked\]:bg-primary-active/,
+        );
+        expect(bell.className).toContain("focus-visible:ring-2");
+    });
+});

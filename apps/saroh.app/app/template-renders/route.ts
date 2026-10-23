@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 
 import { env } from "@/env";
 import { templateRendersAllowed } from "@/lib/template-renders/guard";
-import { templateRenderIndex } from "@/lib/template-renders/render";
 import { rootDomain } from "@/lib/test-release";
+import { templateRenderIndex } from "@saroh/site-blocks/showcase";
 
 /**
  * What the template renders can draw (industry templates U14): every

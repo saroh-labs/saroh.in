@@ -1,13 +1,13 @@
 "use client";
 
-import { Refusal } from "@/components/shared/refusal";
+import { Refusal } from "@/components/shared/states/refusal";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { FormDialog } from "@/components/shared/form-dialog";
+import { FormDialog } from "@/components/shared/forms/form-dialog";
 import { runAction } from "@/lib/api/run-action";
 import { firstName } from "@/lib/names";
 import { addPerson } from "@/lib/staff/actions";

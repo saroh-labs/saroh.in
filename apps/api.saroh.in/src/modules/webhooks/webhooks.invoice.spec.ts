@@ -21,7 +21,13 @@ jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const client = {
         merchantPaymentProvider: { findUnique: jest.fn() },
-        webhookEvent: { create: jest.fn(), update: jest.fn() },
+        webhookEvent: {
+            create: jest.fn(),
+            update: jest.fn(),
+            // Claims the stored row for the reconcile, or keeps it FAILED.
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            findUnique: jest.fn(),
+        },
         paymentIntent: {
             findFirst: jest.fn(),
             update: jest.fn(),

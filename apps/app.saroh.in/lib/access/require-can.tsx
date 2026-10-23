@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { AccessDenied } from "@/components/shared/access-denied";
+import { AccessDenied } from "@/components/shared/states/access-denied";
 import { whoCanChange } from "@/lib/access/who-can-change";
 import { knownRoleName } from "@/lib/organizations/role-name";
 import type { Organization } from "@/lib/organizations/service";

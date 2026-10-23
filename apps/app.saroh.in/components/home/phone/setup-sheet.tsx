@@ -12,15 +12,18 @@ import type { ComponentPropsWithRef } from "react";
 import { useId, useState } from "react";
 
 import { useCanChangePlan } from "@/components/billing/plan-way";
-import { PlanAsides, readyRows } from "@/components/settings/ready-rows";
-import { SetupChecklist } from "@/components/shared/setup-checklist";
+import { PlanAsides, readyRows } from "@/components/settings/ready/ready-rows";
+import { SetupChecklist } from "@/components/shared/setup-checklist/setup-checklist";
 import { count as countOf } from "@/lib/format/plural";
 import type { ReadyChecklist } from "@/lib/settings/ready";
 import { checklistWords, takeMoneyPlace } from "@/lib/settings/ready";
 import type { ChecklistRow } from "@/lib/setup-checklist";
 import { countRows, orderRows } from "@/lib/setup-checklist";
 
-import { setSetupHidden, useSetupHidden } from "../use-setup-hidden";
+import {
+    setSetupHidden,
+    useSetupHidden,
+} from "@/components/home/setup/use-setup-hidden";
 import { HomeSheet } from "./home-sheet";
 
 /** Said with Undo: on a phone, Settings is the way back (A4). */

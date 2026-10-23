@@ -1,6 +1,6 @@
 "use client";
 
-import { SectionError } from "@/components/shared/section-error";
+import { SectionError } from "@/components/shared/states/section-error";
 
 /** The month could not be read at all; a single layer failing is not this. */
 export default function Error({

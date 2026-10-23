@@ -7,9 +7,12 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { StatusBadge } from "@/components/shared/status-badge";
-import { lostNew, useLeaveGuard } from "@/components/shared/use-leave-guard";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
+import {
+    lostNew,
+    useLeaveGuard,
+} from "@/components/shared/forms/use-leave-guard";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
 import { callName } from "@/lib/services/call-name";
 import type { ServiceDraft, ServiceField } from "@/lib/services/service-editor";
@@ -38,11 +41,11 @@ import type { PanelKey } from "@/lib/services/service-panels";
 import { detailRows, PANEL_FIELDS } from "@/lib/services/service-panels";
 import { zoneShortName } from "@/lib/services/time-picker";
 
+import { FiveQuestions } from "@/components/services/service-fields/questions";
 import { DetailPanel } from "./detail-panel";
 import type { EditorProps } from "./editor-props";
 import { BackToServices } from "./editor-props";
 import { NewServiceFoot, NewServiceSide } from "./new-service-side";
-import { FiveQuestions } from "./questions";
 import { useServiceSave } from "./use-service-save";
 
 /** The five questions' own fields: a problem in any keeps More closed. */

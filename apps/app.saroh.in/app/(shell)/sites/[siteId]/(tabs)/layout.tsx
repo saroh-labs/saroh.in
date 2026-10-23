@@ -2,9 +2,9 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { PausedNote } from "@/components/billing/paused-banner";
-import { navCan } from "@/components/shared/nav-items";
-import { PageContainer } from "@/components/shared/page-container";
-import { WebsiteHeader } from "@/components/sites/website-header";
+import { navCan } from "@/components/shared/navigation/nav-items";
+import { PageContainer } from "@/components/shared/page/page-container";
+import { WebsiteHeader } from "@/components/sites/header/website-header";
 import { pausedSiteIds, pausedWords } from "@/lib/billing/paused";
 import { listPostCategories, listPosts } from "@/lib/content/service";
 import { listForms } from "@/lib/forms/service";

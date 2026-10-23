@@ -139,6 +139,8 @@ export const ALERT_NOTIFICATION_TYPES: Record<AlertEvent, readonly string[]> = {
         "refund.failed",
         "refund.failed.booking",
         "refund.failed.invoice",
+        // A provider's event Saroh couldn't apply after its tries.
+        "payment.event_unapplied",
     ],
     team: ["team.joined"],
     // UX-043: a reviewer's verdict, or their first note of a round.

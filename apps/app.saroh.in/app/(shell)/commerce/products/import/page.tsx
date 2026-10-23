@@ -1,10 +1,10 @@
 import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
 
-import { sellCrumbs } from "@/components/commerce/sell-crumbs";
-import { StorefrontChooser } from "@/components/commerce/storefront-chooser";
-import { PageContainer } from "@/components/shared/page-container";
-import { CsvImport } from "@/components/stores/csv-import";
+import { sellCrumbs } from "@/components/commerce/sell-pages/sell-crumbs";
+import { StorefrontChooser } from "@/components/commerce/sell-pages/storefront-chooser";
+import { PageContainer } from "@/components/shared/page/page-container";
+import { CsvImport } from "@/components/stores/import/csv-import";
 import { requireCan } from "@/lib/access/require-can";
 import { planMeter } from "@/lib/billing/meter";
 import { describeImport } from "@/lib/imports/service";

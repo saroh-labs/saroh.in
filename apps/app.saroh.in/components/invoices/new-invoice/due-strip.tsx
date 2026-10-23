@@ -1,7 +1,7 @@
 "use client";
 
-import { ChipGroup } from "@/components/shared/choice-group";
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { ChipGroup } from "@/components/shared/fields/choice-group";
 import type { InvoiceFormValues } from "@/lib/invoices/new-invoice";
 import { DUES, dueFrom } from "@/lib/invoices/new-invoice";
 

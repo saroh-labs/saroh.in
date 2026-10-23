@@ -1,6 +1,7 @@
 "use client";
 
 import type { LookId } from "@saroh/block-contract";
+import { resolveVariant } from "@saroh/block-contract";
 import type { KeyboardEvent } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -15,9 +16,10 @@ import {
     FRONT_TYPE,
     FRONT_WRAP,
     frontButton,
+    LookEyebrow,
     said,
 } from "./look-front";
-import { formatDuration, servicePriceWords } from "./service-words";
+import { formatDuration, lookPriceWords } from "./service-words";
 
 /**
  * The week's classes under a look (DEC-172, plan U7, #1096), as VA09,
@@ -88,7 +90,7 @@ export function waitlistHref(bookHref: string, s: TimetableSession): string {
 
 /** A class's price as the services list says it; null for none. */
 export function sessionPrice(s: TimetableSession): string | null {
-    return servicePriceWords({
+    return lookPriceWords({
         priceCents: s.priceCents ?? null,
         currency: s.currency ?? null,
         gst: s.gst ?? null,
@@ -153,6 +155,7 @@ export function usePaidWith(
 }
 
 export function LookTimetable({
+    content,
     look,
     title,
     lede,
@@ -162,6 +165,8 @@ export function LookTimetable({
     credit,
     checked = null,
 }: {
+    /** The section's content, for its eyebrow. */
+    content?: unknown;
     look: LookId;
     title: string;
     /** "13 sessions across 5 days." and the merchant's line, when set. */
@@ -190,6 +195,7 @@ export function LookTimetable({
                         look === "quiet" && "min-[700px]:text-center",
                     )}
                 >
+                    <LookEyebrow content={content} look={look} />
                     <h2 data-site-title="" className={type.h2}>
                         {title}
                     </h2>
@@ -214,24 +220,36 @@ export function LookTimetable({
                         {checked ?? ""}
                     </p>
                 </div>
-                <div className="max-[999px]:hidden">
-                    <WeekColumns
-                        look={look}
+                {look === "live" &&
+                resolveVariant("timetable", content) === "list" ? (
+                    <NextFreeRail
                         days={days}
                         byDay={byDay}
                         show={show}
                         paidWith={paidWith}
                     />
-                </div>
-                <div className="min-[1000px]:hidden">
-                    <DayTabs
-                        look={look}
-                        days={days}
-                        byDay={byDay}
-                        show={show}
-                        paidWith={paidWith}
-                    />
-                </div>
+                ) : (
+                    <>
+                        <div className="max-[999px]:hidden">
+                            <WeekColumns
+                                look={look}
+                                days={days}
+                                byDay={byDay}
+                                show={show}
+                                paidWith={paidWith}
+                            />
+                        </div>
+                        <div className="min-[1000px]:hidden">
+                            <DayTabs
+                                look={look}
+                                days={days}
+                                byDay={byDay}
+                                show={show}
+                                paidWith={paidWith}
+                            />
+                        </div>
+                    </>
+                )}
             </div>
         </section>
     );
@@ -252,7 +270,8 @@ function dayParts(date: string): { name: string; day: string } {
 }
 
 const COLUMN: Record<LookId, string> = {
-    folio: "border-site-border border-r last:border-r-0 px-3",
+    // Board VA09: a column a day, 420 tall at least, its classes edge to edge.
+    folio: "border-site-border border-r min-h-[420px]",
     quiet: "border-site-border border-r last:border-r-0 px-3",
     live: "",
 };
@@ -263,7 +282,11 @@ function WeekColumns({ look, days, byDay, show, paidWith }: DayProps) {
         <div
             className={cn(
                 "grid grid-cols-7",
-                look === "live" ? "gap-3" : "border-site-border border-t",
+                look === "live" && "gap-3",
+                look === "quiet" && "border-site-border border-t",
+                // VA09's frame: an ink rule over the week, a hairline down its side.
+                look === "folio" &&
+                    "border-site-border border-t-site-fg border-l border-t",
             )}
         >
             {days.map((date, i) => {
@@ -278,19 +301,37 @@ function WeekColumns({ look, days, byDay, show, paidWith }: DayProps) {
                             COLUMN[look],
                         )}
                     >
-                        <h3 className="grid justify-items-center gap-0.5 pb-4 pt-5">
+                        <h3
+                            className={cn(
+                                "grid gap-0.5",
+                                look === "quiet" &&
+                                    "justify-items-center pb-4 pt-5",
+                                // VA09: left-aligned, today on the surface.
+                                look === "folio" &&
+                                    cn(
+                                        "px-3.5 pb-3 pt-3.5",
+                                        i === 0 && "bg-site-surface",
+                                    ),
+                                // VB09: an eyebrow over a 36px number, left.
+                                look === "live" && "px-0.5 pb-2 pt-1",
+                            )}
+                        >
                             <span className={FRONT_TYPE[look].eyebrow}>
                                 {i === 0 ? `${name} · today` : name}
                             </span>
                             <span
                                 className={cn(
-                                    "font-site-heading text-[34px] tabular-nums leading-tight",
-                                    look === "live"
-                                        ? "font-extrabold"
-                                        : "font-light",
-                                    i === 0 &&
-                                        look !== "live" &&
-                                        "underline decoration-1 underline-offset-[10px]",
+                                    "font-site-heading tabular-nums leading-tight",
+                                    look === "live" &&
+                                        "text-[36px] font-extrabold [font-stretch:80%]",
+                                    look === "folio" &&
+                                        "text-[30px] font-light",
+                                    look === "quiet" &&
+                                        cn(
+                                            "text-[34px] font-light",
+                                            i === 0 &&
+                                                "underline decoration-1 underline-offset-[10px]",
+                                        ),
                                 )}
                             >
                                 {day}
@@ -332,6 +373,87 @@ function WeekColumns({ look, days, byDay, show, paidWith }: DayProps) {
     );
 }
 
+/**
+ * Live's list (VB01 "Next free"): the classes in one row of cards, in
+ * time order, sharing the row on a desk (188px at least) and 212px each
+ * on a phone, scrolling sideways when they run past the page. A card says the day ("Today", "Tomorrow", then the date), the
+ * time large, the class, who · how long · price, its places as a tag,
+ * and a full-width Book (or Join the waitlist).
+ */
+/** "Today" for the week's first day (the read starts today), "Tomorrow" for the next, then the date. */
+function railDay(date: string, today: string | undefined): string {
+    if (date === today) return "Today";
+    const next = new Date(`${today}T12:00:00Z`);
+    next.setUTCDate(next.getUTCDate() + 1);
+    return date === next.toISOString().slice(0, 10)
+        ? "Tomorrow"
+        : dayLabel(date);
+}
+
+function NextFreeRail({ days, byDay, show, paidWith }: Omit<DayProps, "look">) {
+    const sessions = days.flatMap((date) => byDay(date));
+    if (sessions.length === 0) {
+        return <p className="text-site-muted text-[14px]">No classes</p>;
+    }
+    return (
+        <ul
+            data-timetable-rail=""
+            className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-0.5 [scrollbar-width:none]"
+        >
+            {sessions.map((s) => {
+                const words = wordsOf(s, show, paidWith[s.serviceId]);
+                const full = s.placesLeft <= 0;
+                return (
+                    <li
+                        key={`${s.serviceId}:${s.startAt}`}
+                        data-timetable-row=""
+                        data-timetable-full={full ? "" : undefined}
+                        className="bg-site-surface grid w-[212px] shrink-0 snap-start content-start gap-2 rounded-[20px] p-4 min-[1000px]:w-auto min-[1000px]:min-w-[188px] min-[1000px]:flex-1 min-[1000px]:basis-0"
+                    >
+                        <span className={FRONT_TYPE.live.eyebrow}>
+                            {railDay(s.date, days[0])}
+                        </span>
+                        <BigTime
+                            look="live"
+                            time={s.time}
+                            className="text-[44px] [&>span:last-child]:text-[18px]"
+                        />
+                        <span className="text-site-fg font-bold leading-tight [overflow-wrap:anywhere]">
+                            {s.serviceName}
+                        </span>
+                        <LiveMeta session={s} words={words} />
+                        <span
+                            data-timetable-places={words.places?.tone ?? ""}
+                            className="min-h-[26px]"
+                        >
+                            {words.places ? (
+                                <span
+                                    className={cn(
+                                        "inline-flex rounded-[9px] px-[9px] py-1 text-[12.5px] font-bold",
+                                        full
+                                            ? "bg-site-bg text-site-fg"
+                                            : "bg-site-fg text-site-bg",
+                                    )}
+                                >
+                                    {full && s.capacity > 1
+                                        ? "Full · waitlist open"
+                                        : words.places.text}
+                                </span>
+                            ) : null}
+                        </span>
+                        <Action
+                            look="live"
+                            session={s}
+                            show={show}
+                            className="w-full"
+                        />
+                    </li>
+                );
+            })}
+        </ul>
+    );
+}
+
 /** One class in a day's column (desk). */
 function Cell({
     look,
@@ -345,39 +467,66 @@ function Cell({
     paidWith?: string;
 }) {
     const words = wordsOf(session, show, paidWith);
+    const full = session.placesLeft <= 0;
     return (
         <div
             data-timetable-row=""
+            data-timetable-full={full ? "" : undefined}
             className={cn(
                 "grid min-w-0 gap-0.5 text-[13.5px] leading-[1.4]",
-                look === "live"
-                    ? "bg-site-surface rounded-site-s p-3"
-                    : "border-site-border border-t px-1 py-4",
+                look === "live" && "bg-site-surface rounded-site-s gap-1 p-3",
+                look === "quiet" && "border-site-border border-t px-1 py-4",
+                // VA09: 14px cells, 13/1.35, a full class hatched.
+                look === "folio" &&
+                    cn(
+                        "border-site-border border-t p-3.5 text-[13px] leading-[1.35]",
+                        full && HATCH,
+                    ),
             )}
         >
-            <span className="text-site-muted text-[13px] tabular-nums">
-                {words.when}
-            </span>
+            {look === "live" ? (
+                <BigTime
+                    look={look}
+                    time={session.time}
+                    className="text-[22px]"
+                />
+            ) : (
+                <span className="text-site-muted text-[13px] tabular-nums">
+                    {words.when}
+                </span>
+            )}
             <span
                 className={cn(
-                    "font-site-heading text-site-fg text-[19px] leading-tight [overflow-wrap:anywhere]",
-                    look === "live" ? "text-[16px] font-bold" : "font-normal",
+                    "text-site-fg leading-tight [overflow-wrap:anywhere]",
+                    look === "live" && "font-site-body text-[14px] font-bold",
+                    look === "folio" &&
+                        "font-site-heading text-[18px] font-light",
+                    look === "quiet" &&
+                        "font-site-heading text-[19px] font-normal",
                 )}
             >
                 {session.serviceName}
             </span>
-            {words.who ? (
-                <span className="text-site-muted text-[13px]">{words.who}</span>
-            ) : null}
-            {words.price ? (
-                <span
-                    data-timetable-price=""
-                    className="text-site-fg text-[13px] font-semibold tabular-nums"
-                >
-                    {words.price}
-                </span>
-            ) : null}
-            <Places line={words.places} />
+            {look === "live" ? (
+                <LiveMeta session={session} words={words} />
+            ) : (
+                <>
+                    {words.who ? (
+                        <span className="text-site-muted text-[13px]">
+                            {words.who}
+                        </span>
+                    ) : null}
+                    {words.price ? (
+                        <span
+                            data-timetable-price=""
+                            className="text-site-fg text-[13px] font-semibold tabular-nums"
+                        >
+                            {words.price}
+                        </span>
+                    ) : null}
+                </>
+            )}
+            <Places line={words.places} look={look} />
             <Action
                 look={look}
                 session={session}
@@ -385,6 +534,71 @@ function Cell({
                 className="mt-1.5 justify-self-start"
             />
         </div>
+    );
+}
+
+/** VA09's full class: a 135° hatch in the hairline colour. */
+const HATCH =
+    "[background-image:repeating-linear-gradient(135deg,hsl(var(--site-border))_0_1px,transparent_1px_8px)]";
+
+/** A class's time in the board's big type, its "am" small (VB09, VA09). */
+function BigTime({
+    look,
+    time,
+    className,
+}: {
+    look: LookId;
+    time: string;
+    className: string;
+}) {
+    const [clock, period] = clockWords(time).split(" ");
+    return (
+        <span
+            className={cn(
+                "font-site-heading text-site-fg tabular-nums leading-[0.9]",
+                className,
+            )}
+        >
+            <span
+                className={
+                    look === "live"
+                        ? "font-extrabold tracking-[-0.03em] [font-stretch:80%]"
+                        : "font-light"
+                }
+            >
+                {clock}
+            </span>
+            {period ? (
+                <span className="font-site-body ml-0.5 text-[12px] font-semibold">
+                    {period}
+                </span>
+            ) : null}
+        </span>
+    );
+}
+
+/** VB09's one meta line: who · how long · price. */
+function LiveMeta({
+    session,
+    words,
+}: {
+    session: TimetableSession;
+    words: ReturnType<typeof wordsOf>;
+}) {
+    return (
+        <span className="text-site-muted text-[12.5px] leading-[1.4] [overflow-wrap:anywhere]">
+            {[words.who, formatDuration(session.durationMinutes)]
+                .filter(Boolean)
+                .join(" · ")}
+            {words.price ? (
+                <>
+                    {" · "}
+                    <span data-timetable-price="" className="tabular-nums">
+                        {words.price}
+                    </span>
+                </>
+            ) : null}
+        </span>
     );
 }
 
@@ -442,7 +656,8 @@ function DayTabs({ look, days, byDay, show, paidWith }: DayProps) {
                             className={cn(
                                 "grid min-h-[64px] min-w-0 cursor-pointer content-center justify-items-center gap-0.5 text-[12px] transition-colors duration-[var(--site-motion-base,140ms)]",
                                 look === "folio"
-                                    ? "rounded-none"
+                                    ? // VA09 phone: each day edged, 10 by 4.
+                                      "border-site-rule rounded-none border px-1 py-2.5"
                                     : "rounded-site-s",
                                 on
                                     ? "bg-site-fg text-site-bg"
@@ -453,10 +668,13 @@ function DayTabs({ look, days, byDay, show, paidWith }: DayProps) {
                             <span>{name}</span>
                             <span
                                 className={cn(
-                                    "font-site-heading text-[22px] tabular-nums leading-none",
-                                    look === "live"
-                                        ? "font-extrabold"
-                                        : "font-normal",
+                                    "font-site-heading tabular-nums leading-none",
+                                    look === "live" &&
+                                        "text-[22px] font-extrabold",
+                                    look === "folio" &&
+                                        "text-[24px] font-light",
+                                    look === "quiet" &&
+                                        "text-[22px] font-normal",
                                 )}
                             >
                                 {day}
@@ -520,32 +738,54 @@ function Row({
         <div
             data-timetable-row=""
             className={cn(
-                "grid grid-cols-[64px_minmax(0,1fr)] items-start gap-x-3 gap-y-2",
+                "grid items-start gap-x-3 gap-y-2",
+                // VA09 phone: time, words, and Book on the right.
+                look === "folio"
+                    ? "grid-cols-[64px_minmax(0,1fr)_auto]"
+                    : "grid-cols-[64px_minmax(0,1fr)]",
                 look === "live"
                     ? "bg-site-surface rounded-site-s p-3"
                     : "border-site-border border-b py-4",
             )}
         >
-            <span className="font-site-heading text-site-fg pt-0.5 text-[18px] tabular-nums leading-tight">
-                {clockWords(session.time)}
-            </span>
+            {look === "quiet" ? (
+                <span className="font-site-heading text-site-fg pt-0.5 text-[18px] tabular-nums leading-tight">
+                    {clockWords(session.time)}
+                </span>
+            ) : (
+                <BigTime
+                    look={look}
+                    time={session.time}
+                    className={cn(
+                        "pt-0.5",
+                        look === "live" ? "text-[22px]" : "text-[20px]",
+                    )}
+                />
+            )}
             <div className="grid min-w-0 gap-0.5">
                 <span
                     className={cn(
-                        "font-site-heading text-site-fg text-[19px] leading-tight [overflow-wrap:anywhere]",
-                        look === "live"
-                            ? "text-[16px] font-bold"
-                            : "font-normal",
+                        "text-site-fg leading-tight [overflow-wrap:anywhere]",
+                        look === "live" &&
+                            "font-site-body text-[14px] font-bold",
+                        look === "folio" &&
+                            "font-site-heading text-[19px] font-light",
+                        look === "quiet" &&
+                            "font-site-heading text-[19px] font-normal",
                     )}
                 >
                     {session.serviceName}
                 </span>
-                <span className="text-site-muted text-[13px]">
-                    {[formatDuration(session.durationMinutes), words.who]
-                        .filter(Boolean)
-                        .join(" · ")}
-                </span>
-                {words.price ? (
+                {look === "live" ? (
+                    <LiveMeta session={session} words={words} />
+                ) : (
+                    <span className="text-site-muted text-[13px]">
+                        {[formatDuration(session.durationMinutes), words.who]
+                            .filter(Boolean)
+                            .join(" · ")}
+                    </span>
+                )}
+                {look !== "live" && words.price ? (
                     <span
                         data-timetable-price=""
                         className="text-site-fg text-[13px] font-semibold tabular-nums"
@@ -553,14 +793,19 @@ function Row({
                         {words.price}
                     </span>
                 ) : null}
-                <Places line={words.places} />
-                <Action
-                    look={look}
-                    session={session}
-                    show={show}
-                    className="mt-1 justify-self-start"
-                />
+                <Places line={words.places} look={look} />
+                {look === "folio" ? null : (
+                    <Action
+                        look={look}
+                        session={session}
+                        show={show}
+                        className="mt-1 justify-self-start"
+                    />
+                )}
             </div>
+            {look === "folio" ? (
+                <Action look={look} session={session} show={show} />
+            ) : null}
         </div>
     );
 }
@@ -586,12 +831,22 @@ function wordsOf(
  * never jumps. "Last place" is in the accent's text colour (4.5:1, KD4);
  * "Full" in the ink, never faded.
  */
-function Places({ line }: { line: ReturnType<typeof placesLine> }) {
+function Places({
+    line,
+    look,
+}: {
+    line: ReturnType<typeof placesLine>;
+    look: LookId;
+}) {
     return (
         <span
             data-timetable-places={line?.tone ?? ""}
             className={cn(
-                "block min-h-[20px] text-[13px] font-semibold",
+                "block font-semibold",
+                // VB09's tag row: 24 tall, 12.5px.
+                look === "live"
+                    ? "min-h-[24px] text-[12.5px]"
+                    : "min-h-[20px] text-[13px]",
                 line?.tone === "full"
                     ? "text-site-fg"
                     : "text-site-accent-text",
@@ -634,7 +889,16 @@ function Action({
         <a
             href={sessionHref(show.bookHref, session)}
             aria-label={`Book ${session.serviceName}, ${when}`}
-            className={frontButton(look, "outline", cn("px-5", className))}
+            className={
+                look === "folio"
+                    ? // VA09: Book is an accent text link, 44 by 44 to tap.
+                      cn(
+                          "text-site-accent-text inline-flex min-h-11 min-w-11 items-center justify-center text-[13px] font-semibold underline underline-offset-4",
+                          FRONT_RING,
+                          className,
+                      )
+                    : frontButton(look, "outline", cn("px-5", className))
+            }
         >
             Book
         </a>
@@ -647,6 +911,7 @@ function Action({
  * when the classes come. The cached page is always the loading one.
  */
 export function LookTimetableNote({
+    content,
     look,
     title,
     lede,
@@ -654,6 +919,8 @@ export function LookTimetableNote({
     onRetry,
     children,
 }: {
+    /** The section's content, for its eyebrow. */
+    content?: unknown;
     look: LookId;
     title: string;
     lede: string | null;
@@ -674,6 +941,7 @@ export function LookTimetableNote({
                         look === "quiet" && "min-[700px]:text-center",
                     )}
                 >
+                    <LookEyebrow content={content} look={look} />
                     <h2 data-site-title="" className={type.h2}>
                         {title}
                     </h2>

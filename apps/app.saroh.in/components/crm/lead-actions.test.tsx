@@ -37,8 +37,8 @@ const showSuccess = vi.fn();
 const showError = vi.fn();
 const showWarning = vi.fn();
 vi.mock(
-    "@/components/shared/use-hold",
-    () => import("@/components/shared/hold-now.test-kit"),
+    "@/components/shared/undo/use-hold",
+    () => import("@/components/shared/undo/hold-now.test-kit"),
 );
 vi.mock("@saroh/ui/toast", () => ({
     showSuccess: (...args: unknown[]) => showSuccess(...args) as unknown,

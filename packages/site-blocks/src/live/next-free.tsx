@@ -9,12 +9,14 @@ import { DEFAULT_API_URL } from "../api-url";
 import { FRONT_RING, frontButton } from "../blocks/look-front";
 import type { PublicToday, PublicTodayItem } from "../blocks/on-today";
 import { isPublicToday, isTodayItem, todayHref } from "../blocks/on-today";
+import { formatDuration } from "../blocks/service-words";
 import { clockWords } from "../lib/clock";
 import { openState, openStateText } from "../lib/opening-hours";
 import { cn } from "../lib/utils";
 import { useQrSource, withQrSource } from "../qr-source";
 import { LiveFact } from "./live-fact";
 import { checkedWords, nextFreeWhen, placesLeftWords } from "./live-words";
+import { nextFreeSentence } from "./next-free-sentence";
 import type { LiveRead } from "./use-live-read";
 import { useLiveRead } from "./use-live-read";
 
@@ -29,8 +31,8 @@ import { useLiveRead } from "./use-live-read";
  * - the hero's slot under Folio and Quiet (VA01, VD01): "Next free ·
  *   Hatha yoga · Wed 21 Oct, 7:00 am · 3 places left", and a link to book
  *   that time;
- * - Live's Now strip (VB00Live, VB01): "6:00 pm Vinyasa flow · 3 left",
- *   with "Open now · closes 9pm" and "Checked 5:20 pm" under it;
+ * - Live's Now strip (VB01): pills, "Now · checked 5:20 pm", "Open now ·
+ *   closes 9pm" and "6:00 pm · Vinyasa flow · 3 places left · Book";
  * - the phone's Book bar (VD01): "Next free: today, 6:00 pm".
  *
  * Until the read answers, and whenever it fails or finds nothing free, the
@@ -144,10 +146,8 @@ export function HeroNextFree({
         <LiveFact
             read={read}
             pick={pickNext}
-            // The fresh line (20px, held to it: its mixed faces would make
-            // the line box 21px), the 2px gap and the 44px link, so the
-            // slot is as tall waiting as it is when the time lands.
-            reserve="min-h-[66px]"
+            // As tall waiting as when the time lands, so nothing moves.
+            reserve={SLOT_HEIGHT[look]}
             className={cn(
                 "flex w-full min-w-0 flex-col justify-center gap-0.5",
                 look === "quiet" && "min-[700px]:items-center",
@@ -175,6 +175,71 @@ export function HeroNextFree({
     );
 }
 
+/**
+ * The slot's kept height per look: Folio's sentence card (VA01, three lines
+ * of 23px on a phone, two of 40px on a desk), Quiet's line and link (VD01's
+ * 96px and 72px). Live keeps its own in `HeroNextFree`.
+ */
+const SLOT_HEIGHT: Record<LookId, string> = {
+    folio: "min-h-[150px] min-[700px]:min-h-[106px]",
+    quiet: "min-h-[96px] min-[700px]:min-h-[72px]",
+    live: "min-h-[76px]",
+};
+
+/**
+ * Folio's next booking as the board's sentence card (VA01 `.now`): its
+ * label and length beside "I'd like a Hatha yoga with Meera today at
+ * 7:00 am." on a desk, under it on a phone. The sentence is the link to
+ * book that time; its phrases are drawn as the board's dotted choices.
+ */
+function FolioSentence({
+    next,
+    href,
+    count,
+}: {
+    next: Next;
+    href: string;
+    count: boolean;
+}) {
+    const { item, today } = next;
+    const places = count ? placesLeftWords(item.placesLeft) : null;
+    const words = nextFreeSentence(item, today.date);
+    const phrase =
+        "border-site-accent-text text-site-accent-text border border-dotted px-[.22em] pl-[.3em] leading-[1.15]";
+    return (
+        // A phone stacks label, sentence, length; a desk puts the label
+        // over the length beside the sentence.
+        <div className="grid w-full gap-2.5 min-[700px]:grid-cols-[auto_minmax(0,1fr)] min-[700px]:items-center min-[700px]:gap-x-5 min-[700px]:gap-y-1 min-[700px]:[grid-template-areas:'c_s'_'m_s']">
+            <p className="text-site-muted text-[12px] font-semibold uppercase tracking-[0.18em] min-[700px]:self-end min-[700px]:[grid-area:c]">
+                Next free
+            </p>
+            <Link
+                href={href}
+                data-live-value=""
+                className={cn(
+                    "font-site-heading text-site-fg text-[23px] font-light leading-[1.62] tracking-[-0.02em] [text-wrap:pretty] min-[700px]:text-[40px] min-[700px]:leading-[1.32] min-[700px]:[grid-area:s]",
+                    FRONT_RING,
+                )}
+            >
+                I&rsquo;d like {words.article}{" "}
+                <span className={phrase}>{words.what}</span> with{" "}
+                <span className={phrase}>{words.who}</span>
+                {words.on ? " on " : " "}
+                <span className={phrase}>{words.when}</span>.
+            </Link>
+            <p className="text-site-body min-[700px]:text-site-muted text-[14px] min-[700px]:self-start min-[700px]:text-[13px] min-[700px]:[grid-area:m]">
+                {formatDuration(item.durationMinutes)}
+                {places ? (
+                    <>
+                        {" · "}
+                        <PlacesLeft words={places} />
+                    </>
+                ) : null}
+            </p>
+        </div>
+    );
+}
+
 /** Folio's and Quiet's line: Next free, what, when, a small true count. */
 function SlotLine({
     look,
@@ -187,19 +252,23 @@ function SlotLine({
     href: string;
     count: boolean;
 }) {
+    if (look === "folio") {
+        return <FolioSentence next={next} href={href} count={count} />;
+    }
     const { item, today } = next;
     const places = count ? placesLeftWords(item.placesLeft) : null;
     return (
         <>
             <p
                 data-live-value=""
-                className="text-site-body h-5 w-full truncate text-[14.5px] tabular-nums leading-5 min-[700px]:w-auto"
+                className="text-site-body w-full text-[15px] tabular-nums leading-[1.6] min-[700px]:w-auto"
             >
-                <span className="text-site-muted mr-3 text-[12px] font-semibold uppercase tracking-[0.18em]">
+                <span className="text-site-muted mr-3 text-[12px] font-medium uppercase tracking-[0.22em]">
                     Next free
                 </span>
-                <span className="text-site-fg font-semibold">
+                <span className="text-site-fg font-medium">
                     {item.serviceName}
+                    {item.staffName ? ` with ${item.staffName}` : ""}
                 </span>
                 {" · "}
                 {nextFreeWhen(item, today.date)}
@@ -237,10 +306,15 @@ function PlacesLeft({ words }: { words: string }) {
 }
 
 /**
- * Live's Now strip (VB00Live "Now strip · fresh", VB01): the next free
- * time and what it is, its count while fresh, and under it whether the
- * place is open and when this was checked. Dark, as drawn; no pulse.
+ * Live's Now strip (VB01 `.now`): the board's small pills on the page's
+ * ground. On a desk "Now · checked 5:20 pm", whether the place is open
+ * (its dot only when it is), and the next free time and what it is, with
+ * its count while fresh and Book; on a phone the time first, "3 left", and
+ * the pills scroll sideways (`.pnow`). No pulse.
  */
+const PILL =
+    "bg-site-surface text-site-fg inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-semibold max-[699px]:gap-1.5 max-[699px]:px-3";
+
 function NowStrip({
     next,
     href,
@@ -253,7 +327,8 @@ function NowStrip({
     checkedAt?: number;
 }) {
     const { item, today } = next;
-    const places = count
+    const places = count ? placesLeftWords(item.placesLeft) : null;
+    const short = count
         ? placesLeftWords(item.placesLeft, { short: true })
         : null;
     const open = openState(
@@ -266,39 +341,49 @@ function NowStrip({
         item.date === today.date
             ? clockWords(item.time)
             : nextFreeWhen(item, today.date);
-    const under = [
-        open ? openStateText(open) : null,
-        checkedAt ? checkedWords(checkedAt, today.timezone) : null,
-    ].filter((part): part is string => part !== null);
+    const tag =
+        "bg-site-fg text-site-bg rounded-[9px] px-[9px] py-1 text-[12.5px] font-bold tabular-nums";
     return (
-        <>
+        <div className="flex w-full min-w-0 items-center gap-2 overflow-x-auto [scrollbar-width:none] min-[700px]:flex-wrap">
+            <span className="text-site-muted mr-1 shrink-0 whitespace-nowrap text-[13px] font-bold tracking-[0.02em] max-[699px]:hidden">
+                Now
+                {checkedAt ? (
+                    <span className="text-[12.5px] font-semibold tabular-nums">
+                        {" · "}
+                        {checkedWords(checkedAt, today.timezone).toLowerCase()}
+                    </span>
+                ) : null}
+            </span>
+            {open ? (
+                <span className={PILL}>
+                    {open.open ? (
+                        <span
+                            aria-hidden="true"
+                            className="bg-site-status size-[9px] shrink-0 rounded-full"
+                        />
+                    ) : null}
+                    {openStateText(open)}
+                </span>
+            ) : null}
             <Link
                 href={href}
                 aria-label={`Next free: ${item.serviceName}, ${nextFreeWhen(item, today.date)}${places ? `, ${places}` : ""}`}
-                className={cn(
-                    "bg-site-fg text-site-bg flex min-h-[54px] w-full min-w-0 items-center gap-3 rounded-full px-4 text-[14.5px] font-semibold",
-                    FRONT_RING,
-                )}
+                className={cn(PILL, "max-[699px]:order-first", FRONT_RING)}
             >
-                <span
-                    data-live-value=""
-                    className="min-w-0 flex-1 truncate tabular-nums"
-                >
-                    {when} {item.serviceName}
+                <span data-live-value="" className="tabular-nums">
+                    {when} · {item.serviceName}
                 </span>
                 {places ? (
-                    <span
-                        data-live-count=""
-                        className="bg-site-bg text-site-fg shrink-0 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[12.5px] font-bold tabular-nums"
-                    >
-                        {places}
+                    <span data-live-count="" className={tag}>
+                        <span className="max-[699px]:hidden">{places}</span>
+                        <span className="min-[700px]:hidden">{short}</span>
                     </span>
                 ) : null}
+                <span className="underline decoration-[1.5px] underline-offset-[3px] max-[699px]:hidden">
+                    Book
+                </span>
             </Link>
-            <p className="text-site-muted h-[18px] truncate px-1 text-[12.5px] leading-[18px]">
-                {under.join(" · ")}
-            </p>
-        </>
+        </div>
     );
 }
 

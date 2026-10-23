@@ -66,3 +66,22 @@ describe("claiming due jobs in a non-UTC session", () => {
         expect(second.map((j) => j.id)).not.toContain(job.id);
     });
 });
+
+describe("renewing a claimed job's lease", () => {
+    it("renews only for the worker that holds it, and keeps it from a reclaim", async () => {
+        const { prisma } = await import("@saroh/database");
+        const job = await queue.enqueue({
+            type: "test.renew",
+            payload: {},
+            runAt: new Date(Date.now() - 1000),
+        });
+        await queue.claimDue("worker_1", 10);
+        // Its lease looks lapsed, as a job waiting behind a long one does.
+        await prisma.$executeRaw`UPDATE "Job" SET "lockedAt" = (now() AT TIME ZONE 'UTC') - interval '10 minutes' WHERE id = ${job.id}`;
+
+        await expect(queue.renew(job.id, "worker_2")).resolves.toBe(false);
+        await expect(queue.renew(job.id, "worker_1")).resolves.toBe(true);
+        const second = await queue.claimDue("worker_2", 10);
+        expect(second.map((j) => j.id)).not.toContain(job.id);
+    });
+});

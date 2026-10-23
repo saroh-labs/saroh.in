@@ -65,14 +65,15 @@ test("opens on the Overview for the last 4 weeks, three answers each leading to 
         "Overview",
         "Money",
         "What sells",
-        /^Where customers come from\s*Next$/,
+        "Where customers come from",
     ]);
     await expect(
         tabs(page).getByRole("link", { name: "Overview" }),
     ).toHaveAttribute("aria-current", "page");
+    // Sources and the path are built (U16, #1101): no tab is marked Next.
     await expect(
         tabs(page).getByRole("link", { name: /^Where customers come from/ }),
-    ).toContainText("Next");
+    ).not.toContainText("Next");
 
     for (const [question, link, href] of [
         ["Am I making more money?", "See money", "/analytics?tab=money"],

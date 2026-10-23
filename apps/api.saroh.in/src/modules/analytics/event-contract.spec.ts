@@ -141,3 +141,172 @@ describe("event-contract — every declared type is used", () => {
         expect(code.some((text) => named.test(text))).toBe(true);
     });
 });
+
+describe("event-contract — where a visit came from (U15)", () => {
+    const STEPS = ["site.visit", "site.looked", "site.started", "site.paid"];
+
+    it.each(STEPS)(
+        "%s keeps only a known source and an allowed ref",
+        (type) => {
+            expect(
+                validateEventProperties(type, 1, {
+                    source: "instagram",
+                    ref: " Diwali-Post ",
+                }),
+            ).toEqual({ source: "instagram", ref: "diwali-post" });
+            expect(
+                validateEventProperties(type, 1, { source: "direct" }),
+            ).toEqual({ source: "direct" });
+        },
+    );
+
+    it.each(STEPS)("%s drops everything else it is sent", (type) => {
+        expect(
+            validateEventProperties(type, 1, {
+                source: "google",
+                path: "/pay/secret-token",
+                referrer: "https://www.google.com/search?q=me",
+                query: "utm_source=google&email=a@example.com",
+                visitId: "abc",
+            }),
+        ).toEqual({ source: "google" });
+    });
+
+    it.each(STEPS)(
+        "%s refuses an unknown source or a ref of any other shape",
+        (type) => {
+            expect(() => validateEventProperties(type, 1, {})).toThrow(
+                BadRequestException,
+            );
+            expect(() =>
+                validateEventProperties(type, 1, { source: "facebook" }),
+            ).toThrow(BadRequestException);
+            for (const ref of [
+                "someone@example.com",
+                "call-9876543210",
+                "has space",
+                "a".repeat(33),
+                "-lead",
+                "a.b",
+                42,
+            ]) {
+                expect(() =>
+                    validateEventProperties(type, 1, { source: "other", ref }),
+                ).toThrow(BadRequestException);
+            }
+        },
+    );
+
+    it("lets the public intake take the steps, never a paid order", () => {
+        for (const type of STEPS) {
+            expect(PUBLIC_INGESTABLE_TYPES.has(type)).toBe(true);
+        }
+        expect(PUBLIC_INGESTABLE_TYPES.has("order.paid")).toBe(false);
+        expect(PUBLIC_INGESTABLE_TYPES.has("order.refunded")).toBe(false);
+    });
+
+    it("keeps where a visit came from off an order's own events (DEC-181)", () => {
+        expect(
+            validateEventProperties("order.paid", 1, {
+                orderId: "o1",
+                amountCents: 100,
+                source: "whatsapp",
+                ref: "status",
+            }),
+        ).toEqual({ orderId: "o1", amountCents: 100 });
+        expect(
+            validateEventProperties("order.refunded", 1, {
+                orderId: "o1",
+                amountCents: 100,
+                source: "whatsapp",
+            }),
+        ).toEqual({ orderId: "o1", amountCents: 100 });
+    });
+
+    it("takes site.paid like the other steps: the group and label only (DEC-181)", () => {
+        expect(
+            validateEventProperties("site.paid", 1, {
+                source: "instagram",
+                ref: "diwali-post",
+                orderId: "o1",
+                amountCents: 100,
+            }),
+        ).toEqual({ source: "instagram", ref: "diwali-post" });
+        expect(() =>
+            validateEventProperties("site.paid", 1, { source: "tiktok" }),
+        ).toThrow(BadRequestException);
+        expect(PUBLIC_INGESTABLE_TYPES.has("site.paid")).toBe(true);
+    });
+});
+
+describe("event-contract — site.view keeps its promises on the server (U15 privacy review)", () => {
+    it("cuts the path at its query and fragment", () => {
+        expect(
+            validateEventProperties("site.view", 1, {
+                path: "/shop/bread?ref=diwali&email=a@example.com#top",
+            }),
+        ).toEqual({ path: "/shop/bread" });
+        expect(
+            validateEventProperties("site.view", 1, { path: "?token=abc" }),
+        ).toEqual({ path: "/" });
+        expect(
+            validateEventProperties("site.view", 1, { path: "/about#team" }),
+        ).toEqual({ path: "/about" });
+    });
+
+    it("keeps the referrer's origin only, and drops one that isn't an address", () => {
+        expect(
+            validateEventProperties("site.view", 1, {
+                path: "/",
+                referrer: "https://www.google.com/search?q=someone+9876543210",
+            }),
+        ).toEqual({ path: "/", referrer: "https://www.google.com" });
+        expect(
+            validateEventProperties("site.view", 1, {
+                path: "/",
+                referrer: "android-app://com.whatsapp/",
+            }),
+        ).toEqual({ path: "/" });
+        expect(
+            validateEventProperties("site.view", 1, {
+                path: "/",
+                referrer: "not an address",
+            }),
+        ).toEqual({ path: "/" });
+    });
+
+    it("never keeps a title", () => {
+        expect(
+            validateEventProperties("site.view", 1, {
+                path: "/",
+                title: "Order for Asha Rao",
+            }),
+        ).toEqual({ path: "/" });
+    });
+
+    it.each([
+        "/account",
+        "/account/orders/cmh2k9x0a0001qz8l3v5d7f9b",
+        "/checkout",
+        "/checkout/abc",
+        "/shop/order/abc",
+        "/pay/secret-token",
+        "/book/claim/token",
+        "/shop/stop-waiting/token",
+        "/q/abc",
+        "/autopay/x",
+        "/pay/secret?x=1",
+    ])("refuses a view of the private page %s", (path) => {
+        expect(() => validateEventProperties("site.view", 1, { path })).toThrow(
+            BadRequestException,
+        );
+    });
+
+    it("counts the public pages beside them", () => {
+        for (const path of ["/book", "/shop", "/quotes", "/payments-info"]) {
+            expect(validateEventProperties("site.view", 1, { path })).toEqual({
+                path,
+            });
+        }
+    });
+});

@@ -1,6 +1,6 @@
 import type { BadgeProps } from "@saroh/ui/badge";
 
-import { STOCK_TEXT } from "@/components/commerce/stock-tones";
+import { STOCK_TEXT } from "@/components/commerce/stock/stock-tones";
 import type { ProductStatus } from "@/lib/products/service";
 
 /**

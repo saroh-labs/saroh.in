@@ -81,14 +81,41 @@ const COLUMN_HEADING =
 export const LOOK_FOOTER_LINK = `${FOOTER_LINK} inline-flex min-h-11 min-w-11 items-center`;
 const LOOK_MENU_LINK =
     "focus-visible:ring-site-footer-fg inline-flex min-h-11 min-w-11 items-center rounded-sm underline decoration-transparent decoration-1 underline-offset-[3px] transition-[text-decoration-color,opacity] duration-150 [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)] hover:decoration-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-site-footer-bg active:opacity-70 aria-[current=page]:font-bold aria-[current=page]:decoration-current";
-export const LOOK_COLUMN_HEADING =
-    "font-site-body text-site-footer-muted m-0 mb-1.5 text-[12px] font-semibold uppercase leading-snug tracking-[0.16em]";
+/**
+ * Each look's column heading, as its board draws it: Quiet's eyebrow (500,
+ * .22em), Folio's cap (600, .18em), Live's bold sentence-case label in the
+ * footer's own text colour.
+ */
+const LOOK_COLUMN_HEADING: Record<LookId, string> = {
+    quiet: "font-site-body text-site-footer-muted m-0 pb-1.5 text-[12px] font-medium uppercase leading-snug tracking-[0.22em]",
+    folio: "font-site-body text-site-footer-muted m-0 mb-1.5 text-[12px] font-semibold uppercase leading-snug tracking-[0.18em]",
+    live: "font-site-body text-site-footer-fg m-0 mb-1.5 text-[16px] font-bold leading-snug",
+};
+
+/** Live's links are bold and always underlined (board VB `.lnk`). */
+const LIVE_LINK = "font-bold decoration-[1.5px]";
+
+/**
+ * Each look's facts as columns: Quiet three-up, centred, at most 1000px;
+ * Folio the name block first at 2fr beside 1fr columns, two-up on a phone;
+ * Live 760px beside its name. Columns past the board's flow on in a row.
+ */
+const LOOK_COLUMNS: Record<LookId, string> = {
+    quiet: "mx-auto grid max-w-[1000px] grid-cols-1 justify-items-center gap-9 text-center text-[15px] leading-[1.55] min-[700px]:auto-cols-fr min-[700px]:grid-flow-col min-[700px]:gap-12 [&_dl]:mx-auto [&_dl]:text-left [&_ul]:justify-items-center",
+    folio: "grid grid-cols-2 gap-x-5 gap-y-8 text-left text-[14.5px] leading-normal min-[700px]:auto-cols-fr min-[700px]:grid-flow-col min-[700px]:grid-cols-[2fr] min-[700px]:gap-12",
+    live: "grid grid-cols-1 gap-8 text-left text-[14.5px] leading-normal min-[700px]:w-[760px] min-[700px]:max-w-full min-[700px]:auto-cols-fr min-[700px]:grid-flow-col min-[700px]:gap-5",
+};
 
 /** A look's footer link and heading classes, for a column of its own. */
-export const lookFooterClasses = {
-    heading: LOOK_COLUMN_HEADING,
-    link: LOOK_MENU_LINK,
-};
+export function lookFooterClasses(look: LookId) {
+    return {
+        heading: LOOK_COLUMN_HEADING[look],
+        link:
+            look === "live"
+                ? `${LOOK_MENU_LINK} ${LIVE_LINK} decoration-current`
+                : LOOK_MENU_LINK,
+    };
+}
 
 /** The label over a place's week, one step quieter than a column heading. */
 const HOURS_LABEL =
@@ -177,6 +204,7 @@ export function FooterContact({
     menu = [],
     now,
     look,
+    leading = null,
     trailing = null,
 }: {
     contact: SiteContact | null | undefined;
@@ -189,13 +217,20 @@ export function FooterContact({
      * and Quiet's centred columns. Absent is Classic, unchanged.
      */
     look?: LookId;
+    /** A first column before the places (Folio's name block); it orders
+     * itself first. */
+    leading?: ReactNode;
     /** One more column after the pages (a look's "Your account"). */
     trailing?: ReactNode;
 }) {
     const { phone, email, places, address, social } = shownContact(contact);
     if (!hasFooterFacts(contact, menu)) return null;
-    const heading = look ? LOOK_COLUMN_HEADING : COLUMN_HEADING;
-    const tap = look ? LOOK_FOOTER_LINK : TAP_LINK;
+    const heading = look ? LOOK_COLUMN_HEADING[look] : COLUMN_HEADING;
+    const tap = look
+        ? look === "live"
+            ? `${LOOK_FOOTER_LINK} ${LIVE_LINK}`
+            : LOOK_FOOTER_LINK
+        : TAP_LINK;
     const centred = look === "quiet";
 
     const whatsapp = reachOf({ phone, email, social }).whatsapp;
@@ -212,8 +247,8 @@ export function FooterContact({
         <div
             data-site-contact=""
             className={
-                centred
-                    ? "grid grid-cols-1 justify-items-center gap-x-10 gap-y-9 text-center text-[15px] leading-relaxed sm:grid-cols-[repeat(auto-fit,minmax(13rem,1fr))] [&_dl]:mx-auto [&_dl]:text-left [&_ul]:justify-items-center"
+                look
+                    ? LOOK_COLUMNS[look]
                     : "grid grid-cols-1 gap-x-10 gap-y-9 text-left text-[14.5px] leading-relaxed sm:grid-cols-[repeat(auto-fit,minmax(13rem,1fr))]"
             }
         >
@@ -311,9 +346,11 @@ export function FooterContact({
                 items={[...menu]}
                 heading="Pages"
                 headingClassName={heading}
-                linkClassName={look ? LOOK_MENU_LINK : MENU_LINK}
+                linkClassName={look ? lookFooterClasses(look).link : MENU_LINK}
             />
             {trailing}
+            {/* Last in the tree, so Classic's ids don't move; first on screen. */}
+            {leading}
         </div>
     );
 }

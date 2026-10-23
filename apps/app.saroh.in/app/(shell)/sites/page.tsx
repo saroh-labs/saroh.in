@@ -5,8 +5,8 @@ import { Globe } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { navCan } from "@/components/shared/nav-items";
-import { PageContainer } from "@/components/shared/page-container";
+import { navCan } from "@/components/shared/navigation/nav-items";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { listSites } from "@/lib/sites/service";

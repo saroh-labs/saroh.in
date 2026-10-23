@@ -19,8 +19,10 @@ import {
  * yellow. So a look DERIVES what it draws from the colours it is given:
  *
  * - the accent, as a fill, is moved toward the text until it reaches 3:1
- *   on the page and on a card, and text on it is ink or white, whichever
- *   reads (4.5:1);
+ *   on the page and on a card (Live, when the palette names its own accent
+ *   text: as it is, since it only fills what carries its own text;
+ *   `accentFillContrast`), and text on it is ink or
+ *   white, whichever reads (4.5:1);
  * - the accent as text (`accentText`) is moved further, to 4.5:1 on both;
  * - a control's edge (`rule`) reaches 3:1 on both;
  * - every text colour reaches 4.5:1 on what it sits on.
@@ -141,11 +143,15 @@ export function deriveSafeColours(
 ): SafeColours {
     const p: Record<string, string> = { ...input };
 
-    // Live draws cards: a surface a step off the page, unless the
-    // palette already has its own.
+    // Live draws cards on a tinted page (board VB: white cards on a grey
+    // ground): the page moves a step toward the text, a hero on the page
+    // with it, and the cards keep the page's own colour. Unless the
+    // palette already has a surface of its own.
     const tint = LOOKS[look].colour.surfaceTint;
     if (tint > 0 && p.surface === p.bg) {
-        p.surface = mixHex(p.bg, p.fg, tint);
+        const ground = mixHex(p.bg, p.fg, tint);
+        if (p.heroBg === p.bg) p.heroBg = ground;
+        p.bg = ground;
     }
     const page = [p.bg, p.surface];
 
@@ -162,6 +168,12 @@ export function deriveSafeColours(
     )[0];
     const ink = relativeLuminance(darkest) < 0.05 ? darkest : INK;
 
+    // A palette that names its own accent text has kept the accent for
+    // fills (board VB's lime): the look may let it sit under a graphic's
+    // 3:1. A business's colours never name one, so they are moved as ever.
+    const fillContrast = input.accentText
+        ? LOOKS[look].colour.accentFillContrast
+        : PALETTE_GRAPHIC_CONTRAST;
     let accentTreatment: AccentTreatment = "fill";
     const given = p.accent;
     if (contrastRatio(given, fg) < INK_LIKE) {
@@ -173,7 +185,7 @@ export function deriveSafeColours(
             fg,
             page,
             (c) =>
-                worst(c, page) >= PALETTE_GRAPHIC_CONTRAST &&
+                worst(c, page) >= fillContrast &&
                 contrastRatio(textOn(c, ink), c) >= PALETTE_MIN_CONTRAST,
         );
     }
@@ -184,7 +196,13 @@ export function deriveSafeColours(
         contrastRatio(p.accentFg, accent) >= PALETTE_MIN_CONTRAST
             ? p.accentFg
             : readableOn(textOn(accent, ink), accent, ink);
-    p.accentText = reaching(accent, page, PALETTE_MIN_CONTRAST, fg);
+    // The palette's own accent text while it reads (board VB's green text),
+    // else the accent moved until it does.
+    p.accentText =
+        input.accentText &&
+        worst(input.accentText, page) >= PALETTE_MIN_CONTRAST
+            ? input.accentText
+            : reaching(accent, page, PALETTE_MIN_CONTRAST, fg);
     p.rule = reaching(p.border, page, PALETTE_GRAPHIC_CONTRAST, fg);
     p.accentSoft = moveUntil(
         mixHex(accent, p.bg, SOFT_MIX),

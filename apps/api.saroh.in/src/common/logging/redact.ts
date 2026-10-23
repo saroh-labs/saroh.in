@@ -120,6 +120,10 @@ const TOKEN_PATHS = [
     /^(\/public\/sites\/[^/?#]+\/waitlist-claim\/)[^/?#]+/,
     // A back-in-stock watch's stop link (U23, #1154).
     /^(\/public\/sites\/[^/?#]+\/stock-watch\/)[^/?#]+/,
+    // An invitation link, read before sign-in and accepted after it.
+    /^(\/public\/organization-invitations\/)[^/?#]+/,
+    /^(\/organization-invitations\/)[^/?#]+/,
+    /^(\/invitations\/)[^/?#]+/,
 ];
 
 /**

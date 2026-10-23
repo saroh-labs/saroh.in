@@ -14,8 +14,8 @@ import type {
 } from "@/lib/modules/turn-on-schema";
 import { usesLine } from "@/lib/sites/template-picker";
 
-import { CheckRow } from "@/components/shared/check-row";
-import { RadioCards } from "@/components/shared/choice-group";
+import { CheckRow } from "@/components/shared/fields/check-row";
+import { RadioCards } from "@/components/shared/fields/choice-group";
 import { TextLink } from "@saroh/ui/text-link";
 
 export type Update = (change: (draft: TurnOnDraft) => TurnOnDraft) => void;

@@ -34,7 +34,7 @@ export const metadata = { title: "Subscriptions · Billing" };
 const BASE = "/billing/subscriptions";
 
 /**
- * Every business's Saroh plan subscription (R26, DEC-163): the month's
+ * Every business's Saroh plan subscription (R26, DEC-179): the month's
  * total at list price, five status cards and the plan chips that filter
  * as they are pressed, and a row per business with who it is billed to,
  * its plan and note, its status, its next charge and how it is paid, its

@@ -25,15 +25,22 @@ import type {
     WeeklyRange,
 } from "@/lib/staff/types";
 
+import type { useBookingRules } from "@/components/bookings/booking-rules/booking-rules-card";
+import {
+    ApprovalSwitch,
+    RuleChoices,
+    RulesList,
+} from "@/components/bookings/booking-rules/booking-rules-card";
+import {
+    OffDetails,
+    rangeOfLine,
+} from "@/components/bookings/time-off/time-off-card";
 import { BookablePreview, WhyNotOffered } from "./bookable-preview";
-import type { useBookingRules } from "./booking-rules-card";
-import { ApprovalSwitch, RuleChoices, RulesList } from "./booking-rules-card";
 import type { SaveWeek } from "./day-editor";
 import { DayEditor } from "./day-editor";
 import { EveryoneDay } from "./everyone-day";
 import { ExtraHoursBody } from "./extra-hours";
 import { HoursPanel } from "./hours-panel";
-import { OffDetails, rangeOfLine } from "./time-off-card";
 import { EVERYONE, WhosePicker } from "./whose-hours";
 
 /** Which sheet is open: one at a time. */

@@ -59,6 +59,7 @@ export const NOTICE_KINDS = {
     // Pages: there is no one record to open.
     "provider.attention": "providers",
     "provider.back": "providers",
+    "payment.event_unapplied": "providers",
     "team.joined": "team",
     // A customer asked to remove their data (DEC-172): the customer, when
     // the request names one; else the Customers requests list.

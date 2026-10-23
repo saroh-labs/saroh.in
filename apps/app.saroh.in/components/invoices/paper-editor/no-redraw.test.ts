@@ -64,7 +64,7 @@ describe("the invoice editor is never redrawn by its own saves", () => {
             const at = src.indexOf(`<${sheet}`);
             expect(at).toBeGreaterThan(-1);
             const tag = src.slice(at, src.indexOf("/>", at));
-            expect(tag).toMatch(/\binPlace\b/);
+            expect(tag).toMatch(/\bsave=\{save\w+InPlace\}/);
         }
     });
 });

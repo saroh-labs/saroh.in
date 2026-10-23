@@ -4,7 +4,7 @@ import { paiseToRupees } from "../billing/saroh-invoice-terms";
 import { stateName } from "../invoices/gst-states";
 
 /**
- * The pure rules behind Admin › Billing (DEC-163): which month an invoice
+ * The pure rules behind Admin › Billing (DEC-179): which month an invoice
  * falls in, the month's GST export, and what the subscriptions add up to.
  * No database here, so each rule is tested on its own.
  */

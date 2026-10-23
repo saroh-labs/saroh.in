@@ -6,13 +6,13 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import {
     ListTable,
     ListTableHead,
     listTable,
-} from "@/components/shared/list-toolbar";
-import { StatusBadge } from "@/components/shared/status-badge";
-import { ViewerDate } from "@/components/shared/viewer-date";
+} from "@/components/shared/lists/list-toolbar";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { personHref } from "@/lib/contacts/person-href";
 import type { CustomerRow, CustomersPage } from "@/lib/customers/list";
 import {

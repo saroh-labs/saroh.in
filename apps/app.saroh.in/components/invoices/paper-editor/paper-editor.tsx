@@ -11,8 +11,8 @@ import { useWatch } from "react-hook-form";
 
 import { HeaderOverlay } from "@/components/bookings/calendar/header/header-overlay";
 import { usePhone } from "@/components/bookings/calendar/header/use-phone";
-import { BusinessLogoSheet } from "@/components/organizations/business-logo-sheet";
-import { PayInstructionsSheet } from "@/components/organizations/pay-instructions-sheet";
+import { BusinessLogoSheet } from "@/components/organizations/logo/business-logo-sheet";
+import { PayInstructionsSheet } from "@/components/organizations/pay-instructions/pay-instructions-sheet";
 import { runAction } from "@/lib/api/run-action";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import type {
@@ -23,7 +23,10 @@ import { EMPTY_LINE, isGoodLine, issueLine } from "@/lib/invoices/new-invoice";
 import type { PickRow } from "@/lib/invoices/new-invoice-lines";
 import { lineOfProduct } from "@/lib/invoices/new-invoice-lines";
 import { hasOwnLook, lookOf } from "@/lib/invoices/paper-look";
-import { saveOrganizationSettingsInPlace } from "@/lib/organizations/settings-actions";
+import {
+    saveBusinessLogoInPlace,
+    saveOrganizationSettingsInPlace,
+} from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 
 import { CustomerBlock } from "../new-invoice/customer-block";
@@ -431,7 +434,7 @@ export function PaperEditor({
                     }}
                     open={sheet.open}
                     returnTo="paper-change-logo"
-                    inPlace
+                    save={saveBusinessLogoInPlace}
                     onClose={() =>
                         setSheet((s) => (s ? { ...s, open: false } : s))
                     }
@@ -447,7 +450,7 @@ export function PaperEditor({
                     businessName={businessName}
                     open={sheet.open}
                     returnTo={partId({ part: "notes" })}
-                    inPlace
+                    save={saveOrganizationSettingsInPlace}
                     onClose={() =>
                         setSheet((s) => (s ? { ...s, open: false } : s))
                     }

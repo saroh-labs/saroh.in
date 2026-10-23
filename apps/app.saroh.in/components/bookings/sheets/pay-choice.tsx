@@ -4,8 +4,8 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Segmented } from "@saroh/ui/segmented";
 import { useId } from "react";
 
-import { CheckRow } from "@/components/shared/check-row";
-import { RadioCards } from "@/components/shared/choice-group";
+import { CheckRow } from "@/components/shared/fields/check-row";
+import { RadioCards } from "@/components/shared/fields/choice-group";
 import { CANT_TAKE_PAYMENTS } from "@/lib/organizations/permits";
 import type { PayChoice as Choice, PaidBy } from "@/lib/services/booking-pay";
 import {

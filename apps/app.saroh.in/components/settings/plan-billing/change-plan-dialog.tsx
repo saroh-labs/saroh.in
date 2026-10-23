@@ -18,7 +18,7 @@ import { LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import type { BusinessBillingProfile } from "@/lib/billing-profiles/view";
 import type { ProfileRefusal } from "@/lib/saroh-billing/billing-actions";
 import {

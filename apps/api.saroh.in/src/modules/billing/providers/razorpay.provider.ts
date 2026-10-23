@@ -1008,12 +1008,15 @@ export class RazorpayBillingProvider implements BillingProvider {
      * (`POST /subscriptions/:id/addons`), which Razorpay charges with the
      * subscription's next invoice. Unverified (U16): that it is taken with
      * the next charge and not later, that a subscription that is only
-     * authenticated (a trial) accepts one, and that a repeat after a lost
-     * answer can't be told from a new one (Razorpay keeps no reference).
+     * authenticated (a trial) accepts one. Razorpay keeps no reference, so
+     * Saroh's rides in the item's description, and a repeat (a lost answer,
+     * or a SENT mark that failed) first looks for the add-on already made.
      */
     private async addToNextCharge(
         item: NextChargeItem,
     ): Promise<{ providerChargeId: string }> {
+        const made = await this.findAddon(item);
+        if (made) return { providerChargeId: made };
         const res = await this.call(
             "add-on item",
             "POST",
@@ -1036,6 +1039,39 @@ export class RazorpayBillingProvider implements BillingProvider {
             );
         }
         return { providerChargeId: json.id };
+    }
+
+    /**
+     * The add-on Saroh already put on the subscription under this reference,
+     * read from the newest pages of add-ons (`GET /addons`) as
+     * {@link findPlan} reads plans. Unverified (U16): the list's shape.
+     */
+    private async findAddon(item: NextChargeItem): Promise<string | null> {
+        const description = `${REFERENCE_NOTE}:${item.reference}`;
+        for (let page = 0; page < FIND_PLAN_PAGES; page += 1) {
+            const res = await this.call(
+                "add-on lookup",
+                "GET",
+                `/addons?count=${FIND_PLAN_PAGE_SIZE}&skip=${page * FIND_PLAN_PAGE_SIZE}`,
+            );
+            const json = (await res.json()) as {
+                items?: {
+                    id?: string;
+                    subscription_id?: string;
+                    item?: { description?: string | null };
+                }[];
+            };
+            const items = json.items ?? [];
+            const hit = items.find(
+                (a) =>
+                    a.id &&
+                    a.subscription_id === item.providerSubscriptionId &&
+                    a.item?.description === description,
+            );
+            if (hit?.id) return hit.id;
+            if (items.length < FIND_PLAN_PAGE_SIZE) return null;
+        }
+        return null;
     }
 
     // ── HTTP ────────────────────────────────────────────────────────────

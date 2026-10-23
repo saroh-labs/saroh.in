@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
-import { BookingDetailView } from "@/components/bookings/booking-detail";
+import { BookingDetailView } from "@/components/bookings/booking-page/booking-detail";
 import { NewBookingHost } from "@/components/bookings/new-booking/new-booking-host";
 import {
     flowServices,

@@ -166,6 +166,16 @@ a note saying so.
   own billing inbox (`BillingWebhookEvent`) has no business in its URL and
   stays `(provider, providerEventId)`. Reconciliation follows a state machine that rejects illegal
   transitions.
+  A merchant delivery is stored, answered 200 and then applied: its row
+  commits with a `webhook.process` retry job, the request tries once, an
+  unexpected error is left to the job's retries (about 16 hours, its own
+  schedule in `RETRY_SCHEDULES`, `jobs/job-queue.port.ts`), and a 4xx
+  refusal or the last try keeps the row FAILED for replay and raises
+  `merchant_webhook_failed` in Admin › Billing › Needs action, and tells
+  the business's team on the Payment failed row
+  (`payment.event_unapplied`, `notifications/webhook-alerts.ts`). Only a row
+  that could not be stored is a 5xx, because a provider switches off a
+  webhook that keeps failing (`webhooks/webhooks.service.ts`).
 - **Current** — **Stored provider payloads are for verification and audit,**
   never read on a serving path (`WebhookEvent.payload`).
 - **Current** — **A capture is compared before it pays anything** (PAY-06).
@@ -185,6 +195,13 @@ a note saying so.
   invoice or credit note; its refund webhook (Saroh's, or a dashboard
   refund matched by payment id) settles on that row before the order's
   refund path (`payments/mismatch-refund.ts`).
+- **Current** (22 Oct 2026) — **A provider order id Saroh chooses is unique
+  per intent.** Cashfree refuses an `order_id` it has seen, so each intent
+  sends `<Order or Invoice id>_<12 hex>` and keeps it as its
+  `providerIntentId`; refunds, look-ups and webhooks name the order by it.
+  An intent made before kept Cashfree's numeric `cf_order_id` and was sent
+  under its Order's or Invoice's id, which `cashfreeOrderId` falls back to
+  (`payments/providers/cashfree.provider.ts`).
 - **Current** — **The server derives amounts.** A payment intent's amount comes
   from the Order or, for an invoice pay link, the Invoice — never from the
   request. The public invoice intent route reads its body by hand, so an
@@ -231,7 +248,10 @@ a note saying so.
 - **Current** — **Money that arrives for something already settled is kept,
   not lost.** A webhook success on a paid or void invoice marks the intent
   SUCCEEDED and records a `CAPTURED_NEEDS_REFUND` attempt, which Home raises
-  until a refund is recorded.
+  until a refund is recorded. A capture on a paid order with nothing
+  left to take (two tabs on its pay page) marks its intent SUPERSEDED and is
+  owed back as a superseded edit charge is, never counted
+  (`webhooks.service.ts` `nothingLeftToTake`).
 - **Current** — **Consent gates the send.** A revoked consent makes a message
   `SUPPRESSED`: no job, no delivery.
 - **Current** (D17) — **One transactional path.** A message about a
@@ -643,9 +663,27 @@ Test mode, 2026-09-29, on a business's own connection (Northwind). Docs:
 - **Card and eMandate pre-debit notice (D6, U21).** Card: the issuing bank
   sends the notice (SMS or email) when the debit is asked for, and Razorpay
   debits ~36 hours later (an AFA link instead above ₹15,000); the order
-  needs no `notification`. eMandate: no notice is sent by anyone; the RBI
-  framework covers cards, PPIs and UPI only. Evidence and open questions:
+  needs no `notification`. eMandate: Razorpay and the bank send none (the
+  RBI framework covers cards, PPIs and UPI only), so **Saroh sends it**
+  (DEC-180, below); its order carries no `notification` either
+  (`PRE_DEBIT_METHODS` stays UPI only). Evidence:
   `docs/architecture/research/2026-10-pre-debit-notice.md`, DEC-174.
+- **eMandate: Saroh's notice, or no debit (DEC-180, #1175).** For an
+  eMandate (`sarohSendsNotice` in `subscriptions/autopay-timing.ts`) the
+  debit is planned at least `PRE_DEBIT_LEAD_HOURS` (26 h) after the
+  charge is prepared, as for UPI (`needsNotice`, `prepareCharge` holds
+  `debitAfter` to `debitAt` though the provider answers `NOT_NEEDED`).
+  Once prepared, the charge job queues `customer.notify`
+  `AUTOPAY_PRE_DEBIT` (`site-accounts/notices/pre-debit.ts`, keyed
+  `pre-debit:<intentId>`) for 26 h before the debit (`sarohNoticeAt`):
+  "₹X will be taken from your bank account on ‹day› for ‹plan›", through
+  the business's own email provider, no switch. Before the debit it reads
+  `preDebitNoticeState`: the email SENT, the debit goes no sooner than
+  `SAROH_NOTICE_MIN_HOURS` (24 h) after it (a late email moves the debit);
+  otherwise (no provider, no address, email turned off, not sent) the
+  charge is CANCELLED, the subscription's history gets
+  NOT_CHARGED_NO_NOTICE with `data.reason`, and the renewal invoice takes
+  U10's auto-send. Card and UPI are untouched.
 - **Unanswered charges.** A UPI debit can take 24–36 hours to be answered,
   more when the notice fails; some banks leave the payment `created`.
   Razorpay doesn't retry a failed debit on an order with `notification`;

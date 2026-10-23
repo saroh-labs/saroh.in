@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { storefrontNoticeTitle } from "@/components/organizations/storefront-team-notice";
+import { storefrontNoticeTitle } from "@/components/organizations/team/storefront-team-notice";
 
 import { shownRoleLabel, storefrontRolesLine } from "./storefront-team";
 

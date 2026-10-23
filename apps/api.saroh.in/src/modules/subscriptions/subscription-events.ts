@@ -84,6 +84,13 @@ export const SUBSCRIPTION_EVENT_KINDS = [
     /** Paid by autopay (D13). */
     "CHARGED",
     /**
+     * An eMandate renewal not taken by autopay because Saroh's pre-debit
+     * email to the customer didn't go (DEC-180): `data.reason`
+     * NO_EMAIL_PROVIDER, NO_EMAIL_ADDRESS, EMAIL_OFF or NOT_SENT. The
+     * invoice went to them to pay as it would without autopay.
+     */
+    "NOT_CHARGED_NO_NOTICE",
+    /**
      * An early renewal invoice (D13B, "Charge on the renewal date") dropped
      * before its period began, its autopay charge cancelled: `data.reason`
      * CANCELLED, PAUSED or PLAN_CHANGED, `data.by` VOIDED or CREDITED.

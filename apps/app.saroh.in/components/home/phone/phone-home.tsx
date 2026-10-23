@@ -6,8 +6,8 @@ import type { HomeModel } from "@/lib/home/service";
 import { nextBookingSentence } from "@/lib/home/tiles";
 import { showsGoing } from "@/lib/home/week";
 
-import type { HomeSetup } from "../home-setup";
-import { NeedsYou } from "../needs-you";
+import type { HomeSetup } from "@/components/home/dashboard/home-setup";
+import { NeedsYou } from "@/components/home/needs-you/needs-you";
 import { DaySheet, SinceYesterday } from "./day-sheet";
 import { PhoneFigures } from "./phone-figures";
 import { PhoneGoingLine } from "./phone-going-line";

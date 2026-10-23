@@ -9,7 +9,7 @@ import type { PhoneNext } from "@/lib/home/phone-home";
 import { daySheetTitle } from "@/lib/home/phone-home";
 import type { HomeToday } from "@/lib/home/service";
 
-import { Today, useTodayMarks } from "../today";
+import { Today, useTodayMarks } from "@/components/home/dashboard/today";
 import { HomeSheet } from "./home-sheet";
 import { PhoneNextLine } from "./phone-next-line";
 

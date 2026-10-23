@@ -403,7 +403,7 @@ export function sellsRows(read: SellsRead): SellsRow[] {
 
 /**
  * "Where do customers come from?" until sources are tracked (U16): "1,689
- * visits from 1,109 people, 23 enquiries and 159 online orders." Before the
+ * visits from 1,109 visitors, 23 enquiries and 159 online orders." Before the
  * first sale it adds that no order has come yet (`IBNoSalesD`).
  */
 export function fromAnswer(
@@ -414,7 +414,7 @@ export function fromAnswer(
     if (summary.siteViews <= 0) {
         return `No visits to your website in ${lastPeriod(period)}.`;
     }
-    const visits = `${count(summary.siteViews, "visit")} from ${count(summary.uniqueVisitors, "person", "people")}`;
+    const visits = `${count(summary.siteViews, "visit")} from ${count(summary.uniqueVisitors, "visitor")}`;
     if (noSalesYet) return `${visits}. No orders yet.`;
     const enquiries =
         summary.enquiries > 0
@@ -446,6 +446,9 @@ export const HOW_INSIGHTS_ARE_COUNTED: readonly string[] = [
     "The weekly bars are seven days at a time, back from today, so a period's bars add up to its money in.",
     "What sells counts what was paid for, and bookings that weren't cancelled.",
     "Your website's visits, enquiries and online orders are updated every hour.",
+    "Visitors are counted each day: a visitor who comes back on another day is counted again.",
+    "Where visits come from counts each visit once, by the site or app it came from, and by the links made here. Nothing about the visitor is kept.",
+    "A visit is counted as paid when it paid online there and then. A refund later isn't taken off where it came from.",
 ];
 
 /** A part of the Overview that couldn't be read. */

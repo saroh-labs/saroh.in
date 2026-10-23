@@ -434,6 +434,13 @@ export function toAvailabilityService(service: Service): AvailabilityService {
     };
 }
 
+/**
+ * The longest range one availability read may ask for. Every slot in it is
+ * worked out on each read, and the public route takes it from a stranger, so
+ * a century-long range would tie the API up. The pickers ask for 14 days.
+ */
+export const MAX_RANGE_DAYS = 62;
+
 export function parseRange(
     fromISO: string,
     toISO: string,
@@ -445,6 +452,11 @@ export function parseRange(
     }
     if (from.getTime() >= to.getTime()) {
         throw new BadRequestException("from must be before to");
+    }
+    if (to.getTime() - from.getTime() > MAX_RANGE_DAYS * 86_400_000) {
+        throw new BadRequestException(
+            `from/to may span at most ${MAX_RANGE_DAYS} days`,
+        );
     }
     return { from, to };
 }

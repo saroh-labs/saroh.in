@@ -6,7 +6,7 @@ jest.mock("@saroh/database", () => {
         form: { findUnique: jest.fn() },
         site: { findMany: jest.fn() },
         submission: { findUnique: jest.fn(), create: jest.fn() },
-        contact: { upsert: jest.fn() },
+        contact: { upsert: jest.fn(), findUnique: jest.fn() },
         pipeline: {
             findUnique: jest.fn(),
             findFirst: jest.fn(),

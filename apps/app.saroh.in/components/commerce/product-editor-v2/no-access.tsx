@@ -1,5 +1,5 @@
-import { AccessDenied } from "@/components/shared/access-denied";
-import { whoCanChange } from "@/components/shared/who-can-change";
+import { AccessDenied } from "@/components/shared/states/access-denied";
+import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { knownRoleName } from "@/lib/organizations/role-name";
 
 /**

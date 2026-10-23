@@ -14,6 +14,7 @@ import {
     verifySignInCode,
 } from "@/app/[domain]/account/actions";
 
+import { VisitStep } from "@/components/visit-step";
 import { accountAreaOn } from "@/lib/account-area";
 import { getSiteForHost } from "@/lib/publication";
 import { getOrderConfirmation } from "@/lib/shop-confirmation";
@@ -87,9 +88,21 @@ export default async function ShopOrderPage({
             ) : null,
     };
 
+    // Paid online (DEC-181): the visit that paid says so, once, with its
+    // group and label only. This page is private, so it sends no page
+    // view; a visit begun on a public page still sends this step.
+    const paid =
+        lookup.ok && lookup.order.paidOnline ? <VisitStep step="paid" /> : null;
+
     return look ? (
-        <LookOrderPlaced look={look} {...props} />
+        <>
+            {paid}
+            <LookOrderPlaced look={look} {...props} />
+        </>
     ) : (
-        <OrderConfirmation {...props} />
+        <>
+            {paid}
+            <OrderConfirmation {...props} />
+        </>
     );
 }

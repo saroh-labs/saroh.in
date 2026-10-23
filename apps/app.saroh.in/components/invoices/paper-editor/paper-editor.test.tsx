@@ -15,12 +15,12 @@ import {
     ratePicker,
     rateShown,
     ratesOffered,
-} from "@/components/shared/gst-rate-picker.testing";
+} from "@/components/shared/fields/gst-rate-picker.testing";
 
 import type { InvoiceFormBusiness } from "@/lib/invoices/new-invoice";
 import type { Invoice } from "@/lib/invoices/service";
 
-import { InvoiceForm } from "../invoice-form";
+import { InvoiceForm } from "@/components/invoices/new-invoice/invoice-form";
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
@@ -40,16 +40,19 @@ const step = vi.hoisted(() => ({
     options: [] as unknown[],
     ensure: vi.fn(() => Promise.resolve(true)),
 }));
-vi.mock("@/components/organizations/use-business-details-step", () => ({
-    useBusinessDetailsStep: (options: unknown) => {
-        step.options.push(options);
-        return {
-            run: (fn: () => unknown) => fn(),
-            ensure: step.ensure,
-            step: null,
-        };
-    },
-}));
+vi.mock(
+    "@/components/organizations/business-details/use-business-details-step",
+    () => ({
+        useBusinessDetailsStep: (options: unknown) => {
+            step.options.push(options);
+            return {
+                run: (fn: () => unknown) => fn(),
+                ensure: step.ensure,
+                step: null,
+            };
+        },
+    }),
+);
 const settings = vi.hoisted(() => ({
     saveOrganizationSettings: vi.fn(),
     saveOrganizationSettingsInPlace: vi.fn(),
@@ -57,7 +60,9 @@ const settings = vi.hoisted(() => ({
     saveBusinessLogoInPlace: vi.fn(),
 }));
 vi.mock("@/lib/organizations/settings-actions", () => settings);
-vi.mock("@/components/shared/logo-upload", () => ({ LogoUpload: () => null }));
+vi.mock("@/components/shared/fields/logo-upload", () => ({
+    LogoUpload: () => null,
+}));
 const toast = vi.hoisted(() => ({
     showSuccess: vi.fn(),
     showError: vi.fn(),
@@ -653,7 +658,9 @@ describe("the style rail", () => {
         step.ensure.mockClear();
         // No payment link to make: Issue it, and the page moves on.
         render({ providerConnected: false });
-        expect(step.options.at(-1)).toMatchObject({ inPlace: true });
+        expect(step.options.at(-1)).toMatchObject({
+            save: settings.saveOrganizationSettingsInPlace,
+        });
         act(() => part("Change line 2: Butter croissant (trade)").click());
         setValue(byLabel("Qty"), "24");
         act(() => part("Change line 2: Butter croissant (trade)").click());

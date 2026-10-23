@@ -34,7 +34,7 @@ import {
 const HERS = { id: "seed_booking_calendar-only", booker: "Meera Nair" };
 
 /**
- * `NAV_GROUPS` (`components/shared/nav-items.tsx`) for the role's five
+ * `NAV_GROUPS` (`components/shared/navigation/nav-items.tsx`) for the role's five
  * permissions: Appointments is the only module in reach, and its Courses
  * page asks a read the role doesn't hold. Settings is offered for
  * `module:read`.

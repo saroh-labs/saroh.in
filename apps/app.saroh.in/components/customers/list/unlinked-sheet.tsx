@@ -1,6 +1,6 @@
 "use client";
 
-import { FormSheet } from "@/components/shared/form-sheet";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import {
@@ -15,7 +15,7 @@ import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { runAction } from "@/lib/api/run-action";
 import { personHref } from "@/lib/contacts/person-href";
 import { linkCustomerAction } from "@/lib/customer-workspace/actions";

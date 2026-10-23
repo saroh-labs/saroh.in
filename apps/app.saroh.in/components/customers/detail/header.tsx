@@ -12,7 +12,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { Globe, MoreHorizontal } from "lucide-react";
 import Link from "next/link";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import type { MoreItem } from "@/lib/customer-workspace/more-menu";
 import type { Tab, TabKey, Tag } from "@/lib/customer-workspace/view";
 import { phoneLabel } from "@/lib/organizations/business-phone";

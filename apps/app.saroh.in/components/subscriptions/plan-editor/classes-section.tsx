@@ -6,7 +6,7 @@ import { useId } from "react";
 
 import type { EditorFields } from "@/components/editor-shell/editor-shell";
 import { Section } from "@/components/services/service-editor/fields";
-import { Chip } from "@/components/shared/chip";
+import { Chip } from "@/components/shared/lists/chip";
 import type { PlanForm } from "@/lib/subscriptions/plan-editor";
 import { CLASS_CHOICES } from "@/lib/subscriptions/plan-editor";
 

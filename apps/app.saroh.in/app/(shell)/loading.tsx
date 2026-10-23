@@ -1,4 +1,4 @@
-import { ShellLoading } from "@/components/shared/shell-loading";
+import { ShellLoading } from "@/components/shared/shell/shell-loading";
 
 export default function Loading() {
     return <ShellLoading width="full" />;

@@ -6,16 +6,16 @@ import type { FormEvent } from "react";
 import { useState } from "react";
 
 import {
+    GstRatePicker,
+    pickerWiring,
+} from "@/components/shared/fields/gst-rate-picker";
+import {
     FormSheet,
     FormSheetBody,
     FormSheetFoot,
     useFormSheetDirty,
-} from "@/components/shared/form-sheet";
-import {
-    GstRatePicker,
-    pickerWiring,
-} from "@/components/shared/gst-rate-picker";
-import { Refusal } from "@/components/shared/refusal";
+} from "@/components/shared/forms/form-sheet";
+import { Refusal } from "@/components/shared/states/refusal";
 import { WHO_CAN_CHANGE } from "@/lib/access/who-can-change";
 import { runAction } from "@/lib/api/run-action";
 import { formatMoney } from "@/lib/format/money";

@@ -50,7 +50,7 @@ There is no client-side server-state library and no global client store.
 
 ## The screen updates by itself: live refresh — **Current** (10 Oct 2026)
 
-One hook, `useLiveRefresh` (`components/shared/use-live-refresh.ts`),
+One hook, `useLiveRefresh` (`components/shared/live-refresh/use-live-refresh.ts`),
 mounted once in the app shell by `LiveRefresh`. It is `router.refresh()`,
 nothing more: the server reads the page again and React keeps what is on
 screen. No page keeps a timer of its own, and there is still no client

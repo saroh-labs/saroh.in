@@ -194,7 +194,7 @@ export default function HoursSection({
                         <button
                             type="button"
                             onClick={retry}
-                            className="text-site-accent focus-visible:ring-site-accent cursor-pointer rounded-[var(--site-radius)] text-sm font-semibold underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2"
+                            className="text-site-accent-text focus-visible:ring-site-accent cursor-pointer rounded-[var(--site-radius)] text-sm font-semibold underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2"
                         >
                             Try again
                         </button>

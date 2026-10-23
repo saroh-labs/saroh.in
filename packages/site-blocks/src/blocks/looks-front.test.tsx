@@ -313,18 +313,27 @@ describe.each(LOOKS)("%s: the rest of the front door", (look) => {
             const name = row.querySelector("[data-service-row-link]");
             expect(name).not.toBeNull();
             expect(name?.className).toContain("after:inset-0");
-            const book = within(row as HTMLElement).getByRole("link", {
+            const book = within(row as HTMLElement).queryByRole("link", {
                 name: /^Book: /,
             });
-            expect(book.className).toContain("min-h-11");
-            expect(book.className).toContain("z-10");
-            expect(name?.getAttribute("href")).toBe(book.getAttribute("href"));
+            if (look === "quiet") {
+                // VD01: the whole row is the way in, with no Book of its own.
+                expect(book).toBeNull();
+                return;
+            }
+            expect(book?.className).toContain("min-h-11");
+            expect(book?.className).toContain("z-10");
+            expect(name?.getAttribute("href")).toBe(book?.getAttribute("href"));
         });
         expect(
             section.querySelectorAll("a a, a button, button a, a [role=link]"),
         ).toHaveLength(0);
         expect(
-            within(section).getByRole("link", { name: "Book: Hatha yoga" }),
+            look === "quiet"
+                ? within(section).getByRole("link", { name: "Hatha yoga" })
+                : within(section).getByRole("link", {
+                      name: "Book: Hatha yoga",
+                  }),
         ).toHaveAttribute("href", "/book?service=svc_hatha");
         // One filled button a view: no Book on a row is filled.
         expect(section.querySelector(".bg-site-accent")).toBeNull();
@@ -354,6 +363,31 @@ describe.each(LOOKS)("%s: the rest of the front door", (look) => {
         ).toEqual(["Meera Iyer", "Kabir Menon", "Ananya Rao"]);
         expect(section.querySelector("img")).toBeNull();
         expect(section).not.toHaveTextContent("No photo yet");
+    });
+
+    it("people: names and roles alone take the Home grid; with their lines, the About rows", () => {
+        const draw = (bio?: string) =>
+            render(
+                <PageSections
+                    sections={[
+                        {
+                            type: "person",
+                            content: { ...(team.content as object), bio },
+                        },
+                    ]}
+                    look={look}
+                />,
+            ).container.querySelector(`[data-site-look-team="${look}"] ul`);
+        const grid = must(draw());
+        const rows = must(draw("Taught Hatha for twelve years."));
+        if (look === "live") {
+            // Live has one layout: cards either way.
+            expect(rows.className).toBe(grid.className);
+        } else {
+            expect(rows.className).not.toBe(grid.className);
+            expect(rows.className).not.toContain("min-[700px]:grid-cols-3");
+            expect(grid.className).toContain("min-[700px]:grid-cols-3");
+        }
     });
 
     it("people: a person's own photo is used when the owner set one", () => {
@@ -542,5 +576,53 @@ describe("a hero's desk grid", () => {
         expect(
             gridAreas([["h", "p"], false, null, ["c", "c"]]).gridTemplateAreas,
         ).toBe("'h p' 'c c'");
+    });
+});
+
+describe("a section's eyebrow and the hero's second link (DEC-172, 22 Oct)", () => {
+    it.each(LOOKS)("%s draws them where the section sets them", (look) => {
+        const html = renderToStaticMarkup(
+            <PageSections
+                sections={[
+                    hero({
+                        eyebrow: "HSR Layout, Bengaluru",
+                        secondaryCta: {
+                            label: "See the timetable",
+                            href: "/#timetable",
+                        },
+                    }),
+                    {
+                        ...services,
+                        content: {
+                            ...(services.content as object),
+                            eyebrow: "Classes and services",
+                        },
+                    },
+                ]}
+                look={look}
+                bookHref="/book"
+                fixtures={{ services: SERVICES }}
+            />,
+        );
+        expect(html).toContain("HSR Layout, Bengaluru");
+        expect(html).toContain("Classes and services");
+        expect(html).toContain('href="/#timetable"');
+        expect(html).toContain("See the timetable");
+    });
+
+    it("Classic draws neither", () => {
+        const html = renderToStaticMarkup(
+            <PageSections
+                sections={[
+                    hero({
+                        eyebrow: "HSR Layout, Bengaluru",
+                        secondaryCta: { label: "See it", href: "/#t" },
+                    }),
+                ]}
+                bookHref="/book"
+            />,
+        );
+        expect(html).not.toContain("data-site-eyebrow");
+        expect(html).not.toContain('href="/#t"');
     });
 });

@@ -13,11 +13,11 @@ import type { HomeNeedGroup } from "@/lib/home/service";
 
 import { groupOpenAll } from "@/lib/home/group-body";
 
+import { NeedGroupBody } from "@/components/home/needs-you/need-group-body";
+import { RemindAll } from "@/components/home/needs-you/remind-all";
 import type { RemindAllState } from "@/lib/home/remind-all";
-import { NeedGroupBody } from "../need-group-body";
-import { RemindAll } from "../remind-all";
 
-import type { InlineActions } from "../use-inline-actions";
+import type { InlineActions } from "@/components/home/needs-you/use-inline-actions";
 import { HomeSheet } from "./home-sheet";
 
 /**

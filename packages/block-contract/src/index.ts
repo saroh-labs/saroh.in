@@ -5,6 +5,7 @@ export * from "./invoice-paper";
 export * from "./looks";
 export * from "./palette";
 export * from "./phone";
+export * from "./private-paths";
 export * from "./rendered";
 export * from "./safe-colours";
 export * from "./section-contract";

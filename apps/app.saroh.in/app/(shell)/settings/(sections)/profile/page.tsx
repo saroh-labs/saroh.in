@@ -1,8 +1,8 @@
 import {
     SettingsPanel,
     SettingsPanelHeader,
-} from "@/components/settings/settings-panel";
-import { YourProfile } from "@/components/settings/your-profile";
+} from "@/components/settings/page/settings-panel";
+import { YourProfile } from "@/components/settings/profile/your-profile";
 import { env } from "@/env";
 import { accountSettingsUrl } from "@/lib/accounts";
 import { getAlertPreferences } from "@/lib/notifications/service";

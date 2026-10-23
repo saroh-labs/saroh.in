@@ -1,6 +1,6 @@
-import { InvoicesScreen } from "@/components/invoices/invoices-screen";
-import { PaymentsLocked } from "@/components/invoices/payments-locked";
-import { PageContainer } from "@/components/shared/page-container";
+import { InvoicesScreen } from "@/components/invoices/list/invoices-screen";
+import { PaymentsLocked } from "@/components/invoices/locked/payments-locked";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { readMissingRates } from "@/lib/gst-rates/service";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
 import { listQueryFrom, readsOnServer } from "@/lib/invoices/list-view";

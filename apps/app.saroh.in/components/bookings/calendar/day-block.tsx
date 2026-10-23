@@ -121,7 +121,7 @@ export function DayBlock({
             </span>
             <span
                 className={cn(
-                    "block min-w-0 truncate text-[11px] max-[759px]:text-[11.5px] max-[759px]:opacity-90",
+                    "block min-w-0 truncate text-[11px] max-[759px]:text-[11.5px]",
                     oneRow && "min-[760px]:flex-1",
                 )}
             >

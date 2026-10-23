@@ -16,11 +16,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { useTakingBookings } from "@/components/services/use-taking-bookings";
-import type { ConfirmResult } from "@/components/shared/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { PriceHistoryList } from "@/components/shared/price-history";
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { useTakingBookings } from "@/components/services/list/use-taking-bookings";
+import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
+import { PriceHistoryList } from "@/components/shared/price-history/price-history";
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
 import { count } from "@/lib/format/plural";

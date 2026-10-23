@@ -1,6 +1,6 @@
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
-import { TeamScreen } from "@/components/organizations/team-screen";
-import { SettingsPanel } from "@/components/settings/settings-panel";
+import { TeamScreen } from "@/components/organizations/team/team-screen";
+import { SettingsPanel } from "@/components/settings/page/settings-panel";
 import { rowNotice } from "@/lib/billing/access";
 import { pausedTeam, teamOverLimit } from "@/lib/billing/paused";
 import { modulesOrUnknown } from "@/lib/modules/guard";

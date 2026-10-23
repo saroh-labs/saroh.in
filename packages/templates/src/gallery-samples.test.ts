@@ -2,14 +2,21 @@ import { describe, expect, it } from "vitest";
 
 import { GALLERY_SAMPLES } from "./gallery-samples";
 import { instantiateTemplate } from "./instantiate";
+import { SHOWCASE_ONLY_TEMPLATES } from "./look-showcase";
 import type { TemplateContext, TemplateManifest } from "./manifest";
 import { listTemplates } from "./registry";
 
 /**
- * The gallery's sample words (KTD-6) stay in the gallery. Every template the
- * gallery shows has its design's words for the render, and a merchant's site
- * made from it — whatever the business has switched on — carries none of
- * them: it keeps the placeholders the owner replaces.
+ * The gallery's sample words (KTD-6) never reach a site through its
+ * creation. Every template the gallery shows has its design's words for
+ * the render, and a merchant's site made from it — whatever the business
+ * has switched on — carries none of them: it keeps the placeholders the
+ * owner replaces.
+ *
+ * Since DEC-182 there is one other way in, and only by the owner's choice:
+ * "Use this look with its starter content" copies a showcase template's
+ * pages, sample words and all, into the draft. That path is tested on its
+ * own (`look-showcase.test.ts`), with the pre-publish check's matcher.
  */
 
 /** A template the gallery shows: the render route's own rule. */
@@ -71,13 +78,16 @@ describe("gallery samples (KTD-6)", () => {
         }
     });
 
-    it("names only gallery templates", () => {
-        const ids = gallery.map((t) => t.id).sort();
+    it("names only gallery templates, and the looks' showcase", () => {
+        const ids = [
+            ...gallery.map((t) => t.id),
+            ...Object.keys(SHOWCASE_ONLY_TEMPLATES),
+        ].sort();
         expect(Object.keys(GALLERY_SAMPLES).sort()).toEqual(ids);
     });
 
     it.each(gallery.map((t) => [t.id, t] as const))(
-        "lays none of %s's sample words on a merchant's site",
+        "lays none of %s's sample words on a site made from it",
         (_id, t) => {
             const words = sampleWords(GALLERY_SAMPLES[t.id]);
             expect(words.length).toBeGreaterThan(0);

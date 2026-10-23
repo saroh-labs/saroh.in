@@ -4,7 +4,7 @@ import { formatClock } from "@/lib/format/datetime";
 import { cn } from "@saroh/ui/lib/utils";
 import { Plus } from "lucide-react";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import type { Block, Column, Span } from "@/lib/services/diary";
 import {

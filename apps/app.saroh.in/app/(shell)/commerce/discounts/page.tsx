@@ -1,5 +1,5 @@
-import { PageContainer } from "@/components/shared/page-container";
-import { DiscountsScreen } from "@/components/stores/discounts-screen";
+import { PageContainer } from "@/components/shared/page/page-container";
+import { DiscountsScreen } from "@/components/stores/discounts/discounts-screen";
 import { listDiscounts } from "@/lib/discounts/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";

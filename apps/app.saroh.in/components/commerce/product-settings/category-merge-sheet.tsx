@@ -4,8 +4,8 @@ import { count } from "@/lib/format/plural";
 import type { ReactElement } from "react";
 import { useState } from "react";
 
-import { ChipGroup } from "@/components/shared/choice-group";
-import { FormSheet } from "@/components/shared/form-sheet";
+import { ChipGroup } from "@/components/shared/fields/choice-group";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import type { CatalogueView } from "@/lib/products/settings";
 import { Notice } from "@saroh/ui/notice";
 

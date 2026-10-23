@@ -5,6 +5,7 @@ import type {
     CommsSendInput,
     CommsSendResult,
 } from "./provider.port";
+import { relayBase } from "./relay-base";
 
 /**
  * WhatsApp adapter (S6-001).
@@ -45,10 +46,7 @@ export class WhatsappCommsProvider implements CommsProvider {
             );
         }
         const version = apiVersion ?? "v19.0";
-        const origin = (baseUrl ?? "https://graph.facebook.com").replace(
-            /\/$/,
-            "",
-        );
+        const origin = await relayBase(baseUrl, "https://graph.facebook.com");
 
         let res: Response;
         try {

@@ -43,7 +43,7 @@ vi.mock("@saroh/ui/dialog", async () =>
 );
 // The existing removal is its own component, with its own tests: here it
 // is only whether it opens, for whom, and what happens once it ran.
-vi.mock("@/components/customers/detail/remove-details-dialog", () => ({
+vi.mock("@/components/customers/more-actions/remove-details-dialog", () => ({
     RemoveDetailsDialog: ({
         name,
         onRemoved,

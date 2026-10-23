@@ -18,7 +18,7 @@ import { adminFetch, getJson } from "./control-plane";
 import type { BillingHistoryPage, HistoryShow } from "./subscription-sheet";
 
 /**
- * Admin › Billing's reads (DEC-163). Server-only: each forwards the
+ * Admin › Billing's reads (DEC-179). Server-only: each forwards the
  * operator's session to `/admin/billing/*`, where the API decides, with
  * `saroh-billing:read`, whether they may see it. `null` is the API's
  * refusal (401/403); a throw is an outage.

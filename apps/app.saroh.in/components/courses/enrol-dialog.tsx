@@ -8,9 +8,9 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
-import type { ContactOption } from "@/components/shared/contact-picker";
-import { ContactPicker } from "@/components/shared/contact-picker";
-import { FormSheet } from "@/components/shared/form-sheet";
+import type { ContactOption } from "@/components/shared/fields/contact-picker";
+import { ContactPicker } from "@/components/shared/fields/contact-picker";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import { enrol } from "@/lib/courses/actions";
 import { booksLine, seatsLeftLine } from "@/lib/courses/seats";

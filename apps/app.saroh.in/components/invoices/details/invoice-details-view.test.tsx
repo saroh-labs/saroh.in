@@ -40,13 +40,16 @@ vi.mock("@/lib/invoices/actions", () => ({
     shareInvoice: vi.fn(),
 }));
 vi.mock("@/lib/gst-rates/actions", () => ({ saveGstRates: vi.fn() }));
-vi.mock("@/components/organizations/use-business-details-step", () => ({
-    useBusinessDetailsStep: () => ({
-        run: <R,>(action: () => Promise<R>) => action(),
-        step: null,
+vi.mock(
+    "@/components/organizations/business-details/use-business-details-step",
+    () => ({
+        useBusinessDetailsStep: () => ({
+            run: <R,>(action: () => Promise<R>) => action(),
+            step: null,
+        }),
     }),
-}));
-vi.mock("@/components/qr/qr-button", () => ({ QrButton: () => null }));
+);
+vi.mock("@/components/qr/link-qr/qr-button", () => ({ QrButton: () => null }));
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh, push: vi.fn(), replace: vi.fn() }),

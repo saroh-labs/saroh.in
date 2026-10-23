@@ -5,10 +5,10 @@ import { showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useState } from "react";
 
-import { RemoveDetailsDialog } from "@/components/customers/detail/remove-details-dialog";
-import { FormSheet } from "@/components/shared/form-sheet";
-import { StatusBadge } from "@/components/shared/status-badge";
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { RemoveDetailsDialog } from "@/components/customers/more-actions/remove-details-dialog";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { personHref } from "@/lib/contacts/person-href";
 import type { DataRequestRow } from "@/lib/customer-workspace/data-requests-view";
 import {

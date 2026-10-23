@@ -33,6 +33,15 @@ export interface JobQueue {
     claimDue(workerId: string, limit: number): Promise<Job[]>;
 
     /**
+     * Restart a claimed job's lease (`lockedAt` = now), fenced on the lease
+     * like {@link complete}. The worker calls it just before running each job
+     * of a batch: one claim covers the batch, so a job waiting behind a long
+     * one can pass the visibility timeout and be reclaimed. `false` (nothing
+     * written) means another worker has it, and this one must not run it.
+     */
+    renew(id: string, workerId: string): Promise<boolean>;
+
+    /**
      * Mark a job DONE — but only while `workerId` still holds its lease.
      *
      * Returns `false`, writing nothing, when it does not. A handler that runs
@@ -121,6 +130,31 @@ export function nextBackoff(attempts: number): number {
     return Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * 2 ** n);
 }
 
+const MINUTE_MS = 60_000;
+
+/**
+ * Job types that retry on their own schedule instead of {@link nextBackoff}'s
+ * five-minute cap: the wait before retry N is entry N (the last repeats).
+ * A merchant's webhook (`webhook.process`) is the provider's only word on a
+ * payment, so it is retried for about 16 hours, as Razorpay retries its own
+ * deliveries for a day: an outage of hours still lands it.
+ */
+export const RETRY_SCHEDULES: Readonly<
+    Partial<Record<string, readonly number[]>>
+> = {
+    "webhook.process": [1, 5, 15, 30, 60, 120, 240, 480].map(
+        (m) => m * MINUTE_MS,
+    ),
+};
+
+/** The wait before a failed job of `type` runs again (`attempts` as in {@link nextBackoff}). */
+export function retryDelay(type: string, attempts: number): number {
+    const schedule = RETRY_SCHEDULES[type];
+    if (!schedule?.length) return nextBackoff(attempts);
+    const i = Math.min(Math.max(1, Math.floor(attempts)), schedule.length) - 1;
+    return schedule[i] ?? nextBackoff(attempts);
+}
+
 /**
  * In-memory {@link JobQueue} for unit tests and local drive-by use. No DB, no
  * network, no timers. `claimDue` mirrors the real visibility semantics (a
@@ -170,6 +204,13 @@ export class FakeJobQueue implements JobQueue {
         return Promise.resolve(claimed);
     }
 
+    renew(id: string, workerId: string): Promise<boolean> {
+        const job = this.held(id, workerId);
+        if (!job) return Promise.resolve(false);
+        job.lockedAt = new Date();
+        return Promise.resolve(true);
+    }
+
     complete(id: string, workerId: string): Promise<boolean> {
         const job = this.held(id, workerId);
         if (!job) return Promise.resolve(false);
@@ -193,7 +234,7 @@ export class FakeJobQueue implements JobQueue {
             job.processedAt = new Date();
         } else {
             job.status = "PENDING";
-            job.runAt = new Date(Date.now() + nextBackoff(attempts));
+            job.runAt = new Date(Date.now() + retryDelay(job.type, attempts));
         }
         return Promise.resolve(true);
     }

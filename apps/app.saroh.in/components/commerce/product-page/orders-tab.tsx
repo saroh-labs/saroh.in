@@ -3,7 +3,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { ShoppingBag } from "lucide-react";
 
 import { OrderCardFrame } from "@/components/commerce/orders/order-row";
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { customerHref } from "@/lib/customers/links";
 import { orderHref } from "@/lib/orders/links";
 import { productHref } from "@/lib/products/links";
@@ -11,9 +11,9 @@ import type { ProductOverview } from "@/lib/products/overview";
 import type { OverviewOrder } from "@/lib/products/overview-rules";
 import { ORDER_STATUS_LABEL } from "@/lib/products/overview-rules";
 
-import { LinkFilter } from "@/components/shared/link-filter";
-import { listTable } from "@/components/shared/list-toolbar";
+import { listTable } from "@/components/shared/lists/list-toolbar";
 import { TextLink } from "@saroh/ui/text-link";
+import { LinkFilter } from "./link-filter";
 import {
     PanelFailed,
     PanelForbidden,

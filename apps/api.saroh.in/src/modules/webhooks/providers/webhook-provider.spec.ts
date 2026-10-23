@@ -246,6 +246,8 @@ describe("CashfreeWebhookProvider", () => {
         });
         expect(event.outcome).toBe("SUCCEEDED");
         expect(event.orderRef).toBe("order_cf_1");
+        // The order id Saroh sent is the intent's own (one per intent).
+        expect(event.providerIntentId).toBe("order_cf_1");
         expect(event.providerPaymentRef).toBe("55");
         expect(event.providerEventId).toBe("PAYMENT_SUCCESS_WEBHOOK:55");
     });

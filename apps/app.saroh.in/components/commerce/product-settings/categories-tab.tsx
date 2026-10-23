@@ -7,7 +7,7 @@ import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { NameDialog } from "@/components/shared/name-dialog";
+import { NameDialog } from "@/components/shared/forms/name-dialog";
 import type { CatalogueView, CategoryRemoval } from "@/lib/products/settings";
 import {
     addCategory,
@@ -17,7 +17,7 @@ import {
     restoreCategory,
 } from "@/lib/products/settings-actions";
 
-import { listTable } from "@/components/shared/list-toolbar";
+import { listTable } from "@/components/shared/lists/list-toolbar";
 import { cn } from "@saroh/ui/lib/utils";
 import { TextLink } from "@saroh/ui/text-link";
 import { CategoryMergeSheet } from "./category-merge-sheet";

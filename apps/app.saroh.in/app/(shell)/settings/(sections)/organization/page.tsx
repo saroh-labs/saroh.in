@@ -1,18 +1,18 @@
 import { FailedState } from "@saroh/ui/data-state";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
-import { OrganizationSettingsForm } from "@/components/organizations/organization-settings-form";
-import { WebAddressSection } from "@/components/organizations/web-address-section";
-import {
-    ReadyChecklist,
-    readyHasCard,
-} from "@/components/settings/ready-checklist";
+import { OrganizationSettingsForm } from "@/components/organizations/business-settings/organization-settings-form";
+import { WebAddressSection } from "@/components/organizations/web-address/web-address-section";
 import {
     SettingsPanel,
     SettingsPanelHeader,
-} from "@/components/settings/settings-panel";
-import { ShowSetupOnHome } from "@/components/settings/show-setup-on-home";
-import { SettingsColumns } from "@/components/shared/settings-columns";
+} from "@/components/settings/page/settings-panel";
+import {
+    ReadyChecklist,
+    readyHasCard,
+} from "@/components/settings/ready/ready-checklist";
+import { ShowSetupOnHome } from "@/components/settings/ready/show-setup-on-home";
+import { SettingsColumns } from "@/components/shared/page/settings-columns";
 import { mayChangePlan } from "@/lib/billing/plan-access";
 import { kindWords } from "@/lib/organizations/kind";
 import {

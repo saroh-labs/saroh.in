@@ -1,6 +1,6 @@
 "use client";
 
-import { FailedRead } from "@/components/shared/failed-read";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { AbsentOr } from "@saroh/ui/absent-value";
 import {
     EmptyState,
@@ -10,7 +10,7 @@ import {
 import { isAbsentText } from "@saroh/ui/lib/absent";
 import Link from "next/link";
 
-import { whoCanChange } from "@/components/shared/who-can-change";
+import { whoCanChange } from "@/components/shared/states/who-can-change";
 import type {
     MonthRow,
     PriceHistory,

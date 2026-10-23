@@ -192,6 +192,39 @@ describe("block rendering", () => {
             expect(sided).toBe(plain);
             expect(plain).not.toContain("<img");
         });
+
+        it("under a look, the photo above is the boards' band (VD01, VA01); Classic keeps its column", () => {
+            const above = { ...photo, imageSide: "above" as const };
+            const classic = render(<RichTextSection content={above} />);
+            expect(
+                classic.container.querySelector("[data-site-look-band]"),
+            ).toBeNull();
+            classic.unmount();
+            // Quiet: the content width, 16:9 on a desk.
+            const quiet = render(
+                <RichTextSection content={above} look="quiet" />,
+            );
+            const band = quiet.container.querySelector(
+                '[data-site-look-band="quiet"]',
+            );
+            const quietImg = band?.querySelector("img");
+            expect(quietImg?.className).toContain("min-[700px]:aspect-video");
+            expect(quietImg?.parentElement?.className).toContain(
+                "max-w-site-content",
+            );
+            quiet.unmount();
+            // Folio: edge to edge, 21:9 on a desk.
+            const folio = render(
+                <RichTextSection content={above} look="folio" />,
+            );
+            const folioImg = folio.container.querySelector(
+                '[data-site-look-band="folio"] img',
+            );
+            expect(folioImg?.className).toContain("min-[700px]:aspect-[21/9]");
+            expect(folioImg?.parentElement?.className ?? "").not.toContain(
+                "max-w-site-content",
+            );
+        });
     });
 
     it("cta", () => {

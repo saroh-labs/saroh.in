@@ -30,7 +30,7 @@ import { people } from "../fixtures/sessions";
  */
 
 /**
- * Every row of `NAV_GROUPS` (`components/shared/nav-items.tsx`) whose module
+ * Every row of `NAV_GROUPS` (`components/shared/navigation/nav-items.tsx`) whose module
  * Northwind runs. Sell › Stock is drawn only while the business tracks stock,
  * which a product spec may have turned off, so it is allowed and not asked.
  * Class packs is not in it: the module is not offered on any plan (DEC-099),

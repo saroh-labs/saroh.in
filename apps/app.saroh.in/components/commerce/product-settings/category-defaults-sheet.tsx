@@ -6,9 +6,9 @@ import { Label } from "@saroh/ui/label";
 import type { ReactElement } from "react";
 import { useId, useState } from "react";
 
-import { CheckRow } from "@/components/shared/check-row";
-import { ChipGroup } from "@/components/shared/choice-group";
-import { FormSheet } from "@/components/shared/form-sheet";
+import { CheckRow } from "@/components/shared/fields/check-row";
+import { ChipGroup } from "@/components/shared/fields/choice-group";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import type { DefaultsSuggestion } from "@/lib/products/settings";
 import type { DefaultsRow, ReturnsChoice } from "@/lib/products/settings-rules";
 import {

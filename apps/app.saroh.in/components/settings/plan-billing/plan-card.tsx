@@ -3,7 +3,7 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { CalendarClock, Check } from "lucide-react";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import type { PickerRow } from "@/lib/saroh-billing/plan-view";
 
 import { card } from "./styles";

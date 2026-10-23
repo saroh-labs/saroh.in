@@ -10,7 +10,7 @@ jest.mock("@saroh/database", () => {
         // No live site by default, so these tests validate against Form.fields.
         site: { findMany: jest.fn().mockResolvedValue([]) },
         submission: { findUnique: jest.fn(), create: jest.fn() },
-        contact: { upsert: jest.fn() },
+        contact: { upsert: jest.fn(), findUnique: jest.fn() },
         pipeline: {
             findUnique: jest.fn(),
             findFirst: jest.fn(),
@@ -204,6 +204,31 @@ describe("EnquiryService.submit — one submission produces one correct lead", (
         expect(activityCreate.mock.calls[0][0].data.organizationId).toBe(
             "org_FORM",
         );
+    });
+
+    it("never changes a name or phone the business already has for that email", async () => {
+        const service = new EnquiryService();
+        wireHappyPath();
+        (prisma.contact.findUnique as jest.Mock).mockResolvedValueOnce({
+            firstName: "Jane",
+            lastName: null,
+            phone: "98450 00000",
+            company: null,
+        });
+
+        // A stranger types Jane's email with their own number.
+        await service.submit(
+            "form_1",
+            { ...validData, phone: "555" },
+            undefined,
+            "iphash",
+        );
+
+        const { update } = contactUpsert.mock.calls[0][0];
+        expect(update).not.toHaveProperty("phone");
+        expect(update).not.toHaveProperty("firstName");
+        // What the business didn't know is filled in.
+        expect(update.lastName).toBe("Doe");
     });
 
     it("persists the immutable Submission with the raw data, ipHash and idempotencyKey", async () => {

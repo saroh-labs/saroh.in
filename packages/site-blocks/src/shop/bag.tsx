@@ -16,6 +16,7 @@ import { readQrSource } from "../qr-source";
 import { useTestRelease } from "../test-release/context";
 import { TestReleaseStopSheet } from "../test-release/test-release-stop";
 import { itemsText } from "../test-release/words";
+import { markVisitStep } from "../visit-source";
 import type {
     CheckoutStarted,
     ShopCheckoutApi,
@@ -163,6 +164,12 @@ export function ShopBag({
     useEffect(() => {
         if (open) bagShown();
     }, [open]);
+    // The classic bag is its own checkout: opening it starts one (U15),
+    // once per visit. A look's bag leads to `/checkout`, which says so.
+    const atCheckout = step.kind === "bag" && !look;
+    useEffect(() => {
+        if (atCheckout) markVisitStep("started");
+    }, [atCheckout]);
 
     const close = useCallback(() => {
         setStep({ kind: "closed" });

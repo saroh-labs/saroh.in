@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { HOLD_UNDO_MS } from "@/lib/hold-undo";
 import type { CappedList } from "@/lib/lists/capped";
 import { loadPlanEvents, setPlanArchived } from "@/lib/subscriptions/actions";
@@ -34,7 +34,7 @@ import type {
 } from "@/lib/subscriptions/service";
 import { payRows } from "@/lib/subscriptions/view";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { runAction } from "@/lib/api/run-action";
 import { TabStrip } from "@saroh/ui/tabs";
 import { PlanHistory } from "./history";

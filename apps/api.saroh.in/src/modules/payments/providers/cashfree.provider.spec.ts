@@ -197,3 +197,56 @@ describe("CashfreeProvider.createOrderIntent", () => {
         });
     });
 });
+
+describe("CashfreeProvider order ids (one per intent)", () => {
+    it("sends a new order_id for each intent on the same Order, and keeps it as the intent's id", async () => {
+        fetchMock.mockImplementation(() =>
+            answer(200, { cf_order_id: 2149460581, payment_session_id: "s" }),
+        );
+        const provider = new CashfreeProvider();
+        const make = () =>
+            provider.createOrderIntent({
+                amountCents: 25050,
+                currency: "INR",
+                orderId: "cmorder000000000000000001",
+                credentials: CREDS,
+            });
+
+        const first = await make();
+        const second = await make();
+
+        const sent = (fetchMock.mock.calls as [string, RequestInit][]).map(
+            ([, init]) =>
+                (JSON.parse(init.body as string) as { order_id: string })
+                    .order_id,
+        );
+        expect(sent[0]).not.toBe(sent[1]);
+        for (const id of sent) {
+            expect(id).toMatch(/^cmorder000000000000000001_[a-f0-9]{12}$/);
+            expect(id.length).toBeLessThanOrEqual(45);
+        }
+        expect([first.providerIntentId, second.providerIntentId]).toEqual(sent);
+        expect(first.clientParams.cashfreeOrderId).toBe(sent[0]);
+    });
+
+    it("refunds and looks up an intent made before by its Order's id, not Cashfree's number", async () => {
+        fetchMock.mockImplementation(() => answer(200, { cf_refund_id: 1 }));
+        const provider = new CashfreeProvider();
+        const old = {
+            ...INPUT,
+            providerIntentId: "2149460581",
+            merchantRef: "cmorder000000000000000001",
+        };
+
+        await provider.refund(old);
+        await provider.findRefund(old);
+
+        const urls = (fetchMock.mock.calls as [string][]).map(([url]) => url);
+        expect(urls[0]).toBe(
+            "https://api.cashfree.com/pg/orders/cmorder000000000000000001/refunds",
+        );
+        expect(urls[1]).toBe(
+            `https://api.cashfree.com/pg/orders/cmorder000000000000000001/refunds/${INPUT.reference}`,
+        );
+    });
+});

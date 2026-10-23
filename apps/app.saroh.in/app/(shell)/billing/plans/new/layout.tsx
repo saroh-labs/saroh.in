@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
-import { paymentsDenied } from "@/components/invoices/payments-denied";
-import { ModuleGate } from "@/components/modules/module-gate";
+import { paymentsDenied } from "@/components/invoices/locked/payments-denied";
+import { ModuleGate } from "@/components/modules/gate/module-gate";
 
 /**
  * Capability gate for a new plan (D7), as a plan's own page has: plans come

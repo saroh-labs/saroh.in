@@ -1,7 +1,7 @@
 /**
  * A way off the page made in code — `router.push` from Search settings or
  * the ⌘K menu — asks first, as a link click does, whether an open edit holds
- * the page (`components/organizations/use-leave-guard.tsx`). An event on the
+ * the page (`components/shared/forms/use-leave-guard.tsx`). An event on the
  * window, so the menus need not know which screen is editing.
  */
 const LEAVE_REQUEST = "saroh:leave-request";

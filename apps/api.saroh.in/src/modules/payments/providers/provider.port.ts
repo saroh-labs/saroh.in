@@ -64,6 +64,11 @@ export interface RefundInput {
     reference: string;
     /** The provider's order/intent id the refund is booked against. */
     providerIntentId: string;
+    /**
+     * The Order's or Invoice's id the intent was made for: Cashfree's order
+     * id for an intent made before 22 Oct 2026 (`cashfreeOrderId`).
+     */
+    merchantRef?: string | null;
     /** The provider's payment id (from the capture webhook), when known. */
     providerPaymentRef?: string | null;
     /** Server-derived minor units to refund. Never client-supplied. */

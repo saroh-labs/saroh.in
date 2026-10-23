@@ -58,6 +58,10 @@ export const NOTICE_TEMPLATES = [
     "THREAD_REPLY",
     // A renewal's autopay charge failed, with a fresh link to pay (U10).
     "AUTOPAY_FAILED",
+    // "₹X will be taken from your bank account on ‹date›", a day before
+    // each eMandate debit (DEC-180, #1175): no switch, since without it
+    // the debit doesn't happen.
+    "AUTOPAY_PRE_DEBIT",
     // "₹X is on its way back to how you paid" (DEC-174 U12, #1143): an
     // online refund the provider took, behind the REFUND switch.
     "REFUND_SENT",

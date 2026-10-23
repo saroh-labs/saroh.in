@@ -3,9 +3,9 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { PageContainer } from "@/components/shared/page-container";
-import type { ScheduledGoLives } from "@/components/sites/site-versions";
-import { SiteVersions } from "@/components/sites/site-versions";
+import { PageContainer } from "@/components/shared/page/page-container";
+import type { ScheduledGoLives } from "@/components/sites/versions/site-versions";
+import { SiteVersions } from "@/components/sites/versions/site-versions";
 import { requireSession } from "@/lib/session";
 import { getReviewState, getSite, listPublications } from "@/lib/sites/service";
 import { readTestReleases } from "@/lib/sites/test-releases-api";

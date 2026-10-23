@@ -3,7 +3,7 @@ import { cache } from "react";
 
 import { OrderDetail } from "@/components/commerce/order-detail/order-detail";
 import { OrderLocked } from "@/components/commerce/orders/orders-states";
-import { OrderReviews } from "@/components/stores/order-reviews";
+import { OrderReviews } from "@/components/stores/reviews/order-reviews";
 import { ownAccountsRoom, takesOnlinePayment } from "@/lib/billing/access";
 import { personHref } from "@/lib/contacts/person-href";
 import { customerHref } from "@/lib/customers/links";

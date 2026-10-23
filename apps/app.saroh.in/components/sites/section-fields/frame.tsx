@@ -3,6 +3,7 @@
 import {
     anchorFromLabel,
     anchorProblem,
+    EYEBROW_MAX,
     NAV_LABEL_MAX,
 } from "@saroh/block-contract";
 import { Field } from "@saroh/ui/field";
@@ -77,8 +78,22 @@ export function SectionFrameFields({
     const problem = anchor ? anchorProblem(anchor) : null;
     const chosen = BANDS.find((b) => b.id === band);
 
+    const eyebrow = typeof content.eyebrow === "string" ? content.eyebrow : "";
+
     return (
         <div className="grid gap-3 border-t pt-4">
+            <Field label="Label above the heading">
+                <Input
+                    value={eyebrow}
+                    maxLength={EYEBROW_MAX}
+                    placeholder="Classes and services"
+                    onChange={(e) => set({ eyebrow: e.target.value })}
+                />
+            </Field>
+            <p className="-mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+                Small capitals over the block's heading. The Quiet, Folio and
+                Live looks show it.
+            </p>
             <Field label="Menu label">
                 <Input
                     value={navLabel}

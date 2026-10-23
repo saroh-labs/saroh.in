@@ -16,12 +16,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Section } from "@/lib/sites/service";
 
-import { emptySection } from "../empty-section";
-import { HeroFields } from "./hero";
-import { PersonFields } from "./person";
-import { TimetableFields } from "./timetable";
+import { emptySection } from "@/components/sites/blocks/empty-section";
+import { HeroFields } from "@/components/sites/content-sections/hero";
+import { PersonFields } from "@/components/sites/content-sections/person";
+import { TimetableFields } from "@/components/sites/selling-sections/timetable";
 
-vi.mock("@/components/sites/media-picker", () => ({
+vi.mock("@/components/shared/fields/media-picker", () => ({
     MediaPicker: ({
         label,
         onPick,

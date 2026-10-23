@@ -1,4 +1,4 @@
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { Button } from "@saroh/ui/button";
 import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
@@ -7,7 +7,7 @@ import Link from "next/link";
 import {
     WHO_CAN_CHANGE,
     whoCanChange,
-} from "@/components/shared/who-can-change";
+} from "@/components/shared/states/who-can-change";
 import { backTo, couldntLoad } from "@saroh/ui/lib/state-copy";
 import { TextLink } from "@saroh/ui/text-link";
 

@@ -1,4 +1,4 @@
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { Badge } from "@saroh/ui/badge";
 
 import { messageStatusWords } from "@/lib/messages/message-status";

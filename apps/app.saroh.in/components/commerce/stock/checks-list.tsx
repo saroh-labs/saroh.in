@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { ListPaging } from "@/components/shared/list-toolbar";
+import { ListPaging } from "@/components/shared/lists/list-toolbar";
 import { productHref } from "@/lib/products/links";
 import type { StockHref, StockListPage } from "@/lib/stock/list-query";
 import { STOCK_LISTS, STOCK_PAGES_LABEL } from "@/lib/stock/list-query";
@@ -17,7 +17,7 @@ import { resolveStockCheck, undoStock } from "@/lib/stock/screen-actions";
 import type { StockCheck, StockChecks } from "@/lib/stock/service";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { runAction } from "@/lib/api/run-action";
 import { PILL_TONE } from "./tones";
 

@@ -4,8 +4,8 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { Globe } from "lucide-react";
 import Link from "next/link";
 
-import { PageContainer } from "@/components/shared/page-container";
-import { CreateSiteForm } from "@/components/sites/create-site-form";
+import { PageContainer } from "@/components/shared/page/page-container";
+import { CreateSiteForm } from "@/components/sites/new-site/create-site-form";
 import { requireCan } from "@/lib/access/require-can";
 import { mayAddWebsite } from "@/lib/business-limits";
 import { modulesOrUnknown } from "@/lib/modules/guard";

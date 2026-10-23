@@ -3,9 +3,9 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { LimitNoticeBlock } from "@/components/billing/limit-notice";
-import { AccessDenied } from "@/components/shared/access-denied";
-import { PageContainer } from "@/components/shared/page-container";
-import { whoCanChange } from "@/components/shared/who-can-change";
+import { PageContainer } from "@/components/shared/page/page-container";
+import { AccessDenied } from "@/components/shared/states/access-denied";
+import { whoCanChange } from "@/components/shared/states/who-can-change";
 
 import { PlanEditor } from "@/components/subscriptions/plan-editor/plan-editor";
 import { membershipPlansLock } from "@/lib/billing/access";

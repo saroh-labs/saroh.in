@@ -12,10 +12,12 @@
     "exports": {
         ".": "./src/index.ts",
         "./image-sizes": "./src/lib/image-sizes.ts",
+        "./showcase": "./src/showcase/index.ts",
         "./site-icon": "./src/site-icon.ts",
         "./tailwind-preset": "./src/tailwind-preset.ts",
         "./test-release-words": "./src/test-release-words.ts",
-        "./url-path": "./src/url-path.ts"
+        "./url-path": "./src/url-path.ts",
+        "./visit-source": "./src/visit-source.ts"
     },
     "scripts": {
         "lint": "eslint src/",
@@ -24,6 +26,7 @@
     },
     "dependencies": {
         "@saroh/block-contract": "workspace:*",
+        "@saroh/templates": "workspace:*",
         "clsx": "^2.1.1",
         "tailwind-merge": "^3.6.0",
         "uqr": "^0.1.3"
@@ -35,7 +38,6 @@
     },
     "devDependencies": {
         "@saroh/eslint-config": "workspace:*",
-        "@saroh/templates": "workspace:*",
         "@saroh/tsconfig": "workspace:*",
         "@testing-library/jest-dom": "^6.6.3",
         "@testing-library/react": "^16.1.0",

@@ -1,3 +1,5 @@
+import type { LookId } from "@saroh/block-contract";
+
 import { destructiveAlertClasses } from "../../alert";
 import { cn } from "../../lib/utils";
 import type { BusinessReach } from "../../reach-links";
@@ -46,6 +48,8 @@ export interface WhenProps {
     onSkip?: (skip: number) => void;
     /** A call and a message, offered when nothing is free. */
     reach?: BusinessReach | null;
+    /** A look's frame: its own day strip and time chips. */
+    look?: LookId;
 }
 
 /** Step 2: when — a day and a start, or a class session. */
@@ -93,6 +97,7 @@ export function WhenBody({
     later = null,
     onSkip,
     reach = null,
+    look,
 }: WhenProps) {
     const weeks = { skip, later, onSkip };
     return (
@@ -174,6 +179,7 @@ export function WhenBody({
                     onPerson={onPerson}
                     weeks={weeks}
                     reach={reach}
+                    look={look}
                 />
             ) : days ? (
                 <Sessions

@@ -94,7 +94,8 @@ test.describe("the renderer draws a look", { tag: "@serial" }, () => {
                 1,
             );
             expect(await rootToken(page, "--site-radius")).toBe("999px");
-            expect(await rootToken(page, "--site-radius-photo")).toBe("16px");
+            // Board VD: photos 4 (DEC-172, 22 Oct).
+            expect(await rootToken(page, "--site-radius-photo")).toBe("4px");
 
             const families = await loadedFamilies(page);
             expect(families.length, families.join(", ")).toBeLessThanOrEqual(2);

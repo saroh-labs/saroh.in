@@ -31,22 +31,28 @@ import type {
     WeeklyRange,
 } from "@/lib/staff/types";
 
+import { useBookingRules } from "@/components/bookings/booking-rules/booking-rules-card";
+import {
+    MoreSection,
+    RulesRow,
+} from "@/components/bookings/booking-rules/more-list";
+import {
+    PersonRulesSection,
+    RuleRequestLine,
+} from "@/components/bookings/booking-rules/person-rules";
+import { PersonRulesPanels } from "@/components/bookings/booking-rules/person-rules-panels";
+import type { PersonRulesData } from "@/components/bookings/booking-rules/use-person-rules";
+import { usePersonRules } from "@/components/bookings/booking-rules/use-person-rules";
+import { AddTimeOffSheet } from "@/components/bookings/time-off/add-time-off-sheet";
+import { TimeOffCard } from "@/components/bookings/time-off/time-off-card";
 import { AddPersonDialog } from "./add-person-dialog";
-import { AddTimeOffSheet } from "./add-time-off-sheet";
-import { useBookingRules } from "./booking-rules-card";
 import { FirstHours, useSetMine } from "./first-hours";
 import { HoursHeader } from "./hours-header";
 import type { Panel } from "./hours-panels";
 import { HoursPanels } from "./hours-panels";
-import { MoreSection, RulesRow } from "./more-list";
 import { OutsideNote } from "./outside-note";
-import { PersonRulesSection, RuleRequestLine } from "./person-rules";
-import { PersonRulesPanels } from "./person-rules-panels";
 import { SeveralDaysSheet } from "./several-days-sheet";
-import { TimeOffCard } from "./time-off-card";
 import { useHours } from "./use-hours";
-import type { PersonRulesData } from "./use-person-rules";
-import { usePersonRules } from "./use-person-rules";
 import { WeeklyHours } from "./weekly-hours";
 import { EVERYONE, WhoseRow } from "./whose-hours";
 

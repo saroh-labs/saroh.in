@@ -52,7 +52,7 @@ pattern files refer back here.
 - **Current** (DEC-130, amended 11 Oct 2026) — **The first run is four
   short steps, and it ends in the product.** Sign-up takes an email and a
   code (DEC-129). Setup is a stepper
-  (`components/organizations/business-setup-form.tsx`), one question to a
+  (`components/organizations/setup/business-setup-form.tsx`), one question to a
   screen with Back and Continue: "What are you setting up?", then the name
   step (your name if the account has none, the name, the web address, the
   country, India chosen), then "What will you do first?". The last step's
@@ -173,7 +173,7 @@ pattern files refer back here.
 - **Current** (10 Oct 2026) — **A moment is one calm line where the product
   marks that something good happened for the business**, in the right place,
   once, with the real fact in it and at most one thing worth doing next. The
-  shared piece is `Moment` (`apps/app.saroh.in/components/shared/moment.tsx`):
+  shared piece is `Moment` (`apps/app.saroh.in/components/shared/notices/moment.tsx`):
   a `Notice` in the success tone with a title, one fact line, one optional
   action and Dismiss, announced politely (`role="status"`), entering on the
   motion tokens and still under reduced motion.
@@ -596,7 +596,7 @@ organizations/:org/customers`: everyone who has paid (an order through a
   flips its own line in the same commit, so no switch ever does nothing.
 - **Current** (DEC-174, U4 #1135) — **Settings › Providers' "Emails to
   your customers"**, under "Updates in Messages"
-  (`components/providers/customer-emails-row.tsx`, words in
+  (`components/providers/customer-emails/customer-emails-row.tsx`, words in
   `lib/communications/customer-emails.ts`): a read row ("9 on, 1 off",
   "Not sent: Overdue reminders.") and at most one quiet line under it (no
   email provider: "None of these go out until your email is connected";
@@ -651,12 +651,101 @@ organizations/:org/customers`: everyone who has paid (an order through a
   every hour"); a live site sends one cookieless `site.view` per page
   (`apps/saroh.app/lib/site-view.ts`: path only, the referrer's origin only,
   nothing when the browser sends Do Not Track or Global Privacy Control,
-  nothing from the account area, never on a test release or preview), and an
+  nothing from a private page — the account area, a checkout, a pay link, an
+  order's page, a waitlist claim (`lib/private-paths.ts`, U15) — never on a
+  test release or preview), and an
   enquiry writes `enquiry.submitted` in its own transaction (UX-032). Its
   Orders tile (#919) counts `order.paid` less `order.refunded` (#867) over the
   range's days; nothing before #867 is back-filled (DEC-012), so a line under
   the tiles says so while the range reaches back before
   `ORDERS_RECORDED_FROM` (`lib/analytics/website-words.ts`).
+- **Current** — where a site visit came from (U15, #1099, A13), first party,
+  for "Where customers come from". The visit lives in the visitor's tab
+  memory only (`@saroh/site-blocks/visit-source`: no cookie, no storage, no
+  id; it ends on a reload, a closed tab or 30 minutes without a page). Its
+  source is one of five groups (`instagram`, `google`, `whatsapp`, `direct`
+  = "Typed your address", `other`) from the referrer's host and an allowed
+  `ref` / `utm_source` value, plus at most one merchant link label of the
+  allowed shape (`analytics/visit-source.ts`: lower-case letters, digits,
+  hyphens, 32 at most, no run of six digits, no more than six digits in all,
+  never an id's shape `c` + 24); nothing else in the address is read, and
+  `ref` is never read on `/book` (or under it) or beside the booking flow's
+  `step=`, where it is a booking's id. **Totals only, from links made in
+  Saroh (DEC-181):** the intake keeps a step's label only when it is one
+  of that site's live `SiteLink` labels (`analytics/site-link-labels.ts`,
+  a minute's cache per site, dropped on every link write); any other `ref`
+  counts under its group with no label. Each step is sent once a visit,
+  with the source only and no visitor hash: `site.visit`, `site.looked` (a
+  product or the booking page), `site.started` (a checkout: `/checkout`
+  sends no page view, being private, but does send this step) and
+  `site.paid` (the order's own confirmation page, `/shop/order/<id>`, also
+  private, after a successful online payment there and then: exactly this
+  step, with the group and label only, never the order or its amount).
+  Nothing about a visit is kept on an order or a customer: no
+  `Order.visitSource` / `visitRef`, no "came from" on the order, and
+  `order.paid` / `order.refunded` carry no source. A payment made later
+  another way (a pay link, at the counter, at pick-up) isn't counted to a
+  source, and a refund isn't taken off one. The rollup adds `source` and
+  `ref` dimensions; `analytics/visit-sources.ts` is the read (counted from
+  the first day a source was recorded; paid per site from `site.paid`;
+  labels with fewer than 3 visits in the range fold into one
+  `OTHER_LINKS_REF` row, "Other links").
+- **Current** — **the links a business makes to share its site**
+  (DEC-181, #1099): `SiteLink` (site, name, label, made by, when,
+  archived), made, listed and archived with Undo on Insights › Where
+  customers come from under the sources ("Links made in Saroh",
+  `components/insights/where-from/site-links.tsx`). Make a link takes a name ("Name
+  the post, not the person." under it), proposes the label from it, shows
+  it editable with the whole link, and copies
+  `https://<site's real address>/?ref=<label>` once made (the address is
+  `siteAddressOf`, as every share link). Each link shows its visits and
+  paid in the period, or "Fewer than 3 visits". Reading is
+  `analytics:read`; making and archiving is `site:update`, each written to
+  Activity (`site-link.created`, `.archived`, `.restored`). A label is
+  unique per site among live links and passes the label checks; an
+  archived label is free again.
+- **Current** — **what visit tracking collects, where, for how long and who
+  sees it** (U15 privacy review, 21 Oct). The browser's word is never
+  trusted: each promise below is kept by the API too.
+
+    | What                                                                                                                                                   | Where it is kept                                                                                                                                                                                       | For how long                                                     | Who sees it                                                         |
+    | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------- |
+    | A page view: its path (cut at `?` and `#`), the referrer's origin, no title                                                                            | `AnalyticsEvent` `site.view`                                                                                                                                                                           | 400 days, then the retention sweep deletes it                    | Nobody row by row; counted into Insights for `analytics:read`       |
+    | A visitor hash on a page view: `sha256(daily salt : site : address)`, the salt an HMAC of `ANALYTICS_IP_SALT` and the UTC day, never stored            | `AnalyticsEvent.visitorHash`                                                                                                                                                                           | With the view (400 days); a new hash every day and on every site | Nobody; only "unique visitors a day"                                |
+    | A visit's steps (`site.visit`, `site.looked`, `site.started`, `site.paid`): a group and a label made in Saroh, no visitor, time to the hour, random id | `AnalyticsEvent`                                                                                                                                                                                       | 400 days                                                         | Counted into Insights for `analytics:read`                          |
+    | Daily counts by path, source and label                                                                                                                 | `AnalyticsDailyAggregate`                                                                                                                                                                              | Kept (they name no one)                                          | `analytics:read`; labels under 3 visits only as "Other links"       |
+    | The links a business made to share its site: name, label, who made it, when                                                                            | `SiteLink`                                                                                                                                                                                             | Kept; archived, never deleted                                    | `analytics:read`; made and archived with `site:update`, in Activity |
+    | Nothing at all                                                                                                                                         | Private pages (`PRIVATE_PATH_PREFIXES` in `@saroh/block-contract`, one list for the site and the API, which refuses a view of one), Do Not Track or Global Privacy Control, previews and test releases |                                                                  |                                                                     |
+
+    Never kept: anything about a visit on an order or a customer (DEC-181),
+    a label that isn't one of the site's links made in Saroh, the address,
+    a cookie or browser storage, the query string beyond one allowed label,
+    the referrer's path, a page title, a consent
+    value, a time or a dedupe key the browser sent (a public event is stored
+    `anonymous`, at the server's time). Views stored before the review under
+    a private path are removed by the one-off
+    `packages/database/src/backfill/private-path-views.cli.ts` (dry run
+    first).
+
+- **Current** — "From visit to paid" and "Where do visitors come from?"
+  (U16, #1101) on Where customers come from, between the figures and the
+  visits each day, and the Overview's third answer, read from
+  `GET analytics/sources?period=&siteId=` (`analytics/sources.ts`,
+  `analytics:read`, counts only). The path's four steps (visited, looked,
+  started, paid) are each held to at most the one before, so it never goes
+  up. A share is said as a count reads ("1 in 7", "3 in 4", "about half",
+  `lib/insights/sources-words.ts` `oneIn`), never a percentage, and what
+  is counted is called visits, never people (no visitor is kept); the
+  website figure of unique visitors a day is "Visitors", never "People"
+  (owner, 21 Oct: one who comes back another day is counted again, and How
+  these are counted says so). A source
+  with fewer than 5 visits is counted in Other sites and the line under the
+  table names it; the merchant's own `?ref=` links are listed under the
+  table when any were visited. Counting that began inside the period says
+  from when; before anything is counted one message says it starts with
+  the next visit. With a website chosen, all four steps are that
+  website's, paid included (DEC-181: paid is the visit's own `site.paid`).
+  Where customers come from is no longer marked Next.
 
 ## One word each
 
@@ -737,7 +826,7 @@ empty states, and every sentence a `lib/` function returns):
   be read.
     - **A Settings read row keeps its words.** Label on the left, value
       on the right, the row's Edit button beside it: "Not set" there is the
-      invitation to set it (`Absent` in `components/sites/settings-rows.tsx`,
+      invitation to set it (`Absent` in `components/shared/page/settings-rows.tsx`,
       `empty` on a Business row, Your profile, the pay-instructions and
       verification rows, an Activity change).
     - **A sentence is not a cell.** A line that reads as words keeps them

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
-import { makePayLink } from "@/components/bookings/pay-link-panel";
+import { makePayLink } from "@/components/bookings/booking-page/pay-link-panel";
 import {
     CustomerStep,
     useCustomerFinder,
@@ -16,7 +16,7 @@ import {
     useOverlayDirty,
     useOverlaySubmit,
     useToastsAboveFoot,
-} from "@/components/shared/overlay-form";
+} from "@/components/shared/forms/overlay-form";
 import { runAction } from "@/lib/api/run-action";
 import { classesLeft, packOffer, usablePacks } from "@/lib/class-packs/balance";
 import type { CustomerPick } from "@/lib/customers/picker";

@@ -1,6 +1,6 @@
 "use client";
 
-import { RadioCards } from "@/components/shared/choice-group";
+import { RadioCards } from "@/components/shared/fields/choice-group";
 import type { CollectionKind } from "@/lib/collections/service";
 
 const KINDS: { value: CollectionKind; label: string; note: string }[] = [

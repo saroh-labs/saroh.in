@@ -30,6 +30,7 @@ import { wordReview } from "./review-alerts";
 import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
 import { TEAM_ALERT_TYPE } from "./team-alerts";
 import { putOffUntilDue, wordUncollected } from "./uncollected-alert";
+import { wordWebhook } from "./webhook-alerts";
 
 export { DATA_REQUEST_NOTIFICATION_TYPE } from "./data-request-alerts";
 export {
@@ -467,6 +468,8 @@ export async function wordAlert(
             return wordReview(tx, organizationId, payload);
         case "domain":
             return wordDomain(tx, organizationId, payload);
+        case "webhook":
+            return wordWebhook(tx, organizationId, payload);
         case "ask":
             return wordAsk(tx, organizationId, payload);
         case "request":
@@ -778,6 +781,8 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
                 : null;
         case "request":
             return str("requestId") ? (p as TeamAlertPayload) : null;
+        case "webhook":
+            return str("webhookEventId") ? (p as TeamAlertPayload) : null;
         case "member":
             return str("subscriptionId") &&
                 (((p.change === "cancelled" || p.change === "paused") &&

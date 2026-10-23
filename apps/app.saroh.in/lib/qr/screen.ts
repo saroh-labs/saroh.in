@@ -1,5 +1,5 @@
-import type { QrStyleLock } from "@/components/qr/qr-style-lock";
-import { qrStyleLock } from "@/components/qr/qr-style-lock";
+import type { QrStyleLock } from "@/components/qr/maker/qr-style-lock";
+import { qrStyleLock } from "@/components/qr/maker/qr-style-lock";
 import { apiFetch, orgBase } from "@/lib/api/http";
 import type { Organization } from "@/lib/organizations/service";
 import { readOrganizationSettings } from "@/lib/organizations/settings-service";

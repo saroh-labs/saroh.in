@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import type { useHold } from "@/components/shared/use-hold";
+import type { useHold } from "@/components/shared/undo/use-hold";
 import { recordBookingOutcome } from "@/lib/services/actions";
 import type { BookingOutcome } from "@/lib/services/booking-state";
 import { BOOKING_WORDS } from "@/lib/services/booking-words";

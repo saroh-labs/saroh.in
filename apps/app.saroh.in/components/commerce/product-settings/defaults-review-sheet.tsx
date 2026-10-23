@@ -3,8 +3,8 @@
 import type { ReactElement } from "react";
 import { useState } from "react";
 
-import { CheckRow } from "@/components/shared/check-row";
-import { FormSheet } from "@/components/shared/form-sheet";
+import { CheckRow } from "@/components/shared/fields/check-row";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import type { DefaultsSuggestion } from "@/lib/products/settings";
 import { suggestionText } from "@/lib/products/settings-rules";
 

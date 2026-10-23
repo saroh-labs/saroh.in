@@ -11,7 +11,7 @@ import type { UseFormReturn } from "react-hook-form";
 import { Controller, useWatch } from "react-hook-form";
 
 import { HeaderOverlay } from "@/components/bookings/calendar/header/header-overlay";
-import { GstRatePicker } from "@/components/shared/gst-rate-picker";
+import { GstRatePicker } from "@/components/shared/fields/gst-rate-picker";
 import type { InvoiceFormValues } from "@/lib/invoices/new-invoice";
 
 import type { PaperTarget } from "../new-invoice/paper-preview";

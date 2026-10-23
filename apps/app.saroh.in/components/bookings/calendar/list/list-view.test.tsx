@@ -39,12 +39,12 @@ vi.mock("@/components/bookings/new-booking/launcher", () => ({
 vi.mock("../../availability/add-person-dialog", () => ({
     AddPersonDialog: () => null,
 }));
-vi.mock("../booking-quick-look", () => ({
+vi.mock("@/components/bookings/quick-look/booking-quick-look", () => ({
     BookingQuickLook: ({ block }: { block: { key: string } | null }) =>
         block ? <div role="dialog">Quick look {block.key}</div> : null,
 }));
 // The free-time sheet (U9): books, or blocks the time with its own switch.
-vi.mock("../new-booking-from-gap", () => ({
+vi.mock("@/components/bookings/free-time/new-booking-from-gap", () => ({
     NewBookingFromGap: ({
         target,
     }: {
@@ -60,7 +60,7 @@ vi.mock("../new-booking-from-gap", () => ({
             </div>
         ) : null,
 }));
-vi.mock("../open-hours-dialog", () => ({
+vi.mock("@/components/bookings/free-time/open-hours-dialog", () => ({
     OpenHoursDialog: ({
         target,
     }: {

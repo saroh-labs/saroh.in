@@ -5,8 +5,8 @@ import {
     OrdersLocked,
 } from "@/components/commerce/orders/orders-states";
 import { SellDenied } from "@/components/commerce/orders/sell-denied";
-import { ModuleGate } from "@/components/modules/module-gate";
-import { PageContainer } from "@/components/shared/page-container";
+import { ModuleGate } from "@/components/modules/gate/module-gate";
+import { PageContainer } from "@/components/shared/page/page-container";
 import {
     orderLockedText,
     ordersAccess,

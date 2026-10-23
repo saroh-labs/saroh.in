@@ -1,6 +1,6 @@
 "use client";
 
-import { SectionError } from "@/components/shared/section-error";
+import { SectionError } from "@/components/shared/states/section-error";
 
 /**
  * The order could not be read. The kitchen keeps working from the printed

@@ -38,7 +38,10 @@
   and `deadLetter` update
   `WHERE id = … AND status = 'PROCESSING' AND lockedBy = <worker>` and report
   whether they won; a new write to a claimed `Job` carries the same condition.
-  Reclaim is anchored on `lockedAt` (the claim), never `createdAt`.
+  Reclaim is anchored on `lockedAt` (the claim), never `createdAt`. One claim
+  covers a batch of up to `JOB_WORKER_BATCH`, so the worker renews each
+  job's lease (`renew`, the same fence) just before running it, and skips
+  a job another worker reclaimed while an earlier one ran (22 Oct 2026).
 - **Current** (10 Oct 2026) — **Every inbox notice names what it opens.**
   A `Notification` is written with `noticeOf(type, target)`
   (`notifications/notice-target.ts`), which makes the target required for
@@ -684,6 +687,14 @@ the Privacy Policy states both.
   asked, so a run delivered twice debits once. A redelivery that finds the
   debit already claimed (`ALREADY`, PROCESSING) writes the `LOOK` step: the
   run before it may have died between the claim and its next step.
+- **An eMandate's debit waits on Saroh's own notice** (DEC-180). `PREPARE`
+  queues `AUTOPAY_PRE_DEBIT` with the `DEBIT` step, on one transaction
+  (`enqueuePreDebitNoticeInTx` skips a notice already queued or handled),
+  26 h before the debit; `DEBIT` reads `preDebitNoticeState` first and,
+  with no email gone, lets the charge go (`notTold`: CANCELLED, the
+  waiting notice deleted, NOT_CHARGED_NO_NOTICE, the renewal invoice's
+  auto-send) instead of asking for it. Rules in `backend-integrations.md`
+  → "eMandate: Saroh's notice, or no debit".
 - **A charge that stands aside comes back on its own** (review 3). When a
   step refuses for a pay-link checkout the customer has open
   (CHECKOUT_OPEN), `stoodAside` writes, on the same transaction as its
@@ -1035,7 +1046,11 @@ overrideId, reason }`. Re-read, then decide
   charge, queued with the rows (a purchase, a renewal, a change of
   provider subscription). Each row goes under its own id as the reference
   and only a QUEUED row becomes SENT; a refusal is logged and the row
-  waits for the next charge; anything unanswered is retried.
+  waits for the next charge; anything unanswered is retried. Razorpay
+  keeps no reference, so its adapter first looks for an add-on on the
+  subscription whose description is `saroh_ref:<row id>` and posts only
+  when there is none: a retry after a lost answer or a failed SENT mark
+  never adds the item twice (22 Oct 2026).
 - **`billing.moves.apply`** is the hourly self-rescheduling sweep (one
   PENDING run, a partial unique index): due pending moves that are ready
   (`plan-moves.ts`) and OPEN checkouts past `expiresAt`. A paid

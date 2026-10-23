@@ -8,11 +8,15 @@ import {
     keptPlan,
     needsNotice,
     projectedCharge,
+    SAROH_NOTICE_MIN_HOURS,
+    sarohNoticeAt,
+    sarohSendsNotice,
     timingOf,
 } from "./autopay-timing";
 
 const ZONE = "Asia/Kolkata";
 const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
 // A renewal at the start of 29 Sep in Kolkata.
 const RENEWAL = new Date("2026-09-28T18:30:00Z");
 
@@ -32,15 +36,35 @@ describe("autopay timing", () => {
         expect(isAutopayChargeTiming(3)).toBe(false);
     });
 
-    it("UPI (or an unknown method) waits on the notice; a card or eMandate doesn't", () => {
+    it("UPI (or an unknown method) waits on the provider's notice, an eMandate on Saroh's (DEC-180); a card doesn't", () => {
         const now = new Date("2026-09-26T19:00:00Z");
         expect(needsNotice("UPI")).toBe(true);
         expect(needsNotice(null)).toBe(true);
+        expect(needsNotice("EMANDATE")).toBe(true);
         expect(needsNotice("CARD")).toBe(false);
+        expect(sarohSendsNotice("EMANDATE")).toBe(true);
+        for (const m of ["UPI", "CARD", null]) {
+            expect(sarohSendsNotice(m)).toBe(false);
+        }
         expect(earliestDebit(now, "UPI").getTime()).toBe(
             now.getTime() + 26 * HOUR,
         );
-        expect(earliestDebit(now, "EMANDATE")).toBe(now);
+        expect(earliestDebit(now, "EMANDATE").getTime()).toBe(
+            now.getTime() + 26 * HOUR,
+        );
+        expect(earliestDebit(now, "CARD")).toBe(now);
+    });
+
+    it("Saroh's eMandate email goes 26 hours before the debit, or now when that has passed", () => {
+        const now = new Date("2026-09-26T19:00:00Z");
+        const debit = new Date(now.getTime() + 3 * DAY);
+        expect(sarohNoticeAt(debit, now).getTime()).toBe(
+            debit.getTime() - 26 * HOUR,
+        );
+        // Planned too close (a resume's kept debit): at once.
+        expect(sarohNoticeAt(new Date(now.getTime() + HOUR), now)).toBe(now);
+        // Always more than the 24 hours it must stand before the debit.
+        expect(SAROH_NOTICE_MIN_HOURS).toBeLessThan(26);
     });
 
     it("DAY_AFTER_RENEWAL plans nothing: D13's timing", () => {

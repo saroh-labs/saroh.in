@@ -6,7 +6,7 @@ import { X } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 
-import { LATE_AFTER_ANCHOR } from "@/components/stores/fulfilment-section";
+import { LATE_AFTER_ANCHOR } from "@/components/stores/delivery/fulfilment-section";
 import { runAction } from "@/lib/api/run-action";
 import { lateAfterWords } from "@/lib/stores/late-after";
 import { storefrontHref } from "@/lib/stores/links";

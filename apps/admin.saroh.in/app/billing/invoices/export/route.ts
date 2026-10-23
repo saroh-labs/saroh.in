@@ -5,7 +5,7 @@ import { readGstin, readInvoiceStatus, readMonth } from "@/lib/billing-words";
 import { param } from "@/lib/params";
 
 /**
- * "Export for the CA" on Admin › Billing › Invoices (DEC-163): one
+ * "Export for the CA" on Admin › Billing › Invoices (DEC-179): one
  * month's invoices, made by the API. A proxy: the operator's session is
  * attached server-side and the API decides, with `saroh-billing:read`.
  */

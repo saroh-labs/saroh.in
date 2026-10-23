@@ -166,7 +166,7 @@ function LeadCard({
                 </span>
             ) : null}
             {show.label ? (
-                <span className="text-site-accent text-sm font-semibold underline-offset-4 group-hover:underline">
+                <span className="text-site-accent-text text-sm font-semibold underline-offset-4 group-hover:underline">
                     {show.label}
                 </span>
             ) : null}

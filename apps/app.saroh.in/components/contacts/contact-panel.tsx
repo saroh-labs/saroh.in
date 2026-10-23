@@ -1,4 +1,4 @@
-import { FailedRead } from "@/components/shared/failed-read";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { EmptyState } from "@saroh/ui/data-state";
 import type { ReactNode } from "react";
 

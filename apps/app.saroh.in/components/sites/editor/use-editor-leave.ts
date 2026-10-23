@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 
-import { useLeaveGuard } from "@/components/shared/use-leave-guard";
+import { useLeaveGuard } from "@/components/shared/forms/use-leave-guard";
 
 /** How long a way out waits for the editor's own save before it asks. */
 const SETTLE_MS = 6000;

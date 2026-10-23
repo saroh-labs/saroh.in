@@ -7,7 +7,10 @@ import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
 
-import { ChoiceGroup, RadioCards } from "@/components/shared/choice-group";
+import {
+    ChoiceGroup,
+    RadioCards,
+} from "@/components/shared/fields/choice-group";
 import type { PaperDefault } from "@/lib/invoices/paper-look";
 import {
     colourMoved,

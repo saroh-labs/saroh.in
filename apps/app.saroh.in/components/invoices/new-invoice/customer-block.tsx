@@ -12,8 +12,8 @@ import { Controller, useWatch } from "react-hook-form";
 
 import type { AddedContact } from "@/components/contacts/add-contact-dialog";
 import { AddContactDialog } from "@/components/contacts/add-contact-dialog";
-import type { ContactOption } from "@/components/shared/contact-picker";
-import { ContactPicker } from "@/components/shared/contact-picker";
+import type { ContactOption } from "@/components/shared/fields/contact-picker";
+import { ContactPicker } from "@/components/shared/fields/contact-picker";
 import { GST_STATES } from "@/lib/invoices/gst";
 import type { InvoiceFormValues } from "@/lib/invoices/new-invoice";
 import { supplyLine } from "@/lib/invoices/new-invoice";

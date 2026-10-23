@@ -14,7 +14,7 @@ import {
     Section,
 } from "@/components/services/service-editor/fields";
 import { GstFields } from "@/components/services/service-editor/gst-fields";
-import { Chip } from "@/components/shared/chip";
+import { Chip } from "@/components/shared/lists/chip";
 import type { GstAsk } from "@/lib/gst/item-words";
 import { NOT_ASKED } from "@/lib/gst/item-words";
 import { rateBps } from "@/lib/gst/price-mode";

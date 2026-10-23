@@ -20,7 +20,7 @@ import {
     ratePicker,
     rateShown,
     ratesOffered,
-} from "@/components/shared/gst-rate-picker.testing";
+} from "@/components/shared/fields/gst-rate-picker.testing";
 
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import type { ProductDetail } from "@/lib/products/service";

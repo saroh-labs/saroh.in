@@ -71,7 +71,9 @@ function loaded(key: string): string {
 function expectedOptions(face: SiteFontFace) {
     return {
         subsets: [...(face.subsets ?? ["latin"])],
-        weight: face.weights.map(String),
+        ...(face.axes
+            ? { axes: [...face.axes] }
+            : { weight: face.weights.map(String) }),
         ...(face.styles ? { style: [...face.styles] } : {}),
         display: "swap",
         preload: false,
@@ -131,7 +133,7 @@ describe("the looks' faces", () => {
                 loader: "Newsreader",
                 options: {
                     subsets: ["latin", "latin-ext"],
-                    weight: ["300", "400"],
+                    axes: ["opsz"],
                     style: ["normal", "italic"],
                     display: "swap",
                     preload: false,
@@ -173,7 +175,7 @@ describe("the looks' faces", () => {
                 loader: "Bricolage_Grotesque",
                 options: {
                     subsets: ["latin", "latin-ext"],
-                    weight: ["700", "800"],
+                    axes: ["wdth"],
                     display: "swap",
                     preload: false,
                 },

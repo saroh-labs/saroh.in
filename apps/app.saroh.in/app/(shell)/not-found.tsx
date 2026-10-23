@@ -1,6 +1,6 @@
 import { NotFound } from "@saroh/ui/not-found";
 
-import { PageContainer } from "@/components/shared/page-container";
+import { PageContainer } from "@/components/shared/page/page-container";
 
 export const metadata = { title: "Page not found" };
 

@@ -2,11 +2,11 @@ import type { ToastId } from "@saroh/ui/toast";
 import { dismissToast, showUndo } from "@saroh/ui/toast";
 import { useEffect, useRef } from "react";
 
-import { SECTION_LABELS } from "@/components/sites/editor-constants";
 import type { Hold, HoldSlot } from "@/lib/hold-undo";
 import { createHoldSlot, HOLD_UNDO_MS } from "@/lib/hold-undo";
 import type { Section } from "@/lib/sites/service";
 import type { SiteStyle } from "@/lib/sites/style";
+import { SECTION_LABELS } from "./editor-constants";
 
 /** Which document an Undo puts back: the page's blocks, or the site's look. */
 type Doc = "sections" | "style";
@@ -173,7 +173,7 @@ export function useUndo({
         resetStyle() {
             const before = style;
             resetStyle();
-            hold("Back to the starting look", "style", before, () =>
+            hold("Colours, type and spacing reset.", "style", before, () =>
                 setStyle(before),
             );
         },

@@ -269,7 +269,7 @@ export function LookShopListing({
                         look === "folio" &&
                             "border-site-fg border-b border-t py-3.5",
                         look === "live" &&
-                            "rounded-site-s bg-site-surface px-4 py-3",
+                            "rounded-site-photo bg-site-surface px-4 py-3",
                         centred && "min-[700px]:justify-center",
                     )}
                 >
@@ -347,7 +347,7 @@ export function LookShopListing({
                         look === "quiet" &&
                             "mt-8 grid grid-cols-2 gap-x-4 gap-y-10 min-[700px]:gap-x-12 min-[1000px]:grid-cols-3 min-[1000px]:gap-y-14",
                         look === "live" &&
-                            "rounded-site-s bg-site-surface max-[699px]:divide-site-border mt-5 px-4 max-[699px]:divide-y min-[700px]:grid min-[700px]:grid-cols-2 min-[700px]:gap-4 min-[700px]:bg-transparent min-[700px]:px-0 min-[1000px]:grid-cols-3",
+                            "rounded-site-photo bg-site-surface max-[699px]:divide-site-border mt-5 px-4 max-[699px]:divide-y min-[700px]:grid min-[700px]:grid-cols-2 min-[700px]:gap-4 min-[700px]:bg-transparent min-[700px]:px-0 min-[1000px]:grid-cols-3",
                     )}
                 >
                     {shown.map((p, index) => {
@@ -445,7 +445,7 @@ export function LookShopListing({
                             return (
                                 <li
                                     key={p.slug}
-                                    className="min-[700px]:rounded-site-s min-[700px]:bg-site-surface relative flex min-w-0 items-center gap-4 py-4 min-[700px]:flex-col min-[700px]:items-stretch min-[700px]:p-2.5"
+                                    className="min-[700px]:rounded-site-photo min-[700px]:bg-site-surface relative flex min-w-0 items-center gap-4 py-4 min-[700px]:flex-col min-[700px]:items-stretch min-[700px]:p-2.5"
                                 >
                                     {photo ? (
                                         <span className="rounded-site-photo block size-[88px] shrink-0 overflow-hidden min-[700px]:aspect-[16/10] min-[700px]:size-auto min-[700px]:w-full">

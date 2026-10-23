@@ -4,12 +4,21 @@ import type { ReactNode } from "react";
 
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
+import type { LiveToday } from "../live/next-free";
 import { HeroNextFree } from "../live/next-free";
+import type { LiveRead } from "../live/use-live-read";
 import { HeroHeading } from "./hero-heading";
 import type { HeroLevel } from "./hero-level";
 import type { FrontDoor, PageProof } from "./look-front";
-import { FRONT_RING, FRONT_WRAP, FrontCta, frontButton } from "./look-front";
+import {
+    FRONT_RING,
+    FRONT_WRAP,
+    frontButton,
+    FrontCta,
+    LookEyebrow,
+} from "./look-front";
 import { OwnerPhotoNote } from "./no-photo";
+import type { PublicToday } from "./on-today";
 
 /**
  * The hero under a look (DEC-172, plan U6, #1094), as each look's fixed
@@ -52,6 +61,23 @@ import { OwnerPhotoNote } from "./no-photo";
  *
  * Drawn from `--site-*` only (gates G2 and G7).
  */
+/** Room under the hero's eyebrow, as each board sets it (VA01, VD01, VB01). */
+const EYEBROW_SPACE: Record<LookId, string> = {
+    folio: "pb-5",
+    quiet: "pb-6",
+    live: "pb-3",
+};
+
+/**
+ * The button and the quieter link beside it: VD01 centres them 28px apart,
+ * VB01 sets them 20px apart, Folio's sit together.
+ */
+const SECOND_ROW: Record<LookId, string> = {
+    folio: "flex flex-wrap items-center gap-x-6 gap-y-3",
+    quiet: "flex flex-wrap items-center justify-center gap-x-7 gap-y-3",
+    live: "flex flex-wrap items-center gap-x-5 gap-y-3",
+};
+
 export default function LookHero({
     content,
     look,
@@ -62,6 +88,8 @@ export default function LookHero({
     proof = null,
     siteId,
     apiUrl,
+    today,
+    now,
 }: {
     content: RenderedHero;
     look: LookId;
@@ -74,33 +102,71 @@ export default function LookHero({
     siteId?: string | null;
     /** Base URL of the public API, for that read. */
     apiUrl?: string;
+    /** A sample's today (a template's render), drawn instead of the read. */
+    today?: PublicToday;
+    /** The render's pinned moment, for the sample's "checked" time. */
+    now?: Date;
 }) {
     const src = content.image?.src.trim() ? content.image : null;
+    const second =
+        content.secondaryCta?.label.trim() && content.secondaryCta.href.trim()
+            ? content.secondaryCta
+            : null;
     const parts: HeroParts = {
         heading: (
-            <HeroHeading
-                level={level}
-                className={cn(HEADING[look], "[overflow-wrap:anywhere]")}
-            >
-                {content.heading}
-            </HeroHeading>
+            <>
+                <LookEyebrow
+                    content={content}
+                    look={look}
+                    className={EYEBROW_SPACE[look]}
+                />
+                <HeroHeading
+                    level={level}
+                    className={cn(HEADING[look], "[overflow-wrap:anywhere]")}
+                >
+                    {content.heading}
+                </HeroHeading>
+            </>
         ),
         line: content.subheading ? (
             <p className={LINE[look]}>{content.subheading}</p>
         ) : null,
-        button: content.cta ? (
-            <FrontCta
-                content={content.cta}
-                look={look}
-                className={BUTTON_WIDTH[look]}
-            />
-        ) : null,
+        button:
+            content.cta || second ? (
+                <div className={SECOND_ROW[look]}>
+                    {content.cta ? (
+                        <FrontCta
+                            content={content.cta}
+                            look={look}
+                            className={BUTTON_WIDTH[look]}
+                        />
+                    ) : null}
+                    {second ? (
+                        <FrontCta
+                            content={{ ...second, style: "link" }}
+                            look={look}
+                        />
+                    ) : null}
+                </div>
+            ) : null,
         door: frontDoor ? (
             <FrontDoorSlot
                 door={frontDoor}
                 look={look}
                 siteId={siteId}
                 apiUrl={apiUrl}
+                sample={
+                    !siteId && today
+                        ? {
+                              status: "fresh",
+                              data: {
+                                  ...today,
+                                  nextFree: today.items[0] ?? null,
+                              },
+                              fetchedAt: now?.getTime(),
+                          }
+                        : undefined
+                }
             />
         ) : null,
         proof: proof ? <ProofLine proof={proof} look={look} /> : null,
@@ -189,7 +255,7 @@ export function gridAreas(rows: (string[] | null | false)[]): {
 /** The headline per look: the boards' display sizes, phone then desk. */
 const HEADING: Record<LookId, string> = {
     folio: "font-site-heading text-[calc(clamp(3.25rem,10vw,9rem)*var(--site-heading-scale,1))] font-light leading-[0.95] tracking-[-0.045em] [text-wrap:balance] min-[700px]:leading-[0.9]",
-    quiet: "font-site-heading text-[calc(clamp(3.75rem,8.9vw,8rem)*var(--site-heading-scale,1))] font-light leading-none tracking-[-0.02em] [font-variant-numeric:lining-nums] [text-wrap:balance] min-[700px]:leading-[0.95]",
+    quiet: "font-site-heading text-[calc(clamp(3.25rem,8.9vw,8rem)*var(--site-heading-scale,1))] font-light leading-none tracking-[-0.02em] [font-variant-numeric:lining-nums] [text-wrap:balance] min-[700px]:leading-[0.95]",
     live: "font-site-heading text-[calc(clamp(2.5rem,7.8vw,7rem)*var(--site-heading-scale,1))] font-extrabold leading-[0.95] tracking-[-0.035em] [font-stretch:80%] [text-wrap:balance] min-[700px]:leading-[0.86] min-[700px]:tracking-[-0.045em]",
 };
 
@@ -225,7 +291,7 @@ function FolioHero({
         door || button ? (
             <div
                 data-site-rise=""
-                className="border-t-site-fg border-b-site-border grid gap-3 border-t pt-4 min-[700px]:grid-cols-[minmax(0,1fr)_auto] min-[700px]:items-center min-[700px]:gap-5 min-[700px]:border-b min-[700px]:py-[18px]"
+                className="border-t-site-fg border-b-site-border grid gap-2.5 border-t pt-4 min-[700px]:min-h-[150px] min-[700px]:grid-cols-[minmax(0,1fr)_auto] min-[700px]:items-center min-[700px]:gap-5 min-[700px]:border-b min-[700px]:py-[18px]"
             >
                 {door ?? <span />}
                 {button}
@@ -306,8 +372,11 @@ function QuietHero({
             <div
                 className={cn(
                     FRONT_WRAP,
-                    "flex flex-col gap-3.5 pb-7 max-[699px]:order-2 min-[700px]:items-center min-[700px]:gap-6 min-[700px]:pb-[72px] min-[700px]:pt-[88px] min-[700px]:text-center",
-                    hasPhoto ? "pt-6" : "pt-10",
+                    "flex flex-col gap-3.5 pb-7 max-[699px]:order-2 min-[700px]:items-center min-[700px]:gap-6 min-[700px]:text-center",
+                    // VD01 pads a hero with no photo 136/136 on a desk.
+                    hasPhoto
+                        ? "pt-6 min-[700px]:pb-[72px] min-[700px]:pt-[88px]"
+                        : "pt-10 min-[700px]:py-[136px]",
                 )}
             >
                 <div data-site-rise="">{heading}</div>
@@ -320,7 +389,7 @@ function QuietHero({
                     </div>
                 ) : null}
                 {door ? (
-                    <div className="w-full min-[700px]:flex min-[700px]:justify-center">
+                    <div className="w-full min-[700px]:flex min-[700px]:justify-center min-[700px]:pt-2">
                         {door}
                     </div>
                 ) : null}
@@ -419,11 +488,14 @@ function FrontDoorSlot({
     look,
     siteId,
     apiUrl,
+    sample,
 }: {
     door: FrontDoor;
     look: LookId;
     siteId?: string | null;
     apiUrl?: string;
+    /** A sample's next free time, drawn as a fresh read (no site). */
+    sample?: LiveRead<LiveToday>;
 }) {
     const label = door.kind === "book" ? "See times" : "See the shop";
     const plain =
@@ -457,7 +529,7 @@ function FrontDoorSlot({
                 door.kind === "book" && DOOR_HEIGHT[look],
             )}
         >
-            {door.kind === "book" && siteId ? (
+            {door.kind === "book" && (siteId || sample) ? (
                 // Next free, read in the browser; "See times" until then
                 // and whenever it can't say (U8, #1042).
                 <HeroNextFree
@@ -466,6 +538,7 @@ function FrontDoorSlot({
                     apiUrl={apiUrl}
                     bookHref={door.href}
                     fallback={plain}
+                    read={sample}
                 />
             ) : (
                 plain
@@ -483,11 +556,11 @@ const DOOR: Record<LookId, string> = {
 
 /**
  * The height kept for the next booking (VD01's 96px on a phone and 72px
- * on a desk; VA01's card; VB01's Now strip).
+ * on a desk; VA01's sentence card; VB01's Now strip).
  */
 const DOOR_HEIGHT: Record<LookId, string> = {
-    folio: "min-h-[72px]",
-    quiet: "min-h-[72px]",
+    folio: "min-h-[150px] min-[700px]:min-h-[106px]",
+    quiet: "min-h-[96px] min-[700px]:min-h-[72px]",
     live: "min-h-[54px]",
 };
 

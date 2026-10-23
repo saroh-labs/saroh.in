@@ -115,21 +115,24 @@ test("a business that has sold reads its answers, then the figures behind them",
     await expect(
         website.getByRole("link", { name: /^Enquiries/ }),
     ).toHaveAttribute("href", "/leads");
-    // Orders is back (#919): the range's paid orders, opening those days'.
+    // Orders is back (#919): the range's paid orders, opening those days'
+    // (U14 names them Paid orders and bookings, with how they moved).
     await expect(
-        website.getByRole("link", { name: /^Orders\s*[\d,]+$/ }),
+        website.getByRole("link", {
+            name: /^Paid orders and bookings\s*[\d,]+/,
+        }),
     ).toHaveAttribute(
         "href",
         /^\/commerce\/orders\?date=custom&from=\d{4}-\d{2}-\d{2}&to=\d{4}-\d{2}-\d{2}&payment=paid$/,
     );
     await expect(website).toContainText(
-        "visits, visitors, enquiries and paid orders",
+        "visits, visitors, enquiries, and paid orders and bookings",
     );
     const visits = page.getByRole("group", { name: /^Visits each day/ });
     if ((await visits.count()) > 0) {
         await visits.getByRole("button").first().click();
         await expect(page.locator("main")).toContainText(
-            /\w+day \d+ \w+ · [\d,]+ visits? · [\d,]+ visitors?/,
+            /\w+day \d+ \w+ · (no visits|[\d,]+ visits? · [\d,]+ visitors?)/,
         );
     }
     await expect(page.locator("main")).not.toContainText(/\b\d{2}-\d{2}\b/);
@@ -173,7 +176,9 @@ test("a business that has never taken money is told so, not shown ₹0", async (
     await openInsights(page, WHITEFIELD, "?tab=from");
     const website = page.getByRole("region", { name: "Your website" });
     await expect(
-        website.getByRole("link", { name: /^Orders\s*0$/ }),
+        website.getByRole("link", {
+            name: /^Paid orders and bookings\s*0/,
+        }),
     ).toBeVisible();
     await expect(website.getByTestId("website-orders-note")).toContainText(
         /^No paid orders (recorded )?in the last 4 weeks\./,

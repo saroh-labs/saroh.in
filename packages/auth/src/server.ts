@@ -178,6 +178,12 @@ export interface CreateAuthOptions {
      * See `server-errors.ts`.
      */
     onServerError?: OnAuthServerError;
+    /**
+     * The proxies in front, as address ranges: the sign-in rate limit reads
+     * the client from `X-Forwarded-For` past them, from the right, as the
+     * host's own `trust proxy` does. None: only a single-address header.
+     */
+    trustedProxies?: string[];
 }
 
 /**
@@ -461,9 +467,12 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
         account: {
             accountLinking: {
                 enabled: true,
-                // Only link social accounts whose provider verifies the email,
-                // so a spoofed unverified email can't take over an account.
-                trustedProviders: ["github", "google"],
+                // Google only: every Google account's address is verified.
+                // GitHub lets an account keep an address it never verified,
+                // so a GitHub sign-in links only when GitHub says it is
+                // verified (Better Auth reads that flag), or anyone could add
+                // someone's address to GitHub and take their account.
+                trustedProviders: ["google"],
             },
         },
         emailAndPassword: {
@@ -575,6 +584,7 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
             // The development environment names its cookie apart from
             // production's (`AUTH_COOKIE_PREFIX`, `constants.ts`).
             cookiePrefix: sessionCookiePrefix(),
+            ipAddress: { trustedProxies: opts.trustedProxies },
             crossSubDomainCookies: cookieDomain
                 ? { enabled: true, domain: cookieDomain }
                 : { enabled: false },

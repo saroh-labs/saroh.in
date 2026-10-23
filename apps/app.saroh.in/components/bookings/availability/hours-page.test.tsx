@@ -59,7 +59,7 @@ vi.mock("./availability-editor", () => ({
         return null;
     },
 }));
-vi.mock("@/components/modules/module-gate", () => ({
+vi.mock("@/components/modules/gate/module-gate", () => ({
     ModuleGate: ({ children }: { children: ReactElement }) => children,
 }));
 

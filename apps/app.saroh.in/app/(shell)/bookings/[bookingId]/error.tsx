@@ -1,6 +1,6 @@
 "use client";
 
-import { SectionError } from "@/components/shared/section-error";
+import { SectionError } from "@/components/shared/states/section-error";
 
 /**
  * A booking that couldn't be read (U12): "Couldn't load this booking",

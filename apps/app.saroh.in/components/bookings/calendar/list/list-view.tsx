@@ -5,7 +5,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
 
 import { useNewBookingLauncher } from "@/components/bookings/new-booking/launcher";
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { formatClock, formatDay } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
 import type { Block, Column, LocalDate, Span } from "@/lib/services/diary";

@@ -1,4 +1,5 @@
 import type { LookId, RenderedCta } from "@saroh/block-contract";
+import { sectionFrameOf } from "@saroh/block-contract";
 import Link from "next/link";
 
 import { cn } from "../lib/utils";
@@ -93,7 +94,7 @@ const BUTTON: Record<LookId, Record<FrontButtonKind, string>> = {
     // VA01: square, the accent filled for the action, an ink or a control
     // edge for the rest; a link is ink underlined.
     folio: {
-        fill: "min-h-[52px] border border-site-accent bg-site-accent px-[26px] text-[15px] font-semibold tracking-[0.02em] text-site-accent-fg hover:opacity-90",
+        fill: "min-h-[52px] gap-[14px] border border-site-accent bg-site-accent px-[26px] text-[15px] font-semibold tracking-[0.02em] text-site-accent-fg hover:opacity-90",
         outline:
             "border border-site-fg bg-transparent px-[18px] text-[14px] font-semibold tracking-[0.02em] text-site-fg hover:bg-site-fg/5",
         quiet: "border border-site-rule bg-transparent px-[18px] text-[14px] font-semibold tracking-[0.02em] text-site-fg hover:border-site-fg",
@@ -213,6 +214,31 @@ function firstLetter(word: string): string {
         Array.from(word).find(
             (c) => !/[\s.,;:'"()[\]{}\-–—·&/\\!?*_+=@#%^`~|<>]/.test(c),
         ) ?? ""
+    );
+}
+
+/**
+ * The small label over a block's heading (the section's `eyebrow`, DEC-172,
+ * 22 Oct), in the look's eyebrow style; nothing when the section has none.
+ */
+export function LookEyebrow({
+    content,
+    look,
+    className,
+}: {
+    content: unknown;
+    look: LookId;
+    className?: string;
+}) {
+    const eyebrow = sectionFrameOf(content).eyebrow;
+    if (!eyebrow) return null;
+    return (
+        <p
+            data-site-eyebrow=""
+            className={cn(FRONT_TYPE[look].eyebrow, className)}
+        >
+            {eyebrow}
+        </p>
     );
 }
 

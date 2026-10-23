@@ -41,7 +41,7 @@ export function JournalLead({
     return (
         <article className="text-site-fg max-w-[var(--site-measure,40rem)]">
             {post.date ? (
-                <p className="text-site-accent text-[14px] tracking-[0.04em]">
+                <p className="text-site-accent-text text-[14px] tracking-[0.04em]">
                     {post.dateTime ? (
                         <time dateTime={post.dateTime}>{post.date}</time>
                     ) : (

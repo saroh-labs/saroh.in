@@ -29,7 +29,7 @@ export const RAW_ALLOWED = {
     // button: each item of a row's menu sheet on a phone, a row that is one button
     "components/bookings/all-bookings/row-menu.tsx": ["button"],
     // button: a row that is one button (a rule, opened to change it)
-    "components/bookings/availability/booking-rules-card.tsx": ["button"],
+    "components/bookings/booking-rules/booking-rules-card.tsx": ["button"],
     // button: a row that opens its time picker under it
     "components/bookings/availability/clock-select.tsx": ["button"],
     // button: a row that is one button (a shift, a person's day, add a shift)
@@ -39,9 +39,9 @@ export const RAW_ALLOWED = {
     // button: a row that is one button (add someone else)
     "components/bookings/availability/first-hours.tsx": ["button"],
     // button: a row that is one button (More's rows)
-    "components/bookings/availability/more-list.tsx": ["button"],
+    "components/bookings/booking-rules/more-list.tsx": ["button"],
     // button: a row or card that is one button
-    "components/bookings/availability/time-off-card.tsx": ["button"],
+    "components/bookings/time-off/time-off-card.tsx": ["button"],
     // button: a chip, a row or card that is one button
     "components/bookings/availability/weekly-hours.tsx": ["button"],
     // button: a card that is one button (whose hours, opened to pick)
@@ -62,7 +62,7 @@ export const RAW_ALLOWED = {
     // button: a row that is one button (a person, picked to see theirs)
     "components/bookings/calendar/header/people-sheet.tsx": ["button"],
     // button: a menu row that is one button (the quick look's More)
-    "components/bookings/calendar/quick-look-more.tsx": ["button"],
+    "components/bookings/quick-look/quick-look-more.tsx": ["button"],
     // button: a cell covered by its button, a row or card that is one button
     "components/bookings/calendar/day-by-person.tsx": ["button"],
     // button: a booking on the Day calendar, a block that is one button
@@ -70,7 +70,7 @@ export const RAW_ALLOWED = {
     // button: a booking on the diary, a block that is one button
     "components/bookings/calendar/diary-block.tsx": ["button"],
     // button: free time on the diary, a cell covered by its button
-    "components/bookings/calendar/free-gap.tsx": ["button"],
+    "components/bookings/free-time/free-gap.tsx": ["button"],
     // button: a day heading, a cell that is one button
     "components/bookings/calendar/week-view.tsx": ["button"],
     // button: free time and a booking on the diary, each one button
@@ -97,7 +97,7 @@ export const RAW_ALLOWED = {
     // button: a row or card that is one button
     "components/commerce/orders/bulk-bar.tsx": ["button"],
     // button: the ink bar's own buttons, as Orders' bulk bar draws them
-    "components/invoices/remind-bar.tsx": ["button"],
+    "components/invoices/list/remind-bar.tsx": ["button"],
     // button: a row or card that is one button
     "components/commerce/orders/order-row.tsx": ["button"],
     // button: a combobox trigger
@@ -112,13 +112,13 @@ export const RAW_ALLOWED = {
     // button: a row or card that is one button
     "components/commerce/product-editor-v2/visibility-section.tsx": ["button"],
     // button: a control styled by its screen's own helper
-    "components/commerce/product-page/sold-out-actions.tsx": ["button"],
+    "components/commerce/product-stock/sold-out-actions.tsx": ["button"],
     // button: a row or card that is one button
-    "components/commerce/product-page/stock-tab.tsx": ["button"],
+    "components/commerce/product-stock/stock-tab.tsx": ["button"],
     // button: a row or card that is one button
-    "components/commerce/product-page/stock-table.tsx": ["button"],
+    "components/commerce/product-stock/stock-table.tsx": ["button"],
     // button: a control styled by its screen's own helper
-    "components/commerce/product-page/tracking-actions.tsx": ["button"],
+    "components/commerce/product-stock/tracking-actions.tsx": ["button"],
     // button: a rich text toolbar's toggles
     "components/commerce/product-sections/description-editor.tsx": ["button"],
     // button: a row or card that is one button
@@ -130,18 +130,18 @@ export const RAW_ALLOWED = {
     // button: a chip that adds a token to the pattern
     "components/commerce/product-settings/sku-tab.tsx": ["button"],
     // button: a chip
-    "components/customers/customer-picker.tsx": ["button"],
+    "components/commerce/new-order/customer-picker.tsx": ["button"],
     // button: a Requests row that is one button, opening its side sheet (DEC-172)
     "components/customers/data-requests/requests-view.tsx": ["button"],
     // button: a row or card that is one button
-    "components/customers/detail/merge-search.tsx": ["button"],
+    "components/customers/more-actions/merge-search.tsx": ["button"],
     // button: a control styled by its screen's own helper
     "components/customers/detail/overview.tsx": ["button"],
     // button: a row or card that is one button
-    "components/home/first-run-jobs.tsx": ["button"],
+    "components/home/dashboard/first-run-jobs.tsx": ["button"],
     // button: Home's + on a phone, the 56px square floating over the tab bar
     // that opens the New sheet (DEC-171); no Button size is that shape
-    "components/home/new-sheet.tsx": ["button"],
+    "components/home/header/new-sheet.tsx": ["button"],
     // button: the phone Home's Next line, a row that is one button (U17)
     "components/home/phone/phone-next-line.tsx": ["button"],
     // button: each Needs you group's line on a phone, a row that is one
@@ -153,66 +153,75 @@ export const RAW_ALLOWED = {
     // button: Insights' period on a phone, the board's 40px white button
     // with the period's name that opens its sheet (DEC-171, IBPeriodP)
     // button: a week's bar of Money's chart, pressed to read and open it (U12)
-    "components/insights/money-chart.tsx": ["button"],
+    "components/insights/money/money-chart.tsx": ["button"],
     // button: an age of "Who owes me?", a row that is one button (U12)
-    "components/insights/owed-by-age.tsx": ["button"],
-    "components/insights/period-control.tsx": ["button"],
+    "components/insights/money/owed-by-age.tsx": ["button"],
+    "components/insights/overview/period-control.tsx": ["button"],
+    // button: the board's website chip on Where customers come from, naming
+    // the site shown and opening its picker (DEC-171, U14, IBSiteD)
+    "components/insights/where-from/site-picker.tsx": ["button"],
     // button: a part of the invoice's paper, pressed to change it (U15)
     "components/invoices/paper-editor/part-popover.tsx": ["button"],
     // button: "Add a line" under the paper's lines, a row that is one button (U15)
     "components/invoices/paper-editor/add-line.tsx": ["button"],
     // button: "Cheques not in the bank", a line that is one pressed filter (DEC-173)
-    "components/invoices/cheques-line.tsx": ["button"],
+    "components/invoices/list/cheques-line.tsx": ["button"],
     // button: a row or card that is one button
-    "components/invoices/invoice-row.tsx": ["button"],
+    "components/invoices/list/invoice-row.tsx": ["button"],
     // button: a figure of the money strip, a card that is one pressed filter (DEC-173)
-    "components/invoices/money-strip.tsx": ["button"],
+    "components/invoices/list/money-strip.tsx": ["button"],
     // button: a line's remove button, drawn twice (phone and desk) in the table's own grid
     "components/invoices/new-invoice/lines-table.tsx": ["button"],
     // button: a row or card that is one button
-    "components/organizations/organization-switcher.tsx": ["button"],
+    "components/organizations/switcher/organization-switcher.tsx": ["button"],
     // button: a row that opens its role
-    "components/organizations/roles-tab.tsx": ["button"],
+    "components/organizations/roles/role-list.tsx": ["button"],
+    // button: the list's New role row
+    "components/organizations/roles/roles-tab.tsx": ["button"],
     // button: a control styled by its screen's own helper
-    "components/qr/qr-add-logo.tsx": ["button"],
+    "components/qr/maker/qr-add-logo.tsx": ["button"],
     // button: a row or card that is one button
-    "components/qr/qr-target-picker.tsx": ["button"],
+    "components/qr/maker/qr-target-picker.tsx": ["button"],
     // button: a row that is one button (a service's own hours, opening under itself)
-    "components/services/service-editor/hours-field.tsx": ["button"],
+    "components/services/service-fields/hours-field.tsx": ["button"],
     // button: a row that is one button (More details, a saved service's rows)
     "components/services/service-editor/service-rows.tsx": ["button"],
     // button: a row or card that is one button
-    "components/settings/activity-list.tsx": ["button"],
+    "components/settings/activity/activity-list.tsx": ["button"],
     // button: a control styled by its screen's own helper, an option in a list; input: a field its screen draws itself
-    "components/settings/settings-search.tsx": ["button", "input"],
+    "components/shared/navigation/settings-search.tsx": ["button", "input"],
     // button: a row or card that is one button
-    "components/shared/app-sidebar.tsx": ["button"],
+    "components/shared/shell/app-sidebar.tsx": ["button"],
     // button: the one hand-drawn radio, shared by every choice group
-    "components/shared/choice-group.tsx": ["button"],
+    "components/shared/fields/choice-group.tsx": ["button"],
     // button: a control styled by its screen's own helper
-    "components/shared/failed-read.tsx": ["button"],
+    "components/shared/states/failed-read.tsx": ["button"],
     // button: Other rate, a chip-shaped disclosure (aria-expanded) beside the rates (DEC-176)
-    "components/shared/gst-rate-picker.tsx": ["button"],
+    "components/shared/fields/gst-rate-picker.tsx": ["button"],
     // input: a file picker
-    "components/shared/logo-upload.tsx": ["input"],
+    "components/shared/fields/logo-upload.tsx": ["input"],
     // button: a tab
-    "components/shared/section-list.tsx": ["button"],
+    "components/shared/page/section-list.tsx": ["button"],
     // button: a control styled by its screen's own helper
-    "components/shared/tab-bar.tsx": ["button"],
+    "components/shared/shell/tab-bar.tsx": ["button"],
     // button: a chip
-    "components/shared/user-menu.tsx": ["button"],
+    "components/shared/shell/user-menu.tsx": ["button"],
     // button: a row or card that is one button
-    "components/sites/add-block-panel.tsx": ["button"],
+    "components/sites/blocks/add-block-panel.tsx": ["button"],
     // button: a row or card that is one button
-    "components/sites/add-page-panel.tsx": ["button"],
+    "components/sites/pages/add-page-panel.tsx": ["button"],
     // button: a row or card that is one button
-    "components/sites/add-section-dialog.tsx": ["button"],
+    "components/sites/blocks/add-section-dialog.tsx": ["button"],
     // button: the site editor's own answer buttons
-    "components/sites/choice-field.tsx": ["button"],
+    "components/sites/section-fields/choice-field.tsx": ["button"],
     // button: a row or card that is one button
-    "components/sites/editor/editor-canvas.tsx": ["button"],
+    "components/sites/canvas/editor-canvas.tsx": ["button"],
     // button: a choice in a list
     "components/sites/editor/editor-rail.tsx": ["button"],
+    // button: a Brand tab colour row, one line that opens its swatches (DEC-184)
+    "components/sites/looks/colour-picker.tsx": ["button"],
+    // button: the phone's Typeface row in the Brand sheet, one line (DEC-184)
+    "components/sites/looks/typeface-picker.tsx": ["button"],
     // button: a row or card that is one button, a row that opens
     "components/sites/editor/editor-top-bar.tsx": ["button"],
     // button: a tab of the editor's bottom bar
@@ -220,23 +229,23 @@ export const RAW_ALLOWED = {
     // button: the preview width toggles, a row or card that is one button
     "components/sites/editor/top-bar-actions.tsx": ["button"],
     // input: a file picker
-    "components/sites/media-picker.tsx": ["input"],
+    "components/shared/fields/media-picker.tsx": ["input"],
     // button: a row or card that is one button, an option in a list
-    "components/sites/pages-panel.tsx": ["button"],
+    "components/sites/pages/pages-panel.tsx": ["button"],
     // input: a field its screen draws itself
-    "components/sites/post-editor.tsx": ["input"],
+    "components/sites/posts/post-editor.tsx": ["input"],
     // button: a row or card that is one button
-    "components/sites/pre-publish-check.tsx": ["button"],
+    "components/sites/publish/pre-publish-check.tsx": ["button"],
     // button: a colour swatch in the toolbar; input: a field its screen draws itself
-    "components/sites/rich-text-editor.tsx": ["button", "input"],
+    "components/sites/rich-text/rich-text-editor.tsx": ["button", "input"],
     // input: a slider
     "components/sites/section-fields/padding.tsx": ["input"],
     // button: a block's name tag on the canvas
-    "components/sites/section-preview.tsx": ["button"],
+    "components/sites/canvas/section-preview.tsx": ["button"],
     // input: a slider
-    "components/sites/style-panel.tsx": ["input"],
+    "components/sites/looks/style-panel.tsx": ["input"],
     // input: a file picker
-    "components/stores/csv-import.tsx": ["input"],
+    "components/stores/import/csv-import.tsx": ["input"],
     // input: a native radio inside its card; label: a radio card with a timeline in it
-    "components/subscriptions/timing-card.tsx": ["input", "label"],
+    "components/subscriptions/plans/timing-card.tsx": ["input", "label"],
 };

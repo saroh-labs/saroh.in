@@ -2,13 +2,13 @@ import type {
     NavCounts,
     NavGroup,
     NavItem,
-} from "@/components/shared/nav-items";
+} from "@/components/shared/navigation/nav-items";
 import {
     isNavChildCurrent,
     isNavItemActive,
     isNavSectionActive,
     navCountFor,
-} from "@/components/shared/nav-items";
+} from "@/components/shared/navigation/nav-items";
 
 /**
  * The phone's navigation: four tabs, then More (the "Saroh Tab Bar" design,

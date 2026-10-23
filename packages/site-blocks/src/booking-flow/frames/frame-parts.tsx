@@ -180,9 +180,12 @@ export function CloseButton({
 export function Progress({
     count,
     className,
+    segment,
 }: {
     count: { at: number; of: number };
     className?: string;
+    /** Each hairline's size, per look's board. */
+    segment?: string;
 }) {
     return (
         <div aria-hidden="true" className={cn("flex gap-1.5", className)}>
@@ -191,6 +194,7 @@ export function Progress({
                     key={i}
                     className={cn(
                         "h-[3px] flex-1 rounded-full",
+                        segment,
                         i < count.at ? "bg-site-fg" : "bg-site-border",
                     )}
                 />
@@ -199,18 +203,42 @@ export function Progress({
     );
 }
 
+/**
+ * The bar's words and button as each look's board sets them: Quiet's price
+ * 18/500 (VD08), Folio's 12.5px muted line and 17px price (VA08), Live's
+ * condensed 26px price (40px in its desk card) and 58px button (VB08).
+ */
+const BAR_STYLE: Record<
+    LookId,
+    { summary?: string; price?: string; stackPrice?: string; action?: string }
+> = {
+    quiet: { price: "text-[18px] font-medium" },
+    folio: {
+        summary: "text-site-muted text-[12.5px]",
+        price: "text-[17px]",
+    },
+    live: {
+        price: "font-site-heading text-[26px] font-extrabold leading-[0.9] tracking-[-0.03em] [font-stretch:80%]",
+        stackPrice: "text-[40px]",
+        action: "min-h-[58px] px-[26px] text-[17px]",
+    },
+};
+
 /** The summary and the step's one filled button. */
 export function BarContent({
     bar,
+    look,
     className,
     stack = false,
 }: {
     bar: FrameBarProps;
+    look: LookId;
     className?: string;
     /** The button under the words, full width (Live's desk card). */
     stack?: boolean;
 }) {
     const { action } = bar;
+    const style = BAR_STYLE[look];
     return (
         <div
             className={cn(
@@ -220,12 +248,23 @@ export function BarContent({
         >
             <div className="min-w-0 flex-1">
                 {bar.summary ? (
-                    <p className="text-site-body truncate text-[13.5px]">
+                    <p
+                        className={cn(
+                            "text-site-body truncate text-[13.5px]",
+                            style.summary,
+                        )}
+                    >
                         {bar.summary}
                     </p>
                 ) : null}
                 {bar.price ? (
-                    <p className="text-site-fg text-[19px] font-semibold tabular-nums leading-tight">
+                    <p
+                        className={cn(
+                            "text-site-fg text-[19px] font-semibold tabular-nums leading-tight",
+                            style.price,
+                            stack && style.stackPrice,
+                        )}
+                    >
                         {bar.price}
                     </p>
                 ) : null}
@@ -250,6 +289,7 @@ export function BarContent({
                     }
                     className={cn(
                         lookPrimary(action.blocked),
+                        style.action,
                         stack ? "w-full" : "shrink-0",
                     )}
                 >

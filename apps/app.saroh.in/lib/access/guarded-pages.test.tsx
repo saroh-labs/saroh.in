@@ -74,13 +74,13 @@ vi.mock("@/lib/discounts/options", () => ({
     loadReachOptions: () => loadReachOptions(),
 }));
 // The forms themselves are not under test: a marker says one was drawn.
-vi.mock("@/components/stores/discount-form", () => ({
+vi.mock("@/components/stores/discounts/discount-form", () => ({
     DiscountForm: () => <form data-testid="discount-form" />,
 }));
-vi.mock("@/components/customers/add-customer-form", () => ({
+vi.mock("@/components/customers/store-customer/add-customer-form", () => ({
     AddCustomerForm: () => <form data-testid="add-customer-form" />,
 }));
-vi.mock("@/components/sites/post-editor", () => ({
+vi.mock("@/components/sites/posts/post-editor", () => ({
     PostEditor: () => <form data-testid="post-editor" />,
 }));
 

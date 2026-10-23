@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
     BookingsCouldntLoad,
     BookingsView,
-} from "@/components/bookings/bookings-view";
+} from "@/components/bookings/all-bookings/bookings-view";
 import {
     NewBookingButton,
     NewBookingHost,
@@ -14,10 +14,10 @@ import {
     flowServices,
     flowStaff,
 } from "@/components/bookings/new-booking/setup";
-import { Moment } from "@/components/shared/moment";
-import { PageContainer } from "@/components/shared/page-container";
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
-import { SinceNotice } from "@/components/shared/since-notice";
+import { Moment } from "@/components/shared/notices/moment";
+import { SinceNotice } from "@/components/shared/notices/since-notice";
+import { PageContainer } from "@/components/shared/page/page-container";
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { readOnlyLine } from "@/lib/access/who-can-change";
 import { takesOnlinePayment } from "@/lib/billing/access";
 import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";

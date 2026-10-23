@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { NavGroup, NavRole } from "@/components/shared/nav-items";
+import type {
+    NavGroup,
+    NavRole,
+} from "@/components/shared/navigation/nav-items";
 import {
     NAV_GROUPS,
     NOTIFICATIONS_NAV,
@@ -18,7 +21,7 @@ import {
     navRoleCan,
     navRowsForModule,
     settingsPagesFor,
-} from "@/components/shared/nav-items";
+} from "@/components/shared/navigation/nav-items";
 
 /**
  * What each role is OFFERED (#313).

@@ -12,7 +12,7 @@ import {
     bookingRow,
 } from "@/lib/customer-workspace/view";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { Chips, Empty, ROW_LINK } from "./parts";
 
 /**

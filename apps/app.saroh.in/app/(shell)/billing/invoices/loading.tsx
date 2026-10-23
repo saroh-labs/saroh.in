@@ -1,4 +1,4 @@
-import { PageLoading } from "@/components/shared/page-loading";
+import { PageLoading } from "@/components/shared/page/page-loading";
 
 /**
  * The Invoices list's own shape (DEC-173, U8 #1120): the header as the

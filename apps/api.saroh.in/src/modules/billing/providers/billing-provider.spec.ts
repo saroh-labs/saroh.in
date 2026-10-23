@@ -1163,6 +1163,7 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
 
     it("puts an item on a subscription's next charge, GST included, with Saroh's reference (U16)", async () => {
         const { provider, calls } = recorded([
+            { status: 200, body: { items: [] } },
             { status: 200, body: { id: "ao_1" } },
         ]);
         await expect(
@@ -1174,7 +1175,10 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
                 currency: "INR",
             }),
         ).resolves.toEqual({ providerChargeId: "ao_1" });
-        expect(calls[0]).toEqual({
+        expect(calls[0]?.url).toBe(
+            "https://api.razorpay.com/v1/addons?count=100&skip=0",
+        );
+        expect(calls[1]).toEqual({
             url: "https://api.razorpay.com/v1/subscriptions/sub_9/addons",
             method: "POST",
             body: {
@@ -1187,6 +1191,45 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
                 quantity: 1,
             },
         });
+    });
+
+    it("never adds an item twice: a repeat finds the add-on already made under its reference (U16)", async () => {
+        const { provider, calls } = recorded([
+            {
+                status: 200,
+                body: {
+                    items: [
+                        // Another subscription's item with the same reference
+                        // text, and this one's other item: neither is it.
+                        {
+                            id: "ao_other_sub",
+                            subscription_id: "sub_8",
+                            item: { description: "saroh_ref:row_1" },
+                        },
+                        {
+                            id: "ao_other_row",
+                            subscription_id: "sub_9",
+                            item: { description: "saroh_ref:row_2" },
+                        },
+                        {
+                            id: "ao_made",
+                            subscription_id: "sub_9",
+                            item: { description: "saroh_ref:row_1" },
+                        },
+                    ],
+                },
+            },
+        ]);
+        await expect(
+            provider.charges.addToNextCharge({
+                providerSubscriptionId: "sub_9",
+                reference: "row_1",
+                name: "More things (add-on)",
+                amountPaise: 262,
+                currency: "INR",
+            }),
+        ).resolves.toEqual({ providerChargeId: "ao_made" });
+        expect(calls.map((c) => c.method)).toEqual(["GET"]);
     });
 
     it("reads when an event happened, its phase and the period it paid to", () => {

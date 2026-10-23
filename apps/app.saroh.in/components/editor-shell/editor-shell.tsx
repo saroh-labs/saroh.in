@@ -8,10 +8,10 @@ import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
-import { useLeaveGuard } from "@/components/shared/use-leave-guard";
+import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
+import { useLeaveGuard } from "@/components/shared/forms/use-leave-guard";
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import {
     heldAtOpen,
     isSettled,

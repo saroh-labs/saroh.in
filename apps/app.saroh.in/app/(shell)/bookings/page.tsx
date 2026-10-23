@@ -3,7 +3,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { cookies } from "next/headers";
 
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
-import { BookingsViewSwitch } from "@/components/bookings/bookings-view-switch";
+import { BookingsViewSwitch } from "@/components/bookings/all-bookings/bookings-view-switch";
 import { CalendarScreen } from "@/components/bookings/calendar/calendar-screen";
 import {
     NewBookingButton,
@@ -13,8 +13,8 @@ import {
     flowServices,
     flowStaff,
 } from "@/components/bookings/new-booking/setup";
-import { PageContainer } from "@/components/shared/page-container";
-import { ShareLinkButton } from "@/components/sites/share-link-button";
+import { PageContainer } from "@/components/shared/page/page-container";
+import { ShareLinkButton } from "@/components/shared/share-link/share-link-button";
 import { takesOnlinePayment } from "@/lib/billing/access";
 import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packsOn } from "@/lib/class-packs/switched-on";

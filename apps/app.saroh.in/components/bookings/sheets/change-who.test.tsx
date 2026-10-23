@@ -14,11 +14,11 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BookingQuickLook } from "@/components/bookings/calendar/booking-quick-look";
+import { BookingQuickLook } from "@/components/bookings/quick-look/booking-quick-look";
 import type {
     QuickLookActions,
     QuickLookContext,
-} from "@/components/bookings/calendar/quick-look-types";
+} from "@/components/bookings/quick-look/quick-look-types";
 import type { DiaryBooking } from "@/lib/services/booking-calendar";
 import type { Block } from "@/lib/services/diary";
 import { bookingState } from "@/lib/services/diary";
@@ -27,8 +27,8 @@ import type { ReassignCandidate } from "@/lib/services/service";
 import { candidateNote, changeWhoSave, changeWhoTitle } from "./change-who";
 
 vi.mock(
-    "@/components/shared/use-hold",
-    () => import("@/components/shared/hold-now.test-kit"),
+    "@/components/shared/undo/use-hold",
+    () => import("@/components/shared/undo/hold-now.test-kit"),
 );
 
 const readBookingPerson = vi.fn();

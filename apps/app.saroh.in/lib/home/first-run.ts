@@ -57,7 +57,7 @@ export interface InvoiceJobFacts {
 
 /**
  * What a module is called where the merchant will look for it: the sidebar
- * (`components/shared/nav-items.tsx`). The design says "People"; this sidebar
+ * (`components/shared/navigation/nav-items.tsx`). The design says "People"; this sidebar
  * says Contacts, and a toast pointing at a row that does not exist sends the
  * merchant looking for nothing.
  */

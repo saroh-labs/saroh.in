@@ -9,7 +9,7 @@
  * clock. Imports nothing server-only: the screen is a client component.
  */
 
-import type { StatusTone } from "@/components/shared/status-badge";
+import type { StatusTone } from "@/components/shared/lists/status-badge";
 import { formatDay } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
 import { firstName } from "@/lib/names";

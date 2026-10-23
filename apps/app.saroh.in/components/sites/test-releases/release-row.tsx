@@ -16,8 +16,8 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 
-import type { ConfirmResult } from "@/components/shared/confirm-dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import type { ConfirmResult } from "@/components/shared/confirm/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm/confirm-dialog";
 import { openReleaseInNewTab } from "@/components/sites/test-releases/open-release";
 import { ReleaseLinks } from "@/components/sites/test-releases/release-links";
 import { runAction } from "@/lib/api/run-action";

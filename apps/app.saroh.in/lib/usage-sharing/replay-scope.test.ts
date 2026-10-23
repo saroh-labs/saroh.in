@@ -89,32 +89,32 @@ describe("session replay is the workspace and saroh.in only", () => {
 
     it("only WorkspaceTracking starts it, behind the notice, in the shell and the goal picker", () => {
         expect(filesWith("app.saroh.in", /\.startReplay\(/)).toEqual([
-            "components/shared/workspace-tracking.tsx",
+            "components/shared/shell/workspace-tracking.tsx",
         ]);
         expect(filesWith("app.saroh.in", /\.startSiteReplay\(/)).toEqual([]);
         // The one place that mounts the recorder also mounts the notice.
         expect(filesWith("app.saroh.in", /<WorkspaceTracking\b/)).toEqual([
-            "components/shared/usage-recording.tsx",
+            "components/shared/shell/usage-recording.tsx",
         ]);
         expect(filesWith("app.saroh.in", /<UsageNotice\b/)).toEqual([
-            "components/shared/usage-recording.tsx",
+            "components/shared/shell/usage-recording.tsx",
         ]);
         expect(filesWith("app.saroh.in", /<UsageRecording\b/).sort()).toEqual([
             "app/onboarding/modules/layout.tsx",
-            "components/shared/app-shell.tsx",
+            "components/shared/shell/app-shell.tsx",
         ]);
     });
 
     it("a page visit is named only by the two components that start the recorder (DEC-160)", () => {
         expect(filesWith("app.saroh.in", /[Tt]racking\??\.pageview\(/)).toEqual(
-            ["components/shared/workspace-tracking.tsx"],
+            ["components/shared/shell/workspace-tracking.tsx"],
         );
         expect(filesWith("saroh.in", /[Tt]racking\??\.pageview\(/)).toEqual([
             "app/site-tags.tsx",
         ]);
         // The workspace names a route's shape, never the address.
         expect(
-            read("app.saroh.in/components/shared/workspace-tracking.tsx"),
+            read("app.saroh.in/components/shared/shell/workspace-tracking.tsx"),
         ).toContain("routeShape(usePathname(), useParams())");
         // saroh.in names the address its allow-list leaves.
         expect(read("saroh.in/app/site-tags.tsx")).toContain(
@@ -124,7 +124,7 @@ describe("session replay is the workspace and saroh.in only", () => {
 
     it("a recording is asked for only where it is switched on, shared, and told", () => {
         const recording = read(
-            "app.saroh.in/components/shared/usage-recording.tsx",
+            "app.saroh.in/components/shared/shell/usage-recording.tsx",
         );
         expect(recording).toContain(
             "sharesUsage={recordingOn && sharesUsageNow(read)}",
@@ -134,12 +134,12 @@ describe("session replay is the workspace and saroh.in only", () => {
             "{recordingOn && usageNoticeDue(read) ? <UsageNotice /> : null}",
         );
         // Read before the recorder could start, and only when switched on.
-        expect(read("app.saroh.in/components/shared/app-shell.tsx")).toContain(
-            "recordingOn ? usageSharingOrNull() : null",
-        );
+        expect(
+            read("app.saroh.in/components/shared/shell/app-shell.tsx"),
+        ).toContain("recordingOn ? usageSharingOrNull() : null");
         // The recorder is told whether the notice has been shown.
         expect(
-            read("app.saroh.in/components/shared/workspace-tracking.tsx"),
+            read("app.saroh.in/components/shared/shell/workspace-tracking.tsx"),
         ).toContain("noticeShown,");
     });
 

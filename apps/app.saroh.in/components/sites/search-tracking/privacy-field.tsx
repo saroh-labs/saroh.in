@@ -7,7 +7,7 @@ import { Label } from "@saroh/ui/label";
 import { showSuccess } from "@saroh/ui/toast";
 import { useId, useState, useTransition } from "react";
 
-import { FormSheet } from "@/components/shared/form-sheet";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import {
     NOTE,
     PROBLEM,

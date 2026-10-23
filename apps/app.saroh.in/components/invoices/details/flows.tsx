@@ -4,17 +4,17 @@ import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
-import type { CancelOrCorrectInvoice } from "@/components/invoices/cancel-or-correct-sheet";
-import { CancelOrCorrectSheet } from "@/components/invoices/cancel-or-correct-sheet";
-import type { InvoiceRef } from "@/components/invoices/invoice-actions";
-import { RefundInvoiceDialog } from "@/components/invoices/invoice-actions";
-import { RecordPaymentSheet } from "@/components/invoices/record-payment-sheet";
-import { ShareSheet } from "@/components/invoices/share-sheet";
+import type { CancelOrCorrectInvoice } from "@/components/invoices/cancel-or-correct/cancel-or-correct-sheet";
+import { CancelOrCorrectSheet } from "@/components/invoices/cancel-or-correct/cancel-or-correct-sheet";
+import { RecordPaymentSheet } from "@/components/invoices/payments/record-payment-sheet";
+import { ShareSheet } from "@/components/invoices/share/share-sheet";
 import type { ShareMessageKind } from "@/lib/invoices/detail-actions";
 import type { InvoiceDetails } from "@/lib/invoices/details";
 import type { PaymentTarget } from "@/lib/invoices/record-payment";
 import type { ShareTab } from "@/lib/invoices/share";
 import { invoiceZone } from "@/lib/invoices/zone";
+import type { InvoiceRef } from "./invoice-actions";
+import { RefundInvoiceDialog } from "./invoice-actions";
 
 /*
  * The seams the details view opens other units' flows through (DEC-173,

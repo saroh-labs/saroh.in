@@ -5,8 +5,8 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useState } from "react";
 
-import { FailedRead } from "@/components/shared/failed-read";
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
+import { FailedRead } from "@/components/shared/states/failed-read";
 import { personHref } from "@/lib/contacts/person-href";
 import type { ChargeRow, CollectionRow } from "@/lib/subscriptions/view";
 import { chargeHref } from "@/lib/subscriptions/view";

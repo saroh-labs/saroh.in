@@ -1,6 +1,6 @@
 "use client";
 
-import { Refusal } from "@/components/shared/refusal";
+import { Refusal } from "@/components/shared/states/refusal";
 import { formatDate } from "@/lib/format/datetime";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
@@ -8,8 +8,8 @@ import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { Chip } from "@/components/shared/chip";
-import { FormDialog } from "@/components/shared/form-dialog";
+import { FormDialog } from "@/components/shared/forms/form-dialog";
+import { Chip } from "@/components/shared/lists/chip";
 import { runAction } from "@/lib/api/run-action";
 import { extendHolder } from "@/lib/class-packs/actions";
 import {

@@ -19,6 +19,7 @@ import { safeLink } from "./notice";
 import { orderStepNotice, placedOrderNotice } from "./order";
 import { orderDeliveryNotice } from "./order-delivery";
 import { packNotice } from "./pack";
+import { preDebitNotice } from "./pre-debit";
 import { refundSentNotice } from "./refund";
 import { teamReplyNotice } from "./thread-reply";
 import { waitlistNotice } from "./waitlist";
@@ -38,6 +39,8 @@ import { waitlistNotice } from "./waitlist";
  */
 export const NOTICES = {
     AUTOPAY_FAILED: autopayFailedNotice,
+    // A day before each eMandate debit (DEC-180, #1175).
+    AUTOPAY_PRE_DEBIT: preDebitNotice,
     BACK_IN_STOCK: backInStockNotice,
     // "We'll email you when it's back", with Stop waiting (DEC-178, #1170).
     BACK_IN_STOCK_WAITING: backInStockWaitingNotice,

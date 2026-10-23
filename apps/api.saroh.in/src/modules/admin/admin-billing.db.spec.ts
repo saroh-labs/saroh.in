@@ -1,5 +1,5 @@
 /**
- * Admin › Billing over HTTP against a real Postgres (DEC-163): only Saroh
+ * Admin › Billing over HTTP against a real Postgres (DEC-179): only Saroh
  * staff holding `saroh-billing:read` (Platform Owners and Billing) see every
  * business's invoices, their PDFs, the month's export and the
  * subscriptions. The owner's rule (17 Oct): the API decides, and nobody

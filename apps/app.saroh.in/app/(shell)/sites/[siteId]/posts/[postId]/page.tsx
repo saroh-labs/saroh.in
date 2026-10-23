@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
-import { PostEditor } from "@/components/sites/post-editor";
-import { PostReadView } from "@/components/sites/post-read-view";
+import { PostEditor } from "@/components/sites/posts/post-editor";
+import { PostReadView } from "@/components/sites/posts/post-read-view";
 import { activeCut, postPaused } from "@/lib/billing/paused";
 import { getPost, listPostCategories } from "@/lib/content/service";
 import { recordTitle } from "@/lib/page-title";

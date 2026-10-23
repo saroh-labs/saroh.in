@@ -36,22 +36,22 @@ import {
     tagFor,
 } from "@/lib/customer-workspace/view";
 
-import { RequestBanner } from "@/components/customers/data-requests/request-banner";
-import { runAction } from "@/lib/api/run-action";
-import type { DataRequestRow } from "@/lib/customer-workspace/data-requests-view";
-import { requestsHref } from "@/lib/customer-workspace/data-requests-view";
 import {
     AttentionCard,
     AttentionEditor,
     HeaderAttention,
     useAttention,
-} from "./attention";
-import { AttentionSuggestions } from "./attention-suggestions";
+} from "@/components/customers/attention/attention";
+import { AttentionSuggestions } from "@/components/customers/attention/attention-suggestions";
+import { RequestBanner } from "@/components/customers/data-requests/request-banner";
+import { useMoreActions } from "@/components/customers/more-actions/more-actions";
+import { runAction } from "@/lib/api/run-action";
+import type { DataRequestRow } from "@/lib/customer-workspace/data-requests-view";
+import { requestsHref } from "@/lib/customer-workspace/data-requests-view";
 import { InvoicesTab, SubscriptionsTab } from "./billing-tabs";
 import { BookingsTab } from "./bookings-tab";
 import { Header, Tabs } from "./header";
 import { MessagesTab } from "./messages-tab";
-import { useMoreActions } from "./more-actions";
 import { Notes } from "./notes";
 import { DuplicateNotice, PartialNotice, PossibleMatch } from "./notices";
 import { OrdersTab } from "./orders-tab";

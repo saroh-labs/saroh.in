@@ -9,7 +9,7 @@ import { PenLine } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { FormSheet } from "@/components/shared/form-sheet";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import { updateLead } from "@/lib/leads/actions";
 

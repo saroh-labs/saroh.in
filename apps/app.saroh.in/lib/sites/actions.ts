@@ -2,6 +2,7 @@
 
 import type { VisitPlacesRead } from "@/lib/stores/storefronts";
 import { listVisitPlaces } from "@/lib/stores/storefronts";
+import type { LookId } from "@saroh/block-contract";
 
 import type { GridCatalogueRead } from "./grid-catalogue";
 import { readGridCatalogue } from "./grid-catalogue";
@@ -13,7 +14,6 @@ import type {
     CreateSiteInput,
     PreviewLinkDays,
     ReviewerVerdict,
-    Section,
     SectionInput,
     SiteFooter,
     SiteNavigation,
@@ -22,24 +22,29 @@ import type {
     UpdatePageInput,
 } from "./service";
 import {
+    bringInSection as bringInSectionApi,
+    copyStarterContent as copyStarterContentApi,
     createApproval as createApprovalApi,
     createComment as createCommentApi,
     createPage as createPageApi,
     createPreviewLink as createPreviewLinkApi,
     createSite as createSiteApi,
     deletePage as deletePageApi,
-    getPageDraft as getPageDraftApi,
+    fillDetails as fillDetailsApi,
     getReviewState as getReviewStateApi,
     getSiteFlags as getSiteFlagsApi,
     listComments as listCommentsApi,
+    listDraftVersions as listDraftVersionsApi,
     listPreviewLinks as listPreviewLinksApi,
     publishSite as publishSiteApi,
     requestReview as requestReviewApi,
     restorePublication as restorePublicationApi,
     revokePreviewLink as revokePreviewLinkApi,
+    rollbackDraft as rollbackDraftApi,
     saveDraftSections as saveDraftSectionsApi,
     saveSiteIcon as saveSiteIconApi,
     setCommentResolved as setCommentResolvedApi,
+    undoStarterContent as undoStarterContentApi,
     updatePage as updatePageApi,
     updateSiteFooter as updateSiteFooterApi,
     updateSiteNavigation as updateSiteNavigationApi,
@@ -136,25 +141,45 @@ export async function restorePublication(
 }
 
 /**
- * One page's draft sections, for a picture of it drawn outside the editor's
- * open page: a look's preview draws the home page (DEC-177). Null when it
- * can't be read; nothing is written.
+ * "Use this look with its starter content" (DEC-182): the look set and its
+ * showcase template copied into the draft.
  */
-export async function getPageSections(
+export async function copyStarterContent(
     siteId: string,
+    look: LookId | "classic",
+    fill: boolean,
+) {
+    return copyStarterContentApi(siteId, look, fill);
+}
+
+/** "Bring in my details" (DEC-182): sample words filled with the business's. */
+export async function fillDetails(siteId: string) {
+    return fillDetailsApi(siteId);
+}
+
+/** The draft's previous versions, newest first (DEC-182). */
+export async function listDraftVersions(siteId: string) {
+    return listDraftVersionsApi(siteId);
+}
+
+/** Roll the draft back to a previous version (DEC-182). */
+export async function rollbackDraft(siteId: string, versionId: string) {
+    return rollbackDraftApi(siteId, versionId);
+}
+
+/** One section of a previous version brought into the draft (DEC-182). */
+export async function bringInSection(
+    siteId: string,
+    versionId: string,
     pageId: string,
-): Promise<Section[] | null> {
-    try {
-        const draft = await getPageDraftApi(siteId, pageId);
-        if (!draft) return null;
-        // As the editor's page reads them: `order` is the array's.
-        return draft.sections.map(
-            ({ type, contractVersion, content, hidden, key }) =>
-                ({ type, contractVersion, content, hidden, key }) as Section,
-        );
-    } catch {
-        return null;
-    }
+    sectionKey: string,
+) {
+    return bringInSectionApi(siteId, versionId, pageId, sectionKey);
+}
+
+/** Put back the draft a starter copy replaced (DEC-182). */
+export async function undoStarterContent(siteId: string, snapshotId: string) {
+    return undoStarterContentApi(siteId, snapshotId);
 }
 
 export async function updateSiteStyle(siteId: string, style: SiteStyle) {

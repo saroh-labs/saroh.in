@@ -246,14 +246,49 @@ export {
     clinicTemplate,
 } from "./templates/clinic";
 export {
+    PRANA_GALLERY_SAMPLE,
+    PRANA_TEMPLATE_ID,
+    pranaShowcase,
+} from "./templates/prana";
+export {
     SALON_GALLERY_SAMPLE,
     SALON_TEMPLATE_ID,
     salonServiceIds,
     salonTemplate,
 } from "./templates/salon";
 
-// Every gallery template's sample words, by id (KTD-6): gallery renders only.
+// Every gallery template's sample words, by id (KTD-6): the gallery's
+// renders, a look's Preview, and the starter content an owner copies into
+// a draft (DEC-182). Never a new site.
+export {
+    GALLERY_PATCHES,
+    withGallerySample,
+    withGallerySamples,
+} from "./gallery-patches";
+export type { GallerySectionPatch } from "./gallery-patches";
 export { GALLERY_SAMPLES } from "./gallery-samples";
+export { gallerySampleIn, isGallerySample } from "./sample-words";
+export type { GallerySampleFound } from "./sample-words";
+// A starter's sample words replaced with the business's own (DEC-182).
+export { fillBusinessDetails } from "./fill-details";
+export type { BusinessFacts, FillResult, FilledKind } from "./fill-details";
+
+// Each look's showcase template, and what copying it into a draft replaces
+// (DEC-182).
+export {
+    LOOK_SHOWCASE_PALETTE,
+    LOOK_SHOWCASE_TEMPLATE,
+    SHOWCASE_ONLY_TEMPLATES,
+    lookShowcaseTemplate,
+    starterCopyPlan,
+    withLookShowcase,
+} from "./look-showcase";
+export type {
+    ShowcaseLook,
+    StarterCopyPlan,
+    StarterCopySitePage,
+    StarterCopyTemplatePage,
+} from "./look-showcase";
 
 // The pre-publish check's matcher for a template's placeholder words.
 export {

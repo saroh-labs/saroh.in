@@ -86,6 +86,25 @@ describe("Analytics retention sweep (DB)", () => {
         ).resolves.toMatchObject({ count: 3 });
     });
 
+    it("drops a visit's step events past retention like any other event (U15)", async () => {
+        const step = await prisma.analyticsEvent.create({
+            data: {
+                organizationId: org,
+                type: "site.visit",
+                properties: { source: "instagram", ref: "diwali-post" },
+                occurredAt: new Date(now.getTime() - 401 * DAY),
+                receivedAt: new Date(now.getTime() - 401 * DAY),
+                expiresAt: new Date(now.getTime() - DAY),
+            },
+        });
+
+        await retention.sweep(now);
+
+        await expect(
+            prisma.analyticsEvent.findUnique({ where: { id: step.id } }),
+        ).resolves.toBeNull();
+    });
+
     it("keeps one waiting run of the chain", async () => {
         await prisma.job.deleteMany({
             where: { type: ANALYTICS_RETENTION_TYPE },

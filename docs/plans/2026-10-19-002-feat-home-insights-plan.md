@@ -125,10 +125,28 @@ recommendation)**
 - **A12. Who sees suggestions:** anyone with Insights; the money-based ones
   (late bill, selling less) only with `payment:read`.
 - **A13. Link tracking and consent:** sources are counted for every visit
-  without identifying anyone (referrer origin and an allowed `ref` or
-  `utm_source` value only); a visit is tied to a paid order only through a
-  short-lived visit id never stored with the person; #889's banner can widen
-  this later. A privacy review happens before U15 merges.
+  without identifying anyone (the referrer's host and an allowed `ref` or
+  `utm_source` value only); #889's banner can widen this later.
+  _As built (U15 #1099, privacy review 21 Oct; DEC-181, 21 Oct):_ there
+  is **no visit id**, and **totals only**: nothing about a visit is kept on
+  an order or a customer (no `Order.visitSource` / `visitRef`, no "came
+  from" on the order; that migration was dropped before release). The
+  visit lives in the visitor's tab memory only. Paid is the visit's own
+  fourth step, `site.paid`, sent once by its confirmation page after a
+  successful online payment, with the group and label only; a payment
+  made later another way isn't counted to a source and a refund isn't
+  taken off one. **Only links made in Saroh** count as a label: the
+  business makes them on Insights › Where customers come from (`SiteLink`),
+  and the intake keeps a step's label only when it is one of the site's
+  live links, else the step counts under its group. `ref` is never read on
+  `/book` or with the booking flow's `step=` (it is a booking's id there);
+  a label with a run of six digits, seven digits in all, or an id's shape
+  is dropped by the site and by the API. The steps (`site.visit`,
+  `site.looked`, `site.started` and `site.paid`, which the private
+  `/checkout` and `/shop/order/<id>` still send) carry no visitor hash and
+  are stored to the hour; labels under 3 visits in a range read as "Other
+  links". No banner: the privacy-review fixes and the "what is collected"
+  table are in `docs/patterns/saroh-product.md` → Insights.
 - **A14. Low stock uses each stock level's own alert** (`lowStockAlert` on
   the inventory row), and no row appears for a product with no stock level.
   The row says how fast it sells ("sells about 9 a day") when it sold in
@@ -1052,6 +1070,12 @@ extend `e2e/tests/insights-from.spec.ts`.
 **Test scenarios:** steps never go up; "1 in 7"; sources below a minimum
 grouped as Other; before tracking began → the tab says from when; db spec
 plain and `TEST_RLS=on`; e2e desk and phone.
+
+_Since DEC-181:_ paid is per site (the visit's own `site.paid`), so a
+website chosen narrows all four steps and the table's "Paid is counted for
+your whole business" note is gone. The links made in Saroh are listed and
+made under the sources (`site-links.tsx`), and the website figure of
+unique visitors a day is "Visitors" again (owner, 21 Oct).
 
 ### U17. Home on a phone, simplified
 

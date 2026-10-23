@@ -2,7 +2,7 @@ import { Button } from "@saroh/ui/button";
 import { planLabel } from "@saroh/ui/lib/state-copy";
 import Link from "next/link";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import type { PausedView } from "@/lib/billing/paused";
 import { PLAN_AND_BILLING_HREF, pausedBanner } from "@/lib/billing/paused";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";

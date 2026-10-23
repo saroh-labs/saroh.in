@@ -4,8 +4,8 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import type { StatusTone } from "@/components/shared/status-badge";
-import { whoCanChange } from "@/components/shared/who-can-change";
+import type { StatusTone } from "@/components/shared/lists/status-badge";
+import { whoCanChange } from "@/components/shared/states/who-can-change";
 import type { DiaryState } from "@/lib/services/diary";
 
 /**
@@ -61,11 +61,11 @@ export const STATE_TONE: Record<DiaryState, StatusTone> = {
 };
 
 /**
- * The choice chip lives in `components/shared/chip.tsx` since the customer
+ * The choice chip lives in `components/shared/lists/chip.tsx` since the customer
  * picker (E4) shares it; re-exported so the Bookings screens import it from
  * here as before.
  */
-export { Chip } from "@/components/shared/chip";
+export { Chip } from "@/components/shared/lists/chip";
 
 /** The small uppercase label over a group of chips. */
 export function Eyebrow({

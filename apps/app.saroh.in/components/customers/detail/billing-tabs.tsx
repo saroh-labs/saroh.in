@@ -5,7 +5,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useState } from "react";
 
-import { RecordPaymentSheet } from "@/components/invoices/record-payment-sheet";
+import { RecordPaymentSheet } from "@/components/invoices/payments/record-payment-sheet";
 import type {
     DetailInvoice,
     DetailSubscription,
@@ -13,7 +13,7 @@ import type {
 import type { Kind } from "@/lib/customer-workspace/view";
 import { invoiceRow, isPayable, subRow } from "@/lib/customer-workspace/view";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { Notice } from "@saroh/ui/notice";
 import { Empty, ROW_LINK } from "./parts";
 

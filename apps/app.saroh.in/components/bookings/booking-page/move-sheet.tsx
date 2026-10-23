@@ -9,13 +9,13 @@ import {
     changeToldText,
     isTakenRefusal,
     movedToldText,
-} from "@/components/bookings/calendar/quick-look-state";
+} from "@/components/bookings/quick-look/quick-look-state";
 import { TimePicker } from "@/components/bookings/sheets/time-picker";
 import {
     FormSheet,
     FormSheetBody,
     FormSheetFoot,
-} from "@/components/shared/form-sheet";
+} from "@/components/shared/forms/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import { formatDateTime, formatTime } from "@/lib/format/datetime";
 import type { NoticeReach } from "@/lib/messages/notice-reach";

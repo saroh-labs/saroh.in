@@ -55,6 +55,8 @@ const CLASS_LEVEL: Record<string, string> = {
     "sites/site-icon.controller.ts": "WEBSITE",
     // A site's QR codes (Settings › Share).
     "sites/qr-codes.controller.ts": "WEBSITE",
+    // A look's starter content copied into the draft, and its Undo (DEC-182).
+    "sites/starter-content.controller.ts": "WEBSITE",
     "forms/forms.controller.ts": "WEBSITE",
     "domains/domains.controller.ts": "WEBSITE",
     "content/posts.controller.ts": "WEBSITE",
@@ -350,7 +352,7 @@ const NEVER: Record<string, string> = {
         "saroh.in's contact form, not a tenant surface",
     "admin/admin-contact-messages.controller.ts":
         "staff control plane (messages from saroh.in/contact), not a tenant surface",
-    // DEC-163, DEC-166: Saroh's own invoices, subscriptions and the billing
+    // DEC-179, DEC-166: Saroh's own invoices, subscriptions and the billing
     // queue and controls, across businesses.
     "admin/admin-billing.controller.ts":
         "staff control plane (Saroh's own billing), not a tenant surface",

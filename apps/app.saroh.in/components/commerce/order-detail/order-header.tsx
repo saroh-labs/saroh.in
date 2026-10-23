@@ -4,12 +4,12 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { BusinessDate } from "@/components/shared/business-zone";
+import { BusinessDate } from "@/components/shared/dates/business-zone";
 import { howWords } from "@/lib/orders/lifecycle";
 import type { StepTone } from "@/lib/orders/list-row";
 import type { OrderRead } from "@/lib/orders/read";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 
 /**
  * The order's page header: "Sell › Orders › #1063", its number and status, how long it has waited ("Late" in words and

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormDialog } from "@/components/shared/form-dialog";
+import { FormDialog } from "@/components/shared/forms/form-dialog";
 import { count, plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";

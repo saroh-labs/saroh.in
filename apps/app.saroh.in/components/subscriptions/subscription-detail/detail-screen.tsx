@@ -10,8 +10,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import type { ContactOption } from "@/components/shared/contact-picker";
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import type { ContactOption } from "@/components/shared/fields/contact-picker";
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { autopayPanel } from "@/lib/subscriptions/autopay";
 import { pauseNote, pauseOptions } from "@/lib/subscriptions/pause";
 import type {
@@ -40,9 +40,9 @@ import {
     subscriptionPay,
 } from "@/lib/subscriptions/view";
 
-import { StatusBadge } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/lists/status-badge";
+import { SubscribeDialog } from "@/components/subscriptions/list/subscribe-dialog";
 import { Notice } from "@saroh/ui/notice";
-import { SubscribeDialog } from "../subscribe-dialog";
 import type { Step } from "./action-dialogs";
 import { ActionDialog } from "./action-dialogs";
 import { AutopayActions } from "./autopay-panel";

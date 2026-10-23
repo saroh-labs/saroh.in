@@ -16,12 +16,12 @@ import {
     ratePicker,
     rateShown,
     ratesOffered,
-} from "@/components/shared/gst-rate-picker.testing";
+} from "@/components/shared/fields/gst-rate-picker.testing";
 
 import type { InvoiceFormBusiness } from "@/lib/invoices/new-invoice";
 import type { Invoice } from "@/lib/invoices/service";
 
-import { InvoiceForm } from "../invoice-form";
+import { InvoiceForm } from "./invoice-form";
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -31,9 +31,13 @@ vi.mock("next/navigation", () => ({
 // On the paper (U15), the business\'s settings save in place.
 vi.mock("@/lib/organizations/settings-actions", () => ({
     saveOrganizationSettings: vi.fn(),
+    saveOrganizationSettingsInPlace: vi.fn(),
     saveBusinessLogo: vi.fn(),
+    saveBusinessLogoInPlace: vi.fn(),
 }));
-vi.mock("@/components/shared/logo-upload", () => ({ LogoUpload: () => null }));
+vi.mock("@/components/shared/fields/logo-upload", () => ({
+    LogoUpload: () => null,
+}));
 const actions = vi.hoisted(() => ({
     createInvoice: vi.fn(),
     issueInvoice: vi.fn(),
@@ -44,13 +48,16 @@ vi.mock("@/lib/invoices/link-actions", () => ({ newPayLink: vi.fn() }));
 const products = vi.hoisted(() => ({ findInvoiceProducts: vi.fn() }));
 vi.mock("@/lib/invoices/product-actions", () => products);
 vi.mock("@/lib/contacts/create", () => ({ createContact: vi.fn() }));
-vi.mock("@/components/organizations/use-business-details-step", () => ({
-    useBusinessDetailsStep: () => ({
-        run: (fn: () => unknown) => fn(),
-        ensure: () => Promise.resolve(true),
-        step: null,
+vi.mock(
+    "@/components/organizations/business-details/use-business-details-step",
+    () => ({
+        useBusinessDetailsStep: () => ({
+            run: (fn: () => unknown) => fn(),
+            ensure: () => Promise.resolve(true),
+            step: null,
+        }),
     }),
-}));
+);
 const toast = vi.hoisted(() => ({
     showSuccess: vi.fn(),
     showError: vi.fn(),

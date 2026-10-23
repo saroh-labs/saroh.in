@@ -5,7 +5,7 @@ import { Input } from "@saroh/ui/input";
 import { OptionSelect } from "@saroh/ui/option-select";
 import type { ChangeEvent } from "react";
 
-import { BusinessPhoneInput } from "@/components/shared/business-phone-input";
+import { BusinessPhoneInput } from "@/components/shared/fields/business-phone-input";
 import { GST_STATES } from "@/lib/invoices/gst";
 import { phoneProblem } from "@/lib/organizations/business-phone";
 import type { BillingDetail, ChangeQuote } from "@/lib/saroh-billing/plan-view";

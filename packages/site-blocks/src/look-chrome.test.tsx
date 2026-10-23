@@ -680,6 +680,25 @@ describe("the dock's tabs", () => {
             "Book",
         ]);
     });
+
+    it("puts the action in the middle, as board VB lays it", () => {
+        const tabs = dockTabs({
+            home: "/",
+            pages: [
+                { label: "Timetable", href: "/timetable" },
+                { label: "Plans", href: "/plans" },
+            ],
+            action: BOOK,
+            accountHref: "/account",
+        });
+        expect(tabs.map((t) => t.label)).toEqual([
+            "Home",
+            "Timetable",
+            "Book",
+            "Plans",
+            "You",
+        ]);
+    });
 });
 
 describe("chrome page kinds", () => {
@@ -770,9 +789,15 @@ describe.each(LOOKS)("%s's footer", (look) => {
         // No accounts on this site: no column for them.
         expect(within(foot).queryByText("Your account")).toBeNull();
         // The footer's Book is an outline: the view's filled button is the
-        // page's own.
-        const book = within(foot).getByRole("link", { name: "Book" });
-        expect(book.className).not.toMatch(FILLED);
+        // page's own. Live's has none: its dock and page carry Book (VB).
+        if (look === "live") {
+            expect(
+                within(foot).queryByRole("link", { name: "Book" }),
+            ).toBeNull();
+        } else {
+            const book = within(foot).getByRole("link", { name: "Book" });
+            expect(book.className).not.toMatch(FILLED);
+        }
         for (const link of within(foot).getAllByRole("link")) {
             const row =
                 TALL.test(link.className) ||

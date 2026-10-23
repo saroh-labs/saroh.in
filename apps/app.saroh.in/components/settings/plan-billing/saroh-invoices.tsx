@@ -5,7 +5,7 @@ import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { ReceiptText } from "lucide-react";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import type { SarohInvoice } from "@/lib/saroh-billing/plan-view";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 

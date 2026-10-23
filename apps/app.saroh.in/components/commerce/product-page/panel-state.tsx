@@ -9,7 +9,7 @@ import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { Children } from "react";
 
-import { whoCanChange } from "@/components/shared/who-can-change";
+import { whoCanChange } from "@/components/shared/states/who-can-change";
 
 /**
  * A product tab with nothing in it yet: the shared empty card at panel

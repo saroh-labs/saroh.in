@@ -724,7 +724,7 @@ export default function ProductPage({
                         </h2>
                         {product.description ? (
                             <div
-                                className="prose prose-sm prose-headings:text-site-fg prose-p:text-site-body prose-strong:text-site-fg prose-li:text-site-body prose-a:text-site-accent mt-2.5 max-w-[65ch] text-[15px] leading-relaxed"
+                                className="prose prose-sm prose-headings:text-site-fg prose-p:text-site-body prose-strong:text-site-fg prose-li:text-site-body prose-a:text-site-accent-text mt-2.5 max-w-[65ch] text-[15px] leading-relaxed"
                                 // Sanitised by the API on every save.
                                 dangerouslySetInnerHTML={{
                                     __html: product.description,

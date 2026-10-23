@@ -191,7 +191,7 @@ ${block}
                     --site-page-margin: ${px(tokens.pageMargin.desk)};
                     --site-section-padding: ${px(tokens.sectionPadding.desk)};
                 }
-            }${cardCorners(at)}${stateRules(at)}${fonts && lookNeedsRupee(look) ? rupeeFaceRules() : ""}`;
+            }${cardCorners(at, look)}${sectionRules(at, look)}${stateRules(at)}${fonts && lookNeedsRupee(look) ? rupeeFaceRules() : ""}`;
 }
 
 /**
@@ -251,13 +251,43 @@ function stateRules(at: string): string {
  * Classic markup. A block drawn for the look names `rounded-site-s` or
  * `rounded-site-photo` itself and is not matched.
  */
-function cardCorners(at: string): string {
+function cardCorners(at: string, look: LookId): string {
+    // Live's cards are 24 (board VB), its photo radius; other looks' are small.
+    const card = look === "live" ? "--site-radius-photo" : "--site-radius-s";
     return `
             ${at} [class*="rounded-[calc(var(--site-radius)*1.4)]"],
             ${at} [class*="rounded-[calc(var(--site-radius)*1.6)]"] {
-                border-radius: var(--site-radius-s);
+                border-radius: var(${card});
             }
             ${at} img[class*="rounded-[var(--site-radius)]"] {
                 border-radius: var(--site-radius-photo);
+            }`;
+}
+
+/**
+ * The hairline between sections (boards VA and VD): a full-width rule over
+ * every section after the first under Folio, and after the second under
+ * Quiet (its services follow the hero unruled). Never over a band or a
+ * block that paints its own ground. Quiet's weights ride along.
+ */
+function sectionRules(at: string, look: LookId): string {
+    if (look === "live") return "";
+    // Quiet's body face loads 400 and 500 only, and its boards never go
+    // heavier: a bold anywhere under it is drawn at 500, not faked.
+    const weights =
+        look === "quiet"
+            ? `
+            ${at} :is(.font-semibold, .font-bold, .font-extrabold),
+            ${at} [class*="aria-[current=page]:font-bold"][aria-current="page"] {
+                font-weight: 500;
+            }`
+            : "";
+    const after =
+        look === "quiet"
+            ? "[data-site-section] ~ [data-site-section] ~ [data-site-section]"
+            : "[data-site-section] ~ [data-site-section]";
+    return `${weights}
+            ${at} ${after}:not(:empty):not([data-site-band]):not(:has(> [data-site-ground])) {
+                border-top: 1px solid hsl(var(--site-border));
             }`;
 }

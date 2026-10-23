@@ -11,7 +11,7 @@ import {
     ListFilter,
     ListPaging,
     ListToolbar,
-} from "@/components/shared/list-toolbar";
+} from "@/components/shared/lists/list-toolbar";
 
 import { productHref } from "@/lib/products/links";
 import type { StockHref, StockListPage } from "@/lib/stock/list-query";

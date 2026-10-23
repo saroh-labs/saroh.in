@@ -11,7 +11,7 @@ import type {
     DataColumn,
     DataFilter,
 } from "@/components/shared/data-view/types";
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { personHref } from "@/lib/contacts/person-href";
 import type { ContactListItem } from "@/lib/contacts/service";
 import { contactSourceLabel } from "@/lib/contacts/source";

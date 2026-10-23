@@ -1,6 +1,6 @@
 "use client";
 
-import { SectionError } from "@/components/shared/section-error";
+import { SectionError } from "@/components/shared/states/section-error";
 
 /**
  * New order couldn't be opened. Its own boundary, so it isn't told the

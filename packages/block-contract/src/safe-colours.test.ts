@@ -107,6 +107,38 @@ describe("deriveSafeColours", () => {
         expect(parsePalette(safe.palette).ok).toBe(true);
     });
 
+    it("keeps a designed lime fill under Live when the palette names its own accent text (board VB)", () => {
+        const board = given({
+            bg: "#EDEEEA",
+            surface: "#FFFFFF",
+            fg: "#121410",
+            body: "#121410",
+            muted: "#55584F",
+            border: "#DEE0D8",
+            accent: "#C6F432",
+            accentFg: "#121410",
+            accentText: "#4C6300",
+        });
+        const live = deriveSafeColours(board, "live").palette;
+        expect(live.accent).toBe("#C6F432");
+        expect(live.accentText).toBe("#4C6300");
+        expect(
+            contrastRatio(live.accentFg, live.accent),
+        ).toBeGreaterThanOrEqual(PALETTE_MIN_CONTRAST);
+        expect(parsePalette(live, { accentFillContrast: 1 }).ok).toBe(true);
+        // Another look still holds the fill to a graphic's 3:1.
+        const quiet = deriveSafeColours(board, "quiet").palette;
+        expect(contrastRatio(quiet.accent, quiet.bg)).toBeGreaterThanOrEqual(
+            PALETTE_GRAPHIC_CONTRAST,
+        );
+        // A business's own lime (no accent text) is still moved under Live.
+        const { accentText: _none, ...business } = board;
+        const moved = deriveSafeColours(business, "live").palette;
+        expect(contrastRatio(moved.accent, moved.bg)).toBeGreaterThanOrEqual(
+            PALETTE_GRAPHIC_CONTRAST,
+        );
+    });
+
     it("lifts the rule to 3:1 on the page and on a card", () => {
         const safe = deriveSafeColours(
             given({
@@ -141,18 +173,18 @@ describe("deriveSafeColours", () => {
         expect(parsePalette(safe.palette).ok).toBe(true);
     });
 
-    it("draws Live's cards a step off the page, and no other look's", () => {
+    it("tints Live's page a step off its white cards, and no other look's", () => {
         const palette = given({
             ...WHITE_PAGE,
             accent: "#1F5A3D",
             accentFg: "#FFFFFF",
         });
-        expect(deriveSafeColours(palette, "live").palette.surface).not.toBe(
-            "#FFFFFF",
-        );
-        expect(deriveSafeColours(palette, "quiet").palette.surface).toBe(
-            "#FFFFFF",
-        );
+        const live = deriveSafeColours(palette, "live").palette;
+        // Board VB: white cards on a grey ground.
+        expect(live.surface).toBe("#FFFFFF");
+        expect(live.bg).not.toBe("#FFFFFF");
+        expect(live.heroBg).toBe(live.bg);
+        expect(deriveSafeColours(palette, "quiet").palette.bg).toBe("#FFFFFF");
         // A palette's own surface is kept.
         expect(
             deriveSafeColours({ ...palette, surface: "#FAFAFA" }, "live")

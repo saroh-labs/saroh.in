@@ -19,8 +19,15 @@ import {
  * booking" beside them with the button. Both are drawn and CSS shows one
  * (`max-[699px]:` / `min-[700px]:`), never a width read in script.
  */
+/** VB08's hairlines: 4px, 2px corners, 4px apart (`.prog`, `.pg`). */
+const LIVE_SEGMENT = "h-1 rounded-[2px]";
+/** VB08's step title: 40px on a phone (`.d3`), 56px on a desk (`.d2`). */
+const TITLE =
+    "[&>h2]:text-[calc(2.5rem*var(--site-heading-scale,1))] min-[700px]:[&>h2]:text-[calc(3.5rem*var(--site-heading-scale,1))]";
+
 export function SheetsFrame(props: FrameProps) {
     const {
+        look,
         business,
         label,
         countText,
@@ -43,38 +50,50 @@ export function SheetsFrame(props: FrameProps) {
             className="bg-site-bg text-site-fg max-[699px]:min-h-[100dvh]"
         >
             {/* The phone's sheet head. */}
-            <div className="px-4 pt-3 min-[700px]:hidden">
-                <div className="grid grid-cols-[44px_minmax(0,1fr)_44px] items-center">
+            <div className="px-4 pb-2.5 min-[700px]:hidden">
+                <div className="grid h-[60px] grid-cols-[44px_minmax(0,1fr)_44px] items-center">
                     {onBack ? (
                         <BackButton onBack={onBack} />
                     ) : (
                         <span aria-hidden="true" />
                     )}
-                    <p className="text-center text-[14.5px] font-semibold">
+                    <p className="text-center text-[14.5px] font-bold">
                         {where || label}
                     </p>
                     <CloseButton onClose={onClose} />
                 </div>
-                {count ? <Progress count={count} className="mt-3" /> : null}
+                {count ? (
+                    <Progress
+                        count={count}
+                        className="gap-1"
+                        segment={LIVE_SEGMENT}
+                    />
+                ) : null}
             </div>
             {/* The desk's page head. */}
-            <div className="mx-auto max-w-[1180px] px-10 pt-6 max-[699px]:hidden">
-                <div className="flex items-center gap-4">
+            <div className="mx-auto max-w-[1180px] px-10 max-[699px]:hidden">
+                <div className="flex h-[76px] items-center gap-4">
                     {onBack ? <BackButton onBack={onBack} /> : null}
                     <p className="font-site-heading flex-1 truncate text-[22px] font-extrabold tracking-[-0.02em]">
                         {business}
                     </p>
-                    <p className="text-[15px] font-semibold">{label}</p>
+                    <p className="text-[16px] font-bold">{label}</p>
                     <div className="flex flex-1 justify-end">
                         <CloseButton onClose={onClose} withWord />
                     </div>
                 </div>
-                {count ? <Progress count={count} className="mt-4" /> : null}
+                {count ? (
+                    <Progress
+                        count={count}
+                        className="gap-1"
+                        segment={LIVE_SEGMENT}
+                    />
+                ) : null}
             </div>
 
             <div
                 style={FRAME_RADII}
-                className="mx-auto grid max-w-[1180px] gap-8 px-4 pb-40 pt-5 min-[700px]:grid-cols-[minmax(0,1fr)_340px] min-[700px]:px-10 min-[700px]:pb-16 min-[700px]:pt-8"
+                className="mx-auto grid max-w-[1180px] gap-8 px-4 pb-40 pt-5 min-[700px]:grid-cols-[minmax(0,1fr)_420px] min-[700px]:gap-12 min-[700px]:px-10 min-[700px]:pb-16 min-[700px]:pt-7"
             >
                 <div data-site-fade="" className="min-w-0">
                     {top ? <div className="mb-4">{top}</div> : null}
@@ -83,27 +102,27 @@ export function SheetsFrame(props: FrameProps) {
                             {earlier}
                         </div>
                     ) : null}
-                    {heading}
+                    <div className={TITLE}>{heading}</div>
                     <div className="mt-5">{children}</div>
                 </div>
                 {bar ? (
                     <aside
                         aria-label="Your booking"
-                        className="bg-site-surface border-site-border rounded-site-s sticky top-6 self-start border p-6 max-[699px]:hidden"
+                        className="bg-site-surface rounded-site-photo sticky top-6 self-start p-6 shadow-[0_1px_0_rgba(0,0,0,.04),0_18px_40px_-24px_rgba(0,0,0,.35)] max-[699px]:hidden"
                     >
-                        <p className="text-site-muted mb-3 text-[13px] font-semibold">
+                        <p className="text-site-muted mb-3 text-[13px] font-bold tracking-[0.02em]">
                             Your booking
                         </p>
-                        <BarContent bar={bar} stack />
+                        <BarContent bar={bar} look={look} stack />
                     </aside>
                 ) : null}
             </div>
             {bar ? (
                 <div
                     data-booking-bar=""
-                    className="bg-site-bg border-site-border fixed inset-x-0 bottom-[var(--site-consent-offset,0px)] z-50 border-t px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 min-[700px]:hidden"
+                    className="bg-site-bg fixed inset-x-0 bottom-[var(--site-consent-offset,0px)] z-50 px-4 pb-[calc(20px+env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_24px_-16px_rgba(0,0,0,.25)] min-[700px]:hidden"
                 >
-                    <BarContent bar={bar} />
+                    <BarContent bar={bar} look={look} />
                 </div>
             ) : null}
         </div>

@@ -1,6 +1,6 @@
 import { PageHeader } from "@saroh/ui/page-header";
 
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 
 /** The page's line under its title (BKMAvailability, BKDHours). */
 export const HOURS_LEAD =

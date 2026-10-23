@@ -15,6 +15,7 @@ import {
     startCheckout,
 } from "@/app/[domain]/shop/actions";
 
+import { VisitStep } from "@/components/visit-step";
 import { publicApiUrl } from "@/lib/api-url";
 import { getSignedInCustomer } from "@/lib/customer-session";
 import { dontCachePage } from "@/lib/page-cache/site-rules";
@@ -63,6 +64,8 @@ export default async function LookCheckoutPage({
 
     return (
         <main className="w-full">
+            {/* The visit started a checkout (U15): once a visit. */}
+            <VisitStep step="started" />
             <LookCheckout
                 look={look}
                 site={resolved.siteId}

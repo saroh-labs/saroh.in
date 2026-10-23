@@ -2,8 +2,8 @@ import { ModuleOffState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 import { CalendarDays } from "lucide-react";
 
-import { AccessDenied } from "@/components/shared/access-denied";
-import { whoCanChange } from "@/components/shared/who-can-change";
+import { AccessDenied } from "@/components/shared/states/access-denied";
+import { whoCanChange } from "@/components/shared/states/who-can-change";
 
 /**
  * A business with nothing the calendar can lay out for this person: none of

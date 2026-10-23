@@ -91,9 +91,14 @@ test.describe("site sign-in: the API side", () => {
             .getByLabel("Password", { exact: true })
             .fill(demoUser.password);
         await page.getByRole("button", { name: "Sign in" }).click();
-        await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-            timeout: 30_000,
-        });
+        // Polled: `waitForURL` fails on a redirect cut short on the way
+        // (net::ERR_ABORTED), though the page lands (DEV_LEARNINGS, 20 Oct).
+        await expect
+            .poll(() => new URL(page.url()).pathname.startsWith("/login"), {
+                timeout: 30_000,
+            })
+            .toBe(false);
+        await page.waitForLoadState("load");
         // The same browser, carrying the workspace cookies.
         const res = await page.request.get(sessionUrl, {
             headers: { "x-saroh-relay": relay(SITE_HOST) },
@@ -124,9 +129,14 @@ test.describe("site sign-in: in the browser", () => {
             .getByLabel("Password", { exact: true })
             .fill(demoUser.password);
         await page.getByRole("button", { name: "Sign in" }).click();
-        await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-            timeout: 30_000,
-        });
+        // Polled: `waitForURL` fails on a redirect cut short on the way
+        // (net::ERR_ABORTED), though the page lands (DEV_LEARNINGS, 20 Oct).
+        await expect
+            .poll(() => new URL(page.url()).pathname.startsWith("/login"), {
+                timeout: 30_000,
+            })
+            .toBe(false);
+        await page.waitForLoadState("load");
     }
 
     /**

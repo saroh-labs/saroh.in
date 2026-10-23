@@ -18,9 +18,9 @@ import {
     updateField,
 } from "@/lib/products/settings-actions";
 
-import { Chip } from "@/components/shared/chip";
-import { ChipGroup } from "@/components/shared/choice-group";
-import { FormSheet } from "@/components/shared/form-sheet";
+import { ChipGroup } from "@/components/shared/fields/choice-group";
+import { FormSheet } from "@/components/shared/forms/form-sheet";
+import { Chip } from "@/components/shared/lists/chip";
 import { Segmented } from "@saroh/ui/segmented";
 import { PROBLEM } from "./product-settings";
 

@@ -4,7 +4,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { lookOf, lookScope } from "./look-context";
-import { HELD_AFTER_MS, RUPEE_FAMILY, withRupee } from "./look-theme";
+import {
+    HELD_AFTER_MS,
+    lookRules,
+    RUPEE_FAMILY,
+    withRupee,
+} from "./look-theme";
 import SectionRenderer, {
     opensOverPhoto,
     PageSections,
@@ -116,10 +121,11 @@ describe("a look's tokens", () => {
     it("Quiet: pill buttons, its photo and small corners, its phone and desk spacing", () => {
         const sheet = css("quiet");
         expect(lastValue(sheet, "--site-radius")).toBe("999px");
-        expect(lastValue(sheet, "--site-radius-photo")).toBe("16px");
-        expect(lastValue(sheet, "--site-radius-s")).toBe("12px");
+        // Board VD: fields 14, photos 4, sections 72 on a phone.
+        expect(lastValue(sheet, "--site-radius-photo")).toBe("4px");
+        expect(lastValue(sheet, "--site-radius-s")).toBe("14px");
         expect(lastValue(sheet, "--site-page-margin")).toBe("20px");
-        expect(lastValue(sheet, "--site-section-padding")).toBe("64px");
+        expect(lastValue(sheet, "--site-section-padding")).toBe("72px");
         const desk = block(sheet, "@media (min-width: 768px)");
         expect(desk).toContain("--site-page-margin: 48px;");
         expect(desk).toContain("--site-section-padding: 120px;");
@@ -229,12 +235,10 @@ describe("a look's type", () => {
         expect(lastValue(folio, "--site-content-width")).toBe("initial");
         // No column rule for a width the look does not set.
         expect(folio).not.toContain("max-width: var(--site-content-width)");
-        // Folio's section titles are eyebrows in the quiet colour, not the
-        // template's accent ones.
-        const label = block(folio, ":is([data-site-title]");
-        expect(label).toContain("color: hsl(var(--site-muted));");
-        expect(label).not.toContain("--site-accent");
-        // Quiet sets no label style: plain titles.
+        // No look sets a label style (VA01 draws a section's own small
+        // label over a large heading, DEC-172 22 Oct), and the template's
+        // is cleared: plain titles under Folio and Quiet alike.
+        expect(folio).not.toContain("letter-spacing: 0.14em;");
         expect(css("quiet")).not.toContain("letter-spacing: 0.14em;");
     });
 
@@ -480,5 +484,38 @@ describe("the states every look shares (U15)", () => {
         const sheet = css(undefined);
         expect(sheet).not.toContain("site-held");
         expect(sheet).not.toContain("--site-consent-offset");
+    });
+});
+
+describe("a look's rules between sections (boards VA and VD)", () => {
+    it("rules Folio's sections from the second, Quiet's from the third, never Live's", () => {
+        const folio = lookRules(":root", "folio", null);
+        const quiet = lookRules(":root", "quiet", null);
+        expect(folio).toContain(
+            ":root [data-site-section] ~ [data-site-section]:not(:empty)",
+        );
+        expect(quiet).toContain(
+            ":root [data-site-section] ~ [data-site-section] ~ [data-site-section]:not(:empty)",
+        );
+        expect(folio).toContain(
+            "border-top: 1px solid hsl(var(--site-border))",
+        );
+        expect(lookRules(":root", "live", null)).not.toContain("border-top");
+    });
+
+    it("draws a bold at 500 under Quiet only, whose face has no heavier weight", () => {
+        expect(lookRules(":root", "quiet", null)).toContain("font-weight: 500");
+        expect(lookRules(":root", "folio", null)).not.toContain(
+            "font-weight: 500",
+        );
+    });
+});
+
+describe("Folio's full padding between sections (board VA)", () => {
+    it("drops the halved gap under Folio only; Classic keeps it", () => {
+        const halved = "padding-top: calc(var(--site-section-padding) * 0.5)";
+        expect(craftRules(":root", {}, "folio")).not.toContain(halved);
+        expect(craftRules(":root", {}, "quiet")).toContain(halved);
+        expect(craftRules(":root", {})).toContain(halved);
     });
 });

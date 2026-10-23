@@ -4,12 +4,12 @@ import { useRouter } from "next/navigation";
 
 import type { SendHeld } from "@/components/bookings/sheets/cancel-sheet";
 import { CancelSheet } from "@/components/bookings/sheets/cancel-sheet";
-import { TakePayment } from "@/components/bookings/take-payment";
 import { formatDateTime } from "@/lib/format/datetime";
 import { paidLine } from "@/lib/services/booking-money";
 import type { PageBooking } from "@/lib/services/booking-page";
 import type { DeskTake } from "@/lib/services/desk-pay";
 import type { PeekPerson } from "@/lib/services/peek";
+import { TakePayment } from "./take-payment";
 
 import { ChangeWhoSheet } from "@/components/bookings/sheets/change-who";
 

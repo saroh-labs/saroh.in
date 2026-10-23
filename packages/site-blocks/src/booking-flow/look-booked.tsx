@@ -153,45 +153,128 @@ export function LookBooked({
         ...(change ? [["Change", change] as [string, React.ReactNode]] : []),
     ];
 
+    // VD08f: centred, a ringed tick, the service and the date in the
+    // display face (the date in italic), then the details as a list.
+    const quiet = look === "quiet";
+    const calendar = (
+        <a
+            href={googleCalendarHref({ ...entry, location: where })}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={quiet ? lookLink : lookOutline}
+        >
+            Add to Google Calendar
+        </a>
+    );
+    const directionsLink = directions ? (
+        <a
+            href={directions}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={quiet ? lookLink : lookOutline}
+        >
+            Directions
+        </a>
+    ) : null;
+
     return (
-        <div data-booking-done="" data-site-fade="" className="min-w-0">
+        <div
+            data-booking-done=""
+            data-site-fade=""
+            className={cn("min-w-0", quiet && "text-center")}
+        >
+            {quiet ? (
+                <span
+                    aria-hidden="true"
+                    className="border-site-fg text-site-fg mb-6 inline-flex size-[72px] items-center justify-center rounded-full border"
+                >
+                    <svg
+                        width="28"
+                        height="28"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.25"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    >
+                        <path d="M5 12.5l4.5 4.5L19 7.5" />
+                    </svg>
+                </span>
+            ) : null}
             <h2
                 ref={headingRef}
                 tabIndex={-1}
                 className={cn(
                     STEP_HEADING[look],
                     "text-site-fg outline-none [text-wrap:balance]",
-                    look === "quiet" && "text-left min-[700px]:text-left",
+                    quiet &&
+                        "min-[700px]:text-[calc(4rem*var(--site-heading-scale,1))]",
                 )}
             >
                 You&apos;re booked{phase.first ? `, ${phase.first}` : ""}.
             </h2>
-            <p className="text-site-fg mt-2 text-[17px] font-medium">
-                {booking.serviceName}
-            </p>
+            {quiet ? (
+                <>
+                    <p className="font-site-heading text-site-fg mt-5 text-[28px] font-normal leading-[1.15] min-[700px]:text-[34px]">
+                        {booking.serviceName}
+                    </p>
+                    <p
+                        data-booking-when=""
+                        className="font-site-heading text-site-fg mt-4 text-[28px] italic leading-[1.2] min-[700px]:text-[34px]"
+                    >
+                        {phase.when}
+                    </p>
+                </>
+            ) : (
+                <p className="text-site-fg mt-2 text-[17px] font-medium">
+                    {booking.serviceName}
+                </p>
+            )}
             {/* What happens next: an email only when one goes. */}
             <p className="text-site-body mt-1 text-[14.5px] [overflow-wrap:anywhere]">
                 {toldText(reachOrNull(booking.reach), email)}
             </p>
 
-            <dl
-                data-booking-ticket=""
-                className="border-site-fg mt-5 border-y py-1"
-            >
-                {rows.map(([k, v]) => (
-                    <div
-                        key={k}
-                        className="border-site-border flex gap-4 border-b py-3 text-[14.5px] last:border-b-0"
-                    >
-                        <dt className="text-site-muted w-[84px] shrink-0">
-                            {k}
-                        </dt>
-                        <dd className="text-site-fg min-w-0 flex-1 font-medium [overflow-wrap:anywhere]">
-                            {v}
-                        </dd>
-                    </div>
-                ))}
-            </dl>
+            {quiet ? (
+                <dl
+                    data-booking-ticket=""
+                    className="border-site-border mt-7 grid grid-cols-1 gap-1 border-t pt-7 text-left text-[15.5px] min-[700px]:grid-cols-[128px_minmax(0,1fr)] min-[700px]:gap-x-6 min-[700px]:gap-y-3.5"
+                >
+                    {/* The date is said above, in the display face. */}
+                    {rows
+                        .filter(([k]) => k !== "When")
+                        .map(([k, v]) => (
+                            <div key={k} className="contents">
+                                <dt className="text-site-muted pt-[3px] text-[12px] font-medium uppercase tracking-[0.2em]">
+                                    {k}
+                                </dt>
+                                <dd className="text-site-body m-0 pb-3 [overflow-wrap:anywhere] min-[700px]:pb-0">
+                                    {v}
+                                </dd>
+                            </div>
+                        ))}
+                </dl>
+            ) : (
+                <dl
+                    data-booking-ticket=""
+                    className="border-site-fg mt-5 border-y py-1"
+                >
+                    {rows.map(([k, v]) => (
+                        <div
+                            key={k}
+                            className="border-site-border flex gap-4 border-b py-3 text-[14.5px] last:border-b-0"
+                        >
+                            <dt className="text-site-muted w-[84px] shrink-0">
+                                {k}
+                            </dt>
+                            <dd className="text-site-fg min-w-0 flex-1 font-medium [overflow-wrap:anywhere]">
+                                {v}
+                            </dd>
+                        </div>
+                    ))}
+                </dl>
+            )}
 
             {booking.meetingUrl ? (
                 <p className="text-site-body mt-3 text-[14.5px]">
@@ -207,33 +290,33 @@ export function LookBooked({
                 </p>
             ) : null}
 
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-                <button
-                    type="button"
-                    onClick={addToCalendar}
-                    className={lookPrimary(false)}
-                >
-                    Add to calendar
-                </button>
-                <a
-                    href={googleCalendarHref({ ...entry, location: where })}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={lookOutline}
-                >
-                    Add to Google Calendar
-                </a>
-                {directions ? (
-                    <a
-                        href={directions}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={lookOutline}
+            {quiet ? (
+                <div className="mt-7 grid justify-items-center gap-3.5">
+                    <button
+                        type="button"
+                        onClick={addToCalendar}
+                        className={lookPrimary(false)}
                     >
-                        Directions
-                    </a>
-                ) : null}
-            </div>
+                        Add to calendar
+                    </button>
+                    <div className="flex flex-wrap justify-center gap-x-6 gap-y-1.5">
+                        {calendar}
+                        {directionsLink}
+                    </div>
+                </div>
+            ) : (
+                <div className="mt-5 flex flex-wrap items-center gap-3">
+                    <button
+                        type="button"
+                        onClick={addToCalendar}
+                        className={lookPrimary(false)}
+                    >
+                        Add to calendar
+                    </button>
+                    {calendar}
+                    {directionsLink}
+                </div>
+            )}
 
             {payAhead ? (
                 <PayInstructionsCard
@@ -250,7 +333,12 @@ export function LookBooked({
                 />
             ) : null}
 
-            <div className="mt-4 flex flex-wrap items-center gap-x-6">
+            <div
+                className={cn(
+                    "mt-4 flex flex-wrap items-center gap-x-6",
+                    quiet && "justify-center",
+                )}
+            >
                 <a href={BOOKINGS_HREF} className={lookLink}>
                     {MOVE_OR_CANCEL}
                 </a>

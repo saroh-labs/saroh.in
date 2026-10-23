@@ -6,10 +6,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-// Two different decisions took this number on 17 Oct and both are cited in
-// code (DEC-163, Home's late orders and Admin Billing); renumbering either
-// would break those citations, so this pair is allowed and no other.
-const KNOWN = new Set(["DEC-163"]);
+// No number may be written twice. (DEC-163 was, until 21 Oct: Admin
+// Billing became DEC-179 and its citations moved with it.)
+const KNOWN = new Set();
 
 const file = join(import.meta.dirname, "..", "docs/architecture/DECISIONS.md");
 const seen = new Map();

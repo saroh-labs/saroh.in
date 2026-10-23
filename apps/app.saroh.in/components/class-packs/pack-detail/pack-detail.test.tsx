@@ -11,10 +11,6 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-    openOptions,
-    pickOption,
-} from "@/components/shared/pick-option.test-kit";
 import type { PackDetailTab } from "@/lib/class-packs/pack-detail";
 import type {
     PackDetail,
@@ -24,6 +20,7 @@ import type {
     PackUsedPage,
     PartRead,
 } from "@/lib/class-packs/pack-detail-data";
+import { openOptions, pickOption } from "./pick-option.test-kit";
 
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({

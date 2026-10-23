@@ -15,15 +15,15 @@ import {
 import { env } from "@/env";
 import { SITE_FACES } from "@/lib/site-fonts";
 import { templateRendersAllowed } from "@/lib/template-renders/guard";
-import { templateRender } from "@/lib/template-renders/render";
 import { rootDomain } from "@/lib/test-release";
+import { templateRender } from "@saroh/site-blocks/showcase";
 
 /**
  * A gallery template drawn for its sample business (industry templates U14):
  * `/template-renders/<template>/<colourway>/<page path>` — `bakery/crust`
  * for the home page, `gym/acid/timetable` for another. The real header,
  * blocks, theme, fonts and footer a published site gets, from fixtures and
- * with no API (`lib/template-renders/render.ts`), so the gallery's and the
+ * with no API (`@saroh/site-blocks/showcase`, `render.ts`), so the gallery's and the
  * picker's 2× captures are the renderer's own output (KTD-6), taken by
  * `e2e/marketing-shots/template-shots.ts`.
  *
@@ -110,6 +110,7 @@ export default async function TemplateRenderPage({
                     packs={render.packs}
                     productGrids={render.productGrids}
                     fixtures={render.fixtures}
+                    frontDoor={render.frontDoor}
                     look={look}
                 />
             </SiteChromeFrame>

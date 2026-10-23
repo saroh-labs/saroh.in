@@ -1,22 +1,25 @@
-import { FailedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 import { forbidden } from "next/navigation";
 
-import { AnalyticsDashboard } from "@/components/analytics/analytics-dashboard";
-import { InsightsTabs } from "@/components/insights/insights-tabs";
-import { MoneyTab } from "@/components/insights/money-tab";
-import { Overview } from "@/components/insights/overview";
-import type { PeriodChoice } from "@/components/insights/period-control";
+import { MoneyTab } from "@/components/insights/money/money-tab";
+import { InsightsTabs } from "@/components/insights/overview/insights-tabs";
+import { Overview } from "@/components/insights/overview/overview";
+import type { PeriodChoice } from "@/components/insights/overview/period-control";
 import {
     PeriodSegments,
     PeriodSheet,
-} from "@/components/insights/period-control";
-import { SellsTab } from "@/components/insights/sells-tab";
-import { SuggestionCard } from "@/components/insights/suggestion-card";
-import { PageContainer } from "@/components/shared/page-container";
+} from "@/components/insights/overview/period-control";
+import { SuggestionCard } from "@/components/insights/overview/suggestion-card";
+import { SellsTab } from "@/components/insights/sells/sells-tab";
+import { FromTab } from "@/components/insights/where-from/from-tab";
+import type { SiteOption } from "@/components/insights/where-from/site-picker";
+import { PageContainer } from "@/components/shared/page/page-container";
 import {
+    readLinks,
     readMoney,
     readSells,
+    readSiteChoices,
+    readSources,
     readSuggestions,
     readTraffic,
     summarizeAnalytics,
@@ -29,7 +32,6 @@ import type { InsightsAddress, PeriodWindow } from "@/lib/insights/period";
 import {
     INSIGHTS_PERIODS,
     insightsHref,
-    PERIOD_LABEL,
     periodChoiceLine,
     periodLine,
     periodWindow,
@@ -40,9 +42,15 @@ import { listModules } from "@/lib/modules/service";
 import { permits } from "@/lib/organizations/permits";
 import { activeOrganizationOnce } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
-import { ORDERS_FIRST_RUN, shareLink } from "@/lib/sites/share-links";
-import { readWebAddressLinks } from "@/lib/sites/share-links-read";
-import { couldntLoad } from "@saroh/ui/lib/state-copy";
+import {
+    ORDERS_FIRST_RUN,
+    shareLink,
+    siteAddressOf,
+} from "@/lib/sites/share-links";
+import {
+    readWebAddressLinks,
+    RENDERER_APEX,
+} from "@/lib/sites/share-links-read";
 
 /**
  * A page title is how a merchant with six tabs open finds this one.
@@ -64,9 +72,10 @@ export const metadata = { title: "Insights" };
  * without payments sees counts and is told who can show them money.
  *
  * Money reads the period (U12, #1093, `money-tab.tsx`), and so does What
- * sells (U13, #1095, `sells-tab.tsx`). Until its own unit lands, Where
- * customers come from is today's website figures for the chosen period
- * (U14, #1097): nothing that Insights showed before is out of reach.
+ * sells (U13, #1095, `sells-tab.tsx`). Where customers come from holds
+ * the website figures for the period, with a site picker (U14, #1097,
+ * `from-tab.tsx`), and the path from visit to paid and where visitors come
+ * from (U16, #1101), which the Overview's third answer reads too.
  */
 export default async function AnalyticsPage({
     searchParams,
@@ -98,10 +107,11 @@ export default async function AnalyticsPage({
         line: periodChoiceLine(period, periodWindow(period, today)),
     }));
 
-    const body = tabBody(address, window, {
+    const body = tabBody(address, window, today, {
         canRemind: permits(organization, "invoice:write"),
         canTakeOrder: permits(organization, "order:create"),
         canAddService: permits(organization, "service:write"),
+        canMakeLinks: permits(organization, "site:update"),
     });
 
     return (
@@ -147,7 +157,13 @@ export default async function AnalyticsPage({
 function tabBody(
     address: InsightsAddress,
     window: PeriodWindow,
-    can: { canRemind: boolean; canTakeOrder: boolean; canAddService: boolean },
+    today: string,
+    can: {
+        canRemind: boolean;
+        canTakeOrder: boolean;
+        canAddService: boolean;
+        canMakeLinks: boolean;
+    },
 ) {
     switch (address.tab) {
         case "money":
@@ -163,18 +179,26 @@ function tabBody(
                 />
             );
         case "from":
-            return <FromTab address={address} window={window} />;
+            return (
+                <FromPart
+                    address={address}
+                    window={window}
+                    today={today}
+                    canMakeLinks={can.canMakeLinks}
+                />
+            );
         default:
             return <OverviewTab address={address} window={window} />;
     }
 }
 
-function trafficFor(address: InsightsAddress, window: PeriodWindow) {
-    return readTraffic({
-        from: window.from,
-        to: window.to,
-        ...(address.siteId ? { siteId: address.siteId } : {}),
-    });
+/**
+ * Every website's rows for some days: a website is chosen when the rows
+ * are folded (`summarizeAnalytics`), because paid orders are written for
+ * the whole business and a per-site read would leave them out.
+ */
+function trafficFor(from: string, to: string) {
+    return readTraffic({ from, to });
 }
 
 async function OverviewTab({
@@ -184,11 +208,12 @@ async function OverviewTab({
     address: InsightsAddress;
     window: PeriodWindow;
 }) {
-    const [money, sells, traffic, suggestions] = await Promise.all([
+    const [money, sells, traffic, suggestions, sources] = await Promise.all([
         readMoney(address.period),
         readSells(address.period),
-        trafficFor(address, window),
+        trafficFor(window.from, window.to),
         readSuggestions(address.period),
+        readSources(address.period, address.siteId),
     ]);
     // Without Insights' own reads the page is not theirs (#274). Outside
     // any try, so the interrupt lands.
@@ -207,7 +232,12 @@ async function OverviewTab({
         ReturnType<typeof summarizeAnalytics>["summary"]
     > =
         traffic.status === "ok"
-            ? { status: "ok", data: summarizeAnalytics(traffic.data).summary }
+            ? {
+                  status: "ok",
+                  data: summarizeAnalytics(traffic.data, {
+                      siteId: address.siteId,
+                  }).summary,
+              }
             : { status: "failed" };
     // Before the first sale the card copies the live shop (else website)
     // link; only then is the web address read (`IBNoSalesD`).
@@ -223,6 +253,7 @@ async function OverviewTab({
             money={money}
             sells={sells}
             website={website}
+            sources={sources}
             suggestion={<SuggestionCard read={suggestions} share={share} />}
         />
     );
@@ -285,50 +316,102 @@ async function SellsPart({
 }
 
 /**
- * Where customers come from: today's website figures, for the page's
- * period, until sources are tracked (U14 to U16).
+ * Where customers come from: the website's figures for the period and
+ * the period before, for the website chosen (U14, #1097), and where the
+ * visits came from (U16, #1101). The reads go together; each that fails
+ * is named on the tab.
  */
-async function FromTab({
+async function FromPart({
     address,
     window,
+    today,
+    canMakeLinks,
 }: {
     address: InsightsAddress;
     window: PeriodWindow;
+    today: string;
+    canMakeLinks: boolean;
 }) {
-    const traffic = await trafficFor(address, window);
+    const [traffic, earlier, sites, links, sourcesRead, madeRead] =
+        await Promise.all([
+            trafficFor(window.from, window.to),
+            trafficFor(window.beforeFrom, window.beforeTo),
+            readSiteChoices(),
+            readWebAddressLinks(),
+            readSources(address.period, address.siteId),
+            readLinks(address.period, address.siteId),
+        ]);
     if (traffic.status === "denied") forbidden();
+    const list = sites.status === "ok" ? sites.data : null;
+    // A website no longer the business's (or never) reads as all of them.
+    const siteId =
+        address.siteId && (!list || list.some((s) => s.id === address.siteId))
+            ? address.siteId
+            : null;
+    const fold = { siteId, from: window.from, to: window.to };
+    // A website no longer the business's reads as all of them, sources too.
+    const [sources, made] =
+        siteId === address.siteId
+            ? [sourcesRead, madeRead]
+            : await Promise.all([
+                  readSources(address.period, siteId),
+                  readLinks(address.period, siteId),
+              ]);
+    // Each website's real address, as every share link reads it, for the
+    // links made in Saroh to copy (DEC-181).
+    const linkSites = (list ?? []).map((s) => ({
+        id: s.id,
+        name: s.name,
+        url: siteAddressOf(s, links, RENDERER_APEX)?.url ?? null,
+    }));
+    const options: SiteOption[] | null = list
+        ? [
+              {
+                  id: null,
+                  name: "All your sites",
+                  line: "Every website together",
+                  href: insightsHref({ ...address, siteId: null }),
+              },
+              ...list.map((s) => ({
+                  id: s.id,
+                  name: s.name,
+                  line:
+                      siteAddressOf(s, links, RENDERER_APEX)?.host ??
+                      "No address yet",
+                  href: insightsHref({ ...address, siteId: s.id }),
+              })),
+          ]
+        : null;
     return (
-        <section aria-labelledby="website-heading" className="space-y-4">
-            <div className="min-w-0">
-                <h2
-                    id="website-heading"
-                    className="font-display text-[19px] font-semibold tracking-[-0.025em]"
-                >
-                    Your website
-                </h2>
-                <p className="mt-1 text-[13px] leading-[1.5] text-muted-foreground">
-                    {PERIOD_LABEL[address.period]}: visits, visitors, enquiries
-                    and paid orders. Updated every hour.
-                </p>
-            </div>
-            {traffic.status === "ok" ? (
-                <AnalyticsDashboard
-                    view={summarizeAnalytics(traffic.data)}
-                    range={{
-                        from: window.from,
-                        to: window.to,
-                        label: PERIOD_LABEL[address.period]
-                            .replace(/^Last /, "")
-                            .toLowerCase(),
-                    }}
-                />
-            ) : (
-                <FailedState
-                    size="panel"
-                    title={couldntLoad("your website's figures")}
-                    retryHref={insightsHref(address)}
-                />
-            )}
-        </section>
+        <FromTab
+            period={address.period}
+            window={window}
+            current={
+                traffic.status === "ok"
+                    ? {
+                          status: "ok",
+                          data: summarizeAnalytics(traffic.data, fold),
+                      }
+                    : { status: "failed" }
+            }
+            before={
+                earlier.status === "ok"
+                    ? {
+                          status: "ok",
+                          data: summarizeAnalytics(earlier.data, { siteId })
+                              .summary,
+                      }
+                    : { status: "failed" }
+            }
+            sites={options}
+            sitesFailed={sites.status === "failed"}
+            siteId={siteId}
+            retryHref={insightsHref({ ...address, siteId })}
+            sources={sources}
+            links={made}
+            linkSites={linkSites}
+            canMakeLinks={canMakeLinks}
+            today={today}
+        />
     );
 }

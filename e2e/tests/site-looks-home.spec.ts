@@ -129,13 +129,13 @@ test.describe("each look's home and About", { tag: "@serial" }, () => {
                     );
                     // The booking page's slot holds "See times" until the
                     // live read answers, then the next free time's own link
-                    // (U8, #1042).
+                    // (U8, #1042): Folio's is the board's sentence (VA01).
                     await expect(
                         door.getByRole("link", {
                             name:
                                 kind === "shop"
                                     ? "See the shop"
-                                    : /^(See times|Book this (class|time)|Next free: .+)$/,
+                                    : /^(See times|Book this (class|time)|Next free: .+|I’d like an? .+ at .+\.)$/,
                         }),
                     ).toBeVisible();
                 }

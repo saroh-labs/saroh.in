@@ -17,7 +17,7 @@ import {
     ratePicker,
     rateShown,
     ratesOffered,
-} from "@/components/shared/gst-rate-picker.testing";
+} from "@/components/shared/fields/gst-rate-picker.testing";
 
 import type { CourseDetail } from "@/lib/courses/service";
 

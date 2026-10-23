@@ -15,6 +15,7 @@ import {
     ShopUnavailable,
 } from "@saroh/site-blocks";
 
+import { VisitStep } from "@/components/visit-step";
 import { getCatalogueProduct } from "@/lib/catalogue";
 import { moduleLabel, NOT_FOR_SEARCH } from "@/lib/module-pages";
 import { dontCachePage, showsProduct } from "@/lib/page-cache/site-rules";
@@ -212,6 +213,8 @@ export default async function ShopProductPage({
     // The page's main landmark (UX-082): the header and footer sit outside.
     return (
         <main className="mx-auto w-full max-w-site-content">
+            {/* The visit looked at a product (U15): once a visit, its source only. */}
+            <VisitStep step="looked" />
             {/* Product structured data (#473), from what this page shows. */}
             <script
                 type="application/ld+json"

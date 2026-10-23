@@ -6,7 +6,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { personHref } from "@/lib/contacts/person-href";
 import type { FormField, Submission } from "@/lib/forms/service";
 import { getForm, listSubmissions } from "@/lib/forms/service";

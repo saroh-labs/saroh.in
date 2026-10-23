@@ -1549,12 +1549,12 @@ describe("the order read", () => {
         expect(read.next.undo?.eventId).toBe(step.eventId);
         expect(read.events[0].actor?.name).toBe("Meera");
         // The fixture's total (360.00 / 36000) must not leak. Wall-clock
-        // timestamps (events[].at, next.undo.until) are cut first: one whose
-        // milliseconds land on .360 is not a money figure (#847).
-        const body = JSON.stringify(read).replace(
-            /\d{4}-\d{2}-\d{2}T[\d:.]+Z/g,
-            "<time>",
-        );
+        // figures are cut first: a timestamp (events[].at, next.undo.until)
+        // whose milliseconds land on .360 (#847), and the minutes late since
+        // the fixture's fixed date, which grow every day (36019 on 22 Oct).
+        const body = JSON.stringify(read)
+            .replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z/g, "<time>")
+            .replace(/"lateBy":\d+/g, '"lateBy":<minutes>');
         expect(body).not.toContain("360");
     });
 

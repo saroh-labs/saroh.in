@@ -44,7 +44,7 @@ const focusRing =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent focus-visible:ring-offset-2 focus-visible:ring-offset-site-bg";
 
 const linkClasses = cn(
-    "text-site-accent mx-4 mt-1 inline-flex cursor-pointer items-center gap-1 justify-self-start rounded-[var(--site-radius)] text-sm font-semibold underline-offset-4 transition-opacity hover:underline active:opacity-70",
+    "text-site-accent-text mx-4 mt-1 inline-flex cursor-pointer items-center gap-1 justify-self-start rounded-[var(--site-radius)] text-sm font-semibold underline-offset-4 transition-opacity hover:underline active:opacity-70",
     focusRing,
 );
 

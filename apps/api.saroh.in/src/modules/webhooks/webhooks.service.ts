@@ -1,11 +1,12 @@
 import {
     BadRequestException,
+    HttpException,
     Inject,
     Injectable,
     Logger,
     UnauthorizedException,
 } from "@nestjs/common";
-import type { Prisma, PrismaClient } from "@saroh/database";
+import type { Job, Prisma, PrismaClient } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { toMinor } from "../../common/money";
@@ -13,6 +14,7 @@ import {
     recordOrderPaidInTx,
     recordOrderRefundedInTx,
 } from "../analytics/order-events";
+import { raiseBillingOpsNoticeInTx } from "../billing/billing-ops-notice";
 import { confirmHoldInTx } from "../bookings/booking-hold";
 import { markBookingPaidInTx } from "../bookings/booking-pay-link";
 import { completePackDraftInTx } from "../class-packs/pack-checkout";
@@ -31,12 +33,17 @@ import {
     invoiceSupersededPayment,
     settleSupplementaryInvoices,
 } from "../invoices/order-invoicing";
+import { RETRY_SCHEDULES } from "../jobs/job-queue.port";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import type { PaymentStatus } from "../orders/dto";
 import { leftToRefundCents } from "../orders/hand-payments";
 import { holdsOnPayment } from "../orders/online-checkout";
 import { finishCancelInTx } from "../orders/order-cancel";
-import { RETIRED_PAY_LINK } from "../orders/order-pay-link";
+import {
+    dueCentsOf,
+    PAY_LINK_ORDER_SELECT,
+    RETIRED_PAY_LINK,
+} from "../orders/order-pay-link";
 import { assertPaymentTransition } from "../orders/order-state";
 import { orderMoneyIntents } from "../orders/treatment-ledger";
 import {
@@ -88,6 +95,14 @@ import { WEBHOOK_PROVIDER_FACTORY } from "./providers/webhook-provider.port";
 /** A Prisma transaction client (the `$transaction(async (tx) => …)` argument). */
 type Tx = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
 
+/** The job that retries a stored delivery the request could not apply. */
+export const WEBHOOK_PROCESS_TYPE = "webhook.process";
+/** The first run, then one per entry of its retry schedule: about 16 hours. */
+const WEBHOOK_PROCESS_ATTEMPTS =
+    (RETRY_SCHEDULES[WEBHOOK_PROCESS_TYPE]?.length ?? 0) + 1;
+/** The request's own try goes first; the job waits this long behind it. */
+const WEBHOOK_RETRY_AFTER_MS = 60_000;
+
 /** The outcome of handling one inbound webhook. Never carries secret material. */
 export interface WebhookResult {
     /**
@@ -96,8 +111,9 @@ export interface WebhookResult {
      *   `providerEventId`); no-op.
      * - `ignored`   — verified but not a money event / no matching intent.
      * - `failed`    — verified but reconciliation errored (recorded for replay).
+     * - `queued`    — stored, and an unexpected error left it to its retry job.
      */
-    status: "processed" | "duplicate" | "ignored" | "failed";
+    status: "processed" | "duplicate" | "ignored" | "failed" | "queued";
     /** Whether this call changed any payment/refund/order state. */
     changed: boolean;
 }
@@ -151,13 +167,15 @@ const PROVIDER_LABEL: Record<string, string> = {
  *     same→same target is a guard-free no-op, so money state moves at most once
  *     even if the same event somehow reaches reconcile twice.
  *
- * ERROR POLICY (documented, deliberate): a reconciliation error marks the
- * durably-stored event `FAILED` (+ `error`) and returns **200**, NOT a 5xx. The
- * event is retained for inspection/replay by an internal job; returning 5xx
- * would invite the provider to hammer a poison event into an endless retry loop,
- * which is the more dangerous failure mode. Transient infra failures (e.g. the
- * inbox write itself throwing something other than P2002) still propagate as
- * 5xx so the provider retries a delivery we never durably accepted.
+ * ERROR POLICY (documented, deliberate): store, answer 200, then apply. The
+ * inbox row commits with a `webhook.process` job; the request tries the event
+ * once, and an unexpected error (a lost connection, a lock timeout) is left to
+ * that job's retries with backoff. A refusal that would fail again (a 4xx
+ * `HttpException`: an illegal state move, a validation error), or the job's
+ * last try, keeps the row `FAILED` (+ `error`) for staff to replay. Only an
+ * inbox row that could not be stored is a 5xx: a provider that keeps getting
+ * non-2xx answers switches the webhook off (DEV_LEARNINGS, merchant webhook
+ * FAILED for good).
  */
 @Injectable()
 export class WebhooksService {
@@ -210,23 +228,38 @@ export class WebhooksService {
 
         const event = provider.parseEvent({ payload, headers });
 
-        // Idempotent inbox. A duplicate `(organizationId, provider,
-        // providerEventId)` → P2002 → 200 no-op: the exactly-once guarantee,
-        // per business (PAY-05). Any OTHER error propagates.
+        // Store, answer, then apply. The inbox row and its retry job commit
+        // together: a duplicate `(organizationId, provider, providerEventId)`
+        // → P2002 → 200 no-op, per business (PAY-05). Only a row that could
+        // not be stored is a 5xx: nothing is kept, and the redelivery is
+        // wanted. After this every answer is 200, because Razorpay and
+        // Cashfree switch off a webhook that keeps failing.
         let inboxId: string;
         try {
-            const row = await prisma.webhookEvent.create({
-                data: {
-                    organizationId,
-                    provider: name,
-                    providerEventId: event.providerEventId,
-                    eventType: event.eventType,
-                    payload: payload as Prisma.InputJsonValue,
-                    signature: provider.signatureHeader(headers) ?? null,
-                    status: "RECEIVED",
-                },
+            inboxId = await prisma.$transaction(async (tx) => {
+                const row = await tx.webhookEvent.create({
+                    data: {
+                        organizationId,
+                        provider: name,
+                        providerEventId: event.providerEventId,
+                        eventType: event.eventType,
+                        payload: payload as Prisma.InputJsonValue,
+                        signature: provider.signatureHeader(headers) ?? null,
+                        status: "RECEIVED",
+                    },
+                });
+                await tx.job.create({
+                    data: {
+                        type: WEBHOOK_PROCESS_TYPE,
+                        organizationId,
+                        payload: { webhookEventId: row.id },
+                        maxAttempts: WEBHOOK_PROCESS_ATTEMPTS,
+                        // The answer below tries first; the job is the retry.
+                        runAt: new Date(Date.now() + WEBHOOK_RETRY_AFTER_MS),
+                    },
+                });
+                return row.id;
             });
-            inboxId = row.id;
         } catch (err) {
             if (isUniqueViolation(err)) {
                 return { status: "duplicate", changed: false };
@@ -234,35 +267,128 @@ export class WebhooksService {
             throw err;
         }
 
-        // Reconcile. On error, record FAILED and return 200 (see class docs).
         try {
-            const { applied } = await prisma.$transaction((tx) =>
-                this.reconcile(tx, name, organizationId, event),
-            );
-            await prisma.webhookEvent.update({
-                where: { id: inboxId },
-                data: {
-                    status: applied ? "PROCESSED" : "IGNORED",
-                    processedAt: new Date(),
+            return await this.processInbox(
+                inboxId,
+                name,
+                organizationId,
+                event,
+                {
+                    lastTry: false,
                 },
+            );
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            this.logger.warn(
+                `Webhook ${name}/${event.providerEventId} reconcile errored; its job retries it: ${message}`,
+            );
+            return { status: "queued", changed: false };
+        }
+    }
+
+    /**
+     * The retry job of a stored delivery (`webhook.process`): applies it if
+     * it is still RECEIVED, throws on an error worth another try so the queue
+     * backs off, and on the last attempt keeps it FAILED for staff to replay.
+     */
+    readonly processJob = async (job: Job): Promise<void> => {
+        const { webhookEventId } = job.payload as { webhookEventId: string };
+        const stored = await prisma.webhookEvent.findUnique({
+            where: { id: webhookEventId },
+            select: {
+                provider: true,
+                organizationId: true,
+                payload: true,
+                status: true,
+            },
+        });
+        if (stored?.status !== "RECEIVED" || !stored.organizationId) return;
+        const provider = this.factory.get(stored.provider);
+        await this.processInbox(
+            webhookEventId,
+            provider.name,
+            stored.organizationId,
+            provider.parseEvent({ payload: stored.payload, headers: {} }),
+            { lastTry: job.attempts + 1 >= job.maxAttempts },
+        );
+    };
+
+    /**
+     * Apply one stored delivery. The RECEIVED row is claimed by an update in
+     * the reconcile's transaction, so the answer's try and the job's never
+     * both apply it: the second waits on the row, then finds it settled. An
+     * error that would fail again (a 4xx: an illegal state move, a
+     * validation error), or any error on the last try, keeps the row FAILED
+     * for replay; any other error rolls back and is thrown for a retry.
+     */
+    private async processInbox(
+        id: string,
+        name: string,
+        organizationId: string,
+        event: NormalizedWebhookEvent,
+        { lastTry }: { lastTry: boolean },
+    ): Promise<WebhookResult> {
+        try {
+            const applied = await prisma.$transaction(async (tx) => {
+                const claim = await tx.webhookEvent.updateMany({
+                    where: { id, status: "RECEIVED" },
+                    data: { processedAt: new Date() },
+                });
+                if (claim.count === 0) return null;
+                const { applied } = await this.reconcile(
+                    tx,
+                    name,
+                    organizationId,
+                    event,
+                );
+                await tx.webhookEvent.update({
+                    where: { id },
+                    data: {
+                        status: applied ? "PROCESSED" : "IGNORED",
+                        processedAt: new Date(),
+                    },
+                });
+                return applied;
             });
+            if (applied === null)
+                return { status: "duplicate", changed: false };
             return {
                 status: applied ? "processed" : "ignored",
                 changed: applied,
             };
         } catch (err) {
+            if (!lastTry && !wouldFailAgain(err)) throw err;
             const message = err instanceof Error ? err.message : String(err);
-            await prisma.webhookEvent.update({
-                where: { id: inboxId },
-                data: {
-                    status: "FAILED",
-                    error: message,
-                    processedAt: new Date(),
-                },
+            await prisma.$transaction(async (tx) => {
+                const marked = await tx.webhookEvent.updateMany({
+                    where: { id, status: "RECEIVED" },
+                    data: {
+                        status: "FAILED",
+                        error: message,
+                        processedAt: new Date(),
+                    },
+                });
+                if (marked.count === 0) return;
+                // Nothing retries it now: an operator replays it or
+                // settles the payment by hand.
+                await raiseBillingOpsNoticeInTx(tx, this.logger, {
+                    code: "merchant_webhook_failed",
+                    organizationId,
+                    refs: {
+                        webhookEvent: id,
+                        provider: name,
+                        providerEvent: event.providerEventId,
+                        eventType: event.eventType,
+                    },
+                    note: `A ${name} ${event.eventType} event for this business could not be applied after its tries (${message.slice(0, 200)}). Its payment, refund or mandate may be out of step until it is replayed in Operations › Webhooks.`,
+                    dedupeKey: `merchant_webhook_failed:${id}`,
+                });
+                // The team, so nobody acts on a record that is out of step.
+                await enqueueTeamAlert(tx, organizationId, {
+                    event: "webhook",
+                    webhookEventId: id,
+                });
             });
-            this.logger.warn(
-                `Webhook ${name}/${event.providerEventId} reconcile failed: ${message}`,
-            );
             return { status: "failed", changed: false };
         }
     }
@@ -714,6 +840,26 @@ export class WebhooksService {
                 );
             }
             return { applied: online.applied };
+        }
+
+        // A second capture on an order with nothing left to take (two tabs
+        // on the pay page, each with its own intent) is not the order's
+        // money: it is settled as a superseded charge, owed back, never
+        // counted. A balance or an edit's difference still has money due.
+        if (
+            intent.status !== "SUCCEEDED" &&
+            (await nothingLeftToTake(tx, orderId))
+        ) {
+            await tx.paymentIntent.update({
+                where: { id: intent.id },
+                data: { status: SUPERSEDED_INTENT },
+            });
+            return this.applySupersededSuccess(
+                tx,
+                { ...intent, status: SUPERSEDED_INTENT },
+                orderId,
+                event,
+            );
         }
 
         // Read before the move: money arriving on an order cancelled in the
@@ -1637,6 +1783,24 @@ function capturedOf(event: NormalizedWebhookEvent): CapturedAmount {
     };
 }
 
+/**
+ * Whether a paid order has nothing left to take, read under the order's
+ * lock (after the intent's, as reserve.ts orders them) so two captures
+ * settling at once see each other.
+ */
+async function nothingLeftToTake(tx: Tx, orderId: string): Promise<boolean> {
+    await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
+    const order = await tx.order.findUnique({
+        where: { id: orderId },
+        select: PAY_LINK_ORDER_SELECT,
+    });
+    return (
+        order?.paymentStatus === "PAID" &&
+        order.status !== "CANCELLED" &&
+        dueCentsOf(order) <= 0
+    );
+}
+
 async function lockIntent(tx: Tx, intent: IntentRow): Promise<string> {
     const rows = await tx.$queryRaw<{ status: string }[]>`
         SELECT status FROM "PaymentIntent" WHERE id = ${intent.id} FOR NO KEY UPDATE`;
@@ -1697,4 +1861,9 @@ function isUniqueViolation(err: unknown): boolean {
         "code" in err &&
         (err as { code?: string }).code === "P2002"
     );
+}
+
+/** A refusal redelivery can't change: a 4xx from the state machine or a check. */
+function wouldFailAgain(err: unknown): boolean {
+    return err instanceof HttpException && err.getStatus() < 500;
 }
