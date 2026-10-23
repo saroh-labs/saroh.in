@@ -52,6 +52,7 @@ export function EditorPanels({
     inspectorTitle,
     pageTitle,
     overlayOpen = false,
+    brandActions,
     body,
     setBody,
     releases,
@@ -70,6 +71,8 @@ export function EditorPanels({
     inspectorTitle: string;
     /** The open page's title: "Blocks on Home". */
     pageTitle: string;
+    /** The Brand sheet's head: Saved, and ⋯ with Reset style. */
+    brandActions?: ReactNode;
     /** Something else is over the page (Publish): the pill stays away. */
     overlayOpen?: boolean;
     /** The editor's body, below the top bar, where sheets are laid. */
@@ -204,6 +207,7 @@ export function EditorPanels({
                               ? "Brand"
                               : `Blocks on ${pageTitle}`
                     }
+                    actions={sheet === "brand" ? brandActions : undefined}
                     closeLabel={
                         sheet === "add"
                             ? "Close Add a block"

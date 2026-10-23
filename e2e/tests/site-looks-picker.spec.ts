@@ -2,7 +2,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { openFromPill } from "../fixtures/phone-editor";
+import { lookGallery, openFromPill } from "../fixtures/phone-editor";
 import { useSession } from "../fixtures/sessions";
 import { setNorthwindLook } from "../fixtures/site-look";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
@@ -48,12 +48,12 @@ const lookCard = (page: Page) => page.locator("[data-look-current]");
 
 /** The looks' gallery behind the card's Change, opened if it isn't. */
 async function gallery(page: Page) {
-    const dialog = page.getByRole("dialog", { name: "Change look" });
-    if (!(await dialog.isVisible())) {
-        await page.locator("[data-look-change]").click();
-    }
-    await expect(dialog).toBeVisible();
-    return dialog;
+    const looks = await lookGallery(
+        page,
+        (page.viewportSize()?.width ?? 1440) < 760,
+    );
+    await expect(looks).toBeVisible();
+    return looks;
 }
 
 /**
@@ -216,8 +216,12 @@ test.describe("the Look row", { tag: "@serial" }, () => {
 
             await preview.getByRole("button", { name: "Close" }).last().click();
             await expect(preview).toHaveCount(0);
-            // The gallery made way for the dialog: back on Change.
-            await expect(page.locator("[data-look-change]")).toBeFocused();
+            // Back where it was opened: Change on a desk, where the gallery
+            // made way for the dialog; the look's own Preview in a phone's
+            // Look tab (DEC-185).
+            await expect(
+                phone ? open : page.locator("[data-look-change]"),
+            ).toBeFocused();
 
             // Nothing chosen and nothing saved: still Classic.
             await expect(lookCard(page)).toHaveAttribute(

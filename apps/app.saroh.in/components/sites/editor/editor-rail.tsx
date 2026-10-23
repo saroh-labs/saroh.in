@@ -88,9 +88,9 @@ export function EditorRail({
     /** Draw a style on the page unsaved (a typeface tried); null ends it. */
     tryStyle?: (next: SiteStyle | null) => void;
     /**
-     * In the phone's sheet: the bar at the foot carries Page · Add ·
-     * Brand, so the rail draws no tabs of its own, and the Brand tab's
-     * pickers open inside the sheet (DEC-184).
+     * In a phone's sheet (DEC-185): the pill opens Blocks, + or Brand, so
+     * the rail draws no tabs of its own; the blocks are a phone's list and
+     * Brand is its four tabs.
      */
     phone?: boolean;
     styleOptions: SiteStyleOptions;
@@ -153,7 +153,7 @@ export function EditorRail({
                     rules={styleRules}
                     onTry={tryStyle}
                     heroInText={heroDrawsInText(sections, style.look)}
-                    inline={phone}
+                    phoneTabs={phone}
                 />
             ) : (
                 <>

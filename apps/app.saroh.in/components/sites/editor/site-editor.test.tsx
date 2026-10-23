@@ -1834,6 +1834,26 @@ describe("SiteEditor narrow and phone (G4)", () => {
         );
     });
 
+    it("opens Brand as one sheet of tabs, with Reset behind its ⋯ (DEC-185)", () => {
+        atWidth(390);
+        render();
+        click(button("Brand"));
+        const tabs = Array.from(
+            sheet()?.querySelectorAll(
+                "[role=tablist][aria-label=Brand] [role=tab]",
+            ) ?? [],
+        ).map((t) => t.textContent);
+        // No look to offer here, so no Look tab.
+        expect(tabs).toEqual(["Type", "Colour", "Spacing"]);
+        // Type: each face itself, a tap is the choice; no search on a phone.
+        expect(sheet()?.textContent).toContain("Newsreader");
+        expect(
+            sheet()?.querySelector("input[aria-label='Search typefaces']"),
+        ).toBeNull();
+        expect(button("More: Reset style")).toBeTruthy();
+        expect(button("Close Brand")).toBeTruthy();
+    });
+
     it("switches page from the page's sheet", () => {
         atWidth(390);
         render();

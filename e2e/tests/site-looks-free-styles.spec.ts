@@ -2,7 +2,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { openFromPill } from "../fixtures/phone-editor";
+import { lookGallery, openFromPill, typefaces } from "../fixtures/phone-editor";
 import { useSession } from "../fixtures/sessions";
 import {
     grantNorthwindThemes,
@@ -70,12 +70,12 @@ async function openEditor(page: Page, siteId: string, phone: boolean) {
 
 /** The looks' gallery behind the Look card's Change (DEC-184). */
 async function gallery(page: Page) {
-    const dialog = page.getByRole("dialog", { name: "Change look" });
-    if (!(await dialog.isVisible())) {
-        await page.locator("[data-look-change]").click();
-    }
-    await expect(dialog).toBeVisible();
-    return dialog;
+    const looks = await lookGallery(
+        page,
+        (page.viewportSize()?.width ?? 1440) < 760,
+    );
+    await expect(looks).toBeVisible();
+    return looks;
 }
 
 /** The look in force, as the Look card says it. */
@@ -202,8 +202,7 @@ test.describe("free and paid styles", { tag: "@serial" }, () => {
 
             // A paid typeface: under "Paid plans" in the search behind
             // Change, refused in place (the search stays open), nothing saved.
-            await page.locator("[data-typeface-change]").click();
-            const typeface = page.getByRole("dialog", { name: "Typeface" });
+            const typeface = await typefaces(page, phone);
             const option = typeface
                 .locator("[cmdk-group]", { hasText: "Paid plans" })
                 .locator(`[data-typeface="${paid.key}"]`);

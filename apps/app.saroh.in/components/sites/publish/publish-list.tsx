@@ -147,6 +147,7 @@ export function PublishFlags({
                                     // Only the owner chooses it, in
                                     // Settings › Business.
                                     <Button
+                                        data-ph-unmask=""
                                         asChild
                                         variant="link"
                                         size="sm"

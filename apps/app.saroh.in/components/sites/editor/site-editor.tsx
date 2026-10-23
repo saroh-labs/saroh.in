@@ -9,6 +9,7 @@ import {
 } from "@/components/sites/canvas/editor-canvas";
 import { useEditorViewport } from "@/components/sites/canvas/use-editor-viewport";
 import { starterContentActions } from "@/components/sites/looks/starter-content-actions";
+import { BrandSheetActions } from "@/components/sites/looks/style-panel";
 import { useEditorStyle } from "@/components/sites/looks/use-editor-style";
 import { PublishSheet } from "@/components/sites/publish/publish-sheet";
 import { usePublish } from "@/components/sites/publish/use-publish";
@@ -343,6 +344,13 @@ export function SiteEditor({
                     pages.find((p) => p.id === pageId)?.title ?? "this page"
                 }
                 overlayOpen={publish.checking}
+                brandActions={
+                    <BrandSheetActions
+                        saving={siteStyle.styleSaving}
+                        dirty={siteStyle.styleDirty}
+                        onReset={() => edits.resetStyle()}
+                    />
+                }
                 body={body}
                 setBody={setBody}
                 rail={

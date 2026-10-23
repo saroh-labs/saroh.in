@@ -16,10 +16,10 @@ import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import type { StyleChoiceRules } from "@/lib/sites/style-access";
 import { ALL_FREE } from "@/lib/sites/style-access";
 import {
+    BrandInline,
     BrandPicker,
     PickerFoot,
     PickerHeader,
-    PickerHost,
 } from "./brand-picker";
 import { DraftTools } from "./draft-tools";
 import type { LookPreviewSource } from "./look-preview";
@@ -159,7 +159,8 @@ export function LookPicker({
     const headingId = useId();
     const galleryId = useId();
     const statusId = useId();
-    const inSheet = useContext(PickerHost) !== null;
+    // A phone's Brand sheet (DEC-185): the looks themselves, to swipe.
+    const inSheet = useContext(BrandInline);
     const [picking, setPicking] = useState(false);
     const [previewing, setPreviewing] = useState<LookChoice | null>(null);
     // The look whose dialog is drawn: kept as it closes, so it fades out
@@ -185,7 +186,7 @@ export function LookPicker({
         .filter((c) => c !== "classic" && paid(c))
         .map((c) => lookName(c as LookId));
     const shownLook = shown === "classic" ? null : shown;
-    const lineUnderCard = refused !== null && !picking;
+    const lineUnderCard = refused !== null && !picking && !inSheet;
 
     function openPreview(choice: LookChoice, from: HTMLElement) {
         opener.current = from;
@@ -206,11 +207,7 @@ export function LookPicker({
         if (look !== draftLook) showSuccess(lookTakenWords(lookName(look)));
     }
 
-    const previewButton = (
-        choice: LookChoice,
-        className: string,
-        iconOnly = false,
-    ) =>
+    const previewButton = (choice: LookChoice, className: string) =>
         preview ? (
             <Button
                 type="button"
@@ -225,196 +222,205 @@ export function LookPicker({
                 onClick={(e) => openPreview(choice, e.currentTarget)}
             >
                 <Eye aria-hidden />
-                {iconOnly ? null : "Preview"}
+                Preview
             </Button>
         ) : null;
+
+    const picker = (
+        <BrandPicker
+            open={picking}
+            onOpenChange={setPicking}
+            title="Change look"
+            className="w-[480px] max-w-[calc(100vw-24px)]"
+            header={
+                <PickerHeader
+                    title="Change look"
+                    note={`${choices.length} looks · the page changes when you choose`}
+                    onClose={() => setPicking(false)}
+                />
+            }
+            trigger={
+                <Button
+                    ref={changeRef}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    aria-haspopup="dialog"
+                    aria-expanded={picking}
+                    data-look-change=""
+                    className="flex-1"
+                >
+                    Change
+                    <ChevronDown aria-hidden />
+                </Button>
+            }
+        >
+            <div
+                className={
+                    inSheet ? "pb-1" : "min-h-0 flex-1 overflow-y-auto p-3"
+                }
+            >
+                <ChoiceGroup<LookChoice>
+                    label="Looks"
+                    describedBy={refused ? galleryId : undefined}
+                    className={
+                        // Cards to swipe in a phone's sheet (DEC-185).
+                        inSheet
+                            ? "flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-1"
+                            : "grid grid-cols-2 gap-2.5"
+                    }
+                    value={current}
+                    onChange={pick}
+                    // Each look with its Preview (DEC-177): a
+                    // button of its own, never inside the radio.
+                    layout={(item) =>
+                        choices.map((choice) => (
+                            <div
+                                key={choice}
+                                className={cn(
+                                    "relative flex flex-col gap-1.5",
+                                    inSheet && "w-[44%] shrink-0 snap-start",
+                                )}
+                            >
+                                {item(choice)}
+                                {/* Under the card on a phone,
+                                    where it is a thumb's width. */}
+                                {previewButton(
+                                    choice,
+                                    inSheet
+                                        ? "w-full"
+                                        : "absolute bottom-2 right-2 h-[30px] gap-1 px-2.5 text-xs",
+                                )}
+                            </div>
+                        ))
+                    }
+                    choices={choices.map((choice) => {
+                        const look = choice === "classic" ? null : choice;
+                        const suggested =
+                            available && look === suggestion.look
+                                ? suggestion.industry
+                                    ? `Suggested for ${suggestion.industry}`
+                                    : "Suggested"
+                                : null;
+                        return {
+                            value: choice,
+                            data: { "data-look-choice": choice },
+                            label: (
+                                <>
+                                    <LookThumbnail
+                                        look={look}
+                                        style={style}
+                                        options={options}
+                                        image={lookThumbnail(
+                                            templateId,
+                                            choice,
+                                        )}
+                                        className={
+                                            inSheet
+                                                ? "h-[88px] w-full"
+                                                : "h-[104px] w-full"
+                                        }
+                                    />
+                                    <span
+                                        className={cn(
+                                            "block min-w-0 px-1 pb-0.5",
+                                            preview && !inSheet && "pr-24",
+                                        )}
+                                    >
+                                        <span className="flex items-center gap-1.5 text-sm font-semibold">
+                                            {lookName(look)}
+                                            {choice === current ? (
+                                                <span className="rounded-[5px] bg-foreground px-1.5 py-px text-[0.65625rem] font-semibold text-background">
+                                                    Now
+                                                </span>
+                                            ) : null}
+                                        </span>
+                                        <span className="block text-xs leading-snug text-muted-foreground">
+                                            {look
+                                                ? LOOKS[look].short
+                                                : CLASSIC.short}
+                                        </span>
+                                        {suggested ? (
+                                            <Badge
+                                                variant="tag"
+                                                size="sm"
+                                                className="mt-1"
+                                            >
+                                                {suggested}
+                                            </Badge>
+                                        ) : null}
+                                    </span>
+                                </>
+                            ),
+                        };
+                    })}
+                    itemClassName={(active) =>
+                        cn(
+                            "flex w-full flex-col gap-1.5 rounded-[10px] border bg-card p-1.5 text-left focus-visible:ring-offset-1",
+                            active
+                                ? "border-foreground ring-1 ring-foreground"
+                                : "border-border hover:bg-muted",
+                        )
+                    }
+                />
+            </div>
+            {paidNames.length > 0 || refused ? (
+                <PickerFoot>
+                    {paidNames.length > 0 ? (
+                        <p>
+                            <Badge variant="tag" size="sm">
+                                Paid plans
+                            </Badge>{" "}
+                            {andList(paidNames)}
+                        </p>
+                    ) : null}
+                    {refused ? (
+                        <div id={galleryId}>
+                            <PaidRefusal name={refused} />
+                        </div>
+                    ) : null}
+                </PickerFoot>
+            ) : null}
+        </BrandPicker>
+    );
 
     return (
         <section className="space-y-2" aria-labelledby={headingId}>
             <h3 id={headingId} className="label">
                 Look
             </h3>
-            <div
-                data-look-current={current}
-                className={cn(
-                    "rounded-[10px] border bg-card p-2",
-                    inSheet
-                        ? "flex items-center gap-2.5"
-                        : "flex flex-col gap-2",
-                )}
-            >
-                <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                    <LookThumbnail
-                        look={draftLook}
-                        style={style}
-                        options={options}
-                        image={lookThumbnail(templateId, current)}
-                        className="h-[54px] w-[72px]"
-                    />
-                    <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">
-                            {lookName(draftLook)}
-                        </p>
-                        <p className="text-xs leading-snug text-muted-foreground">
-                            {draftLook ? LOOKS[draftLook].short : CLASSIC.short}
-                        </p>
+            {inSheet ? (
+                <div data-look-current={current}>{picker}</div>
+            ) : (
+                <div
+                    data-look-current={current}
+                    className="flex flex-col gap-2 rounded-[10px] border bg-card p-2"
+                >
+                    <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                        <LookThumbnail
+                            look={draftLook}
+                            style={style}
+                            options={options}
+                            image={lookThumbnail(templateId, current)}
+                            className="h-[54px] w-[72px]"
+                        />
+                        <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold">
+                                {lookName(draftLook)}
+                            </p>
+                            <p className="text-xs leading-snug text-muted-foreground">
+                                {draftLook
+                                    ? LOOKS[draftLook].short
+                                    : CLASSIC.short}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex shrink-0 gap-1.5">
+                        {previewButton(current, "flex-1")}
+                        {picker}
                     </div>
                 </div>
-                <div className="flex shrink-0 gap-1.5">
-                    {/* The sheet has room for the eye alone (Brand tab, phone). */}
-                    {previewButton(
-                        current,
-                        inSheet ? "w-11 px-0" : "flex-1",
-                        inSheet,
-                    )}
-                    <BrandPicker
-                        open={picking}
-                        onOpenChange={setPicking}
-                        title="Change look"
-                        className="w-[480px] max-w-[calc(100vw-24px)]"
-                        header={
-                            <PickerHeader
-                                title="Change look"
-                                note={`${choices.length} looks · the page changes when you choose`}
-                                onClose={() => setPicking(false)}
-                            />
-                        }
-                        trigger={
-                            <Button
-                                ref={changeRef}
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                aria-haspopup="dialog"
-                                aria-expanded={picking}
-                                data-look-change=""
-                                className={inSheet ? undefined : "flex-1"}
-                            >
-                                Change
-                                <ChevronDown aria-hidden />
-                            </Button>
-                        }
-                    >
-                        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-                            <ChoiceGroup<LookChoice>
-                                label="Looks"
-                                describedBy={refused ? galleryId : undefined}
-                                className="grid grid-cols-2 gap-2.5"
-                                value={current}
-                                onChange={pick}
-                                // Each look with its Preview (DEC-177): a
-                                // button of its own, never inside the radio.
-                                layout={(item) =>
-                                    choices.map((choice) => (
-                                        <div
-                                            key={choice}
-                                            className="relative flex flex-col gap-1.5"
-                                        >
-                                            {item(choice)}
-                                            {/* Under the card on a phone,
-                                                where it is a thumb's width. */}
-                                            {previewButton(
-                                                choice,
-                                                inSheet
-                                                    ? "w-full"
-                                                    : "absolute bottom-2 right-2 h-[30px] gap-1 px-2.5 text-xs",
-                                            )}
-                                        </div>
-                                    ))
-                                }
-                                choices={choices.map((choice) => {
-                                    const look =
-                                        choice === "classic" ? null : choice;
-                                    const suggested =
-                                        available && look === suggestion.look
-                                            ? suggestion.industry
-                                                ? `Suggested for ${suggestion.industry}`
-                                                : "Suggested"
-                                            : null;
-                                    return {
-                                        value: choice,
-                                        data: { "data-look-choice": choice },
-                                        label: (
-                                            <>
-                                                <LookThumbnail
-                                                    look={look}
-                                                    style={style}
-                                                    options={options}
-                                                    image={lookThumbnail(
-                                                        templateId,
-                                                        choice,
-                                                    )}
-                                                    className={
-                                                        inSheet
-                                                            ? "h-[88px] w-full"
-                                                            : "h-[104px] w-full"
-                                                    }
-                                                />
-                                                <span
-                                                    className={cn(
-                                                        "block min-w-0 px-1 pb-0.5",
-                                                        preview &&
-                                                            !inSheet &&
-                                                            "pr-24",
-                                                    )}
-                                                >
-                                                    <span className="flex items-center gap-1.5 text-sm font-semibold">
-                                                        {lookName(look)}
-                                                        {choice === current ? (
-                                                            <span className="rounded-[5px] bg-foreground px-1.5 py-px text-[0.65625rem] font-semibold text-background">
-                                                                Now
-                                                            </span>
-                                                        ) : null}
-                                                    </span>
-                                                    <span className="block text-xs leading-snug text-muted-foreground">
-                                                        {look
-                                                            ? LOOKS[look].short
-                                                            : CLASSIC.short}
-                                                    </span>
-                                                    {suggested ? (
-                                                        <Badge
-                                                            variant="tag"
-                                                            size="sm"
-                                                            className="mt-1"
-                                                        >
-                                                            {suggested}
-                                                        </Badge>
-                                                    ) : null}
-                                                </span>
-                                            </>
-                                        ),
-                                    };
-                                })}
-                                itemClassName={(active) =>
-                                    cn(
-                                        "flex w-full flex-col gap-1.5 rounded-[10px] border bg-card p-1.5 text-left focus-visible:ring-offset-1",
-                                        active
-                                            ? "border-foreground ring-1 ring-foreground"
-                                            : "border-border hover:bg-muted",
-                                    )
-                                }
-                            />
-                        </div>
-                        {paidNames.length > 0 || refused ? (
-                            <PickerFoot>
-                                {paidNames.length > 0 ? (
-                                    <p>
-                                        <Badge variant="tag" size="sm">
-                                            Paid plans
-                                        </Badge>{" "}
-                                        {andList(paidNames)}
-                                    </p>
-                                ) : null}
-                                {refused ? (
-                                    <div id={galleryId}>
-                                        <PaidRefusal name={refused} />
-                                    </div>
-                                ) : null}
-                            </PickerFoot>
-                        ) : null}
-                    </BrandPicker>
-                </div>
-            </div>
+            )}
             {lineUnderCard ? (
                 <div id={statusId}>
                     <PaidRefusal name={refused} />

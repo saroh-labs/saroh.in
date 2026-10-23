@@ -1,24 +1,19 @@
 "use client";
 
 import { cn } from "@saroh/ui/lib/utils";
-import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
-import { useContext, useState } from "react";
+import { useState } from "react";
 
 import { ChoiceGroup } from "@/components/shared/fields/choice-group";
 import type { StyleSwatch } from "@/lib/sites/style";
-import {
-    BrandPicker,
-    PickerFoot,
-    PickerHeader,
-    PickerHost,
-} from "./brand-picker";
+import { BrandPicker, PickerFoot, PickerHeader } from "./brand-picker";
 
 /**
  * One line of the Brand tab's Colour (redesigned 22 Oct 2026): the row's
  * name, its colour and that colour's name, always written, so it reads on
  * touch as well as under a mouse. Pressing it opens what can go there
- * (`children`), a popover on a desk, the sheet itself on a phone.
+ * (`children`) as a popover. A phone's Brand sheet shows its colours as
+ * chips instead (`PhoneColours`, DEC-185).
  */
 export function ColourRow({
     label,
@@ -49,7 +44,6 @@ export function ColourRow({
     children: ReactNode;
 }) {
     const [open, setOpen] = useState(false);
-    const inSheet = useContext(PickerHost) !== null;
     return (
         <>
             <BrandPicker
@@ -72,8 +66,7 @@ export function ColourRow({
                         aria-label={`${label}: ${value}`}
                         data-colour-row={label}
                         className={cn(
-                            "flex w-full items-center gap-2 rounded-lg border bg-card px-2 py-1.5 text-left text-[0.78125rem] transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                            inSheet ? "min-h-11 text-sm" : "min-h-9",
+                            "flex min-h-9 w-full items-center gap-2 rounded-lg border bg-card px-2 py-1.5 text-left text-[0.78125rem] transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                             open && "border-foreground ring-1 ring-foreground",
                         )}
                     >
@@ -82,12 +75,6 @@ export function ColourRow({
                         </span>
                         {chip}
                         <span className="font-semibold">{value}</span>
-                        {inSheet ? (
-                            <ChevronRight
-                                aria-hidden
-                                className="size-4 shrink-0 text-muted-foreground"
-                            />
-                        ) : null}
                     </button>
                 }
             >

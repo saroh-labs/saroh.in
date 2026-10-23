@@ -5,18 +5,24 @@ import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
+import { MoreHorizontal } from "lucide-react";
+import type { ReactNode } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 
-import { ChoiceGroup } from "@/components/shared/fields/choice-group";
+import {
+    ChipGroup,
+    ChoiceGroup,
+} from "@/components/shared/fields/choice-group";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { activeColourway, contrastOk, inColourway } from "@/lib/sites/style";
 import type { PaidKind, StyleChoiceRules } from "@/lib/sites/style-access";
 import { ALL_FREE } from "@/lib/sites/style-access";
 import { Label } from "@saroh/ui/label";
-import { PickerHost } from "./brand-picker";
+import { TabStrip } from "@saroh/ui/tabs";
+import { BrandInline } from "./brand-picker";
 import { Chip, ColourRow, SwatchGrid, unreadableWords } from "./colour-picker";
 import type { LookChoices } from "./look-picker";
-import { LookPicker, lookName } from "./look-picker";
+import { lookChoices, lookName, LookPicker } from "./look-picker";
 import { PaidRefusal } from "./paid-refusal";
 import { TypefacePicker } from "./typeface-picker";
 
@@ -98,7 +104,7 @@ export function StylePanel({
     rules = ALL_FREE,
     onTry,
     heroInText = false,
-    inline = false,
+    phoneTabs = false,
 }: {
     style: SiteStyle;
     options: SiteStyleOptions;
@@ -115,8 +121,12 @@ export function StylePanel({
     onTry?: (next: SiteStyle | null) => void;
     /** The page's hero draws in the text colour: the Hero row moves nothing. */
     heroInText?: boolean;
-    /** In the phone's sheet: pickers open inside it, not as popovers. */
-    inline?: boolean;
+    /**
+     * The phone's Brand sheet (DEC-185): Look · Type · Colour · Spacing as
+     * tabs, each showing its options; Saved and Reset are in the sheet's
+     * head (`BrandSheetActions`).
+     */
+    phoneTabs?: boolean;
 }) {
     // The paid choice just refused, and where: one line, by that control.
     const [refused, setRefused] = useState<{
@@ -222,7 +232,441 @@ export function StylePanel({
         return true;
     }
 
-    // "Saved." for two seconds once a save lands, then the hint again.
+    const savedNow = useSavedNow(saving, dirty);
+    const [tab, setTab] = useState<"look" | "type" | "colour" | "spacing">(
+        "look",
+    );
+
+    /*
+     * Each colour the panel offers, as a part: its name, its colour now,
+     * what can go there, and why one can't. A desk lists them as rows that
+     * open a popover; a phone's sheet as chips over the chosen part's
+     * swatches (DEC-185).
+     */
+    const parts: ColourPart[] = [
+        ...(colourways.length > 0
+            ? [
+                  {
+                      key: "colourway",
+                      label: "Colourway",
+                      chip: (
+                          <span
+                              aria-hidden
+                              className="flex shrink-0 overflow-hidden rounded-[5px] border border-foreground/20"
+                          >
+                              {(current?.chips ?? []).map((hsl, i) => (
+                                  <span
+                                      key={i}
+                                      className="h-[18px] w-2"
+                                      style={{
+                                          background: `hsl(${hsl})`,
+                                      }}
+                                  />
+                              ))}
+                          </span>
+                      ),
+                      value: current?.name ?? "Your own",
+                      foot: colourwayRefused ? (
+                          <PaidRefusal name={colourwayRefused} />
+                      ) : undefined,
+                      after: colourwayRefused ? (
+                          <PaidRefusal name={colourwayRefused} />
+                      ) : undefined,
+                      content: (
+                          <ChoiceGroup
+                              label="Colourway"
+                              className="space-y-1 p-3"
+                              value={current?.id ?? null}
+                              onChange={(id) => {
+                                  const cw = colourways.find(
+                                      (c) => c.id === id,
+                                  );
+                                  if (!cw) return;
+                                  if (!allowed("colourway", cw.id, cw.name)) {
+                                      return;
+                                  }
+                                  onChange(inColourway(style, cw));
+                              }}
+                              choices={colourways.map((cw) => ({
+                                  value: cw.id,
+                                  label: (
+                                      <>
+                                          <span
+                                              aria-hidden="true"
+                                              className="flex shrink-0 overflow-hidden rounded-sm border"
+                                          >
+                                              {cw.chips.map((hsl, i) => (
+                                                  <span
+                                                      key={i}
+                                                      className="h-5 w-3.5"
+                                                      style={{
+                                                          background: `hsl(${hsl})`,
+                                                      }}
+                                                  />
+                                              ))}
+                                          </span>
+                                          {cw.name}
+                                          {paidMark("colourway", cw.id)}
+                                      </>
+                                  ),
+                              }))}
+                              itemClassName={(active) =>
+                                  cn(
+                                      "flex min-h-9 w-full items-center gap-2.5 rounded border px-2.5 py-1.5 text-left text-sm focus-visible:ring-offset-1 coarse:min-h-11",
+                                      active
+                                          ? "border-foreground ring-1 ring-foreground"
+                                          : "border-border hover:bg-muted",
+                                  )
+                              }
+                          />
+                      ),
+                  },
+              ]
+            : []),
+        ...options.rows.map((row): ColourPart => {
+            const label = ROW_NAMES[row.key] ?? row.label;
+            const value =
+                row.key === "text" ? effectiveTextKey : style.colours[row.key];
+            const swatch = swatchOf(row.key, value);
+            const template = paletteOn
+                ? style.palette?.[PALETTE_OF[row.key]]
+                : undefined;
+            // Only the text row can be illegible against a choice made
+            // elsewhere in this panel.
+            const unreadable = (sw: { hsl: string }) =>
+                row.key === "text" && !textReadable(sw.hsl);
+            const locked =
+                ground && row.key === "text"
+                    ? row.swatches.filter(unreadable)
+                    : [];
+            return {
+                key: row.key,
+                label,
+                note:
+                    row.key === "text" && ground
+                        ? `on ${ground.label}`
+                        : undefined,
+                chip: (
+                    <Chip
+                        fill={
+                            template ??
+                            (swatch ? `hsl(${swatch.hsl})` : undefined)
+                        }
+                    />
+                ),
+                value: template ? "Template's own" : (swatch?.label ?? ""),
+                foot:
+                    ground && locked.length > 0
+                        ? locked.map((sw) => (
+                              <p key={sw.key}>{unreadableWords(sw, ground)}</p>
+                          ))
+                        : undefined,
+                hint:
+                    row.key === "heroBackground" && heroInText
+                        ? "This hero uses your text colour. Change it in the hero block."
+                        : undefined,
+                content: (
+                    <SwatchGrid
+                        label={label}
+                        swatches={row.swatches}
+                        value={paletteOn ? null : value}
+                        disabled={unreadable}
+                        onChoose={(key) => setColour(row.key, key)}
+                    />
+                ),
+            };
+        }),
+    ];
+    const paletteLine = paletteOn ? (
+        <p className="py-1 text-xs text-muted-foreground">
+            {current
+                ? `The ${current.name} colourway uses your template's own colours.`
+                : "These colours are your template's own."}{" "}
+            Choose a colour below to use your own instead.
+        </p>
+    ) : null;
+
+    // The Look row, when there is a look to offer (DEC-172).
+    const lookPart =
+        looks &&
+        lookChoices({
+            available: looks.available,
+            draftLook: style.look ?? null,
+            liveLook: looks.liveLook,
+        }).length > 0 ? (
+            <LookPicker
+                style={style}
+                options={options}
+                {...looks}
+                rules={rules}
+                refused={refusedOf("look")}
+                onChoose={(look: LookId | null) => {
+                    if (look && !allowed("look", look, lookName(look))) {
+                        return;
+                    }
+                    if (!look) setRefused(null);
+                    looks.onChoose(look);
+                }}
+            />
+        ) : null;
+    // The pairing picker H1's note promised (DEC-046); an older API that
+    // serves no pairs shows no choice.
+    const typePart =
+        fontPairs.length > 0 ? (
+            <TypefacePicker
+                pairs={fontPairs}
+                active={activePair}
+                rules={rules}
+                refused={refusedOf("fontPair")}
+                onChoose={setFontPair}
+                onTry={
+                    onTry
+                        ? (key) => onTry(key === null ? null : withPair(key))
+                        : undefined
+                }
+            />
+        ) : null;
+    const spacingPart = (
+        <section className="space-y-3">
+            <h3 className="label">Spacing and shape</h3>
+            {options.scalars.map((scalar) => {
+                const value = style.scalars[scalar.key] ?? scalar.min;
+                // A template may set a value under the merchant's
+                // range (a 1px hairline gap, DEC-090): the slider
+                // shows it truly rather than pinned to its floor.
+                const min = Math.min(scalar.min, value);
+                return (
+                    <div key={scalar.key} className="space-y-1">
+                        <div className="flex items-baseline justify-between">
+                            <Label
+                                htmlFor={`style-${scalar.key}`}
+                                className="text-xs font-normal leading-normal"
+                            >
+                                {scalar.label}
+                            </Label>
+                            <span className="text-xs tabular-nums text-muted-foreground">
+                                {scalar.unit === "×"
+                                    ? `${value.toFixed(2)}×`
+                                    : `${value}${scalar.unit}`}
+                            </span>
+                        </div>
+                        <input
+                            id={`style-${scalar.key}`}
+                            type="range"
+                            min={min}
+                            max={scalar.max}
+                            step={scalar.step}
+                            value={value}
+                            onChange={(e) =>
+                                setScalar(scalar.key, Number(e.target.value))
+                            }
+                            className="w-full accent-foreground coarse:h-11"
+                        />
+                    </div>
+                );
+            })}
+        </section>
+    );
+
+    if (phoneTabs) {
+        // The phone's Brand sheet (DEC-185): one tab at a time.
+        const tabs = [
+            ...(lookPart ? [{ key: "look" as const, label: "Look" }] : []),
+            ...(typePart ? [{ key: "type" as const, label: "Type" }] : []),
+            { key: "colour" as const, label: "Colour" },
+            { key: "spacing" as const, label: "Spacing" },
+        ];
+        const shown = tabs.some((t) => t.key === tab) ? tab : tabs[0].key;
+        return (
+            <BrandInline.Provider value>
+                <div className="flex min-h-0 flex-1 flex-col">
+                    <TabStrip
+                        label="Brand"
+                        value={shown}
+                        onValueChange={setTab}
+                        className="shrink-0"
+                        listClassName="px-2"
+                        tabs={tabs.map((t) => ({
+                            value: t.key,
+                            label: t.label,
+                        }))}
+                    />
+                    <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+                        {shown === "look" ? lookPart : null}
+                        {shown === "type" ? typePart : null}
+                        {shown === "colour" ? (
+                            <>
+                                {paletteLine}
+                                <PhoneColours parts={parts} />
+                            </>
+                        ) : null}
+                        {shown === "spacing" ? spacingPart : null}
+                    </div>
+                </div>
+            </BrandInline.Provider>
+        );
+    }
+
+    return (
+        /*
+         * The rail's Brand tab (G2) names this panel and is the way back to
+         * the page's blocks, so it carries no header or Back of its own.
+         */
+        <div className="relative flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3 [&>section+section]:border-t [&>section+section]:pt-4">
+                {lookPart}
+                {typePart}
+                <section className="space-y-1">
+                    <h3 className="label pb-1">Colour</h3>
+                    {parts.map((part) => (
+                        <div key={part.key} className="space-y-1">
+                            <ColourRow
+                                label={part.label}
+                                note={part.note}
+                                chip={part.chip}
+                                value={part.value}
+                                foot={part.foot}
+                                after={part.after}
+                            >
+                                {part.content}
+                            </ColourRow>
+                            {part.hint ? (
+                                <p
+                                    data-hero-hint=""
+                                    className="px-0.5 text-[0.71875rem] leading-snug text-muted-foreground"
+                                >
+                                    {part.hint}
+                                </p>
+                            ) : null}
+                            {part.key === "colourway" ? paletteLine : null}
+                        </div>
+                    ))}
+                </section>
+                {spacingPart}
+            </div>
+
+            <div className="flex items-center justify-between gap-2 border-t p-3">
+                <p
+                    className="text-xs text-muted-foreground"
+                    data-style-save-line=""
+                >
+                    {saving
+                        ? "Saving…"
+                        : savedNow
+                          ? "Saved. Applies to every page."
+                          : "Applies to every page."}
+                </p>
+                <ResetStyle onReset={onReset} />
+            </div>
+        </div>
+    );
+}
+
+/**
+ * "Reset style…" (22 Oct 2026): it moves every colour, the typeface and
+ * the sliders at once, so it asks first, keeping the style the safe way
+ * out; once done, Undo puts it all back in one press (`useUndo`).
+ */
+function ResetStyle({
+    onReset,
+    menu = false,
+}: {
+    onReset: () => void;
+    /** Behind ⋯ in a phone's Brand sheet: "Reset style…" first. */
+    menu?: boolean;
+}) {
+    const [open, setOpen] = useState(false);
+    const [asking, setAsking] = useState(!menu);
+    const titleId = useId();
+    const bodyId = useId();
+    return (
+        <Popover
+            open={open}
+            onOpenChange={(next) => {
+                setOpen(next);
+                setAsking(!menu);
+            }}
+        >
+            <PopoverTrigger asChild>
+                {menu ? (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label="More: Reset style"
+                        className="size-11 shrink-0 text-muted-foreground"
+                    >
+                        <MoreHorizontal aria-hidden />
+                    </Button>
+                ) : (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        aria-haspopup="dialog"
+                    >
+                        Reset style…
+                    </Button>
+                )}
+            </PopoverTrigger>
+            {asking ? (
+                <PopoverContent
+                    role="alertdialog"
+                    aria-labelledby={titleId}
+                    aria-describedby={bodyId}
+                    side={menu ? "bottom" : "top"}
+                    align="end"
+                    className="w-[300px] max-w-[calc(100vw-24px)] rounded-xl p-3.5"
+                >
+                    <p id={titleId} className="text-sm font-semibold">
+                        {RESET_TITLE}
+                    </p>
+                    <p
+                        id={bodyId}
+                        className="mb-3 mt-1.5 text-[0.78125rem] leading-normal text-muted-foreground"
+                    >
+                        {RESET_BODY}
+                    </p>
+                    <div className="flex justify-end gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            autoFocus
+                            onClick={() => setOpen(false)}
+                        >
+                            Keep my style
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => {
+                                setOpen(false);
+                                onReset();
+                            }}
+                        >
+                            Reset style
+                        </Button>
+                    </div>
+                </PopoverContent>
+            ) : (
+                <PopoverContent align="end" className="w-56 p-1">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        className="w-full justify-start"
+                        onClick={() => setAsking(true)}
+                    >
+                        Reset style…
+                    </Button>
+                </PopoverContent>
+            )}
+        </Popover>
+    );
+}
+
+/** "Saved." for two seconds once a save lands, then the hint again. */
+export function useSavedNow(saving: boolean, dirty: boolean): boolean {
     const [savedNow, setSavedNow] = useState(false);
     const wasSaving = useRef(saving);
     useEffect(() => {
@@ -233,359 +677,93 @@ export function StylePanel({
         const id = setTimeout(() => setSavedNow(false), SAVED_MS);
         return () => clearTimeout(id);
     }, [saving, dirty]);
+    return savedNow;
+}
 
-    const [host, setHost] = useState<HTMLDivElement | null>(null);
+/** One colour the Brand tab offers: a row on a desk, a chip on a phone. */
+interface ColourPart {
+    key: string;
+    label: string;
+    note?: string;
+    chip: ReactNode;
+    value: string;
+    foot?: ReactNode;
+    after?: ReactNode;
+    /** A line under the row: the hero that draws in the text colour. */
+    hint?: string;
+    content: ReactNode;
+}
 
+/**
+ * The phone's Colour tab (DEC-185): a chip for each part, showing its
+ * colour now; the chosen part's swatches below, and why a faded one
+ * can't be used, in words.
+ */
+function PhoneColours({ parts }: { parts: ColourPart[] }) {
+    const [chosen, setChosen] = useState(parts[0]?.key ?? "");
+    const part = parts.find((p) => p.key === chosen) ?? parts.at(0);
+    if (!part) return null;
     return (
-        /*
-         * The rail's Brand tab (G2) names this panel and is the way back to
-         * the page's blocks, so it carries no header or Back of its own.
-         */
-        <PickerHost.Provider value={inline ? host : null}>
-            <div className="relative flex min-h-0 flex-1 flex-col">
-                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3 [&>section+section]:border-t [&>section+section]:pt-4">
-                    {looks ? (
-                        <LookPicker
-                            style={style}
-                            options={options}
-                            {...looks}
-                            rules={rules}
-                            refused={refusedOf("look")}
-                            onChoose={(look: LookId | null) => {
-                                if (
-                                    look &&
-                                    !allowed("look", look, lookName(look))
-                                ) {
-                                    return;
-                                }
-                                if (!look) setRefused(null);
-                                looks.onChoose(look);
-                            }}
-                        />
-                    ) : null}
-                    {/* The pairing picker H1's note promised (DEC-046); an
-                        older API that serves no pairs shows no choice. */}
-                    {fontPairs.length > 0 ? (
-                        <TypefacePicker
-                            pairs={fontPairs}
-                            active={activePair}
-                            rules={rules}
-                            refused={refusedOf("fontPair")}
-                            onChoose={setFontPair}
-                            onTry={
-                                onTry
-                                    ? (key) =>
-                                          onTry(
-                                              key === null
-                                                  ? null
-                                                  : withPair(key),
-                                          )
-                                    : undefined
-                            }
-                        />
-                    ) : null}
-                    <section className="space-y-1">
-                        <h3 className="label pb-1">Colour</h3>
-                        {colourways.length > 0 ? (
-                            <ColourRow
-                                label="Colourway"
-                                chip={
-                                    <span
-                                        aria-hidden
-                                        className="flex shrink-0 overflow-hidden rounded-[5px] border border-foreground/20"
-                                    >
-                                        {(current?.chips ?? []).map(
-                                            (hsl, i) => (
-                                                <span
-                                                    key={i}
-                                                    className="h-[18px] w-2"
-                                                    style={{
-                                                        background: `hsl(${hsl})`,
-                                                    }}
-                                                />
-                                            ),
-                                        )}
-                                    </span>
-                                }
-                                value={current?.name ?? "Your own"}
-                                foot={
-                                    colourwayRefused ? (
-                                        <PaidRefusal name={colourwayRefused} />
-                                    ) : undefined
-                                }
-                                after={
-                                    colourwayRefused ? (
-                                        <PaidRefusal name={colourwayRefused} />
-                                    ) : undefined
-                                }
-                            >
-                                <ChoiceGroup
-                                    label="Colourway"
-                                    className="space-y-1 p-3"
-                                    value={current?.id ?? null}
-                                    onChange={(id) => {
-                                        const cw = colourways.find(
-                                            (c) => c.id === id,
-                                        );
-                                        if (!cw) return;
-                                        if (
-                                            !allowed(
-                                                "colourway",
-                                                cw.id,
-                                                cw.name,
-                                            )
-                                        ) {
-                                            return;
-                                        }
-                                        onChange(inColourway(style, cw));
-                                    }}
-                                    choices={colourways.map((cw) => ({
-                                        value: cw.id,
-                                        label: (
-                                            <>
-                                                <span
-                                                    aria-hidden="true"
-                                                    className="flex shrink-0 overflow-hidden rounded-sm border"
-                                                >
-                                                    {cw.chips.map((hsl, i) => (
-                                                        <span
-                                                            key={i}
-                                                            className="h-5 w-3.5"
-                                                            style={{
-                                                                background: `hsl(${hsl})`,
-                                                            }}
-                                                        />
-                                                    ))}
-                                                </span>
-                                                {cw.name}
-                                                {paidMark("colourway", cw.id)}
-                                            </>
-                                        ),
-                                    }))}
-                                    itemClassName={(active) =>
-                                        cn(
-                                            "flex min-h-9 w-full items-center gap-2.5 rounded border px-2.5 py-1.5 text-left text-sm focus-visible:ring-offset-1 coarse:min-h-11",
-                                            active
-                                                ? "border-foreground ring-1 ring-foreground"
-                                                : "border-border hover:bg-muted",
-                                        )
-                                    }
-                                />
-                            </ColourRow>
-                        ) : null}
-                        {paletteOn ? (
-                            <p className="py-1 text-xs text-muted-foreground">
-                                {current
-                                    ? `The ${current.name} colourway uses your template's own colours.`
-                                    : "These colours are your template's own."}{" "}
-                                Choose a colour below to use your own instead.
-                            </p>
-                        ) : null}
-                        {options.rows.map((row) => {
-                            const label = ROW_NAMES[row.key] ?? row.label;
-                            const value =
-                                row.key === "text"
-                                    ? effectiveTextKey
-                                    : style.colours[row.key];
-                            const swatch = swatchOf(row.key, value);
-                            const template = paletteOn
-                                ? style.palette?.[PALETTE_OF[row.key]]
-                                : undefined;
-                            // Only the text row can be illegible against a
-                            // choice made elsewhere in this panel.
-                            const unreadable = (sw: { hsl: string }) =>
-                                row.key === "text" && !textReadable(sw.hsl);
-                            const locked =
-                                ground && row.key === "text"
-                                    ? row.swatches.filter(unreadable)
-                                    : [];
-                            return (
-                                <div key={row.key} className="space-y-1">
-                                    <ColourRow
-                                        label={label}
-                                        note={
-                                            row.key === "text" && ground
-                                                ? `on ${ground.label}`
-                                                : undefined
-                                        }
-                                        chip={
-                                            <Chip
-                                                fill={
-                                                    template ??
-                                                    (swatch
-                                                        ? `hsl(${swatch.hsl})`
-                                                        : undefined)
-                                                }
-                                            />
-                                        }
-                                        value={
-                                            template
-                                                ? "Template's own"
-                                                : (swatch?.label ?? "")
-                                        }
-                                        foot={
-                                            ground && locked.length > 0
-                                                ? locked.map((sw) => (
-                                                      <p key={sw.key}>
-                                                          {unreadableWords(
-                                                              sw,
-                                                              ground,
-                                                          )}
-                                                      </p>
-                                                  ))
-                                                : undefined
-                                        }
-                                    >
-                                        <SwatchGrid
-                                            label={label}
-                                            swatches={row.swatches}
-                                            value={paletteOn ? null : value}
-                                            disabled={unreadable}
-                                            onChoose={(key) =>
-                                                setColour(row.key, key)
-                                            }
-                                        />
-                                    </ColourRow>
-                                    {row.key === "heroBackground" &&
-                                    heroInText ? (
-                                        <p
-                                            data-hero-hint=""
-                                            className="px-0.5 text-[0.71875rem] leading-snug text-muted-foreground"
-                                        >
-                                            This hero uses your text colour.
-                                            Change it in the hero block.
-                                        </p>
-                                    ) : null}
-                                </div>
-                            );
-                        })}
-                    </section>
-
-                    <section className="space-y-3">
-                        <h3 className="label">Spacing and shape</h3>
-                        {options.scalars.map((scalar) => {
-                            const value =
-                                style.scalars[scalar.key] ?? scalar.min;
-                            // A template may set a value under the merchant's
-                            // range (a 1px hairline gap, DEC-090): the slider
-                            // shows it truly rather than pinned to its floor.
-                            const min = Math.min(scalar.min, value);
-                            return (
-                                <div key={scalar.key} className="space-y-1">
-                                    <div className="flex items-baseline justify-between">
-                                        <Label
-                                            htmlFor={`style-${scalar.key}`}
-                                            className="text-xs font-normal leading-normal"
-                                        >
-                                            {scalar.label}
-                                        </Label>
-                                        <span className="text-xs tabular-nums text-muted-foreground">
-                                            {scalar.unit === "×"
-                                                ? `${value.toFixed(2)}×`
-                                                : `${value}${scalar.unit}`}
-                                        </span>
-                                    </div>
-                                    <input
-                                        id={`style-${scalar.key}`}
-                                        type="range"
-                                        min={min}
-                                        max={scalar.max}
-                                        step={scalar.step}
-                                        value={value}
-                                        onChange={(e) =>
-                                            setScalar(
-                                                scalar.key,
-                                                Number(e.target.value),
-                                            )
-                                        }
-                                        className="w-full accent-foreground coarse:h-11"
-                                    />
-                                </div>
-                            );
-                        })}
-                    </section>
+        <div className="space-y-2">
+            <ChipGroup
+                label="Colour"
+                value={part.key}
+                onChange={setChosen}
+                choices={parts.map((p) => ({
+                    value: p.key,
+                    label: (
+                        <span className="flex items-center gap-1.5">
+                            {p.chip}
+                            {p.label}
+                        </span>
+                    ),
+                    ariaLabel: `${p.label}: ${p.value}`,
+                }))}
+            />
+            {part.note ? (
+                <p className="text-xs text-muted-foreground">
+                    {part.label} {part.note}: {part.value}
+                </p>
+            ) : null}
+            <div data-colour-part={part.key}>{part.content}</div>
+            {part.foot ? (
+                <div className="space-y-1 text-xs text-muted-foreground">
+                    {part.foot}
                 </div>
-
-                <div className="flex items-center justify-between gap-2 border-t p-3">
-                    <p
-                        className="text-xs text-muted-foreground"
-                        data-style-save-line=""
-                    >
-                        {saving
-                            ? "Saving…"
-                            : savedNow
-                              ? "Saved. Applies to every page."
-                              : "Applies to every page."}
-                    </p>
-                    <ResetStyle onReset={onReset} />
-                </div>
-                {/* The phone's pickers open here, over the rail. */}
-                <div ref={setHost} />
-            </div>
-        </PickerHost.Provider>
+            ) : null}
+            {part.hint ? (
+                <p data-hero-hint="" className="text-xs text-muted-foreground">
+                    {part.hint}
+                </p>
+            ) : null}
+        </div>
     );
 }
 
 /**
- * "Reset style…" (22 Oct 2026): it moves every colour, the typeface and
- * the sliders at once, so it asks first, keeping the style the safe way
- * out; once done, Undo puts it all back in one press (`useUndo`).
+ * The phone Brand sheet's head (DEC-185): Saved, and ⋯ holding Reset
+ * style…, which asks first and then offers Undo.
  */
-function ResetStyle({ onReset }: { onReset: () => void }) {
-    const [open, setOpen] = useState(false);
-    const titleId = useId();
-    const bodyId = useId();
+export function BrandSheetActions({
+    saving,
+    dirty,
+    onReset,
+}: {
+    saving: boolean;
+    dirty: boolean;
+    onReset: () => void;
+}) {
+    const savedNow = useSavedNow(saving, dirty);
     return (
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    aria-haspopup="dialog"
-                >
-                    Reset style…
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent
-                role="alertdialog"
-                aria-labelledby={titleId}
-                aria-describedby={bodyId}
-                side="top"
-                align="end"
-                className="w-[300px] rounded-xl p-3.5"
+        <>
+            <span
+                className="shrink-0 px-1 text-xs text-muted-foreground"
+                data-style-save-line=""
+                role="status"
             >
-                <p id={titleId} className="text-sm font-semibold">
-                    {RESET_TITLE}
-                </p>
-                <p
-                    id={bodyId}
-                    className="mb-3 mt-1.5 text-[0.78125rem] leading-normal text-muted-foreground"
-                >
-                    {RESET_BODY}
-                </p>
-                <div className="flex justify-end gap-2">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        autoFocus
-                        onClick={() => setOpen(false)}
-                    >
-                        Keep my style
-                    </Button>
-                    <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => {
-                            setOpen(false);
-                            onReset();
-                        }}
-                    >
-                        Reset style
-                    </Button>
-                </div>
-            </PopoverContent>
-        </Popover>
+                {saving ? "Saving…" : savedNow ? "Saved" : null}
+            </span>
+            <ResetStyle onReset={onReset} menu />
+        </>
     );
 }

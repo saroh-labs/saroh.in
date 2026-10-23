@@ -13,12 +13,12 @@ import {
 } from "@saroh/ui/command";
 import { noMatchLine } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
-import { Check, ChevronDown, ChevronRight } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 import { useContext, useEffect, useRef, useState } from "react";
 
 import type { StyleChoiceRules } from "@/lib/sites/style-access";
-import { BrandPicker, PickerFoot, PickerHost } from "./brand-picker";
+import { BrandInline, BrandPicker, PickerFoot } from "./brand-picker";
 import { PaidRefusal } from "./paid-refusal";
 import { useSiteFaces } from "./site-faces";
 
@@ -57,7 +57,8 @@ export function TypefacePicker({
     onTry?: (key: string | null) => void;
 }) {
     const faces = useSiteFaces();
-    const inSheet = useContext(PickerHost) !== null;
+    // A phone's Brand sheet: the faces in place, a tap is the choice.
+    const inSheet = useContext(BrandInline);
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState("");
     const [highlight, setHighlight] = useState(active ?? "");
@@ -97,7 +98,7 @@ export function TypefacePicker({
                 style={{ fontFamily: face(pair.key) }}
                 className={cn(
                     "mx-1 gap-2.5 rounded-[7px] px-3 text-base",
-                    inSheet ? "min-h-11" : "min-h-[38px]",
+                    inSheet ? "min-h-[52px]" : "min-h-[38px]",
                 )}
             >
                 <Check
@@ -126,41 +127,18 @@ export function TypefacePicker({
             title="Typeface"
             className="w-[360px] max-w-[calc(100vw-24px)]"
             trigger={
-                inSheet ? (
-                    <button
-                        type="button"
-                        aria-haspopup="listbox"
-                        data-typeface-change=""
-                        className="flex min-h-11 w-full items-center gap-2.5 rounded-xl border bg-card px-3 text-left text-sm"
-                    >
-                        <span className="flex-1 text-muted-foreground">
-                            Typeface
-                        </span>
-                        <span
-                            className="truncate font-semibold"
-                            style={{ fontFamily: face(current.key) }}
-                        >
-                            {current.name}
-                        </span>
-                        <ChevronRight
-                            aria-hidden
-                            className="size-4 shrink-0 text-muted-foreground"
-                        />
-                    </button>
-                ) : (
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        aria-haspopup="listbox"
-                        aria-expanded={open}
-                        data-typeface-change=""
-                        aria-label={`Change typeface, now ${current.name}`}
-                    >
-                        Change
-                        <ChevronDown aria-hidden />
-                    </Button>
-                )
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    aria-haspopup="listbox"
+                    aria-expanded={open}
+                    data-typeface-change=""
+                    aria-label={`Change typeface, now ${current.name}`}
+                >
+                    Change
+                    <ChevronDown aria-hidden />
+                </Button>
             }
         >
             <Command
@@ -173,20 +151,21 @@ export function TypefacePicker({
                 }}
                 className="min-h-0 flex-1 rounded-none bg-transparent"
             >
-                <div className="relative">
-                    <CommandInput
-                        value={search}
-                        onValueChange={setSearch}
-                        placeholder="Search typefaces"
-                        aria-label="Search typefaces"
-                        className="text-sm"
-                    />
-                    {inSheet ? null : (
+                {/* Nine faces fit a sheet: no search on a phone. */}
+                {inSheet ? null : (
+                    <div className="relative">
+                        <CommandInput
+                            value={search}
+                            onValueChange={setSearch}
+                            placeholder="Search typefaces"
+                            aria-label="Search typefaces"
+                            className="text-sm"
+                        />
                         <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border px-1 font-mono text-[0.65625rem] text-muted-foreground">
                             Esc
                         </kbd>
-                    )}
-                </div>
+                    </div>
+                )}
                 <CommandList className="max-h-none min-h-0 flex-1 pb-1.5">
                     <CommandEmpty>
                         {noMatchLine("typefaces", search)}
@@ -227,9 +206,9 @@ export function TypefacePicker({
 
     return (
         <section className="space-y-2">
-            {/* On a phone the row says "Typeface" itself. */}
+            {/* On a phone (DEC-185) the Type tab is the faces themselves. */}
             {inSheet ? (
-                picker
+                <div data-typeface-current={current.key}>{picker}</div>
             ) : (
                 <>
                     <h3 className="label">Typeface</h3>
@@ -256,7 +235,9 @@ export function TypefacePicker({
                     </div>
                 </>
             )}
-            {refused && !open ? <PaidRefusal name={refused} /> : null}
+            {refused && !open && !inSheet ? (
+                <PaidRefusal name={refused} />
+            ) : null}
         </section>
     );
 }
