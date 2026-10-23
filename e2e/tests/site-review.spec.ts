@@ -3,6 +3,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { northwind, stamp as ownStamp } from "../fixtures/own-data";
+import { openMore } from "../fixtures/phone-editor";
 import { useSession } from "../fixtures/sessions";
 import {
     demoReviewer,
@@ -206,11 +207,12 @@ test.describe("a shared preview link", () => {
         await page.waitForURL(/\/sites\/[^/]+$/, { timeout: 30_000 });
 
         // Review lives in the inspector's Feedback tab since #340. On a
-        // phone (G4) the inspector is a sheet, opened on Feedback from the
-        // bar at the foot of the screen.
+        // phone the inspector is a sheet, opened on Feedback from ⋯ More
+        // (DEC-185).
         if ((page.viewportSize()?.width ?? 1440) < 760) {
-            await page
-                .getByRole("navigation", { name: "Edit this page" })
+            await (
+                await openMore(page)
+            )
                 .getByRole("button", { name: /^Feedback/ })
                 .click();
             await expect(

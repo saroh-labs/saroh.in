@@ -2,6 +2,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { openFromPill } from "../fixtures/phone-editor";
 import { useSession } from "../fixtures/sessions";
 import { setNorthwindLook } from "../fixtures/site-look";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
@@ -28,16 +29,11 @@ interface SiteView {
     liveLook?: string | null;
 }
 
-/** Website › Style: the rail's Brand tab on a desk, its bar on a phone. */
+/** Website › Style: the rail's Brand tab on a desk, its pill on a phone. */
 async function openBrand(page: Page, phone: boolean) {
     if (phone) {
-        const brand = page
-            .getByRole("navigation", { name: "Edit this page" })
-            .getByRole("button", { name: "Brand" });
-        await expect(brand).toBeVisible({ timeout: 30_000 });
-        if ((await brand.getAttribute("aria-pressed")) !== "true") {
-            await brand.click();
-        }
+        // The pill's Brand, in its sheet (DEC-185).
+        await openFromPill(page, "Brand");
         return;
     }
     const brand = page.getByRole("tab", { name: "Brand" });

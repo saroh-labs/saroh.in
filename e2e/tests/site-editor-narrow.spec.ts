@@ -65,8 +65,9 @@ test.describe("the site editor on a phone", { tag: "@serial" }, () => {
             () => document.documentElement.scrollWidth > window.innerWidth,
         );
         expect(overflow).toBe(false);
+        // No bottom tabs: one pill over the page (DEC-185).
         await expect(
-            page.getByRole("navigation", { name: "Edit this page" }),
+            page.getByRole("toolbar", { name: "Edit page" }),
         ).toBeVisible();
 
         await heroChip(page).click();

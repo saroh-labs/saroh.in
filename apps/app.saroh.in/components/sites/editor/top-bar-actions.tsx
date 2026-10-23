@@ -87,15 +87,13 @@ export interface TestReleaseActions {
 }
 /**
  * The bar's actions: theme, width, zoom and Preview, then Share and
- * Publish. Moved out of `editor-top-bar.tsx` (G4) so a phone can show the same
- * controls in its menu, `stacked`, with every target sized for a thumb.
+ * Publish. Moved out of `editor-top-bar.tsx` (G4); a phone's ⋯ More sheet
+ * (DEC-185) shares the view controls and Publish.
  */
 export function TopBarActions({
-    stacked = false,
     compact = false,
     ...p
 }: TopBarActionProps & {
-    stacked?: boolean;
     /**
      * Narrow (UX-035): Preview, Feedback and Test release fold into "More",
      * so Publish stays on screen at tablet width.
@@ -109,75 +107,8 @@ export function TopBarActions({
         run();
     };
     return (
-        <div
-            className={
-                stacked
-                    ? "flex flex-col gap-2"
-                    : "ml-auto flex shrink-0 items-center gap-2"
-            }
-        >
-            <div
-                className={cn(
-                    "flex items-center gap-2",
-                    stacked && "flex-wrap",
-                )}
-            >
-                <ThemeToggle />
-                {/*
-                 * Width only — the preview is already local, and
-                 * switching must not become a re-fetch.
-                 */}
-                <div
-                    role="group"
-                    aria-label="Preview width"
-                    className="flex h-8 items-center gap-0.5 rounded-md border p-0.5 coarse:h-11"
-                >
-                    {DEVICES.map((d) => {
-                        const Icon =
-                            d.key === "phone"
-                                ? Smartphone
-                                : d.key === "tablet"
-                                  ? Tablet
-                                  : Monitor;
-                        return (
-                            <Tip key={d.key} label={d.label}>
-                                <button
-                                    type="button"
-                                    onClick={() => p.setDevice(d.key)}
-                                    aria-pressed={p.device === d.key}
-                                    aria-label={`Show at ${d.label.toLowerCase()} width`}
-                                    className={cn(
-                                        "flex h-full w-8 items-center justify-center rounded transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:w-11",
-                                        p.device === d.key
-                                            ? "bg-secondary text-foreground"
-                                            : "text-muted-foreground hover:text-foreground",
-                                    )}
-                                >
-                                    <Icon aria-hidden className="size-4" />
-                                </button>
-                            </Tip>
-                        );
-                    })}
-                </div>
-
-                {/*
-                 * The zoom readout IS the control (spec §2): no ⌘scroll,
-                 * no pinch, no shortcut.
-                 */}
-                <OptionSelect
-                    aria-label="Zoom"
-                    size="sm"
-                    value={String(p.zoom)}
-                    onValueChange={(v) => {
-                        p.setZoom(v === "fit" ? "fit" : (Number(v) as Zoom));
-                    }}
-                    options={ZOOMS.map((z) => ({
-                        value: String(z),
-                        label: z === "fit" ? "Fit" : `${z}%`,
-                    }))}
-                    className="w-[4.75rem] tabular-nums text-muted-foreground"
-                />
-            </div>
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+            <ViewControls {...p} />
 
             {compact ? (
                 <Popover open={moreOpen} onOpenChange={setMoreOpen}>
@@ -229,7 +160,7 @@ export function TopBarActions({
                     </PopoverContent>
                 </Popover>
             ) : (
-                <SecondaryActions {...p} stacked={stacked} />
+                <SecondaryActions {...p} stacked={false} />
             )}
 
             {/*
@@ -238,55 +169,9 @@ export function TopBarActions({
              * open it says so and offers to take the request back. Style
              * is the rail's Brand tab (G2), so the bar has no button for it.
              */}
-            <ShareControl {...p} stacked={stacked} />
+            <ShareControl {...p} />
 
-            {/*
-             * The one action that puts the site in front of the
-             * public. Not disabled while In review: publishing then
-             * is allowed and recorded as a bypass (#278, DEC-047).
-             * Its title says what it puts live (G2). Unlike the
-             * design it stays pressable when nothing has changed:
-             * publishing again is how a new version is made.
-             */}
-            <Tip label={p.publishHint}>
-                <Button
-                    size="sm"
-                    className={cn(
-                        "wk-press text-[0.78125rem]",
-                        stacked && "w-full",
-                    )}
-                    onClick={p.onPublish}
-                    // With "Publishing needs approval" on, only an owner can
-                    // press it, and it says so rather than refusing on the press.
-                    disabled={
-                        p.publishDisabled || (p.needsApproval && !p.canOverride)
-                    }
-                    busy={p.publishing}
-                    busyLabel="Publishing…"
-                >
-                    {p.needsApproval ? "Needs approval" : "Publish"}
-                    {/*
-                     * Things worth a look before publishing, as a dot (UX-081):
-                     * a number here read as "changes to publish" when it
-                     * counted warnings. The check lists them on the press, so
-                     * the dot stays out of the button's name.
-                     */}
-                    {!p.publishing && p.flagCount > 0 ? (
-                        <span
-                            aria-hidden
-                            data-flag-dot=""
-                            title={`${count(p.flagCount, "thing")} worth a look`}
-                            className="ml-1.5 inline-block size-1.5 rounded-full bg-background/80"
-                        />
-                    ) : null}
-                </Button>
-            </Tip>
-            {/* A phone has no hover, so what Publish puts live is written out. */}
-            {stacked && p.publishHint ? (
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                    {p.publishHint}
-                </p>
-            ) : null}
+            <PublishButton {...p} />
         </div>
     );
 }
@@ -390,10 +275,7 @@ function ShareChoice({
  * the press, while the link anyone could open sat in Feedback; now both are
  * named choices, and an open review can be withdrawn.
  */
-function ShareControl({
-    stacked,
-    ...p
-}: TopBarActionProps & { stacked: boolean }) {
+function ShareControl(p: TopBarActionProps) {
     const [open, setOpen] = useState(false);
     const pick = (run: () => void) => () => {
         setOpen(false);
@@ -426,17 +308,6 @@ function ShareControl({
             />
         </>
     );
-    if (stacked) {
-        return (
-            <div
-                role="group"
-                aria-label={p.inReview ? "In review" : "Share"}
-                className="grid gap-1 rounded-lg border p-1"
-            >
-                {choices}
-            </div>
-        );
-    }
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
@@ -553,5 +424,123 @@ function TestReleaseSplit({
                 </DropdownMenuContent>
             </DropdownMenu>
         </div>
+    );
+}
+
+/** Light or dark, the preview's width and its zoom: the bar's, and More's. */
+export function ViewControls(
+    p: Pick<TopBarActionProps, "device" | "setDevice" | "zoom" | "setZoom">,
+) {
+    return (
+        <div className="flex flex-wrap items-center gap-2">
+            <ThemeToggle />
+            {/*
+             * Width only — the preview is already local, and
+             * switching must not become a re-fetch.
+             */}
+            <div
+                role="group"
+                aria-label="Preview width"
+                className="flex h-8 items-center gap-0.5 rounded-md border p-0.5 coarse:h-11"
+            >
+                {DEVICES.map((d) => {
+                    const Icon =
+                        d.key === "phone"
+                            ? Smartphone
+                            : d.key === "tablet"
+                              ? Tablet
+                              : Monitor;
+                    return (
+                        <Tip key={d.key} label={d.label}>
+                            <button
+                                type="button"
+                                onClick={() => p.setDevice(d.key)}
+                                aria-pressed={p.device === d.key}
+                                aria-label={`Show at ${d.label.toLowerCase()} width`}
+                                className={cn(
+                                    "flex h-full w-8 items-center justify-center rounded transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:w-11",
+                                    p.device === d.key
+                                        ? "bg-secondary text-foreground"
+                                        : "text-muted-foreground hover:text-foreground",
+                                )}
+                            >
+                                <Icon aria-hidden className="size-4" />
+                            </button>
+                        </Tip>
+                    );
+                })}
+            </div>
+
+            {/*
+             * The zoom readout IS the control (spec §2): no ⌘scroll,
+             * no pinch, no shortcut.
+             */}
+            <OptionSelect
+                aria-label="Zoom"
+                size="sm"
+                value={String(p.zoom)}
+                onValueChange={(v) => {
+                    p.setZoom(v === "fit" ? "fit" : (Number(v) as Zoom));
+                }}
+                options={ZOOMS.map((z) => ({
+                    value: String(z),
+                    label: z === "fit" ? "Fit" : `${z}%`,
+                }))}
+                className="w-[4.75rem] tabular-nums text-muted-foreground"
+            />
+        </div>
+    );
+}
+
+/**
+ * The one action that puts the site in front of the public: on the bar, a
+ * desk's and a phone's (DEC-185). Not disabled while In review: publishing
+ * then is allowed and recorded as a bypass (#278, DEC-047). Its title says
+ * what it puts live (G2). It stays pressable when nothing has changed:
+ * publishing again is how a new version is made.
+ */
+export function PublishButton(
+    p: Pick<
+        TopBarActionProps,
+        | "publishHint"
+        | "onPublish"
+        | "publishDisabled"
+        | "needsApproval"
+        | "canOverride"
+        | "publishing"
+        | "flagCount"
+    > & { className?: string },
+) {
+    return (
+        <Tip label={p.publishHint}>
+            <Button
+                size="sm"
+                className={cn("wk-press text-[0.78125rem]", p.className)}
+                onClick={p.onPublish}
+                // With "Publishing needs approval" on, only an owner can
+                // press it, and it says so rather than refusing on the press.
+                disabled={
+                    p.publishDisabled || (p.needsApproval && !p.canOverride)
+                }
+                busy={p.publishing}
+                busyLabel="Publishing…"
+            >
+                {p.needsApproval ? "Needs approval" : "Publish"}
+                {/*
+                 * Things worth a look before publishing, as a dot (UX-081):
+                 * a number here read as "changes to publish" when it
+                 * counted warnings. The sheet lists them on the press, so
+                 * the dot stays out of the button's name.
+                 */}
+                {!p.publishing && p.flagCount > 0 ? (
+                    <span
+                        aria-hidden
+                        data-flag-dot=""
+                        title={`${count(p.flagCount, "thing")} worth a look`}
+                        className="ml-1.5 inline-block size-1.5 rounded-full bg-background/80"
+                    />
+                ) : null}
+            </Button>
+        </Tip>
     );
 }

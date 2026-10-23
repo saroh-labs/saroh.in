@@ -24,6 +24,7 @@ import { styleChoiceRules } from "@/lib/sites/style-access";
 import { publishOverScheduleWarning } from "@/lib/sites/test-releases";
 import type { LookId } from "@saroh/block-contract";
 import { useEffect, useRef, useState } from "react";
+import { SECTION_LABELS } from "./editor-constants";
 import { EditorPanels } from "./editor-panels";
 import { EditorRail } from "./editor-rail";
 import { EditorTopBar } from "./editor-top-bar";
@@ -154,6 +155,8 @@ export function SiteEditor({
         initialSheet,
     );
     const { selection } = sheets;
+    // The editor's body, below the top bar: where its sheets are laid.
+    const [body, setBody] = useState<HTMLDivElement | null>(null);
     const { setSelectedIndex, setRail, setInspector } = selection;
     const draft = useEditorDraft({
         siteId,
@@ -286,6 +289,9 @@ export function SiteEditor({
                 addablePageKinds={addablePageKinds}
                 scheduled={releases.scheduled}
                 testRelease={testReleaseActions(releases)}
+                sheet={sheets.sheet}
+                setSheet={sheets.setSheet}
+                sheetHost={body}
             />
 
             <EditorPanels
@@ -295,9 +301,24 @@ export function SiteEditor({
                 hasSubject={
                     active !== null || selection.selectedChrome !== null
                 }
-                openNotes={review.openNotes}
+                inspectorTitle={
+                    selection.selectedChrome === "header"
+                        ? "Header"
+                        : selection.selectedChrome === "footer"
+                          ? "Footer"
+                          : selection.inspector === "feedback" || !active
+                            ? "Feedback"
+                            : SECTION_LABELS[active.section.type]
+                }
+                pageTitle={
+                    pages.find((p) => p.id === pageId)?.title ?? "this page"
+                }
+                overlayOpen={publish.checking}
+                body={body}
+                setBody={setBody}
                 rail={
                     <EditorRail
+                        phone={layout === "phone"}
                         {...selection}
                         {...siteStyle}
                         {...draft}

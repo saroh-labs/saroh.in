@@ -92,25 +92,12 @@ test(
             );
 
             // The editor's Publish says so before it is pressed (T11): it
-            // reads "Needs approval". On a phone it sits in the "Status,
-            // view and publish" menu.
+            // reads "Needs approval", on a phone's bar too (DEC-185).
             await page.goto(`${urls.APP_URL}/sites/${siteId}`);
             const publish = page
                 .getByRole("button", { name: /^Needs approval/ })
                 .filter({ visible: true });
-            await expect(async () => {
-                if (
-                    (page.viewportSize()?.width ?? 1440) < 760 &&
-                    !(await publish.first().isVisible())
-                ) {
-                    await page
-                        .getByRole("button", {
-                            name: "Status, view and publish",
-                        })
-                        .click();
-                }
-                await expect(publish).toHaveCount(1, { timeout: 2_000 });
-            }).toPass({ timeout: 30_000 });
+            await expect(publish).toHaveCount(1, { timeout: 30_000 });
             await expect(
                 page.getByRole("button", { name: /^Publish( \d+)?$/ }).filter({
                     visible: true,

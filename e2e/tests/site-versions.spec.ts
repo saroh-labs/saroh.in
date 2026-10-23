@@ -71,25 +71,13 @@ async function siteId(page: Page): Promise<string> {
 /** The editor at a phone's width (G4), where the bar folds into a menu. */
 const onPhone = (page: Page) => (page.viewportSize()?.width ?? 1440) < 760;
 
-/**
- * The editor's Publish. On a phone it is in the "Status, view and publish"
- * menu, opened here if it isn't already.
- */
+/** The editor's Publish: on the bar, a phone's too (DEC-185). */
 async function publishButton(page: Page) {
-    const publish = page.getByRole("button", { name: /^Publish/ }).first();
-    if (onPhone(page)) {
-        // Pressed until it opens: a press before hydration (just after a
-        // load or a reload) does nothing.
-        await expect(async () => {
-            if (!(await publish.isVisible())) {
-                await page
-                    .getByRole("button", { name: "Status, view and publish" })
-                    .click();
-            }
-            await expect(publish).toBeVisible({ timeout: 2_000 });
-        }).toPass({ timeout: 30_000 });
-    }
-    await expect(publish).toBeVisible();
+    const publish = page
+        .getByRole("button", { name: /^Publish/ })
+        .filter({ visible: true })
+        .first();
+    await expect(publish).toBeVisible({ timeout: 30_000 });
     return publish;
 }
 
@@ -106,10 +94,10 @@ async function inspectorToggle(page: Page) {
         .first();
     if (onPhone(page) && !(await toggle.isVisible())) {
         await page
-            .getByRole("navigation", { name: "Edit this page" })
-            .getByRole("button", { name: "Page" })
+            .getByRole("toolbar", { name: "Edit page" })
+            .getByRole("button", { name: "Blocks" })
             .click();
-        // The rail lists every block, hidden or not: the header, then the
+        // The list has every block, hidden or not: the header, then the
         // page's own blocks.
         await page
             .getByRole("dialog")

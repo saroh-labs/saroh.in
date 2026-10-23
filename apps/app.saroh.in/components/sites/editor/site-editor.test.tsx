@@ -1682,49 +1682,61 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(canvas.className).not.toContain("p-6");
     });
 
-    it("folds the bar into one menu on a phone, and moves the rail to the foot", () => {
+    it("keeps the page, the status, More and Publish in a phone's bar, with no bottom tabs (DEC-185)", () => {
         atWidth(390);
         render();
         expect($("[data-layout]")?.dataset.layout).toBe("phone");
-        // The page switcher and the way out stay; the rest is in the menu.
         expect(button(/^Page: Home/)).toBeTruthy();
         expect($(`a[aria-label='Back to Website']`)).not.toBeNull();
-        expect(() => button("Publish")).toThrow();
-        expect($("[role=status]")).toBeNull();
-        expect($("[role=group][aria-label='Preview width']")).toBeNull();
-
-        click(button("Status, view and publish"));
-        expect(document.querySelector("[role=status]")?.textContent).toBe(
-            "Published",
-        );
         expect(button("Publish").disabled).toBe(false);
+        expect($("[role=status]")?.textContent).toBe("Published");
+        expect($("[role=group][aria-label='Preview width']")).toBeNull();
+        // No bottom tabs: one pill over the page.
+        expect($("nav[aria-label='Edit this page']")).toBeNull();
+        const pill = $("[role=toolbar][aria-label='Edit page']");
+        expect(
+            Array.from(pill?.querySelectorAll("button") ?? []).map(
+                (b) => b.getAttribute("aria-label") ?? b.textContent,
+            ),
+        ).toEqual(["Blocks", "Add a block", "Brand"]);
+        expect($("[aria-label='Resize the block list']")).toBeNull();
+
+        // ⋯ More: the rest of the desk's bar, in its words.
+        click(button(/^More: preview/));
+        expect(sheet()?.textContent).toContain("Check");
         // No hover on a phone: what Publish does is written out.
-        expect(document.body.textContent).toContain(
+        expect(sheet()?.textContent).toContain(
             "Nothing has changed since the last publish",
         );
         for (const d of ["desktop", "tablet", "phone"]) {
             expect(button(`Show at ${d} width`)).toBeTruthy();
         }
         expect(button(/^Ask a teammate to review/)).toBeTruthy();
-
-        // The rail is a bar at the foot, not a column.
-        expect($("[aria-label='Resize the block list']")).toBeNull();
-        expect($("[role=tablist][aria-label='Editor panels']")).toBeNull();
-        const bar = $("nav[aria-label='Edit this page']");
-        expect(
-            Array.from(bar?.querySelectorAll("button") ?? []).map(
-                (b) => b.textContent,
-            ),
-        ).toEqual(["Page", "Add", "Brand", "Feedback"]);
+        expect(button(/^Share a preview link/)).toBeTruthy();
+        // The pill makes way for a sheet.
+        expect($("[role=toolbar][aria-label='Edit page']")).toBeNull();
     });
 
-    it("opens the rail from the foot, and a block chosen there opens its fields", () => {
+    it("opens Feedback from More", () => {
+        atWidth(390);
+        render({
+            initialComments: [],
+            initialReview: { ...REVIEW, openNotes: 2 },
+        });
+        click(button(/^More: preview/));
+        click(button(/^Feedback/));
+        expect(
+            sheet()?.querySelector("aside[aria-label=Inspector]"),
+        ).not.toBeNull();
+    });
+
+    it("opens the block list from the pill, and a block chosen there opens its fields", () => {
         atWidth(390);
         render();
-        click(button("Page"));
-        expect(sheet()?.textContent).toContain("4 blocks");
+        click(button("Blocks"));
+        expect(sheet()?.textContent).toContain("Blocks on Home");
         click(button("Our story"));
-        // One sheet at a time: the rail makes way for the block's fields.
+        // One sheet at a time: the list makes way for the block's fields.
         expect($$("[role=dialog]")).toHaveLength(1);
         expect(
             sheet()?.querySelector("aside[aria-label=Inspector]"),
@@ -1732,10 +1744,11 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(button("Move block down").disabled).toBe(true);
     });
 
-    it("adds a block from the foot's Add, and opens it", () => {
+    it("adds a block from the pill's +, and opens it", () => {
         atWidth(390);
         render();
-        click(button("Add"));
+        click(button("Add a block"));
+        expect(sheet()?.textContent).toContain("Add a block");
         const tile = Array.from(
             sheet()?.querySelectorAll<HTMLButtonElement>("aside button") ?? [],
         ).find((b) => b.textContent.includes("Contact"));
@@ -1745,6 +1758,14 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(
             sheet()?.querySelector("aside[aria-label=Inspector]"),
         ).not.toBeNull();
+    });
+
+    it("switches page from the page's sheet", () => {
+        atWidth(390);
+        render();
+        click(button(/^Page: Home/));
+        expect(sheet()?.textContent).toContain("Pages");
+        expect(sheet()?.textContent).toContain("/");
     });
 
     it("keeps the selection and the open fields when a phone turns on its side", () => {

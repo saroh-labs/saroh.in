@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * The sheet a fresh editor opens with (DEC-182): only a phone's rail sheet,
+ * The sheet a fresh editor opens with (DEC-182): only a phone's own sheet,
  * open when the editor was started afresh, is open again; nothing else
  * opens on its own.
  */
@@ -33,11 +33,11 @@ afterEach(() => act(() => root.unmount()));
 
 describe("useEditorSheets: the sheet a fresh editor opens with", () => {
     it.each([
-        ["phone", "rail", "rail"],
+        ["phone", "brand", "brand"],
         ["phone", "inspector", null],
         ["phone", null, null],
-        ["narrow", "rail", null],
-        ["wide", "rail", null],
+        ["narrow", "brand", null],
+        ["wide", "brand", null],
     ] as const)("%s, %s open before: %s", (layout, initial, expected) => {
         act(() => root.render(<Probe layout={layout} initial={initial} />));
         expect(host.querySelector("p")?.dataset.sheet).toBe(expected ?? "none");

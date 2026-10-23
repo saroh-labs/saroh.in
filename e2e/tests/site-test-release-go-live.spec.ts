@@ -29,7 +29,7 @@ interface Section {
 
 const onPhone = (page: Page) => (page.viewportSize()?.width ?? 1440) < 760;
 
-/** The phone's "Status, view and publish" menu, opened until it shows. */
+/** The phone's ⋯ More sheet (DEC-185), opened until it shows. */
 async function openPhoneMenu(page: Page, inside: string | RegExp) {
     const target = page
         .getByRole("dialog")
@@ -38,9 +38,7 @@ async function openPhoneMenu(page: Page, inside: string | RegExp) {
         .first();
     await expect(async () => {
         if (!(await target.isVisible())) {
-            await page
-                .getByRole("button", { name: "Status, view and publish" })
-                .click();
+            await page.getByRole("button", { name: /^More: preview/ }).click();
         }
         await expect(target).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 30_000 });

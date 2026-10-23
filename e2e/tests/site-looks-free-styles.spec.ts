@@ -2,6 +2,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { openFromPill } from "../fixtures/phone-editor";
 import { useSession } from "../fixtures/sessions";
 import {
     grantNorthwindThemes,
@@ -45,13 +46,8 @@ interface SiteView {
 
 async function openBrand(page: Page, phone: boolean) {
     if (phone) {
-        const brand = page
-            .getByRole("navigation", { name: "Edit this page" })
-            .getByRole("button", { name: "Brand" });
-        await expect(brand).toBeVisible({ timeout: 30_000 });
-        if ((await brand.getAttribute("aria-pressed")) !== "true") {
-            await brand.click();
-        }
+        // The pill's Brand, in its sheet (DEC-185).
+        await openFromPill(page, "Brand");
         return;
     }
     const brand = page.getByRole("tab", { name: "Brand" });
