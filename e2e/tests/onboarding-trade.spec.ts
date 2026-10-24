@@ -1,5 +1,5 @@
 // @covers app:/onboarding app:/services api:organizations api:capabilities api:bookings
-import type { Page, TestInfo } from "@playwright/test";
+import type { Browser, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { stamp } from "../fixtures/own-data";
@@ -12,6 +12,7 @@ import {
     SETUP_QUESTIONS,
     setupHeading,
 } from "../fixtures/walk-setup";
+import { ignoreHTTPSErrors, urls } from "../playwright.config";
 
 /**
  * Bookings' trade at setup (#1193, DEC-189, plan U16): with "Take bookings"
@@ -20,9 +21,52 @@ import {
  * first service; Something else is Bookings as before. No other goal asks.
  *
  * As Asha (`founder`): each test that creates sets up a business of its own
- * with a stamped name, so nothing of the demo owner's is touched and it
- * runs beside everything else, desk and phone.
+ * with a stamped name, so nothing of the demo owner's is touched.
+ *
+ * The seed rolls modules out per business, so a business made here has none
+ * and setup rightly says Bookings "isn't on offer". The tests that create
+ * turn CRM and Bookings on for everyone first, as Sam would in admin →
+ * Flags, and put them back after: @serial, so nothing runs beside them.
  */
+
+/** CRM and Bookings rolled out to every business, then put back (Sam). */
+const ROLLOUT = ["MODULE_CRM", "MODULE_APPOINTMENTS"] as const;
+
+async function rollOutForEveryone(browser: Browser, testInfo: TestInfo) {
+    const context = await browser.newContext({ ignoreHTTPSErrors });
+    const staff = await context.newPage();
+    await useSession(staff, "staff");
+    const headers = { origin: urls.APP_URL };
+    const set = async (flag: string, enabled: boolean, what: string) => {
+        const res = await staff.request.put(
+            `${urls.API_URL}/admin/flags/${flag}`,
+            {
+                headers,
+                data: {
+                    enabled,
+                    reason: "Browser test: setup's Bookings path (DEC-189)",
+                    idempotencyKey: `trade-${flag}-${what}-${stamp(testInfo)}`,
+                },
+            },
+        );
+        expect(res.ok(), await res.text()).toBe(true);
+    };
+    const before = new Map<string, boolean>();
+    for (const flag of ROLLOUT) {
+        const res = await staff.request.get(
+            `${urls.API_URL}/admin/flags/${flag}/explain`,
+            { headers },
+        );
+        expect(res.ok(), await res.text()).toBe(true);
+        before.set(flag, ((await res.json()) as { value: boolean }).value);
+        await set(flag, true, "on");
+    }
+    return async () => {
+        for (const flag of ROLLOUT)
+            await set(flag, before.get(flag) ?? false, "back");
+        await context.close();
+    };
+}
 
 const TRADE_QUESTION = "What kind of place is it?";
 const SAMPLES_LINE = "Sample services, prices and hours will be ready to edit.";
@@ -97,32 +141,50 @@ test.describe("setup asks a bookings business its trade (DEC-189)", () => {
             .toBeLessThanOrEqual(width);
     });
 
-    test("Salon: the business opens on its sample services", async ({
-        page,
-    }, testInfo) => {
-        await toFirst(page, testInfo, "Trade Salon");
-        await pickGoal(page, /^Take bookings/);
-        await trades(page).getByRole("radio", { name: "Salon" }).click();
-        await expect(page.getByText(SAMPLES_LINE)).toBeVisible();
+    test(
+        "Salon: the business opens on its sample services",
+        { tag: "@serial" },
+        async ({ page, browser }, testInfo) => {
+            const putBack = await rollOutForEveryone(browser, testInfo);
+            try {
+                await toFirst(page, testInfo, "Trade Salon");
+                await pickGoal(page, /^Take bookings/);
+                await trades(page)
+                    .getByRole("radio", { name: "Salon" })
+                    .click();
+                await expect(page.getByText(SAMPLES_LINE)).toBeVisible();
 
-        await answerFirst(page);
-        await expect(page).toHaveURL(/\/services(?:\?|$)/);
-        await expect(
-            page.getByRole("button", { name: "Keep Women's haircut & finish" }),
-        ).toBeVisible();
-    });
+                await answerFirst(page);
+                await expect(page).toHaveURL(/\/services(?:\?|$)/);
+                await expect(
+                    page.getByRole("button", {
+                        name: "Keep Women's haircut & finish",
+                    }),
+                ).toBeVisible();
+            } finally {
+                await putBack();
+            }
+        },
+    );
 
-    test("Something else: Bookings as before, a new service to make", async ({
-        page,
-    }, testInfo) => {
-        await toFirst(page, testInfo, "Trade Other");
-        await pickGoal(page, /^Take bookings/);
-        await trades(page)
-            .getByRole("radio", { name: "Something else" })
-            .click();
-        await expect(page.getByText(SAMPLES_LINE)).toHaveCount(0);
+    test(
+        "Something else: Bookings as before, a new service to make",
+        { tag: "@serial" },
+        async ({ page, browser }, testInfo) => {
+            const putBack = await rollOutForEveryone(browser, testInfo);
+            try {
+                await toFirst(page, testInfo, "Trade Other");
+                await pickGoal(page, /^Take bookings/);
+                await trades(page)
+                    .getByRole("radio", { name: "Something else" })
+                    .click();
+                await expect(page.getByText(SAMPLES_LINE)).toHaveCount(0);
 
-        await answerFirst(page);
-        await expect(page).toHaveURL(/\/services\/new/);
-    });
+                await answerFirst(page);
+                await expect(page).toHaveURL(/\/services\/new/);
+            } finally {
+                await putBack();
+            }
+        },
+    );
 });

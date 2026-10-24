@@ -5,6 +5,7 @@ import AxeBuilder from "@axe-core/playwright";
 import type { Locator, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { answerRemoteImages } from "../fixtures/remote-images";
 import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
 
@@ -457,6 +458,7 @@ test.describe("every main screen is accessible and says what is clickable", () =
             // Motion is clamped (globals.css), so what is measured is the
             // page at rest rather than a frame of its entrance.
             await page.emulateMedia({ reducedMotion: "reduce" });
+            await answerRemoteImages(page);
             await useSession(page);
             await page.goto(`/open/${screen.org}`);
             const path =
