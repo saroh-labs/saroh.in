@@ -885,6 +885,7 @@ bg_step icon-button-tips pnpm run check:icon-button-tips
 bg_step tag-strip pnpm run check:tag-strip
 bg_step titles pnpm run check:titles
 bg_step words pnpm run check:words
+bg_step content-dates pnpm run check:content-dates "$BASE"
 bg_step formats pnpm run check:formats
 bg_step copy pnpm run check:copy
 

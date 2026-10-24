@@ -29,6 +29,7 @@
         "check:titles": "node scripts/check-page-titles.mjs",
         "check:routes": "node scripts/check-app-routes.mjs",
         "check:words": "node --test scripts/check-words.test.mjs && node scripts/check-words.mjs",
+        "check:content-dates": "node --test scripts/check-content-dates.test.mjs && node scripts/check-content-dates.mjs",
         "prepush": "bash scripts/prepush.sh",
         "db:migrate:deploy": "turbo run db:migrate:deploy",
         "db:push": "turbo run db:push",

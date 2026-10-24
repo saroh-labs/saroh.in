@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 
 import { LAUNCH_MODE } from "@/lib/links";
+import { readLivePricingVersion } from "@/lib/pricing";
 import { resourcesContext } from "@/lib/resources-context";
 import { SITE_URL } from "@/lib/seo";
 import { indexedPaths, lastModified } from "@/lib/site-pages";
@@ -15,13 +16,17 @@ import { indexedPaths, lastModified } from "@/lib/site-pages";
  * draft and its preview link are never listed: they are noindex, and
  * robots.txt keeps crawlers out of them.
  *
- * A page says when it last changed only where its content holds a date
- * (`lastModified`). No `changefreq` or `priority`: search engines ignore
- * both, and a guess in them is noise.
+ * Every page says the day its words last changed, from its content
+ * (`lastModified`); /pricing, the day the live catalogue version went
+ * live. No `changefreq` or `priority`: search engines ignore both, and a
+ * guess in them is noise.
  */
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+    // /pricing is listed only once the launch switch is open (`indexedPaths`).
+    const pricing =
+        LAUNCH_MODE === "open" ? await readLivePricingVersion() : null;
     return indexedPaths(LAUNCH_MODE, resourcesContext()).map((path) => {
-        const changed = lastModified(path);
+        const changed = lastModified(path, pricing?.goLiveAt);
         return {
             url: `${SITE_URL}${path}`,
             ...(changed && { lastModified: changed }),

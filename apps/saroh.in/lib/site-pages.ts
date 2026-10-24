@@ -1,18 +1,48 @@
-import { ABOUT } from "@/content/about";
+import { ABOUT, UPDATED as ABOUT_UPDATED } from "@/content/about";
 import {
     CHANGELOG_ENTRIES,
+    UPDATED as CHANGELOG_UPDATED,
     changelogHref,
     liveEntries,
 } from "@/content/changelog";
-import { CONTACT_PAGE } from "@/content/contact-page";
-import { featureHref } from "@/content/features";
-import { helpHref, liveArticles, summarise } from "@/content/help";
+import {
+    CONTACT_PAGE,
+    UPDATED as CONTACT_UPDATED,
+} from "@/content/contact-page";
+import { UPDATED as CUSTOMERS_UPDATED } from "@/content/customers";
+import { featureHref, UPDATED as FEATURES_UPDATED } from "@/content/features";
+import {
+    HELP_PATH,
+    UPDATED as HELP_UPDATED,
+    helpHref,
+    liveArticles,
+    summarise,
+} from "@/content/help";
+import { UPDATED as HOME_UPDATED } from "@/content/home";
+import {
+    INTEGRATION_SLUGS,
+    integrationHref,
+    INTEGRATIONS_PATH,
+    UPDATED as INTEGRATIONS_UPDATED,
+} from "@/content/integrations";
+import { UPDATED as LINK_PREVIEW_UPDATED } from "@/content/link-preview";
+import { UPDATED as QR_CODE_MAKER_UPDATED } from "@/content/qr-code-maker";
 import type { PublishContext } from "@/content/resources";
 import { LEGAL_PAGES, resourcePaths, routeExists } from "@/content/resources";
-import { solutionHref } from "@/content/solutions";
-import { galleryTemplates, templateHref } from "@/content/templates";
+import {
+    solutionHref,
+    UPDATED as SOLUTIONS_UPDATED,
+} from "@/content/solutions";
+import {
+    galleryTemplates,
+    templateHref,
+    TEMPLATES_PATH,
+    UPDATED as TEMPLATES_UPDATED,
+} from "@/content/templates";
 import { FEATURE_SLUGS, SOLUTION_SLUGS } from "@/content/types";
+import { UPDATED as WAITLIST_UPDATED } from "@/content/waitlist";
 import { helpArticles } from "@/lib/help-docs";
+import { integrationMeta } from "@/lib/integration-docs";
 import type { LaunchMode } from "@/lib/links";
 
 /**
@@ -72,21 +102,63 @@ export function indexedPaths(mode: LaunchMode, ctx?: PublishContext): string[] {
 /** The start of a day in India, as a sitemap writes a date. */
 const dayInIndia = (day: string) => `${day}T00:00:00+05:30`;
 
+/** The day in India a moment falls on (YYYY-MM-DD). */
+const indiaDayOf = (iso: string) =>
+    new Date(new Date(iso).getTime() + 330 * 60_000).toISOString().slice(0, 10);
+
+/** Each page's content module's `UPDATED`: the day its words last changed. */
+const PAGE_DAYS: Readonly<Record<string, string>> = {
+    "/": HOME_UPDATED,
+    ...Object.fromEntries(
+        FEATURE_SLUGS.map((s) => [featureHref(s), FEATURES_UPDATED]),
+    ),
+    ...Object.fromEntries(
+        SOLUTION_SLUGS.map((s) => [solutionHref(s), SOLUTIONS_UPDATED]),
+    ),
+    "/waitlist": WAITLIST_UPDATED,
+    [ABOUT.href]: ABOUT_UPDATED,
+    [CONTACT_PAGE.href]: CONTACT_UPDATED,
+    "/customers": CUSTOMERS_UPDATED,
+    [HELP_PATH]: HELP_UPDATED,
+    [INTEGRATIONS_PATH]: INTEGRATIONS_UPDATED,
+    "/changelog": CHANGELOG_UPDATED,
+    [TEMPLATES_PATH]: TEMPLATES_UPDATED,
+    "/tools/link-preview": LINK_PREVIEW_UPDATED,
+    "/tools/qr-code-maker": QR_CODE_MAKER_UPDATED,
+};
+
 /**
- * The day a page's words last changed, for the sitemap's `lastmod`, where
- * the content says one: a legal page's `publishOn` (its "Last updated"), a
- * Help article's `updated`, a changelog entry's `publishOn`. Every other
- * page has no date of its own, and the sitemap gives none: a made-up date
- * (the build's, say) teaches a search engine to ignore the real ones.
+ * The day a page's words last changed, for the sitemap's `lastmod` (R3),
+ * always a date its content holds: a legal page's `publishOn` (its "Last
+ * updated"), a Help article's or a provider page's `updated`, a changelog
+ * entry's `publishOn`, and for every other page its content module's
+ * `UPDATED`. /pricing is the live catalogue version's go-live day
+ * (`pricingLiveAt`, from `GET /public/pricing`), and has none when no
+ * catalogue is live. Never the build's day: a made-up date teaches a search
+ * engine to ignore the real ones.
  */
-export function lastModified(path: string): string | undefined {
+export function lastModified(
+    path: string,
+    pricingLiveAt: string | null = null,
+): string | undefined {
+    if (path === "/pricing") {
+        return pricingLiveAt
+            ? dayInIndia(indiaDayOf(pricingLiveAt))
+            : undefined;
+    }
     const legal = LEGAL_PAGES.find((p) => p.href === path);
     if (legal) return dayInIndia(legal.publishOn);
     const entry = CHANGELOG_ENTRIES.find((e) => changelogHref(e.slug) === path);
     if (entry) return dayInIndia(entry.publishOn);
     const article = helpArticles().find((a) => helpHref(a.slug) === path);
     if (article) return dayInIndia(article.updated);
-    return undefined;
+    const provider = INTEGRATION_SLUGS.find((s) => integrationHref(s) === path);
+    if (provider) return dayInIndia(integrationMeta(provider).updated);
+    if (path.startsWith(`${TEMPLATES_PATH}/`)) {
+        return dayInIndia(TEMPLATES_UPDATED);
+    }
+    const day = PAGE_DAYS[path];
+    return day ? dayInIndia(day) : undefined;
 }
 
 /** Every page the site serves, whatever the mode: a redirect may land on any. */

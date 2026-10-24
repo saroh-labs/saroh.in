@@ -24,6 +24,8 @@ const TIMEOUT_MS = 5000;
 /** `GET /public/pricing`, parsed: the snapshot, and whether it is a draft. */
 export interface PricingRead {
     version: number | null;
+    /** When the served version went live (ISO); null on a draft preview. */
+    goLiveAt: string | null;
     preview: boolean;
     catalog: Catalog;
 }
@@ -36,6 +38,7 @@ export function parsePricingResponse(body: unknown): PricingRead {
     const b = body as Record<string, unknown>;
     return {
         version: typeof b.version === "number" ? b.version : null,
+        goLiveAt: typeof b.goLiveAt === "string" ? b.goLiveAt : null,
         preview: b.preview === true,
         catalog: parseCatalog(b.catalog),
     };
@@ -60,10 +63,20 @@ function building(): boolean {
 export async function readLivePricing(
     fetcher: typeof fetch = fetch,
 ): Promise<Catalog | null> {
+    return (await readLivePricingVersion(fetcher))?.catalog ?? null;
+}
+
+/**
+ * The published version whole (`readLivePricing`, with its `goLiveAt`, which
+ * the sitemap dates /pricing by), or null when there is none to show.
+ */
+export async function readLivePricingVersion(
+    fetcher: typeof fetch = fetch,
+): Promise<PricingRead | null> {
     const api = env.API_URL;
     if (!api) return null;
     const deploying = building() && Boolean(env.VERCEL_ENV);
-    const once = async (): Promise<Catalog | null> => {
+    const once = async (): Promise<PricingRead | null> => {
         const res = await fetcher(`${api}/public/pricing`, {
             headers: { accept: "application/json" },
             // Read once, when the page is built: the site is static, and a
@@ -73,7 +86,7 @@ export async function readLivePricing(
         });
         if (res.status === 404) return null;
         if (!res.ok) throw new Error(`GET /public/pricing: ${res.status}`);
-        return parsePricingResponse(await res.json()).catalog;
+        return parsePricingResponse(await res.json());
     };
     try {
         // A deployment's build rides out an API restart (`build-retry.ts`).

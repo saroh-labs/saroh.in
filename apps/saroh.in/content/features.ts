@@ -20,6 +20,13 @@
 import type { Feature, FeatureSlug } from "./types";
 import { FEATURE_SLUGS } from "./types";
 
+/**
+ * The day this module's words last changed, the sitemap's `lastmod` for its
+ * pages (`lib/site-pages.ts`). Change it with the words:
+ * `pnpm check:content-dates` fails a batch that doesn't.
+ */
+export const UPDATED = "2026-10-12";
+
 export const features: Record<FeatureSlug, Feature> = {
     dashboard: {
         slug: "dashboard",

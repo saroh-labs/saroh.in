@@ -4,6 +4,13 @@ import type { ModeWords, OpenOnly } from "./launch-words";
 import { SAROH_NAME } from "./name";
 
 /**
+ * The day this module's words last changed, the sitemap's `lastmod` for its
+ * pages (`lib/site-pages.ts`). Change it with the words:
+ * `pnpm check:content-dates` fails a batch that doesn't.
+ */
+export const UPDATED = "2026-10-12";
+
+/**
  * /about, from the design "Saroh Marketing Site V2 - About" (DEC-137): who
  * Saroh is for, what the name means, what we hold ourselves to, where we
  * are, who makes it and the closing band.

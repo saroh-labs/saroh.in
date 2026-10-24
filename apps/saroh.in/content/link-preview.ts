@@ -1,6 +1,13 @@
 import type { FaqItem } from "./types";
 
 /**
+ * The day this module's words last changed, the sitemap's `lastmod` for its
+ * pages (`lib/site-pages.ts`). Change it with the words:
+ * `pnpm check:content-dates` fails a batch that doesn't.
+ */
+export const UPDATED = "2026-10-12";
+
+/**
  * The link preview tool's words (resources plan U2; design "Saroh Resources
  * - Link Preview Tool", the email version). Every claim here is what the
  * API does (`apps/api.saroh.in/src/modules/link-preview`) and what the

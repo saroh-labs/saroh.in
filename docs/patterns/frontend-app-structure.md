@@ -235,6 +235,12 @@ accounts and the operator console. `pnpm run check:titles` and
   solution with no screen of its own trade captured has no `hero` and no
   segment `shot`: it is drawn as words, never beside another trade's
   screen.
+- **A page's sitemap date lives beside its words** (R3, #1187): a content
+  module exports `UPDATED`, a provider page's MDX has `updated:`, Help
+  and legal pages keep theirs. Change the date with the words;
+  `pnpm check:content-dates` fails a batch that doesn't. /pricing is the
+  live catalogue version's `goLiveAt`. Never the build's date
+  (`lib/site-pages.ts` `lastModified`).
 - **The site is built at deploy time and nothing deploys on a schedule.** A
   page dated for a day (`publishOn`) appears with the first deploy made on
   or after it. Anything that answers per request about a dated page asks

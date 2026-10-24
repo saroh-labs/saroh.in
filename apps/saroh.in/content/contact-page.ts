@@ -4,6 +4,13 @@ import { SAROH_CONTACT_EMAIL } from "./contact";
 import type { OpenOnly } from "./launch-words";
 
 /**
+ * The day this module's words last changed, the sitemap's `lastmod` for its
+ * pages (`lib/site-pages.ts`). Change it with the words:
+ * `pnpm check:content-dates` fails a batch that doesn't.
+ */
+export const UPDATED = "2026-10-12";
+
+/**
  * /contact, from the design "Saroh Marketing Site V2 - Contact" (DEC-137):
  * the message form, the ways to reach Saroh, the registered office and
  * "Before you write".

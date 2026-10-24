@@ -1,4 +1,11 @@
 /**
+ * The day this module's words last changed, the sitemap's `lastmod` for its
+ * pages (`lib/site-pages.ts`). Change it with the words:
+ * `pnpm check:content-dates` fails a batch that doesn't.
+ */
+export const UPDATED = "2026-10-12";
+
+/**
  * The QR code maker's words (QR codes plan U9; design "Saroh QR Codes",
  * screen 02 "Free QR tool"). Every claim here has a row in
  * `docs/architecture/MARKETING_CLAIMS.md` §6b, and says what the page and

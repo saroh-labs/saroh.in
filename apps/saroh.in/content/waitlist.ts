@@ -2,6 +2,13 @@ import { SAROH_CONTACT_EMAIL } from "./contact";
 import { SAROH_NAME } from "./name";
 
 /**
+ * The day this module's words last changed, the sitemap's `lastmod` for its
+ * pages (`lib/site-pages.ts`). Change it with the words:
+ * `pnpm check:content-dates` fails a batch that doesn't.
+ */
+export const UPDATED = "2026-10-12";
+
+/**
  * The waitlist page's content (Waitlist design, plan U30): the kinds of
  * business it asks about, the opening date and the launch offer.
  *

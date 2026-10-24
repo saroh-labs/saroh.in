@@ -1,4 +1,11 @@
 /**
+ * The day this module's words last changed, the sitemap's `lastmod` for its
+ * pages (`lib/site-pages.ts`). Change it with the words:
+ * `pnpm check:content-dates` fails a batch that doesn't.
+ */
+export const UPDATED = "2026-10-12";
+
+/**
  * /customers: for someone who bought from, or booked with, a business that
  * uses Saroh (Terms rev 46, 9 Oct: "Your customers and your business").
  * A Free site's footer links here with "Report", beside "Made with Saroh"

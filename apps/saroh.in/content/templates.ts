@@ -9,6 +9,13 @@ import { EARLY_ACCESS_DAY } from "@/content/early-access";
 import type { WaitlistKindId } from "@/content/waitlist";
 
 /**
+ * The day this module's words last changed, the sitemap's `lastmod` for its
+ * pages (`lib/site-pages.ts`). Change it with the words:
+ * `pnpm check:content-dates` fails a batch that doesn't.
+ */
+export const UPDATED = "2026-10-24";
+
+/**
  * The Templates gallery (Resources plan U6, industry templates plan U13):
  * `/templates` and `/templates/[slug]`, built from `@saroh/templates` — the
  * same manifests a new site is created from — so the gallery can only show
