@@ -123,10 +123,10 @@ function LeadCard({
                     />
                 )
             ) : null}
-            <span className="flex items-baseline gap-3">
+            <span className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
                 <span
                     className={cn(
-                        "font-site-heading min-w-0 flex-1 font-semibold leading-tight tracking-[-0.015em] underline-offset-4 group-hover:underline",
+                        "font-site-heading flex-1 font-semibold leading-tight tracking-[-0.015em] underline-offset-4 [overflow-wrap:break-word] group-hover:underline",
                         lead
                             ? "text-[calc(1.5rem*var(--site-heading-scale))]"
                             : "text-[calc(1.1875rem*var(--site-heading-scale))]",

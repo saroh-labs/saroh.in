@@ -298,14 +298,13 @@ function GridFrame({
     return (
         <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             <div
-                className={cn(
-                    "mb-3.5 flex items-baseline gap-3",
-                    count && "flex-wrap",
-                )}
+                // Wraps rather than squeezing: a heading never shrinks
+                // below its longest word, so it can't run under the count.
+                className="mb-3.5 flex flex-wrap items-baseline gap-x-3 gap-y-1"
             >
                 <h2
                     data-site-title=""
-                    className="font-site-heading text-site-fg min-w-0 flex-1 text-[calc(1.625rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em]"
+                    className="font-site-heading text-site-fg flex-1 text-[calc(1.625rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em] [overflow-wrap:break-word]"
                 >
                     {title}
                 </h2>
@@ -687,10 +686,12 @@ function BareGrid({
                                 ) : null}
                             </span>
                         ) : null}
-                        <span className="flex items-baseline gap-3">
+                        {/* The price drops under the name when both don't fit a
+                            phone's column; the name keeps its longest word. */}
+                        <span className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
                             <span
                                 className={cn(
-                                    "font-site-heading min-w-0 flex-1 text-[calc(1.25rem*var(--site-heading-scale))] font-semibold leading-tight tracking-[-0.015em] underline-offset-4 group-hover:underline",
+                                    "font-site-heading flex-1 text-[calc(1.25rem*var(--site-heading-scale))] font-semibold leading-tight tracking-[-0.015em] underline-offset-4 [overflow-wrap:break-word] group-hover:underline",
                                     p.soldOut && "text-site-muted",
                                 )}
                             >
