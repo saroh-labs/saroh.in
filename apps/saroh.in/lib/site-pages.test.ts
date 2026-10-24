@@ -89,21 +89,47 @@ describe("lastModified", () => {
         );
     });
 
-    it("dates every listed page (R3), but /pricing only with a live catalogue", async () => {
+    it("dates every listed page (R3), but /pricing and /pricing.md only with a live catalogue", async () => {
         const { indexedPaths, lastModified } = await import("./site-pages");
         const paths = [
             ...indexedPaths("open", EVERYTHING),
             ...indexedPaths("waitlist", EVERYTHING),
         ];
         expect(paths).toContain("/pricing");
+        expect(paths).toContain("/pricing.md");
+        expect(paths).toContain("/llms.txt");
         for (const path of paths) {
-            if (path === "/pricing") continue;
+            if (path === "/pricing" || path === "/pricing.md") continue;
             expect(lastModified(path), path).toMatch(
                 /^\d{4}-\d{2}-\d{2}T00:00:00\+05:30$/,
             );
         }
         expect(lastModified("/pricing")).toBeUndefined();
         expect(lastModified("/pricing", null)).toBeUndefined();
+        expect(lastModified("/pricing.md")).toBeUndefined();
+    });
+
+    it("lists /pricing.md only once the launch switch is open, and /llms.txt always", async () => {
+        const { indexedPaths } = await import("./site-pages");
+        expect(indexedPaths("waitlist", EVERYTHING)).not.toContain(
+            "/pricing.md",
+        );
+        expect(indexedPaths("waitlist", EVERYTHING)).toContain("/llms.txt");
+        expect(indexedPaths("open")).toContain("/llms.txt");
+    });
+
+    it("dates /pricing.md as /pricing, and /llms.txt by the newest page it links", async () => {
+        const { lastModified } = await import("./site-pages");
+        const live = "2026-10-16T20:00:00.000Z";
+        expect(lastModified("/pricing.md", live)).toBe(
+            lastModified("/pricing", live),
+        );
+        const llms = lastModified("/llms.txt");
+        expect(llms).toMatch(/^\d{4}-\d{2}-\d{2}T00:00:00\+05:30$/);
+        // Never older than a page it links.
+        for (const path of ["/about", "/contact", "/features/website"]) {
+            expect((lastModified(path) ?? "") <= (llms ?? ""), path).toBe(true);
+        }
     });
 
     it("dates /pricing by the live version's goLiveAt, as a day in India", async () => {

@@ -49,6 +49,8 @@ import { UPDATED as WAITLIST_UPDATED } from "@/content/waitlist";
 import { helpArticles } from "@/lib/help-docs";
 import { integrationMeta } from "@/lib/integration-docs";
 import type { LaunchMode } from "@/lib/links";
+import { llmsText } from "@/lib/llms";
+import { resourcesContext } from "@/lib/resources-context";
 
 /**
  * The site's indexable pages, one list for the sitemap and the redirect test
@@ -86,7 +88,7 @@ export function indexedPaths(mode: LaunchMode, ctx?: PublishContext): string[] {
             : [];
     return [
         "/",
-        ...(mode === "open" ? ["/pricing"] : []),
+        ...(mode === "open" ? ["/pricing", "/pricing.md"] : []),
         ...FEATURE_SLUGS.map(featureHref),
         ...SOLUTION_SLUGS.map(solutionHref),
         ...(mode === "waitlist" ? ["/waitlist"] : []),
@@ -97,6 +99,8 @@ export function indexedPaths(mode: LaunchMode, ctx?: PublishContext): string[] {
         // For customers of a business on Saroh (Terms rev 46): every
         // merchant site's footer links here, whatever the launch mode.
         "/customers",
+        // For language models (#1187): served in either launch mode.
+        "/llms.txt",
         ...resources,
         ...entries,
         ...help,
@@ -140,17 +144,29 @@ const PAGE_DAYS: Readonly<Record<string, string>> = {
  * `UPDATED`. /pricing is the live catalogue version's go-live day
  * (`pricingLiveAt`, from `GET /public/pricing`), and has none when no
  * catalogue is live. Never the build's day: a made-up date teaches a search
- * engine to ignore the real ones.
+ * engine to ignore the real ones. /pricing.md is dated as /pricing, and
+ * /llms.txt by the newest date among the pages it links.
  */
 export function lastModified(
     path: string,
     pricingLiveAt: string | null = null,
     now: Date = new Date(),
 ): string | undefined {
-    if (path === "/pricing") {
+    if (path === "/pricing" || path === "/pricing.md") {
         return pricingLiveAt
             ? dayInIndia(indiaDayOf(pricingLiveAt))
             : undefined;
+    }
+    if (path === "/llms.txt") {
+        const articles = helpArticles().map((fm) => ({
+            ...summarise(fm),
+            description: fm.description,
+        }));
+        const text = llmsText("", resourcesContext(now), articles);
+        const days = Array.from(text.matchAll(/\]\((\/[^)]*)\)/g))
+            .map((m) => lastModified(m[1], pricingLiveAt, now))
+            .filter((d): d is string => d !== undefined);
+        return days.sort().at(-1);
     }
     const legal = LEGAL_PAGES.find((p) => p.href === path);
     if (legal) return dayInIndia(legal.publishOn);

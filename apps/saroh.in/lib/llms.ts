@@ -6,6 +6,7 @@ import { featureHref, featureList } from "@/content/features";
 import type { HelpFrontmatter } from "@/content/help";
 import { helpHref, liveArticles } from "@/content/help";
 import { integrationHref, liveIntegrations } from "@/content/integrations";
+import { PRICING_DESCRIPTION } from "@/content/pricing";
 import type { PublishContext } from "@/content/resources";
 import {
     linkShown,
@@ -17,10 +18,13 @@ import {
 import { solutionHref, solutionList } from "@/content/solutions";
 import type { GalleryTemplate } from "@/content/templates";
 import { galleryTemplates, templateHref } from "@/content/templates";
+import type { LaunchMode } from "@/lib/links";
+import { LAUNCH_MODE } from "@/lib/links";
 
 /**
  * `/llms.txt` (Resources plan U7, llmstxt.org): the site's name, one line
- * on what Saroh is, About and Contact (DEC-137), the feature pages and the
+ * on what Saroh is, About and Contact (DEC-137), Pricing and `/pricing.md`
+ * once the launch switch is open (#1187; no price in this file), the feature pages and the
  * solution pages (each with the one sentence it gives a search engine), then the Resources and
  * legal pages shown now, each with a one-line description, Help's articles, the changelog's entries and
  * the gallery's templates under their page. It follows the same publish rule as the nav, the footer
@@ -51,6 +55,7 @@ export function llmsText(
         GalleryTemplate,
         "slug" | "name" | "description"
     >[] = galleryTemplates(),
+    mode: LaunchMode = LAUNCH_MODE,
 ): string {
     const out: string[] = ["# Saroh", "", `> ${LLMS_SUMMARY}`];
 
@@ -64,6 +69,23 @@ export function llmsText(
         for (const page of company) {
             out.push(line(base, page.href, page.name, page.line));
         }
+    }
+
+    // Pricing is published only once the launch switch is open (DEC-136):
+    // before that /pricing redirects to the waitlist.
+    if (mode === "open") {
+        out.push(
+            "",
+            "## Pricing",
+            "",
+            line(base, "/pricing", "Pricing", PRICING_DESCRIPTION),
+            line(
+                base,
+                "/pricing.md",
+                "Pricing in Markdown",
+                "Each plan's price before GST, its limits and what it includes, as plain text.",
+            ),
+        );
     }
 
     // What Saroh does and who it is for: every feature and solution page,
