@@ -9,7 +9,7 @@ import { withBuildRetries } from "./build-retry";
  * Saroh's own pricing, read from api.saroh.in's published catalogue (plans
  * catalogue U24, KTD-10, KTD-E2). Nothing about a price, a limit or a plan's
  * terms lives in this repo: the pages draw whatever `GET /public/pricing`
- * returns, and the "Pricing announced at launch" placeholder when there is
+ * returns, and the `PRICE_NOTE` placeholder when there is
  * nothing to draw.
  *
  * - The published catalogue is read when the site is built (the site is

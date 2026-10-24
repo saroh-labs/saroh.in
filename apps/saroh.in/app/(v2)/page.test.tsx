@@ -61,8 +61,9 @@ describe("/ (Home)", () => {
         expect(container.innerHTML).not.toContain('"offers"');
         expect(container.innerHTML).not.toContain("/pricing");
         expect(container.textContent).toContain(
-            "Plan details are announced at launch",
+            "Move to a paid plan when you need more.",
         );
+        expect(container.textContent).not.toContain("announced at launch");
     });
 
     it("reads the headline whole and has the anchors other pages link to", async () => {

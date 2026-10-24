@@ -28,7 +28,7 @@
         "check:tag-strip": "node scripts/check-tag-strip.mjs",
         "check:titles": "node scripts/check-page-titles.mjs",
         "check:routes": "node scripts/check-app-routes.mjs",
-        "check:words": "node scripts/check-words.mjs",
+        "check:words": "node --test scripts/check-words.test.mjs && node scripts/check-words.mjs",
         "prepush": "bash scripts/prepush.sh",
         "db:migrate:deploy": "turbo run db:migrate:deploy",
         "db:push": "turbo run db:push",

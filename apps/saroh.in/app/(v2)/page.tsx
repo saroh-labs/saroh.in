@@ -11,17 +11,17 @@ import { TourVideo } from "@/components/v2/home/tour-video";
 import { JsonLd } from "@/components/v2/json-ld";
 import { PillLink } from "@/components/v2/pill";
 import { SectionHeading } from "@/components/v2/section-heading";
-import { faqItems, HOME_FAQ } from "@/content/faq";
+import { HOME_FAQ } from "@/content/faq";
 import { featureHref, featureList } from "@/content/features";
 import { home } from "@/content/home";
 import { solutionHref, solutionList } from "@/content/solutions";
 import { LAUNCH_MODE } from "@/lib/links";
 import { HOME_OG_ALT } from "@/lib/og-card";
 import {
+    faqWithPlans,
     freePlanLine,
     homePlanTeasers,
     planTeaserFootnote,
-    startFreeFaq,
 } from "@/lib/plan-teasers";
 import { readLivePricing } from "@/lib/pricing";
 import { pageMetadata, pageTitle } from "@/lib/seo";
@@ -39,7 +39,7 @@ import {
  *
  * Prices, plan lines and the free-plan line come from the published pricing
  * catalogue, read when the site is built (a publish starts a build, KTD-10);
- * with none, the "announced at launch" placeholders. Before the launch
+ * with none, the placeholders (`PRICE_NOTE`). Before the launch
  * switch opens the catalogue isn't read at all (DEC-136), as on a feature
  * page: one published ahead of launch must not put a plan's name or price
  * in the answers below or in the page's structured data.
@@ -56,9 +56,7 @@ export const metadata: Metadata = pageMetadata({
 
 export default async function HomePage() {
     const catalog = LAUNCH_MODE === "open" ? await readLivePricing() : null;
-    const faq = faqItems(HOME_FAQ).map((item, i) =>
-        HOME_FAQ[i] === "start-free" ? startFreeFaq(catalog, item) : item,
-    );
+    const faq = faqWithPlans(catalog, HOME_FAQ);
 
     return (
         <>

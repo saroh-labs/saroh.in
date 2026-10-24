@@ -6,8 +6,9 @@ import {
     offeredPlans,
 } from "@saroh/pricing-catalog";
 
+import { faqItems } from "@/content/faq";
 import { FREE_PLAN_LINE, PLAN_TEASERS } from "@/content/home";
-import type { FaqItem, PlanId } from "@/content/types";
+import type { FaqId, FaqItem, PlanId } from "@/content/types";
 import {
     PLAN_DETAILS_PLACEHOLDER,
     PRICE_NOTE,
@@ -31,7 +32,7 @@ export interface PlanTeaserView {
     name: string;
     /** The big figure, or `PRICE_PLACEHOLDER`. */
     price: string;
-    /** The small words after the price ("a month", or the launch note). */
+    /** The small words after the price ("a month", or `PRICE_NOTE`). */
     priceNote: string;
     /** What the plan includes, one line. */
     what: string;
@@ -195,4 +196,11 @@ export function startFreeFaq(
         q: fallback.q,
         a: `The ${free.name} plan is ${formatInr(free.pricePaise)} a month: ${lowerFirst(summary)} Move to ${next.name} (${formatInr(next.pricePaise)} a month) when you need more.`,
     };
+}
+
+/** A page's questions, its "start-free" answer through `startFreeFaq`: home and every solution page. */
+export function faqWithPlans(catalog: Catalog | null, ids: FaqId[]): FaqItem[] {
+    return faqItems(ids).map((item, i) =>
+        ids[i] === "start-free" ? startFreeFaq(catalog, item) : item,
+    );
 }

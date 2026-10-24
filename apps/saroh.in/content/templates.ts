@@ -446,7 +446,6 @@ export function listWords(words: readonly string[]): string {
 export { EARLY_ACCESS_DAY };
 /** As the copy writes it. */
 const EARLY_ACCESS_SHORT = "17 Oct";
-const LAST_WAITLIST_DAY = "16th";
 
 /**
  * The gallery's words. Each count and list is derived from the templates
@@ -490,19 +489,14 @@ export const templatesPage = {
     band: {
         before: `Pick one now. It's ready for you on ${EARLY_ACCESS_SHORT}.`,
         after: "Pick one, and start from it.",
-        body: "Join the waitlist, and we'll email you once, with your invite, when early access opens.",
+        body: "Start free, and pick your template when you set up your website.",
     },
 } as const;
 
 export const templateDetail = {
     crumb: "Templates",
-    save: (name: string) => `Save ${name} for early access`,
-    saveNote: {
-        before: (name: string) =>
-            `Early access opens ${EARLY_ACCESS_SHORT}. Join the waitlist by the ${LAST_WAITLIST_DAY} and we'll keep ${name} for you.`,
-        after: (name: string) =>
-            `Join the waitlist and we'll keep ${name} for you with your invite.`,
-    },
+    saveNote: (name: string) =>
+        `Start free, and pick ${name} when you set up your website.`,
     switcher: "Pages",
     desktop: "Desktop",
     phone: "Phone",

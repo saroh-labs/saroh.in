@@ -9,7 +9,7 @@ import { SectionHeading } from "@/components/v2/section-heading";
 import { SolutionHero } from "@/components/v2/solution/solution-hero";
 import { SolutionPricing } from "@/components/v2/solution/solution-pricing";
 import { SolutionSegment } from "@/components/v2/solution/solution-segment";
-import { faqItems, solutionFaq } from "@/content/faq";
+import { solutionFaq } from "@/content/faq";
 import { features } from "@/content/features";
 import {
     isSolutionSlug,
@@ -20,6 +20,7 @@ import {
 import { SOLUTION_SLUGS } from "@/content/types";
 import { LAUNCH_MODE } from "@/lib/links";
 import {
+    faqWithPlans,
     freePlanLine,
     planTeaserFootnote,
     solutionPlanTeasers,
@@ -117,7 +118,10 @@ export default async function SolutionPage({ params }: Props) {
                 />
             ) : null}
 
-            <Faq items={faqItems(solutionFaq(s.faq))} className="pt-[120px]" />
+            <Faq
+                items={faqWithPlans(catalog, solutionFaq(s.faq))}
+                className="pt-[120px]"
+            />
 
             <CtaBand
                 title={s.closer}

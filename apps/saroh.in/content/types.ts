@@ -204,6 +204,6 @@ export interface PlanTeaser {
 /** The price shown when there is no catalogue to read. */
 export const PRICE_PLACEHOLDER = "—";
 /** The line beside a placeholder price. */
-export const PRICE_NOTE = "Pricing announced at launch";
+export const PRICE_NOTE = "Prices are on the pricing page";
 /** What a plan includes, when there is no catalogue to read. */
-export const PLAN_DETAILS_PLACEHOLDER = "Plan details announced at launch";
+export const PLAN_DETAILS_PLACEHOLDER = "Plan details are on the pricing page";

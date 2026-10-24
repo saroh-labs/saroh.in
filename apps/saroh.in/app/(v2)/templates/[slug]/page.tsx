@@ -25,7 +25,7 @@ import { templatesLive } from "@/lib/templates-live";
 /**
  * One template (Resources plan U6, industry templates plan U13; design
  * "Saroh Resources - Templates - Gym"): the breadcrumb, "{Name}: {idea}.",
- * what it is and the button that saves it on the waitlist; its pages in a
+ * what it is and the button that starts from it; its pages in a
  * browser frame, desktop or phone; three notes and the facts, all from the
  * template's manifest; the templates built around the same kind; the band.
  *
@@ -98,9 +98,7 @@ export default async function TemplatePage({ params }: Props) {
                 <div className="grid justify-items-start gap-3">
                     <CtaLink src={`templates-${t.slug}`} template={save} />
                     <span className="max-w-[60ch] text-mk-note text-muted-foreground">
-                        {open
-                            ? detail.saveNote.after(t.name)
-                            : detail.saveNote.before(t.name)}
+                        {detail.saveNote(t.name)}
                     </span>
                 </div>
             </Container>

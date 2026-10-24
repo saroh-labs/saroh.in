@@ -12,7 +12,7 @@ import { softwareApplicationLd } from "@/lib/structured-data";
  * `/pricing` (plans catalogue U24): the Pricing design, drawn from the
  * published catalogue. Static, built from the catalogue when the site is
  * built; a publish starts a build (KTD-10). With no catalogue to read, every
- * price is the "Pricing announced at launch" placeholder.
+ * price is the `PRICE_NOTE` placeholder.
  */
 
 export const metadata: Metadata = pageMetadata({
