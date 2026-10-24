@@ -85,7 +85,8 @@ export function launchInstant(value: string | undefined): number | null {
  * `?access=<key>` on any page sets a cookie (on `DEV_ACCESS_COOKIE_DOMAIN`, so
  * one visit opens every dev app) and reloads the page without the key. A
  * visitor without the cookie is sent, with a 301, to the same page on
- * production (`DEV_REDIRECT_ORIGIN`, each app's own production host), or to `DEV_REDIRECT_PATH` there when the page
+ * production (`DEV_REDIRECT_ORIGIN`, each app's own production host), or
+ * to `DEV_REDIRECT_PATH` there when the page
  * has no twin (accounts' `/login` on the marketing site); a form post is
  * refused instead, so it is never replayed there. The cookie holds the key's digest, so changing the key
  * shuts out every browser let in with the old one.
