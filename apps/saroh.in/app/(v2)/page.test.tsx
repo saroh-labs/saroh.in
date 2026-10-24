@@ -129,4 +129,26 @@ describe("/ (Home)", () => {
         const faq = within(section(container, "faq"));
         expect(faq.getByText(/^The Plan A plan is/)).toBeTruthy();
     });
+
+    it("sends the answers it draws, the worded one too, as a FAQPage", async () => {
+        read.catalog = fakeCatalog();
+        const { container } = render(await HomePage());
+        const drawn = Array.from(
+            section(container, "faq").querySelectorAll("details"),
+        ).map((d) => ({
+            "@type": "Question",
+            name: d.querySelector("summary")?.textContent,
+            acceptedAnswer: {
+                "@type": "Answer",
+                text: d.querySelector("p")?.textContent,
+            },
+        }));
+        const sent = JSON.parse(
+            container.querySelector('script[type="application/ld+json"]')
+                ?.textContent ?? "[]",
+        ) as Record<string, unknown>[];
+        const faq = sent.find((d) => d["@type"] === "FAQPage");
+        expect(faq?.mainEntity).toEqual(drawn);
+        expect(JSON.stringify(faq)).toContain("The Plan A plan is");
+    });
 });

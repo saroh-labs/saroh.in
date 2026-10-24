@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { Container } from "@/components/v2/container";
 import { CtaLink } from "@/components/v2/cta-link";
+import { JsonLd } from "@/components/v2/json-ld";
 import { Breadcrumbs } from "@/components/v2/resources/breadcrumbs";
 import { TemplateCard } from "@/components/v2/templates/template-card";
 import { TemplateViewer } from "@/components/v2/templates/template-viewer";
@@ -20,6 +21,7 @@ import {
 } from "@/content/templates";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata, pageTitle } from "@/lib/seo";
+import { breadcrumbLd } from "@/lib/structured-data";
 import { templatesLive } from "@/lib/templates-live";
 
 /**
@@ -82,6 +84,13 @@ export default async function TemplatePage({ params }: Props) {
 
     return (
         <>
+            {/* The trail the page draws: Templates / {name}. */}
+            <JsonLd
+                data={breadcrumbLd([
+                    { name: detail.crumb, path: TEMPLATES_PATH },
+                    { name: t.name, path: t.href },
+                ])}
+            />
             <Container as="header" className="grid gap-6 pt-14">
                 <Breadcrumbs
                     crumbs={[

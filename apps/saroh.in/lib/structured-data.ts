@@ -1,5 +1,5 @@
 import type { Catalog } from "@saroh/pricing-catalog";
-import { offeredPlans } from "@saroh/pricing-catalog";
+import { offeredPlans, planPricePaise } from "@saroh/pricing-catalog";
 
 import type { CompanyFacts } from "@/content/company";
 import { COMPANY } from "@/content/company";
@@ -104,14 +104,35 @@ export function softwareApplicationLd(
         operatingSystem: "Web",
     };
     if (catalog) {
-        app.offers = offeredPlans(catalog).map((plan) => ({
+        const offer = (name: string, paise: number, unitCode: string) => ({
             "@type": "Offer",
-            name: plan.name,
-            // Monthly, before GST, as the catalogue holds it (integer paise).
-            price: (plan.pricePaise / 100).toFixed(2),
+            name,
+            price: (paise / 100).toFixed(2),
             priceCurrency: "INR",
+            priceSpecification: {
+                "@type": "UnitPriceSpecification",
+                price: (paise / 100).toFixed(2),
+                priceCurrency: "INR",
+                unitCode,
+                valueAddedTaxIncluded: false,
+            },
             url: `${SITE_URL}/pricing`,
-        }));
+        });
+        app.offers = offeredPlans(catalog).flatMap((plan) => [
+            // Monthly, before GST, as the catalogue holds it (integer paise).
+            offer(plan.name, plan.pricePaise, "MON"),
+            // Yearly only while the catalogue offers it, and only for a plan
+            // that costs something: priced as checkout prices it.
+            ...(catalog.yearly.on && plan.pricePaise > 0
+                ? [
+                      offer(
+                          `${plan.name}, yearly`,
+                          planPricePaise(catalog, plan, "year"),
+                          "ANN",
+                      ),
+                  ]
+                : []),
+        ]);
     }
     return app;
 }

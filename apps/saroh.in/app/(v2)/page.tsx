@@ -26,6 +26,7 @@ import {
 import { readLivePricing } from "@/lib/pricing";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import {
+    faqPageLd,
     organizationLd,
     softwareApplicationLd,
     webSiteLd,
@@ -65,6 +66,8 @@ export default async function HomePage() {
                     organizationLd(),
                     webSiteLd(),
                     softwareApplicationLd(catalog, home.seoDescription),
+                    // The very answers drawn under Questions, so the two never drift.
+                    faqPageLd(faq),
                 ]}
             />
             <HomeHero freeLine={freePlanLine(catalog)} />

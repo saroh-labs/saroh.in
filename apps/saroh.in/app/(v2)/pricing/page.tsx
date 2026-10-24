@@ -6,7 +6,7 @@ import { PRICING_COPY, PRICING_DESCRIPTION } from "@/content/pricing";
 import { readLivePricing } from "@/lib/pricing";
 import { placeholderPricingModel, pricingPageModel } from "@/lib/pricing-view";
 import { pageMetadata, pageTitle } from "@/lib/seo";
-import { softwareApplicationLd } from "@/lib/structured-data";
+import { breadcrumbLd, softwareApplicationLd } from "@/lib/structured-data";
 
 /**
  * `/pricing` (plans catalogue U24): the Pricing design, drawn from the
@@ -30,7 +30,13 @@ export default async function PricingRoute() {
     return (
         <>
             <JsonLd
-                data={softwareApplicationLd(catalog, PRICING_DESCRIPTION)}
+                data={[
+                    softwareApplicationLd(catalog, PRICING_DESCRIPTION),
+                    breadcrumbLd([
+                        { name: "Home", path: "/" },
+                        { name: "Pricing", path: "/pricing" },
+                    ]),
+                ]}
             />
             <PricingPage model={model} />
         </>

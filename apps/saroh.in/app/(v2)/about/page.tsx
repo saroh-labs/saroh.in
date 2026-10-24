@@ -7,7 +7,7 @@ import { ABOUT } from "@/content/about";
 import { LAUNCH_MODE } from "@/lib/links";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
-import { organizationLd } from "@/lib/structured-data";
+import { breadcrumbLd, organizationLd } from "@/lib/structured-data";
 
 /*
  * The page's Hindi, in Noto Sans Devanagari (the design's face): सारोह at
@@ -40,7 +40,15 @@ export default function AboutRoute() {
     return (
         <div className={devanagari.variable}>
             {/* Who makes Saroh, for search engines: the facts the page draws. */}
-            <JsonLd data={organizationLd()} />
+            <JsonLd
+                data={[
+                    organizationLd(),
+                    breadcrumbLd([
+                        { name: "Home", path: "/" },
+                        { name: "About", path: ABOUT.href },
+                    ]),
+                ]}
+            />
             <AboutPage mode={LAUNCH_MODE} ctx={resourcesContext()} />
         </div>
     );

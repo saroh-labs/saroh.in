@@ -71,6 +71,23 @@ function jsonLd(container: HTMLElement): Record<string, unknown>[] {
     });
 }
 
+/** The questions and answers the page draws, in order. */
+function drawnFaq(container: HTMLElement) {
+    return Array.from(container.querySelectorAll("#faq details")).map((d) => ({
+        q: d.querySelector("summary")?.textContent,
+        a: d.querySelector("p")?.textContent,
+    }));
+}
+
+/** The questions and answers its FAQPage sends, in order. */
+function sentFaq(container: HTMLElement) {
+    const faq = jsonLd(container).find((d) => d["@type"] === "FAQPage");
+    return (
+        faq?.mainEntity as
+            { name: string; acceptedAnswer: { text: string } }[] | undefined
+    )?.map((e) => ({ q: e.name, a: e.acceptedAnswer.text }));
+}
+
 /** A plan's name, a price or a way to a plan. */
 const PLAN_WORDS =
     /paid plan|\bGrow\b|\bPro\b|Free plan|upgrade|per month|a month|₹|pricing/i;
@@ -207,6 +224,13 @@ describe("/solutions/salons, before launch", () => {
         expect(JSON.stringify(solutions.salons)).not.toMatch(/template/i);
     });
 
+    it("sends the very questions and answers it draws as a FAQPage", async () => {
+        const { container } = await page();
+        const drawn = drawnFaq(container);
+        expect(drawn.length).toBeGreaterThan(0);
+        expect(sentFaq(container)).toEqual(drawn);
+    });
+
     it("promises no reminder and no membership for one-to-one services", () => {
         const own = JSON.stringify(solutions.salons);
         expect(own).not.toMatch(/remind|WhatsApp message|SMS|membership/i);
@@ -253,8 +277,13 @@ describe("Home and the waitlist", () => {
             "Organization",
             "WebSite",
             "SoftwareApplication",
+            "FAQPage",
         ]);
-        const all = JSON.stringify(sent);
+        expect(sentFaq(container)).toEqual(drawnFaq(container));
+        // The FAQ's words are the page's ("Once your GSTIN is in Settings");
+        // the facts about Saroh are the rest.
+        const all = JSON.stringify(sent.slice(0, 3));
+        expect(JSON.stringify(sent[3])).not.toMatch(/"offers"|"price"|₹/);
         expect(all).toContain("Virashi Softwares LLP");
         expect(all).toContain("contact@saroh.in");
         expect(all).not.toMatch(
@@ -265,14 +294,20 @@ describe("Home and the waitlist", () => {
 
 describe("About and Contact", () => {
     it.each(["about", "contact"])(
-        "/%s sends the organization, with no number that isn't published",
+        "/%s sends the organization and its breadcrumb, with no number that isn't published",
         async (name) => {
             const route = (await import(`./${name}/page`)) as {
                 default: () => React.ReactElement;
             };
             const { container } = render(route.default());
             const sent = jsonLd(container);
-            expect(sent.map((d) => d["@type"])).toEqual(["Organization"]);
+            expect(sent.map((d) => d["@type"])).toEqual([
+                "Organization",
+                "BreadcrumbList",
+            ]);
+            expect(JSON.stringify(sent[1])).toContain(
+                `https://www.saroh.in/${name}`,
+            );
             expect(sent[0].legalName).toBe("Virashi Softwares LLP");
             expect(JSON.stringify(sent)).not.toMatch(
                 /telephone|GSTIN|LLPIN|"offers"|"price"/,
