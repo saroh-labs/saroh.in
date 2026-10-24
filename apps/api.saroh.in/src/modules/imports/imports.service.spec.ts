@@ -12,7 +12,11 @@ jest.mock("@saroh/database", () => ({
     },
 }));
 
-import { BadRequestException, type ArgumentsHost } from "@nestjs/common";
+import {
+    BadRequestException,
+    NotFoundException,
+    type ArgumentsHost,
+} from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { AllExceptionsFilter } from "../../common/filters/all-exceptions.filter";
@@ -116,5 +120,29 @@ describe("keepFirstNew (UX-036: import the ones that fit)", () => {
             kept: rows,
             left: 0,
         });
+    });
+});
+
+describe("ImportsService.describe — the mapping schema needs write access", () => {
+    it("refuses a caller who can't write the store (no longer readable by a non-member)", async () => {
+        const stores = {
+            writableOrganization: jest.fn().mockResolvedValue(null),
+        } as unknown as StoresService;
+        await expect(
+            new ImportsService(stores).describe(
+                "store_x",
+                "user_outsider",
+                "customers",
+            ),
+        ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("describes the fields for a writer", async () => {
+        const d = await makeService().describe(
+            "store_1",
+            "user_owner",
+            "customers",
+        );
+        expect(d.entity).toBe("customers");
     });
 });

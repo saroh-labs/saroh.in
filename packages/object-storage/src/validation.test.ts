@@ -215,7 +215,7 @@ describe("videos (#517)", () => {
         ).toBe(false);
     });
 
-    it("keeps the 25 MB cap for a photo, whatever its purpose", () => {
+    it("keeps the 10 MB cap for a photo, whatever its purpose", () => {
         expect(
             schema.safeParse(
                 video({
