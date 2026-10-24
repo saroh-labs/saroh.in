@@ -25,8 +25,17 @@ export const NO_ACTIVITY_DAYS = 7;
 /** No booking or order for this long, with either switched on → NO_TRADING. */
 export const NO_TRADING_DAYS = 14;
 
-/** Modules that make a business one that trades: bookings and selling. */
-const TRADING_MODULES = ["APPOINTMENTS", "COMMERCE"] as const;
+/**
+ * Modules that make a business one that trades: bookings, selling and
+ * classes. A course seat and a class-pack class are `Booking` rows, so the
+ * booking read below already counts them.
+ */
+export const TRADING_MODULES = [
+    "APPOINTMENTS",
+    "COMMERCE",
+    "COURSES",
+    "CLASS_PACKS",
+] as const;
 
 /** Businesses read per page of the sweep. */
 const SWEEP_PAGE = 500;
@@ -282,4 +291,14 @@ export function unemailedSignals() {
         select: { id: true, organizationId: true, kind: true, since: true },
         orderBy: { createdAt: "asc" },
     });
+}
+
+/** Record that these signals were emailed, once each (U18). */
+export async function markEmailed(ids: string[], now: Date): Promise<number> {
+    if (ids.length === 0) return 0;
+    const result = await prisma.inactivitySignal.updateMany({
+        where: { id: { in: ids }, emailedAt: null },
+        data: { emailedAt: now },
+    });
+    return result.count;
 }

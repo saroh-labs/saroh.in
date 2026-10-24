@@ -936,6 +936,102 @@ export async function sendContactMessageNotice(notice: {
     }
 }
 
+/**
+ * Where the admin console is, for a link in a staff email: `ADMIN_URL`, else
+ * the local admin app in development. Null when this instance can't say,
+ * and the email goes without links.
+ */
+export function adminBase(source: {
+    ADMIN_URL?: string;
+    NODE_ENV?: string;
+}): string | null {
+    const base =
+        source.ADMIN_URL ??
+        (source.NODE_ENV === "development"
+            ? "https://admin.saroh.localhost"
+            : undefined);
+    return base ? base.replace(/\/$/, "") : null;
+}
+
+/** What a business went quiet on, as the inactivity signals name it. */
+export type ManagerSignalKind =
+    "NO_ACTIVITY" | "NO_TRADING" | "PAYMENT_DISCONNECTED";
+
+/** A quiet business in a manager's daily email, and its signals. */
+export interface ManagerSignalBusiness {
+    organizationId: string;
+    name: string;
+    signals: { kind: ManagerSignalKind; since: Date }[];
+}
+
+const SIGNAL_WORDS: Record<ManagerSignalKind, string> = {
+    NO_ACTIVITY: "No team activity since",
+    NO_TRADING: "No bookings or orders since",
+    PAYMENT_DISCONNECTED: "Payments disconnected since",
+};
+
+export function managerSignalsSubject(count: number): string {
+    return count === 1
+        ? "1 of your businesses has gone quiet"
+        : `${count} of your businesses have gone quiet`;
+}
+
+/** The manager email's plain-text body: Saroh's words and business names. */
+export function managerSignalsEmail(
+    name: string | null,
+    businesses: ManagerSignalBusiness[],
+    base: string | null,
+): string {
+    return [
+        `Hi ${name ?? "there"},`,
+        "",
+        "These businesses you look after have gone quiet. A call or a message may help.",
+        "",
+        ...businesses.flatMap((business) => [
+            business.name,
+            ...business.signals.map(
+                (signal) =>
+                    `- ${SIGNAL_WORDS[signal.kind]} ${dayOf(signal.since)}`,
+            ),
+            ...(base ? [`${base}/businesses/${business.organizationId}`] : []),
+            "",
+        ]),
+        "Each sign is emailed once. It stays in the admin console until the business is active again.",
+    ].join("\n");
+}
+
+/**
+ * An account manager's daily list of their businesses that went quiet
+ * (R13, #1199): one email a manager, Saroh's fixed words and the business
+ * names, plain text so a name is never read as markup. Awaited, so the
+ * sweep marks a signal emailed only once its email has left. Without SMTP
+ * it prints the subject only in development; elsewhere nothing leaves.
+ */
+export async function sendManagerSignalsEmail(
+    manager: { email: string; name: string | null },
+    businesses: ManagerSignalBusiness[],
+): Promise<EmailOutcome> {
+    const subject = managerSignalsSubject(businesses.length);
+    if (!transporter) {
+        if (env.NODE_ENV === "development") {
+            console.info(`[Manager signals] (no SMTP) ${subject}`);
+            return "sent";
+        }
+        return "not-configured";
+    }
+    try {
+        await transporter.sendMail({
+            from: FROM,
+            to: manager.email,
+            subject,
+            text: managerSignalsEmail(manager.name, businesses, adminBase(env)),
+        });
+        return "sent";
+    } catch {
+        return "failed";
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Site sign-in codes (ADR-011; round-2 plan A, A2)
 // ---------------------------------------------------------------------------

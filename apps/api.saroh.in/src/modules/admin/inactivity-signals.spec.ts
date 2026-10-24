@@ -1,5 +1,5 @@
 import type { BusinessFacts } from "./inactivity-signals";
-import { signalsFor } from "./inactivity-signals";
+import { signalsFor, TRADING_MODULES } from "./inactivity-signals";
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = new Date("2026-10-24T06:00:00.000Z");
@@ -63,5 +63,13 @@ describe("signalsFor (#1199)", () => {
         expect(
             kinds(facts({ ...quiet, lifecycleStatus: "SUSPENDED" })),
         ).toEqual([]);
+    });
+
+    it("counts a class-only business as one that trades", () => {
+        // Course seats and class-pack classes are Booking rows, so the
+        // booking read covers them once the module counts.
+        expect(TRADING_MODULES).toEqual(
+            expect.arrayContaining(["COURSES", "CLASS_PACKS"]),
+        );
     });
 });

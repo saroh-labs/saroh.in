@@ -125,6 +125,13 @@ describe("Inactivity signals (DB, #1199)", () => {
         expect(await open(org)).toEqual([]);
     });
 
+    it("counts a class-only business as trading", async () => {
+        const org = await business(60, ["COURSES"]);
+        await acted(org, 1);
+        await sweep(org);
+        expect(await open(org)).toEqual(["NO_TRADING"]);
+    });
+
     it("leaves trading alone when bookings and selling are both off", async () => {
         const org = await business(60, ["CRM"]);
         await acted(org, 1);

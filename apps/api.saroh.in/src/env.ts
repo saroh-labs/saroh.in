@@ -65,6 +65,10 @@ const envSchema = z.object({
     // create their account — waitlist invitations. Unset: the local accounts
     // app in development, and no invitation link anywhere else.
     ACCOUNTS_URL: z.string().url().optional(),
+    // The admin console's own address, for links staff open from an email —
+    // a manager's daily list of quiet businesses. Unset: the local admin app
+    // in development, and no links anywhere else.
+    ADMIN_URL: z.string().url().optional(),
     // The API's own public address (e.g. https://api.saroh.in), which payment
     // providers send webhooks to. Merchants paste the address built from it
     // into their Razorpay dashboard, so it must stay stable. Unset: setup shows

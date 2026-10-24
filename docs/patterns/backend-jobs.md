@@ -118,6 +118,7 @@ waits while holding one.
 | `commission-payout:<platformAdminId>`     | Putting a line in a teammate's statement month against Mark paid locking that month, so a line never lands in a month already paid; taken after the invoice's key                                                                                                                                                                        | `commission/commission-settle.ts`; `admin/admin-commission.service.ts` (`markPaid`) |
 | `job-chain:membership.ending-notice`      | Leaving one waiting run of the membership-ending sweep (DEC-174 U19), as the manager link sweep does                                                                                                                                                                                                                                     | `subscriptions/membership-ending.handler.ts` (`schedule`)                           |
 | `job-chain:commission.sweep`              | Leaving one waiting run of the commission sweep, as the manager link sweep does                                                                                                                                                                                                                                                          | `commission/commission-sweep.job.ts` (`schedule`)                                   |
+| `job-chain:admin.inactivity-sweep`        | Leaving one waiting run of the daily inactivity sweep and managers' email (#1199), as the manager link sweep does                                                                                                                                                                                                                        | `admin/inactivity-sweep.job.ts` (`schedule`)                                        |
 | `job-chain:class-packs.expiring`          | Leaving one waiting run of the pack expiry sweep (DEC-174 U22), as the manager link sweep does                                                                                                                                                                                                                                           | `class-packs/pack-expiring.handler.ts` (`schedule`)                                 |
 | `job-chain:invoice.overdue-remind`        | Leaving one waiting run of the overdue reminder sweep (automatic notices U20), as the manager link sweep does                                                                                                                                                                                                                            | `invoices/overdue-remind.handler.ts` (`schedule`)                                   |
 | `plan-meter:<organizationId>:<limitKey>`  | Writes that add to one plan limit (a product, a booking…)                                                                                                                                                                                                                                                                                | `billing/metering.service.ts` (`lockMeter`, U13)                                    |
@@ -314,6 +315,16 @@ the Privacy Policy states both.
   itself), at the moment the role ended (`roleEnded`), with one ledger row
   per business as `system:manager-link-sweep`. At most 200 managers a run;
   a manager whose links fail to end is logged and the rest go on.
+- **`admin.inactivity-sweep`** (`admin/inactivity-sweep.job.ts`, R13,
+  #1199) is daily and self-rescheduling (one waiting run under
+  `job-chain:admin.inactivity-sweep`, restarted by the module's six-hour
+  check and at boot). It opens and clears every business's inactivity
+  signals (`admin/inactivity-signals.ts`), then sends each account manager
+  one email listing their businesses' signals not yet emailed, and sets
+  `emailedAt` only on the signals whose email left, so a failed send is
+  tried the next day. A business with no open manager link isn't emailed:
+  its signals stay in the admin attention list. A failed step is logged and
+  the chain goes on.
 
 ## Commission — **Current** (DEC-169, admin console U21)
 
