@@ -1,11 +1,14 @@
 import Link from "next/link";
 
+import { demoTrade } from "@/content/demos";
 import { TOUR_VIDEO } from "@/content/home";
 import type { Solution } from "@/content/types";
+import { demoHref } from "@/lib/demos";
 
 import { ButtonLink } from "../button";
 import { Container } from "../container";
 import { CtaLink } from "../cta-link";
+import { DemoLink } from "../demo-link";
 import { ScreenshotFrame } from "../screenshot-frame";
 
 /**
@@ -22,6 +25,7 @@ export function SolutionHero({
     /** The free-plan line, from the catalogue (`freePlanLine`). */
     freeLine: string;
 }) {
+    const trade = demoTrade(solution.slug);
     return (
         <>
             <Container
@@ -54,6 +58,11 @@ export function SolutionHero({
                 </p>
                 <div className="flex flex-wrap gap-3">
                     <CtaLink src={`solutions-${solution.slug}-hero`} />
+                    <DemoLink
+                        href={demoHref(trade)}
+                        page={`solutions-${solution.slug}`}
+                        trade={trade}
+                    />
                     {TOUR_VIDEO ? (
                         <ButtonLink href="/#video" variant="secondary" play>
                             See it in action · 2 min

@@ -32,6 +32,8 @@ export interface AnalyticsEvents {
     help_vote: { article: string; helpful: "yes" | "no" };
     /** The WhatsApp button (#1188): the page's kind, e.g. `home`, `pricing`. */
     whatsapp_click: { page: string };
+    /** "See a live demo" (#1191): where the button is, and which demo. */
+    demo_open: { page: string; trade: "salon" | "gym" };
 }
 
 /**

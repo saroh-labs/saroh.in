@@ -80,6 +80,13 @@ import { z } from "zod";
  * nothing. Production leaves them out until Saroh's own WhatsApp number is
  * connected (`components/v2/whatsapp-chat.tsx`).
  *
+ * `NEXT_PUBLIC_DEMOS` shows "See a live demo" on the home, pricing and
+ * solution heroes (#1191): `on` shows it; anything else, unset included and
+ * under `next dev` too, shows nothing. Production leaves it out until the
+ * demo script has made the demo businesses there. The button opens
+ * `https://demo-salon.<NEXT_PUBLIC_SITES_DOMAIN>/book` (or `demo-gym`); the
+ * domain is merchant sites' own, `saroh.app` when unset (`lib/demos.ts`).
+ *
  * `SAROH_BUILT_ROUTES` is not set by anyone: `next.config.js` writes the
  * build's page routes into it (`routes.config.js`), so the Resources list links
  * only pages this build has. `SAROH_BUILT_AT` is written the same way: the
@@ -95,6 +102,11 @@ export const env = createEnv({
         NEXT_PUBLIC_WHATSAPP_NUMBER: z
             .string()
             .regex(/^\d{8,15}$/)
+            .optional(),
+        NEXT_PUBLIC_DEMOS: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_SITES_DOMAIN: z
+            .string()
+            .regex(/^[a-z0-9.-]+$/)
             .optional(),
         NEXT_PUBLIC_GA_MEASUREMENT_ID: z
             .string()
@@ -177,6 +189,8 @@ export const env = createEnv({
         NEXT_PUBLIC_TEMPLATES: process.env.NEXT_PUBLIC_TEMPLATES,
         NEXT_PUBLIC_WHATSAPP_CHAT: process.env.NEXT_PUBLIC_WHATSAPP_CHAT,
         NEXT_PUBLIC_WHATSAPP_NUMBER: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER,
+        NEXT_PUBLIC_DEMOS: process.env.NEXT_PUBLIC_DEMOS,
+        NEXT_PUBLIC_SITES_DOMAIN: process.env.NEXT_PUBLIC_SITES_DOMAIN,
         NEXT_PUBLIC_GA_MEASUREMENT_ID:
             process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID,
         NEXT_PUBLIC_GOOGLE_ADS_ID: process.env.NEXT_PUBLIC_GOOGLE_ADS_ID,
