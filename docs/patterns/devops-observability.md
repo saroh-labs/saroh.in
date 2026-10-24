@@ -174,12 +174,16 @@ Analytics. What is sent and how to switch it on:
   A conversion that happens on another host is counted the way sign-up is:
   by passing through a page on saroh.in (`lib/welcome.ts`).
 
+## After a deploy — **Current** (#1192)
+
+The post-deploy watch list (sign-in pages, a merchant site, a booking, a
+checkout, API readiness, PostHog errors, the job backlog and the job
+signals above) and what to do when a check fails:
+`docs/architecture/runbooks/DEPLOY_ROLLBACK_INCIDENT.md`.
+
 ## Not in place yet
 
 - **No source maps at the tracker**, so a browser stack names built files.
   `ERROR_TRACKING_AND_UPTIME.md` → Later.
 - **No uptime monitor** on `/health/ready`, and no log-based alerting. Same
   document.
-- **No post-deploy watch list.** Start one in a runbook: error rate before and
-  after, readiness, job backlog and the age of the oldest unclaimed job, and the
-  two job signals above.

@@ -412,7 +412,9 @@ On each unit's GitHub issue, comment when the unit lands on development.
   production, a push to `development` goes to the development API, and a manual
   run deploys to the `target` it is given (development by default). Each
   environment has its own deploy key, and the development key cannot reach
-  production. Rollback means deploying the previous tag. The image builds in
+  production. Rollback means deploying the previous tag; how to roll back
+  the API and the Workers, the incident steps and the post-deploy watch list
+  are in `docs/architecture/runbooks/DEPLOY_ROLLBACK_INCIDENT.md`. The image builds in
   CI because the host also runs Postgres, and a workspace build there would
   evict its page cache.
 - **Current** — The rollout itself lives on the host, not in this public repo:
