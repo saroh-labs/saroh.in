@@ -30,7 +30,7 @@ import { z } from "zod";
  *
  * `API_URL` also feeds the pricing pages (plan U24): `/pricing`, the plan
  * teasers and the free-plan line read `GET {API_URL}/public/pricing`. Unset,
- * they show the "Pricing announced at launch" placeholder.
+ * they show the "Prices aren't available right now" placeholder.
  *
  * `PRICING_REVALIDATE_SECRET` (server-only, 32+ characters) is the shared
  * secret the API sends in `x-saroh-revalidate` when it calls

@@ -538,7 +538,7 @@ test.describe("pricing", () => {
         if ((await billing.count()) === 0 && (await gst.count()) === 0) {
             // No catalogue on this stack: names and the placeholder only.
             await expect(
-                page.getByText("Pricing announced at launch").first(),
+                page.getByText("Prices aren't available right now").first(),
             ).toBeVisible();
             return;
         }
