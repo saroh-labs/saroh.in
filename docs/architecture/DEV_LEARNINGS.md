@@ -5919,3 +5919,17 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** `buildDataExport` handed `putObject` a `createReadStream(path)` and removed the zip in `finally`. A store that rejects without reading the body (the spec's broken store; in production, a refusal before upload) left the stream still opening the file, which `finally` had just deleted, so it emitted `error` with no listener: an uncaught exception, which in the API could end the process.
 - **Fix:** the upload stream is kept and destroyed in `finally` before the file is removed (`data-export-build.ts`).
 - **Rule:** a stream handed to a call that may fail without reading it is destroyed by the code that made it, before what it reads goes away.
+
+## A business made during a browser test has no modules rolled out (24 Oct 2026)
+
+- **Symptom:** `onboarding-trade.spec.ts` picked Take bookings (Salon or Something else), and setup landed on Home saying "Bookings isn't on offer for this business yet" instead of opening Services.
+- **Cause:** every `MODULE_*` flag is off globally in the seed; the seeded businesses get per-business overrides. Setup creates the business and turns its first goal on in the same press, so a spec has no moment to add an override, and `firstRunJobs` rightly finds nothing rolled out. No browser spec had walked setup into a module before.
+- **Fix:** the two setup tests roll `MODULE_CRM` and `MODULE_APPOINTMENTS` out for everyone through `PUT /admin/flags/:key` as staff, put them back in `finally`, and run `@serial`.
+- **Rule:** a spec that creates a business and expects a module turns its rollout on first: per business (`admin/flags/:key/organizations/:id`, as `booking-page.spec.ts` does) when it can, or globally and `@serial` when the business is made in the same press. Production depends on the same flags: a module off for everyone isn't offered at setup.
+
+## Specs that waited on images.unsplash.com stalled a whole browser run (24 Oct 2026)
+
+- **Symptom:** `product-editor.spec.ts` stuck on "Checking…" after adding a photo by its address, and `a11y.spec.ts` › Products timed out in `page.goto`, desk and phone, retry too, on development as well as the batch. The image loaded in 141 ms in a lone browser.
+- **Cause:** the seed's products and the spec's photos point at images.unsplash.com. In a full run the trace shows the request sent and never answered; the editor's check waits for `load` or `error` on `new Image()`, and `goto` waits for every image, so neither ever finished.
+- **Fix:** `fixtures/remote-images.ts` answers images.unsplash.com with a 1×1 PNG via `page.route`; both specs call it first.
+- **Rule:** a spec never waits on an outside host. A screen that shows seeded Unsplash photos, or a test that adds one, calls `answerRemoteImages(page)` before it navigates.
