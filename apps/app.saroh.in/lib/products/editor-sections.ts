@@ -47,8 +47,8 @@ export const LIMITS = {
     videos: 3,
     // 50 MB, as the API signs a video upload for.
     videoBytes: 50 * 1024 * 1024,
-    // 8 MB, as the editor promises: a shop photo off a phone is well under.
-    photoBytes: 8 * 1024 * 1024,
+    // 5 MB, matching the API's photo cap: a shop photo off a phone is well under.
+    photoBytes: 5 * 1024 * 1024,
     sku: 100,
     variantTitle: 150,
 } as const;
@@ -479,7 +479,7 @@ export const NOT_MEDIA_MESSAGE =
 export const VIDEO_TOO_BIG_MESSAGE =
     "That video is over 50 MB. Keep it under a minute, or export it smaller.";
 export const PHOTO_TOO_BIG_MESSAGE =
-    "That photo is over 8 MB. Most phones can export a smaller copy.";
+    "That photo is over 5 MB. Most phones can export a smaller copy.";
 
 /**
  * The line under the grid (#525): what can still be added once one kind is
@@ -510,7 +510,7 @@ export function mediaLimitNote(items: PhotoDraft[]): {
             full: true,
         };
     return {
-        text: "Photos up to 8 MB, videos up to 50 MB. Drop files onto the grid, or use the tiles.",
+        text: "Photos up to 5 MB, videos up to 50 MB. Drop files onto the grid, or use the tiles.",
         full: false,
     };
 }
