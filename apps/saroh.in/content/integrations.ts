@@ -3,6 +3,14 @@ import { z } from "zod";
 import type { ComingGroupKey } from "./coming";
 import { NOT_AVAILABLE_YET } from "./coming";
 import { SAROH_CONTACT_EMAIL } from "./contact";
+
+/**
+ * The day this module's words last changed, the sitemap's `lastmod` for its
+ * pages (`lib/site-pages.ts`). Change it with the words:
+ * `pnpm check:content-dates` fails a batch that doesn't.
+ */
+export const UPDATED = "2026-10-19";
+
 /**
  * The Integrations pages (Resources plan U3): what connects today, what is
  * planned, and the typed frontmatter every provider page's MDX
@@ -204,6 +212,10 @@ export const integrationFrontmatter = z
         description: text.max(170),
         /** The first paragraph: what this is, in one or two sentences. */
         intro: text,
+        /** The day its words last changed: the sitemap's `lastmod` (R3). */
+        updated: z
+            .string()
+            .regex(/^\d{4}-\d{2}-\d{2}$/, "is not a day (YYYY-MM-DD)"),
         /** The H2 over the MDX body. */
         doesTitle: text,
         /** The panel's breadcrumb, as the app names the screens. */

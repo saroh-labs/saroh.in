@@ -42,6 +42,8 @@ const Open = createContext<{ open: boolean; set: (open: boolean) => void }>({
     open: false,
     set: () => undefined,
 });
+// Copying the link marks Home's share step (#1194): a server action.
+vi.mock("@/lib/moments/actions", () => ({ markMomentSeen: vi.fn() }));
 vi.mock("@saroh/ui/popover", () => ({
     Popover: ({
         open,

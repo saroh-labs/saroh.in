@@ -1,6 +1,7 @@
 import { Badge } from "@saroh/ui/badge";
 
 import type { AttentionReason, LifecycleStatus } from "@/lib/businesses";
+import { SIGNAL_LABEL } from "@/lib/team-member-words";
 
 const LIFECYCLE: Record<
     LifecycleStatus,
@@ -40,4 +41,6 @@ export const ATTENTION_LABEL: Record<AttentionReason, string> = {
     DELETION_WAITING_REFUNDS: "Deletion waiting on refunds",
     // An open row in Billing › Needs action (DEC-166).
     BILLING_ACTION: "Billing needs action",
+    // Inactivity signals the daily sweep keeps (#1199).
+    ...SIGNAL_LABEL,
 };

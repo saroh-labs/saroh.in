@@ -163,6 +163,117 @@ export function invoicesCsvFileName(month: string): string {
     return `saroh-invoices-${month}.csv`;
 }
 
+// ── Referrals and managers (#1189) ───────────────────────────────────────
+
+/** One manager link, as the attribution export reads it. */
+export interface LinkForAttribution {
+    organizationId: string;
+    platformAdminId: string;
+    source: string;
+    startedAt: Date;
+    endedAt: Date | null;
+}
+
+/**
+ * The link open at an instant: started by then and not yet ended, the
+ * latest start winning. The same rule as `linkAtInTx`, over the links
+ * already read for the export, so no read per row.
+ */
+export function linkAt<L extends LinkForAttribution>(
+    links: readonly L[],
+    organizationId: string,
+    at: Date,
+): L | null {
+    let open: L | null = null;
+    for (const link of links) {
+        if (link.organizationId !== organizationId) continue;
+        if (link.startedAt > at) continue;
+        if (link.endedAt && link.endedAt <= at) continue;
+        if (!open || link.startedAt > open.startedAt) open = link;
+    }
+    return open;
+}
+
+/** `src` from a business's `signupSource` (#1190), when it carried one. */
+export function signupSrcOf(signupSource: unknown): string | null {
+    if (!signupSource || typeof signupSource !== "object") return null;
+    const src = (signupSource as Record<string, unknown>).src;
+    return typeof src === "string" ? src : null;
+}
+
+/** How a manager link started, in the admin console's words. */
+const LINK_SOURCE_WORDS: Record<string, string> = {
+    LINK: "Their link",
+    CODE: "Their code",
+    LEAD_EMAIL: "Their lead's email",
+    ASSIGNED: "Assigned",
+};
+
+/** One paid invoice with who it is credited to, already looked up. */
+export interface InvoiceForAttribution {
+    businessName: string;
+    number: string;
+    issuedAt: Date;
+    planName: string;
+    taxablePaise: number;
+    refunded: boolean;
+    /** The manager whose link was open at `issuedAt`. */
+    managerName: string | null;
+    /** That link's source: LINK, CODE, LEAD_EMAIL or ASSIGNED. */
+    linkSource: string | null;
+    signupSrc: string | null;
+    referrerName: string | null;
+}
+
+export const ATTRIBUTION_CSV_HEADER = [
+    "Business",
+    "Invoice",
+    "Issued",
+    "Plan",
+    "Amount before GST",
+    "Refunded",
+    "Account manager",
+    "Brought in by",
+    "Signup source",
+    "Referred by",
+] as const;
+
+/** One invoice as its attribution row (rupees with paise, "1234.50"). */
+export function attributionCsvRow(row: InvoiceForAttribution): string[] {
+    return [
+        row.businessName,
+        row.number,
+        istDay(row.issuedAt),
+        row.planName,
+        paiseToRupees(row.taxablePaise),
+        row.refunded ? "yes" : "no",
+        row.managerName ?? "",
+        row.linkSource
+            ? (LINK_SOURCE_WORDS[row.linkSource] ?? row.linkSource)
+            : "",
+        row.signupSrc ?? "",
+        row.referrerName ?? "",
+    ];
+}
+
+/**
+ * The month's referrals and managers export (#1189): a header, then one
+ * row per invoice in the order given. Every Saroh invoice is a cleared
+ * charge, so each is a paid one; a refunded one stays, marked.
+ */
+export function attributionCsv(rows: InvoiceForAttribution[]): string {
+    const lines: string[][] = [
+        [...ATTRIBUTION_CSV_HEADER],
+        ...rows.map(attributionCsvRow),
+    ];
+    return `${lines.map((line) => line.map(csvCell).join(",")).join("\r\n")}\r\n`;
+}
+
+/** "saroh-referrals-and-managers-2026-10.csv". */
+export function attributionCsvFileName(month: string): string {
+    return `saroh-referrals-and-managers-${month}.csv`;
+}
+
 // ── Subscriptions ────────────────────────────────────────────────────────
 
 export const SUBSCRIPTION_STATUSES = [

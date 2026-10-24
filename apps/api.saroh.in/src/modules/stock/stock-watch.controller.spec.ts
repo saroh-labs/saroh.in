@@ -14,6 +14,7 @@ const job = { create: jest.fn() };
 jest.mock("@saroh/database", () => ({
     prisma: {
         site,
+        organization: { findUnique: () => Promise.resolve(null) },
         $transaction: (fn: (tx: unknown) => unknown) =>
             fn({ stockWatch, contact, job }),
     },

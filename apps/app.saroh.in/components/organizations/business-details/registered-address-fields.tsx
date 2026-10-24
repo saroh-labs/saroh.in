@@ -150,18 +150,21 @@ export function RegisteredAddressFields<T extends FieldValues>({
                         <FormItem {...at("220px")}>
                             <FormLabel>Country</FormLabel>
                             <FormControl>
+                                {/* India only for now (#1214): shown, not
+                                    chosen. One saved elsewhere before
+                                    still shows its own. */}
                                 <CountrySelect
                                     value={
-                                        registered ? "IN" : (field.value ?? "")
+                                        registered || !field.value
+                                            ? "IN"
+                                            : field.value
                                     }
                                     onValueChange={field.onChange}
-                                    disabled={registered}
+                                    disabled
                                 />
                             </FormControl>
                             <FormDescription>
-                                {registered
-                                    ? "GST registration is Indian."
-                                    : "Where the business is registered."}
+                                Saroh is for businesses in India for now.
                             </FormDescription>
                             <FormMessage />
                         </FormItem>

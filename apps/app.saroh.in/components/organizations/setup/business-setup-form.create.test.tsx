@@ -18,6 +18,7 @@ import {
     labelled,
     mount,
     press,
+    pressBack,
     stepOnShow,
     text,
     toFirst,
@@ -223,6 +224,88 @@ describe("What will you do first?", () => {
             expect(host.querySelector('[role="dialog"]')).toBeNull();
         },
     );
+
+    describe("Bookings' trade (#1193, DEC-189)", () => {
+        const SAMPLES = "Sample services, prices and hours will be ready";
+        const tradeChips = () =>
+            Array.from(host.querySelectorAll("[data-trade]")).map(
+                (b) => b.textContent,
+            );
+
+        it("is asked only for Bookings", async () => {
+            await toFirst();
+            expect(tradeChips()).toEqual([]);
+            choose("Take bookings");
+            expect(tradeChips()).toEqual(["Salon", "Gym", "Something else"]);
+            choose("Sell things");
+            expect(tradeChips()).toEqual([]);
+        });
+
+        it.each([
+            ["Salon", "SALON"],
+            ["Gym", "GYM"],
+        ] as const)(
+            "%s says samples are coming and sends the trade",
+            async (label, trade) => {
+                startWithGoalAction.mockResolvedValue({
+                    href: "/services",
+                    turnedOn: ["CRM", "APPOINTMENTS"],
+                });
+                await toFirst();
+                choose("Take bookings");
+                choose(label);
+                expect(text()).toContain(SAMPLES);
+                await press();
+                expect(startWithGoalAction).toHaveBeenCalledWith(
+                    "APPOINTMENTS",
+                    "BUSINESS",
+                    trade,
+                );
+                expect(push).toHaveBeenCalledWith("/services");
+            },
+        );
+
+        it("Something else, or none, is Bookings as before", async () => {
+            startWithGoalAction.mockResolvedValue({
+                href: "/services/new",
+                turnedOn: ["APPOINTMENTS"],
+            });
+            await toFirst();
+            choose("Take bookings");
+            choose("Something else");
+            expect(text()).not.toContain(SAMPLES);
+            await press();
+            expect(startWithGoalAction).toHaveBeenCalledWith(
+                "APPOINTMENTS",
+                "BUSINESS",
+            );
+        });
+
+        it("Back and Continue keep the choice", async () => {
+            await toFirst();
+            choose("Take bookings");
+            choose("Gym");
+            await pressBack();
+            expect(stepOnShow()).toBe("name");
+            await press();
+            expect(stepOnShow()).toBe("first");
+            const on = host.querySelector('[data-trade="GYM"]');
+            expect(on?.getAttribute("aria-checked")).toBe("true");
+            expect(text()).toContain(SAMPLES);
+        });
+
+        it("a trade left behind with Bookings is not sent", async () => {
+            await toFirst();
+            choose("Take bookings");
+            choose("Salon");
+            choose("Sell things");
+            await press();
+            expect(startWithGoalAction).toHaveBeenCalledWith(
+                "COMMERCE",
+                "BUSINESS",
+            );
+        });
+    });
 
     it("Decide later sends no goal and lands on Home", async () => {
         startWithGoalAction.mockResolvedValue({ href: "/", turnedOn: [] });

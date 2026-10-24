@@ -54,6 +54,7 @@ import type {
     WebsiteSetupDto,
 } from "./module-setup.dto";
 import type { ModuleSetups } from "./module-setup.parse";
+import { TRADE_PRESETS } from "./trade-presets";
 
 /** What a setup made or reused, so the app can land on it. */
 export interface SetupCreated {
@@ -273,6 +274,33 @@ function minuteOf(hhmm: string): number {
     return Number(h) * 60 + Number(m);
 }
 
+/** One service the setup writes: the typed first one, or a trade's sample. */
+interface ServiceToWrite {
+    name: string;
+    description?: string;
+    durationMinutes: number;
+    priceCents: number | null;
+    capacity?: number;
+}
+
+/**
+ * What Bookings' setup writes: the typed first service, or — for a trade
+ * (DEC-189) — the preset's sample services.
+ */
+function servicesToWrite(setup: AppointmentsSetupDto): ServiceToWrite[] {
+    if (setup.trade) return [...TRADE_PRESETS[setup.trade].services];
+    const typed = setup.service;
+    // Without a trade parseModuleSetup requires the service.
+    if (!typed) throw new Error("Bookings' setup has no trade or service");
+    return [
+        {
+            name: typed.name,
+            durationMinutes: typed.durationMinutes,
+            priceCents: typed.price !== "" ? toMinor(typed.price) : null,
+        },
+    ];
+}
+
 async function writeAppointments(
     tx: ModuleTransaction,
     ctx: OrganizationContext,
@@ -291,50 +319,64 @@ async function writeAppointments(
         where: { organizationId },
         select: { timezone: true },
     });
-    const priced = setup.service.price !== "";
+    const toWrite = servicesToWrite(setup);
+    // A trade's services are samples (DEC-189): hidden from the booking page
+    // and every public read until the owner keeps or edits each one.
+    const sample = setup.trade !== undefined;
+    // The merchant's own hours win; a trade's fill in when none are sent.
+    const hours =
+        setup.hours ?? (setup.trade ? TRADE_PRESETS[setup.trade].hours : []);
     // Priced in the business's currency, as Sell's storefront is: a
     // business that sells in pounds takes bookings in pounds.
-    const currency = priced
+    const currency = toWrite.some((s) => s.priceCents !== null)
         ? ((await businessCurrency(tx, organizationId)) ?? DEFAULT_CURRENCY)
         : null;
-    const service = await tx.service.create({
-        data: {
-            organizationId,
-            name: setup.service.name,
-            durationMinutes: setup.service.durationMinutes,
-            priceCents: priced ? toMinor(setup.service.price) : null,
-            currency,
-            timezone: profile?.timezone ?? DEFAULT_TIMEZONE,
-            status: "ACTIVE",
-        },
-        select: { id: true, name: true, priceCents: true, currency: true },
-    });
-    // A priced first service starts its price history here.
-    await recordPrices(
-        tx,
-        priceActor(ctx),
-        {
-            kind: "SERVICE",
-            id: service.id,
-            name: service.name,
-            currency: service.currency,
-        },
-        null,
-        serviceFacts(service),
-        "setup",
-    );
-    // The hours are the service's weekly rules, in its zone — what the
-    // booking page offers until staff take it (U3).
-    await tx.availabilityRule.createMany({
-        data: setup.hours.map((h) => ({
-            organizationId,
-            serviceId: service.id,
-            dayOfWeek: h.weekday,
-            startMinute: minuteOf(h.open),
-            endMinute: minuteOf(h.close),
-        })),
-    });
-    return { serviceId: service.id };
+    let firstId: string | undefined;
+    // One at a time: a transaction runs on one connection.
+    for (const each of toWrite) {
+        const service = await tx.service.create({
+            data: {
+                organizationId,
+                name: each.name,
+                description: each.description ?? null,
+                durationMinutes: each.durationMinutes,
+                capacity: each.capacity ?? 1,
+                priceCents: each.priceCents,
+                currency: each.priceCents !== null ? currency : null,
+                timezone: profile?.timezone ?? DEFAULT_TIMEZONE,
+                status: "ACTIVE",
+                ...(sample ? { isSample: true, showOnBookingPage: false } : {}),
+            },
+            select: { id: true, name: true, priceCents: true, currency: true },
+        });
+        firstId ??= service.id;
+        // A priced service starts its price history here.
+        await recordPrices(
+            tx,
+            priceActor(ctx),
+            {
+                kind: "SERVICE",
+                id: service.id,
+                name: service.name,
+                currency: service.currency,
+            },
+            null,
+            serviceFacts(service),
+            "setup",
+        );
+        // The hours are the service's weekly rules, in its zone — what the
+        // booking page offers until staff take it (U3).
+        await tx.availabilityRule.createMany({
+            data: hours.map((h) => ({
+                organizationId,
+                serviceId: service.id,
+                dayOfWeek: h.weekday,
+                startMinute: minuteOf(h.open),
+                endMinute: minuteOf(h.close),
+            })),
+        });
+    }
+    return { serviceId: firstId };
 }
 
 // --- Contacts --------------------------------------------------------------

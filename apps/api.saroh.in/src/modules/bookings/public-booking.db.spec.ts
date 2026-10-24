@@ -227,6 +227,45 @@ describe("the booking page (real database)", () => {
         });
     });
 
+    it("a demo business (DEC-188) shows its services, says demo and books nothing", async () => {
+        await prisma.organization.update({
+            where: { id: owner.organizationId },
+            data: { isDemo: true },
+        });
+        try {
+            const page = await publicBookings.publicBookingPage(siteId);
+            expect(page.demo).toBe(true);
+            expect(page.services.length).toBeGreaterThan(0);
+            const before = await prisma.booking.count({
+                where: { organizationId: owner.organizationId },
+            });
+            await expect(
+                publicBookings.bookOnline(
+                    oneToOne,
+                    booker("demo@example.in", "DESK", nextMonday(6)),
+                    "ip_demo",
+                ),
+            ).rejects.toMatchObject({
+                status: 403,
+                response: { error: "ORGANIZATION_DEMO" },
+            });
+            expect(
+                await prisma.booking.count({
+                    where: { organizationId: owner.organizationId },
+                }),
+            ).toBe(before);
+        } finally {
+            await prisma.organization.update({
+                where: { id: owner.organizationId },
+                data: { isDemo: false },
+            });
+        }
+        // A normal business: the page says no demo.
+        expect((await publicBookings.publicBookingPage(siteId)).demo).toBe(
+            undefined,
+        );
+    });
+
     it("pays at the desk: confirmed, with Karan, paid at the desk", async () => {
         const at = nextMonday(6);
         const { booking, payToken } = await publicBookings.bookOnline(

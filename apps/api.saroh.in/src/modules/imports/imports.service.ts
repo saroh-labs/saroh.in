@@ -236,7 +236,10 @@ export class ImportsService {
      * The columns available to map, for the mapping step, a sample file to
      * start from, and the currency the preview's amounts read in.
      */
-    async describe(storeId: string, entity: ImportEntity) {
+    async describe(storeId: string, userId: string, entity: ImportEntity) {
+        // Importing is a write action; the mapping step is only reached by a
+        // writer. Without this a non-member could read a store's import schema.
+        await this.requireWrite(storeId, userId);
         const d = ENTITY_DESCRIPTORS[entity];
         const currency =
             entity === "products"

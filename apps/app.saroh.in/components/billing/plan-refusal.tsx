@@ -11,13 +11,13 @@ import {
 } from "@saroh/ui/dialog";
 import { planLabel, WHO_CAN_CHANGE_PLAN } from "@saroh/ui/lib/state-copy";
 import { showError, showRefusal } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { upgradeHref } from "@/lib/billing/access";
 import type { PlanRefusal } from "@/lib/billing/refusal";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { useCanChangePlan } from "./plan-way";
+import { UpgradePromptLink } from "./upgrade-prompt-link";
 
 /**
  * A write the business's plan refused, shown as the notice it is (plans
@@ -143,14 +143,15 @@ export function PlanRefusalHost() {
                                 Not now
                             </Button>
                             <Button asChild>
-                                <Link
+                                <UpgradePromptLink
+                                    prompt="plan_refusal"
                                     href={upgradeHref(
                                         refusal?.upgradeTo?.planId,
                                     )}
                                     onClick={() => setRefusal(null)}
                                 >
                                     {refusal?.cta ?? planLabel()}
-                                </Link>
+                                </UpgradePromptLink>
                             </Button>
                         </>
                     ) : (

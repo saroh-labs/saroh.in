@@ -15,7 +15,10 @@ import { toMinor, toMoneyString } from "../../common/money";
 import { notTakingOrders } from "../billing/paused-errors";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { DiscountsService } from "../discounts/discounts.service";
-import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
+import {
+    assertOrganizationOpen,
+    demoRefusal,
+} from "../organizations/organization-lifecycle.gate";
 import type { CreateIntentResult } from "../payments/payments.service";
 import { PaymentsService } from "../payments/payments.service";
 import type { CustomerContext } from "../site-accounts/customer-context.decorator";
@@ -123,6 +126,11 @@ export interface CheckoutOptions {
      * orders right now." and draws no bag. Absent from an older API.
      */
     notTakingOrders?: boolean;
+    /**
+     * A demo business (DEC-188), with `notTakingOrders`: the site says
+     * "This is a demo" where Add to bag and Pay would be. Absent otherwise.
+     */
+    demo?: true;
 }
 
 /** The bag priced now, and how an order leaving the chosen way is paid. */
@@ -232,6 +240,7 @@ export class PublicCheckoutService {
                 return {
                     canOrder: false,
                     notTakingOrders: true,
+                    ...(scope.demo ? { demo: true as const } : {}),
                     storefront: { name: scope.storefront.name },
                     currency: settings.currency,
                     ways: [],
@@ -267,6 +276,7 @@ export class PublicCheckoutService {
     ): Promise<PricedBag> {
         this.read(siteId, callerHash);
         return this.inShop(siteId, async (scope) => {
+            if (scope.demo) throw demoRefusal();
             if (scope.takingOrders === false) throw notTakingOrders();
             const pays = paysOf(
                 await checkoutReadiness(
@@ -318,7 +328,9 @@ export class PublicCheckoutService {
             }
             // Not taking orders — a paused site (#800), or a business
             // suspended or closing (DEC-120) — answers in the paused words
-            // first; the lifecycle gate stays behind it.
+            // first; the lifecycle gate stays behind it. A demo (DEC-188)
+            // says it is one.
+            if (scope.demo) throw demoRefusal();
             if (scope.takingOrders === false) throw notTakingOrders();
             await assertOrganizationOpen(scope.organizationId);
             const ready = await checkoutReadiness(

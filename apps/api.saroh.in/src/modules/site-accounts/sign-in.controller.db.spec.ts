@@ -17,6 +17,7 @@ import type { EmailOutcome } from "../../common/email";
 import { validationPipeOptions } from "../../common/validation";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { isReservedContactEmail } from "../contacts/contact-email";
+import { DEMO_MESSAGE } from "../organizations/organization-lifecycle.gate";
 import { AccountLinkingService } from "./account-linking.service";
 import { ChallengeVerifier } from "./challenge";
 import { SiteCodeAlerts, SiteCodeDelivery } from "./code-delivery";
@@ -909,6 +910,33 @@ describe("site sign-in: wrong, old and refused", () => {
             ).status,
         ).toBe(403);
         expect(t.sender).not.toHaveBeenCalled();
+    });
+
+    it("sends no code and starts no session on a demo business (DEC-188)", async () => {
+        const t = build();
+        const site = await business();
+        const who = email();
+        await t.api.requestCode(relay(site.host), { email: who });
+        const code = t.lastCode();
+        t.sender.mockClear();
+        await prisma.organization.update({
+            where: { id: site.organizationId },
+            data: { isDemo: true },
+        });
+        const asked = await refusal(
+            t.api.requestCode(relay(site.host), { email: email() }),
+        );
+        expect(asked.status).toBe(403);
+        expect(asked.body).toMatchObject({
+            error: "ORGANIZATION_DEMO",
+            message: DEMO_MESSAGE,
+        });
+        expect(t.sender).not.toHaveBeenCalled();
+        const verified = await refusal(
+            t.api.verify(relay(site.host), { email: who, code }),
+        );
+        expect(verified.status).toBe(403);
+        expect(verified.body).toMatchObject({ error: "ORGANIZATION_DEMO" });
     });
 
     it("answers 404 for an unknown or unpublished host", async () => {

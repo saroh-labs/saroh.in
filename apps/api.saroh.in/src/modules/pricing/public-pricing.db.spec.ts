@@ -89,9 +89,10 @@ describe("public pricing (DB, U3)", () => {
     });
 
     it("serves the live version without its retired plan, with a stable ETag and a five-minute cache", async () => {
+        const goLiveAt = new Date(Date.now() - DAY);
         await publish(
             1,
-            new Date(Date.now() - DAY),
+            goLiveAt,
             fakeCatalog((c) => {
                 c.plans[2]!.retired = true;
             }),
@@ -99,7 +100,12 @@ describe("public pricing (DB, U3)", () => {
 
         const first = fakeRes();
         const body = await controller.get(undefined, undefined, first.res);
-        expect(body).toMatchObject({ version: 1, preview: false });
+        // goLiveAt dates saroh.in's /pricing in its sitemap (R3).
+        expect(body).toMatchObject({
+            version: 1,
+            goLiveAt: goLiveAt.toISOString(),
+            preview: false,
+        });
         expect(body!.catalog.plans.map((p) => p.id)).toEqual(["free", "b"]);
         expect(first.headers["cache-control"]).toBe(PUBLIC_PRICING_CACHE);
 

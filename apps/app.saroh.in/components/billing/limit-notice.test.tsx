@@ -26,4 +26,14 @@ describe("LimitNoticeBlock", () => {
         expect(html).toContain("bg-warning-subtle");
         expect(html).toContain('role="status"');
     });
+
+    it("keeps the same way up, in the same words, when it counts as a prompt (#1197)", () => {
+        const plain = renderToStaticMarkup(
+            <LimitNoticeBlock full {...props} />,
+        );
+        const counted = renderToStaticMarkup(
+            <LimitNoticeBlock full prompt="at_limit" {...props} />,
+        );
+        expect(counted).toBe(plain);
+    });
 });

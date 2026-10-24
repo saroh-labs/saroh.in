@@ -124,7 +124,10 @@ export type ReadyStepKey =
     | "tax"
     | "catalogue"
     | "site"
-    | "shop";
+    | "shop"
+    // Home's first steps alone (#1194).
+    | "share"
+    | "first";
 
 /** The API's Website step: the shop waits on "Sells from" (P4). */
 export const WEBSITE_SHOP_NOT_CHOSEN = "WEBSITE_SHOP_NOT_CHOSEN";
@@ -712,6 +715,129 @@ export function checklistWords(
 ): { title: string; lead: string; doneTitle: string } {
     return { title: FINISH_SETUP, ...CHECKLIST_WORDS[checklistSubject(list)] };
 }
+
+/**
+ * Home's first steps (#1194, R12): publish the site, add services or
+ * products, share the booking link, take the first booking or order. They
+ * lead Home until all are done; the money steps (`readyChecklist`) follow
+ * as their own card then, and stay on Settings' readiness page meanwhile,
+ * so nothing is removed.
+ *
+ * Only facts the API already sends, plus one moment (`shared-booking-link`,
+ * set when the booking page or shop link is copied or shared). A shop-only
+ * business is asked for products, its shop link and a first order. A trade
+ * starter's samples are not services yet: a business with only those is
+ * asked to review them, where Keep all is.
+ *
+ * Nothing while neither Bookings nor Sell is on, or while a fact is
+ * unknown (an older API, a failed modules read): Home then shows the money
+ * card as before, rather than a step it can't tick.
+ */
+export interface FirstSteps {
+    steps: ReadyStep[];
+    done: number;
+    total: number;
+    /** Which link the share step hands over, while it applies. */
+    shares: "book" | "shop" | null;
+}
+
+export function firstSteps({
+    settings,
+    modules: all,
+    shared,
+}: {
+    settings: Pick<OrganizationSettings, "setup" | "tradingSince">;
+    modules: readonly ModuleView[] | null;
+    /** The booking page or shop link has been copied or shared. */
+    shared: boolean;
+}): FirstSteps {
+    const none: FirstSteps = { steps: [], done: 0, total: 0, shares: null };
+    const facts = settings.setup;
+    if (!all || !facts) return none;
+    const modules = rolledOut(all);
+    const books = on(modules, "APPOINTMENTS");
+    const sells = on(modules, "COMMERCE");
+    if (!books && !sells) return none;
+    if (books && facts.bookings === undefined) return none;
+
+    const traded =
+        (books && (facts.bookings ?? 0) > 0) ||
+        (sells && settings.tradingSince !== null);
+    const listed = catalogue(modules, facts);
+    const onlySamples =
+        listed?.left === true && books && (facts.sampleServices ?? 0) > 0;
+    const checks: (Check | null)[] = [
+        site(modules, facts),
+        onlySamples
+            ? {
+                  key: "catalogue",
+                  label: "Review your sample services",
+                  why: "Keep the ones you offer, so customers can book them.",
+                  cta: "Review services",
+                  // Bookings › Services, where Keep all is.
+                  href: "/services",
+                  broken: false,
+                  left: true,
+              }
+            : listed,
+        {
+            key: "share",
+            ...(books
+                ? {
+                      label: "Share your booking link",
+                      why: "Send it to customers, so they can book you.",
+                      // Bookings › Services: the booking page's row.
+                      href: "/services",
+                  }
+                : {
+                      label: "Share your shop link",
+                      why: "Send it to customers, so they can order.",
+                      href: "/sites",
+                  }),
+            cta: "Share link",
+            broken: false,
+            // A business that has had a customer has shared its link already.
+            left: !shared && !traded,
+        },
+        {
+            key: "first",
+            label:
+                books && sells
+                    ? "Take your first booking or order"
+                    : books
+                      ? "Take your first booking"
+                      : "Take your first order",
+            why: books
+                ? "Share your link, or add one yourself from Bookings."
+                : "Share your link, or add one yourself from Orders.",
+            cta: books ? "Open Bookings" : "Open Orders",
+            href: books ? "/bookings" : "/commerce/orders",
+            broken: false,
+            left: !traded,
+        },
+    ];
+    const steps: ReadyStep[] = checks
+        .filter((c): c is Check => c !== null)
+        .map(({ left, ...item }) => ({ ...item, done: !left }));
+    const done = steps.filter((s) => s.done).length;
+    return {
+        steps,
+        done,
+        total: steps.length,
+        shares: books ? "book" : "shop",
+    };
+}
+
+/** Whether Home leads with the first steps, rather than the money card. */
+export const firstStepsLead = (first: FirstSteps | null | undefined) =>
+    !!first && first.total > 0 && first.done < first.total;
+
+/** The first steps' card: Home's one setup name, and what they are for. */
+export const FIRST_STEPS_WORDS = {
+    title: FINISH_SETUP,
+    lead: "What is left before your first customer.",
+    doneTitle: "You've had your first customer.",
+};
 
 /**
  * Where Home puts the checklist: first while fewer than half the steps are

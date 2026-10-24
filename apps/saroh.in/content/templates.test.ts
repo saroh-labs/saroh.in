@@ -189,7 +189,7 @@ describe("what the pages say", () => {
                 templateDetail.notes.uses(t),
                 templateDetail.notes.look(t),
                 templateDetail.band.before(t.name),
-                templateDetail.saveNote.before(t.name),
+                templateDetail.saveNote(t.name),
             ]),
         ]);
         expect(words).not.toMatch(/₹|Rs\.?\s?\d|\bINR\b|per month|\/mo\b/i);

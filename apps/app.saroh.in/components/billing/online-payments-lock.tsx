@@ -27,6 +27,7 @@ export async function OnlinePaymentsLockNotice({
             body={lock.body}
             cta={lock.cta}
             href={lock.href}
+            prompt={what === "payments" ? "online_payments" : "memberships"}
             className={className}
         />
     );

@@ -45,6 +45,8 @@ export interface ShopScope {
     kept?: Prisma.ProductWhereInput;
     /** False: the site or its location stopped taking orders (#800). */
     takingOrders?: boolean;
+    /** A demo business (DEC-188): every write refuses with its words. */
+    demo?: true;
 }
 
 /** What the checkout reads from the storefront's settings. */

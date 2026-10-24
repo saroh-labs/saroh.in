@@ -113,6 +113,42 @@ session can't touch production's.
 - The key lives only in the GitHub environment `cloudflare-development`,
   copied onto the dev Workers on each deploy; it is never committed or printed.
 
+## saroh.io stays out of search — **Current**
+
+Search engines must never list a saroh.io page; what they already found moves
+to production (#1185). Three layers do it:
+
+- **The gate's redirect.** A visitor without the key gets a `301` to the same
+  page on the app's own production host, path and query kept, with
+  `Cache-Control: no-store` (a browser that later gets the key isn't stuck on
+  a remembered redirect) and `X-Robots-Tag: noindex, nofollow`.
+  `DEV_REDIRECT_ORIGIN` in each app's `wrangler.jsonc` names that host:
+  `https://www.saroh.in`, `https://app.saroh.in`, `https://accounts.saroh.in`,
+  `https://admin.saroh.in`, so it is one hop, never via the bare domain. The
+  `?access=` exchange stays a `303`; a form post stays a `404`. Production
+  accounts' prelaunch gate shares this code but is inert since launch
+  (`LAUNCH_AT` has passed).
+- **The dev API.** `ROBOTS_NOINDEX=on` on Coolify's `saroh-api-dev` adds
+  `X-Robots-Tag: noindex, nofollow` to every answer. Production leaves it
+  unset.
+- **Cloudflare, for what no Worker answers.** Two rules on the saroh.io zone,
+  applied by hand after the code ships:
+    1. A Redirect Rule: hostname `saroh.io` → `https://www.saroh.io` with the
+       path and query kept (301), so the bare domain lands on the gated Worker.
+    2. A Transform Rule (modify response header), zone-wide on every request:
+       set `X-Robots-Tag: noindex, nofollow`. It covers `api.`, `media.` and the
+       static files Cloudflare serves without running the Worker.
+
+Check each after a deploy:
+
+```bash
+curl -sI https://www.saroh.io/pricing?x=1   # 301, location https://www.saroh.in/pricing?x=1, no-store, X-Robots-Tag
+curl -sI https://app.saroh.io/orders        # 301 to https://app.saroh.in/orders
+curl -sI https://saroh.io/pricing           # 301 to https://www.saroh.io/pricing, X-Robots-Tag
+curl -sI https://api.saroh.io/health        # X-Robots-Tag: noindex, nofollow
+curl -sI https://api.saroh.in/health        # no X-Robots-Tag
+```
+
 ## Environment checks are allowlists — **Current**
 
 `NODE_ENV` is `development`, `test` or `production`, and the repo compares with

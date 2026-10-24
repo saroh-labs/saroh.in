@@ -19,8 +19,8 @@ export const DEFAULT_ALLOWED_CONTENT_TYPES: ContentTypeAllowlist = {
     "image/avif": "avif",
 };
 
-/** Default upload cap: 25 MiB. */
-export const DEFAULT_MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+/** Default upload cap: 10 MiB (one simple number for photos, 24 Oct 2026). */
+export const DEFAULT_MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 /**
  * Videos (#517): MP4 and MOV only, and only through the video purpose, so a

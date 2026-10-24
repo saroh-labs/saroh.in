@@ -13,8 +13,6 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Check } from "lucide-react";
 import { useFormContext, useWatch } from "react-hook-form";
 
-import { CountrySelect } from "@/components/organizations/business-details/country-select";
-import { Chip } from "@/components/shared/lists/chip";
 import { cleanAddressInput } from "@/lib/organizations/address";
 import { kindDefaults, kindWords } from "@/lib/organizations/kind";
 import type { SetupValues } from "@/lib/organizations/setup-steps";
@@ -23,30 +21,18 @@ import { SetupManagerCode } from "./setup-manager-code";
 import type { AddressState } from "./use-address-check";
 
 /**
- * The countries a merchant is most likely to be in, offered as chips, as the
- * design draws them. Any other is one tap further, through the full list:
- * the chips are a shortcut, never the limit of what can be chosen.
- */
-const COMMON_COUNTRIES = [
-    { code: "IN", name: "India" },
-    { code: "AE", name: "UAE" },
-    { code: "SG", name: "Singapore" },
-    { code: "GB", name: "United Kingdom" },
-    { code: "US", name: "United States" },
-] as const;
-
-/**
  * Setup's second step: your name if the account has none, what it is
- * called, its web address and where it is.
+ * called and its web address.
  *
  * The web address follows the name until the merchant edits it, and is
  * checked as they go. It is the one thing here that is hard to change later,
  * because it is where the business's website lives (`<address>.saroh.app`),
  * so it is asked once, here, and never again when Website is turned on.
  *
- * The country stays on this step, under the address: it is one tap, India
- * is chosen, and it is rarely changed. Under it, one quiet line asks
- * whether someone from Saroh is helping, for their code (DEC-169).
+ * No country is asked: Saroh is for businesses in India for now (#1214),
+ * so the form sends IN. The country chips and `CountrySelect` come back
+ * when Saroh sells elsewhere (#1212). Under the address, one quiet line
+ * asks whether someone from Saroh is helping, for their code (DEC-169).
  *
  * It draws inside the setup form's `<Form>`: the answers are that one
  * form's, so leaving this step and coming back loses nothing.
@@ -57,8 +43,6 @@ export function SetupNameStep({
     taken,
     edited,
     onEdited,
-    otherCountry,
-    onOtherCountry,
 }: {
     /** The account has no name yet, so setup asks for it. */
     needsName: boolean;
@@ -67,12 +51,9 @@ export function SetupNameStep({
     /** The web address was typed by hand. */
     edited: boolean;
     onEdited: () => void;
-    otherCountry: boolean;
-    onOtherCountry: (open: boolean) => void;
 }) {
     const form = useFormContext<SetupValues>();
     const kind = useWatch({ control: form.control, name: "kind" });
-    const country = useWatch({ control: form.control, name: "country" });
     const words = kindWords(kind);
     const defaults = kindDefaults(kind);
 
@@ -209,56 +190,6 @@ export function SetupNameStep({
                     </FormItem>
                 )}
             />
-
-            <FormItem>
-                <FormLabel id="country-label">
-                    {kind === "BUSINESS"
-                        ? "Where does it trade?"
-                        : "Where are you based?"}
-                </FormLabel>
-                <div
-                    role="radiogroup"
-                    aria-labelledby="country-label"
-                    className="flex flex-wrap gap-1.5"
-                    // The countries are Saroh's own list.
-                    data-ph-unmask=""
-                >
-                    {COMMON_COUNTRIES.map((c) => (
-                        <Chip
-                            key={c.code}
-                            on={!otherCountry && country === c.code}
-                            onClick={() => {
-                                onOtherCountry(false);
-                                form.setValue("country", c.code);
-                            }}
-                        >
-                            <span className="font-mono text-[11px] opacity-70">
-                                {c.code}
-                            </span>
-                            {c.name}
-                        </Chip>
-                    ))}
-                    <Chip
-                        on={otherCountry}
-                        onClick={() => onOtherCountry(true)}
-                    >
-                        Another country
-                    </Chip>
-                </div>
-                {otherCountry ? (
-                    <CountrySelect
-                        value={country}
-                        onValueChange={(code) => form.setValue("country", code)}
-                        aria-describedby="country-note"
-                    />
-                ) : null}
-                <FormDescription id="country-note">
-                    {kind === "BUSINESS"
-                        ? "Where the business is based."
-                        : "Where you work from."}{" "}
-                    You can change it in Settings.
-                </FormDescription>
-            </FormItem>
 
             <SetupManagerCode />
         </>

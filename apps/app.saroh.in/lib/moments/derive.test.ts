@@ -329,6 +329,7 @@ describe("shown once", () => {
             "orders-10",
             "orders-100",
             "defaults-suggestions",
+            "shared-booking-link",
         ]);
     });
 });

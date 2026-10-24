@@ -482,6 +482,93 @@ describe("Contacts, Bookings and what needs what", () => {
     });
 });
 
+describe("a trade starter for Bookings (DEC-189)", () => {
+    it("a salon gets its sample services, priced, with hours and price history, none on the booking page", async () => {
+        const ctx = await business("Noor Salon");
+        await setup.enable(ctx, "CRM", {});
+        const out = await setup.enable(ctx, "APPOINTMENTS", {
+            trade: "SALON",
+        });
+        const services = await prisma.service.findMany({
+            where: { organizationId: ctx.organizationId },
+            include: { availabilityRules: true },
+            orderBy: { createdAt: "asc" },
+        });
+        expect(services.length).toBeGreaterThanOrEqual(5);
+        expect(out.created.serviceId).toBe(services[0]?.id);
+        for (const s of services) {
+            expect(s).toMatchObject({
+                isSample: true,
+                showOnBookingPage: false,
+                status: "ACTIVE",
+                currency: "INR",
+            });
+            expect(s.priceCents).toBeGreaterThan(0);
+            // The preset's hours: every day, 10:00–20:00.
+            expect(s.availabilityRules).toHaveLength(7);
+            expect(s.availabilityRules[0]).toMatchObject({
+                startMinute: 600,
+                endMinute: 1200,
+            });
+        }
+        expect(
+            await prisma.auditEvent.count({
+                where: {
+                    organizationId: ctx.organizationId,
+                    action: "price.set",
+                    targetType: "service",
+                },
+            }),
+        ).toBe(services.length);
+    });
+
+    it("a gym's sent hours win over the preset's", async () => {
+        const ctx = await business("Pulse Gym");
+        await setup.enable(ctx, "CRM", {});
+        await setup.enable(ctx, "APPOINTMENTS", { trade: "GYM", hours: HOURS });
+        const rules = await prisma.availabilityRule.findMany({
+            where: { organizationId: ctx.organizationId },
+            select: { dayOfWeek: true },
+        });
+        expect(new Set(rules.map((r) => r.dayOfWeek))).toEqual(
+            new Set(HOURS.map((h) => h.weekday)),
+        );
+    });
+
+    it("refuses a trade with no starter, naming setup.trade, and writes nothing", async () => {
+        const ctx = await business();
+        await setup.enable(ctx, "CRM", {});
+        const r = await refusal(
+            setup.enable(ctx, "APPOINTMENTS", { trade: "BAKERY" }),
+            BadRequestException,
+        );
+        expect(r.details?.field).toBe("setup.trade");
+        expect(await status(ctx, "APPOINTMENTS")).toBeNull();
+        expect(
+            await prisma.service.count({
+                where: { organizationId: ctx.organizationId },
+            }),
+        ).toBe(0);
+    });
+
+    it("without a trade, the one typed service as before: no sample, shown", async () => {
+        const ctx = await business();
+        await setup.enable(ctx, "CRM", {});
+        await setup.enable(ctx, "APPOINTMENTS", {
+            hours: HOURS,
+            service: { name: "Haircut", durationMinutes: 45, price: "500" },
+        });
+        const services = await prisma.service.findMany({
+            where: { organizationId: ctx.organizationId },
+        });
+        expect(services).toHaveLength(1);
+        expect(services[0]).toMatchObject({
+            isSample: false,
+            showOnBookingPage: true,
+        });
+    });
+});
+
 describe("Website", () => {
     it("makes the starter site on its address, unpublished: Publish is all that's left", async () => {
         const ctx = await business("Pulse Yoga");

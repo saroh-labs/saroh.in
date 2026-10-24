@@ -2417,3 +2417,60 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **Additions apply at once.** On an older version, a row its plan includes on the live version but not on its own reads as the live cell, from the moment the version goes live.
     - **Nothing else does.** A row taken away, a lower or higher limit and a new price still wait for a move and its notice, as KTD-4 and DEC-161 say.
 - Rules: `withLiveAdditions` in `packages/pricing-catalog/src/moves.ts`, applied by `CatalogueAccessService.resolve`.
+
+## DEC-187 Milestones say where a business came from, and the list grows by two prompt events
+
+**Status: Accepted — 2026-10-24** · owner · amends DEC-125 (the milestones' properties and closed list) and DEC-156 (where a referral code may go); DEC-127 holds · #1190, #1197; plan `docs/plans/2026-10-24-001-feat-growth-seo-onboarding-round-plan.md` (U12, U13)
+
+- Context:
+    - Nobody could say which link, campaign or referrer a business came by, or how many of each reached a published site, a first booking or a paid plan. U11 keeps `src` and utm on `Organization.signupSource`; the referrer (DEC-156) and the manager who brought a business in (DEC-169) were already recorded. DEC-125 allowed only `plan_key` and `business_kind` on a milestone, and DEC-156 kept referral codes for operators.
+- Decision:
+    - **The milestones' properties widen** (amends DEC-125): every milestone also carries `src`, `utm_source`, `utm_medium` and `utm_campaign` (each when known), `referral_channel` (`business`, `account_manager`, `both` or `none`), `referrer_code` (the referring business's `Organization.referralCode`) and `manager_code` (the bringing-in manager's `StaffProfile.managerCode`), each code in its own key and only when there is one. A business's are read from what setup stored; `signed_up`'s from the sign-up request's `saroh_src`, `saroh_ref` and `saroh_am` cookies, by shape only. Key names sit outside the scrubber's drop pattern, and a test sends them through it.
+    - **The funnel is server-side from the first step**: `signed_up` is "signup started", `onboarding_finished` "signup completed". No browser event is added; Accounts sends no page views.
+    - **The closed list grows by two** (amends DEC-125): `upgrade_prompt_shown` and `upgrade_prompt_pressed` (U13), with their own send path, since they aren't activation-ledger rows. Anything further is still the owner's decision.
+    - **Referral codes may go to server-side events about a business or an account** (amends DEC-156), never to a browser tag, an ad conversion or a recording. DEC-127 holds.
+    - **The weekly funnel is a saved PostHog insight** with CSV export, not an admin module.
+    - **Added 24 Oct (#1190, U20): sign-up page views are counted**, so the funnel shows who opens the sign-up page and leaves before making an account. Accounts' server, on a real render of `/signup` (not a router prefetch or a Server Action), tells the API after the page has gone out (`POST public/funnel/signup-viewed`), and the API sends one `signup_page_viewed` — a new event on the closed list, with its own send path. It is an anonymous count: a fresh random id per view, no person id, no cookie, no session and no code; only `src` and utm (the link's, else `saroh_src`'s), the `plan` and `cycle` picked on saroh.in (shape-checked) and `referral_channel` (whether a business's or a manager's code was carried, never the code). Bots, prefetches and a caller past the limit are not counted, and the API answers 204 whatever happens. DEC-127 holds. No consent is needed: nothing on it identifies the visitor. The funnel's first step becomes `signup_page_viewed` → `signed_up` → `onboarding_finished` → …, read as weekly counts by `src`: a view can't be joined to the account that followed it.
+- Rules: `apps/api.saroh.in/src/modules/analytics/product-milestones.ts` (`sourceProperties`, `sourceFromCookies`, `signupViewProperties`), `apps/api.saroh.in/src/modules/analytics/signup-funnel.controller.ts`, `apps/accounts.saroh.in/lib/signup-viewed.ts`, `packages/auth/src/server.ts` (`onUserCreated` gets the request's `Cookie` header); `docs/architecture/ERROR_TRACKING_AND_UPTIME.md` → The milestones; `docs/patterns/devops-observability.md`.
+- Rules: `apps/api.saroh.in/src/modules/analytics/product-milestones.ts` (`sourceProperties`, `sourceFromCookies`), `packages/auth/src/server.ts` (`onUserCreated` gets the request's `Cookie` header); `docs/architecture/ERROR_TRACKING_AND_UPTIME.md` → The milestones; `docs/patterns/devops-observability.md`.
+
+## DEC-188 Demo businesses carry Organization.isDemo, and every public write refuses them
+
+**Status: Accepted — 2026-10-24** · owner · #1191; plan `docs/plans/2026-10-24-001-feat-growth-seo-onboarding-round-plan.md` (U7, R7)
+
+- Context:
+    - saroh.in wants a "See a live demo" button: a visitor opens a real Saroh site and booking page without signing up. The showcase businesses exist only in the seed, which production never runs. A demo on production must be looked at, never booked, paid, sent to or worked in.
+- Decision:
+    - **A demo is a flag on the business**: `Organization.isDemo`, false by default, set only by the demo-businesses script (U8).
+    - **Every public and site-customer write refuses a demo** with one typed refusal, `ORGANIZATION_DEMO` (403, `details.code` the same), in plain words: "This is a demo business. Booking, paying and sending things are turned off." `assertOrganizationOpen` and `assertOrganizationWindingDown` ask it through the shared lifecycle read; `CustomerSessionGuard` asks it for every signed-in POST, PATCH and DELETE; the public booking, product review and back-in-stock writes ask `assertNotDemo` directly; the checkout refuses on its `demo` scope. Customer sign-in codes and sessions are refused, so a demo has no signed-in customers. `demo-routes.spec.ts` lists every public write and fails a new one that doesn't say where it asks.
+    - **The pages say "This is a demo"**, not "paused": the public site read, the booking page read and the checkout options carry `demo: true`, and the merchant site shows "This is a demo. Booking, paying and sending things are turned off." where Book, Add to bag and Pay would be (the `--site-*` palette, never Saroh's brand).
+    - **Nobody works in a demo**: Better Auth's session-create hook refuses a person whose every membership is in a demo business, whatever way they sign in (password, email code, Google). A person who also belongs to a real business signs in. The business's own workspace writes are not refused by the flag.
+    - **A demo is no one's number**: it is left out of the attribution export, the inactivity signals and the product milestones.
+- Rules: `apps/api.saroh.in/src/modules/organizations/organization-lifecycle.gate.ts` (`assertNotDemo`, `demoRefusal`), `orders/checkout-paused.ts` (`shopPause` reports `demo`), `site-accounts/customer-session.guard.ts`, `packages/auth/src/server.ts` (`refuseDemoOwners`), `packages/site-blocks/src/shop/not-taking-orders.tsx` (`DEMO_TEXT`).
+
+## DEC-189 A trade starter writes sample services that no customer sees until the owner keeps or edits them
+
+**Status: Accepted — 2026-10-24** · owner · "Owners should edit a ready setup instead of starting from empty"; salon and gym first · #1193; plan `docs/plans/2026-10-24-001-feat-growth-seo-onboarding-round-plan.md` (U15, KTD "Trade presets replace the first-service fields")
+
+- Context:
+    - Signup asked for a kind and a first goal, and Bookings' Turn on asked for one typed first service. Website templates for salon, gym and others only lay out pages: their prices and hours are display samples, and no service, price or hours were written.
+- Decision:
+    - **A trade replaces the first service.** Bookings' setup takes an optional `trade` (`SALON` or `GYM`); with one, the typed first service isn't asked and the trade's preset is written in its place, in the same module-setup transaction: about six services, each with its minutes, places (a gym's classes are services of more than one place, so no course or pack is written), a made-up sample price in the business's currency with its price-history entry, and the business's hours as its weekly rules (the preset's own hours when the setup sends none). An unknown trade is a 400 on `setup.trade`. Without a trade, setup is as before.
+    - **The prices are the merchant's samples, not Saroh's**: taken from the demo businesses, in the merchant's own list for them to change.
+    - **Samples are marked and hidden.** `Service.isSample` is the marker; samples are written with `showOnBookingPage` off, and every public read also filters on not-sample (`NOT_SAMPLE`: the booking page, booking by id, the Timetable, On today, the Book page's default sections, the template context and the "bookable online" check), so a sample is never shown or booked before it is the owner's.
+    - **Keep, or the first edit, makes it the owner's**: either clears `isSample` and shows it on the booking page (an edit that itself hides it keeps it hidden). Keep and Keep all change nothing else. The Services list tags a sample "Sample" with Keep, and says once above the list that customers can't see them, with Keep all.
+    - **Samples don't count as services** in the setup facts; `sampleServices` counts them, so Home can say "Review your sample services".
+    - **Not now:** studio, clinic and bakery presets; sample products (`Product.isSample`); picking the trade at signup (U16).
+- Rules: `apps/api.saroh.in/src/modules/capabilities/setup/trade-presets.ts`, `module-setup.writers.ts` (`writeAppointments`), `apps/api.saroh.in/src/modules/bookings/sample-services.ts` (`NOT_SAMPLE`, `KEPT`), `bookings.service.ts` (`keepService`, `keepAllSamples`, the edit), `apps/app.saroh.in/components/services/list/`.
+
+## DEC-190 Saroh is for businesses in India for now
+
+**Status: Accepted — 2026-10-24** · owner · #1214
+
+- Context:
+    - Onboarding offered "Another country", but everything else (GST, UPI, Razorpay and Cashfree, the state list) is built for India, and every business today is Indian.
+- Decision:
+    - Signup sets the country to India and asks nothing about it. Settings shows India and doesn't let it change.
+    - The API refuses another country on create or change ("Saroh is for businesses in India for now."). A business already saved with another country keeps it and can still save its other details.
+    - The country picker stays in the code for when other countries come (#1212); currency and time zones are #1213.
+- Rules: `apps/api.saroh.in/src/modules/organizations/business-country.ts`; `apps/app.saroh.in/lib/organizations/setup-steps.ts`.

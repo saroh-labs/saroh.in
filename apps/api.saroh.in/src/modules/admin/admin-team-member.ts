@@ -10,6 +10,8 @@ import { LEAD_SELECT, leadCard, teammateName } from "../saroh-leads/lead-views";
 import { istDay } from "./admin-billing";
 import type { AdminRole } from "./admin-permissions";
 import { AdminPermission, isAdminRole } from "./admin-permissions";
+import type { OpenSignal } from "./inactivity-signals";
+import { openSignalsByOrganization } from "./inactivity-signals";
 import { scopeForStaff } from "./staff-scope";
 
 /**
@@ -54,6 +56,13 @@ export interface MemberBusiness {
     source: LinkSource;
     kind: LinkKind;
     since: Date;
+    /**
+     * Its open inactivity signals (#1199), oldest first. The page's
+     * businesses are only ever the teammate's own, and `memberAccess` lets
+     * an own-scoped reader open only their own page, so a manager sees
+     * signals for their businesses alone.
+     */
+    signals: OpenSignal[];
 }
 
 export type MemberActivity =
@@ -240,16 +249,19 @@ export async function readTeamMember(input: {
             }),
         ]);
 
-        const businesses: MemberBusiness[] = links
-            .filter((link) => link.endedAt === null)
-            .map((link) => ({
-                organizationId: link.organizationId,
-                name: link.organization.name,
-                slug: link.organization.slug,
-                source: link.source as LinkSource,
-                kind: link.kind as LinkKind,
-                since: link.startedAt,
-            }));
+        const current = links.filter((link) => link.endedAt === null);
+        const signals = await openSignalsByOrganization(
+            current.map((link) => link.organizationId),
+        );
+        const businesses: MemberBusiness[] = current.map((link) => ({
+            organizationId: link.organizationId,
+            name: link.organization.name,
+            slug: link.organization.slug,
+            source: link.source as LinkSource,
+            kind: link.kind as LinkKind,
+            since: link.startedAt,
+            signals: signals.get(link.organizationId) ?? [],
+        }));
 
         const activity: MemberActivity[] = [
             ...contacts.map((row): MemberActivity => ({

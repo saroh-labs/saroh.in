@@ -40,6 +40,7 @@ import { validationPipeOptions } from "../../common/validation";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { DiscountsService } from "../discounts/discounts.service";
 import { recordRedemptionInTx } from "../discounts/redemption";
+import { DEMO_MESSAGE } from "../organizations/organization-lifecycle.gate";
 import { PaymentsService } from "../payments/payments.service";
 import {
     FakeMerchantProvider,
@@ -758,6 +759,43 @@ describe("starting a checkout and paying (G13)", () => {
                 await prisma.order.count({ where: { storeId: s.storeId } }),
             ).toBe(0);
         }
+    });
+
+    it("a demo business (DEC-188) shows its shop, says demo, and takes no order", async () => {
+        const s = await shop();
+        // A session from before it became a demo: its write is refused too.
+        const { token } = await signIn(s.host);
+        await prisma.organization.update({
+            where: { id: s.organizationId },
+            data: { isDemo: true },
+        });
+        const options = await call(
+            "GET",
+            `/public/sites/${s.siteId}/checkout/options`,
+            { host: s.host },
+        );
+        expect(options.body).toMatchObject({
+            canOrder: false,
+            notTakingOrders: true,
+            demo: true,
+        });
+        const priced = await quote(s, {
+            lines: [{ listingId: s.listingId, quantity: 1 }],
+        });
+        expect(priced.status).toBe(403);
+        expect(errorOf(priced.body).message).toBe(DEMO_MESSAGE);
+        const res = await start(s, token);
+        expect(res.status).toBe(403);
+        expect(errorOf(res.body).message).toBe(DEMO_MESSAGE);
+        // And no new sign-in.
+        const asked = await call("POST", "/public/site-accounts/codes", {
+            host: s.host,
+            body: { email: `buyer-${next()}@example.in` },
+        });
+        expect(asked.status).toBe(403);
+        expect(
+            await prisma.order.count({ where: { storeId: s.storeId } }),
+        ).toBe(0);
     });
 
     it("refuses a bag that changed since it was priced", async () => {

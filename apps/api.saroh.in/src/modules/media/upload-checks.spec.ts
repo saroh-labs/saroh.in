@@ -1,7 +1,9 @@
 import { BadRequestException } from "@nestjs/common";
+import { DEFAULT_MAX_UPLOAD_BYTES } from "@saroh/object-storage";
 
 import {
     assertUploadType,
+    IMAGE_TOO_BIG_MESSAGE,
     NOT_A_LOGO_MESSAGE,
     NOT_A_VIDEO_MESSAGE,
     NOT_AN_IMAGE_MESSAGE,
@@ -173,6 +175,26 @@ describe("assertUploadType — only images the screens can show (#873)", () => {
             );
         },
     );
+
+    it("refuses an over-10 MB photo in plain words, not a 500", () => {
+        const tooBig = {
+            contentType: "image/png",
+            contentLength: DEFAULT_MAX_UPLOAD_BYTES + 1,
+            filename: "big.png",
+        };
+        expect(refusal(() => assertUploadType(tooBig))).toBe(
+            IMAGE_TOO_BIG_MESSAGE,
+        );
+    });
+
+    it("takes a photo right at the 10 MB cap", () => {
+        const atCap = {
+            contentType: "image/png",
+            contentLength: DEFAULT_MAX_UPLOAD_BYTES,
+            filename: "ok.png",
+        };
+        expect(refusal(() => assertUploadType(atCap))).toBeNull();
+    });
 
     it("takes a PNG, JPG or WebP logo and nothing else", () => {
         for (const type of ["image/png", "image/jpeg", "image/webp"]) {

@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import {
     DEFAULT_ALLOWED_CONTENT_TYPES,
+    DEFAULT_MAX_UPLOAD_BYTES,
     DEFAULT_MAX_VIDEO_UPLOAD_BYTES,
     hasImageSignature,
     hasIsoBmffSignature,
@@ -24,6 +25,9 @@ export const NOT_PHOTO_OR_VIDEO_MESSAGE =
 /** What a merchant reads when a video is over the cap. */
 export const VIDEO_TOO_BIG_MESSAGE =
     "That video is over 50 MB. Keep it under a minute, or export it smaller.";
+/** What a merchant reads when a photo is over the cap. */
+export const IMAGE_TOO_BIG_MESSAGE =
+    "That photo is over 10 MB. Export it smaller and upload it again.";
 /** What a merchant reads when a "video" turns out not to be one. */
 export const NOT_A_VIDEO_MESSAGE =
     "That file is not a video we can show. Choose an MP4 or MOV.";
@@ -72,6 +76,11 @@ export function assertUploadType(input: CreateUploadInput): void {
             throw new BadRequestException(VIDEO_TOO_BIG_MESSAGE);
         }
         return;
+    }
+    // Every non-video (photo or logo) shares the image cap. Without this an
+    // over-cap image passed to the storage port, which threw as a 500.
+    if (input.contentLength > DEFAULT_MAX_UPLOAD_BYTES) {
+        throw new BadRequestException(IMAGE_TOO_BIG_MESSAGE);
     }
     if (input.purpose === LOGO_UPLOAD_PURPOSE) {
         if (!LOGO_CONTENT_TYPES.includes(input.contentType)) {

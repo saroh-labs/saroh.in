@@ -556,14 +556,33 @@ describe("existingUserSignUpHook: a sign-up for an address that has an account",
 });
 
 describe("userDatabaseHooks: telling the host of a new user", () => {
-    type Hook = (row: unknown) => Promise<unknown>;
+    type Hook = (row: unknown, context?: unknown) => Promise<unknown>;
 
     it("tells the host the new user's id once it is written", async () => {
         const told = vi.fn();
         const after = userDatabaseHooks({ onUserCreated: told }).databaseHooks
             ?.user?.create?.after as unknown as Hook;
-        await after({ id: "user_1", email: "asha@example.com" });
-        expect(told).toHaveBeenCalledWith({ id: "user_1" });
+        await after({ id: "user_1", email: "asha@example.com" }, null);
+        expect(told).toHaveBeenCalledWith({ id: "user_1" }, null);
+    });
+
+    it("hands over the sign-up request's cookies, and only them (DEC-187)", async () => {
+        const told = vi.fn();
+        const after = userDatabaseHooks({ onUserCreated: told }).databaseHooks
+            ?.user?.create?.after as unknown as Hook;
+        await after(
+            { id: "user_1", email: "asha@example.com" },
+            {
+                headers: new Headers({
+                    cookie: "saroh_src=src%3Dhome_hero",
+                    "user-agent": "x",
+                }),
+            },
+        );
+        expect(told).toHaveBeenCalledWith(
+            { id: "user_1" },
+            "saroh_src=src%3Dhome_hero",
+        );
     });
 
     it("never fails the sign-up when the host throws", async () => {

@@ -41,6 +41,11 @@ export interface CheckoutOptions {
      * Absent from an older API.
      */
     notTakingOrders?: boolean;
+    /**
+     * A demo business (DEC-188), with `notTakingOrders`: the shop says
+     * "This is a demo" where the bag and Pay would be.
+     */
+    demo?: boolean;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {

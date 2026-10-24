@@ -6,7 +6,7 @@ import { CONTACT_PAGE } from "@/content/contact-page";
 import { LAUNCH_MODE } from "@/lib/links";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
-import { organizationLd } from "@/lib/structured-data";
+import { breadcrumbLd, organizationLd } from "@/lib/structured-data";
 
 export const metadata: Metadata = pageMetadata({
     title: CONTACT_PAGE.seo.title,
@@ -23,7 +23,15 @@ export default function ContactRoute() {
     return (
         <>
             {/* Who to write to, for search engines: the facts the page draws. */}
-            <JsonLd data={organizationLd()} />
+            <JsonLd
+                data={[
+                    organizationLd(),
+                    breadcrumbLd([
+                        { name: "Home", path: "/" },
+                        { name: "Contact", path: CONTACT_PAGE.href },
+                    ]),
+                ]}
+            />
             <ContactPage mode={LAUNCH_MODE} ctx={resourcesContext()} />
         </>
     );

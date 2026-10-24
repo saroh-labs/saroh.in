@@ -45,9 +45,10 @@ export const auth: Auth = createAuth({
         sendChangeEmailConfirmationEmail(to, url, newEmail),
     sendDeleteAccountVerification: ({ to, url }) =>
         sendDeleteAccountEmail(to, url),
-    // The `signed_up` product milestone (DEC-125): the user's id, nothing
-    // else. A no-op unless PostHog is on.
-    onUserCreated: ({ id }) => signedUp(id),
+    // The `signed_up` product milestone (DEC-125): the user's id and, from
+    // the request's cookies, where they came from (DEC-187). A no-op unless
+    // PostHog is on.
+    onUserCreated: ({ id }, cookieHeader) => signedUp(id, cookieHeader),
     // An account deleted with billing profiles (DEC-167): each business
     // billed to one, or with a payment on one, is raised for an operator.
     // Never refuses the deletion (`@saroh/auth` swallows a failure).

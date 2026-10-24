@@ -14,6 +14,7 @@ import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { emailRoute } from "../communications/email-route";
 import { noticeOn } from "../communications/notice-settings";
 import { isReservedContactEmail } from "../contacts/contact-email";
+import { assertNotDemo } from "../organizations/organization-lifecycle.gate";
 import { authorize } from "../organizations/organization-policy";
 import { enqueueCustomerNotice } from "../site-accounts/customer-notify-queue";
 import { siteCodeSecret } from "../site-accounts/site-secrets";
@@ -174,6 +175,8 @@ export class StockWatchService {
         if (!this.perEmail.take(email)) tooMany();
         const variantId = input.variantId ?? null;
         return this.inSite(siteId, async (organizationId, tx) => {
+            // A demo business stores no address to email (DEC-188).
+            await assertNotDemo(organizationId);
             const why = await this.refusal(tx, organizationId, {
                 siteId,
                 productId,

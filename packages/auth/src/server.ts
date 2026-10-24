@@ -149,10 +149,12 @@ export interface CreateAuthOptions {
     onUserDeleting?: (user: { id: string }) => Promise<void> | void;
     /**
      * Told once, after a user's row is first written (sign-up by password
-     * or through a provider). Handed the id only, never the email or name.
+     * or through a provider). Handed the id only, never the email or name,
+     * and the sign-up request's `Cookie` header (null when there was no
+     * request), for the API to read where the person came from (DEC-187).
      * Whatever it throws is swallowed: it can't fail a sign-up.
      */
-    onUserCreated?: (user: { id: string }) => void;
+    onUserCreated?: (user: { id: string }, cookieHeader: string | null) => void;
     /**
      * Asked before any session is made for a user, however they signed in
      * (a code, a password, a provider). False refuses the session, and with
@@ -347,7 +349,53 @@ export function sessionCookieDomain(apiUrl: string | undefined): string | null {
  * plugin-aware types from `createAuthClient` in ./client instead.
  */
 export function createAuth(opts: CreateAuthOptions = {}): BetterAuthInstance {
-    return betterAuth(authOptions(opts));
+    return betterAuth(
+        authOptions({
+            ...opts,
+            mayStartSession: refuseDemoOwners(opts.mayStartSession),
+        }),
+    );
+}
+
+/** A person's memberships, each saying whether its business is a demo. */
+export type MembershipDemoReader = (
+    userId: string,
+) => Promise<{ organization: { isDemo: boolean } }[]>;
+
+const readMembershipDemos: MembershipDemoReader = (userId) =>
+    prisma.membership.findMany({
+        where: { userId },
+        select: { organization: { select: { isDemo: true } } },
+    });
+
+/**
+ * Whether every business a person belongs to is a demo (DEC-188). False
+ * for a person with no business yet (they are setting one up) and for one
+ * who also belongs to a real business.
+ */
+export async function onlyDemoMemberships(
+    userId: string,
+    read: MembershipDemoReader = readMembershipDemos,
+): Promise<boolean> {
+    const rows = await read(userId);
+    return rows.length > 0 && rows.every((row) => row.organization.isDemo);
+}
+
+/**
+ * The host's `mayStartSession`, and then no session for a demo business's
+ * owner (DEC-188): a demo is for looking at, and nobody works in it.
+ * `session.create.before` runs for every way in, so a password, an emailed
+ * code and Google alike get no session. A throw refuses, as any check that
+ * can't be made does.
+ */
+export function refuseDemoOwners(
+    host: CreateAuthOptions["mayStartSession"],
+    read: MembershipDemoReader = readMembershipDemos,
+): NonNullable<CreateAuthOptions["mayStartSession"]> {
+    return async (user) => {
+        if (host && !(await host(user))) return false;
+        return !(await onlyDemoMemberships(user.id, read));
+    };
 }
 
 /**
@@ -372,9 +420,15 @@ export function userDatabaseHooks(
     if (opts.onUserCreated) {
         const told = opts.onUserCreated;
         user.create = {
-            after: (row: { id: string }) => {
+            after: (
+                row: { id: string },
+                context: { headers?: Headers } | null,
+            ) => {
                 try {
-                    told({ id: row.id });
+                    told(
+                        { id: row.id },
+                        context?.headers?.get("cookie") ?? null,
+                    );
                 } catch {
                     // Never a sign-up's problem.
                 }

@@ -4,8 +4,12 @@ const getJson = vi.fn(() => Promise.resolve(null));
 const adminFetch = vi.fn(() => Promise.resolve(new Response("")));
 vi.mock("./control-plane", () => ({ getJson, adminFetch }));
 
-const { listSarohInvoices, listSarohSubscriptions, fetchInvoicesExport } =
-    await import("./billing");
+const {
+    listSarohInvoices,
+    listSarohSubscriptions,
+    fetchInvoicesExport,
+    fetchAttributionExport,
+} = await import("./billing");
 const words = await import("./billing-words");
 const {
     billingHref,
@@ -171,6 +175,10 @@ describe("addresses", () => {
         await fetchInvoicesExport({ month: "2026-10", gstin: "yes" });
         expect(adminFetch).toHaveBeenLastCalledWith(
             "/billing/invoices/export?month=2026-10&gstin=yes",
+        );
+        await fetchAttributionExport("2026-10");
+        expect(adminFetch).toHaveBeenLastCalledWith(
+            "/billing/invoices/attribution-export?month=2026-10",
         );
     });
 });

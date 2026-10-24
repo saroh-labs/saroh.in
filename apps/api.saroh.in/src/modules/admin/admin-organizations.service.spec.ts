@@ -10,6 +10,8 @@ jest.mock("@saroh/database", () => ({
         webhookEvent: { groupBy: jest.fn(async () => []) },
         // Open billing actions (DEC-166): none unless a test says so.
         billingAction: { findMany: jest.fn(async () => []) },
+        // Open inactivity signals (#1199): none unless a test says so.
+        inactivitySignal: { findMany: jest.fn(async () => []) },
     },
 }));
 // Deletions waiting on refunds (#921): none unless a test says so.
@@ -235,6 +237,37 @@ describe("AdminOrganizationsService.directory", () => {
             }),
         );
         actions.mockResolvedValue([]);
+    });
+
+    it("says which inactivity signals are open, and finds them under Needs attention (#1199)", async () => {
+        findMany.mockResolvedValue([record("quiet"), record("busy")]);
+        const signals = prisma.inactivitySignal.findMany as jest.Mock;
+        const since = new Date("2026-10-01T00:00:00.000Z");
+        signals.mockResolvedValueOnce([
+            { organizationId: "quiet", kind: "NO_ACTIVITY", since },
+            { organizationId: "quiet", kind: "NO_TRADING", since },
+            { organizationId: "quiet", kind: "PAYMENT_DISCONNECTED", since },
+        ]);
+        const page = await service.directory(
+            { health: "attention" },
+            { canReadPii: false },
+        );
+        expect(page.items.map((row) => row.attention)).toEqual([
+            ["NO_ACTIVITY", "NO_TRADING", "PAYMENT_DISCONNECTED"],
+            [],
+        ]);
+        // Only open ones, for this page's businesses.
+        expect(signals).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId: { in: ["quiet", "busy"] },
+                    clearedAt: null,
+                },
+            }),
+        );
+        expect(JSON.stringify(findMany.mock.calls[0][0].where)).toContain(
+            '{"inactivitySignals":{"some":{"clearedAt":null}}}',
+        );
     });
 
     it("filters to businesses without a plan", async () => {

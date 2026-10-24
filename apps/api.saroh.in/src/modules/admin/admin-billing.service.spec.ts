@@ -19,6 +19,9 @@ jest.mock("@saroh/database", () => ({
         billingCheckout: { findMany: jest.fn() },
         billingWebhookEvent: { findMany: jest.fn() },
         pricingCatalogVersion: { findUnique: jest.fn() },
+        accountManagerLink: { findMany: jest.fn(() => Promise.resolve([])) },
+        organization: { findMany: jest.fn(() => Promise.resolve([])) },
+        platformAdmin: { findMany: jest.fn(() => Promise.resolve([])) },
     },
 }));
 jest.mock("../../common/guards/better-auth.guard", () => ({
@@ -97,6 +100,7 @@ describe("saroh-billing:read", () => {
         expect(routes.sort()).toEqual(
             [
                 "counts",
+                "exportAttribution",
                 "exportInvoices",
                 "history",
                 "invoicePdf",
@@ -120,6 +124,9 @@ describe("saroh-billing:read", () => {
         expect(Reflect.getMetadata(PATH_METADATA, proto.exportInvoices)).toBe(
             "billing/invoices/export",
         );
+        expect(
+            Reflect.getMetadata(PATH_METADATA, proto.exportAttribution),
+        ).toBe("billing/invoices/attribution-export");
     });
 });
 
@@ -140,6 +147,9 @@ describe("the service checks the permission itself", () => {
             ).rejects.toBeInstanceOf(ForbiddenException);
             await expect(
                 service.exportInvoices(staff, { month: "2026-10" }),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+            await expect(
+                service.exportAttribution(staff, { month: "2026-10" }),
             ).rejects.toBeInstanceOf(ForbiddenException);
             await expect(
                 service.invoicePdf(staff, "inv_1"),
@@ -190,9 +200,28 @@ describe("the service checks the permission itself", () => {
         );
     });
 
+    it("leaves demo businesses out of the attribution export (DEC-188)", async () => {
+        db.sarohInvoice.findMany.mockResolvedValue([]);
+        await service.exportAttribution(staffAs(AdminRole.PlatformOwner), {
+            month: "2026-10",
+        });
+        expect(db.sarohInvoice.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    AND: expect.arrayContaining([
+                        { organization: { isDemo: false } },
+                    ]),
+                }),
+            }),
+        );
+    });
+
     it("refuses an export with no month", async () => {
         await expect(
             service.exportInvoices(staffAs(AdminRole.PlatformOwner), {}),
+        ).rejects.toMatchObject({ status: 400 });
+        await expect(
+            service.exportAttribution(staffAs(AdminRole.PlatformOwner), {}),
         ).rejects.toMatchObject({ status: 400 });
     });
 });

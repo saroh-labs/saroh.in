@@ -27,6 +27,7 @@ import {
     MAX_ADDRESS_LENGTH,
 } from "../sites/site-address";
 import { recordManagerInTx } from "./account-manager";
+import { refuseCountryOutsideIndia } from "./business-country";
 import { businessTypeWrite } from "./business-type";
 import { startingZone } from "./business-zone";
 import type { OnboardOrganizationDto } from "./dto";
@@ -96,6 +97,7 @@ export class OrganizationOnboardingService {
          */
         // Blank counts as not chosen, like absent: `??` alone would keep ""
         // and refuse it, where it should fall back to the name.
+        refuseCountryOutsideIndia(dto.profile?.country);
         const chosen =
             dto.address === undefined || dto.address === ""
                 ? null
@@ -153,8 +155,9 @@ export class OrganizationOnboardingService {
                 },
             );
 
-            // Who referred it (DEC-156), written here and nowhere else: no
-            // later write names these two columns, so it is never changed.
+            // Who referred it (DEC-156) and where it came from (#1190),
+            // written here and nowhere else: no later write names these
+            // columns, so they are never changed.
             const organization = await tx.organization.create({
                 data: {
                     name: dto.name,
@@ -166,6 +169,9 @@ export class OrganizationOnboardingService {
                               referredByOrganizationId: referredBy,
                               referredAt: new Date(),
                           }
+                        : {}),
+                    ...(dto.signupSource
+                        ? { signupSource: { ...dto.signupSource } }
                         : {}),
                 },
                 select: { id: true, slug: true, createdAt: true },

@@ -1,8 +1,10 @@
 import { home, TOUR_VIDEO } from "@/content/home";
+import { demoHref } from "@/lib/demos";
 
 import { ButtonLink } from "../button";
 import { Container } from "../container";
 import { CtaLink } from "../cta-link";
+import { DemoLink } from "../demo-link";
 import { Eyebrow } from "../eyebrow";
 import { Pill } from "../pill";
 import { ScreenshotFrame } from "../screenshot-frame";
@@ -41,6 +43,11 @@ export function HomeHero({ freeLine }: { freeLine: string }) {
                 </p>
                 <div className="flex flex-wrap gap-3">
                     <CtaLink src="home-hero" />
+                    <DemoLink
+                        href={demoHref("salon")}
+                        page="home"
+                        trade="salon"
+                    />
                     {TOUR_VIDEO ? (
                         <ButtonLink href="#video" variant="secondary" play>
                             See it in action · 2 min

@@ -379,6 +379,29 @@ describe("Classic", () => {
     });
 });
 
+describe("a demo business, in a look (DEC-188)", () => {
+    it.each(["folio", "quiet", "live"] as const)(
+        "%s: says it is a demo where Book would be, never paused",
+        (look) => {
+            render(
+                <BookingFlow
+                    page={{ ...PAGE, paused: true, demo: true }}
+                    apiUrl={API}
+                    account={account()}
+                    look={look}
+                />,
+            );
+            expect(
+                screen.getByText(
+                    "This is a demo. Booking, paying and sending things are turned off.",
+                ),
+            ).toBeInTheDocument();
+            expect(screen.queryByText(/not taking bookings/i)).toBeNull();
+            expect(screen.queryByRole("button", { name: /^Book/ })).toBeNull();
+        },
+    );
+});
+
 describe("booking paused, in a look (DEC-172, U15)", () => {
     it.each(["folio", "quiet", "live"] as const)(
         "%s: says so and offers Message us and Call as buttons, naming no plan",

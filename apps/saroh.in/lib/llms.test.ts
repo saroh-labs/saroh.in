@@ -200,3 +200,35 @@ describe("llmsText", () => {
         expect(without.some((p) => p.startsWith("/solutions/"))).toBe(false);
     });
 });
+
+describe("the Pricing section (#1187)", () => {
+    it("links /pricing and /pricing.md once the launch switch is open, with no price", () => {
+        const text = llmsText(
+            BASE,
+            at(AFTER),
+            articles,
+            undefined,
+            undefined,
+            "open",
+        );
+        const section = text.slice(
+            text.indexOf("## Pricing"),
+            text.indexOf("\n## ", text.indexOf("## Pricing") + 1),
+        );
+        expect(linked(section)).toEqual(["/pricing", "/pricing.md"]);
+        expect(section).not.toMatch(/\u20B9|\d/);
+    });
+
+    it("is left out while the site is on the waitlist", () => {
+        const text = llmsText(
+            BASE,
+            at(AFTER),
+            articles,
+            undefined,
+            undefined,
+            "waitlist",
+        );
+        expect(text).not.toContain("## Pricing");
+        expect(linked(text)).not.toContain("/pricing");
+    });
+});

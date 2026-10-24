@@ -29,6 +29,7 @@ import type { Service } from "@/lib/services/service";
 import type { WhoFields } from "@/lib/services/service-cards";
 import {
     nobodyTakesLine,
+    samplesLine,
     SEARCH_FROM,
     serviceLine,
     servicesCount,
@@ -42,6 +43,7 @@ import { AlsoSell } from "./also-sell";
 import { BookingLinkRow } from "./booking-link-row";
 import type { ServiceRowView } from "./services-rows";
 import { ServicesPhoneList, ServicesTable } from "./services-rows";
+import { KEEP_ALL, useKeepSamples } from "./use-keep-samples";
 import { useTakingBookings } from "./use-taking-bookings";
 
 const NEW_SERVICE_HREF = "/services/new";
@@ -111,6 +113,7 @@ export function ServicesScreen({
     canNewCourse?: boolean;
 }) {
     const taking = useTakingBookings();
+    const keeping = useKeepSamples();
     // A switch shows what was asked for until the list is read again. Each
     // is kept against the row it was flipped on (`updatedAt`), so a fresh
     // read always wins.
@@ -227,6 +230,11 @@ export function ServicesScreen({
     };
 
     const hasRows = all.length > 0;
+    // A trade starter's samples (DEC-189): said once, with Keep all.
+    const samples = samplesLine(all.filter((s) => s.isSample).length);
+    const onKeep = canEdit
+        ? (row: ServiceRowView) => void keeping.keep(row.service)
+        : null;
 
     return (
         <div className={hasRows && canEdit ? "max-[759px]:pb-20" : undefined}>
@@ -275,6 +283,30 @@ export function ServicesScreen({
                 />
             ) : (
                 <>
+                    {samples ? (
+                        <Notice
+                            tone="neutral"
+                            align="center"
+                            className="mb-3 bg-card"
+                            data-ph-unmask=""
+                            data-samples-notice=""
+                            action={
+                                canEdit ? (
+                                    <Button
+                                        variant="outline"
+                                        disabled={keeping.busy !== null}
+                                        onClick={() => void keeping.keepAll()}
+                                    >
+                                        {keeping.busy === KEEP_ALL
+                                            ? "Keeping…"
+                                            : "Keep all"}
+                                    </Button>
+                                ) : undefined
+                            }
+                        >
+                            {samples}
+                        </Notice>
+                    ) : null}
                     {/* Said once, with what fixes it, never on every row. */}
                     {nobody ? (
                         <>
@@ -353,6 +385,8 @@ export function ServicesScreen({
                                     rows={shown}
                                     onTaking={onTaking}
                                     busy={taking.busy}
+                                    onKeep={onKeep}
+                                    keeping={keeping.busy}
                                 />
                             </div>
                             <div className={PHONE}>
@@ -360,6 +394,8 @@ export function ServicesScreen({
                                     rows={shown}
                                     onTaking={onTaking}
                                     busy={taking.busy}
+                                    onKeep={onKeep}
+                                    keeping={keeping.busy}
                                 />
                             </div>
                         </>

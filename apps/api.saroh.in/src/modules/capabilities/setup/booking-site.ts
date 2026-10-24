@@ -27,6 +27,7 @@ import { STARTER_TEMPLATE_ID } from "@saroh/templates";
 
 import type { OrganizationContext } from "../../../common/types/organization-context";
 import type { EntitlementService } from "../../billing/entitlement.service";
+import { NOT_SAMPLE } from "../../bookings/sample-services";
 import { allows } from "../../organizations/organization-policy";
 import { siteDefaults } from "../../sites/site-address";
 import type { WebsiteSetupDto } from "./module-setup.dto";
@@ -107,6 +108,8 @@ export function bookableOnline(
         deletedAt: null,
         status: "ACTIVE",
         showOnBookingPage: true,
+        // Never a trade starter's sample before it is kept (DEC-189).
+        ...NOT_SAMPLE,
         siteId: null,
     };
 }

@@ -158,7 +158,7 @@ export function pricingPageModel(catalog: Catalog): PricingPageModel {
 /**
  * The page with no catalogue to show (the API unreachable on a first build,
  * or no version published yet): the plan names, every price the
- * placeholder, every detail "Plan details announced at launch". No toggles:
+ * placeholder, every detail `PLAN_DETAILS_PLACEHOLDER`. No toggles:
  * there is nothing for them to change.
  */
 export function placeholderPricingModel(): PricingPageModel {

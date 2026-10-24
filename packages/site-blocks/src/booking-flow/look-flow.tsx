@@ -8,6 +8,7 @@ import { DEFAULT_API_URL } from "../api-url";
 import { NO_CAPTURE_ATTRS, NO_CAPTURE_CLASS } from "../consent-events";
 import { cn } from "../lib/utils";
 import type { BusinessReach } from "../reach-links";
+import { NotTakingOrders } from "../shop/not-taking-orders";
 import { TestReleaseStopSheet } from "../test-release/test-release-stop";
 import { useCloseBooking } from "./book-return";
 import type { BookingFlowProps } from "./booking-account";
@@ -107,7 +108,8 @@ export function LookBookingFlow(props: BookingFlowProps & { look: LookId }) {
         email: reach?.email ?? null,
     };
     const paused = page.paused === true;
-    const bookable = page.open && page.services.length > 0 && !paused;
+    const demo = page.demo === true;
+    const bookable = page.open && page.services.length > 0 && !paused && !demo;
 
     const who =
         !!service &&
@@ -343,6 +345,8 @@ export function LookBookingFlow(props: BookingFlowProps & { look: LookId }) {
                 onAgain={pick.again}
             />,
         );
+    } else if (demo) {
+        drawn = plain(<NotTakingOrders demo />);
     } else if (!bookable) {
         drawn = plain(
             <LookClosedCard

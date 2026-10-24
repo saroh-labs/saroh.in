@@ -10,7 +10,7 @@ import {
     VERIFICATION_OTP_EXPIRY_SECONDS,
 } from "./constants";
 import type { CreateAuthOptions } from "./server";
-import { authOptions } from "./server";
+import { authOptions, refuseDemoOwners } from "./server";
 
 /**
  * Signing up and signing in with an emailed code (owner, 10 Oct 2026), run
@@ -423,6 +423,39 @@ describe("session hooks: a hold, and the mailbox proven", () => {
         expect(after.status).toBe(200);
     });
 
+    it("gives a demo business's owner no session, by code or by password (DEC-188)", async () => {
+        let memberships: { organization: { isDemo: boolean } }[] = [];
+        const s = stack({
+            hooks: {
+                mayStartSession: refuseDemoOwners(undefined, () =>
+                    Promise.resolve(memberships),
+                ),
+            },
+        });
+        await priya(s);
+        memberships = [{ organization: { isDemo: true } }];
+
+        await s.ask("priya@example.com");
+        const byCode = await s.signIn("priya@example.com", s.lastCode());
+        expect(byCode.status).not.toBe(200);
+        const byPassword = await s.post("/sign-in/email", {
+            email: "priya@example.com",
+            password: "a-long-password",
+        });
+        expect(byPassword.status).not.toBe(200);
+
+        // Also in a real business: she signs in.
+        memberships = [
+            { organization: { isDemo: true } },
+            { organization: { isDemo: false } },
+        ];
+        const after = await s.post("/sign-in/email", {
+            email: "priya@example.com",
+            password: "a-long-password",
+        });
+        expect(after.status).toBe(200);
+    });
+
     it("refuses when the hold can't be checked", async () => {
         const s = stack({
             hooks: {
@@ -455,5 +488,33 @@ describe("session hooks: a hold, and the mailbox proven", () => {
         await s.signIn("priya@example.com", s.lastCode());
         expect(proven).toHaveLength(2);
         expect(new Set(proven).size).toBe(1);
+    });
+});
+
+describe("refuseDemoOwners (DEC-188)", () => {
+    const reader =
+        (...demos: boolean[]) =>
+        () =>
+            Promise.resolve(
+                demos.map((isDemo) => ({ organization: { isDemo } })),
+            );
+
+    it("refuses only a person whose every business is a demo", async () => {
+        expect(
+            await refuseDemoOwners(undefined, reader(true))({ id: "u" }),
+        ).toBe(false);
+        expect(
+            await refuseDemoOwners(undefined, reader(true, false))({ id: "u" }),
+        ).toBe(true);
+        // No business yet: setting one up.
+        expect(await refuseDemoOwners(undefined, reader())({ id: "u" })).toBe(
+            true,
+        );
+    });
+
+    it("keeps the host's own refusal", async () => {
+        expect(await refuseDemoOwners(() => false, reader())({ id: "u" })).toBe(
+            false,
+        );
     });
 });

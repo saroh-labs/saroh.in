@@ -125,8 +125,43 @@ describe("APPOINTMENTS", () => {
             hours: HOURS,
             service: { ...SERVICE, price: "" },
         });
-        expect(setup.hours[0]).toEqual(HOURS[0]);
-        expect(setup.service.price).toBe("");
+        expect(setup.hours?.[0]).toEqual(HOURS[0]);
+        expect(setup.service?.price).toBe("");
+    });
+
+    it("a trade (DEC-189) replaces the first service; its hours are optional", () => {
+        expect(parseModuleSetup("APPOINTMENTS", { trade: "SALON" })).toEqual(
+            expect.objectContaining({ trade: "SALON" }),
+        );
+        const withHours = parseModuleSetup("APPOINTMENTS", {
+            trade: "GYM",
+            hours: HOURS,
+        });
+        expect(withHours.hours).toEqual(HOURS);
+        // Its hours, when sent, are checked as ever.
+        const r = refusal(() =>
+            parseModuleSetup("APPOINTMENTS", {
+                trade: "GYM",
+                hours: [{ weekday: 9, open: "10:00", close: "19:00" }],
+            }),
+        );
+        expect(r.details.field).toBe("setup.hours.0.weekday");
+    });
+
+    it("refuses a trade it has no starter for", () => {
+        const r = refusal(() =>
+            parseModuleSetup("APPOINTMENTS", { trade: "BAKERY" }),
+        );
+        expect(r.details.field).toBe("setup.trade");
+        expect(r.message).toBe("Choose Salon or Gym, or something else.");
+    });
+
+    it("without a trade, the first service and hours are still asked", () => {
+        const r = refusal(() => parseModuleSetup("APPOINTMENTS", {}));
+        expect(r.details.fields.map((f) => f.field)).toEqual([
+            "setup.hours",
+            "setup.service",
+        ]);
     });
 
     it("names nested fields by their path", () => {

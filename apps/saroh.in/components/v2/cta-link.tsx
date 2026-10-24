@@ -2,7 +2,8 @@
 
 import { track } from "@/lib/analytics";
 import type { LaunchMode } from "@/lib/links";
-import { cta } from "@/lib/links";
+import { ACCOUNTS_URL, cta } from "@/lib/links";
+import { keepButtonSource } from "@/lib/referral";
 
 import type { ButtonSize, ButtonVariant } from "./button";
 import { ButtonLink } from "./button";
@@ -10,7 +11,8 @@ import { ButtonLink } from "./button";
 /**
  * A "start" button: its label and address come from the one CTA builder
  * (`lib/links.ts`, KTD-16), so waitlist and open mode never disagree, and a
- * click sends `cta_click { plan, page, mode }` — no personal data.
+ * click sends `cta_click { plan, page, mode }` — no personal data — and
+ * keeps its `src` for the business it may make (#1190).
  */
 export function CtaLink({
     src,
@@ -63,6 +65,7 @@ export function CtaLink({
             size={size}
             className={className}
             onClick={() => {
+                keepButtonSource(src, ACCOUNTS_URL);
                 track("cta_click", {
                     plan,
                     page: src,

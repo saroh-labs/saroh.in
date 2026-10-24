@@ -9,8 +9,13 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContextService } from "./organization-context.service";
 import {
     assertMembersMayOpen,
+    assertNotDemo,
     assertOrganizationOpen,
     assertOrganizationWindingDown,
+    assertWorkspaceWrite,
+    DEMO_MESSAGE,
+    demoRefusal,
+    isDemoOrganization,
     isReadOnlyMethod,
     NOT_TAKING_NEW_MESSAGE,
     publicSiteOnlineFor,
@@ -75,6 +80,56 @@ describe("assertOrganizationOpen", () => {
         expect(["POST", "PUT", "PATCH", "DELETE"].some(isReadOnlyMethod)).toBe(
             false,
         );
+    });
+});
+
+describe("a demo business (DEC-188)", () => {
+    const demoBody = {
+        error: "ORGANIZATION_DEMO",
+        message: DEMO_MESSAGE,
+    };
+
+    it.each([
+        ["assertOrganizationOpen", assertOrganizationOpen],
+        ["assertOrganizationWindingDown", assertOrganizationWindingDown],
+        ["assertNotDemo", assertNotDemo],
+    ])("%s refuses it with the demo words", async (_, gate) => {
+        findUnique.mockResolvedValue({
+            lifecycleStatus: "ACTIVE",
+            isDemo: true,
+        });
+        await expect(gate("org_demo")).rejects.toMatchObject({
+            response: demoBody,
+        });
+    });
+
+    it("says it is a demo in plain words, with no state", () => {
+        expect(demoRefusal().getStatus()).toBe(403);
+        expect(DEMO_MESSAGE).toBe(
+            "This is a demo business. Booking, paying and sending things are turned off.",
+        );
+    });
+
+    it("leaves a normal business and a missing one through", async () => {
+        findUnique.mockResolvedValue({
+            lifecycleStatus: "ACTIVE",
+            isDemo: false,
+        });
+        await expect(assertNotDemo("org_1")).resolves.toBeUndefined();
+        await expect(isDemoOrganization("org_1")).resolves.toBe(false);
+        findUnique.mockResolvedValue(null);
+        await expect(assertNotDemo("org_1")).resolves.toBeUndefined();
+        await expect(assertOrganizationOpen("org_1")).resolves.toBeUndefined();
+    });
+
+    it("never refuses the business's own workspace writes", async () => {
+        findUnique.mockResolvedValue({
+            lifecycleStatus: "ACTIVE",
+            isDemo: true,
+        });
+        await expect(
+            assertWorkspaceWrite("org_demo", "new"),
+        ).resolves.toBeUndefined();
     });
 });
 

@@ -23,6 +23,13 @@ import type {
 } from "./types";
 import { SOLUTION_SLUGS } from "./types";
 
+/**
+ * The day this module's words last changed, the sitemap's `lastmod` for its
+ * pages (`lib/site-pages.ts`). Change it with the words:
+ * `pnpm check:content-dates` fails a batch that doesn't.
+ */
+export const UPDATED = "2026-10-12";
+
 export const solutions: Record<SolutionSlug, Solution> = {
     shops: {
         slug: "shops",

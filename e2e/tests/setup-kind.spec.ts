@@ -150,11 +150,9 @@ test.describe("setup is three short steps (DEC-070, DEC-130)", () => {
         await expect(
             page.getByText("Is it registered as a company?"),
         ).toHaveCount(0);
-        await expect(
-            page
-                .getByRole("radiogroup", { name: "Where does it trade?" })
-                .getByRole("radio", { name: /India/ }),
-        ).toHaveAttribute("aria-checked", "true");
+        // India only for now (#1214): no country is asked.
+        await expect(page.getByText("Where does it trade?")).toHaveCount(0);
+        await expect(page.getByText("Another country")).toHaveCount(0);
         await expect(page.getByText(/Signed in as/)).toBeVisible();
         await sideways();
 

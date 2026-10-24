@@ -17,7 +17,7 @@ import type { FaqId, FaqItem } from "./types";
 export const faqs = {
     "start-free": {
         q: "What does Start free include?",
-        a: "Free gives you what you need to put your site up and start. Move to a paid plan when you need more. Plan details are announced at launch.",
+        a: "Free gives you what you need to put your site up and start. Move to a paid plan when you need more.",
     },
     gst: {
         q: "Does it do GST?",

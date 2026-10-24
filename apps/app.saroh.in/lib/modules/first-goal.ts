@@ -54,6 +54,11 @@ export async function startWithGoal(
     deps: FirstGoalDeps,
     goal: string,
     kind?: unknown,
+    /**
+     * Bookings' trade (DEC-189): its sample services, prices and hours are
+     * written in place of the first service, and setup lands on the list.
+     */
+    trade?: "SALON" | "GYM",
 ): Promise<FirstGoalOutcome> {
     if (goal === GOAL_LATER || !isGoalKey(goal)) {
         return { href: HOME, turnedOn: [] };
@@ -98,7 +103,11 @@ export async function startWithGoal(
         const res = await deps
             .enableModule(
                 key,
-                NO_SETUP.has(key) ? undefined : setupFor(key, draft),
+                key === "APPOINTMENTS" && trade
+                    ? { trade }
+                    : NO_SETUP.has(key)
+                      ? undefined
+                      : setupFor(key, draft),
             )
             .catch((): EnableResult => ({
                 ok: false,
@@ -116,5 +125,8 @@ export async function startWithGoal(
         turnedOn.push(key);
         if (res.siteId) siteId = res.siteId;
     }
+    // With a trade, the samples are on the Services list, to keep or edit.
+    if (goal === "APPOINTMENTS" && trade)
+        return { href: "/services", turnedOn };
     return { href: goalHref(goal, { siteId }), turnedOn };
 }

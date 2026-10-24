@@ -101,6 +101,8 @@ const CASES = [
         ],
         refused: [
             "createService",
+            "keepService",
+            "keepAllSamples",
             "updateService",
             "removeService",
             "replaceRules",

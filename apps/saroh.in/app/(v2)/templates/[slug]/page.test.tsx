@@ -85,7 +85,7 @@ describe("/templates/[slug]", () => {
         ).toEqual({});
     });
 
-    it("on a preview, says early access opens 17 Oct and saves the template to the waitlist", async () => {
+    it("on a preview, says it is ready on 17 Oct and the button carries the template", async () => {
         mocked.env = { ...mocked.ON, RESOURCES_PREVIEW: "1" };
         await renderAt("gym", "2026-10-10T06:00:00Z");
         expect(
@@ -102,7 +102,7 @@ describe("/templates/[slug]", () => {
         );
         expect(
             screen.getByText(
-                "Early access opens 17 Oct. Join the waitlist by the 16th and we'll keep Gym for you.",
+                "Start free, and pick Gym when you set up your website.",
             ),
         ).toBeTruthy();
         expect(
