@@ -12,6 +12,7 @@ import {
     readSetupDraft,
     SETUP_DRAFT_KEY,
     SETUP_STEPS,
+    setupSchema,
     stepAfter,
     stepBefore,
     stepCount,
@@ -194,6 +195,32 @@ describe("who Saroh bills, asked of an owner with a profile (DEC-167)", () => {
     });
 });
 
+describe("the country (#1214)", () => {
+    it("is India, and setup takes no other", () => {
+        expect(setupSchema(false).safeParse(ANSWERED).success).toBe(true);
+        for (const country of ["AE", "US", "SG", ""]) {
+            expect(
+                setupSchema(false).safeParse({ ...ANSWERED, country }).success,
+            ).toBe(false);
+        }
+    });
+
+    it("reads a draft from before as India, whatever country it kept", () => {
+        window.sessionStorage.setItem(
+            SETUP_DRAFT_KEY,
+            JSON.stringify({
+                for: "asha@example.com",
+                values: { ...ANSWERED, country: "AE" },
+                edited: false,
+                goalPicked: false,
+                otherCountry: true,
+            }),
+        );
+        expect(readSetupDraft("asha@example.com")?.values.country).toBe("IN");
+        window.sessionStorage.clear();
+    });
+});
+
 describe("which step may be shown", () => {
     it("finds the first step with an answer its gate would refuse", () => {
         expect(firstUnanswered(ANSWERED, false)).toBeNull();
@@ -278,7 +305,6 @@ describe("the draft's trade", () => {
             values: { ...ANSWERED, goal: "APPOINTMENTS", trade: "SALON" },
             edited: false,
             goalPicked: true,
-            otherCountry: false,
         };
         writeSetupDraft("asha@example.com", withTrade);
         expect(readSetupDraft("asha@example.com")?.values.trade).toBe("SALON");
@@ -290,7 +316,6 @@ describe("the draft", () => {
         values: ANSWERED,
         edited: true,
         goalPicked: false,
-        otherCountry: false,
     };
 
     beforeEach(() => window.sessionStorage.clear());

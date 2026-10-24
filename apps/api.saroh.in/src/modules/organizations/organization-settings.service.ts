@@ -29,6 +29,7 @@ import {
 } from "../sites/page-cache-revalidate";
 import type { PublicContact } from "./business-contact";
 import { businessPublicContactOf } from "./business-contact";
+import { refuseCountryOutsideIndia } from "./business-country";
 import { logoProblem } from "./business-logo";
 import type { PayInstructionsView } from "./business-pay-instructions";
 import {
@@ -486,6 +487,8 @@ export class OrganizationSettingsService {
                   select: TAX_CURRENT_SELECT,
               })
             : null;
+        // Sending a country always touches tax, so the stored one is read.
+        refuseCountryOutsideIndia(profileData.country, taxCurrent?.country);
         const taxData = touchesTax(taxSent)
             ? taxChanges(taxCurrent, taxSent)
             : {};

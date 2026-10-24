@@ -313,13 +313,66 @@ describe("OrganizationSettingsService", () => {
         });
 
         it("patches only the fields sent — never blanks the untouched ones", async () => {
-            await service.update(ctx(), { profile: { country: "US" } });
+            await service.update(ctx(), { profile: { country: "IN" } });
 
             expect(orgUpdate).not.toHaveBeenCalled();
             expect(profileUpsert).toHaveBeenCalledWith({
                 where: { organizationId: "org_1" },
-                create: { organizationId: "org_1", country: "US" },
-                update: { country: "US" },
+                create: { organizationId: "org_1", country: "IN" },
+                update: { country: "IN" },
+            });
+        });
+
+        describe("India only for now (#1214)", () => {
+            it("refuses a change to another country, and writes nothing", async () => {
+                const refusal = await service
+                    .update(ctx(), { profile: { country: "US" } })
+                    .catch((e: BadRequestException) => e.getResponse());
+                expect(refusal).toEqual({
+                    message: "Saroh is for businesses in India for now.",
+                    details: { field: "country" },
+                });
+                expect(prisma.$transaction).not.toHaveBeenCalled();
+            });
+
+            it("lets a business already in another country keep it and save the rest", async () => {
+                profileFindUnique.mockResolvedValue({
+                    gstRegistered: false,
+                    gstState: null,
+                    taxId: null,
+                    country: "AE",
+                    addressLine1: null,
+                    addressLine2: null,
+                    city: null,
+                    postalCode: null,
+                });
+                await service.update(ctx(), {
+                    profile: { country: "AE", legalName: "Acme FZE" },
+                });
+                expect(profileUpsert).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        update: expect.objectContaining({
+                            country: "AE",
+                            legalName: "Acme FZE",
+                        }),
+                    }),
+                );
+
+                await service.update(ctx(), {
+                    profile: { legalName: "Acme Trading" },
+                });
+                expect(profileUpsert).toHaveBeenLastCalledWith(
+                    expect.objectContaining({
+                        update: { legalName: "Acme Trading" },
+                    }),
+                );
+            });
+
+            it("refuses moving a business in another country to a third", async () => {
+                profileFindUnique.mockResolvedValue({ country: "AE" });
+                await expect(
+                    service.update(ctx(), { profile: { country: "SG" } }),
+                ).rejects.toBeInstanceOf(BadRequestException);
             });
         });
 

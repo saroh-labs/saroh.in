@@ -58,7 +58,8 @@ export function setupSchema(
             address: z.string().min(3, {
                 message: "A web address needs at least 3 characters",
             }),
-            country: z.string().length(2),
+            // India only for now (#1214): setup never asks, and sends IN.
+            country: z.literal("IN"),
             // A goal's key, or "LATER".
             goal: z.string().min(1),
             // Bookings' trade (DEC-189): asked only when the goal is
@@ -408,8 +409,6 @@ export interface SetupDraft {
     edited: boolean;
     /** A goal was picked by hand, so a change of kind leaves it alone. */
     goalPicked: boolean;
-    /** "Another country" is open. */
-    otherCountry: boolean;
 }
 
 const draftSchema = z.object({
@@ -419,6 +418,7 @@ const draftSchema = z.object({
         yourName: z.string().max(120).optional(),
         name: z.string().max(200),
         address: z.string().max(100),
+        // A draft from before #1214 can say another; it is read as IN.
         country: z.string().length(2),
         goal: z.string().min(1).max(40),
         trade: z.enum(SETUP_TRADES).optional(),
@@ -426,7 +426,6 @@ const draftSchema = z.object({
     }),
     edited: z.boolean(),
     goalPicked: z.boolean(),
-    otherCountry: z.boolean(),
 });
 
 function storage(): Storage | null {
@@ -446,7 +445,8 @@ export function readSetupDraft(email: string): SetupDraft | null {
         const parsed = draftSchema.safeParse(JSON.parse(raw));
         if (!parsed.success || parsed.data.for !== email) return null;
         const { for: _for, ...draft } = parsed.data;
-        return draft;
+        // India only for now (#1214), whatever an older draft said.
+        return { ...draft, values: { ...draft.values, country: "IN" } };
     } catch {
         return null;
     }

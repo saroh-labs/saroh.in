@@ -188,8 +188,10 @@ describe("the name step", () => {
             "Rye & Co. Bakery",
         );
         expect(labelled("Web address")).toBeTruthy();
-        expect(text()).toContain("Where does it trade?");
-        expect(checked("country-label")).toEqual(["INIndia"]);
+        // India only for now (#1214): no country is asked.
+        expect(text()).not.toContain("Where does it trade?");
+        expect(text()).not.toContain("Another country");
+        expect(group("country-label")).toEqual([]);
         expect(primary().textContent).toBe("Continue");
         expect(button("Back")).toBeTruthy();
         // The step before and the step after are out of the page.
@@ -212,7 +214,7 @@ describe("the name step", () => {
         await toName();
         expect(heading().textContent).toBe(title);
         expect(labelled(label).placeholder).toBe(placeholder);
-        expect(text()).toContain("Where are you based?");
+        expect(text()).not.toContain("Where are you based?");
     });
 
     it("fills the web address from the name until it is edited", async () => {

@@ -27,6 +27,7 @@ import {
     MAX_ADDRESS_LENGTH,
 } from "../sites/site-address";
 import { recordManagerInTx } from "./account-manager";
+import { refuseCountryOutsideIndia } from "./business-country";
 import { businessTypeWrite } from "./business-type";
 import { startingZone } from "./business-zone";
 import type { OnboardOrganizationDto } from "./dto";
@@ -96,6 +97,7 @@ export class OrganizationOnboardingService {
          */
         // Blank counts as not chosen, like absent: `??` alone would keep ""
         // and refuse it, where it should fall back to the name.
+        refuseCountryOutsideIndia(dto.profile?.country);
         const chosen =
             dto.address === undefined || dto.address === ""
                 ? null
