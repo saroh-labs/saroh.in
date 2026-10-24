@@ -2462,3 +2462,15 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **Samples don't count as services** in the setup facts; `sampleServices` counts them, so Home can say "Review your sample services".
     - **Not now:** studio, clinic and bakery presets; sample products (`Product.isSample`); picking the trade at signup (U16).
 - Rules: `apps/api.saroh.in/src/modules/capabilities/setup/trade-presets.ts`, `module-setup.writers.ts` (`writeAppointments`), `apps/api.saroh.in/src/modules/bookings/sample-services.ts` (`NOT_SAMPLE`, `KEPT`), `bookings.service.ts` (`keepService`, `keepAllSamples`, the edit), `apps/app.saroh.in/components/services/list/`.
+
+## DEC-190 Saroh is for businesses in India for now
+
+**Status: Accepted — 2026-10-24** · owner · #1214
+
+- Context:
+    - Onboarding offered "Another country", but everything else (GST, UPI, Razorpay and Cashfree, the state list) is built for India, and every business today is Indian.
+- Decision:
+    - Signup sets the country to India and asks nothing about it. Settings shows India and doesn't let it change.
+    - The API refuses another country on create or change ("Saroh is for businesses in India for now."). A business already saved with another country keeps it and can still save its other details.
+    - The country picker stays in the code for when other countries come (#1212); currency and time zones are #1213.
+- Rules: `apps/api.saroh.in/src/modules/organizations/business-country.ts`; `apps/app.saroh.in/lib/organizations/setup-steps.ts`.
