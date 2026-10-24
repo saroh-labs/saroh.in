@@ -7,6 +7,7 @@ import { createOrganization } from "@/lib/organizations/actions";
 import type { BillingField } from "@/lib/organizations/setup-billing";
 import { billingFieldOf, billingSent } from "@/lib/organizations/setup-billing";
 import type { SetupValues } from "@/lib/organizations/setup-steps";
+import { tradeSent } from "@/lib/organizations/setup-steps";
 import { browserZone } from "@/lib/organizations/time-zones";
 import {
     startCheckoutAfterOnboarding,
@@ -108,12 +109,17 @@ export async function createFromSetup(
     // Turn its first goal on with the defaults and learn where to land. A
     // goal that can't be turned on lands on Home with the reason: the
     // business is set up either way.
-    const start = await startWithGoalAction(values.goal, values.kind).catch(
-        () => ({
-            href: "/",
-            said: `${businessName} is set up. Pick what to do first from Home.`,
-        }),
-    );
+    // Bookings' trade (DEC-189): Salon or Gym writes its samples. Without
+    // one, the call is as it always was.
+    const trade = tradeSent(values);
+    const start = await (
+        trade
+            ? startWithGoalAction(values.goal, values.kind, trade)
+            : startWithGoalAction(values.goal, values.kind)
+    ).catch(() => ({
+        href: "/",
+        said: `${businessName} is set up. Pick what to do first from Home.`,
+    }));
     if (invite) {
         // Where the waitlist entry is marked joined and the offer starts;
         // the API checks the invite against this account.

@@ -61,6 +61,9 @@ export function setupSchema(
             country: z.string().length(2),
             // A goal's key, or "LATER".
             goal: z.string().min(1),
+            // Bookings' trade (DEC-189): asked only when the goal is
+            // Bookings. None chosen reads as "Something else".
+            trade: z.enum(SETUP_TRADES).optional(),
             // Who Saroh bills (DEC-167): a profile's id, or "new" with its
             // fields below. Checked only when asked.
             billingChoice: z.string().optional(),
@@ -91,6 +94,48 @@ export function setupSchema(
         });
 }
 
+/* Bookings' trade (#1193, DEC-189). */
+
+/** The trades setup offers. "OTHER" is no trade: Bookings as before. */
+export const SETUP_TRADES = ["SALON", "GYM", "OTHER"] as const;
+export type SetupTrade = (typeof SETUP_TRADES)[number];
+
+export const TRADE_CHOICES: readonly { value: SetupTrade; label: string }[] = [
+    { value: "SALON", label: "Salon" },
+    { value: "GYM", label: "Gym" },
+    { value: "OTHER", label: "Something else" },
+];
+
+/** Whether the trade is asked: only when the goal is Bookings. */
+export function asksTrade(goal: unknown): boolean {
+    return goal === "APPOINTMENTS";
+}
+
+/**
+ * The trade sent to Bookings' setup: Salon or Gym, when Bookings is the
+ * goal. Anything else sends none, and Bookings turns on as it always has.
+ */
+export function tradeSent(values: {
+    goal: string;
+    trade?: SetupTrade;
+}): "SALON" | "GYM" | undefined {
+    if (!asksTrade(values.goal)) return undefined;
+    return values.trade === "SALON" || values.trade === "GYM"
+        ? values.trade
+        : undefined;
+}
+
+/**
+ * The line under the trade: with Salon or Gym, the samples take the first
+ * service's place. Something else says nothing: the first service is made
+ * on the page they land on, as before.
+ */
+export function tradeLine(goal: unknown, trade: unknown): string | null {
+    return asksTrade(goal) && (trade === "SALON" || trade === "GYM")
+        ? "Sample services, prices and hours will be ready to edit."
+        : null;
+}
+
 export type SetupValues = z.infer<ReturnType<typeof setupSchema>>;
 export type SetupField = keyof SetupValues;
 
@@ -113,7 +158,7 @@ const FIELDS: Record<SetupStepId, readonly SetupField[]> = {
     kind: ["kind"],
     name: ["yourName", "name", "address", "country", "managerCode"],
     billing: BILLING_FIELDS,
-    first: ["goal"],
+    first: ["goal", "trade"],
 };
 
 /** Setup's steps, in order: the plan's, after the account's. */
@@ -376,6 +421,7 @@ const draftSchema = z.object({
         address: z.string().max(100),
         country: z.string().length(2),
         goal: z.string().min(1).max(40),
+        trade: z.enum(SETUP_TRADES).optional(),
         managerCode: z.string().max(20).optional(),
     }),
     edited: z.boolean(),

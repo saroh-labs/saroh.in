@@ -23,6 +23,7 @@ import { NO_BILLING } from "@/lib/organizations/setup-billing";
 import { defaultGoal, setupGoals } from "@/lib/organizations/setup-plan";
 import type { SetupDraft, SetupValues } from "@/lib/organizations/setup-steps";
 import {
+    asksTrade,
     clearSetupDraft,
     firstUnanswered,
     isLastStep,
@@ -51,6 +52,7 @@ import {
     STEP_LEAD_ID,
     stepHeadingId,
 } from "./setup-step-frame";
+import { SetupTradeChoice } from "./setup-trade-choice";
 import { isTaken, useAddressCheck } from "./use-address-check";
 import { fieldsOf, useSetupWalk } from "./use-setup-walk";
 
@@ -180,6 +182,7 @@ function SetupSteps({
     const name = useWatch({ control: form.control, name: "name" });
     const address = useWatch({ control: form.control, name: "address" });
     const kind = useWatch({ control: form.control, name: "kind" });
+    const goal = useWatch({ control: form.control, name: "goal" });
     const check = useAddressCheck(address);
 
     // Which step is on show, and where the keyboard goes when it changes.
@@ -405,6 +408,21 @@ function SetupSteps({
                                             }}
                                             labelledBy={headingId}
                                             describedBy={STEP_LEAD_ID}
+                                        />
+                                    </FormItem>
+                                )}
+                            />
+                        ) : null}
+
+                        {step === "first" && asksTrade(goal) ? (
+                            <FormField
+                                control={form.control}
+                                name="trade"
+                                render={({ field }) => (
+                                    <FormItem data-ph-unmask="">
+                                        <SetupTradeChoice
+                                            value={field.value}
+                                            onChange={field.onChange}
                                         />
                                     </FormItem>
                                 )}

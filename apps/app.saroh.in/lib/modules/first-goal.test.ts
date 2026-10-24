@@ -156,6 +156,17 @@ describe("startWithGoal: destinations per goal", () => {
         ]);
     });
 
+    it("Bookings with a trade: its samples, then the Services list", async () => {
+        const d = deps();
+        expect(
+            await startWithGoal(d, "APPOINTMENTS", "BUSINESS", "SALON"),
+        ).toEqual({ href: "/services", turnedOn: ["CRM", "APPOINTMENTS"] });
+        expect(vi.mocked(d.enableModule).mock.calls).toEqual([
+            ["CRM", {}],
+            ["APPOINTMENTS", { trade: "SALON" }],
+        ]);
+    });
+
     it("People: Contacts, then New contact open", async () => {
         const d = deps();
         expect(await startWithGoal(d, "CRM", "BUSINESS")).toEqual({
