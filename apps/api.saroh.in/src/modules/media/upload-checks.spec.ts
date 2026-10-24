@@ -176,7 +176,7 @@ describe("assertUploadType — only images the screens can show (#873)", () => {
         },
     );
 
-    it("refuses an over-5 MB photo in plain words, not a 500", () => {
+    it("refuses an over-10 MB photo in plain words, not a 500", () => {
         const tooBig = {
             contentType: "image/png",
             contentLength: DEFAULT_MAX_UPLOAD_BYTES + 1,
@@ -187,7 +187,7 @@ describe("assertUploadType — only images the screens can show (#873)", () => {
         );
     });
 
-    it("takes a photo right at the 5 MB cap", () => {
+    it("takes a photo right at the 10 MB cap", () => {
         const atCap = {
             contentType: "image/png",
             contentLength: DEFAULT_MAX_UPLOAD_BYTES,

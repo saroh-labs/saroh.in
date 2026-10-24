@@ -27,7 +27,7 @@ export const VIDEO_TOO_BIG_MESSAGE =
     "That video is over 50 MB. Keep it under a minute, or export it smaller.";
 /** What a merchant reads when a photo is over the cap. */
 export const IMAGE_TOO_BIG_MESSAGE =
-    "That photo is over 5 MB. Export it smaller and upload it again.";
+    "That photo is over 10 MB. Export it smaller and upload it again.";
 /** What a merchant reads when a "video" turns out not to be one. */
 export const NOT_A_VIDEO_MESSAGE =
     "That file is not a video we can show. Choose an MP4 or MOV.";

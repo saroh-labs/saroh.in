@@ -518,9 +518,11 @@ describe("15 photos and 3 videos (#517)", () => {
         expect(mediaFileProblem({ type: "video/webm", size: MB }, [])).toBe(
             "That is not a photo or a video. Choose a JPG, PNG, WebP, MP4 or MOV.",
         );
-        // Photos up to 5 MB, as the editor says (#525).
-        expect(mediaFileProblem({ type: "image/jpeg", size: 9 * MB }, [])).toBe(
-            "That photo is over 5 MB. Most phones can export a smaller copy.",
+        // Photos up to 10 MB, as the editor says (#525).
+        expect(
+            mediaFileProblem({ type: "image/jpeg", size: 11 * MB }, []),
+        ).toBe(
+            "That photo is over 10 MB. Most phones can export a smaller copy.",
         );
         expect(mediaFileProblem({ type: "image/jpeg", size: 4 * MB }, [])).toBe(
             "",
@@ -530,7 +532,7 @@ describe("15 photos and 3 videos (#517)", () => {
     it("says what can still be added once one kind is full (#525)", () => {
         const fifteen = Array.from({ length: 15 }, (_, i) => photo(i));
         expect(mediaLimitNote([])).toEqual({
-            text: "Photos up to 5 MB, videos up to 50 MB. Drop files onto the grid, or use the tiles.",
+            text: "Photos up to 10 MB, videos up to 50 MB. Drop files onto the grid, or use the tiles.",
             full: false,
         });
         expect(mediaLimitNote([...fifteen, video(1)]).text).toBe(
