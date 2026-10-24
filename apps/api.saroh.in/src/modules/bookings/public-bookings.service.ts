@@ -17,6 +17,7 @@ import { suggestFromBookingNoteInTx } from "../customer-workspace/attention-sugg
 import { hashPayToken } from "../invoices/pay-token";
 import { loadPriceTerms } from "../invoices/price-terms";
 import { takingNewActivity } from "../orders/checkout-paused";
+import { assertNotDemo } from "../organizations/organization-lifecycle.gate";
 import { qrSourceFor } from "../sites/qr-source";
 import { isValidSlotStart } from "./availability";
 import type { PublicCredit } from "./booking-credit";
@@ -420,6 +421,8 @@ export class PublicBookingsService {
         }
         // A business suspended or closing takes no new booking (DEC-120),
         // and its booker hears what a paused site says (#800), never why.
+        // A demo (DEC-188) says it is one.
+        await assertNotDemo(service.organizationId);
         if (!(await takingNewActivity(service.organizationId))) {
             throw notTakingOrders("bookings");
         }

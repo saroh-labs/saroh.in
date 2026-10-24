@@ -141,6 +141,11 @@ model Organization {
   lifecycleStatus  String @default("ACTIVE")
   lifecycleVersion Int    @default(1)
 
+  // A demo business (DEC-188): its site opens for anyone to look at, and
+  // every public and site-customer write refuses with ORGANIZATION_DEMO.
+  // Its owner can't sign in. Set only by the demo-businesses script.
+  isDemo Boolean @default(false)
+
   // What is being set up (DEC-070): BUSINESS (a shop, studio, practice),
   // SOLO ("Just me": a freelancer, consultant, creator) or WORK ("A site for
   // my work": a portfolio, blog, projects). It changes Saroh's words and

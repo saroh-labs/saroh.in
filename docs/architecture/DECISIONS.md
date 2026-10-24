@@ -2448,3 +2448,17 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **Samples don't count as services** in the setup facts; `sampleServices` counts them, so Home can say "Review your sample services".
     - **Not now:** studio, clinic and bakery presets; sample products (`Product.isSample`); picking the trade at signup (U16).
 - Rules: `apps/api.saroh.in/src/modules/capabilities/setup/trade-presets.ts`, `module-setup.writers.ts` (`writeAppointments`), `apps/api.saroh.in/src/modules/bookings/sample-services.ts` (`NOT_SAMPLE`, `KEPT`), `bookings.service.ts` (`keepService`, `keepAllSamples`, the edit), `apps/app.saroh.in/components/services/list/`.
+
+## DEC-188 Demo businesses carry Organization.isDemo, and every public write refuses them
+
+**Status: Accepted — 2026-10-24** · owner · #1191; plan `docs/plans/2026-10-24-001-feat-growth-seo-onboarding-round-plan.md` (U7, R7)
+
+- Context:
+    - saroh.in wants a "See a live demo" button: a visitor opens a real Saroh site and booking page without signing up. The showcase businesses exist only in the seed, which production never runs. A demo on production must be looked at, never booked, paid, sent to or worked in.
+- Decision:
+    - **A demo is a flag on the business**: `Organization.isDemo`, false by default, set only by the demo-businesses script (U8).
+    - **Every public and site-customer write refuses a demo** with one typed refusal, `ORGANIZATION_DEMO` (403, `details.code` the same), in plain words: "This is a demo business. Booking, paying and sending things are turned off." `assertOrganizationOpen` and `assertOrganizationWindingDown` ask it through the shared lifecycle read; `CustomerSessionGuard` asks it for every signed-in POST, PATCH and DELETE; the public booking, product review and back-in-stock writes ask `assertNotDemo` directly; the checkout refuses on its `demo` scope. Customer sign-in codes and sessions are refused, so a demo has no signed-in customers. `demo-routes.spec.ts` lists every public write and fails a new one that doesn't say where it asks.
+    - **The pages say "This is a demo"**, not "paused": the public site read, the booking page read and the checkout options carry `demo: true`, and the merchant site shows "This is a demo. Booking, paying and sending things are turned off." where Book, Add to bag and Pay would be (the `--site-*` palette, never Saroh's brand).
+    - **Nobody works in a demo**: Better Auth's session-create hook refuses a person whose every membership is in a demo business, whatever way they sign in (password, email code, Google). A person who also belongs to a real business signs in. The business's own workspace writes are not refused by the flag.
+    - **A demo is no one's number**: it is left out of the attribution export, the inactivity signals and the product milestones.
+- Rules: `apps/api.saroh.in/src/modules/organizations/organization-lifecycle.gate.ts` (`assertNotDemo`, `demoRefusal`), `orders/checkout-paused.ts` (`shopPause` reports `demo`), `site-accounts/customer-session.guard.ts`, `packages/auth/src/server.ts` (`refuseDemoOwners`), `packages/site-blocks/src/shop/not-taking-orders.tsx` (`DEMO_TEXT`).

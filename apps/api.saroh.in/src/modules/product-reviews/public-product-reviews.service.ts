@@ -10,6 +10,7 @@ import { Prisma, prisma, runInOrgContext } from "@saroh/database";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { noticeOf } from "../notifications/notice-target";
 import { PRODUCT_LINES } from "../orders/order-line";
+import { assertNotDemo } from "../organizations/organization-lifecycle.gate";
 import { parseSiteStyle, siteStyleVariables } from "../sites/site-style";
 import type { PublicReviewDto } from "./dto";
 import { orderIneligibility } from "./eligibility";
@@ -136,6 +137,8 @@ export class PublicProductReviewsService {
         dto: PublicReviewDto,
     ): Promise<{ orderItemId: string; completed: boolean }> {
         const inv = await this.requireOpen(token);
+        // A demo business keeps no review (DEC-188).
+        await assertNotDemo(inv.organizationId);
         if (!this.limiter.take(inv.id)) {
             throw tooManyRequests(
                 "Too many reviews at once. Try again shortly.",

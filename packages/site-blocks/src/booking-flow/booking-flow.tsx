@@ -8,6 +8,7 @@ import { DEFAULT_API_URL } from "../api-url";
 import { NO_CAPTURE_ATTRS, NO_CAPTURE_CLASS } from "../consent-events";
 import { cn } from "../lib/utils";
 import type { BusinessReach } from "../reach-links";
+import { NotTakingOrders } from "../shop/not-taking-orders";
 import { SitePageState } from "../shop/page-state";
 import { TestReleaseStopSheet } from "../test-release/test-release-stop";
 import type { BookingFlowProps } from "./booking-account";
@@ -101,7 +102,8 @@ function ClassicBookingFlow(props: BookingFlowProps) {
     // Online booking paused at the plan's monthly cap (DEC-095): said up
     // front, before any choosing, never after the booker has done the work.
     const paused = page.paused === true;
-    const bookable = page.open && services.length > 0 && !paused;
+    const demo = page.demo === true;
+    const bookable = page.open && services.length > 0 && !paused && !demo;
     // The summary is drawn twice, and CSS alone shows one: the aside from
     // 700px, the pinned bar under it. A script that asked the screen's
     // width drew the desk layout first on every phone, then swapped.
@@ -163,6 +165,8 @@ function ClassicBookingFlow(props: BookingFlowProps) {
                 <div className="grid min-w-0 flex-[999_1_460px] grid-cols-[minmax(0,1fr)] gap-3.5">
                     {phase.kind === "booked" ? (
                         outcome(phase)
+                    ) : demo ? (
+                        <NotTakingOrders demo />
                     ) : !bookable ? (
                         <ClosedCard
                             paused={page.open && services.length > 0 && paused}

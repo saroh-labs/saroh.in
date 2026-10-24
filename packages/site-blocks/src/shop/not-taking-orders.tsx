@@ -9,11 +9,25 @@
  * On a product page it stands where the button would: a note with a rule
  * in the accent down its side, in the body colour, so it reads as the
  * answer to "how do I buy this" and not as small print.
+ *
+ * On a demo business (DEC-188) the same note says it is a demo instead,
+ * where Book, Add to bag and Pay would be.
  */
 export const NOT_TAKING_ORDERS_TEXT =
     "This business isn't taking orders right now.";
 
-export function NotTakingOrders({ banner = false }: { banner?: boolean }) {
+/** What a demo business's pages say where Book and Pay would be. */
+export const DEMO_TEXT =
+    "This is a demo. Booking, paying and sending things are turned off.";
+
+export function NotTakingOrders({
+    banner = false,
+    demo = false,
+}: {
+    banner?: boolean;
+    demo?: boolean;
+}) {
+    const text = demo ? DEMO_TEXT : NOT_TAKING_ORDERS_TEXT;
     if (banner) {
         return (
             <div className="bg-site-bg max-w-site-content mx-auto w-full px-5 pt-6 sm:px-[var(--site-page-margin)]">
@@ -21,7 +35,7 @@ export function NotTakingOrders({ banner = false }: { banner?: boolean }) {
                     role="status"
                     className="border-site-border bg-site-surface text-site-fg rounded-[calc(var(--site-radius,2px)+10px)] border px-4 py-3 text-[15px] font-medium"
                 >
-                    {NOT_TAKING_ORDERS_TEXT}
+                    {text}
                 </p>
             </div>
         );
@@ -31,7 +45,7 @@ export function NotTakingOrders({ banner = false }: { banner?: boolean }) {
             role="status"
             className="border-site-accent text-site-fg border-l-2 py-1 pl-3.5 text-[15px] font-medium leading-normal"
         >
-            {NOT_TAKING_ORDERS_TEXT}
+            {text}
         </p>
     );
 }

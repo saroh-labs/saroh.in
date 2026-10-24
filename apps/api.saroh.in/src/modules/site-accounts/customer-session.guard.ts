@@ -1,6 +1,10 @@
 import type { CanActivate, ExecutionContext } from "@nestjs/common";
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 
+import {
+    assertNotDemo,
+    isReadOnlyMethod,
+} from "../organizations/organization-lifecycle.gate";
 import type { CustomerRequest } from "./customer-context.decorator";
 import { SessionsService } from "./sessions.service";
 import { resolveSiteHost } from "./site-host";
@@ -34,7 +38,9 @@ export class CustomerSessionGuard implements CanActivate {
     async canActivate(context: ExecutionContext): Promise<boolean> {
         const request = context
             .switchToHttp()
-            .getRequest<CustomerRequest & { siteRelay?: SiteRelay }>();
+            .getRequest<
+                CustomerRequest & { siteRelay?: SiteRelay; method?: string }
+            >();
         const relay = verifySiteRelay(
             request.headers[SITE_RELAY_HEADER],
             siteRelaySecret(),
@@ -53,6 +59,11 @@ export class CustomerSessionGuard implements CanActivate {
         const site = await resolveSiteHost(relay.host);
         const customer = await this.sessions.resolve(token, site);
         if (!customer) throw signedOut();
+        // A demo business (DEC-188) takes no signed-in write: one door for
+        // every site-customer POST, PATCH and DELETE.
+        if (!isReadOnlyMethod(request.method)) {
+            await assertNotDemo(customer.organizationId);
+        }
         request.customerContext = customer;
         return true;
     }

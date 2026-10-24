@@ -18,12 +18,49 @@ import {
 export const NOT_TAKING_NEW_MESSAGE =
     "This business isn't taking new orders, bookings or enquiries right now.";
 
-async function lifecycleOf(organizationId: string): Promise<string | null> {
-    const organization = await prisma.organization.findUnique({
+/**
+ * What a visitor is told on a demo business (DEC-188): it is there to be
+ * looked at, so nothing a customer does on it is kept or sent.
+ */
+export const DEMO_MESSAGE =
+    "This is a demo business. Booking, paying and sending things are turned off.";
+
+/** The shared lifecycle read: the state, and whether it is a demo. */
+async function lifecycleOf(
+    organizationId: string,
+): Promise<{ lifecycleStatus: string; isDemo: boolean } | null> {
+    return prisma.organization.findUnique({
         where: { id: organizationId },
-        select: { lifecycleStatus: true },
+        select: { lifecycleStatus: true, isDemo: true },
     });
-    return organization?.lifecycleStatus ?? null;
+}
+
+/** The refusal every public write on a demo business gets (DEC-188). */
+export function demoRefusal(): ForbiddenException {
+    return new ForbiddenException({
+        error: "ORGANIZATION_DEMO",
+        message: DEMO_MESSAGE,
+        // What reaches a client through the exception filter's envelope.
+        details: { code: "ORGANIZATION_DEMO" },
+    });
+}
+
+/** Whether a business is a demo (DEC-188). A missing one is not. */
+export async function isDemoOrganization(
+    organizationId: string,
+): Promise<boolean> {
+    return (await lifecycleOf(organizationId))?.isDemo === true;
+}
+
+/**
+ * Refuse a public or site-customer write on a demo business (DEC-188).
+ * Asked by {@link assertOrganizationOpen} and
+ * {@link assertOrganizationWindingDown}, by `CustomerSessionGuard` for every
+ * signed-in write, and directly by the writes that ask none of them.
+ * `demo-routes.spec.ts` keeps every public write asking.
+ */
+export async function assertNotDemo(organizationId: string): Promise<void> {
+    if (await isDemoOrganization(organizationId)) throw demoRefusal();
 }
 
 /** The refusal a customer gets: the same for every state, naming none. */
@@ -56,10 +93,12 @@ function notTakingNew(): ForbiddenException {
 export async function assertOrganizationOpen(
     organizationId: string,
 ): Promise<void> {
-    const status = await lifecycleOf(organizationId);
+    const organization = await lifecycleOf(organizationId);
     // A missing business is the caller's own 404 to raise; this gate only
     // answers "is it open".
-    if (status === null || lifecycleAllows(status, "new")) return;
+    if (organization === null) return;
+    if (organization.isDemo) throw demoRefusal();
+    if (lifecycleAllows(organization.lifecycleStatus, "new")) return;
     throw notTakingNew();
 }
 
@@ -73,8 +112,10 @@ export async function assertOrganizationOpen(
 export async function assertOrganizationWindingDown(
     organizationId: string,
 ): Promise<void> {
-    const status = await lifecycleOf(organizationId);
-    if (status === null || lifecycleAllows(status, "wind-down")) return;
+    const organization = await lifecycleOf(organizationId);
+    if (organization === null) return;
+    if (organization.isDemo) throw demoRefusal();
+    if (lifecycleAllows(organization.lifecycleStatus, "wind-down")) return;
     throw notTakingNew();
 }
 
@@ -105,8 +146,10 @@ export async function assertWorkspaceWrite(
     organizationId: string,
     writeClass: LifecycleWriteClass,
 ): Promise<void> {
-    const status = await lifecycleOf(organizationId);
-    if (status === null || lifecycleAllows(status, writeClass)) return;
+    // The workspace is the business's own: a demo's flag is for its
+    // visitors (DEC-188), never its members.
+    const status = (await lifecycleOf(organizationId))?.lifecycleStatus;
+    if (status === undefined || lifecycleAllows(status, writeClass)) return;
     throw new ForbiddenException({
         error: "ORGANIZATION_NOT_ACTIVE",
         status,

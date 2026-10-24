@@ -46,6 +46,8 @@ export type { InactivitySignalKind };
 export interface BusinessFacts {
     createdAt: Date;
     lifecycleStatus: string;
+    /** A demo business (DEC-188): never flagged. */
+    isDemo?: boolean;
     /** Its team's latest recorded action (the directory's `lastActiveAt`). */
     lastActiveAt: Date | null;
     /** Bookings or selling switched on. */
@@ -67,6 +69,8 @@ export function signalsFor(
     const open = new Map<InactivitySignalKind, Date>();
     // Suspended or leaving businesses have their own flags.
     if (facts.lifecycleStatus !== "ACTIVE") return open;
+    // A demo business (DEC-188) is quiet on purpose.
+    if (facts.isDemo) return open;
     if (now.getTime() - facts.createdAt.getTime() < NEW_BUSINESS_DAYS * DAY_MS)
         return open;
 
@@ -141,6 +145,7 @@ async function readFacts(ids: string[]): Promise<Map<string, BusinessFacts>> {
                 id: true,
                 createdAt: true,
                 lifecycleStatus: true,
+                isDemo: true,
                 organizationModules: {
                     where: {
                         status: "ENABLED",
@@ -190,6 +195,7 @@ async function readFacts(ids: string[]): Promise<Map<string, BusinessFacts>> {
                 {
                     createdAt: org.createdAt,
                     lifecycleStatus: org.lifecycleStatus,
+                    isDemo: org.isDemo,
                     lastActiveAt: lastActive.get(org.id) ?? null,
                     trades: org.organizationModules.length > 0,
                     lastTradeAt: lastTrade.get(org.id) ?? null,

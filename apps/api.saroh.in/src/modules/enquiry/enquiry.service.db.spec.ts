@@ -146,6 +146,24 @@ function repliesOf(organizationId: string) {
 }
 
 describe("the enquiry auto-reply (real database)", () => {
+    it("a demo business (DEC-188) keeps no enquiry and sends nothing", async () => {
+        const b = await business();
+        await prisma.organization.update({
+            where: { id: b.owner.organizationId },
+            data: { isDemo: true },
+        });
+        await expect(submit(b)).rejects.toMatchObject({
+            status: 403,
+            response: { error: "ORGANIZATION_DEMO" },
+        });
+        expect(
+            await jobsOf(b.owner.organizationId, CUSTOMER_NOTIFY_TYPE),
+        ).toHaveLength(0);
+        expect(
+            await jobsOf(b.owner.organizationId, "enquiry.notify"),
+        ).toHaveLength(0);
+    });
+
     it("an enquiry with an email, provider connected: one reply through the business's own email, their message quoted, not in the thread", async () => {
         await prisma.featureFlag.create({
             data: { key: "ACCOUNT_THREAD", enabledByDefault: true },

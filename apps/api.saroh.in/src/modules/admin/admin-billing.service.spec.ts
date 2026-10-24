@@ -19,6 +19,9 @@ jest.mock("@saroh/database", () => ({
         billingCheckout: { findMany: jest.fn() },
         billingWebhookEvent: { findMany: jest.fn() },
         pricingCatalogVersion: { findUnique: jest.fn() },
+        accountManagerLink: { findMany: jest.fn(() => Promise.resolve([])) },
+        organization: { findMany: jest.fn(() => Promise.resolve([])) },
+        platformAdmin: { findMany: jest.fn(() => Promise.resolve([])) },
     },
 }));
 jest.mock("../../common/guards/better-auth.guard", () => ({
@@ -194,6 +197,22 @@ describe("the service checks the permission itself", () => {
         expect(page.statusCounts).toEqual({ paid: 1, unpaid: 1, refunded: 1 });
         expect(db.sarohInvoice.findMany).toHaveBeenCalledWith(
             expect.objectContaining({ skip: 50, take: 50 }),
+        );
+    });
+
+    it("leaves demo businesses out of the attribution export (DEC-188)", async () => {
+        db.sarohInvoice.findMany.mockResolvedValue([]);
+        await service.exportAttribution(staffAs(AdminRole.PlatformOwner), {
+            month: "2026-10",
+        });
+        expect(db.sarohInvoice.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    AND: expect.arrayContaining([
+                        { organization: { isDemo: false } },
+                    ]),
+                }),
+            }),
         );
     });
 

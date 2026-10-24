@@ -451,7 +451,13 @@ export class AdminBillingService {
         }
         const [rows, refunded] = await Promise.all([
             prisma.sarohInvoice.findMany({
-                where: invoiceWhere({ month: query.month }),
+                // A demo business (DEC-188) is no one's sale.
+                where: {
+                    AND: [
+                        invoiceWhere({ month: query.month }),
+                        { organization: { isDemo: false } },
+                    ],
+                },
                 orderBy: [{ issuedAt: "asc" }, { number: "asc" }],
                 take: CSV_MAX_ROWS,
                 select: {

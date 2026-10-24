@@ -72,4 +72,14 @@ describe("signalsFor (#1199)", () => {
             expect.arrayContaining(["COURSES", "CLASS_PACKS"]),
         );
     });
+
+    it("never flags a demo business (DEC-188)", () => {
+        const quiet = {
+            lastActiveAt: null,
+            lastTradeAt: null,
+            paymentsDisconnected: true,
+        };
+        expect(kinds(facts({ ...quiet, isDemo: true }))).toEqual([]);
+        expect(kinds(facts({ ...quiet, isDemo: false })).length).toBe(3);
+    });
 });

@@ -107,6 +107,8 @@ export interface MilestoneSource {
 export interface MilestoneFacts extends MilestoneSource {
     planKey: string | null;
     businessKind: string | null;
+    /** A demo business (DEC-188) sends no milestone. */
+    isDemo?: boolean;
 }
 
 /** Reads the facts. Replaced in unit tests. */
@@ -123,6 +125,7 @@ const readFacts: MilestoneFactsReader = (organizationId) =>
                 where: { id: organizationId },
                 select: {
                     kind: true,
+                    isDemo: true,
                     signupSource: true,
                     referredByOrganization: {
                         select: { referralCode: true },
@@ -149,6 +152,7 @@ const readFacts: MilestoneFactsReader = (organizationId) =>
         return {
             planKey: subscription?.plan.key ?? null,
             businessKind: organization?.kind ?? null,
+            isDemo: organization?.isDemo === true,
             signupSource: signupSourceOf(organization?.signupSource),
             referrerCode: referralCodeOf(
                 organization?.referredByOrganization?.referralCode,
@@ -330,6 +334,8 @@ export class ProductMilestones {
     ): Promise<void> {
         try {
             const facts = await this.facts(organizationId);
+            // A demo business (DEC-188) is no one's funnel.
+            if (facts.isDemo) return;
             captureProductEvent(milestone, organizationId, {
                 plan_key: facts.planKey ?? "none",
                 business_kind: facts.businessKind ?? "unknown",

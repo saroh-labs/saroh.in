@@ -888,6 +888,28 @@ describe("the booking page (U19)", () => {
         expect(document.body.textContent).not.toMatch(/plan|limit/i);
         expect(calls).toHaveLength(0);
     });
+
+    it("a demo business (DEC-188): says it is a demo, with nothing to book", () => {
+        serve(() => json({}));
+        render(
+            <BookingFlow
+                page={{ ...PAGE, paused: true, demo: true }}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        expect(
+            screen.getByText(
+                "This is a demo. Booking, paying and sending things are turned off.",
+            ),
+        ).toBeInTheDocument();
+        expect(screen.queryByText(/paused/i)).toBeNull();
+        expect(screen.queryByRole("button", { name: /^Book/ })).toBeNull();
+        expect(
+            screen.queryByRole("radio", { name: /Personal training/ }),
+        ).toBeNull();
+        expect(calls).toHaveLength(0);
+    });
 });
 
 describe("Where and anything we should know (E7)", () => {

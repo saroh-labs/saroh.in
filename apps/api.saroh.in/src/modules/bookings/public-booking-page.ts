@@ -154,6 +154,11 @@ export interface PublicBookingPage {
      * names no plan. Its own team still books by hand.
      */
     paused: boolean;
+    /**
+     * A demo business (DEC-188): the page shows what can be booked and
+     * says "This is a demo" where Book would be. Absent otherwise.
+     */
+    demo?: true;
     timezone: string;
     /**
      * Whether pay now is on offer: the business lets people pay online
@@ -488,7 +493,7 @@ export async function publicBookingPage(
         },
         select: {
             organizationId: true,
-            organization: { select: { name: true } },
+            organization: { select: { name: true, isDemo: true } },
         },
     });
     if (!site) throw new NotFoundException("Site not found");
@@ -553,6 +558,7 @@ export async function publicBookingPage(
         businessName: site.organization.name,
         open,
         paused: paused || !siteOpen,
+        ...(site.organization.isDemo ? { demo: true as const } : {}),
         timezone: zone,
         payOnline: online && allowsOnline(rules),
         rules,

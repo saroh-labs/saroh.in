@@ -229,6 +229,28 @@ describe("making an order's pay link (real database)", () => {
         );
     });
 
+    it("a demo business (DEC-188) takes no payment on a pay link", async () => {
+        const id = await unpaidOrder();
+        const link = await payLinks.make(owner, id);
+        await prisma.organization.update({
+            where: { id: owner.organizationId },
+            data: { isDemo: true },
+        });
+        try {
+            await expect(
+                publicPay.createIntent(link.token, {}),
+            ).rejects.toMatchObject({
+                status: 403,
+                response: { error: "ORGANIZATION_DEMO" },
+            });
+        } finally {
+            await prisma.organization.update({
+                where: { id: owner.organizationId },
+                data: { isDemo: false },
+            });
+        }
+    });
+
     it("shows `order:read` when a link was made, never the link", async () => {
         const id = await unpaidOrder();
         const { payLinkCreatedAt } = await payLinks.make(owner, id);

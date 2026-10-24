@@ -199,6 +199,29 @@ async function refusal(p: Promise<unknown>): Promise<{
 }
 
 describe("the class waitlist (A12)", () => {
+    it("a demo business (DEC-188) puts nobody on its waitlist", async () => {
+        const at = nextMonday(7);
+        const { serviceId } = await fullClass(2, at);
+        const b = await customer("Demo");
+        await prisma.organization.update({
+            where: { id: owner.organizationId },
+            data: { isDemo: true },
+        });
+        try {
+            await expect(
+                waitlist.join(b, serviceId, at.toISOString()),
+            ).rejects.toMatchObject({
+                status: 403,
+                response: { error: "ORGANIZATION_DEMO" },
+            });
+        } finally {
+            await prisma.organization.update({
+                where: { id: owner.organizationId },
+                data: { isDemo: false },
+            });
+        }
+    });
+
     it("a freed place is offered to the first in line, who books it", async () => {
         const at = nextMonday(7);
         const { serviceId, booked } = await fullClass(2, at);

@@ -172,6 +172,27 @@ describe("product milestones (DEC-125)", () => {
         ).toEqual(["org_a", "org_b"]);
     });
 
+    it("sends nothing for a demo business (DEC-188)", async () => {
+        const { transport, events, facts } = build();
+        setTelemetry({ transport, environment: "production" });
+        facts.mockResolvedValueOnce({
+            planKey: "pro",
+            businessKind: "BUSINESS",
+            isDemo: true,
+            signupSource: null,
+            referrerCode: null,
+            managerCode: null,
+        });
+        await events.firstOrderCreated("org_demo", "o1");
+        await events.firstOrderCreated("org_a", "o2");
+        await settle();
+        expect(
+            transport.capture.mock.calls.map(
+                ([message]: [{ distinctId: string }]) => message.distinctId,
+            ),
+        ).toEqual(["org_a"]);
+    });
+
     it("says the plan's key, the business's kind and the environment, and nothing personal", async () => {
         const { transport, events } = build();
         setTelemetry({ transport, environment: "development" });
