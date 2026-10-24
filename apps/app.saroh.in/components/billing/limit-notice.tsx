@@ -4,7 +4,10 @@ import { Notice } from "@saroh/ui/notice";
 import { ProgressBar } from "@saroh/ui/progress-bar";
 import Link from "next/link";
 
+import type { PromptKey } from "@/lib/billing/upgrade-prompts";
+
 import { PlanWay } from "./plan-way";
+import { UpgradePromptLink } from "./upgrade-prompt-link";
 
 /**
  * The limit notice every screen shares ("Saroh Settings" design, Team): the
@@ -27,6 +30,7 @@ export function LimitNoticeBlock({
     body,
     cta,
     href,
+    prompt,
     className,
 }: {
     full: boolean;
@@ -38,6 +42,8 @@ export function LimitNoticeBlock({
     body: string;
     cta: string;
     href: string;
+    /** The upgrade prompt it counts as (#1197); not counted without. */
+    prompt?: PromptKey;
     className?: string;
 }) {
     if (!plansShown()) return null;
@@ -52,7 +58,13 @@ export function LimitNoticeBlock({
             action={
                 <PlanWay className="text-foreground/80">
                     <Button asChild size="sm" className="shrink-0">
-                        <Link href={href}>{cta}</Link>
+                        {prompt ? (
+                            <UpgradePromptLink prompt={prompt} href={href}>
+                                {cta}
+                            </UpgradePromptLink>
+                        ) : (
+                            <Link href={href}>{cta}</Link>
+                        )}
                     </Button>
                 </PlanWay>
             }

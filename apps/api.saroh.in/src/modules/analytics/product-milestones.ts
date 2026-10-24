@@ -24,8 +24,9 @@ import {
  * The workspace's product milestones, sent to PostHog (DEC-125, widened
  * by DEC-187: each says where the business or account came from).
  *
- * These nine events are the whole list. Nothing else about how a business
- * uses the workspace is sent, from the server or from the browser.
+ * These nine events, and the two upgrade-prompt events below (DEC-187),
+ * are the whole list ({@link PRODUCT_EVENTS}). Nothing else about how a
+ * business uses the workspace is sent, from the server or from the browser.
  */
 export const PRODUCT_MILESTONES = [
     "signed_up",
@@ -39,6 +40,23 @@ export const PRODUCT_MILESTONES = [
     "plan_upgraded",
 ] as const;
 export type ProductMilestone = (typeof PRODUCT_MILESTONES)[number];
+
+/**
+ * An upgrade prompt shown or pressed (DEC-187, #1197). Not ledger rows:
+ * their own send path, `billing/upgrade-prompts.ts`, which sends "shown"
+ * once per business, prompt and IST day.
+ */
+export const UPGRADE_PROMPT_EVENTS = [
+    "upgrade_prompt_shown",
+    "upgrade_prompt_pressed",
+] as const;
+export type UpgradePromptEvent = (typeof UPGRADE_PROMPT_EVENTS)[number];
+
+/** The closed list: every product event the API sends. */
+export const PRODUCT_EVENTS = [
+    ...PRODUCT_MILESTONES,
+    ...UPGRADE_PROMPT_EVENTS,
+] as const;
 
 /**
  * Which activation-ledger row is each business milestone's source. The

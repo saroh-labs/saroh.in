@@ -66,6 +66,8 @@ import {
 import { billingProviderFactoryProvider } from "./providers/provider.factory";
 import { SarohInvoicesService } from "./saroh-invoices.service";
 import { SubscriptionsService } from "./subscriptions.service";
+import { UpgradePromptsService } from "./upgrade-prompts";
+import { UpgradePromptsController } from "./upgrade-prompts.controller";
 
 /** How often a stopped sweep chain is looked for and restarted. */
 const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
@@ -132,11 +134,14 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         // The caller's own billing profiles, for setting up a business.
         BillingProfilesController,
         BusinessBillingProfileController,
+        // An upgrade prompt shown or pressed (#1197, DEC-187).
+        UpgradePromptsController,
     ],
     providers: [
         PlansService,
         SubscriptionsService,
         CatalogueAccessService,
+        UpgradePromptsService,
         EntitlementService,
         MeteringService,
         OverLimitService,

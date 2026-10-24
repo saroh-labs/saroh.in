@@ -13,8 +13,10 @@ import type { AnalyticsService, RecordEventInput } from "./analytics.service";
 import { ACTIVATION_TYPES } from "./event-contract";
 import {
     MILESTONE_BY_LEDGER_TYPE,
+    PRODUCT_EVENTS,
     PRODUCT_MILESTONES,
     ProductMilestones,
+    UPGRADE_PROMPT_EVENTS,
     signedUp,
     sourceProperties,
 } from "./product-milestones";
@@ -97,6 +99,20 @@ describe("product milestones (DEC-125)", () => {
         );
         for (const type of Object.keys(MILESTONE_BY_LEDGER_TYPE))
             expect(ACTIVATION_TYPES).toContain(type);
+    });
+
+    it("grows the closed list by exactly the two prompt events (DEC-187), neither from the ledger", () => {
+        expect([...PRODUCT_EVENTS].sort()).toEqual(
+            [
+                ...PRODUCT_MILESTONES,
+                "upgrade_prompt_shown",
+                "upgrade_prompt_pressed",
+            ].sort(),
+        );
+        for (const event of UPGRADE_PROMPT_EVENTS)
+            expect(Object.values(MILESTONE_BY_LEDGER_TYPE)).not.toContain(
+                event,
+            );
     });
 
     it("sends each milestone once per business, however often its fact repeats", async () => {

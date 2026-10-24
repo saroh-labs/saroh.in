@@ -176,6 +176,25 @@ part and they can't be faked or blocked
   it writes nothing of its own: it switches modules on one at a time and may
   be skipped, so there is no "finished" for the API to see.
 
+### Upgrade prompts (DEC-187, #1197)
+
+`upgrade_prompt_shown` and `upgrade_prompt_pressed`, the closed list's only
+other events (`UPGRADE_PROMPT_EVENTS`), sent by
+`apps/api.saroh.in/src/modules/billing/upgrade-prompts.ts` from
+`POST organizations/:id/upgrade-prompts/:key/:action` (`org:read`), not
+from the ledger.
+
+- **Keys**: a fixed list (`deposits`, `online_payments`, `team_member`,
+  `own_domain`, `memberships`, `near_limit`, `at_limit`, `plan_refusal`);
+  anything else, or an action other than `shown`/`pressed`, is a 400.
+- **Properties**: `prompt`, `plan_offered` (derived on the server from the
+  key's catalogue row and the business's plan, as the locks' `upgradeTo`;
+  `none` when there's no plan above) and `plan_key` (the plan it is on).
+- **Shown once a day**: `Organization.promptsShown` keeps each prompt's last
+  IST day, set in one statement, so "shown" goes once per business, prompt
+  and day. "Pressed" always goes. The workspace's sessionStorage only saves
+  repeat requests (`apps/app.saroh.in/lib/billing/upgrade-prompts.ts`).
+
 ### The weekly sign-up funnel (DEC-187)
 
 A saved PostHog insight, not an admin module. The owner makes it once in the

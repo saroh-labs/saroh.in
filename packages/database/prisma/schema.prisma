@@ -429,6 +429,12 @@ model Organization {
   // changed after. Null: it carried none. Never given to a browser tag.
   signupSource Json?
 
+  // The day each upgrade prompt was last shown to the business (#1197,
+  // DEC-187): `{ "<prompt key>": "YYYY-MM-DD" }`, the day as it reads in
+  // India. "Shown" goes to PostHog once a day per prompt
+  // (`billing/upgrade-prompts.ts`), whose fixed list holds the keys.
+  promptsShown Json?
+
   // A customer's message thread with the business (round-2 A13).
   customerThreads        CustomerThread[]
   customerThreadMessages CustomerThreadMessage[]

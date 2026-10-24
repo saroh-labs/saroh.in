@@ -1,3 +1,5 @@
+import { vi } from "vitest";
+
 /*
  * jsdom has no top layer, and its selector engine (nwsapi) resolves `:modal`
  * and `:popover-open` by calling `Element.matches`, which is nwsapi again:
@@ -52,3 +54,13 @@ if (
         return undefined;
     };
 }
+
+/*
+ * Every upgrade prompt says it was shown (#1197) through a server action,
+ * which reads server-only env. A component test never reaches the API, so
+ * the action is a no-op everywhere; `lib/billing/upgrade-prompts.test.tsx`
+ * brings its own to look at the calls.
+ */
+vi.mock("@/lib/billing/upgrade-prompts-action", () => ({
+    recordUpgradePrompt: () => Promise.resolve(),
+}));
