@@ -181,6 +181,8 @@ model Organization {
   sarohContactLogs    SarohContactLog[]
   // Who at Saroh looks after it, and who did before (DEC-169).
   accountManagerLinks AccountManagerLink[]
+  // Signs it has gone quiet, for its manager and the attention list (#1199).
+  inactivitySignals   InactivitySignal[]
 
   // Optional groupings beneath the org (S1-010). Projects and Teams are NEVER
   // a tenant/ownership/billing root — always org-scoped (ADR-001).
@@ -3028,6 +3030,35 @@ model AccountManagerLink {
   @@unique([organizationId], map: "AccountManagerLink_one_open_per_business", where: raw("\"endedAt\" IS NULL"))
   @@index([organizationId, startedAt])
   @@index([platformAdminId, endedAt])
+}
+
+// A sign a business has gone quiet (R13, #1199): its team hasn't acted in
+// 7 days, it hasn't taken a booking or order in 14, or its payment provider
+// came apart. The sweep (`admin/inactivity-signals.ts`) opens one row per
+// kind while the condition holds and clears it once it doesn't; at most one
+// open row per kind per business. `emailedAt` is when its manager was told
+// (once). Saroh's view of a business, never shown to the business itself.
+model InactivitySignal {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  kind      InactivitySignalKind
+  /// When the quiet started: the last activity, trade, or when it was noticed.
+  since     DateTime
+  emailedAt DateTime?
+  clearedAt DateTime?
+  createdAt DateTime             @default(now())
+
+  @@unique([organizationId, kind], map: "InactivitySignal_one_open_per_kind", where: raw("\"clearedAt\" IS NULL"))
+  @@index([clearedAt, emailedAt])
+}
+
+enum InactivitySignalKind {
+  NO_ACTIVITY
+  NO_TRADING
+  PAYMENT_DISCONNECTED
 }
 
 // A commission rate (DEC-169, admin console U21): what share of a payment

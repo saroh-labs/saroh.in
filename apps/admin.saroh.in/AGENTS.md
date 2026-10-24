@@ -254,7 +254,10 @@ recorded grant (the API refuses it otherwise).
   reason, an empty field clearing it and the tax id only when typed; then
   their console roles), **Businesses** (each open manager link with how it
   came in, their link, their code, their lead's email or assigned, and
-  since when; linked to the business only for `organization:read`),
+  since when; linked to the business only for `organization:read`; and
+  its open inactivity signals in words, #1199: no team activity, no
+  bookings or orders, payments disconnected, each with since when; the
+  same signals are attention reasons on the directory),
   **Leads** (their open leads, soonest follow-up first; only for the
   teammate themself and Support and Platform owner, the API sends none to
   Billing or Auditor), **Earnings** (U21's `EarningsCard`, only with
