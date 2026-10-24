@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 import { BLOCK_META } from "./fixtures";
 import { parseSectionContent, SECTION_TYPES } from "./section-contract";
 import { toRendered } from "./to-rendered";
-import { defaultVariant, isKnownVariant, resolveVariant } from "./variants";
+import {
+    defaultVariant,
+    isKnownVariant,
+    productGridPhoneColumns,
+    resolveVariant,
+} from "./variants";
 
 /**
  * #254 — a variant always resolves to something drawable, and content written
@@ -648,5 +653,26 @@ describe("projects", () => {
         expect(resolveVariant("projects", { variant: "masonry" })).toBe(
             "cards",
         );
+    });
+});
+
+describe("productGridPhoneColumns", () => {
+    it("is the owner's choice, else two for plates and bare cards set across, else one", () => {
+        expect(productGridPhoneColumns("default", { phoneColumns: 2 })).toBe(2);
+        expect(productGridPhoneColumns("plates", { phoneColumns: 1 })).toBe(1);
+        expect(productGridPhoneColumns("plates", {})).toBe(2);
+        expect(
+            productGridPhoneColumns("default", {
+                cardStyle: "bare",
+                columns: 5,
+            }),
+        ).toBe(2);
+        expect(
+            productGridPhoneColumns("lead", { cardStyle: "bare", columns: 5 }),
+        ).toBe(1);
+        expect(productGridPhoneColumns("default", { cardStyle: "bare" })).toBe(
+            1,
+        );
+        expect(productGridPhoneColumns("default", {})).toBe(1);
     });
 });

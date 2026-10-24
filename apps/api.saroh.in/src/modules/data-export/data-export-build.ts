@@ -105,6 +105,9 @@ export async function buildDataExport(input: {
     const made = input.now ?? new Date();
     const path = join(tmpdir(), `saroh-data-export-${exportId}.zip`);
     const zip = new ZipFile(path);
+    // Closed before the file goes: a store that refuses without reading it
+    // would otherwise leave it opening a deleted file, an uncaught ENOENT.
+    let upload: ReturnType<typeof createReadStream> | null = null;
     const counts: DataExportCounts = {
         files: {},
         media: { included: 0, leftOut: 0, bytes: 0 },
@@ -131,7 +134,8 @@ export async function buildDataExport(input: {
 
         const sizeBytes = await zip.close();
         const storageKey = dataExportKey(organizationId, exportId);
-        await storage.putObject(storageKey, createReadStream(path), {
+        upload = createReadStream(path);
+        await storage.putObject(storageKey, upload, {
             contentType: "application/zip",
             contentLength: sizeBytes,
         });
@@ -140,6 +144,7 @@ export async function buildDataExport(input: {
         zip.abort();
         throw error;
     } finally {
+        upload?.destroy();
         await rm(path, { force: true });
     }
 }

@@ -2406,3 +2406,14 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **Publish is a sheet**: from the right on a desk, from the bottom on a phone, always the same surface whatever the list's length (a popover for short lists was considered and refused: the same button must open the same place, the count changes while it is open, and fixing, publishing and the result need room). It says what goes live, puts anything that blocks publishing first in red with its fix (Publish greyed out, the foot saying why), lists advice as not stopping you, fixes the web address in place, shows Publishing… and then turns into the result (the address to copy, Open site, Share link, Done).
     - **Choosing is a popover, committing is a sheet**: look, type and colour choices stay popovers; publish, add a block and settings are sheets.
 - Rules: `apps/app.saroh.in/components/sites/editor/` and `components/sites/publish/`; the patterns file for the editor gets the popover/sheet rule when U6 lands.
+
+## DEC-186 A row a plan gains reaches the businesses already on it at once
+
+**Status: Accepted — 2026-10-24** · owner · after a Pro business was refused the paid looks once "Themes, fonts and templates" was added to Pro in a new catalogue version
+
+- Context:
+    - A business reads the catalogue version it is billed on (KTD-4). Publishing with "keep" leaves it there; "move" moves it only at its first renewal at least 7 days on (30 when the price changes). So a row added to a plan reached new businesses only, and the ones already paying for that plan were refused it.
+- Decision:
+    - **Additions apply at once.** On an older version, a row its plan includes on the live version but not on its own reads as the live cell, from the moment the version goes live.
+    - **Nothing else does.** A row taken away, a lower or higher limit and a new price still wait for a move and its notice, as KTD-4 and DEC-161 say.
+- Rules: `withLiveAdditions` in `packages/pricing-catalog/src/moves.ts`, applied by `CatalogueAccessService.resolve`.

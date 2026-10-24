@@ -32,6 +32,7 @@ export function LeadGrid({
     show,
     base,
     line,
+    phone,
 }: {
     products: ShopListingCard[];
     show: LeadShow;
@@ -39,9 +40,17 @@ export function LeadGrid({
     base: string | null;
     /** The card's line from a product's blurb (the grid's own rule). */
     line: (blurb: string | null) => string | null;
+    /** Two across on a phone, when the merchant chose it: the lead spans both. */
+    phone?: 1 | 2;
 }) {
+    const two = phone === 2;
     return (
-        <ul className="grid grid-cols-1 gap-[var(--site-grid-gap,0.75rem)] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        <ul
+            className={cn(
+                "grid gap-[var(--site-grid-gap,0.75rem)] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
+                two ? "grid-cols-2" : "grid-cols-1",
+            )}
+        >
             {products.map((p, i) => {
                 const lead = i === 0;
                 const body = (
@@ -60,6 +69,7 @@ export function LeadGrid({
                         className={cn(
                             "min-w-0",
                             lead && "sm:col-span-2 sm:row-span-2",
+                            lead && two && "col-span-2",
                         )}
                     >
                         {base !== null ? (
@@ -123,10 +133,10 @@ function LeadCard({
                     />
                 )
             ) : null}
-            <span className="flex items-baseline gap-3">
+            <span className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
                 <span
                     className={cn(
-                        "font-site-heading min-w-0 flex-1 font-semibold leading-tight tracking-[-0.015em] underline-offset-4 group-hover:underline",
+                        "font-site-heading flex-1 font-semibold leading-tight tracking-[-0.015em] underline-offset-4 [overflow-wrap:break-word] group-hover:underline",
                         lead
                             ? "text-[calc(1.5rem*var(--site-heading-scale))]"
                             : "text-[calc(1.1875rem*var(--site-heading-scale))]",

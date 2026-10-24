@@ -19,6 +19,7 @@ import {
     planPriceOf,
     resolveAllAccess,
     validateCatalog,
+    withLiveAdditions,
 } from "@saroh/pricing-catalog";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -233,6 +234,9 @@ export function newestPlanOverride(
  *    (cancelled) or a live plan override. A business with neither reads
  *    {@link FREE_ENTITLEMENTS} (`reason: "no-plan"`).
  *
+ * On an older version, a row its plan has since gained on the live version
+ * is its at once (DEC-186): additions only, its price unchanged.
+ *
  * Then `resolveAllAccess` applies its live overrides — a `plan` override
  * first, passed straight through (`effectivePlanId`), then remove, grant,
  * limit and raise — and its add-ons, read from the same version (KTD-5).
@@ -395,7 +399,12 @@ export class CatalogueAccessService {
             );
             return legacy("no-catalogue", fallback);
         }
-        const { catalog } = snapshot;
+        // Rows its plan has gained since its version are its now (DEC-186).
+        const later = version === null ? null : await this.version(null, now);
+        const catalog =
+            later && later.version > snapshot.version
+                ? withLiveAdditions(snapshot.catalog, later.catalog)
+                : snapshot.catalog;
         const planIds = new Set(catalog.plans.map((p) => p.id));
         if (!planIds.has(planId)) {
             this.logger.warn(

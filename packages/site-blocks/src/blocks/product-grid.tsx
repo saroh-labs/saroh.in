@@ -298,14 +298,13 @@ function GridFrame({
     return (
         <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             <div
-                className={cn(
-                    "mb-3.5 flex items-baseline gap-3",
-                    count && "flex-wrap",
-                )}
+                // Wraps rather than squeezing: a heading never shrinks
+                // below its longest word, so it can't run under the count.
+                className="mb-3.5 flex flex-wrap items-baseline gap-x-3 gap-y-1"
             >
                 <h2
                     data-site-title=""
-                    className="font-site-heading text-site-fg min-w-0 flex-1 text-[calc(1.625rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em]"
+                    className="font-site-heading text-site-fg flex-1 text-[calc(1.625rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em] [overflow-wrap:break-word]"
                 >
                     {title}
                 </h2>
@@ -407,6 +406,12 @@ function ProductCards({
             : cn(cardClass, !show.photo && "pt-4");
     // Bare cards (template polish): the even grid without the card.
     const bare = !lead && !plates && !list && content.cardStyle === "bare";
+    // Across on a phone, only when the merchant chose it: absent, each look
+    // keeps its own steps.
+    const phone =
+        !list && (content.phoneColumns === 1 || content.phoneColumns === 2)
+            ? content.phoneColumns
+            : undefined;
 
     return (
         <GridFrame
@@ -435,6 +440,7 @@ function ProductCards({
                     show={show}
                     base={base}
                     line={cardLine}
+                    phone={phone}
                 />
             ) : lead ? (
                 <LeadGrid
@@ -442,6 +448,7 @@ function ProductCards({
                     show={show}
                     base={base}
                     line={cardLine}
+                    phone={phone}
                 />
             ) : bare ? (
                 <BareGrid
@@ -449,6 +456,7 @@ function ProductCards({
                     show={show}
                     base={base}
                     columns={content.columns}
+                    phone={phone}
                 />
             ) : (
                 <ul
@@ -456,7 +464,12 @@ function ProductCards({
                         "grid",
                         list
                             ? "grid-cols-1 gap-2.5"
-                            : "gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(230px,100%),1fr))]",
+                            : phone
+                              ? cn(
+                                    "gap-3 sm:[grid-template-columns:repeat(auto-fill,minmax(min(230px,100%),1fr))]",
+                                    PHONE_COLUMNS[phone],
+                                )
+                              : "gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(230px,100%),1fr))]",
                     )}
                 >
                     {products.map((p) => {
@@ -622,6 +635,19 @@ const BARE_COLUMNS: Partial<Record<number, string>> = {
     5: "grid-cols-1 gap-x-4 min-[360px]:grid-cols-2 sm:gap-x-[30px] md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
 };
 
+/** The same steps from the tablet up, under the merchant's phone choice. */
+const BARE_COLUMNS_ABOVE_PHONE: Partial<Record<number, string>> = {
+    3: "gap-x-4 sm:grid-cols-2 sm:gap-x-[30px] md:grid-cols-3",
+    4: "gap-x-4 sm:grid-cols-2 sm:gap-x-[30px] md:grid-cols-3 lg:grid-cols-4",
+    5: "gap-x-4 sm:grid-cols-2 sm:gap-x-[30px] md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
+};
+
+/** Products across on a phone, the merchant's choice (`phoneColumns`). */
+export const PHONE_COLUMNS: Record<1 | 2, string> = {
+    1: "grid-cols-1",
+    2: "grid-cols-2",
+};
+
 /**
  * The bare cards (template polish), as the bakery design lays out its
  * bread: no card around each product, a tall 4:5 photo, the name and the
@@ -634,21 +660,29 @@ function BareGrid({
     show,
     base,
     columns,
+    phone,
 }: {
     products: ShopListingCard[];
     show: CardShow;
     base: string | null;
     columns?: number;
+    /** Across on a phone, when the merchant chose it. */
+    phone?: 1 | 2;
 }) {
-    const fixed = columns !== undefined ? BARE_COLUMNS[columns] : undefined;
+    const fixed =
+        columns === undefined
+            ? undefined
+            : phone
+              ? cn(PHONE_COLUMNS[phone], BARE_COLUMNS_ABOVE_PHONE[columns])
+              : BARE_COLUMNS[columns];
+    const fill = phone
+        ? cn(
+              PHONE_COLUMNS[phone],
+              "gap-x-4 sm:gap-x-[30px] sm:[grid-template-columns:repeat(auto-fill,minmax(min(212px,100%),1fr))]",
+          )
+        : "gap-x-[30px] [grid-template-columns:repeat(auto-fill,minmax(min(212px,100%),1fr))]";
     return (
-        <ul
-            className={cn(
-                "grid gap-y-10",
-                fixed ??
-                    "gap-x-[30px] [grid-template-columns:repeat(auto-fill,minmax(min(212px,100%),1fr))]",
-            )}
-        >
+        <ul className={cn("grid gap-y-10", fixed ?? fill)}>
             {products.map((p) => {
                 const line = show.line ? cardLine(p.blurb) : null;
                 const amount = browsePriceWords(
@@ -687,10 +721,12 @@ function BareGrid({
                                 ) : null}
                             </span>
                         ) : null}
-                        <span className="flex items-baseline gap-3">
+                        {/* The price drops under the name when both don't fit a
+                            phone's column; the name keeps its longest word. */}
+                        <span className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
                             <span
                                 className={cn(
-                                    "font-site-heading min-w-0 flex-1 text-[calc(1.25rem*var(--site-heading-scale))] font-semibold leading-tight tracking-[-0.015em] underline-offset-4 group-hover:underline",
+                                    "font-site-heading flex-1 text-[calc(1.25rem*var(--site-heading-scale))] font-semibold leading-tight tracking-[-0.015em] underline-offset-4 [overflow-wrap:break-word] group-hover:underline",
                                     p.soldOut && "text-site-muted",
                                 )}
                             >
