@@ -17,12 +17,13 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  * Bookings or Sell on (its modules sit behind rollout flags the stack
  * turns on for seeded businesses only, DEV_LEARNINGS), so the counting —
  * a new business's 0 of 4, samples, a shop-only business — is vitest's
- * (`ready.test.ts`, `first-steps-checklist.test.tsx`). Northwind has its
- * site, services and bookings; what is left is sharing the booking link.
+ * (`ready.test.ts`, `first-steps-checklist.test.tsx`). Northwind has had
+ * customers, so its link counts as shared and the 4 are done: Home shows
+ * no first steps. What this checks in the browser is that, and that
+ * copying the booking link marks the moment for the business.
  *
- * Sharing marks a moment for the whole business, once, and nothing takes
- * it back: `@serial`. The first project to run shares; the second finds the
- * 4 done, and both check what Home then shows.
+ * Copying marks a moment for the whole business, once, and nothing takes
+ * it back: `@serial`.
  */
 
 interface Seen {
@@ -63,78 +64,28 @@ test.describe("Home's first steps (#1194)", { tag: "@serial" }, () => {
         await page.goto(`/open/${NORTHWIND_ORG}`);
     });
 
-    test("sharing the booking link ticks its step, and the money card follows", async ({
+    test("a business that has had customers sees no first steps, and copying its booking link marks the moment", async ({
         page,
     }) => {
-        const moments = () => northwind(page.request).get<Seen>("/moments");
-        const shared = (await moments()).seen.includes("shared-booking-link");
-
         await page.goto("/");
         await expect(
             page.getByRole("heading", { level: 1 }).first(),
         ).toBeVisible();
+        await expect(firstSteps(page)).toHaveCount(0);
+        await noSideways(page);
 
-        if (!shared) {
-            // Not shared yet: the 4 lead, with the share step left, and
-            // none of the money steps on Home.
-            const card = firstSteps(page);
-            await expect(card).toBeVisible();
-            await expect(card).toContainText("Finish setup");
-            await expect(card).toContainText("Share your booking link");
-            await expect(
-                page
-                    .locator('[data-setup-checklist="home"]')
-                    .filter({ visible: true }),
-            ).toHaveCount(0);
-            await noSideways(page);
-
-            // Meanwhile every money step is on Settings › Business.
-            await page.goto("/settings/organization");
-            await expect(
-                page
-                    .getByRole("region", { name: "Finish setup" })
-                    .filter({ visible: true }),
-            ).toBeVisible();
-
-            await page.goto("/");
-            const step = firstSteps(page).locator('[data-step="share"]');
-            const press = step.getByRole("button", { name: "Share link" });
-            const go = step.getByRole("link", { name: "Share link" });
-            if ((await go.count()) > 0) {
-                // Not live from Home's read: the booking page's own row.
-                await go.click();
-                await expect(page).toHaveURL(/\/services$/);
-                await page.getByRole("button", { name: "Copy link" }).click();
-            } else {
-                await pressUntil(
-                    press,
-                    page.getByText(/Booking page link copied/),
-                );
-            }
-            await expect
-                .poll(async () =>
-                    (await moments()).seen.includes("shared-booking-link"),
-                )
-                .toBe(true);
-            await page.goto("/");
-        }
-
-        // Shared: the share step is ticked, or all 4 are and the card has
-        // made way for the money card.
-        await expect(
-            page.getByRole("heading", { level: 1 }).first(),
-        ).toBeVisible();
-        const card = firstSteps(page);
-        if ((await card.count()) > 0) {
-            await expect(card.locator('[data-step="share"]')).toHaveAttribute(
-                "data-done",
-                "",
-            );
-        } else {
-            await expect(
-                page.locator('[data-setup-checklist="home-first"]'),
-            ).toHaveCount(0);
-        }
+        await page.goto("/services");
+        await pressUntil(
+            page.getByRole("button", { name: "Copy link" }).first(),
+            page.getByText(/link copied/i),
+        );
+        await expect
+            .poll(async () =>
+                (
+                    await northwind(page.request).get<Seen>("/moments")
+                ).seen.includes("shared-booking-link"),
+            )
+            .toBe(true);
         await noSideways(page);
     });
 });

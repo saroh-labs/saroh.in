@@ -1245,6 +1245,14 @@ describe("firstSteps: Home's 4 steps, then the money card (#1194, R12)", () => {
         expect(firstStepsLead(f)).toBe(false);
     });
 
+    it("a business that has already had a customer counts its link as shared", () => {
+        // Northwind and the demo stores: trading for months, never pressed share.
+        const f = first({ sitesNotLive: 0, services: 2, bookings: 12 });
+        expect(f.steps.find((s) => s.key === "share")?.done).toBe(true);
+        expect([f.done, f.total]).toEqual([4, 4]);
+        expect(firstStepsLead(f)).toBe(false);
+    });
+
     it("a shop-only business: products, its shop link and a first order", () => {
         const modules = [mod("COMMERCE"), mod("WEBSITE")];
         const f = first({}, { modules });

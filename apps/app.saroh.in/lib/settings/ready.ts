@@ -760,6 +760,9 @@ export function firstSteps({
     if (!books && !sells) return none;
     if (books && facts.bookings === undefined) return none;
 
+    const traded =
+        (books && (facts.bookings ?? 0) > 0) ||
+        (sells && settings.tradingSince !== null);
     const listed = catalogue(modules, facts);
     const onlySamples =
         listed?.left === true && books && (facts.sampleServices ?? 0) > 0;
@@ -793,7 +796,8 @@ export function firstSteps({
                   }),
             cta: "Share link",
             broken: false,
-            left: !shared,
+            // A business that has had a customer has shared its link already.
+            left: !shared && !traded,
         },
         {
             key: "first",
@@ -809,10 +813,7 @@ export function firstSteps({
             cta: books ? "Open Bookings" : "Open Orders",
             href: books ? "/bookings" : "/commerce/orders",
             broken: false,
-            left: !(
-                (books && (facts.bookings ?? 0) > 0) ||
-                (sells && settings.tradingSince !== null)
-            ),
+            left: !traded,
         },
     ];
     const steps: ReadyStep[] = checks
