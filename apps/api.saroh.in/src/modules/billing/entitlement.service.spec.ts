@@ -344,7 +344,32 @@ describe("EntitlementService on the catalogue (U12)", () => {
         expect(versionFindUnique).toHaveBeenCalledWith({
             where: { version: 7 },
         });
-        expect(liveVersion).not.toHaveBeenCalled();
+    });
+
+    it("gives an older version's plan a row the live version adds, but not a new limit (DEC-186)", async () => {
+        subFindUnique.mockResolvedValue(onPlan("catalog.free", { version: 7 }));
+        versionFindUnique.mockResolvedValue(
+            versionRow(7, fakeLegacyMappedCatalog()),
+        );
+        liveVersion.mockResolvedValue(
+            versionRow(
+                8,
+                fakeLegacyMappedCatalog((c) => {
+                    const cell = (id: string) =>
+                        c.modules.find((m) => m.id === id)?.cells;
+                    Object.assign(cell("invoicing") ?? {}, {
+                        free: { inc: true, text: "Included" },
+                    });
+                    Object.assign(cell("products") ?? {}, {
+                        free: { inc: true, text: "22", limit: 22 },
+                    });
+                }),
+            ),
+        );
+
+        await expect(service().getEntitlements("org_1")).resolves.toMatchObject(
+            { invoicing: true, bookings: false, products: 11 },
+        );
     });
 
     it("locks what Free leaves out, and gives it no custom domain", async () => {
