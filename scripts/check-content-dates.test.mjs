@@ -18,11 +18,20 @@ const BASE = {
     "apps/saroh.in/content/types.ts": "export type A = string;\n",
 };
 
+/**
+ * The environment without git's own variables. Run from a git hook
+ * (`.husky/pre-push`), GIT_DIR and friends point at the real repo, and a
+ * `git commit` meant for the temporary one landed on the branch (24 Oct).
+ */
+const ENV = Object.fromEntries(
+    Object.entries(process.env).filter(([k]) => !k.startsWith("GIT_")),
+);
+
 /** A repo whose first commit (tagged `base`) holds BASE, then `edits` uncommitted. */
 function check(edits) {
     const root = mkdtempSync(join(tmpdir(), "check-content-dates-"));
     const git = (...args) =>
-        execFileSync("git", args, { cwd: root, stdio: "ignore" });
+        execFileSync("git", args, { cwd: root, env: ENV, stdio: "ignore" });
     const write = (files) => {
         for (const [path, source] of Object.entries(files)) {
             mkdirSync(join(root, dirname(path)), { recursive: true });
@@ -48,6 +57,7 @@ function check(edits) {
         write(edits);
         return spawnSync(process.execPath, [SCRIPT, "base"], {
             cwd: root,
+            env: ENV,
             encoding: "utf8",
         });
     } finally {
@@ -92,9 +102,10 @@ test("passes when the date moves with the words, and on a module with no date", 
 test("skips when the base isn't there", () => {
     const root = mkdtempSync(join(tmpdir(), "check-content-dates-"));
     try {
-        execFileSync("git", ["init", "-q"], { cwd: root });
+        execFileSync("git", ["init", "-q"], { cwd: root, env: ENV });
         const r = spawnSync(process.execPath, [SCRIPT, "origin/nowhere"], {
             cwd: root,
+            env: ENV,
             encoding: "utf8",
         });
         assert.equal(r.status, 0, r.stderr);

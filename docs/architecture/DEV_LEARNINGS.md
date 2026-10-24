@@ -5940,3 +5940,10 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** `cell()` turned `|` into `\|` but left `\` alone, so a backslash already in catalogue text (`a \| b`) would undo the escape and split the row.
 - **Fix:** escape `\` first, then `|` (`cell()`, with a test in `pricing-md.test.ts`).
 - **Rule:** any escaping by `replace` escapes the escape character itself first. CodeQL (`js/incomplete-sanitization`) is the check; the gate doesn't run it, so a new hand-written escaper gets a test with a backslash in its input.
+
+## A check's test committed onto the real branch from inside the pre-push hook (24 Oct 2026)
+
+- **Symptom:** `git push` failed at `content-dates`, and afterwards the batch branch had a new commit `base` by `t <t@example.com>` whose tree was the test's three fixture files (everything else deleted), plus a local tag `base`. Caught before it left the machine: the push itself was refused.
+- **Cause:** `scripts/check-content-dates.test.mjs` builds a throwaway repo in a temp folder and runs `git init/add/commit/tag` there. Inside `.husky/pre-push` (a worktree), git exports `GIT_DIR` and related variables, which win over `cwd`, so those commands ran against the real repo.
+- **Fix:** the branch was reset to its last real commit (files untouched) and the tag deleted; the test now runs git with every `GIT_*` variable removed (`ENV`), and passes with `GIT_DIR` set to the real repo.
+- **Rule:** any script or test that runs git in a repo of its own passes an env without `GIT_*`. Run it once with `GIT_DIR=$(git rev-parse --git-dir)` set to prove it.
