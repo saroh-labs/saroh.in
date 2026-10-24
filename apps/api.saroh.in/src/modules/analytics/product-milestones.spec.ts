@@ -119,15 +119,16 @@ describe("product milestones (DEC-125)", () => {
         expect(Object.keys(properties)).toHaveLength(7);
     });
 
-    it("grows the closed list by exactly the two prompt events (DEC-187), neither from the ledger", () => {
+    it("grows the closed list by exactly the two prompt events and the sign-up page count (DEC-187), none from the ledger", () => {
         expect([...PRODUCT_EVENTS].sort()).toEqual(
             [
                 ...PRODUCT_MILESTONES,
                 "upgrade_prompt_shown",
                 "upgrade_prompt_pressed",
+                "signup_page_viewed",
             ].sort(),
         );
-        for (const event of UPGRADE_PROMPT_EVENTS)
+        for (const event of [...UPGRADE_PROMPT_EVENTS, "signup_page_viewed"])
             expect(Object.values(MILESTONE_BY_LEDGER_TYPE)).not.toContain(
                 event,
             );

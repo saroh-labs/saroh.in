@@ -54,10 +54,14 @@ export const UPGRADE_PROMPT_EVENTS = [
 ] as const;
 export type UpgradePromptEvent = (typeof UPGRADE_PROMPT_EVENTS)[number];
 
-/** The closed list: every product event the API sends. */
+/** The anonymous sign-up page count (DEC-187, added 24 Oct), its own send path. */
+export const FUNNEL_EVENTS = ["signup_page_viewed"] as const;
+
+/** The closed list: every product event the API sends; more is the owner's decision. */
 export const PRODUCT_EVENTS = [
     ...PRODUCT_MILESTONES,
     ...UPGRADE_PROMPT_EVENTS,
+    ...FUNNEL_EVENTS,
 ] as const;
 
 /**
@@ -236,13 +240,6 @@ export function signedUp(userId: string, cookieHeader: string | null): void {
         sourceProperties(sourceFromCookies(cookieHeader)),
     );
 }
-
-/**
- * The events outside the milestones, each with its own send path (DEC-187).
- * With {@link PRODUCT_MILESTONES}, the whole closed list; anything further is
- * the owner's decision.
- */
-export const FUNNEL_EVENTS = ["signup_page_viewed"] as const;
 
 const REFERRAL_CHANNELS = [
     "business",
