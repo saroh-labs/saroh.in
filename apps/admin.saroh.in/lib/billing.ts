@@ -96,6 +96,13 @@ export function fetchInvoicesExport(filters: {
     return adminFetch(`/billing/invoices/export${query(filters)}`);
 }
 
+/** The month's referrals and managers CSV (#1189), as the API sent it. */
+export function fetchAttributionExport(month: string): Promise<Response> {
+    return adminFetch(
+        `/billing/invoices/attribution-export${query({ month })}`,
+    );
+}
+
 /** Billing › Needs action (DEC-166): open or resolved, a page. */
 export function listBillingActions(filters: {
     state?: ActionState;

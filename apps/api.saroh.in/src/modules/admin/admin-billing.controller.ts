@@ -5,6 +5,7 @@ import { PlatformAdminContext } from "../../common/decorators/platform-admin-con
 import { RequireAdminPermission } from "../../common/decorators/require-admin-permission.decorator";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import {
+    ExportAttributionDto,
     ExportSarohInvoicesDto,
     ListSarohInvoicesDto,
     ListSarohSubscriptionsDto,
@@ -69,6 +70,35 @@ export class AdminBillingController {
         await this.read(staff, "billing.invoices.export", "saroh_invoice", {
             metadata: { ...filters(query), resultCount: count },
         });
+        const file = Buffer.from(csv, "utf8");
+        return new StreamableFile(file, {
+            type: "text/csv; charset=utf-8",
+            disposition: `attachment; filename="${fileName}"`,
+            length: file.length,
+        });
+    }
+
+    /**
+     * One month's paid invoices with their manager, signup source and
+     * referrer, as a CSV (#1189). Declared before `:id`.
+     */
+    @Get("billing/invoices/attribution-export")
+    @RequireAdminPermission(AdminPermission.SarohBillingRead)
+    @Header("Cache-Control", "no-store")
+    async exportAttribution(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Query() query: ExportAttributionDto,
+    ): Promise<StreamableFile> {
+        const { csv, fileName, count } = await this.billing.exportAttribution(
+            staff,
+            query,
+        );
+        await this.read(
+            staff,
+            "billing.invoices.attribution-export",
+            "saroh_invoice",
+            { metadata: { ...filters(query), resultCount: count } },
+        );
         const file = Buffer.from(csv, "utf8");
         return new StreamableFile(file, {
             type: "text/csv; charset=utf-8",

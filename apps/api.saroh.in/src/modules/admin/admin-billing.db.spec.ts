@@ -275,6 +275,7 @@ function get(path: string, as?: string, headers: Record<string, string> = {}) {
 const ROUTES = () => [
     "/billing/invoices",
     "/billing/invoices/export?month=2026-10",
+    "/billing/invoices/attribution-export?month=2026-10",
     `/billing/invoices/${invoices.a}/pdf`,
     "/billing/subscriptions",
     `/billing/subscriptions/${subscriptionA}`,
@@ -857,6 +858,115 @@ describe("Admin › Billing › Invoices: Paid, Unpaid, Refunded (R29)", () => {
     it("refuses a status it doesn't know", async () => {
         expect(
             (await get("/billing/invoices?status=overdue", people.billing))
+                .status,
+        ).toBe(400);
+    });
+});
+
+describe("Admin › Billing › the referrals and managers export (#1189)", () => {
+    const at = { managed: "", ended: "", referred: "" };
+    const number = (n: number) => `TST/${tag.slice(-6)}/${n}`;
+
+    beforeAll(async () => {
+        const org = async (name: string, data: object = {}) =>
+            (
+                await prisma.organization.create({
+                    data: { name, slug: `${name}-${tag}`, ...data },
+                })
+            ).id;
+        at.managed = await org("attr-managed");
+        at.ended = await org("attr-ended");
+        at.referred = await org("attr-referred", {
+            referredByOrganizationId: at.managed,
+            signupSource: { src: "solutions-salons-hero", utmSource: "google" },
+        });
+        const manager = await staff(await user("Asha Manager"), "SUPPORT");
+        // Open since 1 October: invoice 15 (25 October) is hers.
+        await prisma.accountManagerLink.create({
+            data: {
+                organizationId: at.managed,
+                platformAdminId: manager,
+                source: "LINK",
+                kind: "BROUGHT_IN",
+                startedAt: new Date("2026-10-01T00:00:00.000Z"),
+            },
+        });
+        // Ended 20 October: invoice 16 (26 October) has no manager.
+        await prisma.accountManagerLink.create({
+            data: {
+                organizationId: at.ended,
+                platformAdminId: manager,
+                source: "ASSIGNED",
+                kind: "ASSIGNED",
+                startedAt: new Date("2026-09-01T00:00:00.000Z"),
+                endedAt: new Date("2026-10-20T00:00:00.000Z"),
+            },
+        });
+        await invoice(at.managed, 15, null);
+        await invoice(at.ended, 16, null);
+        const refunded = await invoice(at.referred, 17, null);
+        await prisma.billingRefund.create({
+            data: {
+                organizationId: at.referred,
+                provider: "RAZORPAY",
+                kind: "REFUND",
+                providerRefundId: `rfnd_${tag}_17`,
+                providerPaymentId: `pay_${tag}_17`,
+                invoiceId: refunded,
+                amountPaise: 500,
+                status: "PROCESSED",
+                source: "PROVIDER",
+            },
+        });
+    });
+
+    async function rows(): Promise<Map<string, string>> {
+        const res = await get(
+            "/billing/invoices/attribution-export?month=2026-10",
+            people.billing,
+        );
+        expect(res.status).toBe(200);
+        expect(res.headers.get("content-type")).toContain("text/csv");
+        expect(res.headers.get("cache-control")).toBe("no-store");
+        expect(res.headers.get("content-disposition")).toContain(
+            "saroh-referrals-and-managers-2026-10.csv",
+        );
+        const lines = (await res.text()).trimEnd().split("\r\n");
+        return new Map(lines.map((line) => [line.split(",")[1], line]));
+    }
+
+    it("credits the manager whose link was open at the invoice, and nobody after it ended", async () => {
+        const csv = await rows();
+        expect(csv.get(number(15))).toBe(
+            `attr-managed,${number(15)},2026-10-25,Plan B,1500.00,no,Asha Manager,Their link,,`,
+        );
+        expect(csv.get(number(16))).toBe(
+            `attr-ended,${number(16)},2026-10-26,Plan B,1600.00,no,,,,`,
+        );
+    });
+
+    it("names the referrer and the signup src, and marks a refunded invoice", async () => {
+        const csv = await rows();
+        expect(csv.get(number(17))).toBe(
+            `attr-referred,${number(17)},2026-10-27,Plan B,1700.00,yes,,,solutions-salons-hero,attr-managed`,
+        );
+    });
+
+    it("lists every invoice of the month once", async () => {
+        const csv = await rows();
+        for (const n of [1, 2, 15, 16, 17])
+            expect(csv.has(number(n))).toBe(true);
+        // Invoices of other months are left out.
+        const res = await get(
+            "/billing/invoices/attribution-export?month=2026-11",
+            people.billing,
+        );
+        expect(await res.text()).not.toContain(number(15));
+    });
+
+    it("400 without a month", async () => {
+        expect(
+            (await get("/billing/invoices/attribution-export", people.billing))
                 .status,
         ).toBe(400);
     });

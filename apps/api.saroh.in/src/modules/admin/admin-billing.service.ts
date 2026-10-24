@@ -18,6 +18,7 @@ import {
     REFUNDED_AUDIT_ACTION,
 } from "../billing/double-charge";
 import { renderSarohInvoicePdf } from "../billing/saroh-invoice-paper";
+import { teammateName } from "../saroh-leads/lead-views";
 import type {
     InvoiceStatus,
     NextChargeHow,
@@ -25,12 +26,16 @@ import type {
     SubscriptionView,
 } from "./admin-billing";
 import {
+    attributionCsv,
+    attributionCsvFileName,
     INVOICE_STATUSES,
     invoicesCsv,
     invoicesCsvFileName,
     istMonthRange,
+    linkAt,
     mrrPaise,
     nextChargeOf,
+    signupSrcOf,
     subscriptionViewWhere,
 } from "./admin-billing";
 import type { BillingHistoryPage, HistoryShow } from "./admin-billing-history";
@@ -424,6 +429,112 @@ export class AdminBillingService {
         return {
             csv: invoicesCsv(rows),
             fileName: invoicesCsvFileName(query.month),
+            count: rows.length,
+        };
+    }
+
+    /**
+     * One month's paid invoices with who each is credited to (#1189): the
+     * account manager whose link was open when it was issued, how that
+     * link started, the business's signup `src` and the business that
+     * referred it. Refunded invoices stay, marked. Each of the links,
+     * referrers and names is one read for the whole month, never one per
+     * row.
+     */
+    async exportAttribution(
+        staff: PlatformAdminInfo,
+        query: { month?: string },
+    ): Promise<{ csv: string; fileName: string; count: number }> {
+        assertSarohBillingReader(staff);
+        if (!query.month || !istMonthRange(query.month)) {
+            throw new BadRequestException("Choose a month to export.");
+        }
+        const [rows, refunded] = await Promise.all([
+            prisma.sarohInvoice.findMany({
+                where: invoiceWhere({ month: query.month }),
+                orderBy: [{ issuedAt: "asc" }, { number: "asc" }],
+                take: CSV_MAX_ROWS,
+                select: {
+                    id: true,
+                    number: true,
+                    issuedAt: true,
+                    planName: true,
+                    taxablePaise: true,
+                    organizationId: true,
+                    organization: {
+                        select: {
+                            name: true,
+                            signupSource: true,
+                            referredByOrganizationId: true,
+                        },
+                    },
+                },
+            }),
+            refundedInvoiceIds(),
+        ]);
+        const orgIds = [...new Set(rows.map((r) => r.organizationId))];
+        const referrerIds = [
+            ...new Set(
+                rows.flatMap((r) =>
+                    r.organization.referredByOrganizationId
+                        ? [r.organization.referredByOrganizationId]
+                        : [],
+                ),
+            ),
+        ];
+        const [links, referrers] = await Promise.all([
+            prisma.accountManagerLink.findMany({
+                where: { organizationId: { in: orgIds } },
+                select: {
+                    organizationId: true,
+                    platformAdminId: true,
+                    source: true,
+                    startedAt: true,
+                    endedAt: true,
+                },
+            }),
+            prisma.organization.findMany({
+                where: { id: { in: referrerIds } },
+                select: { id: true, name: true },
+            }),
+        ]);
+        const managers = await prisma.platformAdmin.findMany({
+            where: {
+                id: { in: [...new Set(links.map((l) => l.platformAdminId))] },
+            },
+            select: { id: true, user: { select: { name: true } } },
+        });
+        const managerName = new Map(
+            managers.map((m) => [m.id, teammateName(m.user.name)]),
+        );
+        const referrerName = new Map(referrers.map((o) => [o.id, o.name]));
+        const refundedIds = new Set(refunded);
+        const csv = attributionCsv(
+            rows.map((r) => {
+                const link = linkAt(links, r.organizationId, r.issuedAt);
+                const referrerId = r.organization.referredByOrganizationId;
+                return {
+                    businessName: r.organization.name,
+                    number: r.number,
+                    issuedAt: r.issuedAt,
+                    planName: r.planName,
+                    taxablePaise: r.taxablePaise,
+                    refunded: refundedIds.has(r.id),
+                    managerName: link
+                        ? (managerName.get(link.platformAdminId) ??
+                          "A former teammate")
+                        : null,
+                    linkSource: link?.source ?? null,
+                    signupSrc: signupSrcOf(r.organization.signupSource),
+                    referrerName: referrerId
+                        ? (referrerName.get(referrerId) ?? "A deleted business")
+                        : null,
+                };
+            }),
+        );
+        return {
+            csv,
+            fileName: attributionCsvFileName(query.month),
             count: rows.length,
         };
     }

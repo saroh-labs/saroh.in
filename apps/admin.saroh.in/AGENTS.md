@@ -132,7 +132,9 @@ recorded grant (the API refuses it otherwise).
   Not applied / No business. Invoices have Paid · Unpaid · Refunded chips
   (`status`; Unpaid is Razorpay taking less than the total, Refunded a
   processed refund or a lost dispute, the API's `invoiceStatusWhere`), each
-  with its count, and Export for the CA keeps every filter.
+  with its count, and Export for the CA keeps every filter. Export
+  referrals and managers (#1189) is the month's paid invoices with the
+  account manager at each one's date, the signup `src` and the referrer.
 - **Users (`/users`, admin console U9, R13; People until then, and
   `/people` redirects)** lists everyone with an account: a search and the
   chips No business yet · Email not verified · Owners · Joined this week

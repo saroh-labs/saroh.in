@@ -58,6 +58,12 @@ export class ListSarohInvoicesDto {
     page?: number;
 }
 
+/** The month's referrals and managers export (#1189): the month, required. */
+export class ExportAttributionDto {
+    @Matches(MONTH, { message: "month must look like 2026-10" })
+    month!: string;
+}
+
 /** The month's GST export: the same filters, the month required. */
 export class ExportSarohInvoicesDto {
     @Matches(MONTH, { message: "month must look like 2026-10" })

@@ -97,6 +97,7 @@ describe("saroh-billing:read", () => {
         expect(routes.sort()).toEqual(
             [
                 "counts",
+                "exportAttribution",
                 "exportInvoices",
                 "history",
                 "invoicePdf",
@@ -120,6 +121,9 @@ describe("saroh-billing:read", () => {
         expect(Reflect.getMetadata(PATH_METADATA, proto.exportInvoices)).toBe(
             "billing/invoices/export",
         );
+        expect(
+            Reflect.getMetadata(PATH_METADATA, proto.exportAttribution),
+        ).toBe("billing/invoices/attribution-export");
     });
 });
 
@@ -140,6 +144,9 @@ describe("the service checks the permission itself", () => {
             ).rejects.toBeInstanceOf(ForbiddenException);
             await expect(
                 service.exportInvoices(staff, { month: "2026-10" }),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+            await expect(
+                service.exportAttribution(staff, { month: "2026-10" }),
             ).rejects.toBeInstanceOf(ForbiddenException);
             await expect(
                 service.invoicePdf(staff, "inv_1"),
@@ -193,6 +200,9 @@ describe("the service checks the permission itself", () => {
     it("refuses an export with no month", async () => {
         await expect(
             service.exportInvoices(staffAs(AdminRole.PlatformOwner), {}),
+        ).rejects.toMatchObject({ status: 400 });
+        await expect(
+            service.exportAttribution(staffAs(AdminRole.PlatformOwner), {}),
         ).rejects.toMatchObject({ status: 400 });
     });
 });
