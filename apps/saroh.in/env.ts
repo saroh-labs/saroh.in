@@ -73,6 +73,13 @@ import { z } from "zod";
  * build. Unset counts as `on` only under `next dev`
  * (`lib/resources-context.ts`).
  *
+ * `NEXT_PUBLIC_WHATSAPP_CHAT` and `NEXT_PUBLIC_WHATSAPP_NUMBER` (digits
+ * with the country code, no `+`) show the floating "Chat with us on
+ * WhatsApp" button on the V2 pages (#1188). Both must be set, the switch to
+ * `on`; anything else, unset included and under `next dev` too, shows
+ * nothing. Production leaves them out until Saroh's own WhatsApp number is
+ * connected (`components/v2/whatsapp-chat.tsx`).
+ *
  * `SAROH_BUILT_ROUTES` is not set by anyone: `next.config.js` writes the
  * build's page routes into it (`routes.config.js`), so the Resources list links
  * only pages this build has. `SAROH_BUILT_AT` is written the same way: the
@@ -84,6 +91,11 @@ export const env = createEnv({
         NEXT_PUBLIC_ACCOUNTS_URL: z.string().url().optional(),
         NEXT_PUBLIC_LAUNCH_MODE: z.enum(["waitlist", "open"]).optional(),
         NEXT_PUBLIC_TEMPLATES: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_WHATSAPP_CHAT: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_WHATSAPP_NUMBER: z
+            .string()
+            .regex(/^\d{8,15}$/)
+            .optional(),
         NEXT_PUBLIC_GA_MEASUREMENT_ID: z
             .string()
             .regex(/^G-[A-Z0-9]+$/)
@@ -163,6 +175,8 @@ export const env = createEnv({
         NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
         NEXT_PUBLIC_LAUNCH_MODE: process.env.NEXT_PUBLIC_LAUNCH_MODE,
         NEXT_PUBLIC_TEMPLATES: process.env.NEXT_PUBLIC_TEMPLATES,
+        NEXT_PUBLIC_WHATSAPP_CHAT: process.env.NEXT_PUBLIC_WHATSAPP_CHAT,
+        NEXT_PUBLIC_WHATSAPP_NUMBER: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER,
         NEXT_PUBLIC_GA_MEASUREMENT_ID:
             process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID,
         NEXT_PUBLIC_GOOGLE_ADS_ID: process.env.NEXT_PUBLIC_GOOGLE_ADS_ID,

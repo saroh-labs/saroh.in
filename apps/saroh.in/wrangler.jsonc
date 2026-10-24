@@ -66,6 +66,10 @@
         // The Templates gallery's switch (DEC-135): "on" here. Production
         // leaves it out, which is off: no /templates and no link to it.
         "NEXT_PUBLIC_TEMPLATES": "on",
+        // The floating WhatsApp button (#1188): on here only. The number is
+        // a PLACEHOLDER until Saroh's own WhatsApp number is connected.
+        "NEXT_PUBLIC_WHATSAPP_CHAT": "on",
+        "NEXT_PUBLIC_WHATSAPP_NUMBER": "910000000000",
         // Ad conversions (DEC-127) are production's alone. Set here they
         // would still load nothing: lib/ga.ts reads them only where
         // VERCEL_ENV is "production".
@@ -112,6 +116,10 @@
                 "LAUNCH_AT": "2026-10-17T08:00:00+05:30",
                 // The Templates gallery is off while this is left out
                 // (DEC-135). To bring it back: "NEXT_PUBLIC_TEMPLATES": "on".
+                // The WhatsApp button (#1188) is off while these are left
+                // out. Once Saroh's real number is connected, turn it on with
+                // "NEXT_PUBLIC_WHATSAPP_CHAT": "on" and
+                // "NEXT_PUBLIC_WHATSAPP_NUMBER": "<country code + number, digits>".
                 // Ad conversions (DEC-127): Google Ads and the Meta Pixel,
                 // each off until its PUBLIC id (not a secret) is set here.
                 // Even then a tag loads only after a visitor accepts

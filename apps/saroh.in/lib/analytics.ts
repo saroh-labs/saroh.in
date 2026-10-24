@@ -30,6 +30,8 @@ export interface AnalyticsEvents {
     pricing_toggle: { control: "yearly" | "gst"; value: boolean };
     /** A Help article's "Did this help?": its slug, and yes or no. */
     help_vote: { article: string; helpful: "yes" | "no" };
+    /** The WhatsApp button (#1188): the page's kind, e.g. `home`, `pricing`. */
+    whatsapp_click: { page: string };
 }
 
 /**

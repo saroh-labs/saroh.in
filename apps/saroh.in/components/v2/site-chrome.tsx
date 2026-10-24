@@ -1,7 +1,9 @@
 import { resourceItems } from "@/components/v2/nav-items";
 import { SiteFooter } from "@/components/v2/site-footer";
 import { SiteNav } from "@/components/v2/site-nav";
+import { WhatsAppChat, whatsappNumber } from "@/components/v2/whatsapp-chat";
 import { shownLegal, shownResources, shownTools } from "@/content/resources";
+import { env } from "@/env";
 import { asksConsent } from "@/lib/ga";
 import { resourcesContext } from "@/lib/resources-context";
 import { siteTagConfig } from "@/lib/site-tag-config";
@@ -35,6 +37,13 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
                     cookieChoices={analytics}
                 />
             </div>
+            <WhatsAppChat
+                number={whatsappNumber(
+                    env.NEXT_PUBLIC_WHATSAPP_CHAT,
+                    env.NEXT_PUBLIC_WHATSAPP_NUMBER,
+                )}
+                asksConsent={analytics}
+            />
         </div>
     );
 }
