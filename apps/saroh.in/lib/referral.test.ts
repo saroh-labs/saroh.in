@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { resetAddress, takeAddress } from "./page-address";
 import {
+    keepButtonSource,
     keepReferral,
     keptManagerLink,
     keptReferral,
@@ -291,6 +292,19 @@ describe("an account manager's link (DEC-169)", () => {
 });
 
 describe("where a visitor came from (#1190)", () => {
+    it("keeps a start button's src as it is pressed, with the campaign they came by", () => {
+        open("/?utm_source=google&utm_campaign=salons_oct");
+        keepReferral(ACCOUNTS);
+        keepButtonSource("solutions-salons-hero", ACCOUNTS);
+        expect(keptSource(document.cookie)).toEqual({
+            src: "solutions-salons-hero",
+            utm_source: "google",
+            utm_campaign: "salons_oct",
+        });
+        keepButtonSource("bad src<x>", ACCOUNTS);
+        expect(keptSource(document.cookie).src).toBe("solutions-salons-hero");
+    });
+
     it("is src and the campaign's three, on the shared domain, for the stated time", () => {
         expect(
             sourceCookie(

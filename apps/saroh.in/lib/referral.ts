@@ -263,3 +263,30 @@ export function keepReferral(
         // Cookies are blocked, or the accounts address isn't one: nothing kept.
     }
 }
+
+/**
+ * Keeps a start button's own `src` as the visitor presses it (#1190). In open
+ * mode the button goes straight to sign-up on accounts, so its `src` never
+ * passes through a saroh.in page for {@link keepReferral} to keep. The
+ * campaign the visitor came by stays.
+ */
+export function keepButtonSource(
+    src: string,
+    accountsUrl: string,
+    win: Window = window,
+): void {
+    const source = sourceFromSearch(`src=${encodeURIComponent(src)}`);
+    if (source.src === undefined) return;
+    try {
+        win.document.cookie = sourceCookie(
+            { ...keptSource(win.document.cookie), src: source.src },
+            {
+                host: win.location.hostname,
+                accountsHost: new URL(accountsUrl).hostname,
+                secure: win.location.protocol === "https:",
+            },
+        );
+    } catch {
+        // Cookies are blocked, or the accounts address isn't one: nothing kept.
+    }
+}
