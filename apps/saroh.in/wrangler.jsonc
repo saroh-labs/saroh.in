@@ -55,7 +55,7 @@
         "VERCEL_GIT_COMMIT_REF": "development",
         "API_URL": "https://api.saroh.io",
         "DEV_ACCESS_COOKIE_DOMAIN": ".saroh.io",
-        "DEV_REDIRECT_ORIGIN": "https://saroh.in",
+        "DEV_REDIRECT_ORIGIN": "https://www.saroh.in",
         "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.io",
         "RESOURCES_PREVIEW": "1",
         // The site as it will be after early access opens ("Start free",

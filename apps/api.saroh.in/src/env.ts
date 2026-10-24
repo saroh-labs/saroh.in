@@ -209,6 +209,10 @@ const envSchema = z.object({
     // pages they changed. Anything else (unset included) queues nothing.
     // Switch it on before the Worker's own `SITE_PAGE_CACHE`.
     SITE_PAGE_CACHE: z.enum(["on", "off"]).optional(),
+    // `on` adds `X-Robots-Tag: noindex, nofollow` to every answer
+    // (`src/common/robots-header.ts`): set on the dev API (api.saroh.io) so
+    // search engines never list it. Unset or `off`: no header (production).
+    ROBOTS_NOINDEX: z.enum(["on", "off"]).optional(),
     // TEST ONLY. Hosts the link preview tool may fetch although they resolve
     // to loopback (comma-separated, e.g. `localhost`): the browser tests
     // point it at a page served on the test machine, which the SSRF guard

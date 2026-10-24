@@ -84,8 +84,8 @@ export function launchInstant(value: string | undefined): number | null {
  * runs it.
  * `?access=<key>` on any page sets a cookie (on `DEV_ACCESS_COOKIE_DOMAIN`, so
  * one visit opens every dev app) and reloads the page without the key. A
- * visitor without the cookie is sent to the same page on production
- * (`DEV_REDIRECT_ORIGIN`), or to `DEV_REDIRECT_PATH` there when the page
+ * visitor without the cookie is sent, with a 301, to the same page on
+ * production (`DEV_REDIRECT_ORIGIN`, each app's own production host), or to `DEV_REDIRECT_PATH` there when the page
  * has no twin (accounts' `/login` on the marketing site); a form post is
  * refused instead, so it is never replayed there. The cookie holds the key's digest, so changing the key
  * shuts out every browser let in with the old one.
@@ -141,6 +141,14 @@ export function withDevAccess(
         let target = `${url.pathname}${url.search}`;
         const fixed = process.env.DEV_REDIRECT_PATH?.trim();
         if (fixed) target = fixed;
-        return noIndex(NextResponse.redirect(new URL(target, production), 307));
+        // Permanent, so search engines move what they found on saroh.io to
+        // production; no-store, so a browser that later gets the key isn't
+        // stuck on a remembered redirect.
+        const response = NextResponse.redirect(
+            new URL(target, production),
+            301,
+        );
+        response.headers.set("Cache-Control", "no-store");
+        return noIndex(response);
     };
 }

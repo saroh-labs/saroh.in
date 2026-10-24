@@ -36,6 +36,7 @@ import {
     flushTelemetry,
     installTelemetry,
 } from "./common/observability/posthog";
+import { robotsNoindex } from "./common/robots-header";
 import { trustProxy } from "./common/trust-proxy";
 import { validationPipeOptions } from "./common/validation";
 import { env } from "./env";
@@ -111,6 +112,10 @@ async function bootstrap() {
     app.use(correlationIdMiddleware);
 
     app.use(helmet());
+
+    // The dev API stays out of search (ROBOTS_NOINDEX=on); off in production.
+    const noindex = robotsNoindex(env.ROBOTS_NOINDEX);
+    if (noindex) app.use(noindex);
 
     // Credentialed CORS for every *.saroh.in frontend (never "*" with creds).
     //
