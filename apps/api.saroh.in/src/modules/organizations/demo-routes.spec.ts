@@ -72,6 +72,10 @@ const ASKS: Record<string, How> = {
     "POST public/site-accounts/me/plan/:ref/resume": SESSION,
     "POST public/site-accounts/me/packs/:ref/buy": SESSION,
     "POST public/site-accounts/me/autopay/plans/:ref": SESSION,
+    // DEC-187: an anonymous count of sign-up page views, kept by Saroh.
+    "POST public/funnel/signup-viewed": {
+        exempt: "Saroh's own sign-up count, not a business's customer write",
+    },
     // Enquiries, reviews and back in stock.
     "POST public/forms/:formId/submit": "enquiry/enquiry.service.ts",
     "POST public/product-reviews/:token/reviews":
