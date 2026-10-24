@@ -28,7 +28,12 @@ import {
 import { UPDATED as LINK_PREVIEW_UPDATED } from "@/content/link-preview";
 import { UPDATED as QR_CODE_MAKER_UPDATED } from "@/content/qr-code-maker";
 import type { PublishContext } from "@/content/resources";
-import { LEGAL_PAGES, resourcePaths, routeExists } from "@/content/resources";
+import {
+    isPublished,
+    LEGAL_PAGES,
+    resourcePaths,
+    routeExists,
+} from "@/content/resources";
 import {
     solutionHref,
     UPDATED as SOLUTIONS_UPDATED,
@@ -140,6 +145,7 @@ const PAGE_DAYS: Readonly<Record<string, string>> = {
 export function lastModified(
     path: string,
     pricingLiveAt: string | null = null,
+    now: Date = new Date(),
 ): string | undefined {
     if (path === "/pricing") {
         return pricingLiveAt
@@ -158,7 +164,17 @@ export function lastModified(
         return dayInIndia(TEMPLATES_UPDATED);
     }
     const day = PAGE_DAYS[path];
-    return day ? dayInIndia(day) : undefined;
+    if (!day) return undefined;
+    // A hub changes when an entry under it goes live, not only its own words.
+    const under =
+        path === "/changelog"
+            ? CHANGELOG_ENTRIES.filter((e) =>
+                  isPublished(e.publishOn, now),
+              ).map((e) => e.publishOn)
+            : path === HELP_PATH
+              ? helpArticles().map((a) => a.updated)
+              : [];
+    return dayInIndia([day, ...under].sort().at(-1) ?? day);
 }
 
 /** Every page the site serves, whatever the mode: a redirect may land on any. */

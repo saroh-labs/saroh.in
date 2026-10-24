@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { CHANGELOG_ENTRIES, changelogHref } from "@/content/changelog";
+import {
+    CHANGELOG_ENTRIES,
+    UPDATED as CHANGELOG_UPDATED,
+    changelogHref,
+} from "@/content/changelog";
 import { UPDATED as FEATURES_UPDATED } from "@/content/features";
 import { helpHref } from "@/content/help";
 import { UPDATED as HOME_UPDATED } from "@/content/home";
@@ -31,6 +35,27 @@ const todayInIndia = () =>
  * its content holds a date, and never guesses a frequency or a priority.
  */
 describe("lastModified", () => {
+    it("dates the changelog and Help hubs by their newest live entry", async () => {
+        const { lastModified } = await import("./site-pages");
+        const far = new Date("2099-01-01T00:00:00Z");
+        const newest = (days: string[]) => [...days].sort().at(-1);
+        expect(lastModified("/changelog", null, far)).toBe(
+            `${newest([CHANGELOG_UPDATED, ...CHANGELOG_ENTRIES.map((e) => e.publishOn)])}T00:00:00+05:30`,
+        );
+        expect(
+            (lastModified("/help", null, far) ?? "").slice(0, 10) >=
+                (newest(helpArticles().map((a) => a.updated)) ?? ""),
+        ).toBe(true);
+    });
+
+    it("leaves an entry that isn't live yet out of the changelog hub's date", async () => {
+        const { lastModified } = await import("./site-pages");
+        // Before any entry is live, the hub is dated by its own words.
+        expect(lastModified("/changelog", null, new Date(0))).toBe(
+            `${CHANGELOG_UPDATED}T00:00:00+05:30`,
+        );
+    });
+
     it("is a legal page's own date, at midnight in India", async () => {
         const { lastModified } = await import("./site-pages");
         for (const page of LEGAL_PAGES) {
