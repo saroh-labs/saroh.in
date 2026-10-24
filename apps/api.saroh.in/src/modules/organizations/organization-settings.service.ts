@@ -215,6 +215,11 @@ export interface SetupFacts {
      * says "Review your sample services" while there are some.
      */
     sampleServices: number;
+    /**
+     * Bookings ever made, any status: Home's "Take your first booking"
+     * (#1194). The first order is `tradingSince`.
+     */
+    bookings: number;
     /** Websites not deleted. */
     sites: number;
     /** Of those, the ones with nothing published now (never, or taken down). */
@@ -933,6 +938,7 @@ export class OrganizationSettingsService {
             products,
             services,
             sampleServices,
+            bookings,
             sites,
             sitesNotLive,
             invoices,
@@ -943,6 +949,7 @@ export class OrganizationSettingsService {
             }),
             prisma.service.count({ where: { ...service, ...NOT_SAMPLE } }),
             prisma.service.count({ where: { ...service, isSample: true } }),
+            prisma.booking.count({ where: { organizationId } }),
             prisma.site.count({ where: site }),
             prisma.site.count({
                 where: { ...site, currentPublicationId: null },
@@ -956,6 +963,7 @@ export class OrganizationSettingsService {
             products,
             services,
             sampleServices,
+            bookings,
             sites,
             sitesNotLive,
             invoices,

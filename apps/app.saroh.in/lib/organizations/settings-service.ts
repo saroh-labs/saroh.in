@@ -102,6 +102,11 @@ export interface SetupFacts {
      * older than it: none.
      */
     sampleServices?: number;
+    /**
+     * Bookings ever made, any status (#1194): Home's first steps. Absent
+     * from an API older than it: unknown.
+     */
+    bookings?: number;
     sites: number;
     sitesNotLive: number;
     /**

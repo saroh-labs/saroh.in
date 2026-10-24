@@ -27,6 +27,7 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn().mockResolvedValue([]),
         },
         service: { count: jest.fn().mockResolvedValue(0) },
+        booking: { count: jest.fn().mockResolvedValue(0) },
         site: { count: jest.fn().mockResolvedValue(0) },
         invoice: { count: jest.fn().mockResolvedValue(0) },
     };
@@ -181,7 +182,7 @@ describe("OrganizationSettingsService", () => {
             expect(planTakesOnlinePayment).toHaveBeenCalledWith("org_1");
         });
 
-        it("sends the checklist's facts: products, services, sites, those not live and invoices (H-5, H-6, DEC-070)", async () => {
+        it("sends the checklist's facts: products, services, bookings, sites, those not live and invoices (H-5, H-6, DEC-070, #1194)", async () => {
             (prisma.product.count as jest.Mock).mockResolvedValueOnce(0);
             (prisma.service.count as jest.Mock)
                 .mockResolvedValueOnce(2)
@@ -190,10 +191,12 @@ describe("OrganizationSettingsService", () => {
                 .mockResolvedValueOnce(2)
                 .mockResolvedValueOnce(1);
             (prisma.invoice.count as jest.Mock).mockResolvedValueOnce(3);
+            (prisma.booking.count as jest.Mock).mockResolvedValueOnce(5);
             expect((await service.get(ctx())).setup).toEqual({
                 products: 0,
                 services: 2,
                 sampleServices: 4,
+                bookings: 5,
                 sites: 2,
                 sitesNotLive: 1,
                 invoices: 3,
@@ -214,6 +217,10 @@ describe("OrganizationSettingsService", () => {
                     deletedAt: null,
                     currentPublicationId: null,
                 },
+            });
+            // Every booking the business has had, cancelled or not (#1194).
+            expect(prisma.booking.count).toHaveBeenLastCalledWith({
+                where: { organizationId: "org_1" },
             });
             // A trade starter's samples are counted apart (DEC-189).
             const kept = {

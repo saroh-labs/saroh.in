@@ -5,6 +5,9 @@ import { cn } from "@saroh/ui/lib/utils";
 
 import { QrButton } from "@/components/qr/link-qr/qr-button";
 import type { ShareKind, ShareLink } from "@/lib/sites/share-links";
+import { ticksShareStep } from "@/lib/sites/share-links";
+
+import { noteShared } from "./note-shared";
 
 /** The saved code each shared page has, and how its button names it. */
 const QR: Record<
@@ -30,6 +33,10 @@ export function ShareLinkButton({
     link: ShareLink;
     className?: string;
 }) {
+    // The booking page or shop: Home's share step is done (#1194).
+    const ticks = ticksShareStep(link.kind)
+        ? () => void noteShared()
+        : undefined;
     return (
         <span
             className={cn(
@@ -43,6 +50,8 @@ export function ShareLinkButton({
                 shareLabel={link.label}
                 size="default"
                 icon={false}
+                onCopied={ticks}
+                onShared={ticks}
             />
             <QrButton
                 compact="phone"

@@ -17,9 +17,11 @@ import type { HomeModel } from "@/lib/home/service";
 import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
+import { firstStepsLead } from "@/lib/settings/ready";
 
 import { PlanLockedCard } from "@/components/billing/plan-way";
 import { PhoneHome } from "@/components/home/phone/phone-home";
+import { FirstStepsChecklist } from "@/components/home/setup/first-steps-checklist";
 import { TakeMoneyChecklist } from "@/components/home/setup/take-money-checklist";
 import { WHO_CAN_CHANGE } from "@/components/shared/states/who-can-change";
 import { FirstRunJobs } from "./first-run-jobs";
@@ -90,6 +92,10 @@ export function HomeDashboard({
     }
 
     const now = new Date();
+    // The 4 first steps lead until done (#1194); the money card follows.
+    const first =
+        setup?.first && firstStepsLead(setup.first) ? setup.first : null;
+    const money = first ? null : setup;
 
     return (
         <div className="grid gap-[22px]">
@@ -112,14 +118,21 @@ export function HomeDashboard({
             {/* "Finish setup" leads while fewer than half its steps are
                 done, and has its last word here once they all are (F8);
                 drawn once for both layouts. */}
-            {setup ? (
-                <TakeMoneyChecklist {...setup} slot="first" phoneOwnCard />
+            {first && setup ? (
+                <FirstStepsChecklist
+                    first={first}
+                    share={setup.share}
+                    businessId={setup.businessId}
+                />
+            ) : null}
+            {money ? (
+                <TakeMoneyChecklist {...money} slot="first" phoneOwnCard />
             ) : null}
 
             <div data-home-layout="desk" className="hidden sm:block">
                 <HomeDesk
                     home={home}
-                    setup={setup}
+                    setup={money}
                     now={now}
                     insights={insights}
                 />
@@ -127,7 +140,7 @@ export function HomeDashboard({
             <div data-home-layout="phone" className="sm:hidden">
                 <PhoneHome
                     home={home}
-                    setup={setup}
+                    setup={money}
                     now={now}
                     insights={insights}
                 />
