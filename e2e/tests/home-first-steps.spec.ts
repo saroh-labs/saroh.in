@@ -77,7 +77,8 @@ test.describe("Home's first steps (#1194)", { tag: "@serial" }, () => {
         await page.goto("/services");
         await pressUntil(
             page.getByRole("button", { name: "Copy link" }).first(),
-            page.getByText(/link copied/i),
+            // The button says it itself: "Copied", for 1.6s.
+            page.getByText("Copied", { exact: true }).first(),
         );
         await expect
             .poll(async () =>
