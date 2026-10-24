@@ -129,7 +129,7 @@ exceptions). The constants are in `packages/error-tracking/src/names.ts`.
   load, and `MAX_BROWSER_EXCEPTIONS_PER_SESSION` (20) different ones at most.
 - **Timeout**: `SEND_TIMEOUT_MS` (2 seconds) for one send from a server.
 
-## The nine milestones
+## The milestones
 
 Sent by the API, from where the fact is written, so no browser script takes
 part and they can't be faked or blocked
@@ -151,8 +151,18 @@ part and they can't be faked or blocked
   stores each of those types once per organization. A milestone is sent only
   when its row was _stored_, never when the write was a repeat.
 - **Id**: the organization's (the user's for `signed_up`).
-  **Properties**: `plan_key`, `business_kind`, `environment`, `app`.
-  Never a name, an email, a phone number, an address, an amount, or anything
+  **Properties**: `plan_key`, `business_kind`, `environment`, `app`, and
+  where the business came from (DEC-187): `src`, `utm_source`, `utm_medium`,
+  `utm_campaign` (from `Organization.signupSource`, each when known),
+  `referral_channel` (`business`, `account_manager`, `both` or `none`),
+  `referrer_code` (the referring business's code, DEC-156) and
+  `manager_code` (the code of the manager who brought it in, DEC-169), each
+  code only when there is one. `signed_up` has no plan or kind; it reads the
+  same source keys from the sign-up request's `saroh_src`, `saroh_ref` and
+  `saroh_am` cookies (shape-checked only; whether a code names anyone is
+  setup's to say). Every key sits outside the scrubber's drop pattern, and
+  `product-milestones.spec.ts` proves it. The codes never reach a browser
+  tag (DEC-127). Never a name, an email, a phone number, an address, an amount, or anything
   about a customer. Not even the order's or product's id: the ledger keeps
   that, PostHog doesn't.
 - **Never in a request's way**: the SDK queues it in memory and sends in the
@@ -165,6 +175,24 @@ part and they can't be faked or blocked
 - `onboarding_finished` is the business being set up. The goal picker after
   it writes nothing of its own: it switches modules on one at a time and may
   be skipped, so there is no "finished" for the API to see.
+
+### The weekly sign-up funnel (DEC-187)
+
+A saved PostHog insight, not an admin module. The owner makes it once in the
+project (it can't be made from the repo) and puts its link here:
+
+- **Type**: Funnel, weekly, conversion window 90 days, unique by the
+  event's id. Steps: `signed_up` → `onboarding_finished` → `site_published`
+  → `first_booking_taken` _or_ `first_order_taken` (one step, either event)
+  → `payment_provider_connected` → `plan_upgraded`.
+- **Breakdown**: `src` (and, as a second view, `referral_channel`). Filter
+  `environment = production`.
+- `signed_up` is keyed by the user and the rest by the business, so the
+  first step is a count of sign-ups by source beside the business funnel,
+  not a joined path. Read "started" as `signed_up` and "completed" as
+  `onboarding_finished`, each broken down by `src`.
+- **Export**: the insight's ⋯ → Export → CSV, weekly.
+- Link: _to be added by the owner once saved._
 
 ## Session replay (the workspace and saroh.in)
 

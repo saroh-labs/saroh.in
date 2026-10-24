@@ -149,10 +149,12 @@ export interface CreateAuthOptions {
     onUserDeleting?: (user: { id: string }) => Promise<void> | void;
     /**
      * Told once, after a user's row is first written (sign-up by password
-     * or through a provider). Handed the id only, never the email or name.
+     * or through a provider). Handed the id only, never the email or name,
+     * and the sign-up request's `Cookie` header (null when there was no
+     * request), for the API to read where the person came from (DEC-187).
      * Whatever it throws is swallowed: it can't fail a sign-up.
      */
-    onUserCreated?: (user: { id: string }) => void;
+    onUserCreated?: (user: { id: string }, cookieHeader: string | null) => void;
     /**
      * Asked before any session is made for a user, however they signed in
      * (a code, a password, a provider). False refuses the session, and with
@@ -372,9 +374,15 @@ export function userDatabaseHooks(
     if (opts.onUserCreated) {
         const told = opts.onUserCreated;
         user.create = {
-            after: (row: { id: string }) => {
+            after: (
+                row: { id: string },
+                context: { headers?: Headers } | null,
+            ) => {
                 try {
-                    told({ id: row.id });
+                    told(
+                        { id: row.id },
+                        context?.headers?.get("cookie") ?? null,
+                    );
                 } catch {
                     // Never a sign-up's problem.
                 }

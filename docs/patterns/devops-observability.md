@@ -102,9 +102,13 @@ must keep:
   never a body, a header, a query string, a name, an email, a phone number
   or an amount. A new fact beside an error goes through `scrubContext`.
 - **A product milestone is sent by the API, once, from the activation
-  ledger** (`modules/analytics/product-milestones.ts`). The list is nine
-  events and is closed: a tenth is the owner's decision, not a call site's.
-  Never capture a product event from a browser.
+  ledger** (`modules/analytics/product-milestones.ts`). The list is closed
+  (DEC-187: the nine milestones and the two upgrade-prompt events): one more
+  is the owner's decision, not a call site's. A milestone's properties are
+  the plan, the kind and where the business came from (`src`, utm,
+  `referral_channel`, `referrer_code`, `manager_code`); codes go only to
+  these server-side events, never to a browser tag (DEC-127). Never capture
+  a product event from a browser.
 - **Session replay is the signed-in workspace and saroh.in only**
   (DEC-125, amended 10 Oct), on in production only. The workspace masks
   everything but Saroh's own words and starts after its one-time notice;

@@ -2417,3 +2417,17 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **Additions apply at once.** On an older version, a row its plan includes on the live version but not on its own reads as the live cell, from the moment the version goes live.
     - **Nothing else does.** A row taken away, a lower or higher limit and a new price still wait for a move and its notice, as KTD-4 and DEC-161 say.
 - Rules: `withLiveAdditions` in `packages/pricing-catalog/src/moves.ts`, applied by `CatalogueAccessService.resolve`.
+
+## DEC-187 Milestones say where a business came from, and the list grows by two prompt events
+
+**Status: Accepted — 2026-10-24** · owner · amends DEC-125 (the milestones' properties and closed list) and DEC-156 (where a referral code may go); DEC-127 holds · #1190, #1197; plan `docs/plans/2026-10-24-001-feat-growth-seo-onboarding-round-plan.md` (U12, U13)
+
+- Context:
+    - Nobody could say which link, campaign or referrer a business came by, or how many of each reached a published site, a first booking or a paid plan. U11 keeps `src` and utm on `Organization.signupSource`; the referrer (DEC-156) and the manager who brought a business in (DEC-169) were already recorded. DEC-125 allowed only `plan_key` and `business_kind` on a milestone, and DEC-156 kept referral codes for operators.
+- Decision:
+    - **The milestones' properties widen** (amends DEC-125): every milestone also carries `src`, `utm_source`, `utm_medium` and `utm_campaign` (each when known), `referral_channel` (`business`, `account_manager`, `both` or `none`), `referrer_code` (the referring business's `Organization.referralCode`) and `manager_code` (the bringing-in manager's `StaffProfile.managerCode`), each code in its own key and only when there is one. A business's are read from what setup stored; `signed_up`'s from the sign-up request's `saroh_src`, `saroh_ref` and `saroh_am` cookies, by shape only. Key names sit outside the scrubber's drop pattern, and a test sends them through it.
+    - **The funnel is server-side from the first step**: `signed_up` is "signup started", `onboarding_finished` "signup completed". No browser event is added; Accounts sends no page views.
+    - **The closed list grows by two** (amends DEC-125): `upgrade_prompt_shown` and `upgrade_prompt_pressed` (U13), with their own send path, since they aren't activation-ledger rows. Anything further is still the owner's decision.
+    - **Referral codes may go to server-side events about a business or an account** (amends DEC-156), never to a browser tag, an ad conversion or a recording. DEC-127 holds.
+    - **The weekly funnel is a saved PostHog insight** with CSV export, not an admin module.
+- Rules: `apps/api.saroh.in/src/modules/analytics/product-milestones.ts` (`sourceProperties`, `sourceFromCookies`), `packages/auth/src/server.ts` (`onUserCreated` gets the request's `Cookie` header); `docs/architecture/ERROR_TRACKING_AND_UPTIME.md` → The milestones; `docs/patterns/devops-observability.md`.
