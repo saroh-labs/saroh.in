@@ -317,6 +317,10 @@ export interface ProductGridContent {
     cutOff?: string;
     /** `bare`: the even grid without a card. Absent: the card. */
     cardStyle?: "card" | "bare";
+    /** Across at the desk for bare cards, a template's (not edited here). */
+    columns?: 3 | 4 | 5;
+    /** Across on a phone, the owner's choice; absent, the look's own. */
+    phoneColumns?: 1 | 2;
 }
 
 /**

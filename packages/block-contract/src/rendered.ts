@@ -382,6 +382,8 @@ const renderedProductGrid = z.object({
     cardStyle: z.string().optional(),
     // A count this build does not draw falls back to filling the row.
     columns: z.number().int().optional(),
+    // Across on a phone; a count this build does not know keeps the look's.
+    phoneColumns: z.number().int().optional(),
 });
 
 /**

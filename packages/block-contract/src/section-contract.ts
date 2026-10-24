@@ -1012,6 +1012,14 @@ const productGridV1 = z.object({
      * as before. The other looks ignore it.
      */
     columns: z.union([z.literal(3), z.literal(4), z.literal(5)]).optional(),
+    /**
+     * How many products across on a phone, the owner's choice (24 Oct
+     * 2026): one, each product the screen's width, or two side by side.
+     * From the tablet width up the look lays out as it always has. ABSENT,
+     * the look's own (`productGridPhoneColumns` in `variants.ts`). The `list` layout is one
+     * per row and ignores it.
+     */
+    phoneColumns: z.union([z.literal(1), z.literal(2)]).optional(),
 });
 
 /** How many classes a Timetable may be limited to (U2). */

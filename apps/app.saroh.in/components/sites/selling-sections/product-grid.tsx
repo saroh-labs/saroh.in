@@ -3,7 +3,7 @@
 import { EmptyState } from "@saroh/ui/data-state";
 import { Field } from "@saroh/ui/field";
 
-import { resolveVariant } from "@saroh/block-contract";
+import { productGridPhoneColumns, resolveVariant } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import {
@@ -63,6 +63,7 @@ export function ProductGridFieldsView({
     const patch = (next: Partial<ProductGridContent>) =>
         onChange({ ...section, content: { ...c, ...next } });
     const source: Source = c.source ?? "newest";
+    const variant = resolveVariant("productGrid", c);
 
     return (
         <div className="grid gap-3">
@@ -177,8 +178,7 @@ export function ProductGridFieldsView({
                     note: "Words at the foot of each card, like “View”. Leave empty for none: the whole card opens the product.",
                 }}
             />
-            {resolveVariant("productGrid", c) === "default" &&
-            (c.layout ?? "cards") === "cards" ? (
+            {variant === "default" && (c.layout ?? "cards") === "cards" ? (
                 <OptionSwitch
                     label="Without a card"
                     checked={c.cardStyle === "bare"}
@@ -187,6 +187,27 @@ export function ProductGridFieldsView({
                     }
                     note="Tall photos with the name and price under them, no box around each. Sold out sits on the photo's corner."
                 />
+            ) : null}
+            {variant !== "default" || (c.layout ?? "cards") === "cards" ? (
+                <Field label="On a phone">
+                    <Segmented
+                        label="Products across on a phone"
+                        value={String(productGridPhoneColumns(variant, c))}
+                        onValueChange={(v) => {
+                            const n = v === "2" ? 2 : 1;
+                            // The look's own count is stored as absent.
+                            const own = productGridPhoneColumns(variant, {
+                                ...c,
+                                phoneColumns: undefined,
+                            });
+                            patch({ phoneColumns: n === own ? undefined : n });
+                        }}
+                        options={[
+                            { value: "1", label: "1 across" },
+                            { value: "2", label: "2 across" },
+                        ]}
+                    />
+                </Field>
             ) : null}
             <OptionSwitch
                 label="Say how many are left"
