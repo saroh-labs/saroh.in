@@ -223,7 +223,9 @@ export default async function ShopPage({
     if (look) {
         return (
             <main className="w-full">
-                {checkout?.notTakingOrders ? <NotTakingOrders banner /> : null}
+                {checkout?.notTakingOrders ? (
+                    <NotTakingOrders banner demo={checkout.demo === true} />
+                ) : null}
                 <LookShopListing
                     look={look}
                     title={moduleLabel(snapshot.pages, "SHOP", "Shop")}
@@ -242,7 +244,9 @@ export default async function ShopPage({
     }
     return (
         <main className="w-full">
-            {checkout?.notTakingOrders ? <NotTakingOrders banner /> : null}
+            {checkout?.notTakingOrders ? (
+                <NotTakingOrders banner demo={checkout.demo === true} />
+            ) : null}
             <ShopListing
                 products={lookup.data.products}
                 bagSite={checkout?.canOrder ? siteId : null}

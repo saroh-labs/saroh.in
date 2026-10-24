@@ -416,6 +416,27 @@ describe("the packs on sale", () => {
         ).toBe(0);
     });
 
+    it("buys nothing on a demo business (DEC-188)", async () => {
+        const s = await studio();
+        const { token } = await signIn(s.host);
+        await prisma.organization.update({
+            where: { id: s.organizationId },
+            data: { isDemo: true },
+        });
+        const refused = await buy(s, token);
+        expect(refused.status).toBe(403);
+        expect(refused.body.error).toMatchObject({
+            message:
+                "This is a demo business. Booking, paying and sending things are turned off.",
+            details: { code: "ORGANIZATION_DEMO" },
+        });
+        expect(
+            await prisma.invoice.count({
+                where: { organizationId: s.organizationId },
+            }),
+        ).toBe(0);
+    });
+
     it("is behind the account area's switch and the session", async () => {
         const s = await studio();
         const { token } = await signIn(s.host);

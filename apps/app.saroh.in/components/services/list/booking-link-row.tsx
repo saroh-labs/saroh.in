@@ -14,6 +14,7 @@ import { QrButton } from "@/components/qr/link-qr/qr-button";
 import { FormSheet } from "@/components/shared/forms/form-sheet";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { Row } from "@/components/shared/page/settings-rows";
+import { noteShared } from "@/components/shared/share-link/note-shared";
 import { runAction } from "@/lib/api/run-action";
 import type { BookingLinkView } from "@/lib/services/booking-link";
 import {
@@ -84,7 +85,11 @@ export function BookingLinkRow({
     const action =
         row.kind === "live" ? (
             <span className="flex flex-wrap items-center gap-2">
-                <CopyButton value={row.url} label="Copy link" />
+                <CopyButton
+                    value={row.url}
+                    label="Copy link"
+                    onCopied={() => void noteShared()}
+                />
                 <QrButton
                     compact="phone"
                     link={{
@@ -221,7 +226,11 @@ function PublishSheet({
                         {address}
                     </p>
                     <span className="flex flex-wrap items-center gap-2">
-                        <CopyButton value={view.url} label="Copy link" />
+                        <CopyButton
+                            value={view.url}
+                            label="Copy link"
+                            onCopied={() => void noteShared()}
+                        />
                         <QrButton
                             link={{
                                 mode: "saved",

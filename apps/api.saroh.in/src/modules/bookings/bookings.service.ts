@@ -96,6 +96,7 @@ import {
 } from "./own-diary";
 import type { BookInput, ReserveBy, ReserveWith } from "./reservation";
 import { loadBookableService, reserve, reserveInTx } from "./reservation";
+import { KEPT } from "./sample-services";
 import type { ServiceView } from "./service-fields";
 import { assertDepositPriced, toServiceView } from "./service-fields";
 import { businessZone } from "./staff-availability";
@@ -529,6 +530,12 @@ export class BookingsService {
         if (dto.bookableByTeam !== undefined) {
             data.bookableByTeam = dto.bookableByTeam;
         }
+        if (service.isSample) {
+            // The first edit of a trade starter's sample keeps it (DEC-189):
+            // it is the owner's now, and shown unless this save hides it.
+            data.isSample = false;
+            data.showOnBookingPage ??= KEPT.showOnBookingPage;
+        }
         if (dto.depositMode !== undefined || dto.priceCents !== undefined) {
             // Checked as the service will be: a price cleared under a deposit
             // is refused as surely as a deposit set on no price. (A null
@@ -576,6 +583,50 @@ export class BookingsService {
             saved,
             await loadPriceTerms(prisma, ctx.organizationId),
         );
+    }
+
+    /**
+     * Keep a trade starter's sample as it is (DEC-189): no longer a sample,
+     * and shown on the booking page. Nothing else changes; a service that
+     * isn't a sample is returned untouched. `service:write`.
+     */
+    async keepService(
+        ctx: OrganizationContext,
+        serviceId: string,
+    ): Promise<ServiceView> {
+        requireBookingPower(ctx, "service:write");
+        const service = await this.requireOwnedService(ctx, serviceId);
+        const kept = service.isSample
+            ? await prisma.service.update({
+                  where: { id: service.id },
+                  data: KEPT,
+              })
+            : service;
+        await this.bookingPageFor(ctx, kept);
+        return toServiceView(
+            kept,
+            await loadPriceTerms(prisma, ctx.organizationId),
+        );
+    }
+
+    /** Keep every sample the business has (Keep all). `service:write`. */
+    async keepAllSamples(ctx: OrganizationContext): Promise<{ kept: number }> {
+        requireBookingPower(ctx, "service:write");
+        const where = {
+            organizationId: ctx.organizationId,
+            deletedAt: null,
+            isSample: true,
+        };
+        const first = await prisma.service.findFirst({
+            where: { ...where, status: "ACTIVE" },
+        });
+        const { count } = await prisma.service.updateMany({
+            where,
+            data: KEPT,
+        });
+        // Shown now: the booking page, if it is missing.
+        if (first) await this.bookingPageFor(ctx, { ...first, ...KEPT });
+        return { kept: count };
     }
 
     /**

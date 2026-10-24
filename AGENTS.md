@@ -83,6 +83,7 @@ the right-hand files **before** writing code.
 | Add or change a page, title, description or structured data on saroh.in, or deploy it on a dated day       | `docs/patterns/frontend-app-structure.md` → saroh.in and search                                |
 | Touch the cookie notice, Google Analytics, an ad tag or an ad conversion, on saroh.in or anywhere          | `docs/architecture/ADS_TRACKING.md` · `docs/patterns/devops-observability.md` → Ad tags        |
 | Change lint, TypeScript, CI, tests or dependencies, or ship the API                                        | `docs/patterns/devops-tooling-and-deploy.md`                                                   |
+| Respond to an outage, roll back a release                                                                  | `docs/architecture/runbooks/DEPLOY_ROLLBACK_INCIDENT.md`                                       |
 | Start work, create a branch, push, open a PR or release                                                    | `docs/patterns/devops-tooling-and-deploy.md` → Branches, batches and pull requests             |
 
 ## Before you finish

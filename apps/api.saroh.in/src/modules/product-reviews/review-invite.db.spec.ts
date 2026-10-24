@@ -27,6 +27,7 @@ import { SECRET_LINK_SLOT } from "../communications/transactional";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { decryptSecret } from "../payments/crypto";
 import { ProductReviewsService } from "./product-reviews.service";
+import { PublicProductReviewsService } from "./public-product-reviews.service";
 import { hashReviewToken } from "./token";
 
 const tag = `${process.pid}-${Date.now()}`;
@@ -269,5 +270,44 @@ describe("Review invitations through the business's provider (D11, DB)", () => {
         expect(state.blocked?.message).toBe(
             "Review invitations go from your own email, and connecting your own email needs a paid plan.",
         );
+    });
+});
+
+describe("a review on a demo business (DEC-188)", () => {
+    it("keeps nothing", async () => {
+        const b = await business();
+        const token = `demo-review-${tag}`;
+        await prisma.reviewInvitation.create({
+            data: {
+                organizationId: b.ctx.organizationId,
+                orderId: b.orderId,
+                tokenHash: hashReviewToken(token),
+                toAddress: "ananya@example.in",
+                expiresAt: new Date(Date.now() + 86_400_000),
+            },
+        });
+        const item = await prisma.orderItem.findFirstOrThrow({
+            where: { orderId: b.orderId },
+            select: { id: true },
+        });
+        await prisma.organization.update({
+            where: { id: b.ctx.organizationId },
+            data: { isDemo: true },
+        });
+        await expect(
+            new PublicProductReviewsService().submit(token, {
+                orderItemId: item.id,
+                rating: 5,
+                displayName: "Ananya",
+            }),
+        ).rejects.toMatchObject({
+            status: 403,
+            response: { error: "ORGANIZATION_DEMO" },
+        });
+        expect(
+            await prisma.productReview.count({
+                where: { organizationId: b.ctx.organizationId },
+            }),
+        ).toBe(0);
     });
 });

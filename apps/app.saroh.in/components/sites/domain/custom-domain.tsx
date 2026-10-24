@@ -8,12 +8,14 @@ import { useEffect, useState } from "react";
 
 import { PausedNote } from "@/components/billing/paused-banner";
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
+import { UpgradePromptSeen } from "@/components/billing/upgrade-prompt-link";
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { FailedRead } from "@/components/shared/states/failed-read";
 import type { SheetControl } from "@/components/sites/settings/settings-sheet";
 import { useSheetControl } from "@/components/sites/settings/settings-sheet";
 import { env } from "@/env";
 import { runAction } from "@/lib/api/run-action";
+import { promptPressed } from "@/lib/billing/upgrade-prompts";
 import {
     claimDomain,
     listSiteDomains,
@@ -345,7 +347,12 @@ export function CustomDomain({
 
                         {planNote ? (
                             <div data-domain-plan={plan?.state}>
-                                <PausedNote>{planNote}</PausedNote>
+                                <UpgradePromptSeen prompt="own_domain" />
+                                <PausedNote
+                                    onPress={() => promptPressed("own_domain")}
+                                >
+                                    {planNote}
+                                </PausedNote>
                             </div>
                         ) : null}
 

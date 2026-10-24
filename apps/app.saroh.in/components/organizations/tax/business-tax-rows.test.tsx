@@ -310,6 +310,23 @@ describe("Registered address' row and sheet", () => {
         expect(text).toContain("India");
     });
 
+    it("shows the country as India, not to be changed (#1214)", async () => {
+        onTab("address");
+        draw(noState());
+        await press(edit("Edit registered address"));
+        // The state's picker comes first; the country's is after it.
+        const pickers = Array.from(
+            sheet()?.querySelectorAll<HTMLButtonElement>('[role="combobox"]') ??
+                [],
+        );
+        const country = pickers[pickers.length - 1];
+        expect(country.textContent).toBe("India");
+        expect(country.disabled).toBe(true);
+        expect(sheet()?.textContent).toContain(
+            "Saroh is for businesses in India for now.",
+        );
+    });
+
     it("asks for the state on the sheet's save, and sends nothing (UX-018)", async () => {
         onTab("address");
         draw(noState());

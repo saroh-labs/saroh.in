@@ -12,7 +12,13 @@
  * more."
  */
 import type { PlanTeaser, ShotRef } from "./types";
-import { PLAN_DETAILS_PLACEHOLDER } from "./types";
+
+/**
+ * The day this module's words last changed, the sitemap's `lastmod` for its
+ * pages (`lib/site-pages.ts`). Change it with the words:
+ * `pnpm check:content-dates` fails a batch that doesn't.
+ */
+export const UPDATED = "2026-10-24";
 
 export interface HeroWord {
     /** The saffron initial. */
@@ -73,7 +79,7 @@ export const FREE_PLAN_LINE = {
     /** Catalogue module ids, in the order the line names them. */
     modules: ["website", "products", "bookings"],
     tail: "Move up when you need more.",
-    fallback: `Free to start. Move up when you need more. ${PLAN_DETAILS_PLACEHOLDER}.`,
+    fallback: "Free to start. Move up when you need more.",
 } as const;
 
 /** Home's pricing teaser and the plan order everywhere: Grow is featured. */

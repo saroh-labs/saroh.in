@@ -21,6 +21,8 @@ import {
     createBookingPayLink as createBookingPayLinkApi,
     createService as createServiceApi,
     getBooking,
+    keepAllSamples as keepAllSamplesApi,
+    keepService as keepServiceApi,
     listAvailability as listAvailabilityApi,
     readReassignCandidates as readReassignCandidatesApi,
     readServices,
@@ -76,6 +78,16 @@ export async function updateService(
     input: UpdateServiceInput,
 ) {
     return updateServiceApi(serviceId, input);
+}
+
+/** Keep a sample service as it is (DEC-189). */
+export async function keepService(serviceId: string) {
+    return keepServiceApi(serviceId);
+}
+
+/** Keep every sample service as it is (DEC-189). */
+export async function keepAllSamples() {
+    return keepAllSamplesApi();
 }
 
 export async function archiveService(serviceId: string) {

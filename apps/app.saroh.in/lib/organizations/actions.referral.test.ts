@@ -197,3 +197,54 @@ describe("createOrganization and an account manager (DEC-169)", () => {
         expect(cleared("saroh_am")).toEqual([]);
     });
 });
+
+describe("createOrganization and where the business came from (#1190)", () => {
+    it("sends the cookie's source with the business, then clears it on the shared domain", async () => {
+        jar.held.set(
+            "saroh_src",
+            "src=solutions-salons-hero&utm_source=google",
+        );
+
+        await createOrganization({ name: "Pulse Studio" });
+
+        expect(sent().signupSource).toEqual({
+            src: "solutions-salons-hero",
+            utmSource: "google",
+        });
+        expect(cleared("saroh_src")).toEqual([
+            ["saroh_src", "", { path: "/", maxAge: 0, domain: "saroh.in" }],
+        ]);
+    });
+
+    it("takes the source from the cookie alone, never from what the form sent", async () => {
+        await createOrganization({
+            name: "Pulse Studio",
+            signupSource: { src: "made-up" },
+        });
+
+        expect(sent().signupSource).toBeUndefined();
+    });
+
+    it("sends none for a malformed cookie, still makes the business and clears it", async () => {
+        jar.held.set("saroh_src", "src=<x>");
+
+        const result = await createOrganization({ name: "Pulse Studio" });
+
+        expect(result).toEqual(made);
+        expect(sent().signupSource).toBeUndefined();
+        expect(cleared("saroh_src")).toHaveLength(1);
+    });
+
+    it("keeps the cookie when the business wasn't made", async () => {
+        jar.held.set("saroh_src", "src=ad");
+        api.createOrganization.mockResolvedValue({
+            ok: false,
+            error: "pulse.saroh.app is taken. Try another address.",
+            field: "address",
+        });
+
+        await createOrganization({ name: "Pulse Studio" });
+
+        expect(cleared("saroh_src")).toEqual([]);
+    });
+});

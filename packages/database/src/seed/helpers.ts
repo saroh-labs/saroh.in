@@ -1,5 +1,4 @@
 import type { Prisma } from "@prisma/client";
-import { hashPassword as hashPasswordUntyped } from "better-auth/crypto";
 
 import { parseSectionContentOrThrow } from "@saroh/block-contract";
 import {
@@ -25,9 +24,15 @@ import { SEED_PREFIX, SEEDED_STYLE_VARIABLES } from "./data";
  * package, so the contract we depend on is stated once here rather than letting
  * an unknown type spread through every call site.
  */
-export const hashPassword = hashPasswordUntyped as (
-    password: string,
-) => Promise<string>;
+export async function hashPassword(password: string): Promise<string> {
+    // Loaded when a seed hashes, not on import: better-auth is an ESM build
+    // the API's Jest runtime can't load, and the demo-businesses backfill
+    // its integration suite runs imports this file but never hashes.
+    const crypto = (await import("better-auth/crypto")) as {
+        hashPassword: (password: string) => Promise<string>;
+    };
+    return crypto.hashPassword(password);
+}
 
 export const id = (...parts: (string | number)[]) =>
     `${SEED_PREFIX}${parts.join("_")}`;

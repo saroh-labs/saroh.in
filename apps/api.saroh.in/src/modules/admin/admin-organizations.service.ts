@@ -9,10 +9,14 @@ import { prisma } from "@saroh/database";
 
 import { CatalogueAccessService } from "../billing/catalogue-access.service";
 import { siteRootDomain } from "../sites/site-host-mode";
-import { OPERATOR_LIFECYCLE_ACTIONS } from "./admin-lifecycle.service";
 import { businessesWaitingOnRefunds } from "./deletion-trail";
 import type { EffectivePlan } from "./effective-plan";
 import { effectivePlan } from "./effective-plan";
+import type { InactivitySignalKind } from "./inactivity-signals";
+import {
+    lastActiveByOrganization,
+    openSignalsByOrganization,
+} from "./inactivity-signals";
 import { UNFINISHED_CLEANUP_JOB } from "./organization-deletion-cleanup.handler";
 import {
     domainSearchTerms,
@@ -52,7 +56,13 @@ export type AttentionReason =
      * Saroh's billing needs an operator (DEC-166): an open row in Admin ›
      * Billing › Needs action (a refund owed, a payment unmatched…).
      */
-    | "BILLING_ACTION";
+    | "BILLING_ACTION"
+    /**
+     * An open inactivity signal (R13, #1199): no team activity for 7 days
+     * (NO_ACTIVITY), no booking or order for 14 (NO_TRADING), or its payment
+     * provider disconnected. The sweep opens and clears them.
+     */
+    | InactivitySignalKind;
 
 export interface OrganizationDirectoryRow {
     id: string;
@@ -283,6 +293,8 @@ export class AdminOrganizationsService {
                     },
                     // However long ago: a half-cleared business stays flagged.
                     { jobs: { some: UNFINISHED_CLEANUP_JOB } },
+                    // An open inactivity signal (#1199).
+                    { inactivitySignals: { some: { clearedAt: null } } },
                     // A deletion held back by refunds owed (#921).
                     ...(waitingOnRefunds.size > 0
                         ? [{ id: { in: [...waitingOnRefunds] } }]
@@ -314,16 +326,9 @@ export class AdminOrganizationsService {
             cleanups,
             waiting,
             billingActions,
+            signals,
         ] = await Promise.all([
-            prisma.auditEvent.groupBy({
-                by: ["organizationId"],
-                where: {
-                    organizationId: { in: ids },
-                    // What the business did, not what an operator did to it.
-                    action: { notIn: [...OPERATOR_LIFECYCLE_ACTIONS] },
-                },
-                _max: { createdAt: true },
-            }),
+            lastActiveByOrganization(ids),
             prisma.job.groupBy({
                 by: ["organizationId"],
                 where: {
@@ -358,15 +363,14 @@ export class AdminOrganizationsService {
             businessesWaitingOnRefunds(now, ids),
             // Saroh's billing needs an operator (DEC-166).
             businessesWithBillingActions(ids),
+            // Inactivity signals the sweep left open (#1199).
+            openSignalsByOrganization(ids),
         ]);
         const effective = new Map(ids.map((id, i) => [id, plans[i]]));
         const cleanupUnfinished = new Set(
             cleanups.map((row) => row.organizationId),
         );
 
-        const lastActive = new Map(
-            activity.map((row) => [row.organizationId, row._max.createdAt]),
-        );
         const jobsFailing = new Set(
             failedJobs.map((row) => row.organizationId),
         );
@@ -392,6 +396,9 @@ export class AdminOrganizationsService {
             if (billingActions.has(record.id)) {
                 attention.push("BILLING_ACTION");
             }
+            for (const signal of signals.get(record.id) ?? []) {
+                attention.push(signal.kind);
+            }
 
             return {
                 id: record.id,
@@ -407,7 +414,7 @@ export class AdminOrganizationsService {
                 plan: record.subscription?.plan ?? null,
                 effectivePlan: effective.get(record.id) ?? null,
                 subscriptionStatus: record.subscription?.status ?? null,
-                lastActiveAt: lastActive.get(record.id) ?? null,
+                lastActiveAt: activity.get(record.id) ?? null,
                 attention,
             };
         });

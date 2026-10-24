@@ -46,6 +46,8 @@ vi.mock("@/components/qr/link-qr/qr-button", () => ({
     ),
 }));
 const api = { publish: vi.fn(), make: vi.fn() };
+// A server action: copying the link marks the share step (#1194).
+vi.mock("@/lib/moments/actions", () => ({ markMomentSeen: vi.fn() }));
 vi.mock("@/lib/services/booking-link-actions", () => ({
     publishBookingPage: () => api.publish() as unknown,
     makeBookingPage: () => api.make() as unknown,

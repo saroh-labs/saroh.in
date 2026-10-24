@@ -9,7 +9,7 @@ import { SectionHeading } from "@/components/v2/section-heading";
 import { SolutionHero } from "@/components/v2/solution/solution-hero";
 import { SolutionPricing } from "@/components/v2/solution/solution-pricing";
 import { SolutionSegment } from "@/components/v2/solution/solution-segment";
-import { faqItems, solutionFaq } from "@/content/faq";
+import { solutionFaq } from "@/content/faq";
 import { features } from "@/content/features";
 import {
     isSolutionSlug,
@@ -20,13 +20,14 @@ import {
 import { SOLUTION_SLUGS } from "@/content/types";
 import { LAUNCH_MODE } from "@/lib/links";
 import {
+    faqWithPlans,
     freePlanLine,
     planTeaserFootnote,
     solutionPlanTeasers,
 } from "@/lib/plan-teasers";
 import { readLivePricing } from "@/lib/pricing";
 import { pageMetadata, pageTitle } from "@/lib/seo";
-import { breadcrumbLd } from "@/lib/structured-data";
+import { breadcrumbLd, faqPageLd } from "@/lib/structured-data";
 
 /**
  * `/solutions/shops`, `/solutions/salons`, `/solutions/gyms`,
@@ -68,15 +69,20 @@ export default async function SolutionPage({ params }: Props) {
     // Not read before the launch switch opens (DEC-136), as on a feature
     // page: the line under the hero then names no plan's contents.
     const catalog = LAUNCH_MODE === "open" ? await readLivePricing() : null;
+    const faq = faqWithPlans(catalog, solutionFaq(s.faq));
 
     return (
         <>
-            {/* The trail the hero draws: Solutions / {name}. */}
+            {/* The trail the hero draws: Solutions / {name}; then the
+                very answers drawn below, so the two never drift. */}
             <JsonLd
-                data={breadcrumbLd([
-                    { name: "Solutions", path: "/#solutions" },
-                    { name: s.name, path: solutionHref(slug) },
-                ])}
+                data={[
+                    breadcrumbLd([
+                        { name: "Solutions", path: "/#solutions" },
+                        { name: s.name, path: solutionHref(slug) },
+                    ]),
+                    faqPageLd(faq),
+                ]}
             />
             <SolutionHero solution={s} freeLine={freePlanLine(catalog)} />
 
@@ -117,7 +123,7 @@ export default async function SolutionPage({ params }: Props) {
                 />
             ) : null}
 
-            <Faq items={faqItems(solutionFaq(s.faq))} className="pt-[120px]" />
+            <Faq items={faq} className="pt-[120px]" />
 
             <CtaBand
                 title={s.closer}

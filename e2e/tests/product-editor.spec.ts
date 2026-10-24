@@ -2,6 +2,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { answerRemoteImages } from "../fixtures/remote-images";
 import { useSession } from "../fixtures/sessions";
 import type { Storefront } from "../fixtures/throwaway-products";
 import { removeProducts, takeProduct } from "../fixtures/throwaway-products";
@@ -50,6 +51,7 @@ test.describe("product editor", () => {
         // the same store, and a SKU pattern numbers products by position.
         const name = `Rosehip Face Oil ${testInfo.project.name}`;
 
+        await answerRemoteImages(page);
         await signIn(page);
         await page.goto(`/open/${ORG}`);
         await removeProducts(page.request, LEELA, name);

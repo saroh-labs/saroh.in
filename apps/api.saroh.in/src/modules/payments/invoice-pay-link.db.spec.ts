@@ -191,6 +191,30 @@ describe("the pay link token (real database)", () => {
     });
 });
 
+describe("paying an invoice on a demo business (DEC-188)", () => {
+    it("takes no payment on the pay link", async () => {
+        const id = await issued();
+        const { token } = await invoices.createPayLink(owner, id);
+        await prisma.organization.update({
+            where: { id: owner.organizationId },
+            data: { isDemo: true },
+        });
+        try {
+            await expect(startPaying(token, "demo-1")).rejects.toMatchObject({
+                status: 403,
+                response: { error: "ORGANIZATION_DEMO" },
+            });
+        } finally {
+            await prisma.organization.update({
+                where: { id: owner.organizationId },
+                data: { isDemo: false },
+            });
+        }
+        // A normal business: the same link pays.
+        expect((await startPaying(token, "demo-2")).amountCents).toBe(140000);
+    });
+});
+
 describe("paying an invoice online (real database)", () => {
     it("charges the stored total and a success webhook marks it PAID, once", async () => {
         const id = await issued();

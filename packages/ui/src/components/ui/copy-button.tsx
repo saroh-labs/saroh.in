@@ -195,13 +195,15 @@ export interface ShareLinkProps extends CopyButtonProps {
     /** The share sheet's title, where the phone shows one. */
     title?: string;
     shareLabel?: string;
+    /** After the share sheet sent it (not when it was closed). */
+    onShared?: (value: string) => void;
 }
 
 /** What `canShare` reads never changes while the page is open. */
 const subscribeNever = () => () => undefined;
 
 /** A thumb, and a browser that can open the phone's share sheet. */
-function canShare() {
+export function canShare() {
     return (
         typeof navigator !== "undefined" &&
         typeof navigator.share === "function" &&
@@ -225,6 +227,7 @@ export function ShareLink({
     shareLabel = "Share",
     value,
     onCopied,
+    onShared,
     variant = "outline",
     size = "sm",
     className,
@@ -262,6 +265,7 @@ export function ShareLink({
             const url = typeof value === "function" ? await value() : value;
             if (url === null) return;
             await navigator.share({ url, text, title });
+            onShared?.(url);
         } catch (error) {
             // Closing the sheet is a choice, not a failure. Anything else
             // (blocked, unsupported after all) gets the copy button.

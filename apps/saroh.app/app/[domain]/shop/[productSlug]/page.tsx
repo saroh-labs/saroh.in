@@ -189,7 +189,7 @@ export default async function ShopProductPage({
             )
         ) : checkout?.notTakingOrders ? (
             // Stopped taking orders for now (#800): nothing to ask about.
-            <NotTakingOrders />
+            <NotTakingOrders demo={checkout.demo === true} />
         ) : (
             <>
                 <AskAboutOrdering

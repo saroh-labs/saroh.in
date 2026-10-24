@@ -1,6 +1,10 @@
 import type { ExecutionContext } from "@nestjs/common";
 import { NotFoundException, UnauthorizedException } from "@nestjs/common";
 
+import {
+    assertNotDemo,
+    demoRefusal,
+} from "../organizations/organization-lifecycle.gate";
 import type {
     CustomerContext,
     CustomerRequest,
@@ -16,6 +20,12 @@ import { SITE_RELAY_HEADER, signSiteRelay } from "./site-relay";
 import { siteRelaySecret } from "./site-secrets";
 
 jest.mock("./site-host", () => ({ resolveSiteHost: jest.fn() }));
+jest.mock("../organizations/organization-lifecycle.gate", () => ({
+    ...jest.requireActual<object>(
+        "../organizations/organization-lifecycle.gate",
+    ),
+    assertNotDemo: jest.fn(),
+}));
 
 /**
  * The customer session guard without a database (round-2 plan A, A3): the
@@ -137,6 +147,32 @@ describe("CustomerSessionGuard", () => {
             response: { details: { reason: "signed-out" } },
         });
         expect(req.customerContext).toBeUndefined();
+    });
+
+    it("asks the demo gate (DEC-188) on a write, never on a read", async () => {
+        const gate = assertNotDemo as jest.MockedFunction<typeof assertNotDemo>;
+        gate.mockReset();
+        gate.mockRejectedValueOnce(demoRefusal());
+        const { guard } = setup();
+        const post = request({
+            [SITE_RELAY_HEADER]: relay(),
+            [CUSTOMER_SESSION_HEADER]: "tok",
+        });
+        (post.req as { method?: string }).method = "POST";
+        await expect(guard.canActivate(post.context)).rejects.toMatchObject({
+            response: { error: "ORGANIZATION_DEMO" },
+        });
+        expect(gate).toHaveBeenCalledWith("org_kavi");
+        expect(post.req.customerContext).toBeUndefined();
+
+        gate.mockClear();
+        const get = request({
+            [SITE_RELAY_HEADER]: relay(),
+            [CUSTOMER_SESSION_HEADER]: "tok",
+        });
+        (get.req as { method?: string }).method = "GET";
+        await expect(guard.canActivate(get.context)).resolves.toBe(true);
+        expect(gate).not.toHaveBeenCalled();
     });
 
     it("answers 404 for a host with no published site", async () => {

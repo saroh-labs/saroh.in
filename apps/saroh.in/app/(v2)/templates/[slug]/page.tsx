@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { Container } from "@/components/v2/container";
 import { CtaLink } from "@/components/v2/cta-link";
+import { JsonLd } from "@/components/v2/json-ld";
 import { Breadcrumbs } from "@/components/v2/resources/breadcrumbs";
 import { TemplateCard } from "@/components/v2/templates/template-card";
 import { TemplateViewer } from "@/components/v2/templates/template-viewer";
@@ -20,12 +21,13 @@ import {
 } from "@/content/templates";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata, pageTitle } from "@/lib/seo";
+import { breadcrumbLd } from "@/lib/structured-data";
 import { templatesLive } from "@/lib/templates-live";
 
 /**
  * One template (Resources plan U6, industry templates plan U13; design
  * "Saroh Resources - Templates - Gym"): the breadcrumb, "{Name}: {idea}.",
- * what it is and the button that saves it on the waitlist; its pages in a
+ * what it is and the button that starts from it; its pages in a
  * browser frame, desktop or phone; three notes and the facts, all from the
  * template's manifest; the templates built around the same kind; the band.
  *
@@ -82,6 +84,13 @@ export default async function TemplatePage({ params }: Props) {
 
     return (
         <>
+            {/* The trail the page draws: Templates / {name}. */}
+            <JsonLd
+                data={breadcrumbLd([
+                    { name: detail.crumb, path: TEMPLATES_PATH },
+                    { name: t.name, path: t.href },
+                ])}
+            />
             <Container as="header" className="grid gap-6 pt-14">
                 <Breadcrumbs
                     crumbs={[
@@ -98,9 +107,7 @@ export default async function TemplatePage({ params }: Props) {
                 <div className="grid justify-items-start gap-3">
                     <CtaLink src={`templates-${t.slug}`} template={save} />
                     <span className="max-w-[60ch] text-mk-note text-muted-foreground">
-                        {open
-                            ? detail.saveNote.after(t.name)
-                            : detail.saveNote.before(t.name)}
+                        {detail.saveNote(t.name)}
                     </span>
                 </div>
             </Container>

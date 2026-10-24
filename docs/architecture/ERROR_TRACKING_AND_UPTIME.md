@@ -129,7 +129,7 @@ exceptions). The constants are in `packages/error-tracking/src/names.ts`.
   load, and `MAX_BROWSER_EXCEPTIONS_PER_SESSION` (20) different ones at most.
 - **Timeout**: `SEND_TIMEOUT_MS` (2 seconds) for one send from a server.
 
-## The nine milestones
+## The milestones
 
 Sent by the API, from where the fact is written, so no browser script takes
 part and they can't be faked or blocked
@@ -151,8 +151,18 @@ part and they can't be faked or blocked
   stores each of those types once per organization. A milestone is sent only
   when its row was _stored_, never when the write was a repeat.
 - **Id**: the organization's (the user's for `signed_up`).
-  **Properties**: `plan_key`, `business_kind`, `environment`, `app`.
-  Never a name, an email, a phone number, an address, an amount, or anything
+  **Properties**: `plan_key`, `business_kind`, `environment`, `app`, and
+  where the business came from (DEC-187): `src`, `utm_source`, `utm_medium`,
+  `utm_campaign` (from `Organization.signupSource`, each when known),
+  `referral_channel` (`business`, `account_manager`, `both` or `none`),
+  `referrer_code` (the referring business's code, DEC-156) and
+  `manager_code` (the code of the manager who brought it in, DEC-169), each
+  code only when there is one. `signed_up` has no plan or kind; it reads the
+  same source keys from the sign-up request's `saroh_src`, `saroh_ref` and
+  `saroh_am` cookies (shape-checked only; whether a code names anyone is
+  setup's to say). Every key sits outside the scrubber's drop pattern, and
+  `product-milestones.spec.ts` proves it. The codes never reach a browser
+  tag (DEC-127). Never a name, an email, a phone number, an address, an amount, or anything
   about a customer. Not even the order's or product's id: the ledger keeps
   that, PostHog doesn't.
 - **Never in a request's way**: the SDK queues it in memory and sends in the
@@ -165,6 +175,54 @@ part and they can't be faked or blocked
 - `onboarding_finished` is the business being set up. The goal picker after
   it writes nothing of its own: it switches modules on one at a time and may
   be skipped, so there is no "finished" for the API to see.
+
+### Upgrade prompts (DEC-187, #1197)
+
+`upgrade_prompt_shown` and `upgrade_prompt_pressed`, the closed list's only
+other events (`UPGRADE_PROMPT_EVENTS`), sent by
+`apps/api.saroh.in/src/modules/billing/upgrade-prompts.ts` from
+`POST organizations/:id/upgrade-prompts/:key/:action` (`org:read`), not
+from the ledger.
+
+- **Keys**: a fixed list (`deposits`, `online_payments`, `team_member`,
+  `own_domain`, `memberships`, `near_limit`, `at_limit`, `plan_refusal`);
+  anything else, or an action other than `shown`/`pressed`, is a 400.
+- **Properties**: `prompt`, `plan_offered` (derived on the server from the
+  key's catalogue row and the business's plan, as the locks' `upgradeTo`;
+  `none` when there's no plan above) and `plan_key` (the plan it is on).
+- **Shown once a day**: `Organization.promptsShown` keeps each prompt's last
+  IST day, set in one statement, so "shown" goes once per business, prompt
+  and day. "Pressed" always goes. The workspace's sessionStorage only saves
+  repeat requests (`apps/app.saroh.in/lib/billing/upgrade-prompts.ts`).
+
+### The weekly sign-up funnel (DEC-187)
+
+A saved PostHog insight, not an admin module. The owner makes it once in the
+project (it can't be made from the repo) and puts its link here:
+
+- **Type**: Funnel, weekly, conversion window 90 days, unique by the
+  event's id. Steps: `signup_page_viewed` → `signed_up` →
+  `onboarding_finished` → `site_published` → `first_booking_taken` _or_
+  `first_order_taken` (one step, either event) →
+  `payment_provider_connected` → `plan_upgraded`.
+- **Breakdown**: `src` (and, as a second view, `referral_channel`). Filter
+  `environment = production`.
+- `signup_page_viewed` (24 Oct, #1190) is someone opening the sign-up
+  page: accounts' server tells the API after a real render of `/signup`
+  (`apps/accounts.saroh.in/lib/signup-viewed.ts` →
+  `POST public/funnel/signup-viewed`). An anonymous count: a new random id
+  per view, no person, no cookie, no code. Properties: `src` and utm (the
+  link's, else the `saroh_src` cookie's), `plan`, `cycle` and
+  `referral_channel`, each shape-checked. Not counted: bots, prefetches, a
+  caller past `SIGNUP_VIEWS_PER_MINUTE`. No consent is needed (nothing
+  identifies the visitor; DEC-127 holds).
+- Each step has a different id (a view's is random, `signed_up`'s the
+  user's, the rest the business's), so the funnel is weekly counts by `src`
+  side by side, not a joined path. Read "left before an account" as
+  `signup_page_viewed` minus `signed_up`, "started" as `signed_up` and
+  "completed" as `onboarding_finished`, each broken down by `src`.
+- **Export**: the insight's ⋯ → Export → CSV, weekly.
+- Link: _to be added by the owner once saved._
 
 ## Session replay (the workspace and saroh.in)
 

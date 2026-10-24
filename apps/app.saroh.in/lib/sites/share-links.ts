@@ -72,6 +72,14 @@ export function shareLink(
     return null;
 }
 
+/**
+ * Whether sharing this link ticks Home's "Share your booking link" (#1194):
+ * the booking page, or the shop for a business that only sells. Marked as
+ * the `shared-booking-link` moment, once, for the whole business.
+ */
+export const ticksShareStep = (kind: ShareKind) =>
+    kind === "book" || kind === "shop";
+
 /** An Orders list with no orders yet: the shop, else the website. */
 export const ORDERS_FIRST_RUN: readonly ShareKind[] = ["shop", "site"];
 

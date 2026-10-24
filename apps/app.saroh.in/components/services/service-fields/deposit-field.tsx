@@ -122,6 +122,7 @@ export function DepositField({
                     body={lock.body}
                     cta={lock.cta}
                     href={lock.href}
+                    prompt="deposits"
                     className="mt-2.5"
                 />
             ) : problem ? (

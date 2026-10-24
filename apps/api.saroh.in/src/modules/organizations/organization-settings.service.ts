@@ -16,6 +16,7 @@ import {
     AuditService,
 } from "../audit/audit.service";
 import { planTakesOnlinePayment } from "../billing/online-payments-plan";
+import { NOT_SAMPLE } from "../bookings/sample-services";
 import type { NumberRestart } from "../invoices/numbering";
 import { invoiceSeriesKeys } from "../invoices/numbering";
 import type { InvoicePaper } from "../invoices/paper-styles";
@@ -28,6 +29,7 @@ import {
 } from "../sites/page-cache-revalidate";
 import type { PublicContact } from "./business-contact";
 import { businessPublicContactOf } from "./business-contact";
+import { refuseCountryOutsideIndia } from "./business-country";
 import { logoProblem } from "./business-logo";
 import type { PayInstructionsView } from "./business-pay-instructions";
 import {
@@ -207,8 +209,18 @@ function invoicePaperData(sent: UpdateOrganizationDto["invoicePaper"]): {
 export interface SetupFacts {
     /** Products not archived: drafts count, as "Add your first product". */
     products: number;
-    /** Bookable services not archived. */
+    /** Bookable services not archived, a trade starter's samples aside. */
     services: number;
+    /**
+     * A trade starter's samples not yet kept (DEC-189), not archived: Home
+     * says "Review your sample services" while there are some.
+     */
+    sampleServices: number;
+    /**
+     * Bookings ever made, any status: Home's "Take your first booking"
+     * (#1194). The first order is `tradingSince`.
+     */
+    bookings: number;
     /** Websites not deleted. */
     sites: number;
     /** Of those, the ones with nothing published now (never, or taken down). */
@@ -475,6 +487,8 @@ export class OrganizationSettingsService {
                   select: TAX_CURRENT_SELECT,
               })
             : null;
+        // Sending a country always touches tax, so the stored one is read.
+        refuseCountryOutsideIndia(profileData.country, taxCurrent?.country);
         const taxData = touchesTax(taxSent)
             ? taxChanges(taxCurrent, taxSent)
             : {};
@@ -918,9 +932,16 @@ export class OrganizationSettingsService {
     /** What the take-money checklist ticks, counted now. */
     private async setupFacts(organizationId: string): Promise<SetupFacts> {
         const site = { organizationId, deletedAt: null };
+        const service = {
+            organizationId,
+            deletedAt: null,
+            status: { not: "ARCHIVED" as const },
+        };
         const [
             products,
             services,
+            sampleServices,
+            bookings,
             sites,
             sitesNotLive,
             invoices,
@@ -929,13 +950,9 @@ export class OrganizationSettingsService {
             prisma.product.count({
                 where: { organizationId, status: { not: "ARCHIVED" } },
             }),
-            prisma.service.count({
-                where: {
-                    organizationId,
-                    deletedAt: null,
-                    status: { not: "ARCHIVED" },
-                },
-            }),
+            prisma.service.count({ where: { ...service, ...NOT_SAMPLE } }),
+            prisma.service.count({ where: { ...service, isSample: true } }),
+            prisma.booking.count({ where: { organizationId } }),
             prisma.site.count({ where: site }),
             prisma.site.count({
                 where: { ...site, currentPublicationId: null },
@@ -948,6 +965,8 @@ export class OrganizationSettingsService {
         return {
             products,
             services,
+            sampleServices,
+            bookings,
             sites,
             sitesNotLive,
             invoices,

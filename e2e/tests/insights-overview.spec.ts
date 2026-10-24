@@ -30,6 +30,9 @@ async function openInsights(page: Page, query = "") {
     await expect(
         page.getByRole("heading", { level: 1, name: "Insights" }),
     ).toBeVisible();
+    // While the page streams, the loading frame's <main> sits beside the
+    // real one (DEV_LEARNINGS, Home's first-steps entry): wait for one.
+    await expect(page.locator("main")).toHaveCount(1);
 }
 
 const tabs = (page: Page) => page.getByRole("navigation", { name: "Insights" });

@@ -25,6 +25,7 @@ import {
     AnalyticsPublicController,
 } from "./analytics.controller";
 import { SellsService } from "./sells.service";
+import { SignupFunnelController } from "./signup-funnel.controller";
 import { SiteLinksService } from "./site-links.service";
 import { SourcesService } from "./sources.service";
 import { SuggestionsService } from "./suggestions.service";
@@ -64,7 +65,11 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         forwardRef(() => OrganizationsModule),
         CapabilitiesModule,
     ],
-    controllers: [AnalyticsPublicController, AnalyticsController],
+    controllers: [
+        AnalyticsPublicController,
+        AnalyticsController,
+        SignupFunnelController,
+    ],
     providers: [
         AnalyticsAggregateHandler,
         AnalyticsRollupHandler,

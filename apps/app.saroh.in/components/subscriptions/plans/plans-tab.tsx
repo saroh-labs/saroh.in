@@ -338,6 +338,7 @@ export function PlansTab({
                     body={locked.body}
                     cta={locked.cta}
                     href={locked.href}
+                    prompt="memberships"
                     className="mb-3"
                 />
             ) : null}

@@ -27,6 +27,7 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn().mockResolvedValue([]),
         },
         service: { count: jest.fn().mockResolvedValue(0) },
+        booking: { count: jest.fn().mockResolvedValue(0) },
         site: { count: jest.fn().mockResolvedValue(0) },
         invoice: { count: jest.fn().mockResolvedValue(0) },
     };
@@ -181,16 +182,21 @@ describe("OrganizationSettingsService", () => {
             expect(planTakesOnlinePayment).toHaveBeenCalledWith("org_1");
         });
 
-        it("sends the checklist's facts: products, services, sites, those not live and invoices (H-5, H-6, DEC-070)", async () => {
+        it("sends the checklist's facts: products, services, bookings, sites, those not live and invoices (H-5, H-6, DEC-070, #1194)", async () => {
             (prisma.product.count as jest.Mock).mockResolvedValueOnce(0);
-            (prisma.service.count as jest.Mock).mockResolvedValueOnce(2);
+            (prisma.service.count as jest.Mock)
+                .mockResolvedValueOnce(2)
+                .mockResolvedValueOnce(4);
             (prisma.site.count as jest.Mock)
                 .mockResolvedValueOnce(2)
                 .mockResolvedValueOnce(1);
             (prisma.invoice.count as jest.Mock).mockResolvedValueOnce(3);
+            (prisma.booking.count as jest.Mock).mockResolvedValueOnce(5);
             expect((await service.get(ctx())).setup).toEqual({
                 products: 0,
                 services: 2,
+                sampleServices: 4,
+                bookings: 5,
                 sites: 2,
                 sitesNotLive: 1,
                 invoices: 3,
@@ -211,6 +217,22 @@ describe("OrganizationSettingsService", () => {
                     deletedAt: null,
                     currentPublicationId: null,
                 },
+            });
+            // Every booking the business has had, cancelled or not (#1194).
+            expect(prisma.booking.count).toHaveBeenLastCalledWith({
+                where: { organizationId: "org_1" },
+            });
+            // A trade starter's samples are counted apart (DEC-189).
+            const kept = {
+                organizationId: "org_1",
+                deletedAt: null,
+                status: { not: "ARCHIVED" },
+            };
+            expect(prisma.service.count).toHaveBeenCalledWith({
+                where: { ...kept, isSample: false },
+            });
+            expect(prisma.service.count).toHaveBeenLastCalledWith({
+                where: { ...kept, isSample: true },
             });
         });
 
@@ -291,13 +313,66 @@ describe("OrganizationSettingsService", () => {
         });
 
         it("patches only the fields sent — never blanks the untouched ones", async () => {
-            await service.update(ctx(), { profile: { country: "US" } });
+            await service.update(ctx(), { profile: { country: "IN" } });
 
             expect(orgUpdate).not.toHaveBeenCalled();
             expect(profileUpsert).toHaveBeenCalledWith({
                 where: { organizationId: "org_1" },
-                create: { organizationId: "org_1", country: "US" },
-                update: { country: "US" },
+                create: { organizationId: "org_1", country: "IN" },
+                update: { country: "IN" },
+            });
+        });
+
+        describe("India only for now (#1214)", () => {
+            it("refuses a change to another country, and writes nothing", async () => {
+                const refusal = await service
+                    .update(ctx(), { profile: { country: "US" } })
+                    .catch((e: BadRequestException) => e.getResponse());
+                expect(refusal).toEqual({
+                    message: "Saroh is for businesses in India for now.",
+                    details: { field: "country" },
+                });
+                expect(prisma.$transaction).not.toHaveBeenCalled();
+            });
+
+            it("lets a business already in another country keep it and save the rest", async () => {
+                profileFindUnique.mockResolvedValue({
+                    gstRegistered: false,
+                    gstState: null,
+                    taxId: null,
+                    country: "AE",
+                    addressLine1: null,
+                    addressLine2: null,
+                    city: null,
+                    postalCode: null,
+                });
+                await service.update(ctx(), {
+                    profile: { country: "AE", legalName: "Acme FZE" },
+                });
+                expect(profileUpsert).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        update: expect.objectContaining({
+                            country: "AE",
+                            legalName: "Acme FZE",
+                        }),
+                    }),
+                );
+
+                await service.update(ctx(), {
+                    profile: { legalName: "Acme Trading" },
+                });
+                expect(profileUpsert).toHaveBeenLastCalledWith(
+                    expect.objectContaining({
+                        update: { legalName: "Acme Trading" },
+                    }),
+                );
+            });
+
+            it("refuses moving a business in another country to a third", async () => {
+                profileFindUnique.mockResolvedValue({ country: "AE" });
+                await expect(
+                    service.update(ctx(), { profile: { country: "SG" } }),
+                ).rejects.toBeInstanceOf(BadRequestException);
             });
         });
 

@@ -61,15 +61,22 @@ vi.mock("./booking-link-row", () => ({
     ),
 }));
 
-const api = { updateService: vi.fn() };
+const api = {
+    updateService: vi.fn(),
+    keepService: vi.fn(),
+    keepAllSamples: vi.fn(),
+};
 vi.mock("@/lib/services/actions", () => ({
     updateService: (...a: unknown[]) => api.updateService(...a) as unknown,
+    keepService: (...a: unknown[]) => api.keepService(...a) as unknown,
+    keepAllSamples: (...a: unknown[]) => api.keepAllSamples(...a) as unknown,
 }));
 
-const toast = { showError: vi.fn(), showUndo: vi.fn() };
+const toast = { showError: vi.fn(), showUndo: vi.fn(), showSuccess: vi.fn() };
 vi.mock("@saroh/ui/toast", () => ({
     showError: (...a: unknown[]) => toast.showError(...a) as unknown,
     showUndo: (...a: unknown[]) => toast.showUndo(...a) as unknown,
+    showSuccess: (...a: unknown[]) => toast.showSuccess(...a) as unknown,
     dismissToast: vi.fn(),
 }));
 
@@ -572,6 +579,92 @@ describe("a search once there are more than 8 services", () => {
         await search("zzz");
         expect(text()).toContain("No services match");
         expect(host.querySelector(SCOPE.desk)).toBeNull();
+    });
+});
+
+describe("a trade starter's samples (DEC-189)", () => {
+    const SAMPLES = [
+        service({
+            id: "sv_s1",
+            name: "Blow-dry",
+            isSample: true,
+            showOnBookingPage: false,
+        }),
+        service({
+            id: "sv_s2",
+            name: "Hair spa",
+            isSample: true,
+            showOnBookingPage: false,
+        }),
+    ];
+    const keepOf = (name: string, size: Size) =>
+        rowOf(name, size).querySelector<HTMLButtonElement>(
+            `button[aria-label="Keep ${name}"]`,
+        );
+    const keepAll = () =>
+        Array.from(host.querySelectorAll("button")).find(
+            (b) => b.textContent === "Keep all",
+        );
+
+    it("tags each sample and says once that customers can't see them, with Keep all", () => {
+        show({ services: [BOTH, ...SAMPLES] });
+        for (const size of ["desk", "phone"] as const) {
+            expect(rowOf("Blow-dry", size).textContent).toContain("Sample");
+            expect(keepOf("Blow-dry", size)).not.toBeNull();
+            expect(rowOf("Physio assessment", size).textContent).not.toContain(
+                "Sample",
+            );
+        }
+        expect(
+            host.querySelector("[data-samples-notice]")?.textContent,
+        ).toContain("2 services are samples, so customers can't see them yet.");
+        expect(keepAll()).toBeDefined();
+    });
+
+    it("says nothing of samples when there are none", () => {
+        show();
+        expect(host.querySelector("[data-samples-notice]")).toBeNull();
+        expect(text()).not.toContain("Sample");
+    });
+
+    it("Keep keeps that one, says so and reads the list again", async () => {
+        api.keepService.mockResolvedValue({ ok: true, data: {} });
+        show({ services: SAMPLES });
+        act(() => keepOf("Hair spa", "desk")?.click());
+        await settle();
+        expect(api.keepService).toHaveBeenCalledWith("sv_s2");
+        expect(toast.showSuccess).toHaveBeenCalledWith(
+            "Hair spa kept. It's on your booking page now.",
+        );
+        expect(router.refresh).toHaveBeenCalled();
+    });
+
+    it("Keep all keeps every one; a refusal is said", async () => {
+        api.keepAllSamples.mockResolvedValue({ ok: true, data: { kept: 2 } });
+        show({ services: SAMPLES });
+        act(() => keepAll()?.click());
+        await settle();
+        expect(api.keepAllSamples).toHaveBeenCalledTimes(1);
+        expect(toast.showSuccess).toHaveBeenCalledWith(
+            "2 services kept. They're on your booking page now.",
+        );
+
+        api.keepAllSamples.mockResolvedValue({
+            ok: false,
+            error: "Couldn't keep the sample services.",
+        });
+        act(() => keepAll()?.click());
+        await settle();
+        expect(toast.showError).toHaveBeenCalledWith(
+            "Couldn't keep the sample services.",
+        );
+    });
+
+    it("a Member sees the tag, but no Keep or Keep all", () => {
+        show({ services: SAMPLES, canEdit: false });
+        expect(rowOf("Blow-dry").textContent).toContain("Sample");
+        expect(keepOf("Blow-dry", "desk")).toBeNull();
+        expect(keepAll()).toBeUndefined();
     });
 });
 

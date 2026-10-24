@@ -8,17 +8,17 @@ Package name `web` (`pnpm --filter web …`) · served at
 
 ## Routes
 
-| Route                                | What it is                                                                           |
-| ------------------------------------ | ------------------------------------------------------------------------------------ |
-| `/`                                  | Home                                                                                 |
-| `/features/[slug]`                   | Eight feature pages, one template (`content/features.ts`)                            |
-| `/solutions/[slug]`                  | Shops, gyms, clinics, one template (`content/solutions.ts`)                          |
-| `/pricing`                           | The published pricing catalogue, or the "announced at launch" placeholder            |
-| `/pricing/preview`, `/pricing/draft` | Staff preview of a pricing draft: token to cookie, then the draft. Noindex, no-store |
-| `/waitlist`                          | The waitlist, the site's ask while `NEXT_PUBLIC_LAUNCH_MODE=waitlist`                |
-| `/api/waitlist`                      | POST forwarder to the API's public waitlist endpoint                                 |
-| `/api/revalidate`                    | Called by the API after a pricing publish, to refresh the pricing pages at once      |
-| `/sitemap.xml`, `/robots.txt`        | Every indexable page (`lib/site-pages.ts`); robots keeps crawlers off draft and API  |
+| Route                                | What it is                                                                              |
+| ------------------------------------ | --------------------------------------------------------------------------------------- |
+| `/`                                  | Home                                                                                    |
+| `/features/[slug]`                   | Eight feature pages, one template (`content/features.ts`)                               |
+| `/solutions/[slug]`                  | Shops, gyms, clinics, one template (`content/solutions.ts`)                             |
+| `/pricing`                           | The published pricing catalogue, or the "Prices aren't available right now" placeholder |
+| `/pricing/preview`, `/pricing/draft` | Staff preview of a pricing draft: token to cookie, then the draft. Noindex, no-store    |
+| `/waitlist`                          | The waitlist, the site's ask while `NEXT_PUBLIC_LAUNCH_MODE=waitlist`                   |
+| `/api/waitlist`                      | POST forwarder to the API's public waitlist endpoint                                    |
+| `/api/revalidate`                    | Called by the API after a pricing publish, to refresh the pricing pages at once         |
+| `/sitemap.xml`, `/robots.txt`        | Every indexable page (`lib/site-pages.ts`); robots keeps crawlers off draft and API     |
 
 Route groups: `(v2)` has the shared nav and footer; `(standalone)` (the
 waitlist) and `(preview)` (the pricing draft) draw their own chrome.

@@ -110,6 +110,30 @@ export class BookingsController {
         return this.bookings.calendarBookings(ctx, query);
     }
 
+    /**
+     * Keep every trade starter sample as it is (DEC-189). Declared BEFORE
+     * `:serviceId`, as `bookings` is.
+     */
+    @Post("keep-all")
+    @RequireModule("APPOINTMENTS")
+    @HttpCode(200)
+    keepAllSamples(
+        @OrgContext() ctx: OrganizationContext,
+    ): Promise<{ kept: number }> {
+        return this.bookings.keepAllSamples(ctx);
+    }
+
+    /** Keep one trade starter sample as it is (DEC-189). */
+    @Post(":serviceId/keep")
+    @RequireModule("APPOINTMENTS")
+    @HttpCode(200)
+    keepService(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("serviceId") serviceId: string,
+    ): Promise<ServiceView> {
+        return this.bookings.keepService(ctx, serviceId);
+    }
+
     @Get(":serviceId")
     @RequireModule("APPOINTMENTS")
     getService(

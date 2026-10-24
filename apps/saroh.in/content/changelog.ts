@@ -4,6 +4,13 @@ import type { IsoDay, PublishContext } from "./resources";
 import { isLive } from "./resources";
 
 /**
+ * The day this module's words last changed, the sitemap's `lastmod` for its
+ * pages (`lib/site-pages.ts`). Change it with the words:
+ * `pnpm check:content-dates` fails a batch that doesn't.
+ */
+export const UPDATED = "2026-10-19";
+
+/**
  * The changelog (plan U4, design "Saroh Resources - Changelog" 1a): its
  * entries, dated and published by day (KTD-2), and the Coming next list.
  *

@@ -233,5 +233,29 @@ export function pauseToast(name: string, taking: boolean): string {
         : `${name} paused. Nobody can book it, and bookings already made stay.`;
 }
 
+/** The tag on a trade starter's sample (DEC-189). */
+export const SAMPLE_WORD = "Sample";
+
+/**
+ * Said once above the list while there are samples: that customers don't
+ * see them, and the two ways to make them yours. Null with none.
+ */
+export function samplesLine(samples: number): string | null {
+    if (samples === 0) return null;
+    return samples === 1
+        ? "1 service is a sample, so customers can't see it yet. Edit it, or keep it as it is."
+        : `${samples} services are samples, so customers can't see them yet. Edit each one, or keep them as they are.`;
+}
+
+/** What Keep and Keep all say they did. */
+export function keptToast(kept: { name: string } | { count: number }): string {
+    if ("name" in kept) {
+        return `${kept.name} kept. It's on your booking page now.`;
+    }
+    return kept.count === 1
+        ? "1 service kept. It's on your booking page now."
+        : `${kept.count} services kept. They're on your booking page now.`;
+}
+
 /** Past this many services the list offers a search. */
 export const SEARCH_FROM = 9;

@@ -72,7 +72,9 @@ describe("withPrivateApp — a signed-in app is never indexed", () => {
         const gate = withPrivateApp(withDevAccess(next));
         const res = await gate(request("https://app.saroh.io/orders"));
         expect(next).not.toHaveBeenCalled();
-        expect(res.status).toBe(307);
+        expect(res.status).toBe(301);
+        expect(res.headers.get("location")).toBe("https://app.saroh.in/orders");
+        expect(res.headers.get("Cache-Control")).toBe("no-store");
         expectPrivate(res);
     });
 

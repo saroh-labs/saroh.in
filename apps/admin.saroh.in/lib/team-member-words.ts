@@ -74,6 +74,36 @@ export interface MemberBusiness {
     source: LinkSource;
     kind: LinkKind;
     since: string;
+    /** Its open inactivity signals (#1199), oldest first. */
+    signals: OpenSignal[];
+}
+
+/** A sign a business has gone quiet (#1199), kept by the daily sweep. */
+export type InactivitySignalKind =
+    "NO_ACTIVITY" | "NO_TRADING" | "PAYMENT_DISCONNECTED";
+
+export interface OpenSignal {
+    kind: InactivitySignalKind;
+    since: string;
+}
+
+/** Short words for a list's badge. */
+export const SIGNAL_LABEL: Record<InactivitySignalKind, string> = {
+    NO_ACTIVITY: "No team activity in 7 days",
+    NO_TRADING: "No bookings or orders in 14 days",
+    PAYMENT_DISCONNECTED: "Payments disconnected",
+};
+
+/** "No team activity since 3 Oct 2026": a signal with when it began. */
+export function signalWords(signal: OpenSignal): string {
+    switch (signal.kind) {
+        case "NO_ACTIVITY":
+            return `No team activity since ${formatDate(signal.since)}`;
+        case "NO_TRADING":
+            return `No bookings or orders since ${formatDate(signal.since)}`;
+        case "PAYMENT_DISCONNECTED":
+            return `Payments disconnected since ${formatDate(signal.since)}`;
+    }
 }
 
 export type MemberActivity =

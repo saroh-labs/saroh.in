@@ -4,6 +4,7 @@ import type { AdminPermission } from "./control-plane";
 import { adminFetch, getJson } from "./control-plane";
 import type { BusinessOverview } from "./overview-words";
 import type { EffectivePlan, UsageNote } from "./plan-words";
+import type { InactivitySignalKind } from "./team-member-words";
 
 /**
  * Businesses on the instance, as the console reads them (plan U3–U5).
@@ -23,7 +24,9 @@ export type AttentionReason =
     /** Past its deletion window, held back by refunds owed (#921). */
     | "DELETION_WAITING_REFUNDS"
     /** Saroh's billing needs an operator: Billing › Needs action (DEC-166). */
-    | "BILLING_ACTION";
+    | "BILLING_ACTION"
+    /** An open inactivity signal (#1199). */
+    | InactivitySignalKind;
 
 export interface BusinessRow {
     id: string;

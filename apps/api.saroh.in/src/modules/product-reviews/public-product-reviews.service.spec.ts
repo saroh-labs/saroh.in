@@ -20,6 +20,7 @@ jest.mock("@saroh/database", () => {
         },
         notification: { create: jest.fn() },
         site: { findFirst: jest.fn() },
+        organization: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     return {
         ...actual,

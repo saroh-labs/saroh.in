@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
@@ -9,7 +10,7 @@ import { useState } from "react";
 import { ChangedRow } from "@/components/changed-row";
 import { EmptyPanel } from "@/components/states/empty-panel";
 import type { MemberBusiness } from "@/lib/team-member-words";
-import { cameInWords, SOURCE_LONG } from "@/lib/team-member-words";
+import { cameInWords, signalWords, SOURCE_LONG } from "@/lib/team-member-words";
 import { useChangeFeedback } from "@/lib/use-change-feedback";
 
 import { LogCallSheet } from "./log-call-sheet";
@@ -96,6 +97,18 @@ export function MemberBusinesses({
                             <span className="truncate text-[13px] text-muted-foreground">
                                 {business.slug}
                             </span>
+                            {business.signals.length > 0 ? (
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                    {business.signals.map((signal) => (
+                                        <Badge
+                                            key={signal.kind}
+                                            variant="warning"
+                                        >
+                                            {signalWords(signal)}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            ) : null}
                         </div>
                         <div className="grid min-w-0 gap-0.5 text-[13px]">
                             <span

@@ -343,6 +343,7 @@ describe("Set commission… elsewhere", () => {
             kind: "ASSIGNED",
             source: "ASSIGNED",
             since: "2026-08-15T06:00:00.000Z",
+            signals: [],
         } as never;
         const { rerender } = render(
             <MemberBusinesses

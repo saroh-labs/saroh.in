@@ -78,10 +78,22 @@ describe("withDevAccess — the dev environment's key", () => {
             request("https://app.saroh.io/orders?status=open"),
         );
         expect(next).not.toHaveBeenCalled();
-        expect(res.status).toBe(307);
+        expect(res.status).toBe(301);
         expect(res.headers.get("location")).toBe(
             "https://app.saroh.in/orders?status=open",
         );
+    });
+
+    it("moves the marketing site to www in one permanent, uncached hop", async () => {
+        vi.stubEnv("DEV_REDIRECT_ORIGIN", "https://www.saroh.in");
+        const res = await gate(request("https://www.saroh.io/pricing?x=1"));
+        expect(next).not.toHaveBeenCalled();
+        expect(res.status).toBe(301);
+        expect(res.headers.get("location")).toBe(
+            "https://www.saroh.in/pricing?x=1",
+        );
+        expect(res.headers.get("Cache-Control")).toBe("no-store");
+        expect(res.headers.get("X-Robots-Tag")).toBe("noindex, nofollow");
     });
 
     it("sends anyone else to one page when it is told to (accounts before early access)", async () => {
@@ -93,7 +105,7 @@ describe("withDevAccess — the dev environment's key", () => {
             request("https://accounts.saroh.in/login?returnTo=x"),
         );
         expect(next).not.toHaveBeenCalled();
-        expect(res.status).toBe(307);
+        expect(res.status).toBe(301);
         expect(res.headers.get("location")).toBe(
             "https://www.saroh.in/waitlist",
         );
@@ -103,7 +115,7 @@ describe("withDevAccess — the dev environment's key", () => {
         const res = await gate(
             request("https://app.saroh.io/orders?access=guess"),
         );
-        expect(res.status).toBe(307);
+        expect(res.status).toBe(301);
         expect(res.headers.get("location")).toBe("https://app.saroh.in/orders");
         expect(res.headers.get("set-cookie")).toBeNull();
     });
@@ -115,7 +127,7 @@ describe("withDevAccess — the dev environment's key", () => {
             }),
         );
         expect(next).not.toHaveBeenCalled();
-        expect(res.status).toBe(307);
+        expect(res.status).toBe(301);
     });
 
     it("refuses a form post rather than replaying it on production", async () => {
@@ -123,6 +135,7 @@ describe("withDevAccess — the dev environment's key", () => {
             request("https://app.saroh.io/orders", { method: "POST" }),
         );
         expect(res.status).toBe(404);
+        expect(res.headers.get("X-Robots-Tag")).toBe("noindex, nofollow");
         expect(next).not.toHaveBeenCalled();
     });
 
@@ -136,7 +149,7 @@ describe("withDevAccess — the dev environment's key", () => {
         vi.stubEnv("LAUNCH_AT", "");
         const late = withDevAccess(next, () => Date.UTC(2099, 0, 1));
         const res = await late(request("https://app.saroh.io/orders"));
-        expect(res.status).toBe(307);
+        expect(res.status).toBe(301);
         expect(next).not.toHaveBeenCalled();
     });
 });
@@ -168,7 +181,7 @@ describe("withDevAccess — accounts opens at LAUNCH_AT", () => {
         clock = AT - 1000;
         const res = await signup();
         expect(next).not.toHaveBeenCalled();
-        expect(res.status).toBe(307);
+        expect(res.status).toBe(301);
         expect(res.headers.get("location")).toBe(
             "https://www.saroh.in/waitlist",
         );
@@ -217,6 +230,6 @@ describe("withDevAccess — accounts opens at LAUNCH_AT", () => {
         clock = Date.UTC(2099, 0, 1);
         const res = await signup();
         expect(next).not.toHaveBeenCalled();
-        expect(res.status).toBe(307);
+        expect(res.status).toBe(301);
     });
 });
