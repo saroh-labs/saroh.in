@@ -16,9 +16,11 @@ import {
 import {
     carriedManagerLink,
     carriedReferral,
+    carriedSource,
     MANAGER_COOKIE,
     REFERRAL_COOKIE,
     referralCookieDomain,
+    SOURCE_COOKIE,
     typedManagerCode,
 } from "./referral-carry";
 
@@ -147,7 +149,8 @@ export async function checkAddress(
  *
  * A referral code the browser carried from saroh.in goes with it (DEC-156,
  * `referral-carry.ts`), and so does an account manager's link (DEC-169,
- * `?am=`): both read here on the server, never from the form, and cleared
+ * `?am=`), and where it came from (#1190, `saroh_src`): all read here on
+ * the server, never from the form, and cleared
  * once the business exists, so the next business this browser makes isn't
  * put down to the same link. The code an owner typed for the teammate
  * helping them is the form's, sent as typed when it is shaped like one.
@@ -158,25 +161,28 @@ export async function createOrganization(
     const jar = await cookies();
     const referralCode = carriedReferral(jar.get(REFERRAL_COOKIE)?.value);
     const managerLink = carriedManagerLink(jar.get(MANAGER_COOKIE)?.value);
+    const signupSource = carriedSource(jar.get(SOURCE_COOKIE)?.value);
     const managerCode = typedManagerCode(input.managerCode);
-    // The carried codes are the cookies' or nothing, whatever the caller
-    // sent.
+    // The carried codes and source are the cookies' or nothing, whatever
+    // the caller sent.
     const {
         managerLinkCode: _sentLink,
         managerLinkSetAt: _sentAt,
         managerCode: _typed,
+        signupSource: _sentSource,
         ...rest
     } = input;
     const res = await createOrganizationApi({
         ...rest,
         referralCode,
         ...(managerLink ?? {}),
+        ...(signupSource ? { signupSource } : {}),
         ...(managerCode ? { managerCode } : {}),
     });
     if (res.ok) {
         await writeActiveOrgCookie(res.data.id, input.name);
-        const carried = [REFERRAL_COOKIE, MANAGER_COOKIE].filter((name) =>
-            jar.has(name),
+        const carried = [REFERRAL_COOKIE, MANAGER_COOKIE, SOURCE_COOKIE].filter(
+            (name) => jar.has(name),
         );
         if (carried.length > 0) {
             const from = await headers();

@@ -8,7 +8,8 @@ import { keepReferral } from "@/lib/referral";
 
 /**
  * Keeps a business's referral code (DEC-156) and an account manager's
- * link (DEC-169, `?am=`) from the link a visitor arrived by
+ * link (DEC-169, `?am=`) and where they came from (#1190, `?src=` and utm)
+ * from the link a visitor arrived by
  * (`lib/referral.ts`), on whichever page they land. It draws nothing and
  * sends nothing; the pages stay the built files they are.
  */

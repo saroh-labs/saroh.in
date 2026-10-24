@@ -420,6 +420,13 @@ model Organization {
   referredOrganizations    Organization[] @relation("OrganizationReferrals")
   referredAt               DateTime?
 
+  // Where it came from (#1190): `src`, `utmSource`, `utmMedium` and
+  // `utmCampaign` from the link its owner landed on saroh.in by (the
+  // `saroh_src` cookie), each a short safe string or absent. Written once,
+  // as the business is made (`organizations/signup-source.ts`), and never
+  // changed after. Null: it carried none. Never given to a browser tag.
+  signupSource Json?
+
   // A customer's message thread with the business (round-2 A13).
   customerThreads        CustomerThread[]
   customerThreadMessages CustomerThreadMessage[]

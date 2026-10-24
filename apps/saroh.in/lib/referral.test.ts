@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { resetAddress, takeAddress } from "./page-address";
@@ -6,6 +9,7 @@ import {
     keepReferral,
     keptManagerLink,
     keptReferral,
+    keptSource,
     MANAGER_COOKIE,
     managerCookie,
     managerFromSearch,
@@ -14,6 +18,9 @@ import {
     referralCookie,
     referralFromSearch,
     sharedDomain,
+    SOURCE_COOKIE,
+    sourceCookie,
+    sourceFromSearch,
 } from "./referral";
 
 /**
@@ -28,6 +35,7 @@ const open = (address: string) =>
     window.history.replaceState(null, "", address);
 const forget = () => {
     document.cookie = `${REFERRAL_COOKIE}=; Max-Age=0; Path=/`;
+    document.cookie = `${SOURCE_COOKIE}=; Max-Age=0; Path=/`;
 };
 
 beforeEach(() => {
@@ -279,5 +287,93 @@ describe("an account manager's link (DEC-169)", () => {
 
         expect(keptManagerLink(document.cookie)?.code).toBe("ABCD2345");
         expect(window.location.href).not.toContain("ABCD2345");
+    });
+});
+
+describe("where a visitor came from (#1190)", () => {
+    it("is src and the campaign's three, on the shared domain, for the stated time", () => {
+        expect(
+            sourceCookie(
+                { src: "solutions-salons-hero", utm_source: "google" },
+                {
+                    host: "www.saroh.in",
+                    accountsHost: "accounts.saroh.in",
+                    secure: true,
+                },
+            ),
+        ).toBe(
+            `saroh_src=src=solutions-salons-hero&utm_source=google; Max-Age=${REFERRAL_DAYS * 86400}; Path=/; Domain=saroh.in; SameSite=Lax; Secure`,
+        );
+    });
+
+    it("keeps it from the page they land on, the waitlist too", () => {
+        open(
+            "/waitlist?src=solutions-salons-hero&utm_source=google&utm_medium=cpc&utm_campaign=salons_oct&ref=abcd2345",
+        );
+        keepReferral(ACCOUNTS);
+        expect(keptSource(document.cookie)).toEqual({
+            src: "solutions-salons-hero",
+            utm_source: "google",
+            utm_medium: "cpc",
+            utm_campaign: "salons_oct",
+        });
+        expect(keptReferral(document.cookie)).toBeNull();
+    });
+
+    it("drops a malformed value and keeps the rest", () => {
+        expect(
+            sourceFromSearch(
+                `?src=%3Cscript%3E&utm_source=google&utm_medium=a%20b&utm_campaign=${"x".repeat(65)}`,
+            ),
+        ).toEqual({ utm_source: "google" });
+        expect(keptSource("saroh_src=src=<x>&utm_medium=cpc")).toEqual({
+            utm_medium: "cpc",
+        });
+        open("/?src=you@example.com");
+        keepReferral(ACCOUNTS);
+        expect(keptSource(document.cookie)).toEqual({});
+    });
+
+    it("lets the last link win: a new campaign replaces all three, a new src only src", () => {
+        open("/?src=ad&utm_source=google&utm_medium=cpc&utm_campaign=one");
+        keepReferral(ACCOUNTS);
+        open("/?utm_source=instagram");
+        keepReferral(ACCOUNTS);
+        expect(keptSource(document.cookie)).toEqual({
+            src: "ad",
+            utm_source: "instagram",
+        });
+        open("/waitlist?src=pricing-grow");
+        keepReferral(ACCOUNTS);
+        expect(keptSource(document.cookie)).toEqual({
+            src: "pricing-grow",
+            utm_source: "instagram",
+        });
+    });
+
+    it("keeps what it has when a later page has none", () => {
+        open("/?src=ad");
+        keepReferral(ACCOUNTS);
+        open("/pricing");
+        keepReferral(ACCOUNTS);
+        expect(keptSource(document.cookie)).toEqual({ src: "ad" });
+    });
+
+    it("is never read by what loads or feeds a tag (DEC-127)", () => {
+        for (const file of [
+            "lib/tags.ts",
+            "lib/ga.ts",
+            "lib/analytics.ts",
+            "lib/consent.ts",
+            "app/site-tags.tsx",
+        ]) {
+            const text = readFileSync(
+                path.resolve(__dirname, "..", file),
+                "utf8",
+            );
+            expect(text, file).not.toMatch(
+                /saroh_src|SOURCE_COOKIE|keptSource/,
+            );
+        }
     });
 });

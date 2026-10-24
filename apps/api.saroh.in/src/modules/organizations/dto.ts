@@ -7,6 +7,7 @@ import {
     IsEmail,
     IsIn,
     IsInt,
+    IsObject,
     IsOptional,
     IsString,
     IsUrl,
@@ -45,6 +46,8 @@ import { ACCEPTED_BUSINESS_TYPES } from "./business-type";
 import type { OrganizationKind } from "./organization-kind";
 import { ORGANIZATION_KINDS } from "./organization-kind";
 import { referralCodeOf } from "./referral";
+import type { SignupSource } from "./signup-source";
+import { signupSourceOf } from "./signup-source";
 
 export { BUSINESS_TYPES, type BusinessType } from "./business-type";
 
@@ -244,6 +247,19 @@ export class OnboardOrganizationDto {
     @IsOptional()
     @IsString()
     managerCode?: string;
+
+    /**
+     * Where the business came from (#1190): `src` and utm from the
+     * `saroh_src` cookie, sent by the workspace, never typed. Never
+     * refused: a value not safely shaped is dropped (`signup-source.ts`),
+     * so a bad link can't stop a business being made.
+     */
+    @Transform(
+        ({ value }: { value: unknown }) => signupSourceOf(value) ?? undefined,
+    )
+    @IsOptional()
+    @IsObject()
+    signupSource?: SignupSource;
 
     /**
      * Who Saroh bills for it (DEC-167, R7): one of the caller's own billing

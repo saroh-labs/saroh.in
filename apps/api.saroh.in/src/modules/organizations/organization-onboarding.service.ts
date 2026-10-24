@@ -153,8 +153,9 @@ export class OrganizationOnboardingService {
                 },
             );
 
-            // Who referred it (DEC-156), written here and nowhere else: no
-            // later write names these two columns, so it is never changed.
+            // Who referred it (DEC-156) and where it came from (#1190),
+            // written here and nowhere else: no later write names these
+            // columns, so they are never changed.
             const organization = await tx.organization.create({
                 data: {
                     name: dto.name,
@@ -166,6 +167,9 @@ export class OrganizationOnboardingService {
                               referredByOrganizationId: referredBy,
                               referredAt: new Date(),
                           }
+                        : {}),
+                    ...(dto.signupSource
+                        ? { signupSource: { ...dto.signupSource } }
                         : {}),
                 },
                 select: { id: true, slug: true, createdAt: true },

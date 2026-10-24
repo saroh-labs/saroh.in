@@ -41,6 +41,20 @@ import { readAddress } from "@/lib/page-address";
  * - Like the referral, nothing about it is given to a tag: `am` is not on
  *   the address allow-list (`lib/page-address.ts`), so it is cut before a
  *   tag loads, and the cookie is never passed to one.
+ *
+ * Where a visitor came from (#1190), `src` and `utm_source`,
+ * `utm_medium` and `utm_campaign` from the address they landed on, is kept
+ * the same way in a third cookie, {@link SOURCE_COOKIE}, and written once on
+ * the business they set up. Its differences:
+ *
+ * - **It holds the four values as a query** (`src=…&utm_source=…`), each
+ *   only letters, digits, `.`, `_` or `-`, at most {@link SOURCE_MAX}
+ *   characters. A value of any other shape is dropped; the rest are kept.
+ * - **The last link wins, part by part**: a new `src` replaces the kept one,
+ *   and a link with any utm replaces all three, so a later page opened from
+ *   a call to action (`/waitlist?src=…`) keeps the campaign it came by.
+ * - `src` and utm stay in the address for tags (`lib/page-address.ts`), as
+ *   before; the cookie itself is never given to a tag.
  */
 export const REFERRAL_COOKIE = "saroh_ref";
 
@@ -58,6 +72,51 @@ export const MANAGER_COOKIE = "saroh_am";
 
 /** A manager code's shape, the API's `MANAGER_CODE_PATTERN`. */
 const MANAGER_CODE = /^[2-9A-HJKMNP-Z]{8}$/;
+
+/** Where a visitor came from (#1190): `src` and utm, kept for setup. */
+export const SOURCE_COOKIE = "saroh_src";
+
+/** The longest value kept; the workspace and the API cap it the same. */
+export const SOURCE_MAX = 64;
+
+/** The query names kept, `src` first, then the campaign's three. */
+const SOURCE_KEYS = [
+    "src",
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+] as const;
+
+const SOURCE_VALUE = new RegExp(`^[A-Za-z0-9._-]{1,${SOURCE_MAX}}$`);
+
+type Source = Partial<Record<(typeof SOURCE_KEYS)[number], string>>;
+
+/** The source values in a query, each only when it is safely shaped. */
+export function sourceFromSearch(search: string): Source {
+    const query = new URLSearchParams(search);
+    const source: Source = {};
+    for (const key of SOURCE_KEYS) {
+        const value = query.get(key)?.trim();
+        if (value && SOURCE_VALUE.test(value)) source[key] = value;
+    }
+    return source;
+}
+
+/** The kept source in a `document.cookie` string, or an empty one. */
+export function keptSource(cookie: string): Source {
+    const value = cookieValue(cookie, SOURCE_COOKIE);
+    return value ? sourceFromSearch(value) : {};
+}
+
+/** The source cookie, as `document.cookie` is assigned it. */
+export function sourceCookie(source: Source, at: CookieAt): string {
+    const query = new URLSearchParams();
+    for (const key of SOURCE_KEYS) {
+        const value = source[key];
+        if (value) query.set(key, value);
+    }
+    return keptCookie(SOURCE_COOKIE, query.toString(), at);
+}
 
 /** The code in a page's query, or null when it holds none shaped like one. */
 export function referralFromSearch(search: string): string | null {
@@ -93,8 +152,10 @@ export function managerFromSearch(search: string): string | null {
 /** The value of cookie `name` in a `document.cookie` string, or null. */
 function cookieValue(cookie: string, name: string): string | null {
     for (const part of cookie.split(";")) {
-        const [key, value] = part.trim().split("=");
-        if (key === name && value) return value;
+        const at = part.indexOf("=");
+        if (at < 0) continue;
+        const value = part.slice(at + 1).trim();
+        if (part.slice(0, at).trim() === name && value) return value;
     }
     return null;
 }
@@ -159,8 +220,8 @@ function keptCookie(name: string, value: string, at: CookieAt): string {
 }
 
 /**
- * Keeps the referral code and the manager link this page was opened with,
- * if it was opened with either. The query is read through `readAddress`,
+ * Keeps the referral code, the manager link and the source this page was
+ * opened with, whichever it was opened with. The query is read through `readAddress`,
  * so it is found whether or not the address has been cut back for a tag
  * yet.
  */
@@ -175,7 +236,11 @@ export function keepReferral(
             ? null
             : referralFromSearch(search);
     const manager = managerFromSearch(search);
-    if (!code && !manager) return;
+    const source = sourceFromSearch(search);
+    const hasUtm = Boolean(
+        source.utm_source ?? source.utm_medium ?? source.utm_campaign,
+    );
+    if (!code && !manager && source.src === undefined && !hasUtm) return;
     try {
         const at = {
             host: win.location.hostname,
@@ -186,6 +251,13 @@ export function keepReferral(
         // The same link opened again keeps when it was first kept.
         if (manager && keptManagerLink(win.document.cookie)?.code !== manager) {
             win.document.cookie = managerCookie(manager, now(), at);
+        }
+        if (source.src !== undefined || hasUtm) {
+            const kept = keptSource(win.document.cookie);
+            win.document.cookie = sourceCookie(
+                hasUtm ? { src: kept.src, ...source } : { ...kept, ...source },
+                at,
+            );
         }
     } catch {
         // Cookies are blocked, or the accounts address isn't one: nothing kept.

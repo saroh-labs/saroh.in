@@ -1,3 +1,5 @@
+import type { SignupSource } from "./service";
+
 /**
  * The referral code a visitor's browser carried here from saroh.in
  * (DEC-156): a first-party cookie saroh.in sets on the domain it shares
@@ -47,6 +49,39 @@ export function carriedManagerLink(
         managerLinkCode: code,
         ...(keptAt ? { managerLinkSetAt: keptAt } : {}),
     };
+}
+
+/**
+ * Where the visitor came from (#1190): `src` and utm from the address they
+ * landed on, kept by saroh.in in a cookie of its own beside the
+ * referral's, as a query (`src=…&utm_source=…`; the name, the keys and the
+ * shape are `apps/saroh.in/lib/referral.ts`'s, change one, change both).
+ * Setup sends it with the business and clears it once the business exists.
+ * Never given to a tag.
+ */
+export const SOURCE_COOKIE = "saroh_src";
+
+const SOURCE_VALUE = /^[A-Za-z0-9._-]{1,64}$/;
+
+const SOURCE_KEYS = {
+    src: "src",
+    utm_source: "utmSource",
+    utm_medium: "utmMedium",
+    utm_campaign: "utmCampaign",
+} as const;
+
+/** The safely shaped values in the cookie, or nothing when there are none. */
+export function carriedSource(
+    value: string | undefined,
+): SignupSource | undefined {
+    if (!value || value.length > 512) return undefined;
+    const query = new URLSearchParams(value);
+    const source: SignupSource = {};
+    for (const [from, to] of Object.entries(SOURCE_KEYS)) {
+        const part = query.get(from)?.trim();
+        if (part && SOURCE_VALUE.test(part)) source[to] = part;
+    }
+    return Object.keys(source).length > 0 ? source : undefined;
 }
 
 /**

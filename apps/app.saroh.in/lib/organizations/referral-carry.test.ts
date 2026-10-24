@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
     carriedManagerLink,
     carriedReferral,
+    carriedSource,
     MANAGER_COOKIE,
     managerCodeProblem,
     REFERRAL_COOKIE,
     referralCookieDomain,
+    SOURCE_COOKIE,
     typedManagerCode,
 } from "./referral-carry";
 
@@ -119,4 +121,39 @@ describe("a code the owner typed (DEC-169)", () => {
         expect(managerCodeProblem("ABCD0345")).toMatch(/8 letters and numbers/);
         expect(managerCodeProblem("hello")).toMatch(/8 letters and numbers/);
     });
+});
+
+describe("where a business came from (#1190)", () => {
+    it("has the name saroh.in gives it", () => {
+        // `apps/saroh.in/lib/referral.ts`: change one, change both.
+        expect(SOURCE_COOKIE).toBe("saroh_src");
+    });
+
+    it("is read from the cookie's query, in the API's names", () => {
+        expect(
+            carriedSource(
+                "src=solutions-salons-hero&utm_source=google&utm_medium=cpc&utm_campaign=salons_oct",
+            ),
+        ).toEqual({
+            src: "solutions-salons-hero",
+            utmSource: "google",
+            utmMedium: "cpc",
+            utmCampaign: "salons_oct",
+        });
+    });
+
+    it("drops a malformed value and keeps the rest", () => {
+        expect(
+            carriedSource(
+                `src=<script>&utm_source=google&utm_medium=a b&utm_campaign=${"x".repeat(65)}`,
+            ),
+        ).toEqual({ utmSource: "google" });
+    });
+
+    it.each([undefined, "", "other=1", "src=", "src=%3Cx%3E", "x".repeat(600)])(
+        "is nothing for %j",
+        (value) => {
+            expect(carriedSource(value)).toBeUndefined();
+        },
+    );
 });

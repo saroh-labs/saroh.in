@@ -93,6 +93,14 @@ export interface OrganizationProfileInput {
     registered?: boolean;
 }
 
+/** `src` and utm a business signed up from (#1190), as the API stores them. */
+export interface SignupSource {
+    src?: string;
+    utmSource?: string;
+    utmMedium?: string;
+    utmCampaign?: string;
+}
+
 export interface CreateOrganizationInput {
     name: string;
     /** "What are you setting up?" (DEC-070). Absent, the API stores BUSINESS. */
@@ -122,6 +130,12 @@ export interface CreateOrganizationInput {
      */
     managerLinkCode?: string;
     managerLinkSetAt?: string;
+    /**
+     * Where the business came from (#1190): `src` and utm from the
+     * `saroh_src` cookie saroh.in set, added by the create action, never
+     * from the form. Written once by the API.
+     */
+    signupSource?: SignupSource;
     /**
      * The code of the Saroh teammate helping them, typed at setup
      * (DEC-169). Optional; the API decides whether it names anyone.
