@@ -159,7 +159,7 @@ export function TypefacePicker({
                             onValueChange={setSearch}
                             placeholder="Search typefaces"
                             aria-label="Search typefaces"
-                            className="text-sm"
+                            className="pr-10 text-sm"
                         />
                         <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border px-1 font-mono text-[0.65625rem] text-muted-foreground">
                             Esc

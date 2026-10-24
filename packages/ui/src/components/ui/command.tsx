@@ -92,7 +92,9 @@ const CommandInput = React.forwardRef<
         <CommandPrimitive.Input
             ref={ref}
             className={cn(
-                "flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:text-disabled-foreground coarse:text-base",
+                // The forms plugin's border and focus ring off: the line under
+                // the row is the field's edge (owner, 24 Oct).
+                "flex h-11 w-full rounded-md border-0 bg-transparent px-0 py-3 text-sm shadow-none outline-none placeholder:text-muted-foreground focus:ring-0 disabled:cursor-not-allowed disabled:text-disabled-foreground coarse:text-base",
                 className,
             )}
             {...props}

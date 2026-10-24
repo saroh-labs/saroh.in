@@ -190,3 +190,26 @@ export function resolveVariant(
     }
     return lookDefault(type, content, look) ?? LEGACY_RESOLVERS[type](content);
 }
+
+/**
+ * How many products across a Product grid shows on a phone, given its
+ * resolved variant: the merchant's choice (`phoneColumns`), else the look's
+ * own — two for `plates` and for bare cards set a number across, one for
+ * the rest.
+ */
+export function productGridPhoneColumns(
+    variant: string,
+    content: {
+        phoneColumns?: 1 | 2;
+        cardStyle?: "card" | "bare";
+        columns?: 3 | 4 | 5;
+    },
+): 1 | 2 {
+    if (content.phoneColumns) return content.phoneColumns;
+    if (variant === "plates") return 2;
+    return variant === "default" &&
+        content.cardStyle === "bare" &&
+        content.columns !== undefined
+        ? 2
+        : 1;
+}

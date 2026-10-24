@@ -30,6 +30,7 @@ export function PlatesGrid({
     show,
     base,
     line,
+    phone,
 }: {
     products: ShopListingCard[];
     show: LeadShow;
@@ -37,11 +38,17 @@ export function PlatesGrid({
     base: string | null;
     /** The cell's line from a product's blurb (the grid's own rule). */
     line: (blurb: string | null) => string | null;
+    /** One across on a phone, when the merchant chose it; else two. */
+    phone?: 1 | 2;
 }) {
+    const one = phone === 1;
     return (
         <ul
             data-grid-look="plates"
-            className="bg-site-border grid auto-rows-[210px] grid-cols-2 gap-[var(--site-grid-gap)] md:auto-rows-[214px] md:[grid-template-columns:1.7fr_1fr_1fr]"
+            className={cn(
+                "bg-site-border grid auto-rows-[210px] gap-[var(--site-grid-gap)] md:auto-rows-[214px] md:[grid-template-columns:1.7fr_1fr_1fr]",
+                one ? "grid-cols-1" : "grid-cols-2",
+            )}
         >
             {products.map((p, i) => {
                 const lead = i === 0;
@@ -60,7 +67,10 @@ export function PlatesGrid({
                         key={p.slug}
                         className={cn(
                             "min-w-0",
-                            lead && "col-span-2 md:col-span-1 md:row-span-2",
+                            lead &&
+                                (one
+                                    ? "md:row-span-2"
+                                    : "col-span-2 md:col-span-1 md:row-span-2"),
                         )}
                     >
                         {base !== null ? (

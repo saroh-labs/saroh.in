@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 
+import { edit, fixture } from "./catalog.fixture";
+import type { Catalog } from "./schema";
+import { cellOf } from "./schema";
+
 import {
     addMonthsUtc,
     MOVE_NOTICE_DAYS,
     moveDateFor,
     moveNoticeDays,
     PRICE_NOTICE_DAYS,
+    withLiveAdditions,
 } from "./moves";
 
 const d = (s: string) => new Date(`${s}T00:00:00Z`);
@@ -67,5 +72,41 @@ describe("moveNoticeDays", () => {
         expect(moveNoticeDays(11_100, 12_300)).toBe(30);
         expect(moveNoticeDays(12_300, 11_100)).toBe(30);
         expect(moveNoticeDays(11_100, 11_100)).toBe(7);
+    });
+});
+
+describe("withLiveAdditions (DEC-186)", () => {
+    const mod = (c: Catalog, id: string) => {
+        const m = c.modules.find((x) => x.id === id);
+        if (!m) throw new Error(`no row ${id}`);
+        return m;
+    };
+    const cell = (c: Catalog, id: string, plan: string) =>
+        cellOf(mod(c, id), plan);
+
+    it("gives an older version's plan a row the live one has added, and nothing else", () => {
+        const own = fixture();
+        const live = edit(own, (c) => {
+            mod(c, "roles").cells.b = mod(c, "roles").cells.c;
+            // Taken away, a lower limit and a dearer plan on live: none
+            // of them reaches it.
+            mod(c, "invoicing").cells.b = { inc: false, off: "locked" };
+            mod(c, "members").cells.b = mod(c, "members").cells.a;
+            for (const p of c.plans) p.pricePaise += 100;
+        });
+
+        const out = withLiveAdditions(own, live);
+
+        expect(cell(out, "roles", "b").inc).toBe(true);
+        expect(cell(out, "roles", "a").inc).toBe(false);
+        expect(cell(out, "invoicing", "b").inc).toBe(true);
+        expect(cell(out, "members", "b")).toEqual(cell(own, "members", "b"));
+        expect(out.plans).toBe(own.plans);
+        expect(cell(own, "roles", "b").inc).toBe(false);
+    });
+
+    it("returns the same rows when the live version adds nothing", () => {
+        const own = fixture();
+        expect(withLiveAdditions(own, fixture()).modules).toEqual(own.modules);
     });
 });

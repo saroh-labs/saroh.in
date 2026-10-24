@@ -456,3 +456,54 @@ describe("a grid card's price when GST comes on top", () => {
         }
     });
 });
+
+describe("products across on a phone, the owner's choice (24 Oct)", () => {
+    const listOf = (look: RenderedProductGrid) => {
+        const { container } = render(
+            <ProductGridSection
+                content={look}
+                feed={{ products: BREADS, basePath: "/shop" }}
+            />,
+        );
+        const ul = container.querySelector("ul");
+        if (!ul) throw new Error("no grid");
+        return ul.className.split(/\s+/);
+    };
+
+    it.each([
+        { ...content },
+        { ...content, cardStyle: "bare" },
+        { ...content, cardStyle: "bare", columns: 5 },
+        { ...content, variant: "lead" },
+        { ...content, variant: "plates" },
+    ])("lays a phone out as chosen (%o)", (look) => {
+        expect(listOf({ ...look, phoneColumns: 1 })).toContain("grid-cols-1");
+        expect(listOf({ ...look, phoneColumns: 1 })).not.toContain(
+            "grid-cols-2",
+        );
+        expect(listOf({ ...look, phoneColumns: 2 })).toContain("grid-cols-2");
+        expect(listOf({ ...look, phoneColumns: 2 })).not.toContain(
+            "grid-cols-1",
+        );
+    });
+
+    it("keeps each look's own steps when nothing is chosen, or a count it doesn't know", () => {
+        expect(listOf({ ...content, cardStyle: "bare", columns: 5 })).toEqual(
+            listOf({
+                ...content,
+                cardStyle: "bare",
+                columns: 5,
+                phoneColumns: 3,
+            }),
+        );
+        expect(listOf({ ...content, cardStyle: "bare", columns: 5 })).toContain(
+            "min-[360px]:grid-cols-2",
+        );
+    });
+
+    it("ignores it in the list layout", () => {
+        expect(
+            listOf({ ...content, layout: "list", phoneColumns: 2 }),
+        ).toContain("grid-cols-1");
+    });
+});

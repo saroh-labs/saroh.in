@@ -386,7 +386,10 @@ export function DraftPreview({
                 header
             )}
             {top ? <ModulePageTop title={top.title} lead={top.lead} /> : null}
-            <div className="space-y-4 p-[var(--site-page-margin)]">{page}</div>
+            {/* Back to back, as the live site draws them: each block keeps its
+                own margins, and a full-bleed hero meets both edges under the
+                header (owner, 24 Oct). */}
+            <div>{page}</div>
             {footer && editing && onSelectChrome ? (
                 <CanvasBlock
                     label="Footer"

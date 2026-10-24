@@ -1,4 +1,6 @@
 import type { BillingCycle } from "./price";
+import type { Catalog } from "./schema";
+import { cellOf } from "./schema";
 
 /** A business hears about a move at least this many days before it applies (KTD-4). */
 export const MOVE_NOTICE_DAYS = 7;
@@ -62,4 +64,27 @@ export function moveDateFor(
         at = addMonthsUtc(billingDate, k);
     }
     return at;
+}
+
+/**
+ * A business stays on the version it is billed on until a move (KTD-4), but
+ * a row its plan has gained since is its at once (DEC-186, owner 24 Oct
+ * 2026): a cell off on its own version and included on the live one reads
+ * as the live cell. Only additions: no row is taken away, no included
+ * row's limit changes, and the price stays its own version's.
+ */
+export function withLiveAdditions(own: Catalog, live: Catalog): Catalog {
+    const modules = own.modules.map((m) => {
+        const later = live.modules.find((x) => x.id === m.id);
+        if (!later) return m;
+        let cells = m.cells;
+        for (const plan of own.plans) {
+            const now = cellOf(later, plan.id);
+            if (now.inc && !cellOf(m, plan.id).inc) {
+                cells = { ...cells, [plan.id]: now };
+            }
+        }
+        return cells === m.cells ? m : { ...m, cells };
+    });
+    return { ...own, modules };
 }
