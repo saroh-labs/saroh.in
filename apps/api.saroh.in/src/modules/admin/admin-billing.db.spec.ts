@@ -900,6 +900,7 @@ describe("Admin › Billing › the referrals and managers export (#1189)", () =
                 kind: "ASSIGNED",
                 startedAt: new Date("2026-09-01T00:00:00.000Z"),
                 endedAt: new Date("2026-10-20T00:00:00.000Z"),
+                endedReason: "Moved on",
             },
         });
         await invoice(at.managed, 15, null);
