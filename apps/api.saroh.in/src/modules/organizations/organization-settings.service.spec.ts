@@ -183,7 +183,9 @@ describe("OrganizationSettingsService", () => {
 
         it("sends the checklist's facts: products, services, sites, those not live and invoices (H-5, H-6, DEC-070)", async () => {
             (prisma.product.count as jest.Mock).mockResolvedValueOnce(0);
-            (prisma.service.count as jest.Mock).mockResolvedValueOnce(2);
+            (prisma.service.count as jest.Mock)
+                .mockResolvedValueOnce(2)
+                .mockResolvedValueOnce(4);
             (prisma.site.count as jest.Mock)
                 .mockResolvedValueOnce(2)
                 .mockResolvedValueOnce(1);
@@ -191,6 +193,7 @@ describe("OrganizationSettingsService", () => {
             expect((await service.get(ctx())).setup).toEqual({
                 products: 0,
                 services: 2,
+                sampleServices: 4,
                 sites: 2,
                 sitesNotLive: 1,
                 invoices: 3,
@@ -211,6 +214,18 @@ describe("OrganizationSettingsService", () => {
                     deletedAt: null,
                     currentPublicationId: null,
                 },
+            });
+            // A trade starter's samples are counted apart (DEC-189).
+            const kept = {
+                organizationId: "org_1",
+                deletedAt: null,
+                status: { not: "ARCHIVED" },
+            };
+            expect(prisma.service.count).toHaveBeenCalledWith({
+                where: { ...kept, isSample: false },
+            });
+            expect(prisma.service.count).toHaveBeenLastCalledWith({
+                where: { ...kept, isSample: true },
             });
         });
 

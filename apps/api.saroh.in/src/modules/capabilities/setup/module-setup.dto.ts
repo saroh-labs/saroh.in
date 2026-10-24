@@ -15,6 +15,7 @@ import {
     MaxLength,
     Min,
     MinLength,
+    ValidateIf,
     ValidateNested,
 } from "class-validator";
 
@@ -22,6 +23,8 @@ import { listTemplates } from "@saroh/templates";
 
 import type { StorefrontFulfilmentType } from "../../orders/fulfilment";
 import { STOREFRONT_FULFILMENT_TYPES } from "../../orders/fulfilment";
+import type { Trade } from "./trade-presets";
+import { TRADES } from "./trade-presets";
 
 /**
  * The setup payload of `PUT /organizations/:id/modules/:key` (DEC-068): what
@@ -96,20 +99,30 @@ export class FirstServiceDto {
     price!: string;
 }
 
-/** Bookings: opening hours and the first service. */
+/**
+ * Bookings: opening hours and the first service — or a trade (DEC-189),
+ * whose sample services replace the first service and whose hours are used
+ * when none are sent. Without a trade, both are asked, as before.
+ */
 export class AppointmentsSetupDto {
+    @IsOptional()
+    @IsIn(TRADES, { message: "Choose Salon or Gym, or something else." })
+    trade?: Trade;
+
+    @ValidateIf((o: AppointmentsSetupDto) => !o.trade || o.hours !== undefined)
     @IsArray({ message: "Set your opening hours." })
     @ArrayMinSize(1, { message: "Open on at least one day." })
     @ArrayMaxSize(21, { message: "Up to three windows a day." })
     @ValidateNested({ each: true })
     @Type(() => OpeningHoursDto)
-    hours!: OpeningHoursDto[];
+    hours?: OpeningHoursDto[];
 
+    @ValidateIf((o: AppointmentsSetupDto) => !o.trade)
     @IsDefined({ message: "Add your first service." })
     @IsObject({ message: "Add your first service." })
     @ValidateNested()
     @Type(() => FirstServiceDto)
-    service!: FirstServiceDto;
+    service?: FirstServiceDto;
 }
 
 /** Website: the site's name and its address, `<address>.saroh.app`. */

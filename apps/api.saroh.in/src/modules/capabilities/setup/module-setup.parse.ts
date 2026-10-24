@@ -96,7 +96,7 @@ function flatten(errors: ValidationError[], prefix: string): SetupFieldError[] {
 
 /** Hours that close after they open, per window. */
 function hoursProblems(setup: AppointmentsSetupDto): SetupFieldError[] {
-    return setup.hours.flatMap((h, i) =>
+    return (setup.hours ?? []).flatMap((h, i) =>
         h.open < h.close
             ? []
             : [

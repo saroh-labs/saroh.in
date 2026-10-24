@@ -95,7 +95,13 @@ export interface RegisteredAddress {
 /** The checklist's facts (`OrganizationSettings.setup`). */
 export interface SetupFacts {
     products: number;
+    /** Services, a trade starter's samples aside (DEC-189). */
     services: number;
+    /**
+     * A trade starter's samples not yet kept (DEC-189). Absent from an API
+     * older than it: none.
+     */
+    sampleServices?: number;
     sites: number;
     sitesNotLive: number;
     /**

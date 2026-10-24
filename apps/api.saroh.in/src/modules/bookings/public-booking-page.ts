@@ -39,6 +39,7 @@ import { openingFor } from "./opening-hours";
 import { bookableStarts, furthestAhead, loadDiaryRules } from "./person-rules";
 import type { OnceRead } from "./reservation";
 import { loadBookableService, readNow } from "./reservation";
+import { NOT_SAMPLE } from "./sample-services";
 import { depositCents } from "./service-fields";
 import { serviceCharge } from "./service-price";
 import {
@@ -462,6 +463,8 @@ export function offeredOnSite(organizationId: string, siteId: string) {
         status: "ACTIVE" as const,
         // The merchant's "Show on booking page" (E1).
         showOnBookingPage: true,
+        // Never a trade starter's sample before it is kept (DEC-189).
+        ...NOT_SAMPLE,
         OR: [{ siteId: null }, { siteId }],
     };
 }
@@ -631,6 +634,7 @@ export async function publicServices(ids: string[]): Promise<PublicService[]> {
             deletedAt: null,
             status: "ACTIVE",
             showOnBookingPage: true,
+            ...NOT_SAMPLE,
             // The same rule public booking closes on (#327), so a list
             // never offers a service its booking block would refuse.
             // Offline with a deleted business's site (#921).

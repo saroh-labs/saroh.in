@@ -5171,6 +5171,10 @@ model Service {
   // of Who can book it (DEC-170, Q5 of 19 Oct). Neither tick reads as
   // paused in the app; bookings already made stay.
   bookableByTeam    Boolean @default(true)
+  // A trade starter's sample (DEC-189): written by setup with
+  // `showOnBookingPage` off, and never shown publicly until the owner keeps
+  // or edits it, which clears this and shows it.
+  isSample          Boolean @default(false)
 
   // The order lines that bill it: a treatment sold as an order (E9).
   orderItems OrderItem[]

@@ -273,7 +273,9 @@ export async function loadBookableService(
     if (service.status !== "ACTIVE") {
         throw new GoneException("This service is not accepting bookings");
     }
-    if (bookingPage && !service.showOnBookingPage) {
+    // A trade starter's sample is never booked online before it is kept
+    // (DEC-189), even by a caller that knows its id.
+    if (bookingPage && (!service.showOnBookingPage || service.isSample)) {
         throw new GoneException("This service isn't booked online");
     }
     // A deleted business's booking page is offline with its site (#921).
