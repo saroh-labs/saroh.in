@@ -84,6 +84,12 @@ const INDEXED = [
 ];
 
 /**
+ * The plain-text files for AI assistants (#1187), listed in the sitemap but
+ * not pages: `/llms.txt` always, `/pricing.md` once the launch switch is open.
+ */
+const TEXT_FILES = ["/llms.txt", ...(OPEN ? ["/pricing.md"] : [])];
+
+/**
  * The Resources pages (plan U1) the sitemap lists once each is published
  * and built (`apps/saroh.in/content/resources.ts`): which ones depends on
  * the day and on which routes have landed, so the sitemap may list these on
@@ -624,8 +630,12 @@ test.describe("links, redirects and the sitemap", () => {
         ]
             .map((m) => new URL(m[1]).pathname)
             .sort();
-        expect(listed).toEqual(expect.arrayContaining(INDEXED));
-        const extra = listed.filter((p) => !INDEXED.includes(p));
+        expect(listed).toEqual(
+            expect.arrayContaining([...INDEXED, ...TEXT_FILES]),
+        );
+        const extra = listed.filter(
+            (p) => !INDEXED.includes(p) && !TEXT_FILES.includes(p),
+        );
         expect(
             extra.filter(
                 (p) => !RESOURCE_PREFIXES.some((r) => p.startsWith(r)),
