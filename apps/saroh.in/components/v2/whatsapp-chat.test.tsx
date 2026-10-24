@@ -11,7 +11,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { track } from "@/lib/analytics";
 import { writeChoices, writeConsent } from "@/lib/consent";
 
-import { pageKind, WhatsAppChat, whatsappNumber } from "./whatsapp-chat";
+import { pageKind, whatsappNumber } from "@/lib/whatsapp";
+
+import { WhatsAppChat } from "./whatsapp-chat";
 
 /** The floating WhatsApp button (#1188), dev only until the real number is connected. */
 vi.mock("next/navigation", () => ({ usePathname: () => "/pricing" }));
