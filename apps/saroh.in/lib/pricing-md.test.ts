@@ -1,7 +1,7 @@
 import { formatInr } from "@saroh/pricing-catalog";
 import { describe, expect, it } from "vitest";
 
-import { pricingMarkdown } from "./pricing-md";
+import { cell, pricingMarkdown } from "./pricing-md";
 import { fakeCatalog } from "./pricing.fixture";
 
 const BASE = "https://www.saroh.in";
@@ -75,5 +75,11 @@ describe("pricingMarkdown", () => {
         expect(md).toContain(`${BASE}/pricing`);
         expect(md).not.toMatch(/₹|\d/);
         expect(md).not.toContain("## Plan");
+    });
+
+    it("escapes a backslash before a pipe, so a cell can't end its row", () => {
+        expect(cell("a | b")).toBe("a \\| b");
+        expect(cell("a \\| b")).toBe("a \\\\\\| b");
+        expect(cell("one\n two")).toBe("one two");
     });
 });

@@ -16,8 +16,12 @@ import { pricingPageModel } from "./pricing-view";
  * and points at `/pricing`.
  */
 
-/** A table cell: one line, with no pipe to break the row. */
-const cell = (t: string) => t.replace(/\|/g, "\\|").replace(/\s+/g, " ");
+/**
+ * A table cell: one line, with no pipe to break the row. Backslashes go
+ * first, so a `\` already in the text can't undo the pipe's escape.
+ */
+export const cell = (t: string) =>
+    t.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\s+/g, " ");
 
 const priceLine = (p: PlanCardView) => `**${p.price}** ${p.per} (${p.sub})`;
 

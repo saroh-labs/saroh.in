@@ -5933,3 +5933,10 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** the seed's products and the spec's photos point at images.unsplash.com. In a full run the trace shows the request sent and never answered; the editor's check waits for `load` or `error` on `new Image()`, and `goto` waits for every image, so neither ever finished.
 - **Fix:** `fixtures/remote-images.ts` answers images.unsplash.com with a 1×1 PNG via `page.route`; both specs call it first.
 - **Rule:** a spec never waits on an outside host. A screen that shows seeded Unsplash photos, or a test that adds one, calls `answerRemoteImages(page)` before it navigates.
+
+## CodeQL: a Markdown table cell escaped the pipe but not the backslash (24 Oct 2026)
+
+- **Symptom:** CodeQL failed PR #1226 with a high alert, "This does not escape backslash characters in the input", on `apps/saroh.in/lib/pricing-md.ts` (`/pricing.md`, #1187). Every local check had passed.
+- **Cause:** `cell()` turned `|` into `\|` but left `\` alone, so a backslash already in catalogue text (`a \| b`) would undo the escape and split the row.
+- **Fix:** escape `\` first, then `|` (`cell()`, with a test in `pricing-md.test.ts`).
+- **Rule:** any escaping by `replace` escapes the escape character itself first. CodeQL (`js/incomplete-sanitization`) is the check; the gate doesn't run it, so a new hand-written escaper gets a test with a backslash in its input.
