@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { Injectable, Logger } from "@nestjs/common";
 import { outsideOrgContext, prisma } from "@saroh/database";
 
@@ -233,6 +235,78 @@ export function signedUp(userId: string, cookieHeader: string | null): void {
         userId,
         sourceProperties(sourceFromCookies(cookieHeader)),
     );
+}
+
+/**
+ * The events outside the milestones, each with its own send path (DEC-187).
+ * With {@link PRODUCT_MILESTONES}, the whole closed list; anything further is
+ * the owner's decision.
+ */
+export const FUNNEL_EVENTS = ["signup_page_viewed"] as const;
+
+const REFERRAL_CHANNELS = [
+    "business",
+    "account_manager",
+    "both",
+    "none",
+] as const;
+
+/** A catalogue plan id's shape (`grow`, `pro`, …); whether it exists isn't checked. */
+const PLAN_ID = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+
+function oneOf<T extends string>(
+    allowed: readonly T[],
+    value: unknown,
+): T | undefined {
+    return allowed.find((a) => a === value);
+}
+
+/**
+ * What a sign-up page view may say, from the body accounts' server sends
+ * (DEC-187, amended 24 Oct): `src` and utm, the plan and cycle picked on
+ * saroh.in, and whether a referral code was carried. Shape checks only; a
+ * value of any other shape is dropped. Never a code, an address, a cookie
+ * or anything else from the body.
+ */
+export function signupViewProperties(raw: unknown): Record<string, string> {
+    const body = (
+        typeof raw === "object" && raw !== null && !Array.isArray(raw)
+            ? raw
+            : {}
+    ) as Record<string, unknown>;
+    const { src, utmSource, utmMedium, utmCampaign } =
+        signupSourceOf({
+            src: body.src,
+            utmSource: body.utm_source,
+            utmMedium: body.utm_medium,
+            utmCampaign: body.utm_campaign,
+        }) ?? {};
+    const plan =
+        typeof body.plan === "string" && PLAN_ID.test(body.plan)
+            ? body.plan
+            : undefined;
+    const cycle = oneOf(["month", "year"], body.cycle);
+    return {
+        ...(src ? { src } : {}),
+        ...(utmSource ? { utm_source: utmSource } : {}),
+        ...(utmMedium ? { utm_medium: utmMedium } : {}),
+        ...(utmCampaign ? { utm_campaign: utmCampaign } : {}),
+        ...(plan ? { plan } : {}),
+        ...(cycle ? { cycle } : {}),
+        referral_channel:
+            oneOf(REFERRAL_CHANNELS, body.referral_channel) ?? "none",
+    };
+}
+
+/**
+ * Someone opened the sign-up page (`signup_page_viewed`): an anonymous
+ * count, so the funnel shows who leaves before making an account. Its id is
+ * new for every view: no person, no cookie, nothing to join it to
+ * `signed_up` by (DEC-187, amended 24 Oct).
+ */
+export function signupPageViewed(properties: Record<string, string>): void {
+    if (!telemetryOn()) return;
+    captureProductEvent("signup_page_viewed", randomUUID(), properties);
 }
 
 @Injectable()

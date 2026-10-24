@@ -7,6 +7,7 @@ import { isJoining } from "@/lib/joining";
 import { onboardingForInvite, onboardingForPlan } from "@/lib/plan-intent";
 import { safeDestination } from "@/lib/return-to";
 import { signInProviders } from "@/lib/sign-in-options";
+import { recordSignupView } from "@/lib/signup-viewed";
 
 export const metadata: Metadata = {
     title: "Sign up",
@@ -38,7 +39,9 @@ export default async function SignupPage({
 }: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    const { redirect, email, plan, cycle, invite } = await searchParams;
+    const params = await searchParams;
+    const { redirect, email, plan, cycle, invite } = params;
+    await recordSignupView(params);
     const returnTo =
         safeDestination(redirect) ??
         onboardingForInvite(invite) ??

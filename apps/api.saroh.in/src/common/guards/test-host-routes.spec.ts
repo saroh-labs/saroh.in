@@ -98,6 +98,9 @@ const REFUSED = [
     // A staff invite's preview (admin plan U24): it writes nothing, but only
     // accounts' server calls it, never a merchant's test release.
     "POST public/staff-invites/preview",
+    // A sign-up page view (DEC-187): a count; only accounts' server sends
+    // one, never a merchant's test release.
+    "POST public/funnel/signup-viewed",
     // Plans, packs and autopay.
     "POST public/site-accounts/me/plans/:ref/join",
     "POST public/site-accounts/me/plan/:ref/cancel",

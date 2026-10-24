@@ -201,15 +201,26 @@ A saved PostHog insight, not an admin module. The owner makes it once in the
 project (it can't be made from the repo) and puts its link here:
 
 - **Type**: Funnel, weekly, conversion window 90 days, unique by the
-  event's id. Steps: `signed_up` → `onboarding_finished` → `site_published`
-  → `first_booking_taken` _or_ `first_order_taken` (one step, either event)
-  → `payment_provider_connected` → `plan_upgraded`.
+  event's id. Steps: `signup_page_viewed` → `signed_up` →
+  `onboarding_finished` → `site_published` → `first_booking_taken` _or_
+  `first_order_taken` (one step, either event) →
+  `payment_provider_connected` → `plan_upgraded`.
 - **Breakdown**: `src` (and, as a second view, `referral_channel`). Filter
   `environment = production`.
-- `signed_up` is keyed by the user and the rest by the business, so the
-  first step is a count of sign-ups by source beside the business funnel,
-  not a joined path. Read "started" as `signed_up` and "completed" as
-  `onboarding_finished`, each broken down by `src`.
+- `signup_page_viewed` (24 Oct, #1190) is someone opening the sign-up
+  page: accounts' server tells the API after a real render of `/signup`
+  (`apps/accounts.saroh.in/lib/signup-viewed.ts` →
+  `POST public/funnel/signup-viewed`). An anonymous count: a new random id
+  per view, no person, no cookie, no code. Properties: `src` and utm (the
+  link's, else the `saroh_src` cookie's), `plan`, `cycle` and
+  `referral_channel`, each shape-checked. Not counted: bots, prefetches, a
+  caller past `SIGNUP_VIEWS_PER_MINUTE`. No consent is needed (nothing
+  identifies the visitor; DEC-127 holds).
+- Each step has a different id (a view's is random, `signed_up`'s the
+  user's, the rest the business's), so the funnel is weekly counts by `src`
+  side by side, not a joined path. Read "left before an account" as
+  `signup_page_viewed` minus `signed_up`, "started" as `signed_up` and
+  "completed" as `onboarding_finished`, each broken down by `src`.
 - **Export**: the insight's ⋯ → Export → CSV, weekly.
 - Link: _to be added by the owner once saved._
 

@@ -12,12 +12,14 @@ import { ActivationEvents } from "./activation-events";
 import type { AnalyticsService, RecordEventInput } from "./analytics.service";
 import { ACTIVATION_TYPES } from "./event-contract";
 import {
+    FUNNEL_EVENTS,
     MILESTONE_BY_LEDGER_TYPE,
     PRODUCT_EVENTS,
     PRODUCT_MILESTONES,
     ProductMilestones,
     UPGRADE_PROMPT_EVENTS,
     signedUp,
+    signupViewProperties,
     sourceProperties,
 } from "./product-milestones";
 
@@ -99,6 +101,22 @@ describe("product milestones (DEC-125)", () => {
         );
         for (const type of Object.keys(MILESTONE_BY_LEDGER_TYPE))
             expect(ACTIVATION_TYPES).toContain(type);
+        // The events with their own send path (DEC-187), none a milestone.
+        expect([...FUNNEL_EVENTS]).toEqual(["signup_page_viewed"]);
+    });
+
+    it("keeps every sign-up view key through the scrubber's drop pattern", () => {
+        const properties = signupViewProperties({
+            src: "a",
+            utm_source: "b",
+            utm_medium: "c",
+            utm_campaign: "d",
+            plan: "grow",
+            cycle: "year",
+            referral_channel: "both",
+        });
+        expect(scrubContext(properties)).toEqual(properties);
+        expect(Object.keys(properties)).toHaveLength(7);
     });
 
     it("grows the closed list by exactly the two prompt events (DEC-187), neither from the ledger", () => {
