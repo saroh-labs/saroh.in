@@ -93,8 +93,8 @@
     "name": "saroh.in",
     "pnpm": {
         "overrides": {
-            "nextra>zod": "4.6.6",
-            "nextra-theme-docs>zod": "4.6.6",
+            "nextra>zod": "4.3.0",
+            "nextra-theme-docs>zod": "4.3.0",
             "zod@>=4.0.0 <4.6.6": "4.6.6",
             "undici@>=7.0.0 <7.30.1": "7.30.1",
             "body-parser@>=2.0.0 <2.4.0": "2.4.0",
