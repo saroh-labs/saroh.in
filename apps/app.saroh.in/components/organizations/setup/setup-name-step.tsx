@@ -119,8 +119,20 @@ export function SetupNameStep({
                             the description and any error are wired to the
                             field a screen reader lands on, not its frame. */}
                         <div
+                            // The `.saroh.app` suffix and the right padding are
+                            // part of the field, so a click anywhere in the box
+                            // puts the cursor in the address, not just on the
+                            // input's own width.
+                            onMouseDown={(e) => {
+                                const input =
+                                    e.currentTarget.querySelector("input");
+                                if (input && e.target !== input) {
+                                    e.preventDefault();
+                                    input.focus();
+                                }
+                            }}
                             className={cn(
-                                "flex h-[38px] items-center rounded-md border border-input bg-field pr-3 font-mono text-sm focus-within:ring-2 focus-within:ring-ring coarse:h-11",
+                                "flex h-[38px] cursor-text items-center rounded-md border border-input bg-field pr-3 font-mono text-sm focus-within:ring-2 focus-within:ring-ring coarse:h-11",
                                 (taken || fieldState.invalid) &&
                                     "border-destructive",
                             )}

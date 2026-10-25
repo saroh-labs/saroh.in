@@ -228,6 +228,21 @@ describe("the name step", () => {
         expect(labelled("Web address").value).toBe("rye");
     });
 
+    it("clicking the .saroh.app suffix puts the cursor in the address", async () => {
+        await toName();
+        const field = labelled("Web address");
+        const suffix = Array.from(host.querySelectorAll("span")).find(
+            (s) => s.textContent.trim() === ".saroh.app",
+        );
+        if (!suffix) throw new Error("No .saroh.app suffix");
+        act(() => {
+            suffix.dispatchEvent(
+                new MouseEvent("mousedown", { bubbles: true }),
+            );
+        });
+        expect(document.activeElement).toBe(field);
+    });
+
     it("Continue is its gate: an empty name is said under its field, with the keyboard on it", async () => {
         await toName();
         await press();
