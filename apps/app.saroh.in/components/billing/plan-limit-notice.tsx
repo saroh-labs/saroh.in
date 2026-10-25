@@ -29,6 +29,7 @@ export async function PlanLimitNotice({
             pct={n.pct}
             body={n.body}
             cta={n.cta}
+            prompt={n.full ? "at_limit" : "near_limit"}
             href={
                 n.href ??
                 upgradeHref(accessRow(view, moduleId)?.upgradeTo?.planId)

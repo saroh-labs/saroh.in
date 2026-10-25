@@ -5,6 +5,13 @@ import type { IsoDay, PublishContext } from "./resources";
 import { isLive } from "./resources";
 
 /**
+ * The day this module's words last changed, the sitemap's `lastmod` for its
+ * pages (`lib/site-pages.ts`). Change it with the words:
+ * `pnpm check:content-dates` fails a batch that doesn't.
+ */
+export const UPDATED = "2026-10-07";
+
+/**
  * Help (Resources plan U5, design "Saroh Resources - Help" 1a and 2a): the
  * product areas the article's side nav lists, the task groups the home
  * page lists, and the typed frontmatter every article's MDX

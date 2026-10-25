@@ -167,6 +167,13 @@ function ExportRow(filters: {
             >
                 Export for the CA · {monthLabel(filters.month)}
             </a>
+            {/* The month's paid invoices with manager, source and referrer (#1189); no other filter. */}
+            <a
+                href={`/billing/invoices/attribution-export?month=${filters.month}`}
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+                Export referrals and managers
+            </a>
         </div>
     );
 }

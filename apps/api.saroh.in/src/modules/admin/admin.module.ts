@@ -74,6 +74,10 @@ import { AdminWaitlistController } from "./admin-waitlist.controller";
 import { AdminWaitlistService } from "./admin-waitlist.service";
 import { AdminController } from "./admin.controller";
 import {
+    INACTIVITY_SWEEP_TYPE,
+    InactivitySweepJob,
+} from "./inactivity-sweep.job";
+import {
     MANAGER_LINK_SWEEP_TYPE,
     ManagerLinkSweepJob,
 } from "./manager-link-sweep.job";
@@ -202,6 +206,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         SecurityLogRetentionHandler,
         // Links end with the Account manager role (DEC-169, U25).
         ManagerLinkSweepJob,
+        // Daily inactivity signals and the managers' email (#1199).
+        InactivitySweepJob,
     ],
 })
 export class AdminModule implements OnModuleInit, OnModuleDestroy {
@@ -215,6 +221,7 @@ export class AdminModule implements OnModuleInit, OnModuleDestroy {
         private readonly securityLogs: SecurityLogRetentionHandler,
         private readonly signInRelease: SignInEmailReleaseHandler,
         private readonly managerLinks: ManagerLinkSweepJob,
+        private readonly inactivity: InactivitySweepJob,
     ) {}
 
     /**
@@ -247,16 +254,19 @@ export class AdminModule implements OnModuleInit, OnModuleDestroy {
             MANAGER_LINK_SWEEP_TYPE,
             this.managerLinks.handle,
         );
+        this.registry.register(INACTIVITY_SWEEP_TYPE, this.inactivity.handle);
         if (env.NODE_ENV === "test") return;
         await this.deletion.schedule(new Date());
         await this.retentionErase.schedule(new Date());
         await this.securityLogs.schedule(new Date());
         await this.managerLinks.schedule(new Date());
+        await this.inactivity.schedule(new Date());
         this.chainCheck = setInterval(() => {
             void this.deletion.ensureScheduled();
             void this.retentionErase.ensureScheduled();
             void this.securityLogs.ensureScheduled();
             void this.managerLinks.ensureScheduled();
+            void this.inactivity.ensureScheduled();
         }, CHAIN_CHECK_MS);
         this.chainCheck.unref();
     }

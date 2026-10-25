@@ -29,10 +29,11 @@ export class ImportsController {
     /** The fields a column may be mapped to, for the mapping step. */
     @Get(":entity")
     describe(
+        @CurrentUser() user: AuthUser,
         @Param("storeId") storeId: string,
         @Param("entity") entity: string,
     ) {
-        return this.imports.describe(storeId, this.entity(entity));
+        return this.imports.describe(storeId, user.id, this.entity(entity));
     }
 
     /**

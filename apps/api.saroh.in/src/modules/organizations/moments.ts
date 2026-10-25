@@ -21,6 +21,9 @@ export const MOMENT_KEYS = [
     // Not a moment told: Product settings › Defaults' suggestions, put away
     // with "Not now" for the whole business (products audit, 16 Oct 2026).
     "defaults-suggestions",
+    // Not a moment told: the booking page (or shop) link was copied or
+    // shared, Home's "Share your booking link" step (#1194).
+    "shared-booking-link",
 ] as const;
 
 export type MomentKey = (typeof MOMENT_KEYS)[number];

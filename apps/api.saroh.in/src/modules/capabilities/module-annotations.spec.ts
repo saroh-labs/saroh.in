@@ -367,6 +367,12 @@ const NEVER: Record<string, string> = {
         "staff control plane (Saroh's own sales leads), not a tenant surface",
     // DEC-120: an owner takes the business's data whatever it has switched
     // off, and while it is closing or suspended.
+    // DEC-187: Saroh's own sign-up count and the owner's upgrade prompts,
+    // which belong to no module.
+    "analytics/signup-funnel.controller.ts":
+        "Saroh's anonymous sign-up page count, not a tenant surface",
+    "billing/upgrade-prompts.controller.ts":
+        "Saroh's own plan prompts to the owner — no module holds them",
     "data-export/data-export.controller.ts":
         "the owner's download of the business's own data — no module holds it",
 };

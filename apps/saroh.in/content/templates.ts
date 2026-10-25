@@ -9,6 +9,13 @@ import { EARLY_ACCESS_DAY } from "@/content/early-access";
 import type { WaitlistKindId } from "@/content/waitlist";
 
 /**
+ * The day this module's words last changed, the sitemap's `lastmod` for its
+ * pages (`lib/site-pages.ts`). Change it with the words:
+ * `pnpm check:content-dates` fails a batch that doesn't.
+ */
+export const UPDATED = "2026-10-24";
+
+/**
  * The Templates gallery (Resources plan U6, industry templates plan U13):
  * `/templates` and `/templates/[slug]`, built from `@saroh/templates` — the
  * same manifests a new site is created from — so the gallery can only show
@@ -446,7 +453,6 @@ export function listWords(words: readonly string[]): string {
 export { EARLY_ACCESS_DAY };
 /** As the copy writes it. */
 const EARLY_ACCESS_SHORT = "17 Oct";
-const LAST_WAITLIST_DAY = "16th";
 
 /**
  * The gallery's words. Each count and list is derived from the templates
@@ -490,19 +496,14 @@ export const templatesPage = {
     band: {
         before: `Pick one now. It's ready for you on ${EARLY_ACCESS_SHORT}.`,
         after: "Pick one, and start from it.",
-        body: "Join the waitlist, and we'll email you once, with your invite, when early access opens.",
+        body: "Start free, and pick your template when you set up your website.",
     },
 } as const;
 
 export const templateDetail = {
     crumb: "Templates",
-    save: (name: string) => `Save ${name} for early access`,
-    saveNote: {
-        before: (name: string) =>
-            `Early access opens ${EARLY_ACCESS_SHORT}. Join the waitlist by the ${LAST_WAITLIST_DAY} and we'll keep ${name} for you.`,
-        after: (name: string) =>
-            `Join the waitlist and we'll keep ${name} for you with your invite.`,
-    },
+    saveNote: (name: string) =>
+        `Start free, and pick ${name} when you set up your website.`,
     switcher: "Pages",
     desktop: "Desktop",
     phone: "Phone",

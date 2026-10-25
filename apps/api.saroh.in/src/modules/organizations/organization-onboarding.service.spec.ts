@@ -395,7 +395,7 @@ describe("OrganizationOnboardingService.onboard", () => {
     it("creates org + profile + OWNER membership atomically in one transaction", async () => {
         const dto: OnboardOrganizationDto = {
             name: "Acme",
-            profile: { legalName: "Acme Inc", type: "company", country: "US" },
+            profile: { legalName: "Acme Inc", type: "company", country: "IN" },
         };
 
         const result = await service.onboard("user_1", dto);
@@ -416,11 +416,11 @@ describe("OrganizationOnboardingService.onboard", () => {
                 legalName: "Acme Inc",
                 // An old client's spelling is stored as `pvt` (F10b).
                 type: "pvt",
-                country: "US",
+                country: "IN",
                 taxId: undefined,
                 contactEmail: undefined,
                 website: undefined,
-                // No zone sent, and the US keeps several: India's (UX-008).
+                // No zone sent: India's, its country's (UX-008).
                 timezone: "Asia/Kolkata",
             },
         });
@@ -677,10 +677,10 @@ describe("OrganizationOnboardingService.onboard", () => {
             expect(zoneOf()).toBe("Asia/Kolkata");
         });
 
-        it("keeps the zone setup sent (the browser's) where the country keeps several", async () => {
+        it("keeps the zone setup sent (the browser's) when no country is said", async () => {
             await service.onboard("user_1", {
                 name: "Acme",
-                profile: { country: "US", timezone: "America/Chicago" },
+                profile: { timezone: "America/Chicago" },
             });
             expect(zoneOf()).toBe("America/Chicago");
         });
@@ -693,12 +693,15 @@ describe("OrganizationOnboardingService.onboard", () => {
             expect(zoneOf()).toBe("Asia/Kolkata");
         });
 
-        it("reads a one-zone country's zone when none was sent", async () => {
-            await service.onboard("user_1", {
-                name: "Acme",
-                profile: { country: "ae" },
+        it("refuses a country other than India, and creates nothing (#1214)", async () => {
+            const refusal = await service
+                .onboard("user_1", { name: "Acme", profile: { country: "ae" } })
+                .catch((e: BadRequestException) => e.getResponse());
+            expect(refusal).toEqual({
+                message: "Saroh is for businesses in India for now.",
+                details: { field: "country" },
             });
-            expect(zoneOf()).toBe("Asia/Dubai");
+            expect(transaction).not.toHaveBeenCalled();
         });
 
         it("falls back past a zone the tz database doesn't know", async () => {

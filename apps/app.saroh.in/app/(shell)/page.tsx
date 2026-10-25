@@ -18,8 +18,10 @@ import type { InvoiceJobFacts } from "@/lib/home/first-run";
 import { mayWriteInvoices } from "@/lib/home/first-run";
 import { getHome } from "@/lib/home/service";
 import { hasAnyInvoice } from "@/lib/invoices/service";
+import type { ModuleView } from "@/lib/modules/schema";
 import { listModules } from "@/lib/modules/service";
 import { homeMoment } from "@/lib/moments/read";
+import { getSeenMoments } from "@/lib/moments/service";
 import type { OrganizationKind } from "@/lib/organizations/kind";
 import { firstRunOrder, INVOICE_JOB, kindOf } from "@/lib/organizations/kind";
 import { permits } from "@/lib/organizations/permits";
@@ -30,8 +32,14 @@ import {
 } from "@/lib/organizations/service";
 import { getOrganizationSettings } from "@/lib/organizations/settings-service";
 import { requireSession } from "@/lib/session";
-import { checklistSubject } from "@/lib/settings/ready";
+import {
+    checklistSubject,
+    firstSteps,
+    firstStepsLead,
+} from "@/lib/settings/ready";
 import { loadReadyChecklist } from "@/lib/settings/ready-service";
+import { shareLink } from "@/lib/sites/share-links";
+import { readWebAddressLinks } from "@/lib/sites/share-links-read";
 
 /** It had none: Home's tab read the bare "Saroh" (12 Oct 2026). */
 export const metadata = { title: "Home" };
@@ -115,7 +123,9 @@ export default async function Home() {
         );
     }
 
-    const setup = home.hasAnyModule ? await loadSetup(business) : null;
+    const setup = home.hasAnyModule
+        ? await loadSetup(business, allModules)
+        : null;
     // What is being set up (DEC-070) orders and words the first-run jobs.
     const kind = kindOf(business?.kind);
     const invoicing = home.hasAnyModule
@@ -146,7 +156,13 @@ export default async function Home() {
                 businessName={business?.name ?? "This business"}
                 kind={kind}
                 // The line under the greeting follows the checklist below.
-                subject={setup ? checklistSubject(setup.list) : null}
+                subject={
+                    setup
+                        ? firstStepsLead(setup.first)
+                            ? "setup"
+                            : checklistSubject(setup.list)
+                        : null
+                }
                 newMenu={newMenu}
                 // The phone Home says it in the day sheet (U17).
                 sinceOnPhone={!home.hasAnyModule}
@@ -190,6 +206,7 @@ async function loadInvoicing(
  */
 async function loadSetup(
     business: Organization | null,
+    modules: ModuleView[] | null,
 ): Promise<HomeSetup | null> {
     const may = business?.actions
         ? business.actions.includes("org:update")
@@ -197,8 +214,20 @@ async function loadSetup(
     if (!business || !may) return null;
     const settings = await getOrganizationSettings().catch(() => null);
     if (!settings) return null;
-    return {
-        list: await loadReadyChecklist(settings),
-        businessId: settings.id,
-    };
+    // The 4 first steps lead until done (#1194); the money card then.
+    const [list, seen] = await Promise.all([
+        loadReadyChecklist(settings),
+        getSeenMoments(),
+    ]);
+    const first = firstSteps({
+        settings,
+        modules,
+        shared: seen?.has("shared-booking-link") ?? false,
+    });
+    // The link the share step hands over, read only while it is left.
+    const share =
+        first.shares && first.steps.some((s) => s.key === "share" && !s.done)
+            ? shareLink(await readWebAddressLinks(), [first.shares])
+            : null;
+    return { list, businessId: settings.id, first, share };
 }

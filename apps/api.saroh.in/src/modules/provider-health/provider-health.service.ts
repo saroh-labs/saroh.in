@@ -67,18 +67,7 @@ export class ProviderHealthService {
         ]);
 
         return [
-            connectedHealth({
-                key: "PAYMENTS",
-                label: "Payments",
-                statuses: payments.map(statusOf),
-                notConfigured: "Connect a payment provider to accept payments.",
-                active: "Payments are ready.",
-                degraded:
-                    "A connected provider is disabled. Re-enable it to take payments.",
-                refused:
-                    "Your payment provider refused its keys. Connect it again to take payments.",
-                actionHref: PROVIDERS_HREF,
-            }),
+            paymentsHealth(payments),
             connectedHealth({
                 key: "COMMUNICATIONS",
                 label: "Communications",
@@ -94,6 +83,28 @@ export class ProviderHealthService {
             domainHealth(domains.map((d) => d.status)),
         ];
     }
+}
+
+/**
+ * Payments' health from the business's payment provider rows. The admin
+ * inactivity sweep reads it too (#1199), so "disconnected" means the same
+ * there as on the business's own Providers screen.
+ */
+export function paymentsHealth(
+    payments: { status: string; attentionAt?: Date | null }[],
+): ProviderHealth {
+    return connectedHealth({
+        key: "PAYMENTS",
+        label: "Payments",
+        statuses: payments.map(statusOf),
+        notConfigured: "Connect a payment provider to accept payments.",
+        active: "Payments are ready.",
+        degraded:
+            "A connected provider is disabled. Re-enable it to take payments.",
+        refused:
+            "Your payment provider refused its keys. Connect it again to take payments.",
+        actionHref: PROVIDERS_HREF,
+    });
 }
 
 /**

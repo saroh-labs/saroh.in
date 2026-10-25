@@ -274,6 +274,7 @@ export type {
 export { LookCheckout } from "./shop/look-checkout";
 export { LookOrderPlaced } from "./shop/look-placed";
 export {
+    DEMO_TEXT,
     NOT_TAKING_ORDERS_TEXT,
     NotTakingOrders,
 } from "./shop/not-taking-orders";

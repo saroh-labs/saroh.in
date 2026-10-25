@@ -98,6 +98,8 @@ const CASES = [
         windDown: ["cancelBooking"],
         gated: [
             "createService",
+            "keepService",
+            "keepAllSamples",
             "listServices",
             "getService",
             // As the service's own read: its editor is the module's screen.

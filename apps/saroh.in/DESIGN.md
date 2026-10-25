@@ -13,7 +13,7 @@ is fixed.
   `app/site.css`.
 - **No prices, limits or plan terms in this repo.** Pages read the published
   pricing catalogue through `lib/pricing.ts`; with none, every price is the
-  `—` placeholder with "Pricing announced at launch". Plan names (Free, Grow,
+  `—` placeholder with "Prices aren't available right now". Plan names (Free, Grow,
   Pro) may appear in copy.
 - **Every "start" button goes through `cta()` in `lib/links.ts`** (label and
   address together), so the launch switch (`NEXT_PUBLIC_LAUNCH_MODE`) moves

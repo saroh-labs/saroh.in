@@ -12,6 +12,7 @@ import {
     STARTER_TEMPLATE_ID,
 } from "@saroh/templates";
 
+import { NOT_SAMPLE } from "../bookings/sample-services";
 import type { ModuleKey } from "../capabilities/module-registry";
 import { moduleRolledOut } from "../capabilities/module-registry";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
@@ -164,6 +165,7 @@ export async function buildTemplateContext(
             deletedAt: null,
             status: "ACTIVE",
             showOnBookingPage: true,
+            ...NOT_SAMPLE,
             ...(options.siteId
                 ? { OR: [{ siteId: null }, { siteId: options.siteId }] }
                 : { siteId: null }),

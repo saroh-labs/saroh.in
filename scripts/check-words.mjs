@@ -11,10 +11,18 @@
 // confirm" is "Awaiting payment", "No-show" is "Didn't come", "Check in" is
 // "Mark arrived", "Pay link" is "Payment link", and the rest in RETIRED.
 // The shared words live in `apps/app.saroh.in/lib/services/booking-words.ts`.
-import { readdirSync, readFileSync, statSync } from "node:fs";
+//
+// The marketing site's waitlist words (#1186): saroh.in has been open since
+// 17 Oct, so "Join the waitlist", "on the waitlist", "announced at launch"
+// and "early access" as a button fail in its content, pages and components.
+// The waitlist page's own files are skipped until they are removed; the
+// product's waitlists (a class waitlist, back in stock) never match.
+//
+// `node scripts/check-words.mjs [root]`: the root is for the fixture test.
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
-const root = join(import.meta.dirname, "..");
+const root = process.argv[2] ?? join(import.meta.dirname, "..");
 
 const SOURCES = [
     "apps/app.saroh.in/app",
@@ -25,6 +33,9 @@ const SOURCES = [
     "apps/saroh.app/lib",
     "packages/site-blocks/src",
     "apps/api.saroh.in/src/modules/site-accounts/notify-templates.ts",
+    "apps/saroh.in/content",
+    "apps/saroh.in/app",
+    "apps/saroh.in/components",
 ];
 const HELP = ["apps/help.saroh.in/content", "apps/saroh.in/content/help"];
 
@@ -74,6 +85,26 @@ const RETIRED = [
 ];
 const WORKSPACE = "apps/app.saroh.in/";
 
+/** The marketing site's retired waitlist words (#1186), and what to say. */
+const MARKETING_RETIRED = [
+    [/\bjoin the waitlist\b/i, "Join the waitlist", "Start free (`cta()`)"],
+    [/\bon the waitlist\b/i, "On the waitlist", "Start free (`cta()`)"],
+    [
+        /\bannounced at launch\b/i,
+        "announced at launch",
+        "what is true today, or nothing",
+    ],
+    [/\b(?:for|get) early access\b/i, "for early access", "Start free"],
+];
+const MARKETING = "apps/saroh.in/";
+/** The waitlist page's own files, until the follow-up removes them. */
+const WAITLIST_PAGE = [
+    "apps/saroh.in/app/(standalone)/waitlist",
+    "apps/saroh.in/components/v2/waitlist/",
+    "apps/saroh.in/content/waitlist.ts",
+    "apps/saroh.in/content/help/",
+];
+
 /**
  * A retired phrase still in a file another unit is rewriting: the file, the
  * phrase as RETIRED writes it, and why. An entry that no longer matches
@@ -83,6 +114,12 @@ const ALLOWED = [];
 const usedAllowance = new Set();
 
 function retiredIn(text, file) {
+    if (file.startsWith(MARKETING)) {
+        if (WAITLIST_PAGE.some((w) => file.startsWith(w))) return [];
+        return MARKETING_RETIRED.filter(([re]) => re.test(text)).map(
+            ([, word]) => word,
+        );
+    }
     if (!file.startsWith(WORKSPACE)) return [];
     const out = [];
     for (const [re, word] of RETIRED) {
@@ -96,12 +133,15 @@ function retiredIn(text, file) {
     }
     return out;
 }
-const SAY = new Map(RETIRED.map(([, word, say]) => [word, say]));
+const SAY = new Map(
+    [...RETIRED, ...MARKETING_RETIRED].map(([, word, say]) => [word, say]),
+);
 
 const isTest = (f) => /\.(test|spec)\.[cm]?[jt]sx?$|__snapshots__/.test(f);
 
 function walk(path, exts) {
     const abs = join(root, path);
+    if (!existsSync(abs)) return [];
     if (statSync(abs).isFile()) return [path];
     return readdirSync(abs, { recursive: true })
         .map(String)
@@ -188,6 +228,6 @@ if (found.length > 0) {
     process.exitCode = 1;
 } else if (!process.exitCode) {
     console.log(
-        `words: ${scanned} files, no Reschedule, Shut or reservation, and none of Bookings' retired words`,
+        `words: ${scanned} files, no Reschedule, Shut or reservation, none of Bookings' retired words and no waitlist words on saroh.in`,
     );
 }

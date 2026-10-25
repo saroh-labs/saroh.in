@@ -94,6 +94,11 @@ export interface Service {
      * team". Neither ticked reads as paused; bookings already made stay.
      */
     bookableByTeam: boolean;
+    /**
+     * A trade starter's sample (DEC-189): hidden from customers until it is
+     * kept or edited. Absent from an API older than it: not a sample.
+     */
+    isSample?: boolean;
 }
 
 /** One recurring weekly availability window (in the Service's timezone). */
@@ -588,6 +593,26 @@ export function updateService(
         "PATCH",
         input,
         "Couldn't update the service.",
+    );
+}
+
+/** Keep a sample service as it is (DEC-189): no longer a sample, shown. */
+export function keepService(serviceId: string): Promise<ApiResult<Service>> {
+    return send<Service>(
+        `/${serviceId}/keep`,
+        "POST",
+        undefined,
+        "Couldn't keep the service.",
+    );
+}
+
+/** Keep every sample service as it is (DEC-189). */
+export function keepAllSamples(): Promise<ApiResult<{ kept: number }>> {
+    return send<{ kept: number }>(
+        "/keep-all",
+        "POST",
+        undefined,
+        "Couldn't keep the sample services.",
     );
 }
 

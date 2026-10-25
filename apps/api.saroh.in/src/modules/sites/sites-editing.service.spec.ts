@@ -1149,6 +1149,7 @@ describe("SitesService public read (drafts never leak)", () => {
             organizationId: "org_1",
             subdomain: "acme",
             currentPublication: { snapshot: { pages: [] }, publishedAt },
+            organization: { isDemo: false },
         });
 
         const result = await service.getPublicationBySubdomain("acme");
@@ -1181,6 +1182,8 @@ describe("SitesService public read (drafts never leak)", () => {
                 currentPublication: {
                     select: { snapshot: true, publishedAt: true },
                 },
+                // Whether it is a demo (DEC-188): `demo: true` only then.
+                organization: { select: { isDemo: true } },
             },
         });
         // No module pages: nothing is added to the read (G15). No icon of
@@ -1196,6 +1199,21 @@ describe("SitesService public read (drafts never leak)", () => {
             // No custom domain of its own: its Saroh address.
             primaryHost: expect.stringMatching(/^acme\./),
         });
+    });
+
+    it("says demo: true for a demo business's site (DEC-188)", async () => {
+        siteFindFirst.mockResolvedValue({
+            id: "site_1",
+            organizationId: "org_1",
+            subdomain: "demo-salon",
+            currentPublication: {
+                snapshot: { pages: [] },
+                publishedAt: new Date("2026-10-24T00:00:00.000Z"),
+            },
+            organization: { isDemo: true },
+        });
+        const result = await service.getPublicationBySubdomain("demo-salon");
+        expect(result).toMatchObject({ demo: true });
     });
 
     it("404s a site that has never published (currentPublication null)", async () => {

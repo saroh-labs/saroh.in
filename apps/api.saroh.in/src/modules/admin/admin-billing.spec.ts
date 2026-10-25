@@ -1,13 +1,22 @@
-import type { InvoiceForCsv } from "./admin-billing";
+import type {
+    InvoiceForAttribution,
+    InvoiceForCsv,
+    LinkForAttribution,
+} from "./admin-billing";
 import {
+    ATTRIBUTION_CSV_HEADER,
+    attributionCsv,
+    attributionCsvFileName,
     csvCell,
     INVOICE_CSV_HEADER,
     invoicesCsv,
     istDay,
     istMonthRange,
+    linkAt,
     monthlyPaise,
     mrrPaise,
     nextChargeOf,
+    signupSrcOf,
     subscriptionViewWhere,
 } from "./admin-billing";
 
@@ -114,6 +123,101 @@ describe("invoicesCsv", () => {
 
     it("is just the header for a month with no invoices", () => {
         expect(invoicesCsv([])).toBe(`${INVOICE_CSV_HEADER.join(",")}\r\n`);
+    });
+});
+
+describe("the referrals and managers export (#1189)", () => {
+    const issuedAt = new Date("2026-10-16T20:00:00.000Z");
+    const link = (over: Partial<LinkForAttribution> = {}) => ({
+        organizationId: "org_1",
+        platformAdminId: "pa_1",
+        source: "LINK",
+        startedAt: new Date("2026-09-01T00:00:00.000Z"),
+        endedAt: null,
+        ...over,
+    });
+
+    it("finds the manager whose link was open at the invoice, not one ended before it", () => {
+        const ended = link({
+            platformAdminId: "pa_old",
+            endedAt: new Date("2026-10-01T00:00:00.000Z"),
+        });
+        expect(linkAt([ended], "org_1", issuedAt)).toBeNull();
+        const open = link({
+            platformAdminId: "pa_new",
+            source: "ASSIGNED",
+            startedAt: new Date("2026-10-01T00:00:00.000Z"),
+        });
+        expect(linkAt([ended, open], "org_1", issuedAt)).toBe(open);
+        // Another business's link, and one started after the invoice, count for nothing.
+        expect(
+            linkAt(
+                [
+                    link({ organizationId: "org_2" }),
+                    link({ startedAt: new Date("2026-10-20T00:00:00.000Z") }),
+                ],
+                "org_1",
+                issuedAt,
+            ),
+        ).toBeNull();
+    });
+
+    it("reads src from a signup source, and nothing from anything else", () => {
+        expect(signupSrcOf({ src: "solutions-salons-hero" })).toBe(
+            "solutions-salons-hero",
+        );
+        expect(signupSrcOf({ utmSource: "google" })).toBeNull();
+        expect(signupSrcOf(null)).toBeNull();
+        expect(signupSrcOf("src")).toBeNull();
+    });
+
+    const row = (over: Partial<InvoiceForAttribution> = {}) => ({
+        businessName: "Example Studio",
+        number: "TST/26-27/0001",
+        issuedAt,
+        planName: "Grow",
+        taxablePaise: 11_100,
+        refunded: false,
+        managerName: "Asha",
+        linkSource: "LINK",
+        signupSrc: "solutions-salons-hero",
+        referrerName: "Other Studio",
+        ...over,
+    });
+
+    it("has the header, then one row per invoice with the manager, source and referrer", () => {
+        const rows = attributionCsv([
+            row(),
+            row({
+                number: "TST/26-27/0002",
+                refunded: true,
+                managerName: null,
+                linkSource: null,
+                signupSrc: null,
+                referrerName: null,
+            }),
+        ])
+            .trimEnd()
+            .split("\r\n");
+        expect(rows).toEqual([
+            ATTRIBUTION_CSV_HEADER.join(","),
+            "Example Studio,TST/26-27/0001,2026-10-17,Grow,111.00,no,Asha,Their link,solutions-salons-hero,Other Studio",
+            "Example Studio,TST/26-27/0002,2026-10-17,Grow,111.00,yes,,,,",
+        ]);
+    });
+
+    it("never lets a typed business name run as a formula", () => {
+        const [, line] = attributionCsv([
+            row({ businessName: "=HYPERLINK(1)", referrerName: "@sum" }),
+        ]).split("\r\n");
+        expect(line).toMatch(/^'=HYPERLINK\(1\),/);
+        expect(line).toMatch(/,'@sum$/);
+    });
+
+    it("names the file by its month", () => {
+        expect(attributionCsvFileName("2026-10")).toBe(
+            "saroh-referrals-and-managers-2026-10.csv",
+        );
     });
 });
 

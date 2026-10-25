@@ -1,8 +1,10 @@
 import { PRICING_COPY } from "@/content/pricing";
+import { demoHref } from "@/lib/demos";
 import type { PricingPageModel } from "@/lib/pricing-model";
 
 import { Container } from "../container";
 import { CtaBand } from "../cta-band";
+import { DemoLink } from "../demo-link";
 import { Eyebrow } from "../eyebrow";
 import { PricingPlans } from "./pricing-plans";
 
@@ -24,6 +26,11 @@ export function PricingPage({ model }: { model: PricingPageModel }) {
                 <p className="m-0 max-w-[58ch] text-mk-intro text-mk-copy [text-wrap:pretty]">
                     {PRICING_COPY.intro}
                 </p>
+                <DemoLink
+                    href={demoHref("salon")}
+                    page="pricing"
+                    trade="salon"
+                />
             </Container>
             <PricingPlans model={model} />
             <CtaBand

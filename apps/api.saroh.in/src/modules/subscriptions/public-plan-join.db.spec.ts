@@ -642,6 +642,27 @@ describe("what joining refuses", () => {
         ).toBe(0);
     });
 
+    it("joins nothing on a demo business (DEC-188)", async () => {
+        const s = await studio();
+        const { token } = await signIn(s.host);
+        await prisma.organization.update({
+            where: { id: s.organizationId },
+            data: { isDemo: true },
+        });
+        const refused = await join(s, token);
+        expect(refused.status).toBe(403);
+        expect(refused.body.error).toMatchObject({
+            message:
+                "This is a demo business. Booking, paying and sending things are turned off.",
+            details: { code: "ORGANIZATION_DEMO" },
+        });
+        expect(
+            await prisma.invoice.count({
+                where: { organizationId: s.organizationId },
+            }),
+        ).toBe(0);
+    });
+
     it("is a plan that isn't there while Payments is off or not rolled out (DEC-057)", async () => {
         for (const over of [{ paymentsOn: false }, { rolledOut: false }]) {
             const s = await studio(over);

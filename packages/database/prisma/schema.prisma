@@ -141,6 +141,11 @@ model Organization {
   lifecycleStatus  String @default("ACTIVE")
   lifecycleVersion Int    @default(1)
 
+  // A demo business (DEC-188): its site opens for anyone to look at, and
+  // every public and site-customer write refuses with ORGANIZATION_DEMO.
+  // Its owner can't sign in. Set only by the demo-businesses script.
+  isDemo Boolean @default(false)
+
   // What is being set up (DEC-070): BUSINESS (a shop, studio, practice),
   // SOLO ("Just me": a freelancer, consultant, creator) or WORK ("A site for
   // my work": a portfolio, blog, projects). It changes Saroh's words and
@@ -181,6 +186,8 @@ model Organization {
   sarohContactLogs    SarohContactLog[]
   // Who at Saroh looks after it, and who did before (DEC-169).
   accountManagerLinks AccountManagerLink[]
+  // Signs it has gone quiet, for its manager and the attention list (#1199).
+  inactivitySignals   InactivitySignal[]
 
   // Optional groupings beneath the org (S1-010). Projects and Teams are NEVER
   // a tenant/ownership/billing root — always org-scoped (ADR-001).
@@ -419,6 +426,19 @@ model Organization {
   referredByOrganization   Organization?  @relation("OrganizationReferrals", fields: [referredByOrganizationId], references: [id], onDelete: SetNull)
   referredOrganizations    Organization[] @relation("OrganizationReferrals")
   referredAt               DateTime?
+
+  // Where it came from (#1190): `src`, `utmSource`, `utmMedium` and
+  // `utmCampaign` from the link its owner landed on saroh.in by (the
+  // `saroh_src` cookie), each a short safe string or absent. Written once,
+  // as the business is made (`organizations/signup-source.ts`), and never
+  // changed after. Null: it carried none. Never given to a browser tag.
+  signupSource Json?
+
+  // The day each upgrade prompt was last shown to the business (#1197,
+  // DEC-187): `{ "<prompt key>": "YYYY-MM-DD" }`, the day as it reads in
+  // India. "Shown" goes to PostHog once a day per prompt
+  // (`billing/upgrade-prompts.ts`), whose fixed list holds the keys.
+  promptsShown Json?
 
   // A customer's message thread with the business (round-2 A13).
   customerThreads        CustomerThread[]
@@ -3023,6 +3043,35 @@ model AccountManagerLink {
   @@index([platformAdminId, endedAt])
 }
 
+// A sign a business has gone quiet (R13, #1199): its team hasn't acted in
+// 7 days, it hasn't taken a booking or order in 14, or its payment provider
+// came apart. The sweep (`admin/inactivity-signals.ts`) opens one row per
+// kind while the condition holds and clears it once it doesn't; at most one
+// open row per kind per business. `emailedAt` is when its manager was told
+// (once). Saroh's view of a business, never shown to the business itself.
+model InactivitySignal {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  kind      InactivitySignalKind
+  /// When the quiet started: the last activity, trade, or when it was noticed.
+  since     DateTime
+  emailedAt DateTime?
+  clearedAt DateTime?
+  createdAt DateTime             @default(now())
+
+  @@unique([organizationId, kind], map: "InactivitySignal_one_open_per_kind", where: raw("\"clearedAt\" IS NULL"))
+  @@index([clearedAt, emailedAt])
+}
+
+enum InactivitySignalKind {
+  NO_ACTIVITY
+  NO_TRADING
+  PAYMENT_DISCONNECTED
+}
+
 // A commission rate (DEC-169, admin console U21): what share of a payment
 // before GST a manager earns, for one link kind (BROUGHT_IN or ASSIGNED),
 // from `effectiveFrom` on. Set in the console by a holder of
@@ -5127,6 +5176,10 @@ model Service {
   // of Who can book it (DEC-170, Q5 of 19 Oct). Neither tick reads as
   // paused in the app; bookings already made stay.
   bookableByTeam    Boolean @default(true)
+  // A trade starter's sample (DEC-189): written by setup with
+  // `showOnBookingPage` off, and never shown publicly until the owner keeps
+  // or edits it, which clears this and shows it.
+  isSample          Boolean @default(false)
 
   // The order lines that bill it: a treatment sold as an order (E9).
   orderItems OrderItem[]

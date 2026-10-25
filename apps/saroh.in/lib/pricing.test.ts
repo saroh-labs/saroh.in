@@ -3,7 +3,11 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { readLivePricing, readPreviewPricing } from "./pricing";
+import {
+    readLivePricing,
+    readLivePricingVersion,
+    readPreviewPricing,
+} from "./pricing";
 import { fakeCatalogInput } from "./pricing.fixture";
 
 const env = vi.hoisted(() => {
@@ -67,6 +71,17 @@ describe("readLivePricing", () => {
         const [url, init] = fetcher.mock.calls[0];
         expect(url).toBe("https://api.test/public/pricing");
         expect(init?.cache).toBe("force-cache");
+    });
+
+    it("keeps the live version's goLiveAt, for the sitemap's /pricing date", async () => {
+        const goLiveAt = "2026-10-16T20:00:00.000Z";
+        const read = await readLivePricingVersion(
+            asFetch(answering({ ...live, goLiveAt })),
+        );
+        expect(read).toMatchObject({ version: 1, goLiveAt });
+        expect(
+            await readLivePricingVersion(asFetch(answering({}, 404))),
+        ).toBeNull();
     });
 
     it("no version published (404): null, the placeholder", async () => {

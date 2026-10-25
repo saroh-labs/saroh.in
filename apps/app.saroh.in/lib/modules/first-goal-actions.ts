@@ -18,12 +18,15 @@ import { enableModule, getSetupDefaults } from "./turn-on-service";
 export async function startWithGoalAction(
     goal: string,
     kind?: string,
+    trade?: "SALON" | "GYM",
 ): Promise<FirstGoalOutcome> {
     await requireSession();
     const outcome = await startWithGoal(
         { listModules, getSetupDefaults, enableModule },
         goal,
         kind,
+        // Checked here too: a server action's argument is anyone's to send.
+        trade === "SALON" || trade === "GYM" ? trade : undefined,
     );
     if (outcome.turnedOn.length > 0) revalidatePath("/", "layout");
     return outcome;

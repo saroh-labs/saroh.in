@@ -11,6 +11,8 @@ import {
     checklistSubject,
     checklistWords,
     emailAttention,
+    firstSteps,
+    firstStepsLead,
     handlesMoney,
     providersTabNote,
     readSetupHidden,
@@ -1160,5 +1162,149 @@ describe("keys a provider refused (UX-012, FB-7)", () => {
             broken: true,
             href: "/settings/providers",
         });
+    });
+});
+
+describe("firstSteps: Home's 4 steps, then the money card (#1194, R12)", () => {
+    /** A salon's facts: nothing listed, booked or published yet. */
+    const facts = {
+        products: 0,
+        services: 0,
+        sampleServices: 0,
+        bookings: 0,
+        sites: 1,
+        sitesNotLive: 1,
+        invoices: 0,
+    };
+    const bookingsSite = [
+        mod("APPOINTMENTS"),
+        mod("WEBSITE"),
+        mod("PAYMENTS", { readiness: "SETUP_REQUIRED" }),
+    ];
+    const first = (
+        setup: Partial<typeof facts> = {},
+        over: {
+            shared?: boolean;
+            tradingSince?: string | null;
+            modules?: ModuleView[];
+        } = {},
+    ) =>
+        firstSteps({
+            settings: {
+                setup: { ...facts, ...setup },
+                tradingSince: over.tradingSince ?? null,
+            },
+            modules: over.modules ?? bookingsSite,
+            shared: over.shared ?? false,
+        });
+
+    it("a new business: 0 of 4, publishing the site first", () => {
+        const f = first();
+        expect([f.done, f.total]).toEqual([0, 4]);
+        expect(f.steps.map((s) => [s.key, s.label, s.href])).toEqual([
+            ["site", "Publish your site", "/sites"],
+            ["catalogue", "Add your first service", "/services/new"],
+            ["share", "Share your booking link", "/services"],
+            ["first", "Take your first booking", "/bookings"],
+        ]);
+        expect(f.shares).toBe("book");
+        expect(firstStepsLead(f)).toBe(true);
+    });
+
+    it("the site live and two kept services: 2 of 4", () => {
+        const f = first({ sitesNotLive: 0, services: 2 });
+        expect([f.done, f.total]).toEqual([2, 4]);
+        expect(f.steps.filter((s) => s.done).map((s) => s.key)).toEqual([
+            "site",
+            "catalogue",
+        ]);
+    });
+
+    it("only a starter's samples: Review your sample services, not done", () => {
+        const f = first({ sampleServices: 4 });
+        expect(f.steps.find((s) => s.key === "catalogue")).toMatchObject({
+            label: "Review your sample services",
+            href: "/services",
+            done: false,
+        });
+        expect(f.done).toBe(0);
+    });
+
+    it("the link copied or shared: the share step is done", () => {
+        const f = first({}, { shared: true });
+        expect(f.steps.find((s) => s.key === "share")?.done).toBe(true);
+        expect(f.done).toBe(1);
+    });
+
+    it("a first booking: 4 of 4, and the money card leads instead", () => {
+        const f = first(
+            { sitesNotLive: 0, services: 2, bookings: 1 },
+            { shared: true },
+        );
+        expect([f.done, f.total]).toEqual([4, 4]);
+        expect(firstStepsLead(f)).toBe(false);
+    });
+
+    it("a business that has already had a customer counts its link as shared", () => {
+        // Northwind and the demo stores: trading for months, never pressed share.
+        const f = first({ sitesNotLive: 0, services: 2, bookings: 12 });
+        expect(f.steps.find((s) => s.key === "share")?.done).toBe(true);
+        expect([f.done, f.total]).toEqual([4, 4]);
+        expect(firstStepsLead(f)).toBe(false);
+    });
+
+    it("a shop-only business: products, its shop link and a first order", () => {
+        const modules = [mod("COMMERCE"), mod("WEBSITE")];
+        const f = first({}, { modules });
+        expect(f.steps.map((s) => s.label)).toEqual([
+            "Publish your site",
+            "Add your first product",
+            "Share your shop link",
+            "Take your first order",
+        ]);
+        expect(f.shares).toBe("shop");
+        const ordered = first(
+            {},
+            { modules, tradingSince: "2026-10-20T10:00:00.000Z" },
+        );
+        expect(ordered.steps.find((s) => s.key === "first")?.done).toBe(true);
+    });
+
+    it("nothing that books or sells, or a fact unknown: no first steps", () => {
+        expect(first({}, { modules: [mod("WEBSITE")] }).total).toBe(0);
+        expect(
+            firstSteps({
+                settings: { tradingSince: null },
+                modules: bookingsSite,
+                shared: false,
+            }).total,
+        ).toBe(0);
+        expect(
+            firstSteps({
+                settings: { setup: facts, tradingSince: null },
+                modules: null,
+                shared: false,
+            }).total,
+        ).toBe(0);
+        expect(firstStepsLead(null)).toBe(false);
+    });
+
+    it("while the 4 show, every money step is still on Settings' readiness list", () => {
+        const settings = { ...fresh.settings, setup: facts };
+        expect(firstStepsLead(first())).toBe(true);
+        const settingsKeys = settingsChecklist({
+            settings,
+            modules: bookingsSite,
+            messaging: null,
+        }).steps.map((s) => s.key);
+        // The money card's own list, which Home draws once the 4 are done.
+        const moneyKeys = readyChecklist({
+            settings,
+            modules: bookingsSite,
+        }).steps.map((s) => s.key);
+        expect(moneyKeys).toEqual(
+            expect.arrayContaining(["payments", "address", "tax", "catalogue"]),
+        );
+        expect(settingsKeys).toEqual(moneyKeys);
     });
 });

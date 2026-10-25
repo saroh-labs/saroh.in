@@ -1,3 +1,4 @@
+import { offeredPlans, planPricePaise } from "@saroh/pricing-catalog";
 import { describe, expect, it, vi } from "vitest";
 
 import type { CompanyFacts } from "@/content/company";
@@ -8,6 +9,7 @@ import { SAROH_SOCIAL } from "@/content/social";
 import { fakeCatalog } from "./pricing.fixture";
 import {
     breadcrumbLd,
+    faqPageLd,
     jsonLdText,
     organizationLd,
     softwareApplicationLd,
@@ -147,6 +149,69 @@ describe("no price, rating or plan while pricing is hidden", () => {
         expect(
             keys(softwareApplicationLd(fakeCatalog(), "x")).has("offers"),
         ).toBe(true);
+    });
+});
+
+describe("faqPageLd", () => {
+    it("gives each question its answer, in order, word for word", () => {
+        const items = [
+            { q: "One?", a: "First." },
+            { q: "Two?", a: "Second." },
+            { q: "Three?", a: "Third." },
+        ];
+        const ld = faqPageLd(items);
+        expect(ld["@type"]).toBe("FAQPage");
+        expect(ld.mainEntity).toEqual(
+            items.map((i) => ({
+                "@type": "Question",
+                name: i.q,
+                acceptedAnswer: { "@type": "Answer", text: i.a },
+            })),
+        );
+    });
+});
+
+describe("softwareApplicationLd offers", () => {
+    interface Offer {
+        name: string;
+        price: string;
+        priceSpecification: { unitCode: string };
+    }
+    const offersOf = (catalog: ReturnType<typeof fakeCatalog>) =>
+        softwareApplicationLd(catalog, "x").offers as Offer[];
+
+    it("yearly off: one monthly offer a plan, priced from the catalogue", () => {
+        const catalog = fakeCatalog();
+        catalog.yearly = { ...catalog.yearly, on: false };
+        const plans = offeredPlans(catalog);
+        expect(
+            offersOf(catalog).map((o) => [
+                o.name,
+                o.price,
+                o.priceSpecification.unitCode,
+            ]),
+        ).toEqual(
+            plans.map((p) => [p.name, (p.pricePaise / 100).toFixed(2), "MON"]),
+        );
+    });
+
+    it("yearly on: each paid plan also has a yearly offer, priced from the catalogue", () => {
+        const catalog = fakeCatalog();
+        expect(catalog.yearly.on).toBe(true);
+        const offers = offersOf(catalog);
+        for (const p of offeredPlans(catalog)) {
+            const yearly = offers.find((o) => o.name === `${p.name}, yearly`);
+            if (p.pricePaise === 0) {
+                expect(yearly).toBeUndefined();
+                continue;
+            }
+            expect(yearly?.price).toBe(
+                (planPricePaise(catalog, p, "year") / 100).toFixed(2),
+            );
+            expect(yearly?.priceSpecification.unitCode).toBe("ANN");
+        }
+        const paid = offeredPlans(catalog).filter((p) => p.pricePaise > 0);
+        expect(offers).toHaveLength(offeredPlans(catalog).length + paid.length);
     });
 });
 

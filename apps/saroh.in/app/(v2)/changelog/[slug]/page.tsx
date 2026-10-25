@@ -14,8 +14,6 @@ import {
 } from "@/content/changelog";
 import type { PublishContext } from "@/content/resources";
 import { isLive, linkShown } from "@/content/resources";
-import { launchOfferLines } from "@/content/waitlist";
-import { readLaunchOffer } from "@/lib/launch-offer";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import { articleLd, breadcrumbLd } from "@/lib/structured-data";
@@ -67,7 +65,6 @@ export default async function ChangelogEntryPage({ params }: Props) {
     const ctx = resourcesContext();
     const entry = liveEntry(slug, ctx);
     if (!entry) notFound();
-    const offer = await readLaunchOffer();
     const path = changelogHref(entry.slug);
 
     return (
@@ -128,16 +125,6 @@ export default async function ChangelogEntryPage({ params }: Props) {
                     ) : null}
                 </section>
             ))}
-            <div className="grid gap-2.5 rounded-mk-card border border-border bg-card p-6">
-                <span className="text-base font-semibold">
-                    On the waitlist?
-                </span>
-                <span className="text-mk-faq text-mk-copy">
-                    {offer
-                        ? `Your invite is in your email, with ${launchOfferLines(offer).headline}.`
-                        : "Your invite is in your email."}
-                </span>
-            </div>
             <p className="m-0 text-[15px] text-muted-foreground">
                 {entry.signoff}
             </p>

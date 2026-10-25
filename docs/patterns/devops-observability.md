@@ -102,9 +102,13 @@ must keep:
   never a body, a header, a query string, a name, an email, a phone number
   or an amount. A new fact beside an error goes through `scrubContext`.
 - **A product milestone is sent by the API, once, from the activation
-  ledger** (`modules/analytics/product-milestones.ts`). The list is nine
-  events and is closed: a tenth is the owner's decision, not a call site's.
-  Never capture a product event from a browser.
+  ledger** (`modules/analytics/product-milestones.ts`). The list is closed
+  (DEC-187: the nine milestones and the two upgrade-prompt events): one more
+  is the owner's decision, not a call site's. A milestone's properties are
+  the plan, the kind and where the business came from (`src`, utm,
+  `referral_channel`, `referrer_code`, `manager_code`); codes go only to
+  these server-side events, never to a browser tag (DEC-127). Never capture
+  a product event from a browser.
 - **Session replay is the signed-in workspace and saroh.in only**
   (DEC-125, amended 10 Oct), on in production only. The workspace masks
   everything but Saroh's own words and starts after its one-time notice;
@@ -174,12 +178,16 @@ Analytics. What is sent and how to switch it on:
   A conversion that happens on another host is counted the way sign-up is:
   by passing through a page on saroh.in (`lib/welcome.ts`).
 
+## After a deploy — **Current** (#1192)
+
+The post-deploy watch list (sign-in pages, a merchant site, a booking, a
+checkout, API readiness, PostHog errors, the job backlog and the job
+signals above) and what to do when a check fails:
+`docs/architecture/runbooks/DEPLOY_ROLLBACK_INCIDENT.md`.
+
 ## Not in place yet
 
 - **No source maps at the tracker**, so a browser stack names built files.
   `ERROR_TRACKING_AND_UPTIME.md` → Later.
 - **No uptime monitor** on `/health/ready`, and no log-based alerting. Same
   document.
-- **No post-deploy watch list.** Start one in a runbook: error rate before and
-  after, readiness, job backlog and the age of the oldest unclaimed job, and the
-  two job signals above.

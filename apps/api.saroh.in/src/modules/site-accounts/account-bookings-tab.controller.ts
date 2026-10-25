@@ -12,6 +12,7 @@ import {
 
 import { notTakingOrders } from "../billing/paused-errors";
 import { takingNewActivity } from "../orders/checkout-paused";
+import { assertNotDemo } from "../organizations/organization-lifecycle.gate";
 import { AccountAreaGuard } from "./account-area";
 import type {
     AccountBookingRow,
@@ -125,6 +126,7 @@ export class AccountBookingsTabController {
  * hears what a paused site says, never why. Cancelling stays open.
  */
 async function assertTakingBookings(customer: CustomerContext): Promise<void> {
+    await assertNotDemo(customer.organizationId);
     if (!(await takingNewActivity(customer.organizationId))) {
         throw notTakingOrders("bookings");
     }

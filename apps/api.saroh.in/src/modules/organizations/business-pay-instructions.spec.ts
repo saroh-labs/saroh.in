@@ -12,6 +12,7 @@ jest.mock("@saroh/database", () => {
         invoiceSequence: { findMany: jest.fn().mockResolvedValue([]) },
         product: { count: jest.fn().mockResolvedValue(0) },
         service: { count: jest.fn().mockResolvedValue(0) },
+        booking: { count: jest.fn().mockResolvedValue(0) },
         site: { count: jest.fn().mockResolvedValue(0) },
         invoice: { count: jest.fn().mockResolvedValue(0) },
     };

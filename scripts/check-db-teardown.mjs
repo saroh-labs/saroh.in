@@ -21,8 +21,18 @@ for (const file of specs) {
     let inside = false;
     lines.forEach((line, i) => {
         if (/^afterAll\(/.test(line)) {
-            inside = true;
             checked += 1;
+            // A one-line afterAll is its own whole body.
+            if (/\);\s*$/.test(line)) {
+                if (/\bprisma\.(?!\$disconnect)\w+/.test(line)) {
+                    console.error(
+                        `apps/api.saroh.in/src/${file}:${i + 1}: a query in the top-level afterAll runs after the setup ended the pool; leave the rows to its truncate`,
+                    );
+                    process.exitCode = 1;
+                }
+                return;
+            }
+            inside = true;
             return;
         }
         if (!inside) return;

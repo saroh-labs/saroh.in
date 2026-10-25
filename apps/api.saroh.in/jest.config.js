@@ -94,6 +94,8 @@ module.exports = {
         // Price history (12 Oct 2026): the first service Bookings makes
         // starts its own, on a fake transaction.
         "<rootDir>/src/modules/capabilities/setup/module-setup.price-history.spec.ts",
+        // DEC-189 trade starters: the salon and gym presets (pure).
+        "<rootDir>/src/modules/capabilities/setup/trade-presets.spec.ts",
         // #117 dark module-enforcement guard (mocked reflector + availability).
         "<rootDir>/src/modules/capabilities/module-enforcement.guard.spec.ts",
         // #117: the guard's shadow/refused log lines and their throttle, the

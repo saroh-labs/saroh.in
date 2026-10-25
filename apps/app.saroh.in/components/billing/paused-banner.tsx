@@ -58,11 +58,14 @@ export function PausedNote({
     children,
     className,
     hiddenPlans,
+    onPress,
 }: {
     children: React.ReactNode;
     className?: string;
     /** What to say while plans are hidden; left out, nothing is drawn. */
     hiddenPlans?: React.ReactNode;
+    /** The way to the plans was pressed (an upgrade prompt, #1197). */
+    onPress?: () => void;
 }) {
     if (!plansShown()) {
         return hiddenPlans ? (
@@ -75,7 +78,9 @@ export function PausedNote({
         <Notice tone="warning" role="note" className={className}>
             {children}{" "}
             <PlanWay className="text-[length:inherit] text-inherit">
-                <TextLink href={PLAN_AND_BILLING_HREF}>{planLabel()}</TextLink>
+                <TextLink href={PLAN_AND_BILLING_HREF} onClick={onPress}>
+                    {planLabel()}
+                </TextLink>
             </PlanWay>
         </Notice>
     );

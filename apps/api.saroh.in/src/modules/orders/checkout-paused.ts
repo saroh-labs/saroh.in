@@ -24,20 +24,38 @@ export interface ShopPause {
     kept: Prisma.ProductWhereInput;
     /** False: this website or its location stopped taking orders. */
     takingOrders: boolean;
+    /**
+     * A demo business (DEC-188): it takes no orders, and its site says
+     * "This is a demo", not that it is paused.
+     */
+    demo?: true;
+}
+
+/** Whether the business is open for its lifecycle, and whether a demo. */
+async function activityOf(
+    organizationId: string,
+): Promise<{ open: boolean; demo: boolean }> {
+    const organization = await prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: { lifecycleStatus: true, isDemo: true },
+    });
+    return {
+        open: !organization || activityOpen(organization.lifecycleStatus),
+        demo: organization?.isDemo === true,
+    };
 }
 
 /**
  * Whether the business takes new orders and bookings at all, for its
- * lifecycle (DEC-120). A missing business is the caller's own 404.
+ * lifecycle (DEC-120); a demo (DEC-188) takes none. A missing business is
+ * the caller's own 404. A caller that refuses asks `assertNotDemo` first,
+ * so a demo hears the demo words.
  */
 export async function takingNewActivity(
     organizationId: string,
 ): Promise<boolean> {
-    const organization = await prisma.organization.findUnique({
-        where: { id: organizationId },
-        select: { lifecycleStatus: true },
-    });
-    return !organization || activityOpen(organization.lifecycleStatus);
+    const { open, demo } = await activityOf(organizationId);
+    return open && !demo;
 }
 
 export async function shopPause(
@@ -45,9 +63,9 @@ export async function shopPause(
     siteId: string,
     storeId: string | null,
 ): Promise<ShopPause> {
-    if (!(await takingNewActivity(organizationId))) {
-        return { kept: {}, takingOrders: false };
-    }
+    const { open, demo } = await activityOf(organizationId);
+    if (demo) return { kept: {}, takingOrders: false, demo: true };
+    if (!open) return { kept: {}, takingOrders: false };
     const paused = await overLimit.pausedNow(organizationId);
     if (!paused) return { kept: {}, takingOrders: true };
     return {

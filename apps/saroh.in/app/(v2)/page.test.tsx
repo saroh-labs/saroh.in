@@ -61,8 +61,9 @@ describe("/ (Home)", () => {
         expect(container.innerHTML).not.toContain('"offers"');
         expect(container.innerHTML).not.toContain("/pricing");
         expect(container.textContent).toContain(
-            "Plan details are announced at launch",
+            "Move to a paid plan when you need more.",
         );
+        expect(container.textContent).not.toContain("announced at launch");
     });
 
     it("reads the headline whole and has the anchors other pages link to", async () => {
@@ -127,5 +128,27 @@ describe("/ (Home)", () => {
         ).toMatch(RUPEE);
         const faq = within(section(container, "faq"));
         expect(faq.getByText(/^The Plan A plan is/)).toBeTruthy();
+    });
+
+    it("sends the answers it draws, the worded one too, as a FAQPage", async () => {
+        read.catalog = fakeCatalog();
+        const { container } = render(await HomePage());
+        const drawn = Array.from(
+            section(container, "faq").querySelectorAll("details"),
+        ).map((d) => ({
+            "@type": "Question",
+            name: d.querySelector("summary")?.textContent,
+            acceptedAnswer: {
+                "@type": "Answer",
+                text: d.querySelector("p")?.textContent,
+            },
+        }));
+        const sent = JSON.parse(
+            container.querySelector('script[type="application/ld+json"]')
+                ?.textContent ?? "[]",
+        ) as Record<string, unknown>[];
+        const faq = sent.find((d) => d["@type"] === "FAQPage");
+        expect(faq?.mainEntity).toEqual(drawn);
+        expect(JSON.stringify(faq)).toContain("The Plan A plan is");
     });
 });

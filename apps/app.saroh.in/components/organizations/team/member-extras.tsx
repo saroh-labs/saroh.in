@@ -5,6 +5,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { useState } from "react";
 
 import { SwitchRow } from "@/components/shared/fields/check-row";
+import { useUpgradePromptShown } from "@/lib/billing/upgrade-prompts";
 import type { ExtraGroup } from "@/lib/organizations/extras";
 import {
     extraGroups,
@@ -57,15 +58,21 @@ export function useMemberExtras({
     // What would be held beyond the picked role; one the role now grants
     // is simply part of it.
     const chosen = extrasBeyond(draft ?? current, draftGrants);
-    const lockedReason = extrasLockedReason({
+    const why = {
         isSelf,
         canEdit,
         reviewer,
         beyondViewer: beyond,
         name,
-        planLocked,
         holdsExtras: current.length > 0,
-    });
+    };
+    const lockedReason = extrasLockedReason({ ...why, planLocked });
+    // The plan is why (no other reason stands): an upgrade prompt (#1197).
+    useUpgradePromptShown(
+        lockedReason !== null && extrasLockedReason(why) === null
+            ? "team_member"
+            : null,
+    );
     const groups =
         catalogue && lockedReason === null
             ? extraGroups({

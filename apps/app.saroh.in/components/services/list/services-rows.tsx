@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { ListTable, ListTableHead, listTable } from "@saroh/ui/list-table";
 import { ScrollX } from "@saroh/ui/scroll-x";
@@ -13,7 +14,12 @@ import { isPlanHref } from "@/lib/billing/plan-access";
 import type { OnlineProblem } from "@/lib/services/online-booking";
 import type { Service } from "@/lib/services/service";
 import type { WhoCanBook } from "@/lib/services/service-cards";
-import { TAKING_LABEL, WHO_TAG } from "@/lib/services/service-cards";
+import {
+    SAMPLE_WORD,
+    TAKING_LABEL,
+    WHO_TAG,
+} from "@/lib/services/service-cards";
+import { KEEP_ALL } from "./use-keep-samples";
 
 /** One service as the list draws it, at either size. */
 export interface ServiceRowView {
@@ -35,6 +41,10 @@ export interface RowsProps {
     onTaking: ((row: ServiceRowView, next: boolean) => void) | null;
     /** The id of the service whose switch is saving. */
     busy: string | null;
+    /** Keep a sample as it is (DEC-189); null for a role that can't. */
+    onKeep?: ((row: ServiceRowView) => void) | null;
+    /** The id of the sample being kept, or "all". */
+    keeping?: string | null;
 }
 
 const hrefOf = (s: Service) => `/services/${s.id}`;
@@ -46,6 +56,39 @@ export function WhoTag({ who }: { who: WhoCanBook }) {
         <StatusBadge thing="service" status="NOT_TAKING" />
     ) : (
         <StatusBadge tone={WHO_TAG[who].tone}>{WHO_TAG[who].word}</StatusBadge>
+    );
+}
+
+/** A sample's tag, and Keep for a role that may (DEC-189). */
+function SampleBits({
+    row,
+    onKeep,
+    keeping,
+    className,
+}: {
+    row: ServiceRowView;
+    onKeep: ((row: ServiceRowView) => void) | null | undefined;
+    keeping: string | null | undefined;
+    className?: string;
+}) {
+    if (!row.service.isSample) return null;
+    return (
+        <span className={cn("flex flex-wrap items-center gap-2", className)}>
+            <StatusBadge tone="draft">{SAMPLE_WORD}</StatusBadge>
+            {onKeep ? (
+                <Button
+                    variant="outline"
+                    size="xs"
+                    disabled={
+                        keeping === row.service.id || keeping === KEEP_ALL
+                    }
+                    aria-label={`Keep ${row.service.name}`}
+                    onClick={() => onKeep(row)}
+                >
+                    Keep
+                </Button>
+            ) : null}
+        </span>
     );
 }
 
@@ -126,7 +169,13 @@ const DESK_GRID =
  * the shared list pieces (`ListTable`, `ListTableHead`, `listTable.row`)
  * and a table's roles, so a screen reader still reads it as one.
  */
-export function ServicesTable({ rows, onTaking, busy }: RowsProps) {
+export function ServicesTable({
+    rows,
+    onTaking,
+    busy,
+    onKeep,
+    keeping,
+}: RowsProps) {
     return (
         <ListTable scroll>
             <ScrollX label="Services">
@@ -185,6 +234,12 @@ export function ServicesTable({ rows, onTaking, busy }: RowsProps) {
                                     >
                                         {row.service.name}
                                     </Link>
+                                    <SampleBits
+                                        row={row}
+                                        onKeep={onKeep}
+                                        keeping={keeping}
+                                        className="mt-1"
+                                    />
                                     {row.problem ? (
                                         <Problem
                                             problem={row.problem}
@@ -238,7 +293,13 @@ export function ServicesTable({ rows, onTaking, busy }: RowsProps) {
  * the Taking bookings switch with On or Off under it. The words open the
  * service; the switch beside them never does.
  */
-export function ServicesPhoneList({ rows, onTaking, busy }: RowsProps) {
+export function ServicesPhoneList({
+    rows,
+    onTaking,
+    busy,
+    onKeep,
+    keeping,
+}: RowsProps) {
     return (
         <ul data-services-list="" data-ph-mask="" className={listTable.card}>
             {rows.map((row) => (
@@ -266,6 +327,12 @@ export function ServicesPhoneList({ rows, onTaking, busy }: RowsProps) {
                                 {row.weekPhone}
                             </span>
                         </Link>
+                        <SampleBits
+                            row={row}
+                            onKeep={onKeep}
+                            keeping={keeping}
+                            className="mt-1.5"
+                        />
                         {row.problem ? (
                             <Problem
                                 problem={row.problem}

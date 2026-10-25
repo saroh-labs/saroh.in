@@ -121,6 +121,7 @@ function member(overrides: Partial<TeamMember> = {}): TeamMember {
                 source: "LINK",
                 kind: "BROUGHT_IN",
                 since: "2026-09-12T00:00:00.000Z",
+                signals: [],
             },
             {
                 organizationId: "org_bloom",
@@ -129,6 +130,13 @@ function member(overrides: Partial<TeamMember> = {}): TeamMember {
                 source: "ASSIGNED",
                 kind: "ASSIGNED",
                 since: "2026-10-02T00:00:00.000Z",
+                signals: [
+                    { kind: "NO_ACTIVITY", since: "2026-10-05T06:00:00.000Z" },
+                    {
+                        kind: "PAYMENT_DISCONNECTED",
+                        since: "2026-10-20T06:00:00.000Z",
+                    },
+                ],
             },
         ],
         leads: [],
@@ -279,6 +287,28 @@ describe("Businesses", () => {
         );
         // Not their own page: no Log a call.
         expect(screen.queryByRole("button", { name: "Log a call" })).toBeNull();
+    });
+
+    it("says in words which businesses have gone quiet (#1199)", () => {
+        render(
+            <MemberBusinesses
+                platformAdminId="pa_priya"
+                businesses={member().businesses}
+                self
+                canLog={false}
+                canOpen
+            />,
+        );
+        const rows = within(
+            screen.getByRole("list", { name: "Businesses they look after" }),
+        ).getAllByRole("listitem");
+        expect(within(rows[0]).queryByText(/since 5 Oct/)).toBeNull();
+        expect(
+            within(rows[1]).getByText(/^No team activity since 5 Oct 2026/),
+        ).toBeTruthy();
+        expect(
+            within(rows[1]).getByText(/^Payments disconnected since/),
+        ).toBeTruthy();
     });
 
     it("names a business without a link for a reader who can't open it", () => {

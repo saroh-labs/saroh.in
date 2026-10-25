@@ -359,6 +359,8 @@ export interface PublicSiteView {
      * signed in. Null when it has neither.
      */
     primaryHost?: string | null;
+    /** A demo business (DEC-188): look, never book or pay. */
+    demo?: true;
 }
 
 /**
@@ -2352,6 +2354,7 @@ export class SitesService {
                 currentPublication: {
                     select: { snapshot: true, publishedAt: true },
                 },
+                organization: { select: { isDemo: true } },
             },
         });
         if (!site?.currentPublication) {
@@ -2372,6 +2375,9 @@ export class SitesService {
             ...(modules ? { modules } : {}),
             icon: await publicSiteIcon(snapshot, site.organizationId),
             primaryHost: await primaryHostOf(site),
+            // A demo business (DEC-188): its pages say "This is a demo"
+            // where Book and Pay would be. Absent otherwise.
+            ...(site.organization.isDemo ? { demo: true as const } : {}),
         };
     }
 

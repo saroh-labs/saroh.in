@@ -121,9 +121,9 @@ describe("redirects", () => {
 });
 
 describe("indexed pages", () => {
-    it("lists Home, 9 features, 4 solutions, About, Contact, /customers and the waitlist while it is the ask; Pricing once it opens", () => {
+    it("lists Home, 9 features, 4 solutions, About, Contact, /customers, /llms.txt and the waitlist while it is the ask; Pricing once it opens", () => {
         const waitlist = indexedPaths("waitlist");
-        expect(waitlist).toHaveLength(18);
+        expect(waitlist).toHaveLength(19);
         expect(waitlist).toEqual(
             expect.arrayContaining(["/features/website", "/solutions/salons"]),
         );
@@ -138,7 +138,9 @@ describe("indexed pages", () => {
         // Pricing waits at the waitlist until launch, and a sitemap never
         // lists a redirect.
         expect(waitlist).not.toContain("/pricing");
+        expect(waitlist).not.toContain("/pricing.md");
         expect(indexedPaths("open")).toContain("/pricing");
+        expect(indexedPaths("open")).toContain("/pricing.md");
         expect(waitlist.filter((p) => p.startsWith("/features/"))).toHaveLength(
             9,
         );

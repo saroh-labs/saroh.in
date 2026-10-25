@@ -103,6 +103,11 @@ export interface BookingPageData {
      * naming no plan. Absent from an older API: not paused.
      */
     paused?: boolean;
+    /**
+     * A demo business (DEC-188): what can be booked shows, and "This is a
+     * demo" stands where Book would. Absent from an older API: not a demo.
+     */
+    demo?: boolean;
     timezone: string;
     /**
      * Pay now is on offer: the business allows it (DEC-088), Payments is on
