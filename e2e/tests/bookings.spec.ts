@@ -879,12 +879,18 @@ test.describe("the List (U6)", () => {
         await context.clearCookies({ name: "saroh_bookings_view" });
         await page.goto("/bookings");
         await expect(page).toHaveURL(/layout=agenda/);
+        // An open day with no bookings shows both "Nothing booked today" and a
+        // Free times section, so the `.or()` can match two; either proves the
+        // List rendered. Take the first so strict mode doesn't trip.
         await expect(
-            page.getByRole("region", { name: "Free times" }).or(
-                page.getByRole("heading", {
-                    name: /^(Closed on|Nothing booked)/,
-                }),
-            ),
+            page
+                .getByRole("region", { name: "Free times" })
+                .or(
+                    page.getByRole("heading", {
+                        name: /^(Closed on|Nothing booked)/,
+                    }),
+                )
+                .first(),
         ).toBeVisible();
     });
 });

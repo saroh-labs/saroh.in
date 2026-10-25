@@ -16,10 +16,10 @@
     "test": "vitest run"
   },
   "peerDependencies": {
+    "next": ">=15",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-hook-form": "^7.51.5",
-    "next": ">=15"
+    "react-hook-form": "^7.51.5"
   },
   "devDependencies": {
     "@saroh/eslint-config": "workspace:*",
@@ -38,7 +38,7 @@
     "react-dom": "catalog:react19",
     "react-hook-form": "catalog:",
     "typescript": "catalog:",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.7.1",

@@ -32,6 +32,6 @@
         "rimraf": "^6.0.1",
         "tsup": "^8.5.0",
         "typescript": "catalog:",
-        "vitest": "^4.1.11"
+        "vitest": "^4.1.12"
     }
 }
