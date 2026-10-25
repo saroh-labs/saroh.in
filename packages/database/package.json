@@ -52,6 +52,6 @@
         "tsup": "^8.5.1",
         "tsx": "^4.23.11",
         "typescript": "catalog:",
-        "vitest": "^4.1.11"
+        "vitest": "^4.1.12"
     }
 }
