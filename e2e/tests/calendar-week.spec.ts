@@ -230,7 +230,10 @@ test.describe("calendar week on a phone", () => {
             page.getByRole("heading", { level: 2, name: / · today$/ }),
         ).toBeVisible();
         const next = page.locator(`[data-strip-day="${istDay(1)}"]`);
-        if (await next.isEnabled()) {
+        // Tomorrow is only on the strip when it falls in the shown week; when
+        // today is the week's last day it starts the next week and is absent,
+        // and isEnabled() on a missing locator would hang. Check it exists first.
+        if ((await next.count()) > 0 && (await next.isEnabled())) {
             await next.click();
             await expect(next).toHaveAttribute("aria-checked", "true");
         }
