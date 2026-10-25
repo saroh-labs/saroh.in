@@ -76,7 +76,15 @@ export function scheduleInstant(
             details: { reason: "skippedTime" },
         });
     }
-    return local.toUTC().toJSDate();
+    // A wall time in the DST fall-back hour happens twice; take the first.
+    // Luxon's pick of the two drifts with the server's current offset, so force
+    // the earlier instant: if the same wall clock one hour earlier carries a
+    // larger offset, Luxon handed us the later (post-fall-back) occurrence.
+    const first =
+        local.minus({ hours: 1 }).offset > local.offset
+            ? local.minus({ hours: 1 })
+            : local;
+    return first.toUTC().toJSDate();
 }
 
 /** A 400 unless `at` is at least 5 minutes and at most 60 days from `now`. */
