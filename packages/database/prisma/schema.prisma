@@ -457,6 +457,11 @@ model Organization {
   overdueReminderTiming    OverdueReminderTiming?
   // "Tell me when it's back" (DEC-174 U23).
   stockWatches             StockWatch[]
+  // Saroh-sent verification codes and the prepaid balance that pays for them (DEC-191, #1235).
+  phoneVerifications       PhoneVerification[]
+  messagingSends           MessagingSend[]
+  messagingWallet          MessagingWallet?
+  messagingLedgerEntries   MessagingLedgerEntry[]
   // Places in line for full classes (round-2 A12).
   classWaitlistEntries     ClassWaitlistEntry[]
   // Customers' "Ask to remove my data" requests (DEC-172, #1106).
@@ -4689,10 +4694,10 @@ model Contact {
 
   // The customer's account on the business's site (ADR-011). At most one
   // that isn't REMOVED (a partial unique on CustomerAccount).
-  customerAccounts         CustomerAccount[] @relation("CustomerAccountContact")
+  customerAccounts         CustomerAccount[]     @relation("CustomerAccountContact")
   // Accounts staff said "This isn't them" about this contact (A4), so the
   // pair is never suggested again.
-  unlinkedCustomerAccounts CustomerAccount[] @relation("CustomerAccountUnlinkedFrom")
+  unlinkedCustomerAccounts CustomerAccount[]     @relation("CustomerAccountUnlinkedFrom")
   // Their "Ask to remove my data" requests (DEC-172): kept after a removal.
   dataRequests             CustomerDataRequest[]
 
@@ -7215,9 +7220,9 @@ model InvoiceEvent {
   data        Json?
   createdAt   DateTime @default(now())
 
-  @@index([invoiceId, createdAt])
   // A failed send is told once per email, however often its job retries.
   @@unique([messageId, kind], map: "InvoiceEvent_message_kind_key", where: raw("\"messageId\" IS NOT NULL"))
+  @@index([invoiceId, createdAt])
 }
 
 model InvoiceLine {
@@ -8787,4 +8792,140 @@ model ContactMessage {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+}
+
+// ── Saroh-sent verification codes (DEC-191, epic #1235) ─────────────────────
+// Saroh sends a business's customer a code (WhatsApp first) and the business
+// pays per message from a prepaid balance. Platform sender, not the business's
+// own provider (CommunicationProvider is untouched).
+
+enum MessagingChannel {
+  WHATSAPP
+  SMS
+  EMAIL
+}
+
+enum VerificationModule {
+  BOOKING
+  ORDER
+  ACCOUNT
+}
+
+enum PhoneVerificationStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+  FAILED
+}
+
+enum MessagingSendStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum MessagingLedgerKind {
+  TOPUP
+  DEBIT
+  RELEASE
+  EXPIRE
+  ADJUST
+}
+
+// One "send a code to this number" session. Rate limits count these rows.
+model PhoneVerification {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  module     VerificationModule
+  // What it verifies (a booking, an order…); informational, no FK.
+  subjectRef String?
+  phoneE164  String
+  // Never the code itself.
+  codeHash   String
+  status     PhoneVerificationStatus @default(PENDING)
+  attempts   Int                     @default(0)
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  // Hashed caller address, for the per-address limit (as Waitlist's).
+  ipHash     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sends MessagingSend[]
+
+  @@index([phoneE164, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([ipHash, createdAt])
+}
+
+// One actual message to the provider. Carries its own status and price, and
+// whether it was charged (chargedAt) or its hold given back (releasedAt).
+model MessagingSend {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  verificationId String
+  verification   PhoneVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+
+  channel           MessagingChannel
+  pricePaise        Int
+  providerMessageId String?
+  status            MessagingSendStatus @default(QUEUED)
+  failureReason     String?
+  chargedAt         DateTime?
+  releasedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ledgerEntries MessagingLedgerEntry[]
+
+  @@index([providerMessageId])
+  @@index([organizationId, createdAt])
+  @@index([verificationId])
+}
+
+// A business's prepaid balance, in paise. Available = balancePaise - heldPaise.
+model MessagingWallet {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  balancePaise Int       @default(0)
+  // Held for sends still in flight (a WhatsApp waits for delivery).
+  heldPaise    Int       @default(0)
+  // 12 months from the last top-up; null before the first.
+  expiresAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Append-only money trail. One entry of a kind per send, so a replayed
+// delivery report can't charge twice.
+model MessagingLedgerEntry {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  kind         MessagingLedgerKind
+  // Signed: a top-up is positive, a debit or expiry negative, a release 0.
+  amountPaise  Int
+  balanceAfter Int
+  sendId       String?
+  send         MessagingSend?      @relation(fields: [sendId], references: [id], onDelete: SetNull)
+  // The top-up it came from (#1241); informational until that model lands.
+  topupId      String?
+  reason       String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([sendId, kind])
+  @@index([organizationId, createdAt])
 }
