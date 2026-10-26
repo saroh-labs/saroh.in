@@ -2491,3 +2491,15 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - Saroh makes the code, stores only its hash and owns expiry, attempt caps and rate limits; MSG91 is transport only.
     - The own-provider path is unchanged: order, booking and invoice messages still go only through the business's own provider.
 - Consequences: a new paid outbound surface open to toll fraud, so per-number, per-business and per-IP limits ship with it and it is pentested before release (#1246).
+
+## DEC-192 Trade pages say renewals can go by UPI Autopay, and keep owners' lines as quotes
+
+**Status: Accepted — 2026-10-26** · owner · #1202
+
+- Context:
+    - The /for/ trade-page copy brief had treated UPI Autopay as unavailable, while the live FAQ (`apps/saroh.in/content/faq.ts`) and the claims ledger (H6, BK17) say memberships renew by UPI Autopay where it is set up. The phone UX audit asked for one answer.
+    - The audit also asked whether the short owner lines on each card ("Saturday morning, the phone doesn't stop.") read as testimonials.
+- Decision:
+    - **Autopay:** marketing and the /for/ pages may say a membership or monthly fee **can renew by UPI Autopay where the business has set it up on its own Razorpay account**; otherwise the bill is ready on the day with a payment link to send. Never "automatic" without that condition.
+    - **Owner lines stay as quotes.** They are the words owners use about their day, shown as quotes with no name, photo, business or rating, so they are not testimonials; real testimonials stay off until there are customers to quote (`saroh-product.md` → Saying what is true).
+- Rules: `docs/patterns/saroh-product.md` → Saying what is true; the copy brief for trade pages (outside the repo).
