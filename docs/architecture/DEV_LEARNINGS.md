@@ -5968,3 +5968,10 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** (1) calendar-week clicked `[data-strip-day="<tomorrow>"]` guarded by `isEnabled()` — but when today is the week strip's last day, tomorrow starts the next week and isn't on the strip, so `isEnabled()` on a missing locator hangs 15s and times out. (2) bookings "opens on List" used `region[Free times].or(heading /Closed on|Nothing booked/)` — an open, unbooked day shows **both** "Nothing booked today" and a Free times section, so `.or()` matched two and tripped strict mode.
 - **Fix:** guard with `(await next.count()) > 0` before `isEnabled()`; add `.first()` to the `.or()`. Both in `e2e/tests/`.
 - **Rule:** an e2e assertion about "today"/"tomorrow" must survive week and DST boundaries — `isEnabled()`/`isVisible()` on a locator that may not exist waits the full timeout (use `count()` first), and an `.or()` that can match more than one state needs `.first()`.
+
+## An audit called every "Start free" false because a pattern doc still said sign-up was waitlist-only (26 Oct 2026)
+
+- **Symptom:** the /for/ phone UX audit rated "Every CTA promises a sign-up that isn't open" severity 4 and proposed "Join the waitlist" buttons, nine days after launch.
+- **Cause:** `docs/patterns/saroh-product.md` → "Saying what is true" still read "Signup is waitlist-only … until then no CTA points at sign-up". Agents treat that file as current truth; nobody rewrote it when the launch switches were flipped on 17 Oct.
+- **Fix:** the bullet now says sign-up is open since the 17 Oct launch (both switches flipped) and keeps the old rule as history. Checked live: www.saroh.in's Start free links to accounts `/signup?src=…`, and `/signup` answers 200 "Sign up · Saroh" without the key.
+- **Rule:** when a launch or release flips a switch a pattern doc describes as "until then…", update that doc in the same batch; an audit claim about what's live gets checked against the live site before it's reported.
