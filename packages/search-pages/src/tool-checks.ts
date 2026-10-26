@@ -1,5 +1,5 @@
 import type { SearchPageCheck } from "./checks";
-import { NOT_AVAILABLE } from "./checks";
+import { emailsIn, NOT_AVAILABLE } from "./checks";
 import type { ToolPageData } from "./tool-schema";
 import { hasTool } from "./tools/registry";
 
@@ -115,9 +115,9 @@ export function toolChecks(p: ToolPageData): SearchPageCheck[] {
     );
 
     const words = wordsOf(p);
-    const emails = [...words.matchAll(/[\w.-]+@[\w.-]+\.\w+/g)]
-        .map((m) => m[0])
-        .filter((x) => !x.endsWith("@example.com") && x !== SAMPLE_UPI);
+    const emails = emailsIn(words).filter(
+        (x) => !x.endsWith("@example.com") && x !== SAMPLE_UPI,
+    );
     add(
         "sample-emails",
         "Sample emails are example.com",
