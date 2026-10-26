@@ -327,6 +327,10 @@ export function searchPageChecks(p: SearchPageData): SearchPageCheck[] {
         if (!(k in s.tiles)) fit.push(`tiles.${k} is missing.`);
     if (s.booking && s.staff?.length && !s.staff.includes(s.booking.staff))
         fit.push(`${s.booking.staff} isn't in staff.`);
+    if (s.booking && s.booking.deposit !== "none" && !s.booking.depositBy)
+        fit.push(
+            "booking.depositBy is missing: the deposit tile shows who paid.",
+        );
     if (s.pack && !(s.pack.left > 0 && s.pack.left <= s.pack.size))
         fit.push("pack.left must be between 1 and the pack's size.");
     if (s.orders && !s.orders.list[0]?.items)

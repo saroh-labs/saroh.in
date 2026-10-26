@@ -1,0 +1,259 @@
+---
+slug: shops
+name: Shops
+plural: shops
+pickAs: shops
+family: Shops and food
+search: shop billing software
+title: Shop billing software with stock and GST bills
+description: "Shop billing software for shops, bakeries, cafés and boutiques: take orders at the counter or on the phone, keep count of stock, and give a GST bill."
+updated: 2026-10-26
+shape: orders
+h1: Every sale billed, every shelf counted.
+lead: Billing and stock software for shops, bakeries, cafés and boutiques. Take orders at the counter or on the phone, keep count of your stock, and give a GST bill for every sale.
+phoneLead: Billing and stock software for shops. Take phone and counter orders, and keep count of stock.
+problemsTitle: What gets easier in your shop.
+problems:
+  - quote: I open up and don't know what to do first.
+  - quote: The price on the board says one thing and the bill says another.
+  - quote: Orders come in on WhatsApp, Instagram and at the counter, and one always slips.
+  - quote: A regular walks in and I can't remember her usual, or her allergy.
+  - quote: I have to remember who gets bread every Saturday, and chase them to pay.
+  - quote: Making GST invoices by hand takes my Sunday.
+  - quote: I put up a website and never know if anyone looks at it.
+starter:
+  title: Add what you sell, with sizes and prices
+  line: Add each product once, with its price, its sizes and how many you have. A small shop's list often starts like this.
+services:
+  - name: Sourdough loaf
+    detail: 500 g
+  - name: Butter croissant
+    detail: per piece
+  - name: Cotton kurta
+    detail: S to XXL
+  - name: Festive hamper
+    detail: small, large
+  - name: Masala chai
+    detail: regular, large
+  - name: Personalised mug
+    detail: per piece
+related:
+  - name: Home bakers
+    slug: home-bakers
+  - name: Boutiques
+    slug: boutiques
+  - name: Florists
+    slug: florists
+  - name: Cafés
+    slug: cafes
+  - name: Cloud kitchens
+    slug: cloud-kitchens
+  - name: Gift shops
+    slug: gift-shops
+ctaTitle: Open tomorrow knowing what to bake.
+scene:
+  business: Hearth & Grain
+  site: hearth-and-grain.saroh.app
+  day: Sat 25 Oct
+  heroAlt: "What a neighbourhood bakery's Saturday looks like in Saroh: counter, phone and WhatsApp orders in one list, croissants counted as they sell, a bill with GST, and a regular who has her sourdough every Saturday and can't have sesame."
+  hero:
+    title: Orders · Sat 25 Oct
+    count: 5 open
+    highlight: 0
+    rows:
+      - time: "#812"
+        name: Rashmi Kulkarni
+        right: Pick-up
+      - time: "#811"
+        name: Brew Lab Café
+        right: Preparing
+      - time: "#810"
+        name: Leela Thomas
+        right: Ready
+      - time: "#809"
+        name: Sanjay Patil
+        right: Delivery
+  chips:
+    - icon: cal
+      title: "#812 · for today, 5 pm"
+      sub: From WhatsApp · in the note
+    - icon: ok
+      title: ₹560 paid · UPI
+      sub: Vikram Shetty · at the counter
+    - icon: bill
+      title: "Bill #1407 · GST"
+      sub: CGST 2.5% + SGST 2.5% shown
+    - icon: person
+      title: Leela · sourdough every Sat
+      pill: No sesame
+  items:
+    - name: Sourdough loaf
+      short: Sourdough
+      len: 500 g
+      price: 220
+    - name: Butter croissant
+      short: Croissant
+      len: per piece
+      price: 110
+    - name: Banana walnut cake
+      short: Banana cake
+      len: 500 g
+      price: 480
+  orders:
+    count: 5 open
+    foot: Copy it into her WhatsApp chat. She pays by UPI or card.
+    list:
+      - no: 812
+        name: Rashmi Kulkarni
+        what: 3 items
+        how: Pick-up
+        stage:
+          tone: amb
+          text: New
+        total: 720
+        note: WhatsApp · for today, 5 pm
+        items: 2 croissants, banana cake
+        due: Sat 5 pm
+        payLabel: Unpaid
+        detail: WhatsApp order. Cake boxed whole, croissants in a separate bag. She collects at 5 pm.
+      - no: 811
+        name: Brew Lab Café
+        what: 16 items
+        how: Delivery
+        stage:
+          tone: grey
+          text: Preparing
+        total: 3520
+        note: Phone call · for Mon 27 Oct, 8 am
+      - no: 810
+        name: Leela Thomas
+        what: 1 item
+        how: Pick-up
+        stage:
+          tone: paid
+          text: Ready
+        total: 220
+        note: Weekly · Saturday sourdough
+      - no: 809
+        name: Sanjay Patil
+        what: 2 items
+        how: Delivery
+        stage:
+          tone: amb
+          text: New
+        total: 440
+        note: Instagram DM · for Sun 26 Oct
+      - no: 808
+        name: Vikram Shetty
+        what: 3 items
+        how: Pick-up
+        stage:
+          tone: paid
+          text: Collected
+        total: 560
+        note: Counter · paid by UPI
+  stock:
+    made:
+      name: Banana walnut cake
+      short: Banana cake
+      sizes:
+        - size: 500 g
+          price: 480
+        - size: 1 kg
+          price: 900
+    counted:
+      name: Butter croissant
+      short: Croissants
+      sub: Per piece
+      price: 110
+      baked: 30
+      left: 6
+  customer:
+    name: Leela Thomas
+    initials: LT
+    stats:
+      - 31 orders
+      - ₹6,820 spent
+    tag: No sesame
+    note: Sourdough every Saturday, sliced. Collects it herself.
+    noteBy: Note from Joel · 4 Oct
+  bill:
+    no: 1407
+    status:
+      tone: amb
+      text: Unpaid
+    gstin: true
+    showCodes: true
+    rate: 5
+    lines:
+      - name: Almond croissant × 2
+        code: HSN 1905
+        codeStatus: to-confirm
+        amount: 228.57
+      - name: Banana walnut cake, 500 g
+        code: HSN 1905
+        codeStatus: to-confirm
+        amount: 457.14
+    cgst: 17.15
+    sgst: 17.14
+    total: 720
+    foot: Payment link ready to send.
+  tiles:
+    orders:
+      title: Every order in one list
+      line: Counter, phone and WhatsApp orders together, with the date in each note.
+      phoneLine: Counter, calls and WhatsApp, together.
+    stock:
+      title: Know what's left on the shelf
+      line: Count the morning's croissants. Cakes made to order don't need counting.
+      phoneLine: Croissants counted, cakes made to order.
+    bill:
+      title: Bills that make themselves
+      line: Every order gets a numbered bill. With your GST number, it shows the tax.
+      phoneLine: With your GST number, bills show the tax.
+    customer:
+      title: Know your regulars
+      line: Their usual, how they collect, and what they can't eat.
+      phoneLine: Their usual, and what they can't eat.
+    website:
+      title: Your products and prices on your website
+      line: Customers see what you sell, then message you or come in.
+      phoneLine: They see it, then message you.
+  quote:
+    text: Orders come in on WhatsApp, Instagram and at the counter, and one always slips.
+    caption: Sound like your Saturdays? Every order goes in one list, late ones first.
+  also:
+    - title: Tickets for packing
+      line: Print the order for whoever packs it, with the allergy on it.
+    - title: Pick-up or delivery
+      line: Mark each order, and see which go out and which are collected.
+    - title: Payment links
+      line: Copy a link into your chat. They pay by UPI or card.
+    - title: Who sees the money
+      line: Give each helper a role. Only the roles you pick see takings.
+    - title: Weekly regulars
+      line: A loaf a week, renewed by UPI Autopay set up on your own Razorpay, or billed with a link.
+      icon: calendar
+    - title: Bills by hand
+      line: Write a bill yourself for a café that buys in bulk.
+---
+
+## What does Start free include?
+
+You can put your website up and start for free, with no card needed. Move up to a paid plan when you need more.
+
+## Can I take orders at the counter and on the phone?
+
+Yes. Counter and phone orders go in one list, with how each one is collected or delivered.
+
+## Can I give GST bills?
+
+Yes. Add your GST number once, and every paid sale gets a numbered bill with the tax shown.
+
+## How do customers pay me?
+
+By UPI or card from a payment link, straight into your own Razorpay or Cashfree account, or in cash at the counter. Connect your email and each bill goes to them by itself.
+
+## Can my staff use it without seeing the money?
+
+Yes. Give each person a role, and only the roles you choose see the money.

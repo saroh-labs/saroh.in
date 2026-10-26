@@ -125,7 +125,8 @@ export const sceneSchema = z.object({
             staff: z.string(),
             time: text,
             deposit: z.enum(["none", "quarter", "half", "full"]),
-            depositBy: text,
+            /** Who paid it, on the deposit tile; not drawn when `deposit` is none. */
+            depositBy: text.optional(),
             times: z.array(time).length(10),
             phoneTimes: z.array(time).length(8),
         })

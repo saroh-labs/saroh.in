@@ -89,6 +89,11 @@ describe("searchPageChecks", () => {
             "scene",
             (p) => p.scene.booking && (p.scene.booking.staff = "Ravi"),
         ],
+        [
+            "a deposit nobody paid",
+            "scene",
+            (p) => p.scene.booking && delete p.scene.booking.depositBy,
+        ],
         ["long title", "seo-title", (p) => (p.title = "x".repeat(60))],
     ];
     it.each(breaks)("fires on %s", (_, id, brk) => {
