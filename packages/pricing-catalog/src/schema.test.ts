@@ -265,6 +265,30 @@ describe("the catalogue schema", () => {
         });
     });
 
+    describe("messaging money packs (DEC-191)", () => {
+        it("reads a version published before them as none sold", () => {
+            expect(parseCatalog(fixtureInput()).messagePacks).toBeUndefined();
+        });
+
+        it("keeps a pack and refuses an empty, fractional or repeated one", () => {
+            const input = fixtureInput() as Record<string, unknown>;
+            input.messagePacks = [{ id: "small", amountPaise: 123 }];
+            expect(parseCatalog(input).messagePacks).toEqual([
+                { id: "small", amountPaise: 123 },
+            ]);
+            input.messagePacks = [
+                { id: "a", amountPaise: 0 },
+                { id: "b", amountPaise: 1.5 },
+            ];
+            expect(errorsOf(input)).toHaveLength(2);
+            input.messagePacks = [
+                { id: "a", amountPaise: 1 },
+                { id: "a", amountPaise: 2 },
+            ];
+            expect(errorsOf(input)).toHaveLength(1);
+        });
+    });
+
     describe("which looks, typefaces and colourways are free (DEC-177)", () => {
         it("reads a version published before it as none free", () => {
             const c = parseCatalog(fixtureInput());

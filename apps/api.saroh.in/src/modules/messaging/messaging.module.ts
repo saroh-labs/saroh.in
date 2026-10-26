@@ -2,6 +2,8 @@ import type { OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { Module } from "@nestjs/common";
 
 import { env } from "../../env";
+import { BillingModule } from "../billing/billing.module";
+import { billingProviderFactoryProvider } from "../billing/providers/provider.factory";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationContextModule } from "../organizations/organization-context.module";
@@ -12,6 +14,7 @@ import {
 } from "./messaging.controller";
 import { Msg91WebhookController } from "./msg91-webhook.controller";
 import { otpTransportProvider } from "./providers/otp-transport.factory";
+import { TopupService } from "./topup.service";
 import { VerificationSendService } from "./verification-send.service";
 import { VerificationService } from "./verification.service";
 import { WALLET_SWEEP_TYPE, WalletSweepHandler } from "./wallet-sweep.handler";
@@ -22,7 +25,12 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
 
 /** Saroh-sent verification codes and the prepaid balance that pays for them (DEC-191). */
 @Module({
-    imports: [JobsModule, OrganizationContextModule, PricingModule],
+    imports: [
+        BillingModule,
+        JobsModule,
+        OrganizationContextModule,
+        PricingModule,
+    ],
     controllers: [
         MessagingController,
         PublicVerificationsController,
@@ -30,6 +38,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
     ],
     providers: [
         otpTransportProvider,
+        billingProviderFactoryProvider,
+        TopupService,
         VerificationService,
         VerificationSendService,
         WalletService,

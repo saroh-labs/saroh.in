@@ -31,7 +31,11 @@ import { MOVE_DOWN_CLAIM_KIND } from "./over-limit";
 import { priceChangeOf, priceWords } from "./price-change";
 import { composeRenewalReminder } from "./renewal-reminder";
 import { renderSarohInvoicePdf } from "./saroh-invoice-paper";
-import { FIRST_MONTH_KEY, SAROH_TIMEZONE } from "./saroh-invoice-terms";
+import {
+    FIRST_MONTH_KEY,
+    SAROH_TIMEZONE,
+    TOPUP_KEY,
+} from "./saroh-invoice-terms";
 import { sarohSeller } from "./saroh-seller";
 import { termEndingOf } from "./term-ending";
 
@@ -227,6 +231,7 @@ export class BillingEmailHandler {
                     ? periodWords(invoice.periodStart, invoice.periodEnd)
                     : null,
             firstMonth: invoice.chargeKey.startsWith(FIRST_MONTH_KEY),
+            topup: invoice.chargeKey.startsWith(TOPUP_KEY),
         });
         const { file, fileName } = await renderSarohInvoicePdf(invoice);
         // Sent to the billing profile's email too (DEC-167, R4): the

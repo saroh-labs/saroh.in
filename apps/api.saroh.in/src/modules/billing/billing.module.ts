@@ -177,6 +177,9 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         DeletedBusinessBilling,
         // An operator ends a business's autopay the in-app way (DEC-166).
         CheckoutService,
+        // A messaging top-up (#1241): the owner's return is reconciled by
+        // the webhook's rule.
+        BillingWebhookService,
         CatalogueAccessService,
         EntitlementService,
         MeteringService,

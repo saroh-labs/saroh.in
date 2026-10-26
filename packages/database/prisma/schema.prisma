@@ -463,6 +463,7 @@ model Organization {
   messagingWallet               MessagingWallet?
   messagingLedgerEntries        MessagingLedgerEntry[]
   messagingVerificationSettings MessagingVerificationSetting[]
+  messagingTopups               MessagingTopup[]
   // Places in line for full classes (round-2 A12).
   classWaitlistEntries          ClassWaitlistEntry[]
   // Customers' "Ask to remove my data" requests (DEC-172, #1106).
@@ -8923,13 +8924,45 @@ model MessagingLedgerEntry {
   balanceAfter Int
   sendId       String?
   send         MessagingSend?      @relation(fields: [sendId], references: [id], onDelete: SetNull)
-  // The top-up it came from (#1241); informational until that model lands.
+  // The top-up it came from (#1241).
   topupId      String?
+  topup        MessagingTopup?     @relation(fields: [topupId], references: [id], onDelete: SetNull)
   reason       String?
 
   createdAt DateTime @default(now())
 
   @@unique([sendId, kind])
+  @@index([organizationId, createdAt])
+}
+
+enum MessagingTopupStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+// A money pack bought for the messaging wallet (#1241): a one-off order on
+// Saroh's own billing provider; paid, it credits the wallet once and is
+// invoiced by Saroh. The pack's amount is copied from the live catalogue.
+model MessagingTopup {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  packId          String
+  // What the wallet is credited, before GST.
+  amountPaise     Int
+  provider        String
+  providerOrderId String               @unique
+  status          MessagingTopupStatus @default(PENDING)
+  sarohInvoiceId  String?
+  paidAt          DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ledgerEntries MessagingLedgerEntry[]
+
   @@index([organizationId, createdAt])
 }
 

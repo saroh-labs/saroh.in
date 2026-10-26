@@ -81,7 +81,16 @@ describe("WalletService", () => {
 
     it("credit → hold → debit reconciles, balanceAfter chains and held returns to 0", async () => {
         const org = await business();
-        await service.credit(org, 1000, { topupId: "topup_1", reason: "test" });
+        const topup = await prisma.messagingTopup.create({
+            data: {
+                organizationId: org,
+                packId: "pack-a",
+                amountPaise: 1000,
+                provider: "RAZORPAY",
+                providerOrderId: uniq("order"),
+            },
+        });
+        await service.credit(org, 1000, { topupId: topup.id, reason: "test" });
         const a = await heldSend(org, 70);
         const b = await heldSend(org, 30);
         expect(await service.get(org)).toMatchObject({
@@ -104,7 +113,7 @@ describe("WalletService", () => {
             ["DEBIT", -70, 930],
             ["DEBIT", -30, 900],
         ]);
-        expect(trail[0]).toMatchObject({ topupId: "topup_1", reason: "test" });
+        expect(trail[0]).toMatchObject({ topupId: topup.id, reason: "test" });
         expect(trail.reduce((s, e) => s + e.amountPaise, 0)).toBe(900);
         const charged = await prisma.messagingSend.findUniqueOrThrow({
             where: { id: a },

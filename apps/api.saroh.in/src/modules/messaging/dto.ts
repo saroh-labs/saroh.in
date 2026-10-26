@@ -28,6 +28,13 @@ export class SetVerificationSettingDto {
     enabled!: boolean;
 }
 
+/** `POST …/messaging/topups`: the catalogue pack to buy. */
+export class StartTopupDto {
+    @IsString()
+    @MaxLength(64)
+    packId!: string;
+}
+
 export class LedgerQueryDto {
     @IsOptional()
     @IsString()

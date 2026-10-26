@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import type { MessagingLedgerEntry } from "@saroh/database";
+import type { MessagingLedgerEntry, Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
@@ -130,36 +130,12 @@ export class WalletService {
     credit(
         organizationId: string,
         amountPaise: number,
-        { topupId, reason }: { topupId?: string; reason?: string } = {},
+        opts: { topupId?: string; reason?: string } = {},
     ): Promise<WalletView> {
         return runInOrgContext(organizationId, () =>
-            prisma.$transaction(async (tx) => {
-                const expiresAt = new Date();
-                expiresAt.setUTCMonth(expiresAt.getUTCMonth() + EXPIRY_MONTHS);
-                const wallet = await tx.messagingWallet.upsert({
-                    where: { organizationId },
-                    create: {
-                        organizationId,
-                        balancePaise: amountPaise,
-                        expiresAt,
-                    },
-                    update: {
-                        balancePaise: { increment: amountPaise },
-                        expiresAt,
-                    },
-                });
-                await tx.messagingLedgerEntry.create({
-                    data: {
-                        organizationId,
-                        kind: "TOPUP",
-                        amountPaise,
-                        balanceAfter: wallet.balancePaise,
-                        topupId,
-                        reason,
-                    },
-                });
-                return view(wallet);
-            }),
+            prisma.$transaction((tx) =>
+                creditInTx(tx, organizationId, amountPaise, opts),
+            ),
         );
     }
 
@@ -276,6 +252,36 @@ export class WalletService {
             }),
         );
     }
+}
+
+/**
+ * {@link WalletService.credit} on the caller's transaction: a paid top-up
+ * (#1241) credits with the billing event that paid it.
+ */
+export async function creditInTx(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    amountPaise: number,
+    { topupId, reason }: { topupId?: string; reason?: string } = {},
+): Promise<WalletView> {
+    const expiresAt = new Date();
+    expiresAt.setUTCMonth(expiresAt.getUTCMonth() + EXPIRY_MONTHS);
+    const wallet = await tx.messagingWallet.upsert({
+        where: { organizationId },
+        create: { organizationId, balancePaise: amountPaise, expiresAt },
+        update: { balancePaise: { increment: amountPaise }, expiresAt },
+    });
+    await tx.messagingLedgerEntry.create({
+        data: {
+            organizationId,
+            kind: "TOPUP",
+            amountPaise,
+            balanceAfter: wallet.balancePaise,
+            topupId,
+            reason,
+        },
+    });
+    return view(wallet);
 }
 
 function view(w: {

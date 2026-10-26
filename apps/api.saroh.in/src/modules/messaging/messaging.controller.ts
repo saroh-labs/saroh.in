@@ -28,8 +28,10 @@ import {
     CheckVerificationDto,
     LedgerQueryDto,
     SetVerificationSettingDto,
+    StartTopupDto,
     StartVerificationDto,
 } from "./dto";
+import { TopupService } from "./topup.service";
 import { VerificationSendService } from "./verification-send.service";
 import type { CheckOutcome } from "./verification.service";
 import { VerificationService } from "./verification.service";
@@ -46,6 +48,7 @@ export class MessagingController {
     constructor(
         private readonly verification: VerificationService,
         private readonly wallet: WalletService,
+        private readonly topups: TopupService,
     ) {}
 
     @Get("verification-settings")
@@ -80,6 +83,29 @@ export class MessagingController {
     ) {
         authorize(ctx, "comms:manage");
         return this.wallet.ledger(ctx.organizationId, query);
+    }
+
+    /** The money packs on sale (#1241), from the live catalogue. */
+    @Get("packs")
+    packs(@OrgContext() ctx: OrganizationContext) {
+        authorize(ctx, "comms:manage");
+        return this.topups.packs();
+    }
+
+    /** Buy a pack: owner only (`billing:manage`), as every Saroh charge. */
+    @Post("topups")
+    @HttpCode(HttpStatus.CREATED)
+    startTopup(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: StartTopupDto,
+    ) {
+        return this.topups.start(ctx, dto.packId);
+    }
+
+    @Get("topups/:id")
+    @Header("Cache-Control", "no-store")
+    topup(@OrgContext() ctx: OrganizationContext, @Param("id") id: string) {
+        return this.topups.status(ctx, id);
     }
 
     /** Sessions started and verified over the last 30 days. */

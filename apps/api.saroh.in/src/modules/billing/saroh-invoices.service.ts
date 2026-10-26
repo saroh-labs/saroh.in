@@ -5,7 +5,7 @@ import {
     NotFoundException,
     Optional,
 } from "@nestjs/common";
-import type { BillingCheckout, Prisma } from "@saroh/database";
+import type { BillingCheckout, MessagingTopup, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -28,6 +28,7 @@ import {
     sarohSeries,
     sarohSupply,
     taxSarohLines,
+    TOPUP_KEY,
 } from "./saroh-invoice-terms";
 import type { SarohSeller } from "./saroh-seller";
 import { sarohSeller, sellerGaps } from "./saroh-seller";
@@ -121,6 +122,49 @@ export class SarohInvoicesService {
     }
 
     // ── The webhook's hooks ────────────────────────────────────────────
+
+    /**
+     * A messaging top-up paid (#1241): one line for the balance it adds,
+     * before GST, once per top-up (`topup:<id>`). A service Saroh sells, so
+     * it is Saroh's invoice like a plan's; no plan, no period.
+     */
+    async invoiceTopupInTx(
+        tx: Tx,
+        input: {
+            topup: MessagingTopup;
+            event: ParsedBillingEvent;
+            now: Date;
+        },
+    ): Promise<string | null> {
+        const { topup, event, now } = input;
+        const seller = this.sellerNow();
+        return this.recordInTx(tx, {
+            organizationId: topup.organizationId,
+            source: "TOPUP",
+            chargeKey: `${TOPUP_KEY}${topup.id}`,
+            provider: topup.provider,
+            providerSubscriptionId: topup.providerOrderId,
+            providerEventId: event.providerEventId,
+            providerPaymentId: event.providerPaymentId ?? null,
+            providerAmountPaise: event.paymentAmountPaise ?? null,
+            providerCustomerId: event.providerCustomerId ?? null,
+            planId: null,
+            planName: "Messaging balance",
+            // Required by the invoice row; a top-up has no cycle.
+            cycle: "month",
+            periodStart: null,
+            periodEnd: null,
+            lines: [
+                {
+                    description: `${seller.name} messaging balance top-up`,
+                    sac: seller.sac,
+                    unitPaise: topup.amountPaise,
+                },
+            ],
+            billTo: null,
+            issuedAt: now,
+        });
+    }
 
     /**
      * A checkout's charge: a new plan's first period (NEW), an upgrade's
