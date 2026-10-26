@@ -5988,3 +5988,9 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Symptom:** `pnpm prepush --all` failed `module-annotations.spec.ts` ("names every controller under src/modules in one of the lists") after the search-pages unit's own quick gate had passed.
 - **Cause:** the unit added two controllers but no row in `CLASS_LEVEL`, `METHOD_LEVEL` or `NEVER`; its quick gate ran only the affected unit tests.
 - **Fix:** both are in `NEVER` (Saroh's own pages, not a tenant surface). When you add a controller, add its row in the same commit and run that spec. The local Playwright browser cache had also gone missing (`~/Library/Caches/ms-playwright`); `pnpm --filter @saroh/e2e exec playwright install chromium` restores it.
+
+## CodeQL flagged regexes in build-time content checks (26 Oct 2026)
+
+- **Symptom:** PR #1252's CodeQL check failed with four warnings in `packages/search-pages`: polynomial ReDoS on `<[^>]+>`, `[\w.-]+@[\w.-]+` and an unanchored `[^?.]*[?.]`, and double unescaping (`&amp;` replaced before `&lt;`). `pnpm prepush --all` had passed; it doesn't run CodeQL.
+- **Fix:** `[^<>]*` in the tag match, email words found by splitting on spaces first (`emailsIn`), `indexOf` for the first sentence, `&amp;` unescaped last; tests pin each.
+- **Rule:** in any matcher run on text, never put an unbounded class that can match the next token's first character in front of it (`[\w.-]+@`, `<[^>]+>`), and never unescape `&amp;` before the other entities.
