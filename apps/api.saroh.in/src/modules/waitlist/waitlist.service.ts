@@ -8,11 +8,11 @@ import type { WaitlistKind, WaitlistPlan } from "./waitlist-keys";
 import {
     businessKey,
     cleanSource,
+    isToolGateSource,
     LINK_PREVIEW_SOURCE,
     maskEmail,
     newRefCode,
     normaliseEmail,
-    QR_MAKER_SOURCE,
     REF_CODE_PATTERN,
     waitlistTemplate,
 } from "./waitlist-keys";
@@ -47,7 +47,8 @@ export type JoinWaitlistResult =
     | { created: false };
 
 /** Sources of entries a tool's email gate made, not people waiting. */
-const TOOL_SOURCES = new Set<string>([LINK_PREVIEW_SOURCE, QR_MAKER_SOURCE]);
+const isToolSource = (source: string): boolean =>
+    source === LINK_PREVIEW_SOURCE || isToolGateSource(source);
 
 /** How many times a clashing referral id is drawn again. */
 const REF_CODE_ATTEMPTS = 3;
@@ -126,7 +127,7 @@ export class WaitlistService {
                 // whatever happens to the lead. A tool's email gate (the
                 // link preview, the QR code maker) is not someone waiting
                 // for Saroh, so it makes none.
-                if (!TOOL_SOURCES.has(data.source)) {
+                if (!isToolSource(data.source)) {
                     await recordWebsiteLead({
                         source: "WAITLIST",
                         email,

@@ -57,7 +57,7 @@ describe("/tools/[slug]", () => {
         );
     });
 
-    it("sends the gate's email, and nothing the visitor typed, to the unlock route", async () => {
+    it("sends the gate's email and the tool's slug, and nothing the visitor typed, to the unlock route", async () => {
         const fetcher = vi
             .fn()
             .mockResolvedValue(
@@ -90,9 +90,10 @@ describe("/tools/[slug]", () => {
         );
         expect(fetcher).toHaveBeenCalledTimes(1);
         const [url, init] = fetcher.mock.calls[0] as [string, RequestInit];
-        expect(url).toBe("/api/qr-code-maker/unlock");
+        expect(url).toBe("/api/tools/unlock");
         expect(JSON.parse(init.body as string)).toEqual({
             email: "ryestudio@example.com",
+            tool: "no-show-cost-calculator",
         });
         expect(
             screen.getByRole("button", { name: "Print or save as PDF" }),
@@ -111,10 +112,12 @@ describe("/tools/[slug]", () => {
                 ),
             ),
         );
-        expect(await toolGateSubmit("a@example.com")).toEqual({
-            ok: false,
-            reason: "rate-limited",
-        });
+        expect(await toolGateSubmit("a@example.com", "gst-calculator")).toEqual(
+            {
+                ok: false,
+                reason: "rate-limited",
+            },
+        );
     });
 });
 

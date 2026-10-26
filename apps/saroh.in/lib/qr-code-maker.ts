@@ -68,7 +68,7 @@ export function logoProblem(file: {
     return null;
 }
 
-/** What `/api/qr-code-maker/unlock` answers. */
+/** What `/api/tools/unlock` answers. */
 export type QrUnlockResult =
     | { unlocked: true; emailed: "sent" | "limited" | "not-sent" }
     | {
@@ -80,15 +80,18 @@ export type QrUnlockResult =
 export const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * The email gate's one call: `POST /api/qr-code-maker/unlock` with the
- * email and nothing else. The QR code maker's, and every free tool's
- * (#1253, `components/v2/tools/tool-gate.tsx`): one route, one payload.
+ * The email gate's one call: `POST /api/tools/unlock` with the email and
+ * the tool's slug, nothing else. The QR code maker's (no slug), and every
+ * free tool's (#1253, `components/v2/tools/tool-gate.tsx`).
  */
-export async function unlockWithEmail(email: string): Promise<QrUnlockResult> {
-    const res = await fetch("/api/qr-code-maker/unlock", {
+export async function unlockWithEmail(
+    email: string,
+    tool?: string,
+): Promise<QrUnlockResult> {
+    const res = await fetch("/api/tools/unlock", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, tool }),
     });
     return (await res.json()) as QrUnlockResult;
 }

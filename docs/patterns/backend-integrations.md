@@ -69,9 +69,10 @@ a note saying so.
   that emails stranger-supplied text is a relay").
   saroh.in's free tools share one email budget, `waitlist/tool-email-cap.ts`
   (3 a UTC day to an address, 300 a day in all): a new tool's gate claims
-  from it rather than counting its own. The QR code maker's email
-  (`tools/qr-maker-email.ts`) takes no input at all, because the API never
-  receives what the visitor typed.
+  from it rather than counting its own. The tools' gate email
+  (`tools/qr-maker-email.ts`) takes only a tool slug, refused unless it is
+  on the API's own list (`tools/tool-names.ts`), which gives the name and
+  link; the API never receives what the visitor typed.
 - **Current** (10 Oct 2026) — **A sentence the API writes formats its
   amount, day and time through `src/common/words-format.ts`**, the API's
   twin of the app's `lib/format`: `moneyWords` and `moneyWordsMinor`

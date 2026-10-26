@@ -461,7 +461,7 @@ Product facts only; which plan names which is kept outside the repo.
 ## 6b. QR code maker (`/tools/qr-code-maker`)
 
 `content/qr-code-maker.ts`, `components/v2/tools/qr-code-maker.tsx`,
-`qr-maker-gate.tsx`, `qr-download.ts`, `app/api/qr-code-maker/unlock/route.ts`,
+`qr-maker-gate.tsx`, `qr-download.ts`, `app/api/tools/unlock/route.ts`,
 `tools/` (API). QR codes plan U9; design "Saroh QR Codes", screen 02, read
 10 Oct 2026. Published 17 Oct (`content/resources.ts`). The page names no
 plan and no price (`lib/qr-code-maker.test.ts`).

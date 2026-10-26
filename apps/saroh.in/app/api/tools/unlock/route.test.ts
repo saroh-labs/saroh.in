@@ -16,9 +16,9 @@ vi.mock("@/env", () => ({ env }));
 import { POST } from "./route";
 
 /**
- * The QR code maker's one route (QR codes plan U9): it asks the API server
- * to server, always signed (the API refuses it otherwise), with the email
- * and nothing else — whatever a caller posts beside it is dropped — and
+ * The free tools' unlock route (QR codes plan U9, #1253): it asks the API
+ * server to server, always signed (the API refuses it otherwise), with the
+ * email and the tool's slug and nothing else — whatever a caller posts beside it is dropped — and
  * every answer the page reads is a typed state, never a thrown error.
  */
 
@@ -45,7 +45,7 @@ const upstream = (status: number, body: unknown = {}) => ({
 
 const unlock = (body: unknown) =>
     POST(
-        new Request("https://www.saroh.in/api/qr-code-maker/unlock", {
+        new Request("https://www.saroh.in/api/tools/unlock", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -55,7 +55,37 @@ const unlock = (body: unknown) =>
         }),
     );
 
-describe("POST /api/qr-code-maker/unlock", () => {
+describe("POST /api/tools/unlock", () => {
+    it("sends the tool's slug with the email", async () => {
+        fetchMock.mockResolvedValue(
+            upstream(200, { unlocked: true, emailed: "sent" }),
+        );
+        await unlock({ email: "a@shop.example.com", tool: "gst-calculator" });
+        const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+        expect(JSON.parse(init.body as string)).toEqual({
+            email: "a@shop.example.com",
+            tool: "gst-calculator",
+        });
+    });
+
+    it.each(["GST Calculator", "../qr", "a".repeat(61), ""])(
+        "refuses a slug of no tool's shape (%s) without asking the API",
+        async (tool) => {
+            const res = await unlock({ email: "a@shop.example.com", tool });
+            expect(res.status).toBe(400);
+            expect(await res.json()).toEqual({
+                unlocked: false,
+                failure: "unavailable",
+            });
+            expect(fetchMock).not.toHaveBeenCalled();
+        },
+    );
+
+    it("answers on the QR code maker's old path too", async () => {
+        const old = await import("../../qr-code-maker/unlock/route");
+        expect(old.POST).toBe(POST);
+    });
+
     it("sends only the email, signed — never a link, a logo or a label", async () => {
         fetchMock.mockResolvedValue(
             upstream(200, { unlocked: true, emailed: "sent" }),

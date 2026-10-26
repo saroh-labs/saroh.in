@@ -30,9 +30,11 @@ import {
     QR_MAKER_SUBJECT,
     QR_MAKER_URL,
     qrMakerEmailText,
+    toolEmail,
 } from "./qr-maker-email";
 import { QrMakerGateService } from "./qr-maker-gate.service";
 import { QrMakerController } from "./qr-maker.controller";
+import { TOOL_NAMES, TOOL_SLUGS } from "./tool-names";
 
 /**
  * The QR code maker's email gate (QR codes plan U9): the route needs the
@@ -122,7 +124,31 @@ describe("the route", () => {
         });
         expect(await validate(dto)).toEqual([]);
         expect(dto.email).toBe("owner@example.com");
-        expect(Object.keys(dto)).toEqual(["email"]);
+        expect(Object.keys(dto).filter((k) => k !== "tool")).toEqual(["email"]);
+        expect(dto.tool).toBeUndefined();
+    });
+
+    it("takes a tool by a slug on its list, and refuses any other", async () => {
+        const ok = plainToInstance(UnlockQrMakerDto, {
+            email: "a@example.com",
+            tool: "gst-calculator",
+        });
+        expect(await validate(ok)).toEqual([]);
+        for (const tool of [
+            "not-a-tool",
+            "GST-calculator",
+            "gst-calculator?x=1",
+            "",
+            7,
+        ]) {
+            const errors = await validate(
+                plainToInstance(UnlockQrMakerDto, {
+                    email: "a@example.com",
+                    tool,
+                }),
+            );
+            expect(errors.map((e) => e.property)).toEqual(["tool"]);
+        }
     });
 
     it("refuses an incomplete email in the page's words", async () => {
@@ -195,6 +221,65 @@ describe("unlocking the downloads", () => {
         expect(QR_MAKER_URL).toBe("https://www.saroh.in/tools/qr-code-maker");
         expect(text).not.toContain("?");
         expect(text).not.toContain("@");
+    });
+
+    it("names another tool: its source, and its email from the server's list", async () => {
+        await gate().unlock({
+            email: "owner@example.com",
+            tool: "gst-calculator",
+        });
+        expect(store.create.mock.calls[0][0].data.source).toBe(
+            "tool:gst-calculator",
+        );
+        expect(send).toHaveBeenCalledWith(
+            "owner@example.com",
+            "GST calculator: your link back",
+            toolEmail("gst-calculator").text,
+        );
+        expect(toolEmail("gst-calculator").text).toContain(
+            "https://www.saroh.in/tools/gst-calculator",
+        );
+    });
+
+    it("the QR code maker, named or not, is today's email and source", async () => {
+        expect(toolEmail("qr-code-maker")).toEqual(toolEmail());
+        expect(toolEmail()).toEqual({
+            subject: QR_MAKER_SUBJECT,
+            text: qrMakerEmailText(),
+        });
+        await gate().unlock({ email: "a@example.com", tool: "qr-code-maker" });
+        expect(store.create.mock.calls[0][0].data.source).toBe("qr-maker");
+    });
+
+    it.each(TOOL_SLUGS)(
+        "%s's email carries only our words: its name, its own link",
+        (slug) => {
+            const { subject, text } = toolEmail(slug);
+            const all = `${subject}\n${text}`;
+            const url = `https://www.saroh.in/tools/${slug}`;
+            expect(all.match(/https?:\/\/\S+/g)).toEqual([url]);
+            if (slug !== "qr-code-maker") {
+                expect(all).toContain(TOOL_NAMES[slug]);
+            }
+            expect(all).not.toContain("?");
+            expect(all).not.toContain("@");
+            expect(all).not.toContain("!");
+        },
+    );
+
+    it("has no email for a slug off the list", () => {
+        expect(() => toolEmail("not-a-tool")).toThrow();
+    });
+
+    it("touches another tool's gate entry too, keeping its source", async () => {
+        store.findUnique.mockResolvedValue({
+            id: "w1",
+            source: "tool:receipt-maker",
+        });
+        const now = new Date("2026-10-18T06:00:00Z");
+        await gate().unlock({ email: "back@example.com", now });
+        expect(store.create).not.toHaveBeenCalled();
+        expect(store.update.mock.calls[0][0].data).toEqual({ checkedAt: now });
     });
 
     it("touches only when its own entry was last used", async () => {

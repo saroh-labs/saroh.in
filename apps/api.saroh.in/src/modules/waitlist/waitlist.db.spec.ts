@@ -427,4 +427,39 @@ describe("the link preview tool's entries (resources plan U2)", () => {
         });
         expect(left).toEqual([{ email: mail("new-qr") }]);
     });
+
+    it("drops another tool's gate entry 12 months after its last use, as the QR code maker's (#1253)", async () => {
+        const now = new Date();
+        const used = (who: string, source: string, at: Date) =>
+            prisma.waitlistSignup.create({
+                data: {
+                    email: mail(who),
+                    emailKey: mail(who),
+                    source,
+                    checkedAt: at,
+                    newsConsent: false,
+                },
+            });
+        const old = new Date(now.getTime() - 400 * DAY_MS);
+        await used("old-gst", "tool:gst-calculator", old);
+        await used(
+            "new-gst",
+            "tool:gst-calculator",
+            new Date(now.getTime() - 30 * DAY_MS),
+        );
+        // A waitlist entry is never swept by this rule, whatever its source.
+        await used("waiting", "instagram", old);
+
+        await expect(new WaitlistRetentionHandler().sweep(now)).resolves.toBe(
+            1,
+        );
+        const left = await prisma.waitlistSignup.findMany({
+            select: { email: true },
+            orderBy: { position: "asc" },
+        });
+        expect(left).toEqual([
+            { email: mail("new-gst") },
+            { email: mail("waiting") },
+        ]);
+    });
 });

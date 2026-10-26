@@ -81,7 +81,7 @@ export default async function ToolRoute({ params }: Props) {
                     ),
                 ]}
             />
-            <SiteToolGate>
+            <SiteToolGate tool={slug}>
                 <ToolPage
                     page={p}
                     draft={!isLive(p.path)}

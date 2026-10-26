@@ -118,7 +118,7 @@ test.describe("QR code maker", () => {
 
         const email = `qr-${stamp(testInfo)}@example.test`;
         const call = page.waitForRequest(
-            (r) => new URL(r.url()).pathname === "/api/qr-code-maker/unlock",
+            (r) => new URL(r.url()).pathname === "/api/tools/unlock",
         );
         await page.getByLabel("Email").fill(email);
         await page.getByRole("button", { name: "Get my QR" }).click();
