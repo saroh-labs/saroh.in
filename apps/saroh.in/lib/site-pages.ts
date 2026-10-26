@@ -261,4 +261,10 @@ export const SERVED_PATHS: readonly string[] = indexedPaths("waitlist");
  * crawler that is kept out never reads that, so the address could still be
  * listed bare from a link to it. Left open, the page is read and dropped.
  */
-export const CRAWL_DISALLOWED = ["/api/", "/pricing/draft", "/pricing/preview"];
+export const CRAWL_DISALLOWED = [
+    "/api/",
+    "/pricing/draft",
+    "/pricing/preview",
+    // The last build's snapshot of what it read (build-state.config.js).
+    "/_build/",
+];

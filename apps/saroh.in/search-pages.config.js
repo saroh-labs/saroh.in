@@ -1,6 +1,8 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
+const buildState = require("./build-state.config");
+
 /**
  * Which /for/ pages and free tools are live (DEC-193, #1253), read from the
  * API once per build.
@@ -13,8 +15,10 @@ const path = require("node:path");
  * (`redirects.js`), so the pages, sitemap, menus and redirects agree.
  *
  * - A production deployment (`VERCEL_ENV=production`) builds only live
- *   pages. If the list can't be read (after riding out an API restart), the
- *   build fails: it never guesses (DEC-193).
+ *   pages. If the list can't be read (after riding out an API restart), it
+ *   uses the live site's snapshot of the list it was last built with
+ *   (`build-state.config.js`) and warns; with neither, the build fails: it never
+ *   guesses (DEC-193).
  * - Any other build is a preview when `RESOURCES_PREVIEW` is on (dev, CI,
  *   prepush) or the list can't be read (local work without an API): every
  *   page in the code is built, and those not live say Draft and `noindex`.
@@ -77,6 +81,9 @@ function parseAnswer(body) {
  * @param {typeof fetch} [fetcher]
  * @param {readonly number[]} [delays]
  * @param {(ms: number) => Promise<void>} [sleep]
+ * @param {{ get(): Promise<{ searchPages: unknown }> }} [state] the live
+ *   site's snapshot (`build-state.config.js` liveState), a production build's
+ *   fallback
  * @returns {Promise<PublishList>}
  */
 async function readPublishList(
@@ -84,6 +91,7 @@ async function readPublishList(
     fetcher = fetch,
     delays = RETRY_DELAYS_MS,
     sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
+    state = undefined,
 ) {
     const production = env.VERCEL_ENV === "production";
     const once = async () => {
@@ -106,8 +114,20 @@ async function readPublishList(
             } catch (err) {
                 const why = err instanceof Error ? err.message : String(err);
                 if (attempt >= delays.length) {
+                    let fallback = "no snapshot to fall back to";
+                    if (state) {
+                        try {
+                            const snap = await state.get();
+                            return {
+                                preview: false,
+                                ...parseAnswer(snap.searchPages),
+                            };
+                        } catch (e) {
+                            fallback = `the live site's snapshot can't be used: ${e instanceof Error ? e.message : String(e)}`;
+                        }
+                    }
                     throw new Error(
-                        `saroh.in: GET /public/search-pages failed (${why}). A production build never guesses which /for/ pages are live (DEC-193); fix the API and deploy again.`,
+                        `saroh.in: GET /public/search-pages failed (${why}; ${fallback}). A production build never guesses which /for/ pages are live (DEC-193); fix the API and deploy again.`,
                     );
                 }
                 console.warn(`[search-pages] read failed (${why}); retrying`);
@@ -182,10 +202,48 @@ module.exports = {
     loadPublishList,
     familyOf,
     toolExists,
+    prebuild,
 };
 
+/**
+ * The prebuild: the publish list, and in production the pricing too, from
+ * the API or (when it's down) the live site's snapshot; then the files the
+ * build reads and the snapshot the next build may need (`build-state.config.js`).
+ * @param {Record<string, string | undefined>} env
+ * @param {typeof fetch} [fetcher]
+ * @param {readonly number[]} [delays]
+ * @param {(ms: number) => Promise<void>} [sleep]
+ * @param {Parameters<typeof buildState.writeBuildState>[4]} [at]
+ */
+async function prebuild(
+    env,
+    fetcher = fetch,
+    delays = RETRY_DELAYS_MS,
+    sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
+    at = {},
+) {
+    const production = env.VERCEL_ENV === "production";
+    const state = buildState.liveState(env, fetcher);
+    const list = await readPublishList(
+        env,
+        fetcher,
+        delays,
+        sleep,
+        production ? state : undefined,
+    );
+    const pricing = production
+        ? await buildState.readBuildPricing(env, state, fetcher, delays, sleep)
+        : null;
+    buildState.writeBuildState(production, list, pricing, env, {
+        ...at,
+        dataAsOf: state.usedFrom,
+    });
+    if (state.usedFrom) console.log(buildState.fallbackWarning(state.usedFrom));
+    return list;
+}
+
 if (require.main === module) {
-    readPublishList(process.env).then(
+    prebuild(process.env).then(
         (list) => {
             fs.writeFileSync(FILE, `${JSON.stringify(list, null, 2)}\n`);
             console.log(

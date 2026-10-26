@@ -1,4 +1,12 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import {
+    mkdtempSync,
+    readdirSync,
+    readFileSync,
+    rmSync,
+    statSync,
+    writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -106,13 +114,47 @@ describe("readLivePricing", () => {
     it("API down on a deployment's build: throws, so the last good site keeps serving", async () => {
         env.NODE_ENV = "production";
         env.NEXT_PHASE = "phase-production-build";
-        env.VERCEL_ENV = "production";
+        env.VERCEL_ENV = "preview";
         await expect(
             readLivePricing(asFetch(answering({}, 503))),
         ).rejects.toThrow();
         await expect(
             readLivePricing(asFetch(answering({ catalog: { plans: [] } }))),
         ).rejects.toThrow();
+    });
+});
+
+describe("readLivePricing in a production build", () => {
+    it("reads what the prebuild read (.build-pricing.json), never the API", async () => {
+        const dir = mkdtempSync(join(tmpdir(), "pricing-"));
+        vi.spyOn(process, "cwd").mockReturnValue(dir);
+        env.NEXT_PHASE = "phase-production-build";
+        env.VERCEL_ENV = "production";
+        const fetcher = answering({}, 503);
+        try {
+            writeFileSync(
+                join(dir, ".build-pricing.json"),
+                JSON.stringify({ pricing: { ...live, version: 7 } }),
+            );
+            expect(
+                (await readLivePricingVersion(asFetch(fetcher)))?.version,
+            ).toBe(7);
+            writeFileSync(
+                join(dir, ".build-pricing.json"),
+                JSON.stringify({ pricing: null }),
+            );
+            expect(await readLivePricing(asFetch(fetcher))).toBeNull();
+            // A snapshot that doesn't validate fails the build.
+            writeFileSync(
+                join(dir, ".build-pricing.json"),
+                JSON.stringify({ pricing: { catalog: { plans: [] } } }),
+            );
+            await expect(readLivePricing(asFetch(fetcher))).rejects.toThrow();
+            expect(fetcher).not.toHaveBeenCalled();
+        } finally {
+            vi.restoreAllMocks();
+            rmSync(dir, { recursive: true, force: true });
+        }
     });
 });
 

@@ -63,8 +63,11 @@ describe("public/_headers", () => {
 
     it("never keeps this public site out of search, and caches no page", () => {
         for (const [pattern, headers] of Array.from(all)) {
+            // The build snapshot (build-state.config.js) is data, never a page.
+            if (pattern === "/_build/*") continue;
             expect(headers.has("x-robots-tag"), pattern).toBe(false);
         }
+        expect(all.get("/_build/*")?.get("x-robots-tag")).toBe("noindex");
         // Only files under their own folders are told how long to be kept.
         expect(all.get("/*")?.has("cache-control")).toBe(false);
     });

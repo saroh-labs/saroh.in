@@ -265,6 +265,15 @@ accounts and the operator console. `pnpm run check:titles` and
   `pnpm check:content-dates` fails a batch that doesn't. /pricing is the
   live catalogue version's `goLiveAt`. Never the build's date
   (`lib/site-pages.ts` `lastModified`).
+- **What a build reads from the API, it reads once, before `next build`**
+  (`search-pages.config.js` + `build-state.config.js`): the /for/ publish
+  list and, once early access is open, `GET /public/pricing`. A production
+  build's `readLivePricing` reads that answer from `.build-pricing.json`,
+  never the API, and writes both answers to `/_build/state.json`. When the
+  API can't be read after the retries, a production build reuses the live
+  site's own `/_build/state.json` and prints a GitHub warning; it fails
+  only when neither answers. A new build-time read joins that file and
+  the snapshot; it never fetches on its own during `next build`.
 - **The site is built at deploy time and nothing deploys on a schedule.** A
   page dated for a day (`publishOn`) appears with the first deploy made on
   or after it. Anything that answers per request about a dated page asks

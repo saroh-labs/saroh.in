@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import type { Catalog } from "@saroh/pricing-catalog";
 import { parseCatalog } from "@saroh/pricing-catalog";
 
@@ -59,6 +62,10 @@ function building(): boolean {
  *   deployment's build (`VERCEL_ENV` set, by the deploy workflow)
  *   fails, so the last good site keeps serving instead of a placeholder; a
  *   local build or development shows the placeholder.
+ * - A production build doesn't fetch here: it reads the answer the prebuild
+ *   read (`.build-pricing.json`, `build-state.config.js`), the API's or, with the
+ *   API down, the live site's own snapshot, so pricing and the /for/ pages
+ *   come from one read.
  */
 export async function readLivePricing(
     fetcher: typeof fetch = fetch,
@@ -73,6 +80,13 @@ export async function readLivePricing(
 export async function readLivePricingVersion(
     fetcher: typeof fetch = fetch,
 ): Promise<PricingRead | null> {
+    if (building() && env.VERCEL_ENV === "production") {
+        // Written by `pnpm build`'s prebuild; missing, the build fails.
+        const { pricing } = JSON.parse(
+            readFileSync(join(process.cwd(), ".build-pricing.json"), "utf8"),
+        ) as { pricing: unknown };
+        return pricing == null ? null : parsePricingResponse(pricing);
+    }
     const api = env.API_URL;
     if (!api) return null;
     const deploying = building() && Boolean(env.VERCEL_ENV);
