@@ -163,7 +163,8 @@ export type AdminPermission =
     | "saroh-leads:write"
     | "team:pay"
     | "commission:rates"
-    | "people:sign-in-help";
+    | "people:sign-in-help"
+    | "search-pages:publish";
 
 export type ControlPlaneResult<T> =
     | { ok: true; data: T }

@@ -6,6 +6,7 @@ import {
     CircleAlert,
     CloudUpload,
     Cog,
+    FileSearch,
     Flag,
     HardDrive,
     Home,
@@ -162,6 +163,13 @@ const GROUPS: ConsoleNavGroup[] = [
                 label: "Plans and modules",
                 icon: Tags,
                 permission: "pricing:read",
+            },
+            {
+                // The /for/ pages and whether each is live (DEC-193).
+                href: "/search-pages",
+                label: "Search pages",
+                icon: FileSearch,
+                permission: "platform:read",
             },
             {
                 href: "/usage",

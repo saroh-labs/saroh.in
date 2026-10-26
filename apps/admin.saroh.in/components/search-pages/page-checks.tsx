@@ -1,0 +1,95 @@
+"use client";
+
+import type { SearchPageCheck, SearchPageData } from "@saroh/search-pages";
+import { searchPageChecks } from "@saroh/search-pages/checks";
+import { cn } from "@saroh/ui/lib/utils";
+import { Skeleton } from "@saroh/ui/skeleton";
+import { Check, CircleAlert, X } from "lucide-react";
+import { useMemo } from "react";
+
+type Checks = SearchPageCheck[] | "loading" | "failed";
+
+/**
+ * A page's checks, run in a client component: they draw the page with
+ * react-dom/server, which Next refuses anywhere on the server graph
+ * (Server Components and route handlers alike). `enabled` false runs
+ * nothing.
+ */
+export function useChecks(page: SearchPageData, enabled = true): Checks {
+    return useMemo(() => {
+        if (!enabled) return "loading";
+        try {
+            return searchPageChecks(page);
+        } catch {
+            return "failed";
+        }
+    }, [page, enabled]);
+}
+
+/** How many checks didn't pass, 0 while they're read or when they couldn't be. */
+export function failingCount(checks: Checks): number {
+    return Array.isArray(checks) ? checks.filter((c) => !c.ok).length : 0;
+}
+
+/** "Checked before you publish": a tick, a warning or a cross, and what each means. */
+export function PageChecks({ page }: { page: SearchPageData }) {
+    const checks = useChecks(page);
+    if (checks === "loading") {
+        return (
+            <div className="grid gap-2" aria-label="Checking the page">
+                <Skeleton className="h-5 w-2/3" />
+                <Skeleton className="h-5 w-1/2" />
+                <Skeleton className="h-5 w-3/5" />
+            </div>
+        );
+    }
+    if (checks === "failed") {
+        return (
+            <p className="text-sm text-muted-foreground">
+                The checks couldn&apos;t run just now. Reload to try again.
+            </p>
+        );
+    }
+    return (
+        <ul className="grid">
+            {checks.map((c) => {
+                const warn = !c.ok && c.severity === "warning";
+                const Icon = c.ok ? Check : warn ? CircleAlert : X;
+                return (
+                    <li
+                        key={c.id}
+                        className="flex items-start gap-3 border-t py-2.5 first:border-t-0"
+                    >
+                        <span
+                            className={cn(
+                                "mt-0.5 inline-flex size-[22px] shrink-0 items-center justify-center rounded-full",
+                                c.ok
+                                    ? "bg-success-subtle text-success-subtle-foreground"
+                                    : warn
+                                      ? "bg-warning-subtle text-warning-subtle-foreground"
+                                      : "bg-destructive-subtle text-destructive-subtle-foreground",
+                            )}
+                        >
+                            <Icon className="size-3.5" aria-hidden />
+                            <span className="sr-only">
+                                {c.ok
+                                    ? "Passes:"
+                                    : warn
+                                      ? "Worth a look:"
+                                      : "Fails:"}
+                            </span>
+                        </span>
+                        <span className="grid gap-0.5">
+                            <strong className="font-semibold">{c.title}</strong>
+                            {c.detail && (
+                                <span className="text-[13px] text-muted-foreground">
+                                    {c.detail}
+                                </span>
+                            )}
+                        </span>
+                    </li>
+                );
+            })}
+        </ul>
+    );
+}

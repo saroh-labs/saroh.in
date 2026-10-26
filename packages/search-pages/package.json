@@ -15,6 +15,7 @@
     ],
     "exports": {
         ".": "./src/index.ts",
+        "./checks": "./src/checks.tsx",
         "./styles.css": "./src/styles.css"
     },
     "scripts": {

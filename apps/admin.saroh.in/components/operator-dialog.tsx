@@ -48,6 +48,7 @@ export function OperatorDialog({
     reasonRequired = true,
     disabled = false,
     disabledReason,
+    ready = true,
     quickReasons,
     reasonLabel = "Reason (kept in the audit trail)",
     open: openProp,
@@ -80,6 +81,8 @@ export function OperatorDialog({
     reasonRequired?: boolean;
     disabled?: boolean;
     disabledReason?: string;
+    /** False keeps the confirm off until something in `fields` is done (a tick). */
+    ready?: boolean;
     /**
      * Common reasons, one tap each. A tap fills the field, which stays
      * editable, so detail can be added before it goes on the record.
@@ -254,7 +257,7 @@ export function OperatorDialog({
                         <Button
                             type="submit"
                             variant={destructive ? "destructive" : "default"}
-                            disabled={pending || !nameOk || !reasonOk}
+                            disabled={pending || !nameOk || !reasonOk || !ready}
                         >
                             {pending ? "Working…" : submitLabel}
                         </Button>

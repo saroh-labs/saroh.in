@@ -5,11 +5,14 @@
  * where a page is drawn; the app must set --font-sans (Geist) and
  * --font-display (Space Grotesk) from packages/ui/fonts.
  */
-export { searchPageChecks } from "./checks";
+// `searchPageChecks` is `@saroh/search-pages/checks`: it draws the page with
+// react-dom/server, which Next refuses in a Server Component's imports, so
+// the index stays importable from one.
 export type { SearchPageCheck } from "./checks";
 export { ForHub } from "./components/for-hub";
 export type { ForHubProps } from "./components/for-hub";
-export { SearchPage } from "./components/search-page";
+export { PRESETS, smallKeys } from "./components/parts";
+export { SearchPage, starterWords } from "./components/search-page";
 export type {
     SearchPageLinks,
     SearchPageProps,

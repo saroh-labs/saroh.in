@@ -45,7 +45,7 @@ export interface SearchPageProps {
 /** The trades the product seeds starter services for (apps/api trade-presets.ts: SALON, GYM). */
 const STARTER_TRADES = new Set(["salons", "gyms"]);
 
-function starterWords(p: SearchPageData) {
+export function starterWords(p: SearchPageData) {
     const kind = PRESETS[p.shape].kind;
     if (STARTER_TRADES.has(p.slug)) {
         return {

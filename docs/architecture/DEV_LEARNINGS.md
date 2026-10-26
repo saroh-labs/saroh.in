@@ -5975,3 +5975,10 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** the commit hook runs Prettier with `prettier-plugin-tailwindcss`, which trims the whitespace at the edges of each string inside a `className` template. `` `vc-time${on ? " on" : ""}` `` became `` `vc-time${on ? "on" : ""}` ``, so the class came out `vc-timeon`.
 - **Fix:** keep the space in the template's fixed text, outside `${…}`: `` `vc-time ${on ? "on" : ""}` `` (or use `cn()`/`clsx`). Every other className template in the repo already did this.
 - **Where the rule lives:** `packages/search-pages/src/search-page.test.tsx` ("class names") fails when a page draws a class `styles.css` doesn't style. Screenshots for review are taken from committed code, never from a working copy before the hook runs.
+
+## `@saroh/search-pages`' index pulled react-dom/server into every Server Component (26 Oct 2026)
+
+- **Symptom:** the admin's first Server Component importing `@saroh/search-pages` failed `next build`: "You're importing a component that imports react-dom/server". Moving the import into a route handler failed the same way ("App Route").
+- **Cause:** `searchPageChecks` (`checks.tsx`) reads a page by drawing it with `renderToStaticMarkup`, and the package index re-exported it, so `listSearchPages()` or `<SearchPage>` from a Server Component brought react-dom/server along. Next refuses it on the whole server graph (Server Components and route handlers); the package's own vitest never sees that rule.
+- **Fix:** the index no longer exports it; it is `@saroh/search-pages/checks` (package.json `exports`). The admin runs it in a client component (`components/search-pages/page-checks.tsx`).
+- **Rule:** a shared package a Next app imports on the server never re-exports a module that imports react-dom/server from its index; that goes behind its own subpath, used from client components or Node scripts. Check a new package with the consuming app's `next build`, not only its own tests.
