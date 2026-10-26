@@ -5994,3 +5994,8 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Symptom:** saroh.in's build failed "CssSyntaxError … Unclosed block" in `packages/search-pages/src/styles.css` after four tool branches were merged; the package's 475 tests were green.
 - **Cause:** each branch appended its own CSS; resolving the conflicts by keeping "both sides" of each hunk dropped a closing brace the hunks shared. No test loads the stylesheet.
 - **Fix:** rebuilt the file as the base plus each branch's appended part; `search-page.test.tsx` now fails when the stylesheet's blocks don't close. When several branches append to one file, rebuild it from base + each branch's suffix rather than hand-resolving hunks.
+## CodeQL flagged regexes in build-time content checks (26 Oct 2026)
+
+- **Symptom:** PR #1252's CodeQL check failed with four warnings in `packages/search-pages`: polynomial ReDoS on `<[^>]+>`, `[\w.-]+@[\w.-]+` and an unanchored `[^?.]*[?.]`, and double unescaping (`&amp;` replaced before `&lt;`). `pnpm prepush --all` had passed; it doesn't run CodeQL.
+- **Fix:** `[^<>]*` in the tag match, email words found by splitting on spaces first (`emailsIn`), `indexOf` for the first sentence, `&amp;` unescaped last; tests pin each.
+- **Rule:** in any matcher run on text, never put an unbounded class that can match the next token's first character in front of it (`[\w.-]+@`, `<[^>]+>`), and never unescape `&amp;` before the other entities.
