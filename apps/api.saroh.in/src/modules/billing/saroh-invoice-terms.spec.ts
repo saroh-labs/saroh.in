@@ -212,7 +212,7 @@ describe("sarohSeller", () => {
     it("reads every detail from configuration, never from code", () => {
         const s = sarohSeller({
             SAROH_LEGAL_NAME: "Example Labs Pvt Ltd",
-            SAROH_GSTIN: "29aaaaa0000a1z5",
+            SAROH_GSTIN: "29aaaaa0000a1zy",
             SAROH_REGISTERED_ADDRESS: "1 Test Road, Testville",
             SAROH_BILLING_EMAIL: "billing@example.test",
             SAROH_INVOICE_SAC: "999999",
