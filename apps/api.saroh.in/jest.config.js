@@ -496,6 +496,9 @@ module.exports = {
         // Which social sign-in buttons the accounts pages show: only
         // providers with both keys set. Pure; no DB.
         "<rootDir>/src/modules/sign-in-options/**/*.spec.ts",
+        // Messaging add-ons (#1235): the MSG91 OTP transport and its fake,
+        // with a stubbed fetch. No DB.
+        "<rootDir>/src/modules/messaging/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
         // #90 (S0-011) API bootstrap smoke test: compiles the full AppModule DI
         // graph so "the app doesn't even start" (the 0fc8f72 boot crash class)

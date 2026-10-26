@@ -190,6 +190,18 @@ const envSchema = z.object({
     // to see the "couldn't send" path and alert. Development, or named
     // outright off production (the CI browser stack); never in production.
     SITE_CODES_EMAIL_FAKE: z.enum(["log", "fail"]).optional(),
+    // Saroh's own MSG91 account (DEC-191): the platform sender of customer
+    // verification codes on WhatsApp, never a merchant's credentials. The
+    // auth key, the integrated WhatsApp number and the approved
+    // authentication template's name. Unset (any of the three) outside
+    // production, codes go to the in-memory fake
+    // (`messaging/providers/otp-transport.factory.ts`); in production a send
+    // fails, naming the missing variable. The key is never logged.
+    MSG91_AUTH_KEY: z.string().optional(),
+    MSG91_WHATSAPP_NUMBER: z.string().optional(),
+    MSG91_WHATSAPP_TEMPLATE: z.string().optional(),
+    // TEST ONLY in practice: where MSG91 calls go instead of its own API.
+    MSG91_BASE_URL: z.string().url().optional(),
     // The opening-day launch offer (marketing plan U31, OQ-1): how many days
     // of the offer plan a business made through a waitlist invite gets, from
     // the moment it is made. The owner's number, set per instance, never
