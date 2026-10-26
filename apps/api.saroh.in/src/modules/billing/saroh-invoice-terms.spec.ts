@@ -221,7 +221,7 @@ describe("sarohSeller", () => {
         expect(s).toEqual({
             name: "Saroh",
             legalName: "Example Labs Pvt Ltd",
-            gstin: "29AAAAA0000A1Z5",
+            gstin: "29AAAAA0000A1ZY",
             state: "29",
             address: "1 Test Road, Testville",
             email: "billing@example.test",
@@ -267,7 +267,7 @@ describe("sarohInvoicePaper", () => {
         currency: "INR",
         sellerName: "Saroh",
         sellerLegalName: "Example Labs Pvt Ltd",
-        sellerGstin: "29AAAAA0000A1Z5",
+        sellerGstin: "29AAAAA0000A1ZY",
         sellerState: "29",
         sellerAddress: "1 Test Road",
         sellerEmail: null,
@@ -358,7 +358,7 @@ describe("sarohInvoicePaper", () => {
         expect(view.seller).toEqual({
             name: "Example Labs Pvt Ltd",
             lines: ["1 Test Road"],
-            tax: "GSTIN 29AAAAA0000A1Z5 · Karnataka (29)",
+            tax: "GSTIN 29AAAAA0000A1ZY · Karnataka (29)",
             product: "Saroh is a product of Example Labs Pvt Ltd",
         });
     });
