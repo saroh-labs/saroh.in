@@ -17,6 +17,7 @@ import { ToolsHub } from "./components/tools-hub";
 import { allToolPages, listSearchPages, loadToolPage } from "./load";
 import { unknownClasses } from "./test-classes";
 import { toolChecks } from "./tool-checks";
+import { TOOL_GROUPS } from "./tool-schema";
 import { EmailGate, emailProblem, ToolGateProvider } from "./tools/email-gate";
 import { TOOLS } from "./tools/registry";
 
@@ -218,16 +219,11 @@ describe("<ToolsHub>", () => {
                 .getByRole("link", { name: /No-show cost calculator/ })
                 .getAttribute("href"),
         ).toBe("/tools/no-show-cost-calculator");
-        expect(within(money).getByText("new")).toBeTruthy();
-        const billing = screen
-            .getByRole("heading", { name: "Billing and GST" })
-            .closest("section");
-        if (!billing) throw new Error("no Billing and GST section");
-        expect(
-            within(billing)
-                .getByRole("link", { name: /GST calculator/ })
-                .getAttribute("href"),
-        ).toBe("/tools/gst-calculator");
+        expect(within(money).getAllByText("new").length).toBeGreaterThan(0);
+        // A section with no tool in the code yet isn't drawn.
+        const used = new Set(allToolPages().map((t) => t.group));
+        for (const g of TOOL_GROUPS.filter((x) => !used.has(x)))
+            expect(screen.queryByRole("heading", { name: g })).toBeNull();
         expect(unknownClasses(container)).toEqual([]);
     });
 });

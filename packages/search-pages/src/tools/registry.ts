@@ -16,6 +16,7 @@ export const TOOLS: Readonly<
     "bill-of-supply-generator": lazy(
         () => import("./bill-of-supply-generator"),
     ),
+    "break-even-calculator": lazy(() => import("./break-even-calculator")),
     "business-card-qr-generator": lazy(
         () => import("./business-card-qr-generator"),
     ),
@@ -25,10 +26,18 @@ export const TOOLS: Readonly<
     "gift-voucher-maker": lazy(() => import("./gift-voucher-maker")),
     "gst-calculator": lazy(() => import("./gst-calculator")),
     "gst-invoice-generator": lazy(() => import("./gst-invoice-generator")),
+    "gstin-checker": lazy(() => import("./gstin-checker")),
+    "gym-membership-plan-calculator": lazy(
+        () => import("./gym-membership-plan-calculator"),
+    ),
+    "hsn-sac-code-finder": lazy(() => import("./hsn-sac-code-finder")),
     "link-in-bio-page-maker": lazy(() => import("./link-in-bio-page-maker")),
     "loyalty-card-maker": lazy(() => import("./loyalty-card-maker")),
     "menu-qr-code-generator": lazy(() => import("./menu-qr-code-generator")),
     "no-show-cost-calculator": lazy(() => import("./no-show-cost-calculator")),
+    "profit-margin-calculator": lazy(
+        () => import("./profit-margin-calculator"),
+    ),
     "quotation-maker": lazy(() => import("./quotation-maker")),
     "receipt-maker": lazy(() => import("./receipt-maker")),
     "refund-policy-generator": lazy(() => import("./refund-policy-generator")),
@@ -36,6 +45,9 @@ export const TOOLS: Readonly<
         () => import("./review-qr-code-generator"),
     ),
     "salon-rate-card-maker": lazy(() => import("./salon-rate-card-maker")),
+    "staff-commission-calculator": lazy(
+        () => import("./staff-commission-calculator"),
+    ),
     "upi-qr-code-generator": lazy(() => import("./upi-qr-code-generator")),
     "whatsapp-link-generator": lazy(() => import("./whatsapp-link-generator")),
     "whatsapp-message-templates": lazy(

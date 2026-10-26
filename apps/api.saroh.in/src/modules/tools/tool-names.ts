@@ -21,7 +21,7 @@ export const TOOL_NAMES: Readonly<Record<string, string>> = {
     "break-even-calculator": "Break-even calculator",
     "staff-commission-calculator": "Staff commission calculator",
     "gym-membership-plan-calculator": "Gym membership plan calculator",
-    "gstin-checker": "GSTIN format checker",
+    "gstin-checker": "GSTIN checker",
     "hsn-sac-code-finder": "HSN/SAC code finder",
     "upi-qr-code-generator": "UPI QR code generator",
     "review-qr-code-generator": "Google review QR code generator",
