@@ -19,11 +19,14 @@ async function business() {
     return org.id;
 }
 
-async function started(organizationId: string) {
+// A number per session, so the resend cooldown (#1239) never trips.
+const nextPhone = () => `98450${String(10_000 + n++).slice(-5)}`;
+
+async function started(organizationId: string, phoneE164 = nextPhone()) {
     return service.start({
         organizationId,
         module: "BOOKING",
-        phoneE164: "98450 12345",
+        phoneE164,
         subjectRef: "booking_1",
     });
 }
@@ -42,7 +45,10 @@ describe("VerificationService", () => {
     });
 
     it("starts a session and verifies the right code once", async () => {
-        const { verificationId, code, expiresAt } = await started(orgId);
+        const { verificationId, code, expiresAt } = await started(
+            orgId,
+            "98450 12345",
+        );
         expect(code).toMatch(/^\d{6}$/);
         const ttl = expiresAt.getTime() - Date.now();
         expect(ttl).toBeGreaterThan(9 * 60_000);

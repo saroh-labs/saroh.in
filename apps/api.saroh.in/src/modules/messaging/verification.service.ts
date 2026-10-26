@@ -1,22 +1,28 @@
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 
-import { BadRequestException, Injectable } from "@nestjs/common";
+import {
+    BadRequestException,
+    HttpException,
+    HttpStatus,
+    Injectable,
+} from "@nestjs/common";
 import type {
     MessagingChannel,
     MessagingSendStatus,
     PhoneVerificationStatus,
     VerificationModule,
 } from "@saroh/database";
-import { prisma, runInOrgContext } from "@saroh/database";
+import { outsideOrgContext, prisma, runInOrgContext } from "@saroh/database";
 
 import { normalisePhoneNumber } from "@saroh/block-contract";
 
 import { siteCodeSecret } from "../site-accounts/site-secrets";
+import { checkAbuse } from "./abuse-guard";
 
 /**
  * Saroh-sent verification codes (DEC-191, #1238): the session primitive.
- * No transport, wallet or rate limit here; the orchestrator does those and
- * calls this. The plaintext code goes back to that in-process caller only:
+ * No transport or wallet here; the orchestrator does those and calls this.
+ * `start` refuses with a 429 past the abuse limits (`abuse-guard.ts`). The plaintext code goes back to that in-process caller only:
  * the row keeps an HMAC of it under the site sign-in code secret, as
  * customer sign-in codes do. A code lives 10 minutes and allows 5 tries.
  */
@@ -81,18 +87,41 @@ export class VerificationService {
         const phoneE164 = indianPhoneE164(input.phoneE164);
         const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
         const expiresAt = new Date(Date.now() + VERIFICATION_TTL_MS);
-        const row = await runInOrgContext(organizationId, () =>
-            prisma.phoneVerification.create({
-                data: {
+        // Counted with no GUC so the per-number windows see every business;
+        // the GUC is set for the insert alone. Locks + count + insert are one tx.
+        const row = await outsideOrgContext(() =>
+            prisma.$transaction(async (tx) => {
+                const verdict = await checkAbuse(tx, {
                     organizationId,
-                    module: input.module,
                     phoneE164,
-                    subjectRef: input.subjectRef,
                     ipHash: input.ipHash,
-                    codeHash: codeHash(organizationId, phoneE164, code),
-                    expiresAt,
-                },
-                select: { id: true },
+                });
+                if (!verdict.allowed) {
+                    throw new HttpException(
+                        {
+                            message:
+                                "Too many codes sent. Try again in a little while.",
+                            details: {
+                                reason: verdict.reason,
+                                retryAfterSeconds: verdict.retryAfterSeconds,
+                            },
+                        },
+                        HttpStatus.TOO_MANY_REQUESTS,
+                    );
+                }
+                await tx.$executeRaw`SELECT set_config('app.current_organization_id', ${organizationId}, true)`;
+                return tx.phoneVerification.create({
+                    data: {
+                        organizationId,
+                        module: input.module,
+                        phoneE164,
+                        subjectRef: input.subjectRef,
+                        ipHash: input.ipHash,
+                        codeHash: codeHash(organizationId, phoneE164, code),
+                        expiresAt,
+                    },
+                    select: { id: true },
+                });
             }),
         );
         return { verificationId: row.id, code, expiresAt };
