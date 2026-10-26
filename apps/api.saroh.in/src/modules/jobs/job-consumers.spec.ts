@@ -30,7 +30,10 @@ import { join, relative, sep } from "node:path";
  * consequence. Delete the entry in the commit that closes it — the last test
  * below fails until you do, so this list cannot quietly outlive the gap.
  */
-const KNOWN_WITHOUT_CONSUMER: Record<string, string> = {};
+const KNOWN_WITHOUT_CONSUMER: Record<string, string> = {
+    "messaging.wallet-sweep":
+        "#1240 U5: WalletSweepHandler is built; messaging.module.ts (integrator) registers it. Until then nothing starts the chain, so nothing is enqueued.",
+};
 
 /** Registered, but nothing enqueues it. Same rules as above. */
 const KNOWN_WITHOUT_PRODUCER: Record<string, string> = {};
