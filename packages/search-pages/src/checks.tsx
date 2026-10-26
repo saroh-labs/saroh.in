@@ -114,15 +114,26 @@ const TITLE_MAX = 60;
 const DESCRIPTION_MAX = 150;
 const BRAND = " · Saroh";
 
+/** Every email-looking word, split on spaces first so no regex backtracks
+ * over a long run of dots or dashes (CodeQL js/polynomial-redos). */
+export function emailsIn(text: string): string[] {
+    return text
+        .split(/\s+/)
+        .map((w) => w.replace(/^[^\w]+|[^\w]+$/g, ""))
+        .filter((w) => /^[\w.-]+@[\w.-]+$/.test(w));
+}
+
 /** The words of rendered markup, as a reader meets them. */
 export function textOf(html: string): string {
+    // `[^<>]` keeps the tag match linear; &amp; goes last so "&amp;lt;"
+    // reads "&lt;", not "<" (CodeQL js/polynomial-redos, js/double-escaping).
     return html
-        .replace(/<[^>]+>/g, " ")
-        .replace(/&amp;/g, "&")
+        .replace(/<[^<>]*>/g, " ")
         .replace(/&#x27;|&#39;/g, "'")
         .replace(/&quot;/g, '"')
         .replace(/&lt;/g, "<")
         .replace(/&gt;/g, ">")
+        .replace(/&amp;/g, "&")
         .replace(/\s+/g, " ")
         .trim();
 }
@@ -246,13 +257,10 @@ export function searchPageChecks(p: SearchPageData): SearchPageCheck[] {
         },
     );
     add("prices-range", "Drawn prices are realistic for the trade", prices);
-    const emails = [...t.matchAll(/[\w.-]+@[\w.-]+/g)]
-        .map((m) => m[0])
-        .filter(
-            (x) =>
-                !x.endsWith("@example.com") &&
-                x !== "saroh-sample-upi-id@okaxis",
-        );
+    const emails = emailsIn(t).filter(
+        (x) =>
+            !x.endsWith("@example.com") && x !== "saroh-sample-upi-id@okaxis",
+    );
     add(
         "sample-emails",
         "Sample emails are example.com",

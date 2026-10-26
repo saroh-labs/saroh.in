@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { searchPageChecks } from "./checks";
+import { emailsIn, searchPageChecks, textOf } from "./checks";
 import { allSearchPages, loadSearchPage } from "./load";
 import type { SearchPageData } from "./schema";
 
@@ -107,5 +107,20 @@ describe("searchPageChecks", () => {
             expect(c.title).toBeTruthy();
             expect(["error", "warning"]).toContain(c.severity);
         }
+    });
+});
+
+describe("textOf and emailsIn", () => {
+    it("unescapes once, and strips tags without backtracking", () => {
+        expect(textOf("<p>A &amp;lt; B</p>")).toBe("A &lt; B");
+        expect(textOf("<".repeat(5000) + "x")).toBe("<".repeat(5000) + "x");
+    });
+    it("finds email words, and stays fast on a long run of dashes", () => {
+        expect(emailsIn("Write to riya@example.com, or call.")).toEqual([
+            "riya@example.com",
+        ]);
+        const t0 = Date.now();
+        expect(emailsIn("-".repeat(50000) + "@")).toEqual([]);
+        expect(Date.now() - t0).toBeLessThan(500);
     });
 });

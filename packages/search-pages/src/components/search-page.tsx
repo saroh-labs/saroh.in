@@ -78,6 +78,13 @@ function Both({ desk, phone }: { desk: string; phone?: string }) {
 }
 
 /** A /for/ page: design D on a desk, the clean phone board below 900px. */
+/** Up to and including the first "?" or ".", without a regex (CodeQL
+ * js/polynomial-redos on an unanchored `[^?.]*`). */
+function firstSentence(text: string): string {
+    const ends = [text.indexOf("?"), text.indexOf(".")].filter((n) => n >= 0);
+    return ends.length ? text.slice(0, Math.min(...ends) + 1) : text;
+}
+
 export function SearchPage({
     page: p,
     draft = false,
@@ -93,7 +100,7 @@ export function SearchPage({
     const bigWords = T[pre.big];
     const url = p.shape === "orders" ? "app.saroh.in" : s.site;
     const starter = starterWords(p);
-    const ask = /[^?.]*[?.]/.exec(s.quote.caption)?.[0] ?? s.quote.caption;
+    const ask = firstSentence(s.quote.caption);
     const alsoIcons = pre.also;
 
     return (
