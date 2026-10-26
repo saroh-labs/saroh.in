@@ -57,6 +57,7 @@ import { SitesModule } from "./modules/sites/sites.module";
 import { StaffModule } from "./modules/staff/staff.module";
 import { StockModule } from "./modules/stock/stock.module";
 // "Tell me when it's back" (DEC-174 U23).
+import { MessagingModule } from "./modules/messaging/messaging.module";
 import { StockWatchModule } from "./modules/stock/stock-watch.module";
 import { StoresModule } from "./modules/stores/stores.module";
 import { SubscriptionsModule } from "./modules/subscriptions/subscriptions.module";
@@ -107,6 +108,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         ProductsModule,
         StockModule,
         StockWatchModule,
+        MessagingModule,
         CategoriesModule,
         CollectionsModule,
         CatalogueModule,

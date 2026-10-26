@@ -150,8 +150,6 @@ worker with `runOnce()`; the poll loop does not start under `NODE_ENV=test`.
 
 ## Known gaps
 
-- `messaging.wallet-sweep` (#1240): handler built, registered when `messaging.module.ts` lands.
-
 A new one is listed here and in `job-consumers.spec.ts`; close a gap
 and delete its entry in the same commit.
 
