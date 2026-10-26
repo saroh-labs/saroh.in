@@ -251,6 +251,20 @@ describe("the catalogue schema", () => {
         });
     });
 
+    describe("per-message prices (DEC-191)", () => {
+        it("reads a version published before them as none priced", () => {
+            expect(parseCatalog(fixtureInput()).messagePrices).toBeUndefined();
+        });
+
+        it("keeps a channel's paise and refuses a negative or fractional one", () => {
+            const input = fixtureInput() as Record<string, unknown>;
+            input.messagePrices = { whatsapp: 7 };
+            expect(parseCatalog(input).messagePrices).toEqual({ whatsapp: 7 });
+            input.messagePrices = { whatsapp: -1, sms: 1.5 };
+            expect(errorsOf(input)).toHaveLength(2);
+        });
+    });
+
     describe("which looks, typefaces and colourways are free (DEC-177)", () => {
         it("reads a version published before it as none free", () => {
             const c = parseCatalog(fixtureInput());

@@ -4,7 +4,14 @@ import { Module } from "@nestjs/common";
 import { env } from "../../env";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
+import { OrganizationContextModule } from "../organizations/organization-context.module";
+import { PricingModule } from "../pricing/pricing.module";
+import {
+    MessagingController,
+    PublicVerificationsController,
+} from "./messaging.controller";
 import { otpTransportProvider } from "./providers/otp-transport.factory";
+import { VerificationSendService } from "./verification-send.service";
 import { VerificationService } from "./verification.service";
 import { WALLET_SWEEP_TYPE, WalletSweepHandler } from "./wallet-sweep.handler";
 import { WalletService } from "./wallet.service";
@@ -14,14 +21,16 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
 
 /** Saroh-sent verification codes and the prepaid balance that pays for them (DEC-191). */
 @Module({
-    imports: [JobsModule],
+    imports: [JobsModule, OrganizationContextModule, PricingModule],
+    controllers: [MessagingController, PublicVerificationsController],
     providers: [
         otpTransportProvider,
         VerificationService,
+        VerificationSendService,
         WalletService,
         WalletSweepHandler,
     ],
-    exports: [VerificationService, WalletService],
+    exports: [VerificationService, VerificationSendService, WalletService],
 })
 export class MessagingModule implements OnModuleInit, OnModuleDestroy {
     private chainCheck?: ReturnType<typeof setInterval>;

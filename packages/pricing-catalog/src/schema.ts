@@ -247,6 +247,18 @@ const catalogShape = z.object({
             ),
         ),
     freeStyles: freeStylesSchema.optional(),
+    /**
+     * What one Saroh-sent verification message costs the business, in paise,
+     * by channel (DEC-191). Absent, or a channel left out: that channel has
+     * no price, and nothing is sent on it.
+     */
+    messagePrices: z
+        .object({
+            whatsapp: paise.optional(),
+            sms: paise.optional(),
+            email: paise.optional(),
+        })
+        .optional(),
 });
 
 function duplicates(ids: readonly string[]): string[] {

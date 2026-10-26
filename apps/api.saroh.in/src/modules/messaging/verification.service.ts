@@ -18,6 +18,7 @@ import { normalisePhoneNumber } from "@saroh/block-contract";
 
 import { siteCodeSecret } from "../site-accounts/site-secrets";
 import { checkAbuse } from "./abuse-guard";
+import { VERIFICATION_MODULES } from "./dto";
 
 /**
  * Saroh-sent verification codes (DEC-191, #1238): the session primitive.
@@ -223,6 +224,106 @@ export class VerificationService {
             });
             return failed.count === 1 ? "too_many_attempts" : "wrong_code";
         });
+    }
+
+    /** Whether the business has Saroh send codes for `module`; off until turned on. */
+    async isEnabled(
+        organizationId: string,
+        module: VerificationModule,
+    ): Promise<boolean> {
+        const row = await runInOrgContext(organizationId, () =>
+            prisma.messagingVerificationSetting.findUnique({
+                where: { organizationId_module: { organizationId, module } },
+                select: { enabled: true },
+            }),
+        );
+        return row?.enabled === true;
+    }
+
+    /** Every module's switch; one never set is off. */
+    async settings(
+        organizationId: string,
+    ): Promise<{ module: VerificationModule; enabled: boolean }[]> {
+        const rows = await runInOrgContext(organizationId, () =>
+            prisma.messagingVerificationSetting.findMany({
+                where: { organizationId },
+                select: { module: true, enabled: true },
+            }),
+        );
+        return VERIFICATION_MODULES.map((module) => ({
+            module,
+            enabled: rows.some((r) => r.module === module && r.enabled),
+        }));
+    }
+
+    async setEnabled(
+        organizationId: string,
+        module: VerificationModule,
+        enabled: boolean,
+    ): Promise<{ module: VerificationModule; enabled: boolean }[]> {
+        await runInOrgContext(organizationId, () =>
+            prisma.messagingVerificationSetting.upsert({
+                where: { organizationId_module: { organizationId, module } },
+                create: { organizationId, module, enabled },
+                update: { enabled },
+            }),
+        );
+        return this.settings(organizationId);
+    }
+
+    /** Sessions started and verified over the last 30 days; rate null with none. */
+    async successRate(
+        organizationId: string,
+        now = new Date(),
+    ): Promise<{ started: number; verified: number; rate: number | null }> {
+        const since = new Date(now.getTime() - 30 * 24 * 60 * 60_000);
+        const [started, verified] = await runInOrgContext(organizationId, () =>
+            Promise.all([
+                prisma.phoneVerification.count({
+                    where: { organizationId, createdAt: { gte: since } },
+                }),
+                prisma.phoneVerification.count({
+                    where: {
+                        organizationId,
+                        createdAt: { gte: since },
+                        status: "VERIFIED",
+                    },
+                }),
+            ]),
+        );
+        return { started, verified, rate: started ? verified / started : null };
+    }
+
+    /** Close a session that no code reached (nothing sent, or the send refused). */
+    async fail(organizationId: string, verificationId: string): Promise<void> {
+        await runInOrgContext(organizationId, () =>
+            prisma.phoneVerification.updateMany({
+                where: {
+                    id: verificationId,
+                    organizationId,
+                    status: "PENDING",
+                },
+                data: { status: "FAILED" },
+            }),
+        );
+    }
+
+    /** The provider's answer on a send recorded before the call. */
+    async updateSend(
+        organizationId: string,
+        sendId: string,
+        data: {
+            status: MessagingSendStatus;
+            providerMessageId?: string;
+            failureReason?: string;
+        },
+    ): Promise<void> {
+        await runInOrgContext(organizationId, () =>
+            prisma.messagingSend.updateMany({
+                where: { id: sendId, organizationId },
+                data,
+            }),
+        );
     }
 
     /** A try that lost a race: fail a session out of tries, say why it closed. */

@@ -445,50 +445,51 @@ model Organization {
   customerThreadMessages CustomerThreadMessage[]
 
   // Autopay mandates at the business's own provider (round-2 D11, D20).
-  paymentMandates          PaymentMandate[]
+  paymentMandates               PaymentMandate[]
   // A class pack's history and its holders' extensions (round-2 E13).
-  packEvents               PackEvent[]
-  packExtensions           PackExtension[]
+  packEvents                    PackEvent[]
+  packExtensions                PackExtension[]
   // The notices told about a customer's bookings and orders (round-2 A14).
-  customerNotices          CustomerNotice[]
+  customerNotices               CustomerNotice[]
   // Which automatic customer notices it has turned off or on, where that
   // differs from the default in code (DEC-174, U1 #1132).
-  customerNoticeSettings   CustomerNoticeSetting[]
-  overdueReminderTiming    OverdueReminderTiming?
+  customerNoticeSettings        CustomerNoticeSetting[]
+  overdueReminderTiming         OverdueReminderTiming?
   // "Tell me when it's back" (DEC-174 U23).
-  stockWatches             StockWatch[]
+  stockWatches                  StockWatch[]
   // Saroh-sent verification codes and the prepaid balance that pays for them (DEC-191, #1235).
-  phoneVerifications       PhoneVerification[]
-  messagingSends           MessagingSend[]
-  messagingWallet          MessagingWallet?
-  messagingLedgerEntries   MessagingLedgerEntry[]
+  phoneVerifications            PhoneVerification[]
+  messagingSends                MessagingSend[]
+  messagingWallet               MessagingWallet?
+  messagingLedgerEntries        MessagingLedgerEntry[]
+  messagingVerificationSettings MessagingVerificationSetting[]
   // Places in line for full classes (round-2 A12).
-  classWaitlistEntries     ClassWaitlistEntry[]
+  classWaitlistEntries          ClassWaitlistEntry[]
   // Customers' "Ask to remove my data" requests (DEC-172, #1106).
-  customerDataRequests     CustomerDataRequest[]
+  customerDataRequests          CustomerDataRequest[]
   // Bulk kitchen moves held on the server, then committed (round-2 B6).
-  orderStageBatches        OrderStageBatch[]
+  orderStageBatches             OrderStageBatch[]
   // Each person's alert choices here (round-2 F14).
-  notificationPreferences  NotificationPreference[]
+  notificationPreferences       NotificationPreference[]
   // Its one order-number series, across every storefront (P3, DEC-066).
-  orderNumberSequence      OrderNumberSequence?
+  orderNumberSequence           OrderNumberSequence?
   // Web addresses it used to have, held for it after a change (DEC-069, L1).
-  addressReservations      AddressReservation[]
+  addressReservations           AddressReservation[]
   // Saroh billing: add-ons bought and coupons used (pricing catalogue U1).
-  subscriptionAddons       SubscriptionAddon[]
-  pricingCouponRedemptions PricingCouponRedemption[]
+  subscriptionAddons            SubscriptionAddon[]
+  pricingCouponRedemptions      PricingCouponRedemption[]
   // Saroh billing: checkouts for a plan change (pricing catalogue U15).
-  billingCheckouts         BillingCheckout[]
-  billingCustomers         BillingCustomer[]
+  billingCheckouts              BillingCheckout[]
+  billingCustomers              BillingCustomer[]
   // Who Saroh bills for this business (DEC-167): one of its owner's
   // billing profiles. Null only for a business made before the profile in
   // the same transaction, or whose profile's owner was deleted; a checkout
   // then makes one for the paying owner.
-  billingProfileId         String?
-  billingProfile           BillingProfile?           @relation("OrganizationBillingProfile", fields: [billingProfileId], references: [id], onDelete: SetNull)
-  sarohInvoices            SarohInvoice[]
+  billingProfileId              String?
+  billingProfile                BillingProfile?                @relation("OrganizationBillingProfile", fields: [billingProfileId], references: [id], onDelete: SetNull)
+  sarohInvoices                 SarohInvoice[]
   // Saroh billing: add-ons owed on the next charge (pricing catalogue U16).
-  subscriptionAddonCharges SubscriptionAddonCharge[]
+  subscriptionAddonCharges      SubscriptionAddonCharge[]
 
   @@index([referredByOrganizationId])
   @@index([billingProfileId])
@@ -8930,4 +8931,20 @@ model MessagingLedgerEntry {
 
   @@unique([sendId, kind])
   @@index([organizationId, createdAt])
+}
+
+// Whether a business has Saroh send its customers a code for one module
+// (#1242). Off until the business turns it on.
+model MessagingVerificationSetting {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  module  VerificationModule
+  enabled Boolean            @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, module])
 }

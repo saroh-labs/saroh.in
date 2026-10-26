@@ -48,6 +48,9 @@ const REFUSED = [
     "DELETE public/site-accounts/sessions",
     "POST public/site-accounts/codes",
     "POST public/site-accounts/sessions",
+    // A verification code costs the business a message (DEC-191).
+    "POST public/site-accounts/verifications",
+    "POST public/site-accounts/verifications/:id/check",
     // The customer's account.
     "PATCH public/site-accounts/me",
     "POST public/site-accounts/me/email",
