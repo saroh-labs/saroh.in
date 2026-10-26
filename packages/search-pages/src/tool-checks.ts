@@ -1,4 +1,5 @@
 import type { SearchPageCheck } from "./checks";
+import { NOT_AVAILABLE } from "./checks";
 import type { ToolPageData } from "./tool-schema";
 import { hasTool } from "./tools/registry";
 
@@ -34,6 +35,15 @@ function wordsOf(p: ToolPageData): string {
  * the tool's own words and sample data are its component's, and its tests
  * check them.
  */
+/** Saroh sends no WhatsApp, bills reach customers only through the
+ * business's own email, and the website takes no orders (SITE_SHOP off). */
+const TOOL_BAND_NOT_AVAILABLE = [
+    /go(es)? out on whatsapp/,
+    /\bsends? (it|them) to (them|the customer|each)/,
+    /takes? orders/,
+    /\b(your|a|the) shop\b/,
+];
+
 export function toolChecks(p: ToolPageData): SearchPageCheck[] {
     const out: SearchPageCheck[] = [];
     const add = (
@@ -90,6 +100,19 @@ export function toolChecks(p: ToolPageData): SearchPageCheck[] {
             "warning",
         );
     }
+
+    // The closing band is the one place a tool page speaks for Saroh: it
+    // may say only what Saroh does today (MARKETING_CLAIMS; 26 Oct, an
+    // invoice band said bills "go out on WhatsApp").
+    const band = `${p.ctaTitle ?? ""} ${p.ctaLine ?? ""}`.toLowerCase();
+    add(
+        "claims",
+        "The closing band says only what Saroh does today",
+        [...NOT_AVAILABLE, ...TOOL_BAND_NOT_AVAILABLE].flatMap((re) => {
+            const m = re.exec(band);
+            return m ? [`Says "${m[0]}", which Saroh doesn't do.`] : [];
+        }),
+    );
 
     const words = wordsOf(p);
     const emails = [...words.matchAll(/[\w.-]+@[\w.-]+\.\w+/g)]
