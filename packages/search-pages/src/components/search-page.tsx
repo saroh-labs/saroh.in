@@ -176,10 +176,10 @@ export function SearchPage({
                                 return (
                                     <article
                                         key={k}
-                                        className={`vc-t sp-card${keys.length === 4 && i === 3 ? "sp-span2" : ""}`}
+                                        className={`vc-t sp-card ${keys.length === 4 && i === 3 ? "sp-span2" : ""}`}
                                     >
                                         <div
-                                            className={`vc-pic${k === "today" ? "sp-pic-today" : ""}`}
+                                            className={`vc-pic ${k === "today" ? "sp-pic-today" : ""}`}
                                             aria-hidden="true"
                                         >
                                             <SmallPicture k={k} p={p} />

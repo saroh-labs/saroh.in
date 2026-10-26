@@ -34,7 +34,7 @@ export function Pill({
 }) {
     return (
         <span
-            className={`${sp ? "vc-sp" : ""}vc-pill ${TONE[tone]}`}
+            className={`vc-pill ${sp ? "vc-sp" : ""} ${TONE[tone]}`}
             style={style}
         >
             {text}
@@ -538,7 +538,7 @@ function Svc({
     right: ReactNode;
 }) {
     return (
-        <div className={`vc-svc${on ? "on" : ""}`}>
+        <div className={`vc-svc ${on ? "on" : ""}`}>
             <span>
                 <span className="vc-b">{title}</span>
                 <br />
@@ -565,7 +565,7 @@ function Who({ staff, pick }: { staff: string[]; pick: string }) {
         <>
             <span className="vc-who">Anyone</span>
             {staff.map((s) => (
-                <span key={s} className={`vc-who${s === pick ? "on" : ""}`}>
+                <span key={s} className={`vc-who ${s === pick ? "on" : ""}`}>
                     <span className="vc-av">{s.replace("Dr. ", "")[0]}</span>
                     {s}
                 </span>
@@ -592,7 +592,7 @@ function Times({
             {times.map((t) => (
                 <span
                     key={t.time}
-                    className={`vc-time${t.picked ? "on" : t.taken ? "off" : ""}`}
+                    className={`vc-time ${t.picked ? "on" : t.taken ? "off" : ""}`}
                 >
                     {t.time}
                 </span>
@@ -764,7 +764,7 @@ function classTimetable(s: Scene): Big {
                 {t.days.map((d) => (
                     <span
                         key={d}
-                        className={`vc-who${d === t.dayTab ? "on" : ""}`}
+                        className={`vc-who ${d === t.dayTab ? "on" : ""}`}
                     >
                         {d}
                     </span>

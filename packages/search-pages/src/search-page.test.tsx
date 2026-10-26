@@ -6,6 +6,9 @@ import {
     screen,
     within,
 } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { ForHub } from "./components/for-hub";
@@ -130,4 +133,25 @@ describe("<ForHub>", () => {
         ).toBe("/for/salons");
         expect(screen.getByRole("heading", { name: "Health" })).toBeTruthy();
     });
+});
+
+// prettier-plugin-tailwindcss strips the leading space of `" on"` inside a
+// className template, gluing `vc-time on` into `vc-timeon` (DEV_LEARNINGS,
+// 26 Oct). Every class the page draws must be one the stylesheet styles.
+describe("class names", () => {
+    const css = readFileSync(join(__dirname, "styles.css"), "utf8");
+    it.each(allSearchPages().map((p) => [p.slug, p] as const))(
+        "%s draws only classes styles.css knows",
+        (_, p) => {
+            const { container } = render(<SearchPage page={p} />);
+            const unknown = new Set<string>();
+            container.querySelectorAll("[class]").forEach((el) => {
+                for (const c of el.getAttribute("class")!.split(/\s+/)) {
+                    if (c && !new RegExp(`\\.${c}(?![\\w-])`).test(css))
+                        unknown.add(c);
+                }
+            });
+            expect([...unknown]).toEqual([]);
+        },
+    );
 });

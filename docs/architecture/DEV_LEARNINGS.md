@@ -5968,3 +5968,10 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** (1) calendar-week clicked `[data-strip-day="<tomorrow>"]` guarded by `isEnabled()` — but when today is the week strip's last day, tomorrow starts the next week and isn't on the strip, so `isEnabled()` on a missing locator hangs 15s and times out. (2) bookings "opens on List" used `region[Free times].or(heading /Closed on|Nothing booked/)` — an open, unbooked day shows **both** "Nothing booked today" and a Free times section, so `.or()` matched two and tripped strict mode.
 - **Fix:** guard with `(await next.count()) > 0` before `isEnabled()`; add `.first()` to the `.or()`. Both in `e2e/tests/`.
 - **Rule:** an e2e assertion about "today"/"tomorrow" must survive week and DST boundaries — `isEnabled()`/`isVisible()` on a locator that may not exist waits the full timeout (use `count()` first), and an `.or()` that can match more than one state needs `.first()`.
+
+## prettier-plugin-tailwindcss glues a class onto the one before it (26 Oct 2026)
+
+- **Symptom:** the /for/ pages' picked time, service and person weren't highlighted, taken times weren't struck through, and pills wrapped. The agent's screenshots had been right; the committed code was not.
+- **Cause:** the commit hook runs Prettier with `prettier-plugin-tailwindcss`, which trims the whitespace at the edges of each string inside a `className` template. `` `vc-time${on ? " on" : ""}` `` became `` `vc-time${on ? "on" : ""}` ``, so the class came out `vc-timeon`.
+- **Fix:** keep the space in the template's fixed text, outside `${…}`: `` `vc-time ${on ? "on" : ""}` `` (or use `cn()`/`clsx`). Every other className template in the repo already did this.
+- **Where the rule lives:** `packages/search-pages/src/search-page.test.tsx` ("class names") fails when a page draws a class `styles.css` doesn't style. Screenshots for review are taken from committed code, never from a working copy before the hook runs.
