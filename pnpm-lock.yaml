@@ -1531,6 +1531,9 @@ importers:
 
   packages/search-pages:
     dependencies:
+      uqr:
+        specifier: ^0.1.3
+        version: 0.1.3
       yaml:
         specifier: ^2.9.0
         version: 2.9.1
@@ -1562,6 +1565,9 @@ importers:
       jsdom:
         specifier: ^25.0.1
         version: 25.0.1
+      jsqr:
+        specifier: ^1.4.0
+        version: 1.4.0
       react:
         specifier: catalog:react19
         version: 19.2.8

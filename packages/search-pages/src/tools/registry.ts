@@ -13,7 +13,17 @@ import { lazy } from "react";
 export const TOOLS: Readonly<
     Record<string, LazyExoticComponent<ComponentType>>
 > = {
+    "business-card-qr-generator": lazy(
+        () => import("./business-card-qr-generator"),
+    ),
+    "link-in-bio-page-maker": lazy(() => import("./link-in-bio-page-maker")),
+    "menu-qr-code-generator": lazy(() => import("./menu-qr-code-generator")),
     "no-show-cost-calculator": lazy(() => import("./no-show-cost-calculator")),
+    "review-qr-code-generator": lazy(
+        () => import("./review-qr-code-generator"),
+    ),
+    "upi-qr-code-generator": lazy(() => import("./upi-qr-code-generator")),
+    "wifi-qr-code-generator": lazy(() => import("./wifi-qr-code-generator")),
 };
 
 export const hasTool = (slug: string) => Object.keys(TOOLS).includes(slug);
