@@ -1945,20 +1945,6 @@
     min-width: 64px;
     height: 48px;
     padding: 0 14px;
-/* unit TB's tools (profit margin, break-even, staff commission, gym plans,
-   GSTIN checker, HSN/SAC finder): the "[to confirm]" mark on a tax fact */
-.tp-tc {
-    font-size: 11px;
-    font-weight: 600;
-    padding: 1px 6px;
-    border-radius: 999px;
-    background: #fdf0dc;
-    color: #8a4a06;
-    white-space: nowrap;
-}
-.tb-btn2 {
-    height: 48px;
-    padding: 0 18px;
     border-radius: 10px;
     border: 1px solid var(--sp-line-strong);
     background: var(--sp-white);
@@ -2003,123 +1989,6 @@
 .tp-input.bq-area {
     height: auto;
     min-height: 88px;
-/* gst-calculator: Copy the working, on the dark result (white on a phone) */
-.gc-copy {
-    height: 46px;
-    padding: 0 18px;
-    border-radius: 12px;
-    border: 1px solid #5a5750;
-    background: transparent;
-    color: inherit;
-    font-weight: 600;
-    font-size: 15px;
-    font-family: inherit;
-    cursor: pointer;
-}
-.gc-copy:focus-visible {
-    outline: 2px solid var(--sp-amber);
-    outline-offset: 2px;
-}
-.gc-copy.gc-copied {
-    color: #8fd19e;
-}
-.gc-status {
-    font-size: 13.5px;
-    line-height: 1.5;
-    color: var(--sp-on-ink);
-}
-@media (max-width: 899.98px) {
-    .gc-copy {
-        height: 48px;
-        border-radius: 10px;
-        border-color: var(--sp-line-strong);
-        background: var(--sp-white);
-        width: 100%;
-    }
-    .gc-copy.gc-copied {
-        color: var(--tp-done);
-        border-color: #a7c7af;
-    }
-    .gc-status {
-        color: var(--sp-body);
-    }
-}
-
-/*
- * _documents: the four document makers (gst-invoice-generator,
- * bill-of-supply-generator, receipt-maker, quotation-maker; boards
- * GstInvoice*, BillOfSupply*, ReceiptMaker*, Quotation*). The form in white
- * fieldsets beside a sticky paper preview; stacked on a phone. Printing
- * prints the paper only.
- */
-.tp-tool.td {
-    display: grid;
-    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-    gap: 32px;
-    align-items: start;
-}
-.td-form {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    min-width: 0;
-}
-.td-set {
-.tb-btn2:focus-visible {
-    outline: 2px solid var(--sp-amber);
-    outline-offset: 2px;
-}
-.tb-set {
-    border: 1px solid var(--sp-line);
-    border-radius: 14px;
-    background: var(--sp-white);
-    margin: 0;
-    padding: 16px 18px 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    min-width: 0;
-}
-.td-set > legend {
-.tb-legend {
-    font-family: var(--sp-display);
-    font-weight: 700;
-    font-size: 16px;
-    padding: 0 6px;
-}
-.td-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 14px;
-    align-items: start;
-}
-.td-grid.td-grid-2 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-.td-wide {
-    grid-column: 1 / -1;
-/*
- * td: parts the WhatsApp, policy and print tools share
- * (src/tools/td-parts.tsx; boards genB/genC): light cards, the written
- * policy, the not-legal-advice note, chat bubbles, the sand print sheet.
- */
-.td-opt {
-    font-weight: 400;
-    color: var(--sp-muted-2);
-}
-.tp-input.td-area {
-    height: auto;
-    min-height: 80px;
-    padding: 10px 12px;
-    line-height: 1.5;
-    resize: vertical;
-}
-.tp-input.td-mono {
-    font-family: var(--tp-mono);
-    font-size: 15px;
-}
-.tp-input.td-area {
-    height: auto;
     padding: 10px 12px;
     line-height: 1.5;
     resize: vertical;
@@ -2414,6 +2283,109 @@
         border: 1px dashed #a39e93;
         border-radius: 0;
         padding: 4mm;
+    }
+}
+
+/* gst-calculator: Copy the working, on the dark result (white on a phone) */
+.gc-copy {
+    height: 46px;
+    padding: 0 18px;
+    border-radius: 12px;
+    border: 1px solid #5a5750;
+    background: transparent;
+    color: inherit;
+    font-weight: 600;
+    font-size: 15px;
+    font-family: inherit;
+    cursor: pointer;
+}
+.gc-copy:focus-visible {
+    outline: 2px solid var(--sp-amber);
+    outline-offset: 2px;
+}
+.gc-copy.gc-copied {
+    color: #8fd19e;
+}
+.gc-status {
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--sp-on-ink);
+}
+@media (max-width: 899.98px) {
+    .gc-copy {
+        height: 48px;
+        border-radius: 10px;
+        border-color: var(--sp-line-strong);
+        background: var(--sp-white);
+        width: 100%;
+    }
+    .gc-copy.gc-copied {
+        color: var(--tp-done);
+        border-color: #a7c7af;
+    }
+    .gc-status {
+        color: var(--sp-body);
+    }
+}
+
+/*
+ * _documents: the four document makers (gst-invoice-generator,
+ * bill-of-supply-generator, receipt-maker, quotation-maker; boards
+ * GstInvoice*, BillOfSupply*, ReceiptMaker*, Quotation*). The form in white
+ * fieldsets beside a sticky paper preview; stacked on a phone. Printing
+ * prints the paper only.
+ */
+.tp-tool.td {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: 32px;
+    align-items: start;
+}
+.td-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+}
+.td-set {
+    border: 1px solid var(--sp-line);
+    border-radius: 14px;
+    background: var(--sp-white);
+    margin: 0;
+    padding: 16px 18px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+}
+.td-set > legend {
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: 16px;
+    padding: 0 6px;
+}
+.td-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    align-items: start;
+}
+.td-grid.td-grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.td-wide {
+    grid-column: 1 / -1;
+}
+.tp-input.td-mono {
+    font-family: var(--tp-mono);
+    font-size: 15px;
+}
+.tp-input.td-area {
+    height: auto;
+    padding: 10px 12px;
+    line-height: 1.5;
+    resize: vertical;
+}
 .td-lines {
     display: grid;
     grid-template-columns: 2.6fr 0.6fr 1fr;
@@ -2571,57 +2543,6 @@
 .td-words {
     font-size: 13px;
     color: var(--sp-body);
-.td-check {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-height: 44px;
-    font-size: 15px;
-    cursor: pointer;
-}
-.td-check-box {
-    width: 20px;
-    height: 20px;
-    margin: 0;
-    flex: none;
-    accent-color: var(--sp-ink);
-}
-.td-check-hint {
-    display: block;
-    margin-left: 30px;
-    line-height: 1.5;
-}
-.td-pair {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    align-items: start;
-}
-.td-stack {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-.td-card {
-    background: var(--sp-white);
-    border: 1px solid var(--sp-line);
-    border-radius: 18px;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-.td-eyebrow {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--sp-muted-2);
-}
-.td-small {
-    font-size: 12.5px;
-    line-height: 1.5;
-    color: var(--sp-muted-2);
 }
 .td-note {
     font-size: 13px;
@@ -2737,6 +2658,89 @@
     .td-paper {
         border: 0;
         box-shadow: none;
+    }
+}
+
+/*
+ * td: parts the WhatsApp, policy and print tools share
+ * (src/tools/td-parts.tsx; boards genB/genC): light cards, the written
+ * policy, the not-legal-advice note, chat bubbles, the sand print sheet.
+ */
+.td-opt {
+    font-weight: 400;
+    color: var(--sp-muted-2);
+}
+.tp-input.td-area {
+    height: auto;
+    min-height: 80px;
+    padding: 10px 12px;
+    line-height: 1.5;
+    resize: vertical;
+}
+.tp-input.td-mono {
+    font-family: var(--tp-mono);
+    font-size: 15px;
+}
+.td-check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    font-size: 15px;
+    cursor: pointer;
+}
+.td-check-box {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    flex: none;
+    accent-color: var(--sp-ink);
+}
+.td-check-hint {
+    display: block;
+    margin-left: 30px;
+    line-height: 1.5;
+}
+.td-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    align-items: start;
+}
+.td-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.td-card {
+    background: var(--sp-white);
+    border: 1px solid var(--sp-line);
+    border-radius: 18px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.td-eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--sp-muted-2);
+}
+.td-small {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--sp-muted-2);
+}
+.td-note {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--sp-body);
+    background: var(--sp-paper);
+    border-radius: 8px;
+    padding: 8px 10px;
+}
 .td-paper .td-note,
 .td-stack .td-note {
     background: var(--sp-amber-tint);
@@ -3354,6 +3358,51 @@
         direction: ltr;
         break-inside: avoid;
     }
+}
+
+/* unit TB's tools (profit margin, break-even, staff commission, gym plans,
+   GSTIN checker, HSN/SAC finder): the "[to confirm]" mark on a tax fact */
+.tp-tc {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: #fdf0dc;
+    color: #8a4a06;
+    white-space: nowrap;
+}
+.tb-btn2 {
+    height: 48px;
+    padding: 0 18px;
+    border-radius: 10px;
+    border: 1px solid var(--sp-line-strong);
+    background: var(--sp-white);
+    color: var(--sp-ink);
+    font-weight: 600;
+    font-size: 15px;
+    font-family: inherit;
+    cursor: pointer;
+}
+.tb-btn2:focus-visible {
+    outline: 2px solid var(--sp-amber);
+    outline-offset: 2px;
+}
+.tb-set {
+    border: 1px solid var(--sp-line);
+    border-radius: 14px;
+    background: var(--sp-white);
+    margin: 0;
+    padding: 16px 18px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+}
+.tb-legend {
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: 16px;
+    padding: 0 6px;
 }
 
 /* break-even-calculator: two cards of fields, no outer card */

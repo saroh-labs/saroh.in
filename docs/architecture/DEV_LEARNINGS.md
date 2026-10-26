@@ -5988,3 +5988,9 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Symptom:** `pnpm prepush --all` failed `module-annotations.spec.ts` ("names every controller under src/modules in one of the lists") after the search-pages unit's own quick gate had passed.
 - **Cause:** the unit added two controllers but no row in `CLASS_LEVEL`, `METHOD_LEVEL` or `NEVER`; its quick gate ran only the affected unit tests.
 - **Fix:** both are in `NEVER` (Saroh's own pages, not a tenant surface). When you add a controller, add its row in the same commit and run that spec. The local Playwright browser cache had also gone missing (`~/Library/Caches/ms-playwright`); `pnpm --filter @saroh/e2e exec playwright install chromium` restores it.
+
+## A hand-merged stylesheet broke the site build while every test passed (26 Oct 2026)
+
+- **Symptom:** saroh.in's build failed "CssSyntaxError … Unclosed block" in `packages/search-pages/src/styles.css` after four tool branches were merged; the package's 475 tests were green.
+- **Cause:** each branch appended its own CSS; resolving the conflicts by keeping "both sides" of each hunk dropped a closing brace the hunks shared. No test loads the stylesheet.
+- **Fix:** rebuilt the file as the base plus each branch's appended part; `search-page.test.tsx` now fails when the stylesheet's blocks don't close. When several branches append to one file, rebuild it from base + each branch's suffix rather than hand-resolving hunks.

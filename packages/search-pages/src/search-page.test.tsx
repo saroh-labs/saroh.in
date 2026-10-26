@@ -158,3 +158,20 @@ describe("class names", () => {
         },
     );
 });
+
+// A hand-merged stylesheet once lost a closing brace and failed the site's
+// build, though every test here passed (26 Oct): it must still parse.
+describe("styles.css", () => {
+    it("closes every block it opens", () => {
+        const css = readFileSync(join(__dirname, "styles.css"), "utf8")
+            .replace(/\/\*[\s\S]*?\*\//g, "")
+            .replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, "");
+        let depth = 0;
+        for (const ch of css) {
+            if (ch === "{") depth++;
+            if (ch === "}") depth--;
+            expect(depth).toBeGreaterThanOrEqual(0);
+        }
+        expect(depth).toBe(0);
+    });
+});
