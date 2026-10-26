@@ -1989,6 +1989,102 @@
 .tp-input.bq-area {
     height: auto;
     min-height: 88px;
+/* gst-calculator: Copy the working, on the dark result (white on a phone) */
+.gc-copy {
+    height: 46px;
+    padding: 0 18px;
+    border-radius: 12px;
+    border: 1px solid #5a5750;
+    background: transparent;
+    color: inherit;
+    font-weight: 600;
+    font-size: 15px;
+    font-family: inherit;
+    cursor: pointer;
+}
+.gc-copy:focus-visible {
+    outline: 2px solid var(--sp-amber);
+    outline-offset: 2px;
+}
+.gc-copy.gc-copied {
+    color: #8fd19e;
+}
+.gc-status {
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--sp-on-ink);
+}
+@media (max-width: 899.98px) {
+    .gc-copy {
+        height: 48px;
+        border-radius: 10px;
+        border-color: var(--sp-line-strong);
+        background: var(--sp-white);
+        width: 100%;
+    }
+    .gc-copy.gc-copied {
+        color: var(--tp-done);
+        border-color: #a7c7af;
+    }
+    .gc-status {
+        color: var(--sp-body);
+    }
+}
+
+/*
+ * _documents: the four document makers (gst-invoice-generator,
+ * bill-of-supply-generator, receipt-maker, quotation-maker; boards
+ * GstInvoice*, BillOfSupply*, ReceiptMaker*, Quotation*). The form in white
+ * fieldsets beside a sticky paper preview; stacked on a phone. Printing
+ * prints the paper only.
+ */
+.tp-tool.td {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: 32px;
+    align-items: start;
+}
+.td-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+}
+.td-set {
+    border: 1px solid var(--sp-line);
+    border-radius: 14px;
+    background: var(--sp-white);
+    margin: 0;
+    padding: 16px 18px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+}
+.td-set > legend {
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: 16px;
+    padding: 0 6px;
+}
+.td-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    align-items: start;
+}
+.td-grid.td-grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.td-wide {
+    grid-column: 1 / -1;
+}
+.tp-input.td-mono {
+    font-family: var(--tp-mono);
+    font-size: 15px;
+}
+.tp-input.td-area {
+    height: auto;
     padding: 10px 12px;
     line-height: 1.5;
     resize: vertical;
@@ -2283,5 +2379,277 @@
         border: 1px dashed #a39e93;
         border-radius: 0;
         padding: 4mm;
+.td-lines {
+    display: grid;
+    grid-template-columns: 2.6fr 0.6fr 1fr;
+    gap: 8px;
+}
+.td-lines.td-lines-code {
+    grid-template-columns: 2.6fr 1.1fr 0.6fr 1fr;
+}
+.td-lines.td-lines-gst {
+    grid-template-columns: 2.4fr 0.6fr 1fr 0.8fr;
+}
+.td-lines.td-lines-code.td-lines-gst {
+    grid-template-columns: 2.4fr 1.1fr 0.6fr 1fr 0.8fr;
+}
+.td-head {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--sp-muted-2);
+}
+.td-line {
+    display: contents;
+}
+.td-code-in.tp-input {
+    font-size: 14px;
+}
+.tp-btn.td-btn2 {
+    border: 1px solid var(--sp-line-strong);
+    background: var(--sp-white);
+    color: var(--sp-ink);
+}
+.td-add {
+    align-self: flex-start;
+}
+.td-share {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+.tp a.td-share {
+    color: var(--sp-ink);
+}
+.td-find {
+    align-self: flex-start;
+    font-size: 13.5px;
+}
+.td-tc {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--sp-amber-tint);
+    color: var(--sp-amber-dark);
+    white-space: nowrap;
+}
+
+/* the preview: a sheet of paper */
+.td-aside {
+    position: sticky;
+    top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+}
+.td-aside-h {
+    display: none;
+}
+.td-paper {
+    background: var(--sp-white);
+    border: 1px solid var(--sp-line);
+    border-radius: 14px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    box-shadow: 0 10px 30px rgba(28, 28, 26, 0.06);
+}
+.td-paper-empty {
+    padding: 40px 0;
+    text-align: center;
+    color: var(--sp-muted-2);
+    font-size: 14.5px;
+}
+.td-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+}
+.td-who {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.td-title {
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: 20px;
+}
+.td-sub {
+    font-size: 13px;
+    color: var(--sp-muted-2);
+}
+.td-num {
+    font-family: var(--tp-mono);
+    font-size: 13px;
+    white-space: nowrap;
+}
+.td-billed {
+    font-size: 13.5px;
+    color: var(--sp-body);
+    border-top: 1px solid var(--sp-line-soft);
+    padding-top: 8px;
+}
+.td-it {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 14px;
+    padding: 6px 0;
+}
+.td-amt {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.td-sums {
+    margin: 0;
+    border-top: 1px solid var(--sp-line-soft);
+    padding-top: 6px;
+}
+.td-sum {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 14px;
+    padding: 4px 0;
+}
+.td-sum dt {
+    color: var(--sp-body);
+}
+.td-sum dd {
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+.td-sum.td-total {
+    font-size: 16px;
+    font-weight: 700;
+    padding-top: 8px;
+    border-top: 1px solid var(--sp-line-soft);
+}
+.td-sum.td-total dt {
+    color: var(--sp-ink);
+}
+.td-words {
+    font-size: 13px;
+    color: var(--sp-body);
+}
+.td-note {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--sp-body);
+    background: var(--sp-paper);
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+.td-due {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--sp-amber-dark);
+    background: var(--sp-amber-tint);
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+.td-small {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--sp-muted-2);
+}
+
+/* the email gate on paper, not on the dark result */
+.td-aside .tp-gate {
+    border-top: 0;
+    padding-top: 0;
+}
+.td-aside .tp-gate-label {
+    font-size: 14px;
+}
+.td-aside .tp-gate-note {
+    font-size: 12.5px;
+    color: var(--sp-muted-2);
+}
+.td-aside .tp-gate-done {
+    color: var(--tp-done);
+}
+.td-aside .tp-gate-line {
+    color: var(--sp-body);
+}
+
+@media (max-width: 899.98px) {
+    .tp-tool.td {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 36px;
+    }
+    .td-form {
+        gap: 14px;
+    }
+    .td-grid,
+    .td-grid.td-grid-2 {
+        grid-template-columns: 1fr;
+    }
+    .td-lines,
+    .td-lines.td-lines-code,
+    .td-lines.td-lines-gst,
+    .td-lines.td-lines-code.td-lines-gst {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .td-head {
+        display: none;
+    }
+    .td-line {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        border: 1px solid var(--sp-line);
+        border-radius: 12px;
+        padding: 12px;
+    }
+    .td-line > * {
+        order: 3;
+    }
+    .td-line > .td-item-in {
+        order: 0;
+        grid-column: 1 / -1;
+    }
+    .td-line > .td-code-in {
+        order: 1;
+    }
+    .td-line > .td-gst-in {
+        order: 2;
+    }
+    .td-aside {
+        position: static;
+        gap: 12px;
+    }
+    .td-aside-h {
+        display: block;
+        font-family: var(--sp-display);
+        font-weight: 700;
+        font-size: 22px;
+    }
+}
+
+/* Print or save as PDF: the paper only */
+@media print {
+    .tp-tool.td {
+        display: block;
+    }
+    .td-form,
+    .td-aside > :not(.td-paper),
+    .td-tc {
+        display: none;
+    }
+    .td-paper {
+        border: 0;
+        box-shadow: none;
     }
 }

@@ -7,7 +7,7 @@ const DESCRIPTION_MAX = 150;
 const BRAND = " · Saroh";
 
 /** The sample GSTIN the tools may show (sample data never real). */
-export const TOOL_SAMPLE_GSTIN = "29AAAAA0000A1Z5";
+export const TOOL_SAMPLE_GSTIN = "29AAAAA0000A1ZY";
 const SAMPLE_UPI = "saroh-sample-upi-id@okaxis";
 
 /** Every word a tool page's file holds, for the sample-data checks. */

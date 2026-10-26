@@ -219,9 +219,15 @@ describe("<ToolsHub>", () => {
                 .getAttribute("href"),
         ).toBe("/tools/no-show-cost-calculator");
         expect(within(money).getByText("new")).toBeTruthy();
+        const billing = screen
+            .getByRole("heading", { name: "Billing and GST" })
+            .closest("section");
+        if (!billing) throw new Error("no Billing and GST section");
         expect(
-            screen.queryByRole("heading", { name: "Billing and GST" }),
-        ).toBeNull();
+            within(billing)
+                .getByRole("link", { name: /GST calculator/ })
+                .getAttribute("href"),
+        ).toBe("/tools/gst-calculator");
         expect(unknownClasses(container)).toEqual([]);
     });
 });

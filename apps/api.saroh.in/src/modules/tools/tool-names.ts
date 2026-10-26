@@ -16,7 +16,7 @@ export const TOOL_NAMES: Readonly<Record<string, string>> = {
     "gst-invoice-generator": "GST invoice generator",
     "bill-of-supply-generator": "Bill of supply generator",
     "receipt-maker": "Receipt maker",
-    "quotation-maker": "Quotation / estimate maker",
+    "quotation-maker": "Quotation maker",
     "profit-margin-calculator": "Profit margin calculator",
     "break-even-calculator": "Break-even calculator",
     "staff-commission-calculator": "Staff commission calculator",

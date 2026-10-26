@@ -13,12 +13,19 @@ import { lazy } from "react";
 export const TOOLS: Readonly<
     Record<string, LazyExoticComponent<ComponentType>>
 > = {
+    "bill-of-supply-generator": lazy(
+        () => import("./bill-of-supply-generator"),
+    ),
     "business-card-qr-generator": lazy(
         () => import("./business-card-qr-generator"),
     ),
+    "gst-calculator": lazy(() => import("./gst-calculator")),
+    "gst-invoice-generator": lazy(() => import("./gst-invoice-generator")),
     "link-in-bio-page-maker": lazy(() => import("./link-in-bio-page-maker")),
     "menu-qr-code-generator": lazy(() => import("./menu-qr-code-generator")),
     "no-show-cost-calculator": lazy(() => import("./no-show-cost-calculator")),
+    "quotation-maker": lazy(() => import("./quotation-maker")),
+    "receipt-maker": lazy(() => import("./receipt-maker")),
     "review-qr-code-generator": lazy(
         () => import("./review-qr-code-generator"),
     ),
