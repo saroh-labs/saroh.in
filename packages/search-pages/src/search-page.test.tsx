@@ -149,7 +149,7 @@ describe("class names", () => {
             const { container } = render(<SearchPage page={p} />);
             const unknown = new Set<string>();
             container.querySelectorAll("[class]").forEach((el) => {
-                for (const c of el.getAttribute("class")!.split(/\s+/)) {
+                for (const c of (el.getAttribute("class") ?? "").split(/\s+/)) {
                     if (c && !new RegExp(`\\.${c}(?![\\w-])`).test(css))
                         unknown.add(c);
                 }

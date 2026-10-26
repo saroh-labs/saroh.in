@@ -375,6 +375,11 @@ const NEVER: Record<string, string> = {
         "Saroh's own plan prompts to the owner — no module holds them",
     "data-export/data-export.controller.ts":
         "the owner's download of the business's own data — no module holds it",
+    // DEC-193: which of Saroh's own /for/ pages are live on saroh.in.
+    "search-pages/search-pages.controller.ts":
+        "staff control plane (Saroh's own search pages), not a tenant surface",
+    "search-pages/public-search-pages.controller.ts":
+        "saroh.in's build reads Saroh's own live page list, not a tenant surface",
 };
 
 /** Controllers with a test of their own below, not a row above. */
