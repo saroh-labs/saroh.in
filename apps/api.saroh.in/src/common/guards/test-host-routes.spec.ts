@@ -39,6 +39,7 @@ const EXEMPT = [
     "POST public/billing/webhooks/:provider",
     "POST public/payments/return",
     "POST public/webhooks/:provider/:organizationId",
+    "POST public/webhooks/msg91",
 ];
 
 /** Refused from a test host with 409 TEST_RELEASE. */

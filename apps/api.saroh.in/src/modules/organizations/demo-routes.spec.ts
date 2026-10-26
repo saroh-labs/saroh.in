@@ -113,6 +113,7 @@ const ASKS: Record<string, How> = {
     "POST public/webhooks/:provider/:organizationId": {
         exempt: "a provider's callback",
     },
+    "POST public/webhooks/msg91": { exempt: "Saroh's MSG91 delivery reports" },
 };
 
 const modules = join(__dirname, "..");

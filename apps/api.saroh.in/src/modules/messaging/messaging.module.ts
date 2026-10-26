@@ -10,6 +10,7 @@ import {
     MessagingController,
     PublicVerificationsController,
 } from "./messaging.controller";
+import { Msg91WebhookController } from "./msg91-webhook.controller";
 import { otpTransportProvider } from "./providers/otp-transport.factory";
 import { VerificationSendService } from "./verification-send.service";
 import { VerificationService } from "./verification.service";
@@ -22,7 +23,11 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
 /** Saroh-sent verification codes and the prepaid balance that pays for them (DEC-191). */
 @Module({
     imports: [JobsModule, OrganizationContextModule, PricingModule],
-    controllers: [MessagingController, PublicVerificationsController],
+    controllers: [
+        MessagingController,
+        PublicVerificationsController,
+        Msg91WebhookController,
+    ],
     providers: [
         otpTransportProvider,
         VerificationService,

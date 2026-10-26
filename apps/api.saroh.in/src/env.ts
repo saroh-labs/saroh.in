@@ -202,6 +202,10 @@ const envSchema = z.object({
     MSG91_WHATSAPP_TEMPLATE: z.string().optional(),
     // TEST ONLY in practice: where MSG91 calls go instead of its own API.
     MSG91_BASE_URL: z.string().url().optional(),
+    // A long random secret the owner also adds as the `x-saroh-webhook-secret`
+    // header in MSG91's webhook settings; delivery reports without it are
+    // refused (`messaging/msg91-webhook.controller.ts`). Unset, all are.
+    MSG91_WEBHOOK_SECRET: z.string().min(32).optional(),
     // The opening-day launch offer (marketing plan U31, OQ-1): how many days
     // of the offer plan a business made through a waitlist invite gets, from
     // the moment it is made. The owner's number, set per instance, never
