@@ -128,7 +128,7 @@ describe("GstCalculator", () => {
         expect(
             screen
                 .getAllByRole("status")
-                .some((el) => el.textContent?.includes("on your clipboard")),
+                .some((el) => el.textContent.includes("on your clipboard")),
         ).toBe(true);
         expect(screen.getByRole("button", { name: "✓ Copied" })).toBeTruthy();
     });

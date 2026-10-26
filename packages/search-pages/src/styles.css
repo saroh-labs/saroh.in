@@ -2078,6 +2078,21 @@
 }
 .td-wide {
     grid-column: 1 / -1;
+/*
+ * td: parts the WhatsApp, policy and print tools share
+ * (src/tools/td-parts.tsx; boards genB/genC): light cards, the written
+ * policy, the not-legal-advice note, chat bubbles, the sand print sheet.
+ */
+.td-opt {
+    font-weight: 400;
+    color: var(--sp-muted-2);
+}
+.tp-input.td-area {
+    height: auto;
+    min-height: 80px;
+    padding: 10px 12px;
+    line-height: 1.5;
+    resize: vertical;
 }
 .tp-input.td-mono {
     font-family: var(--tp-mono);
@@ -2536,6 +2551,57 @@
 .td-words {
     font-size: 13px;
     color: var(--sp-body);
+.td-check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    font-size: 15px;
+    cursor: pointer;
+}
+.td-check-box {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    flex: none;
+    accent-color: var(--sp-ink);
+}
+.td-check-hint {
+    display: block;
+    margin-left: 30px;
+    line-height: 1.5;
+}
+.td-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    align-items: start;
+}
+.td-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.td-card {
+    background: var(--sp-white);
+    border: 1px solid var(--sp-line);
+    border-radius: 18px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.td-eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--sp-muted-2);
+}
+.td-small {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--sp-muted-2);
 }
 .td-note {
     font-size: 13px;
@@ -2651,5 +2717,621 @@
     .td-paper {
         border: 0;
         box-shadow: none;
+.td-paper .td-note,
+.td-stack .td-note {
+    background: var(--sp-amber-tint);
+    color: var(--sp-amber-deep);
+}
+.td-empty {
+    border: 1px dashed var(--sp-line-strong);
+    border-radius: 14px;
+    padding: 36px 16px;
+    text-align: center;
+    color: var(--sp-muted-2);
+    font-size: 14.5px;
+}
+.td-btns {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.td-btn {
+    flex: 1 1 0;
+    min-width: max-content;
+    height: 48px;
+    padding: 0 18px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 15px;
+    font-family: inherit;
+    text-decoration: none;
+    cursor: pointer;
+}
+.td-btn:focus-visible {
+    outline: 2px solid var(--sp-amber);
+    outline-offset: 2px;
+}
+.tp .td-btn-light,
+.td-btn-done {
+    border: 1px solid var(--sp-line-strong);
+    background: var(--sp-white);
+    color: var(--sp-ink);
+}
+.tp .td-btn-light:hover {
+    color: var(--sp-ink);
+    border-color: var(--sp-ink);
+}
+.td-btn.td-btn-done {
+    color: var(--tp-done);
+    border-color: #a7c7af;
+}
+/* the email gate on a light card, desk and phone */
+.td-light .tp-gate {
+    border-top-color: var(--sp-line-soft);
+}
+.td-card > .tp-gate:first-child {
+    border-top: 0;
+    padding-top: 0;
+}
+.td-light .tp-gate-note {
+    color: var(--sp-muted-2);
+}
+.td-light .tp-gate-done {
+    color: var(--tp-done);
+}
+.td-gate-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.td-gate-wrap .tp-gate-note,
+.td-gate-wrap .td-small {
+    font-size: 13px;
+}
+/* a written policy */
+.td-doc {
+    background: var(--sp-white);
+    border: 1px solid var(--sp-line);
+    border-radius: 14px;
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    box-shadow: 0 10px 30px rgba(28, 28, 26, 0.06);
+    font-size: 15px;
+    line-height: 1.6;
+}
+.td-doc-h {
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: 21px;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+}
+.td-doc-sub {
+    font-size: 13px;
+    color: var(--sp-muted-2);
+}
+.td-gap {
+    background: var(--sp-amber-tint);
+    color: var(--sp-amber-dark);
+    border-radius: 4px;
+    padding: 0 3px;
+}
+.td-notlegal {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    background: var(--sp-amber-tint);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--sp-body);
+}
+.td-notlegal-icon {
+    flex: none;
+    margin-top: 1px;
+    color: var(--sp-amber-dark);
+}
+.td-bubble {
+    align-self: flex-end;
+    max-width: 88%;
+    background: var(--sp-line-soft);
+    border-radius: 12px 12px 2px 12px;
+    padding: 10px 12px;
+    font-size: 14.5px;
+    line-height: 1.5;
+    white-space: pre-line;
+}
+.td-bubble.td-bubble-green {
+    background: #dcf8c6;
+}
+/* the sand sheet a printed card lies on */
+.td-paper {
+    background: var(--sp-line-soft);
+    border-radius: 18px;
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+.td-paper-cap {
+    font-size: 13px;
+    color: var(--sp-body);
+    text-align: center;
+}
+.td-sheet {
+    background: var(--sp-white);
+    box-shadow:
+        0 1px 2px rgba(28, 28, 26, 0.12),
+        0 10px 28px rgba(28, 28, 26, 0.1);
+    max-width: 100%;
+    text-align: left;
+}
+.td-faint {
+    opacity: 0.5;
+}
+@media (max-width: 899.98px) {
+    .td-pair {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* whatsapp-link-generator (also the number field of the other WhatsApp and policy tools) */
+.tp-input.wl-num {
+    padding-left: 46px;
+}
+.wl-link {
+    font-family: var(--tp-mono);
+    font-size: 14px;
+    line-height: 1.6;
+    background: var(--sp-paper);
+    border-radius: 9px;
+    padding: 12px 14px;
+    word-break: break-all;
+}
+.wl-empty {
+    font-size: 15px;
+    color: var(--sp-muted-2);
+    background: var(--sp-paper);
+    border-radius: 9px;
+    padding: 18px 14px;
+}
+.wl-sees {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--sp-muted-2);
+}
+@media (max-width: 899.98px) {
+    .wl-sees ~ .td-bubble {
+        background: #dcf8c6;
+    }
+}
+
+/* whatsapp-message-templates */
+.wt-chat {
+    display: flex;
+    flex-direction: column;
+    background: var(--sp-paper);
+    border-radius: 12px;
+    padding: 14px;
+}
+.wt-all {
+    margin: 0;
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+.wt-all li {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* cancellation-policy-generator */
+.cp-wa {
+    background: var(--sp-paper);
+    border-radius: 14px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* salon-rate-card-maker */
+.rc-section {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.rc-legend {
+    padding: 0;
+    margin-bottom: 4px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sp-muted-2);
+}
+.rc-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.rc-line {
+    display: grid;
+    grid-template-columns: 1fr 196px;
+    gap: 8px;
+    align-items: center;
+}
+.rc-own {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.rc-cells {
+    display: grid;
+    grid-template-columns: 104px 84px;
+    gap: 8px;
+}
+.tp-input.rc-input {
+    height: 44px;
+    font-size: 15px;
+}
+.rc-add {
+    align-self: flex-start;
+    height: 44px;
+    padding: 0 14px;
+    border-radius: 10px;
+    border: 1px dashed var(--sp-line-strong);
+    background: transparent;
+    color: var(--sp-ink);
+    font-weight: 600;
+    font-size: 14.5px;
+    font-family: inherit;
+    cursor: pointer;
+}
+.rc-card {
+    --rc: 1.08;
+    width: calc(var(--rc) * 400px);
+    border-radius: 4px;
+    padding: calc(var(--rc) * 30px) calc(var(--rc) * 28px);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--rc) * 16px);
+}
+.rc-head {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--rc) * 4px);
+    border-bottom: 2px solid var(--sp-ink);
+    padding-bottom: calc(var(--rc) * 12px);
+}
+.rc-biz {
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: calc(var(--rc) * 28px);
+    letter-spacing: -0.03em;
+}
+.rc-tag {
+    font-size: calc(var(--rc) * 12px);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--sp-body);
+}
+.rc-sec {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--rc) * 7px);
+}
+.rc-sec-name {
+    font-size: calc(var(--rc) * 11.5px);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--sp-amber-text);
+}
+.rc-item {
+    display: flex;
+    gap: calc(var(--rc) * 8px);
+    align-items: baseline;
+    font-size: calc(var(--rc) * 14px);
+}
+.rc-time {
+    color: var(--sp-muted-2);
+    font-size: calc(var(--rc) * 12px);
+}
+.rc-dots {
+    flex: 1;
+    border-bottom: 1px dotted var(--sp-off);
+}
+.rc-price {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+.rc-foot {
+    border-top: 1px solid var(--sp-line);
+    padding-top: calc(var(--rc) * 10px);
+    display: flex;
+    justify-content: space-between;
+    gap: calc(var(--rc) * 8px);
+    flex-wrap: wrap;
+    font-size: calc(var(--rc) * 12px);
+    color: var(--sp-body);
+}
+@media (max-width: 899.98px) {
+    .rc-card {
+        --rc: 0.82;
+    }
+    .rc-line {
+        grid-template-columns: 1fr;
+    }
+    .rc-cells {
+        grid-template-columns: 1fr 1fr;
+        margin-left: 30px;
+    }
+    .tp-input.rc-input {
+        height: 48px;
+        font-size: 16px;
+    }
+}
+
+/* gift-voucher-maker */
+.gv-code-row {
+    display: flex;
+    gap: 8px;
+}
+.gv-code-row .td-btn {
+    flex: none;
+}
+.gv-wrap {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+.gv-card {
+    --gv: 1.08;
+    width: calc(var(--gv) * 460px);
+    border-radius: calc(var(--gv) * 12px);
+    display: flex;
+    overflow: hidden;
+}
+.gv-main {
+    flex: 1;
+    min-width: 0;
+    padding: calc(var(--gv) * 24px);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--gv) * 8px);
+}
+.gv-eyebrow {
+    font-size: calc(var(--gv) * 11.5px);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--sp-amber-text);
+}
+.gv-biz,
+.gv-worth {
+    font-family: var(--sp-display);
+    font-weight: 700;
+}
+.gv-biz {
+    font-size: calc(var(--gv) * 20px);
+    letter-spacing: -0.02em;
+}
+.gv-worth {
+    font-size: calc(var(--gv) * 40px);
+    letter-spacing: -0.04em;
+    line-height: 1;
+    overflow-wrap: anywhere;
+}
+.gv-line {
+    font-size: calc(var(--gv) * 13px);
+    color: var(--sp-body);
+}
+.gv-terms {
+    font-size: calc(var(--gv) * 11px);
+    color: var(--sp-muted-2);
+}
+.gv-stub {
+    width: calc(var(--gv) * 150px);
+    flex: none;
+    border-left: 2px dashed var(--sp-line-strong);
+    background: var(--sp-amber-tint);
+    padding: calc(var(--gv) * 20px) calc(var(--gv) * 14px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: calc(var(--gv) * 10px);
+}
+.gv-k,
+.gv-book {
+    font-size: calc(var(--gv) * 11px);
+    color: var(--sp-amber-deep);
+}
+.gv-k {
+    font-weight: 600;
+}
+.gv-code {
+    font-family: var(--tp-mono);
+    font-size: calc(var(--gv) * 14px);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+.gv-v {
+    font-size: calc(var(--gv) * 13.5px);
+    font-weight: 600;
+}
+.gv-print,
+.lc-print {
+    display: none;
+}
+@media (max-width: 899.98px) {
+    .gv-card {
+        --gv: 0.72;
+    }
+}
+
+/* loyalty-card-maker */
+.lc-wrap {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+.lc-card {
+    --lc: 1.32;
+    width: calc(var(--lc) * 340px);
+    aspect-ratio: 85 / 55;
+    border-radius: calc(var(--lc) * 10px);
+    padding: calc(var(--lc) * 18px);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--lc) * 10px);
+}
+.lc-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: calc(var(--lc) * 8px);
+}
+.lc-biz {
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: calc(var(--lc) * 18px);
+    letter-spacing: -0.02em;
+}
+.lc-area,
+.lc-offer {
+    color: var(--sp-body);
+}
+.lc-area {
+    font-size: calc(var(--lc) * 11px);
+}
+.lc-offer {
+    font-size: calc(var(--lc) * 12.5px);
+}
+.lc-grid {
+    display: grid;
+    grid-template-columns: repeat(var(--lc-cols), calc(var(--lc) * 40px));
+    gap: calc(var(--lc) * 8px);
+    justify-content: space-between;
+}
+.lc-stamp {
+    width: calc(var(--lc) * 40px);
+    height: calc(var(--lc) * 40px);
+    border-radius: 999px;
+    border: 1.5px dashed var(--sp-off);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(var(--lc) * 11px);
+    color: var(--sp-muted-2);
+}
+.lc-stamp.lc-free {
+    background: var(--sp-amber-tint);
+    border: 2px solid var(--sp-amber-text);
+    color: var(--sp-amber-deep);
+    font-size: calc(var(--lc) * 9.5px);
+    font-weight: 700;
+}
+.lc-back {
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+@media (max-width: 899.98px) {
+    .lc-card {
+        --lc: 0.98;
+    }
+}
+
+/* Printing the policy tools, the templates and the cards: only the sheet. */
+@media print {
+    .tp-tool:has(.td-doc, .cp-wa, .wt-all, .td-paper) .tp-form,
+    .tp-tool:has(.td-doc, .cp-wa) .tp-chips,
+    .td-notlegal,
+    .td-light,
+    .td-paper-cap {
+        display: none;
+    }
+    .tp-tool:has(.wt-all) .td-card:has(.wt-chat) {
+        display: none;
+    }
+    /* the full set of templates sits inside the opened gate */
+    .tp-tool:has(.wt-all) .td-light,
+    .tp-tool:has(.wt-all) .tp-gate {
+        display: flex;
+        border: 0;
+        padding: 0;
+    }
+    .tp-tool:has(.wt-all) .tp-gate > :not(.wt-all) {
+        display: none;
+    }
+    .td-doc,
+    .td-paper {
+        box-shadow: none;
+        border: 0;
+        background: none;
+        padding: 0;
+    }
+    .td-sheet {
+        box-shadow: none;
+    }
+    .rc-card {
+        --rc: 1.25;
+        width: 100%;
+    }
+    .gv-print,
+    .lc-print {
+        display: block;
+    }
+    .gv-card {
+        --gv: 1.55;
+        width: 190mm;
+        height: 90mm;
+        margin-bottom: 4mm;
+        border: 1px dashed var(--sp-off);
+        break-inside: avoid;
+    }
+    .gv-print {
+        display: flex;
+        flex-direction: column;
+    }
+    .td-paper:has(.lc-print) > .lc-wrap {
+        display: none;
+    }
+    .lc-fronts,
+    .lc-backs {
+        display: grid;
+        grid-template-columns: repeat(2, 85mm);
+        justify-content: center;
+    }
+    .lc-backs {
+        direction: rtl;
+        break-before: page;
+    }
+    .lc-card {
+        --lc: 0.94;
+        width: 85mm;
+        height: 55mm;
+        border-radius: 0;
+        border: 1px dashed var(--sp-off);
+        direction: ltr;
+        break-inside: avoid;
     }
 }

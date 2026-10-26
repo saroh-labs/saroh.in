@@ -47,7 +47,8 @@ export interface FieldProps extends Omit<
     InputHTMLAttributes<HTMLInputElement>,
     "prefix"
 > {
-    label: string;
+    /** A string, or words with an "(optional)" span. */
+    label: ReactNode;
     /** The grey line under the field. */
     hint?: ReactNode;
     /** What's wrong, in place of the hint. */
