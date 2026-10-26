@@ -51,6 +51,9 @@ module.exports = {
         // Saroh's own leads (U20): the rules, pure. The rows are in
         // saroh-leads.db.spec.ts (integration).
         "<rootDir>/src/modules/saroh-leads/**/*.spec.ts",
+        // Search pages (DEC-193): the transition rules and the deploy job,
+        // pure. The rows are in search-pages.db.spec.ts (integration).
+        "<rootDir>/src/modules/search-pages/**/*.spec.ts",
         // Commission (U21): the pay rules, pure. The rows are in
         // commission.db.spec.ts (integration).
         "<rootDir>/src/modules/commission/**/*.spec.ts",
