@@ -125,6 +125,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Reaffirmed 2026-10-07 (owner): **a business's messages to its customers go only through its own connected email provider**, review invitations included; Saroh's identity email keeps only sign-in codes and the email-changed notice (ADR-011). DEC-086 is reversed and its code stays off.
 - Amended 2026-10-07 (owner) — **who sends what: whoever is speaking sends it.** (A) Saroh to its own users — sign-in, verification, password and email changes, account deletion, team invitations, Saroh's own billing mail, the waitlist — and (B) Saroh to a business about the business — enquiry alerts and the team alerts (new order, booking, failed payment, someone joined), which move from the business's provider to Saroh — go from **Saroh**. (C) A customer's sign-in on a business's site: with Saroh's built-in customer accounts, **Saroh** sends the codes (‹Business› via Saroh, ADR-011); a business that brings its own login system (Firebase, Auth0, Google or GitHub sign-in, phone OTP) has that system send its own, and Saroh sends nothing — a later feature. (D) A business to its customers — invoices, booking and order notices, waitlist offers, autopay mail, review invitations, marketing — only through **the business's own connected provider**; with none, nothing is emailed. The workspace asks owners and admins to connect their email provider so their customers get emails. Both are built: team alerts from Saroh (#849: `sendTeamAlertEmail`, fixed words and cleaned names only), and that prompt (#850: Home's Needs you and Settings › Providers, from `GET …/comms-providers/email-setup`; Connect for `comms:manage`, or on a plan that can't connect one, DEC-091, See plans for `billing:read`; gone once one is connected), whose note also says why an invoice or a review invitation can't be emailed.
 - Amended 2026-10-20 by [DEC-172](#dec-172-merchant-sites-get-three-looks-on-one-engine-folio-and-quiet-fully-live-for-gyms) (owner): **Saroh's identity email also sends a customer's data-removal acknowledgement and its done notice**, beside the sign-in codes, because they are about the customer's own account.
+- Amended 2026-10-26 by [DEC-191](#dec-191-saroh-may-send-paid-verification-codes-to-a-businesss-customers-as-saroh-beside-the-businesss-own-providers) (owner): **Saroh may send paid verification codes to a business's customers** from its own WhatsApp sender, as "Saroh". Every other message to a business's customers still goes only through its own provider.
 
 ## DEC-012 Analytics event model
 
@@ -2474,3 +2475,19 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - The API refuses another country on create or change ("Saroh is for businesses in India for now."). A business already saved with another country keeps it and can still save its other details.
     - The country picker stays in the code for when other countries come (#1212); currency and time zones are #1213.
 - Rules: `apps/api.saroh.in/src/modules/organizations/business-country.ts`; `apps/app.saroh.in/lib/organizations/setup-steps.ts`.
+
+## DEC-191 Saroh may send paid verification codes to a business's customers, as "Saroh", beside the business's own providers
+
+**Status: Accepted — 2026-10-26** · owner · #1235 · #1236
+
+- Context:
+    - A business that wants to check its customers' phone numbers (booking confirm, cash-on-delivery order, customer account) would have to run its own WhatsApp and SMS setup, including Meta business verification and DLT. Most small businesses can't.
+    - DEC-011 keeps a business's messages to its customers on the business's own provider, and Saroh keeps no number (DEC-086 reversed).
+- Decision:
+    - Saroh may act as a **paid message sender** for metered add-ons. v1 sends **verification codes only**, from one Saroh WhatsApp sender, through one provider (MSG91) behind a platform port, the same shape as Saroh's billing provider (credentials from the environment, never per business).
+    - The sender is **"Saroh"** for every business. WhatsApp authentication templates carry Meta's fixed wording ("‹code› is your verification code"), so the business's name can't be put in the message. Sending under the business's own name means the business's own WhatsApp account, which is the own-provider path (DEC-011) or a later per-business sender.
+    - **WhatsApp first.** SMS needs Saroh's own DLT registration, which waits (no earlier than Q1 2027); until then there is no SMS fallback.
+    - A business pays per message from a **prepaid money balance**: a WhatsApp message is charged only once it is delivered, an SMS or email when it is accepted. Sending stops at zero. Prices live in the admin catalogue, never in the code.
+    - Saroh makes the code, stores only its hash and owns expiry, attempt caps and rate limits; MSG91 is transport only.
+    - The own-provider path is unchanged: order, booking and invoice messages still go only through the business's own provider.
+- Consequences: a new paid outbound surface open to toll fraud, so per-number, per-business and per-IP limits ship with it and it is pentested before release (#1246).
