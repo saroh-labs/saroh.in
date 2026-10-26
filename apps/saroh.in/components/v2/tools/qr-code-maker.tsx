@@ -11,7 +11,6 @@ import { QrArt } from "@saroh/ui/qr-art";
 import { useCallback, useId, useMemo, useState } from "react";
 
 import { qrCodeMaker as copy } from "@/content/qr-code-maker";
-import type { QrUnlockResult } from "@/lib/qr-code-maker";
 import {
     logoProblem,
     QR_DEFAULT_COLOUR,
@@ -20,6 +19,7 @@ import {
     QR_SWATCHES,
     qrLink,
     typedLink,
+    unlockWithEmail,
 } from "@/lib/qr-code-maker";
 
 import { readAsDataUrl, saveFile, svgBlob, svgToPng } from "./qr-download";
@@ -80,12 +80,7 @@ export function QrCodeMaker() {
         setGateError(null);
         try {
             // The email, and nothing about the code.
-            const res = await fetch("/api/qr-code-maker/unlock", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email }),
-            });
-            const body = (await res.json()) as QrUnlockResult;
+            const body = await unlockWithEmail(email);
             if (body.unlocked) {
                 setUnlocked(body);
             } else {

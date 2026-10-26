@@ -124,7 +124,7 @@ describe("<SearchPage>", () => {
 
 describe("<ForHub>", () => {
     it("lists every page under its family", () => {
-        render(<ForHub pages={listSearchPages()} />);
+        render(<ForHub pages={listSearchPages({ kind: "for" })} />);
         const beauty = screen
             .getByRole("heading", { name: "Beauty" })
             .closest("section");

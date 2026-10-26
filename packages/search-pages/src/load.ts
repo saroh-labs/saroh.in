@@ -1,8 +1,17 @@
 import { parse as parseYaml } from "yaml";
 
-import { SOURCES } from "./content.gen";
-import type { Question, SearchPageData, SearchPageEntry } from "./schema";
+import { SOURCES, TOOL_SOURCES } from "./content.gen";
+import type {
+    ForPageEntry,
+    Question,
+    SearchPageData,
+    SearchPageEntry,
+    SearchPageKind,
+    ToolPageEntry,
+} from "./schema";
 import { frontmatterSchema } from "./schema";
+import type { ToolPageData } from "./tool-schema";
+import { toolFrontmatterSchema } from "./tool-schema";
 
 const FENCE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 
@@ -12,7 +21,11 @@ const FENCE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
  * level, a list, a quote, a link or JSX in the body is an error rather than
  * something drawn differently from the page's own questions.
  */
-export function parseQuestions(file: string, body: string): Question[] {
+export function parseQuestions(
+    file: string,
+    body: string,
+    optional = false,
+): Question[] {
     const questions: Question[] = [];
     let para: string[] = [];
     const flush = () => {
@@ -45,7 +58,8 @@ export function parseQuestions(file: string, body: string): Question[] {
         para.push(line);
     }
     flush();
-    if (!questions.length) throw new Error(`${file}: no questions`);
+    if (!questions.length && !optional)
+        throw new Error(`${file}: no questions`);
     for (const q of questions) {
         if (!q.answer.length)
             throw new Error(`${file}: "${q.question}" has no answer`);
@@ -53,56 +67,108 @@ export function parseQuestions(file: string, body: string): Question[] {
     return questions;
 }
 
-/** One file's text, checked: its frontmatter against the schema, its questions. */
-export function parseSearchPage(file: string, source: string): SearchPageData {
+/** A file's frontmatter checked against `schema` (its slug must be the file's name), and the body under it. */
+function splitFile<T extends { slug: string }>(
+    file: string,
+    source: string,
+    schema: {
+        safeParse: (v: unknown) =>
+            | { success: true; data: T }
+            | {
+                  success: false;
+                  error: {
+                      issues: { path: PropertyKey[]; message: string }[];
+                  };
+              };
+    },
+): { data: T; body: string } {
     const match = FENCE.exec(source);
     if (!match) throw new Error(`${file}: no frontmatter`);
-    const parsed = frontmatterSchema.safeParse(parseYaml(match[1] ?? ""));
+    const parsed = schema.safeParse(parseYaml(match[1] ?? ""));
     if (!parsed.success) {
         const lines = parsed.error.issues.map(
-            (i) => `  ${i.path.join(".") || "(root)"}: ${i.message}`,
+            (i) =>
+                `  ${i.path.map(String).join(".") || "(root)"}: ${i.message}`,
         );
         throw new Error(`${file}: frontmatter is wrong\n${lines.join("\n")}`);
     }
     const name = file.replace(/^.*\//, "").replace(/\.mdx$/, "");
     if (parsed.data.slug !== name)
         throw new Error(`${file}: slug says ${parsed.data.slug}`);
+    return { data: parsed.data, body: source.slice(match[0].length) };
+}
+
+/** One file's text, checked: its frontmatter against the schema, its questions. */
+export function parseSearchPage(file: string, source: string): SearchPageData {
+    const { data, body } = splitFile(file, source, frontmatterSchema);
     return {
-        ...parsed.data,
-        path: `/for/${parsed.data.slug}`,
-        questions: parseQuestions(file, source.slice(match[0].length)),
+        ...data,
+        path: `/for/${data.slug}`,
+        questions: parseQuestions(file, body),
+    };
+}
+
+/** One tool's file, checked; an `inApp` tool may have no questions. */
+export function parseToolPage(file: string, source: string): ToolPageData {
+    const { data, body } = splitFile(file, source, toolFrontmatterSchema);
+    return {
+        ...data,
+        path: `/tools/${data.slug}`,
+        questions: parseQuestions(file, body, data.inApp === true),
     };
 }
 
 let cache: SearchPageData[] | null = null;
+let toolCache: ToolPageData[] | null = null;
 
-/** Every page in the code, parsed once; throws naming the file that's wrong. */
+/** Every /for/ page in the code, parsed once; throws naming the file that's wrong. */
 export function allSearchPages(): SearchPageData[] {
     if (cache) return cache;
-    const pages = Object.entries(SOURCES)
+    cache = Object.entries(SOURCES)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([slug, source]) =>
             parseSearchPage(`content/for/${slug}.mdx`, source),
         );
-    const seen = new Map<string, string>();
-    for (const p of pages) {
-        const key = p.search.toLowerCase();
-        const other = seen.get(key);
-        if (other)
-            throw new Error(
-                `/for/${p.slug} and /for/${other} both answer "${p.search}"`,
-            );
-        seen.set(key, p.slug);
-    }
-    cache = pages;
-    return pages;
+    return cache;
+}
+
+/** Every free tool in the code (#1253), parsed once. */
+export function allToolPages(): ToolPageData[] {
+    if (toolCache) return toolCache;
+    toolCache = Object.entries(TOOL_SOURCES)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([slug, source]) =>
+            parseToolPage(`content/tools/${slug}.mdx`, source),
+        );
+    return toolCache;
 }
 
 export const familySlug = (family: string) =>
     family.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
-/** The manifest: every page in the code, live or not (whether it's live is the API's, DEC-193). */
-export function listSearchPages(): SearchPageEntry[] {
+/**
+ * Pages of every kind must not share a slug (the admin's detail address is
+ * `/search-pages/<slug>`) nor a search (two pages would compete for it).
+ */
+function checkUnique(entries: readonly SearchPageEntry[]): void {
+    const slugs = new Map<string, string>();
+    const searches = new Map<string, string>();
+    for (const p of entries) {
+        const otherSlug = slugs.get(p.slug);
+        if (otherSlug)
+            throw new Error(
+                `${p.path} and ${otherSlug} share the slug "${p.slug}"`,
+            );
+        slugs.set(p.slug, p.path);
+        const key = p.search.toLowerCase();
+        const other = searches.get(key);
+        if (other)
+            throw new Error(`${p.path} and ${other} both answer "${p.search}"`);
+        searches.set(key, p.path);
+    }
+}
+
+function forEntries(): ForPageEntry[] {
     return allSearchPages().map((p) => ({
         path: p.path,
         slug: p.slug,
@@ -117,7 +183,49 @@ export function listSearchPages(): SearchPageEntry[] {
     }));
 }
 
-/** One page, ready for `<SearchPage>`, or null when there is no such file. */
+function toolEntries(): ToolPageEntry[] {
+    return allToolPages().map((p) => ({
+        path: p.path,
+        slug: p.slug,
+        kind: "tools",
+        name: p.name,
+        group: p.group,
+        line: p.line,
+        inApp: p.inApp === true,
+        search: p.search,
+        title: p.title,
+        description: p.description,
+        updated: p.updated,
+    }));
+}
+
+let manifest: SearchPageEntry[] | null = null;
+
+/**
+ * The manifest: every page in the code, live or not (whether it's live is
+ * the API's, DEC-193), /for/ pages first, then the tools; `kind` narrows it.
+ */
+export function listSearchPages(opts: { kind: "for" }): ForPageEntry[];
+export function listSearchPages(opts: { kind: "tools" }): ToolPageEntry[];
+export function listSearchPages(opts?: {
+    kind?: SearchPageKind;
+}): SearchPageEntry[];
+export function listSearchPages(
+    opts: { kind?: SearchPageKind } = {},
+): SearchPageEntry[] {
+    if (!manifest) {
+        manifest = [...forEntries(), ...toolEntries()];
+        checkUnique(manifest);
+    }
+    return opts.kind ? manifest.filter((p) => p.kind === opts.kind) : manifest;
+}
+
+/** One /for/ page, ready for `<SearchPage>`, or null when there is no such file. */
 export function loadSearchPage(slug: string): SearchPageData | null {
     return allSearchPages().find((p) => p.slug === slug) ?? null;
+}
+
+/** One tool page, ready for `<ToolPage>`, or null when there is no such file. */
+export function loadToolPage(slug: string): ToolPageData | null {
+    return allToolPages().find((p) => p.slug === slug) ?? null;
 }

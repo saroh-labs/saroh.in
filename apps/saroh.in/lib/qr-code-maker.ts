@@ -78,3 +78,17 @@ export type QrUnlockResult =
 
 /** An email worth sending to the API: something@something.something. */
 export const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * The email gate's one call: `POST /api/qr-code-maker/unlock` with the
+ * email and nothing else. The QR code maker's, and every free tool's
+ * (#1253, `components/v2/tools/tool-gate.tsx`): one route, one payload.
+ */
+export async function unlockWithEmail(email: string): Promise<QrUnlockResult> {
+    const res = await fetch("/api/qr-code-maker/unlock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+    });
+    return (await res.json()) as QrUnlockResult;
+}

@@ -247,6 +247,18 @@ accounts and the operator console. `pnpm run check:titles` and
   `@saroh/search-pages/styles.css` (all under `.sp`, Saroh's colours, the
   apps' `--font-sans`/`--font-display`); links come in as props, so the
   package reads no env.
+- **A free tool is a file and a component in `@saroh/search-pages`**
+  (#1253, publish-controlled as DEC-193): `content/tools/<slug>.mdx`
+  (name, group, line, search, title, description, updated, h1, lead,
+  phoneLead, how/howPhone, ctaTitle/ctaLine, then the questions) and a
+  default-exported client component in `src/tools/<slug>/index.tsx`,
+  one line in `src/tools/registry.ts`. Build it from `src/tools/parts.tsx`
+  and put the file behind the one `<EmailGate>` (the email is all that
+  leaves the browser; saroh.in sends it to the QR code maker's unlock
+  route through `SiteToolGate`). `toolChecks` must pass. saroh.in draws it
+  at `/tools/<slug>` with `<ToolPage>`; the two app tools (`inApp: true`)
+  keep their own routes and obey the same publish list
+  (`PublishContext.live`). Copy `no-show-cost-calculator` for a new one.
 - **A page's sitemap date lives beside its words** (R3, #1187): a content
   module exports `UPDATED`, a provider page's MDX has `updated:`, Help
   and legal pages keep theirs. Change the date with the words;

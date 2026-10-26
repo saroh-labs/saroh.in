@@ -64,6 +64,11 @@ export function sectionOf(
     }
     if (pathname === "/pricing") return "pricing";
     if (resources.some((i) => within(pathname, i.href))) return "resources";
-    if (tools.some((i) => within(pathname, i.href))) return "tools";
+    // The /tools hub too (#1253), which no menu item is.
+    if (
+        tools.some((i) => within(pathname, i.href)) ||
+        within(pathname, "/tools")
+    )
+        return "tools";
     return null;
 }

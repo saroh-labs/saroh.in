@@ -1015,3 +1015,736 @@
         grid-template-columns: 1fr;
     }
 }
+
+/*
+ * ---- Free tools (#1253): `<ToolPage>`, `<ToolsHub>` and the shared tool
+ * parts (`src/tools/parts.tsx`, `email-gate.tsx`), from the tool boards
+ * (`~/.saroh-design-drafts/tools-all/out/project/tools/`). Inside `.sp`, so
+ * the same colours and faces; `.tp` is a tool page. Desk: the form a white
+ * card, the result dark. Phone (below 900px): the form bare, the result
+ * white. A tool's own rules go at the end, under a comment with its slug.
+ */
+.tp {
+    --tp-bad: #b42318;
+    --tp-done: #1f5a31;
+    --tp-dark-note: #2a2926;
+    --tp-link-on-ink: #f0c674;
+    --tp-mono: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
+}
+.tp-wrap {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 48px clamp(20px, 5vw, 56px) 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 48px;
+}
+.tp a {
+    color: var(--sp-amber-text);
+}
+.tp a:hover {
+    color: var(--sp-ink);
+}
+.tp-intro {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-width: 820px;
+}
+.tp .tp-draft {
+    margin: 0 0 4px;
+}
+.tp-crumb {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    font-size: 14.5px;
+    color: var(--sp-muted-2);
+}
+.tp .tp-crumb a {
+    color: var(--sp-muted-2);
+}
+.tp-crumb [aria-current] {
+    color: var(--sp-ink);
+    font-weight: 600;
+}
+.tp-h1 {
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: clamp(38px, 4.6vw, 54px);
+    line-height: 1.04;
+    letter-spacing: -0.045em;
+}
+.tp-hub-h1 {
+    font-size: clamp(40px, 5vw, 58px);
+    line-height: 1.03;
+}
+.tp-lead {
+    font-size: 18px;
+    line-height: 1.6;
+    color: var(--sp-body);
+}
+.tp-h2 {
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: 28px;
+    letter-spacing: -0.03em;
+}
+
+/* the tool: form card + side column */
+.tp-tool {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    align-items: flex-start;
+}
+.tp-loading {
+    min-height: 420px;
+}
+.tp-form {
+    flex: 1 1 420px;
+    background: var(--sp-white);
+    border: 1px solid var(--sp-line);
+    border-radius: 18px;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+.tp-side {
+    flex: 1 1 360px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+}
+.tp-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.tp-label {
+    font-size: 14.5px;
+    font-weight: 600;
+    padding: 0;
+}
+.tp-chips .tp-label {
+    margin-bottom: 8px;
+}
+.tp-input {
+    height: 48px;
+    border: 1px solid var(--sp-line-strong);
+    border-radius: 10px;
+    padding: 0 12px;
+    font-size: 16px;
+    font-family: inherit;
+    background: var(--sp-white);
+    color: var(--sp-ink);
+    width: 100%;
+}
+.tp-input:focus-visible,
+.tp-btn:focus-visible,
+.tp-chip:focus-within,
+.tp-linkbtn:focus-visible,
+.tp-cta-btn:focus-visible,
+.tp-hub-card:focus-visible {
+    outline: 2px solid var(--sp-amber);
+    outline-offset: 2px;
+}
+.tp-input[aria-invalid="true"] {
+    border: 2px solid var(--tp-bad);
+    padding: 0 11px;
+}
+.tp-affix {
+    position: relative;
+}
+.tp-pre,
+.tp-suf {
+    position: absolute;
+    top: 13px;
+    color: var(--sp-muted-2);
+    pointer-events: none;
+}
+.tp-pre {
+    left: 12px;
+}
+.tp-suf {
+    right: 12px;
+}
+.tp-input.tp-input-pre {
+    padding-left: 28px;
+}
+.tp-input.tp-input-suf {
+    padding-right: 40px;
+}
+.tp-hint {
+    font-size: 13px;
+    color: var(--sp-muted-2);
+}
+.tp-error {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--tp-bad);
+}
+.tp-chips {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+}
+.tp-chip-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.tp-chip {
+    position: relative;
+    min-height: 44px;
+    padding: 0 14px;
+    border-radius: 10px;
+    border: 1px solid var(--sp-line-strong);
+    background: var(--sp-white);
+    color: var(--sp-ink);
+    font-size: 14.5px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+.tp-chip.tp-chip-on {
+    border-color: var(--sp-ink);
+    background: var(--sp-ink);
+    color: var(--sp-paper);
+}
+.tp-chip-input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+}
+.tp-chips-hint {
+    display: block;
+    margin-top: 8px;
+}
+.tp-btn {
+    height: 48px;
+    padding: 0 18px;
+    border-radius: 10px;
+    border: none;
+    background: var(--sp-ink);
+    color: var(--sp-paper);
+    font-weight: 600;
+    font-size: 15px;
+    font-family: inherit;
+    cursor: pointer;
+    flex: none;
+}
+.tp-btn:disabled {
+    cursor: progress;
+    opacity: 0.7;
+}
+.tp-btn-wide {
+    width: 100%;
+}
+.tp-linkbtn {
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 13.5px;
+    color: var(--sp-amber-text);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
+
+/* the result: dark on a desk */
+.tp-result {
+    background: var(--sp-ink);
+    color: var(--sp-paper);
+    border-radius: 18px;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+.tp-eyebrow {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--sp-on-ink-muted);
+}
+.tp-figure {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.tp-figure-label {
+    font-size: 14px;
+    color: var(--sp-on-ink-muted);
+}
+.tp-figure-value {
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: 46px;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+}
+.tp-rows {
+    margin: 0;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px 16px;
+    font-size: 15.5px;
+}
+.tp-row {
+    display: contents;
+}
+.tp-row dt {
+    color: var(--sp-on-ink);
+}
+.tp-row dd {
+    margin: 0;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.tp-row-total dt,
+.tp-row-total dd {
+    color: var(--sp-paper);
+    font-weight: 600;
+    border-top: 1px solid var(--sp-on-ink-line);
+    padding-top: 10px;
+}
+.tp-note {
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--sp-on-ink);
+    background: var(--tp-dark-note);
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+.tp-result-empty .tp-empty {
+    font-size: 15px;
+    color: var(--sp-on-ink-muted);
+    padding: 24px 0;
+    text-align: center;
+}
+
+/* the email gate, in the result */
+.tp-gate {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-top: 1px solid var(--sp-on-ink-line);
+    padding-top: 14px;
+}
+.tp-gate-label {
+    font-weight: 600;
+    font-size: 14.5px;
+}
+.tp-gate-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.tp-input.tp-gate-input {
+    flex: 1 1 180px;
+    width: auto;
+    min-width: 0;
+}
+.tp-result .tp-gate-btn {
+    background: var(--sp-amber);
+    color: var(--sp-ink);
+}
+.tp-gate-note {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--sp-on-ink-muted);
+}
+.tp-result .tp-gate-note a,
+.tp-result .tp-linkbtn {
+    color: var(--tp-link-on-ink);
+}
+.tp-result .tp-error {
+    color: #ffb4a8;
+}
+.tp-gate-done {
+    font-weight: 600;
+    font-size: 15px;
+    color: #8fd19e;
+}
+.tp-gate-line {
+    font-size: 13.5px;
+    line-height: 1.5;
+}
+.tp-gate-links {
+    display: flex;
+    gap: 14px;
+}
+
+/* how it works, questions, the closing band */
+.tp-how {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-width: 820px;
+}
+.tp-formula,
+.tp-steps {
+    background: var(--sp-white);
+    border: 1px solid var(--sp-line);
+    border-radius: 14px;
+    padding: 18px 22px;
+    font-size: 14.5px;
+    line-height: 1.9;
+}
+.tp-formula {
+    font-family: var(--tp-mono);
+}
+.tp-steps {
+    margin: 0;
+    padding-left: 42px;
+    font-size: 15.5px;
+    line-height: 1.6;
+}
+.tp-faq {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 860px;
+}
+.tp-faq-list {
+    border-top: 1px solid var(--sp-line);
+}
+.tp-faq-list details {
+    border-bottom: 1px solid var(--sp-line);
+}
+.tp-faq-list summary {
+    cursor: pointer;
+    padding: 16px 0;
+    font-weight: 600;
+    font-size: 17px;
+}
+.tp-faq-list p {
+    padding: 0 0 16px;
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--sp-body);
+    max-width: 72ch;
+}
+.tp-faq-list p + p {
+    margin-top: -6px;
+}
+.tp-cta {
+    background: var(--sp-ink);
+    color: var(--sp-paper);
+    border-radius: 24px;
+    padding: clamp(36px, 5vw, 56px);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 32px;
+    align-items: center;
+    justify-content: space-between;
+}
+.tp-cta-copy {
+    flex: 1 1 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.tp-cta-h {
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: clamp(32px, 3.8vw, 46px);
+    line-height: 1.02;
+    letter-spacing: -0.045em;
+}
+.tp-cta-line {
+    font-size: 17px;
+    line-height: 1.6;
+    color: var(--sp-on-ink);
+    max-width: 48ch;
+}
+.tp .tp-cta-btn {
+    height: 52px;
+    padding: 0 24px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--sp-amber);
+    color: var(--sp-ink);
+    text-decoration: none;
+}
+
+/* the /tools hub */
+.tp-hub-group {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+.tp-hub-h2 {
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: 24px;
+    letter-spacing: -0.02em;
+}
+.tp-hub-grid {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+.tp .tp-hub-card {
+    height: 100%;
+    background: var(--sp-white);
+    border: 1px solid var(--sp-line);
+    border-radius: 16px;
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    color: var(--sp-ink);
+    text-decoration: none;
+}
+.tp .tp-hub-card:hover {
+    border-color: var(--sp-line-strong);
+}
+.tp-hub-name {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+}
+.tp-hub-title {
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: 19px;
+}
+.tp-new {
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--sp-amber-tint);
+    color: var(--sp-amber-dark);
+}
+.tp-hub-line {
+    font-size: 14.5px;
+    line-height: 1.55;
+    color: var(--sp-body);
+}
+.tp-hub-open {
+    margin-top: auto;
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--sp-amber-text);
+}
+
+/* ---- the tools' phone board */
+@media (max-width: 899.98px) {
+    .tp-wrap {
+        max-width: 640px;
+        padding: 44px 16px 40px;
+        gap: 36px;
+    }
+    .tp-intro {
+        gap: 12px;
+    }
+    .tp-crumb {
+        font-size: 13.5px;
+    }
+    .tp-h1 {
+        font-size: 34px;
+        line-height: 1.06;
+        letter-spacing: -0.04em;
+    }
+    .tp-hub-h1 {
+        font-size: 26px;
+        line-height: 1.03;
+    }
+    .tp-lead {
+        font-size: 16px;
+    }
+    .tp-lead.tp-hub-lead {
+        font-size: 18px;
+    }
+    .tp-tool {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 36px;
+    }
+    .tp-form {
+        flex: none;
+        background: none;
+        border: 0;
+        border-radius: 0;
+        padding: 0;
+    }
+    .tp-side {
+        flex: none;
+    }
+    .tp-result {
+        background: var(--sp-white);
+        color: var(--sp-ink);
+        border: 1px solid var(--sp-line);
+        padding: 20px;
+        gap: 12px;
+    }
+    .tp-eyebrow {
+        font-size: 11px;
+        color: var(--sp-muted-2);
+    }
+    .tp-figure {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+    }
+    .tp-figure-label {
+        color: var(--sp-body);
+    }
+    .tp-figure-value {
+        font-size: 34px;
+        letter-spacing: 0;
+    }
+    .tp-rows {
+        display: block;
+    }
+    .tp-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 0;
+        border-top: 1px solid var(--sp-line-soft);
+        font-size: 15px;
+    }
+    .tp-row dt {
+        color: var(--sp-body);
+    }
+    .tp-row dd {
+        font-weight: 600;
+    }
+    .tp-row.tp-row-total {
+        font-weight: 700;
+    }
+    .tp-row-total dt,
+    .tp-row-total dd {
+        color: inherit;
+        border-top: 0;
+        padding-top: 0;
+    }
+    .tp-row-total dt {
+        color: var(--sp-body);
+    }
+    .tp-note {
+        font-size: 13px;
+        color: var(--sp-body);
+        background: var(--sp-paper);
+        padding: 8px 10px;
+    }
+    .tp-result-empty .tp-empty {
+        color: var(--sp-muted-2);
+    }
+    .tp-gate {
+        border-top-color: var(--sp-line-soft);
+    }
+    .tp-result .tp-gate-btn {
+        background: var(--sp-ink);
+        color: var(--sp-paper);
+    }
+    .tp-gate-note {
+        color: var(--sp-muted-2);
+    }
+    .tp-result .tp-gate-note a,
+    .tp-result .tp-linkbtn {
+        color: var(--sp-amber-text);
+    }
+    .tp-result .tp-error {
+        color: var(--tp-bad);
+    }
+    .tp-gate-done {
+        color: var(--tp-done);
+    }
+    .tp-how {
+        gap: 10px;
+    }
+    .tp-h2 {
+        font-size: 22px;
+        letter-spacing: 0;
+    }
+    .tp-formula,
+    .tp-steps {
+        border-radius: 12px;
+        padding: 14px 16px;
+        font-size: 13.5px;
+        line-height: 1.8;
+    }
+    .tp-steps {
+        padding-left: 36px;
+        font-size: 15px;
+    }
+    .tp-faq {
+        gap: 6px;
+    }
+    .tp-faq-list summary {
+        padding: 14px 0;
+        font-size: 15.5px;
+    }
+    .tp-faq-list p {
+        font-size: 15px;
+    }
+    .tp-cta {
+        border-radius: 20px;
+        padding: 28px 22px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+    .tp-cta-copy {
+        flex: none;
+    }
+    .tp-cta-h {
+        font-size: 28px;
+        line-height: 1.05;
+        letter-spacing: -0.04em;
+    }
+    .tp-cta-line {
+        font-size: 15.5px;
+    }
+    .tp .tp-cta-btn {
+        height: 48px;
+        border-radius: 10px;
+    }
+    .tp-hub-grid {
+        grid-template-columns: 1fr;
+    }
+    .tp-hub-group + .tp-cta .tp-cta-h {
+        font-size: 22px;
+    }
+}
+
+/* Print or save as PDF: only the tool, without the email gate. */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    .tp-tool,
+    .tp-tool * {
+        visibility: visible;
+    }
+    .tp-tool {
+        position: absolute;
+        inset: 0 0 auto 0;
+    }
+    .tp-gate {
+        display: none;
+    }
+}

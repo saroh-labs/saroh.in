@@ -3,9 +3,9 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Facts, Panel } from "@/components/panel";
 import { PageChecks } from "@/components/search-pages/page-checks";
 import { formatDate } from "@/lib/format";
-import { pageSections } from "@/lib/search-page-content";
+import { pageSections, toolSections } from "@/lib/search-page-content";
 import { familyPage, isLive, whereItShows } from "@/lib/search-page-words";
-import { searchPageForTab } from "@/lib/search-pages";
+import { loadPage, searchPageForTab } from "@/lib/search-pages";
 
 export async function generateMetadata({
     params,
@@ -13,7 +13,7 @@ export async function generateMetadata({
     params: Promise<{ slug: string }>;
 }) {
     const { slug } = await params;
-    return { title: `/for/${slug} · Search pages` };
+    return { title: `${loadPage(slug)?.page.path ?? slug} · Search pages` };
 }
 
 /**
@@ -28,8 +28,11 @@ export default async function SearchPageOverview({
     const { slug } = await params;
     const data = await searchPageForTab(slug);
     if (!data) return null;
-    const { row, page, site } = data;
-    const to = familyPage(page.family, page.slug);
+    const { row, site } = data;
+    const page = data.page.page;
+    const tool = data.page.kind === "tools" ? data.page.page : null;
+    const to =
+        data.page.kind === "for" ? familyPage(row.family, row.slug) : null;
     const by = row.record?.changedBy?.name;
 
     return (
@@ -41,7 +44,7 @@ export default async function SearchPageOverview({
                             {/* Google's own look, light whatever the console's theme. */}
                             <div className="grid gap-1 rounded-md bg-white px-[18px] py-4 font-[Arial,sans-serif]">
                                 <span className="text-xs text-[#4d5156]">
-                                    {site.host} › for › {page.slug}
+                                    {site.host} › {row.kind} › {page.slug}
                                 </span>
                                 <span className="text-xl leading-snug text-[#1a0dab]">
                                     {page.title} · Saroh
@@ -66,7 +69,12 @@ export default async function SearchPageOverview({
                 <Panel title="What's on the page">
                     {() => (
                         <dl className="grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-                            {pageSections(page).map((s) => (
+                            {(tool
+                                ? toolSections(tool)
+                                : data.page.kind === "for"
+                                  ? pageSections(data.page.page)
+                                  : []
+                            ).map((s) => (
                                 <div
                                     key={s.k}
                                     className="grid gap-0.5 rounded-md bg-muted px-3.5 py-3"
@@ -84,33 +92,37 @@ export default async function SearchPageOverview({
                 <Panel title={`Where it shows on ${site.host}`}>
                     {() => (
                         <ul className="grid">
-                            {whereItShows(row.state, site.host).map((w) => (
-                                <li
-                                    key={w.label}
-                                    className="flex items-center gap-2.5 border-t py-2 text-sm first:border-t-0"
-                                >
-                                    <span
-                                        aria-hidden
-                                        className={cn(
-                                            "size-2 rounded-full",
-                                            w.on
-                                                ? "bg-success"
-                                                : "bg-border-strong",
-                                        )}
-                                    />
-                                    <span className="flex-1">{w.label}</span>
-                                    <span
-                                        className={cn(
-                                            "text-[13px]",
-                                            w.on
-                                                ? "text-success-subtle-foreground"
-                                                : "text-muted-foreground",
-                                        )}
+                            {whereItShows(row.state, site.host, row.kind).map(
+                                (w) => (
+                                    <li
+                                        key={w.label}
+                                        className="flex items-center gap-2.5 border-t py-2 text-sm first:border-t-0"
                                     >
-                                        {w.value}
-                                    </span>
-                                </li>
-                            ))}
+                                        <span
+                                            aria-hidden
+                                            className={cn(
+                                                "size-2 rounded-full",
+                                                w.on
+                                                    ? "bg-success"
+                                                    : "bg-border-strong",
+                                            )}
+                                        />
+                                        <span className="flex-1">
+                                            {w.label}
+                                        </span>
+                                        <span
+                                            className={cn(
+                                                "text-[13px]",
+                                                w.on
+                                                    ? "text-success-subtle-foreground"
+                                                    : "text-muted-foreground",
+                                            )}
+                                        >
+                                            {w.value}
+                                        </span>
+                                    </li>
+                                ),
+                            )}
                         </ul>
                     )}
                 </Panel>
@@ -119,11 +131,23 @@ export default async function SearchPageOverview({
                         <Facts
                             rows={[
                                 ["Target search", `“${page.search}”`],
+                                tool
+                                    ? [
+                                          "Section",
+                                          `${tool.group} · old links go to /tools`,
+                                      ]
+                                    : [
+                                          "Family",
+                                          `${row.family} · old links go to ${to ?? "Home"}`,
+                                      ],
                                 [
-                                    "Family",
-                                    `${page.family} · old links go to ${to ?? "Home"}`,
+                                    "Kind",
+                                    tool
+                                        ? tool.inApp
+                                            ? "Free tool, with its own page in saroh.in"
+                                            : "Free tool"
+                                        : "Trade page",
                                 ],
-                                ["Kind", "Trade page"],
                                 [
                                     "Words last changed",
                                     formatDate(page.updated),

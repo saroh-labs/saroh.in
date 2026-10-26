@@ -74,9 +74,15 @@ describe("search page DTOs", () => {
     const body = (value: unknown) =>
         pipe.transform(value, { type: "body", metatype: SearchPageActionDto });
 
-    it("takes an action on 1 to 100 /for/ paths", async () => {
+    it("takes an action on 1 to 100 /for/ and /tools/ paths", async () => {
         await expect(
             body({ action: "publish", paths: ["/for/salons"] }),
+        ).resolves.toBeInstanceOf(SearchPageActionDto);
+        await expect(
+            body({
+                action: "publish",
+                paths: ["/tools/no-show-cost-calculator", "/for/salons"],
+            }),
         ).resolves.toBeInstanceOf(SearchPageActionDto);
         const hundred = Array.from({ length: 100 }, (_, i) => `/for/p-${i}`);
         await expect(
@@ -93,7 +99,8 @@ describe("search page DTOs", () => {
                 paths: Array.from({ length: 101 }, (_, i) => `/for/p-${i}`),
             },
         ],
-        ["another kind", { action: "publish", paths: ["/tools/qr"] }],
+        ["another kind", { action: "publish", paths: ["/guides/qr"] }],
+        ["a bare kind", { action: "publish", paths: ["/tools/"] }],
         ["capitals", { action: "publish", paths: ["/for/Salons"] }],
         ["a nested path", { action: "publish", paths: ["/for/a/b"] }],
         ["a repeat", { action: "publish", paths: ["/for/a", "/for/a"] }],
@@ -110,6 +117,9 @@ describe("search page DTOs", () => {
                 metatype: SearchPageHistoryQueryDto,
             });
         await expect(query({ path: "/for/salons" })).resolves.toBeDefined();
+        await expect(
+            query({ path: "/tools/qr-code-maker" }),
+        ).resolves.toBeDefined();
         await expect(query({ path: "/for/../x" })).rejects.toBeInstanceOf(
             BadRequestException,
         );

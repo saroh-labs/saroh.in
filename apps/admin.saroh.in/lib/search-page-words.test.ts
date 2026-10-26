@@ -1,4 +1,4 @@
-import type { SearchPageEntry } from "@saroh/search-pages";
+import type { ForPageEntry, ToolPageEntry } from "@saroh/search-pages";
 import { describe, expect, it } from "vitest";
 
 import type { PageRow, SearchPageRecord } from "./search-page-words";
@@ -8,6 +8,7 @@ import {
     eligible,
     historyWords,
     inFilter,
+    kindOf,
     matchesQuery,
     mergePages,
     refusalWords,
@@ -15,14 +16,15 @@ import {
     stateNote,
     stateOf,
     successWords,
+    whereItShows,
 } from "./search-page-words";
 
-const entry = (slug: string, family = "Beauty"): SearchPageEntry => ({
+const entry = (slug: string, family = "Beauty"): ForPageEntry => ({
     path: `/for/${slug}`,
     slug,
     kind: "for",
     name: slug.charAt(0).toUpperCase() + slug.slice(1),
-    family: family as SearchPageEntry["family"],
+    family: family as ForPageEntry["family"],
     familySlug: "x",
     search: `${slug} software`,
     title: "t",
@@ -289,5 +291,90 @@ describe("after the API answers", () => {
                 "saroh.in",
             ).what,
         ).toBe("Archived by a former staff member");
+    });
+});
+
+describe("free tools (#1253)", () => {
+    const tool = (slug: string, inApp = false): ToolPageEntry => ({
+        path: `/tools/${slug}`,
+        slug,
+        kind: "tools",
+        name: slug,
+        group: "Money",
+        line: "l",
+        inApp,
+        search: slug,
+        title: "t",
+        description: "d",
+        updated: "2026-10-26",
+    });
+
+    it("merges tools with their records, the section as the family", () => {
+        const [row, app] = mergePages(
+            [tool("no-show-cost-calculator"), tool("qr-code-maker", true)],
+            {
+                pages: [
+                    {
+                        path: "/tools/qr-code-maker",
+                        status: "LIVE",
+                        liveSince: "2026-10-16T18:30:00Z",
+                        changedAt: "2026-10-26T10:00:00Z",
+                        changedBy: null,
+                    },
+                ],
+                rebuild: idle,
+            },
+        );
+        expect(row).toMatchObject({
+            kind: "tools",
+            family: "Money",
+            inApp: false,
+            state: "draft",
+        });
+        expect(app).toMatchObject({ inApp: true, state: "live" });
+    });
+
+    it("reads the kind from the address, trade pages by default", () => {
+        expect(kindOf("tools")).toBe("tools");
+        expect(kindOf(undefined)).toBe("for");
+        expect(kindOf("guides")).toBe("for");
+    });
+
+    it("says a tool taken off goes to /tools, and where a live one shows", () => {
+        const page = {
+            name: "No-show cost calculator",
+            slug: "no-show-cost-calculator",
+            family: "Money",
+            state: "live" as const,
+            kind: "tools" as const,
+        };
+        const off = dialogWords("unpublish", [page], "saroh.in", "saroh.io");
+        expect(off.points.join(" ")).toContain("sent to /tools");
+        expect(off.points.join(" ")).not.toContain("/for/");
+        const on = dialogWords(
+            "publish",
+            [{ ...page, state: "draft" }],
+            "saroh.in",
+            "saroh.io",
+        );
+        expect(on.points.join(" ")).toContain("the /tools list");
+        expect(
+            whereItShows("live", "saroh.in", "tools").map((w) => w.label),
+        ).toContain("The /tools list, the menu and the footer");
+    });
+
+    it("words the seeded record of the app's two tools", () => {
+        expect(
+            historyWords(
+                {
+                    action: "seeded",
+                    fromStatus: "DRAFT",
+                    toStatus: "LIVE",
+                    by: null,
+                    at: "2026-10-26T10:00:00Z",
+                },
+                "saroh.in",
+            ).what,
+        ).toBe("Live before publish control");
     });
 });

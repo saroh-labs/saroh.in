@@ -1,6 +1,6 @@
 "use client";
 
-import type { SearchPageData } from "@saroh/search-pages";
+import type { SearchPageData, ToolPageData } from "@saroh/search-pages";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import {
@@ -47,7 +47,7 @@ export function SearchPageActions({
     reviewUrl: string;
     canPublish: boolean;
     /** The page's words, for the checks Publish counts. */
-    page: SearchPageData;
+    page: SearchPageData | ToolPageData;
 }) {
     const [opened, setOpened] = useState<PageAction | null>(null);
     // Run when Publish opens: its confirm says how many checks need you.
@@ -113,7 +113,7 @@ export function SearchPageActions({
                     )}
                     <DropdownMenuItem asChild>
                         <a
-                            href={`${CODE_URL}/for/${row.slug}.mdx`}
+                            href={`${CODE_URL}/${row.kind}/${row.slug}.mdx`}
                             target="_blank"
                             rel="noopener noreferrer"
                         >

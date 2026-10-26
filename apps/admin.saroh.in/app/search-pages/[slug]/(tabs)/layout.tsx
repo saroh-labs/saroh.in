@@ -60,10 +60,17 @@ export default async function SearchPageLayout({
                     className="mb-5"
                     breadcrumb={[
                         "Product",
-                        <Link key="list" href="/search-pages">
+                        <Link
+                            key="list"
+                            href={
+                                row.kind === "tools"
+                                    ? "/search-pages?kind=tools"
+                                    : "/search-pages"
+                            }
+                        >
                             Search pages
                         </Link>,
-                        "Trade pages",
+                        row.kind === "tools" ? "Free tools" : "Trade pages",
                         row.name,
                     ]}
                     title={row.name}
@@ -92,7 +99,7 @@ export default async function SearchPageLayout({
                             reviewSite={site.reviewHost}
                             reviewUrl={site.reviewUrl}
                             canPublish={canPublish}
-                            page={page}
+                            page={page.page}
                         />
                     }
                 />

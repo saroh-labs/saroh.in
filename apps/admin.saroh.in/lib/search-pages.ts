@@ -1,4 +1,9 @@
-import { listSearchPages, loadSearchPage } from "@saroh/search-pages";
+import type { SearchPageData, ToolPageData } from "@saroh/search-pages";
+import {
+    listSearchPages,
+    loadSearchPage,
+    loadToolPage,
+} from "@saroh/search-pages";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
@@ -46,7 +51,17 @@ export function readSearchPageHistory(
     return getJson(`/search-pages/history?path=${encodeURIComponent(path)}`);
 }
 
-export const loadPage = cache((slug: string) => loadSearchPage(slug));
+/** A page's words: a /for/ page or a free tool (#1253); slugs are unique across both. */
+export type AnyPage =
+    | { kind: "for"; page: SearchPageData }
+    | { kind: "tools"; page: ToolPageData };
+
+export const loadPage = cache((slug: string): AnyPage | null => {
+    const forPage = loadSearchPage(slug);
+    if (forPage) return { kind: "for", page: forPage };
+    const tool = loadToolPage(slug);
+    return tool ? { kind: "tools", page: tool } : null;
+});
 
 /** The development site, where pages are read before they're published. */
 const DEVELOPMENT_SITE = "https://saroh.io";
@@ -87,7 +102,7 @@ export const siteInfo = cache(async (): Promise<SiteInfo> => {
 export async function searchPageForTab(slug: string): Promise<{
     canPublish: boolean;
     row: PageRow;
-    page: NonNullable<ReturnType<typeof loadSearchPage>>;
+    page: AnyPage;
     site: SiteInfo;
 } | null> {
     const gate = await searchPagesGate();

@@ -52,7 +52,13 @@ import type { LaunchMode } from "@/lib/links";
 import { llmsText } from "@/lib/llms";
 import { resourcesContext } from "@/lib/resources-context";
 import type { PublishList } from "@/lib/search-pages";
-import { FOR_HUB, liveSearchPages, publishList } from "@/lib/search-pages";
+import {
+    FOR_HUB,
+    liveSearchPages,
+    liveTools,
+    publishList,
+    TOOLS_HUB,
+} from "@/lib/search-pages";
 import { listSearchPages } from "@saroh/search-pages";
 
 /**
@@ -81,6 +87,16 @@ export function indexedPaths(
     const forPages: string[] = ctx
         ? liveSearchPages(list).map((p) => p.path)
         : [];
+    // The package's live tools (#1253; the app's two are Resources pages,
+    // in `resources`) and their hub, once any tool is live.
+    const tools = ctx ? liveTools(list) : [];
+    const toolPages = tools
+        .filter((t) => !t.inApp && routeExists(t.path, ctx?.routes ?? null))
+        .map((t) => t.path);
+    const toolsHub =
+        tools.length > 0 && routeExists(TOOLS_HUB.path, ctx?.routes ?? null)
+            ? [TOOLS_HUB.path]
+            : [];
     const resources = ctx ? resourcePaths(ctx) : [];
     const entries =
         ctx && resources.includes("/changelog")
@@ -120,6 +136,8 @@ export function indexedPaths(
         // For language models (#1187): served in either launch mode.
         "/llms.txt",
         ...resources,
+        ...toolsHub,
+        ...toolPages,
         ...entries,
         ...help,
         ...templates,
@@ -194,9 +212,19 @@ export function lastModified(
     if (article) return dayInIndia(article.updated);
     const provider = INTEGRATION_SLUGS.find((s) => integrationHref(s) === path);
     if (provider) return dayInIndia(integrationMeta(provider).updated);
-    // A /for/ page: its own `updated`; the hub, its newest live page's.
-    const forPage = listSearchPages().find((p) => p.path === path);
+    // A /for/ page or a package tool: its own `updated`; a hub, its newest
+    // live page's. The app's two tools keep their content modules' days.
+    const forPage = listSearchPages().find(
+        (p) => p.path === path && !(p.kind === "tools" && p.inApp),
+    );
     if (forPage) return dayInIndia(forPage.updated);
+    if (path === TOOLS_HUB.path) {
+        const day = liveTools()
+            .map((p) => p.updated)
+            .sort()
+            .at(-1);
+        return day ? dayInIndia(day) : undefined;
+    }
     if (path === FOR_HUB.path) {
         const day = liveSearchPages()
             .map((p) => p.updated)

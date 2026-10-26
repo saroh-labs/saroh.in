@@ -12,7 +12,11 @@ import {
     SOLUTION_SLUGS,
     temporary,
 } from "./redirects.js";
-import { familyOf, loadPublishList } from "./search-pages.config.js";
+import {
+    familyOf,
+    loadPublishList,
+    toolExists,
+} from "./search-pages.config.js";
 
 /** The URLs the V1 sitemap listed, and the addresses before it (plan U26). */
 const OLD_URLS = [
@@ -53,7 +57,7 @@ describe("redirects", () => {
         // The tests run with the switch unset: waitlist mode.
         expect(await nextConfig.redirects?.()).toEqual([
             ...REDIRECTS,
-            ...searchRedirects(loadPublishList(), familyOf),
+            ...searchRedirects(loadPublishList(), familyOf, toolExists),
             ...temporary(undefined),
         ]);
     });
@@ -127,6 +131,60 @@ describe("redirects", () => {
 
     it("is a 301 every time", () => {
         for (const r of REDIRECTS) expect(r.statusCode).toBe(301);
+    });
+});
+
+describe("free tool redirects (#1253)", () => {
+    const tools = new Set(["qr-code-maker", "no-show-cost-calculator"]);
+    const exists = (slug: string) => tools.has(slug);
+    const list = (live: string[], takenOff: string[], preview = false) => ({
+        preview,
+        live,
+        takenOff: takenOff.map((path) => ({ path, at: "2026-10-26" })),
+    });
+
+    it("sends a tool taken off to the /tools hub for now (302), or Home with no tool live", () => {
+        expect(
+            searchRedirects(
+                list(
+                    ["/tools/qr-code-maker"],
+                    ["/tools/no-show-cost-calculator"],
+                ),
+                () => null,
+                exists,
+            ),
+        ).toEqual([
+            {
+                source: "/tools/no-show-cost-calculator",
+                destination: "/tools",
+                statusCode: 302,
+            },
+        ]);
+        // The only live tool isn't in this commit's code: no hub to land on.
+        expect(
+            searchRedirects(
+                list(["/tools/gone"], ["/tools/qr-code-maker"]),
+                () => null,
+                exists,
+            ).map((r) => r.destination),
+        ).toEqual(["/"]);
+    });
+
+    it("leaves a tool taken off alone on a preview, and never redirects a live one", () => {
+        expect(
+            searchRedirects(
+                list([], ["/tools/qr-code-maker"], true),
+                () => null,
+                exists,
+            ),
+        ).toEqual([]);
+        expect(
+            searchRedirects(
+                list(["/tools/qr-code-maker"], ["/tools/qr-code-maker"]),
+                () => null,
+                exists,
+            ),
+        ).toEqual([]);
     });
 });
 

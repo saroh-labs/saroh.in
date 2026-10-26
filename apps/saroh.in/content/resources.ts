@@ -181,6 +181,18 @@ export interface PublishContext {
      * None when unset.
      */
     off?: readonly string[];
+    /**
+     * The paths the admin has published (DEC-193, #1253), or null/unset when
+     * every page counts (a preview build, a unit test). A free tool under
+     * `/tools/` is shown only when its path is here: the two app tools
+     * obey the same publish list as the package's.
+     */
+    live?: readonly string[] | null;
+}
+
+/** Whether a free tool at `href` is unpublished on this build's site. */
+function unpublishedTool(href: string, ctx: PublishContext): boolean {
+    return !!ctx.live && href.startsWith("/tools/") && !ctx.live.includes(href);
 }
 
 /** Whether `href` is a switched-off Resources page, or a page under one. */
@@ -217,13 +229,14 @@ export function isLive(
     return ctx.preview || isPublished(page.publishOn, ctx.now);
 }
 
-/** Whether a page may be linked: not switched off, live, and its route is in this build. */
+/** Whether a page may be linked: not switched off, published (a free tool), live, and its route is in this build. */
 export function isShown(
     page: { publishOn: IsoDay; href: string },
     ctx: PublishContext,
 ): boolean {
     return (
         !switchedOff(page.href, ctx) &&
+        !unpublishedTool(page.href, ctx) &&
         isLive(page, ctx) &&
         routeExists(page.href, ctx.routes)
     );

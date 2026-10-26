@@ -1,6 +1,6 @@
 import "@saroh/search-pages/styles.css";
 
-import { SearchPage } from "@saroh/search-pages";
+import { SearchPage, ToolPage } from "@saroh/search-pages";
 import { notFound } from "next/navigation";
 
 import { isLive } from "@/lib/search-page-words";
@@ -28,7 +28,8 @@ export default async function SearchPagePreview({
     if (!gate.ok) return gate.screen;
     const { slug } = await params;
     const page = loadPage(slug);
-    if (!page) notFound();
+    // A tool with its own page in saroh.in has nothing to draw here.
+    if (!page || (page.kind === "tools" && page.page.inApp)) notFound();
     const data = await readSearchPages();
     const row =
         data.status === "ok"
@@ -38,7 +39,15 @@ export default async function SearchPagePreview({
     return (
         <>
             <style>{`html,body{background:#f5f2ec;color-scheme:light;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}`}</style>
-            <SearchPage page={page} draft={!row || !isLive(row.state)} />
+            {page.kind === "tools" ? (
+                // The email gate has no provider here: it opens and sends nothing.
+                <ToolPage page={page.page} draft={!row || !isLive(row.state)} />
+            ) : (
+                <SearchPage
+                    page={page.page}
+                    draft={!row || !isLive(row.state)}
+                />
+            )}
         </>
     );
 }

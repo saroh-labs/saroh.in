@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 import { Faq } from "@/components/v2/faq";
 import { JsonLd } from "@/components/v2/json-ld";
 import { LinkPreviewTool } from "@/components/v2/tools/link-preview-tool";
 import { SarohSharePreview } from "@/components/v2/tools/saroh-share-preview";
 import { linkPreview as copy } from "@/content/link-preview";
+import { linkShown } from "@/content/resources";
+import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata, SITE_URL } from "@/lib/seo";
 import { faqPageLd, toolLd } from "@/lib/structured-data";
 
@@ -19,6 +22,9 @@ import { faqPageLd, toolLd } from "@/lib/structured-data";
  * no `searchParams` and is built once as a file like every other content
  * page (it was the one page rendered on each request). The canonical is the
  * page without the query, so every report is one page to a search engine.
+ *
+ * Published from the admin like every free tool (#1253): a build whose
+ * publish list doesn't have it live draws a 404 here and links it nowhere.
  */
 export const metadata: Metadata = pageMetadata({
     title: copy.metaTitle,
@@ -28,6 +34,7 @@ export const metadata: Metadata = pageMetadata({
 });
 
 export default function LinkPreviewPage() {
+    if (!linkShown(copy.path, resourcesContext())) notFound();
     return (
         <>
             <JsonLd

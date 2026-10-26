@@ -2,7 +2,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 /**
- * Which /for/ pages are live (DEC-193), read from the API once per build.
+ * Which /for/ pages and free tools are live (DEC-193, #1253), read from the
+ * API once per build.
  *
  * `pnpm build` runs this file before `next build`: it reads
  * `GET ${API_URL}/public/search-pages` and writes the answer, with whether
@@ -25,7 +26,11 @@ const path = require("node:path");
 
 const FILE = path.join(__dirname, ".search-pages.json");
 const CONTENT = path.join(__dirname, "../../packages/search-pages/content/for");
-const PAGE_PATH = /^\/for\/[a-z0-9-]+$/;
+const TOOLS_CONTENT = path.join(
+    __dirname,
+    "../../packages/search-pages/content/tools",
+);
+const PAGE_PATH = /^\/(for|tools)\/[a-z0-9-]+$/;
 const TIMEOUT_MS = 5000;
 /** As `lib/build-retry.ts`: about a minute, to ride out an API restart. */
 const RETRY_DELAYS_MS = [3000, 8000, 15000, 30000];
@@ -54,7 +59,9 @@ function parseAnswer(body) {
         live.length !== b.live.length ||
         takenOff.length !== b.takenOff.length
     ) {
-        throw new Error("the answer has a path that isn't /for/<slug>");
+        throw new Error(
+            "the answer has a path that isn't /for/<slug> or /tools/<slug>",
+        );
     }
     return {
         live,
@@ -158,12 +165,23 @@ function familyOf(slug) {
     }
 }
 
+/**
+ * Whether the code has a free tool by this slug (a content file, its own
+ * page or the app's), so a redirect never lands on a tool this commit lacks.
+ * @param {string} slug
+ * @returns {boolean}
+ */
+function toolExists(slug) {
+    return fs.existsSync(path.join(TOOLS_CONTENT, `${slug}.mdx`));
+}
+
 module.exports = {
     FILE,
     parseAnswer,
     readPublishList,
     loadPublishList,
     familyOf,
+    toolExists,
 };
 
 if (require.main === module) {
