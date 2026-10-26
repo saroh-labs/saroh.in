@@ -5982,3 +5982,9 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** `searchPageChecks` (`checks.tsx`) reads a page by drawing it with `renderToStaticMarkup`, and the package index re-exported it, so `listSearchPages()` or `<SearchPage>` from a Server Component brought react-dom/server along. Next refuses it on the whole server graph (Server Components and route handlers); the package's own vitest never sees that rule.
 - **Fix:** the index no longer exports it; it is `@saroh/search-pages/checks` (package.json `exports`). The admin runs it in a client component (`components/search-pages/page-checks.tsx`).
 - **Rule:** a shared package a Next app imports on the server never re-exports a module that imports react-dom/server from its index; that goes behind its own subpath, used from client components or Node scripts. Check a new package with the consuming app's `next build`, not only its own tests.
+
+## A new API controller must be named in the module rollout list (26 Oct 2026)
+
+- **Symptom:** `pnpm prepush --all` failed `module-annotations.spec.ts` ("names every controller under src/modules in one of the lists") after the search-pages unit's own quick gate had passed.
+- **Cause:** the unit added two controllers but no row in `CLASS_LEVEL`, `METHOD_LEVEL` or `NEVER`; its quick gate ran only the affected unit tests.
+- **Fix:** both are in `NEVER` (Saroh's own pages, not a tenant surface). When you add a controller, add its row in the same commit and run that spec. The local Playwright browser cache had also gone missing (`~/Library/Caches/ms-playwright`); `pnpm --filter @saroh/e2e exec playwright install chromium` restores it.
