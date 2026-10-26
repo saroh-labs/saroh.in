@@ -1,0 +1,48 @@
+{
+    "name": "@saroh/search-pages",
+    "version": "0.0.0",
+    "private": true,
+    "description": "The /for/ search pages: their words (content/for/*.mdx) and the one template saroh.in and the admin preview both draw them with (DEC-193).",
+    "license": "MIT",
+    "sideEffects": [
+        "*.css"
+    ],
+    "main": "./src/index.ts",
+    "types": "./src/index.ts",
+    "files": [
+        "src/**",
+        "content/**"
+    ],
+    "exports": {
+        ".": "./src/index.ts",
+        "./styles.css": "./src/styles.css"
+    },
+    "scripts": {
+        "content": "node scripts/embed-content.mjs",
+        "lint": "eslint src/",
+        "test": "vitest run",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "yaml": "^2.9.0",
+        "zod": "catalog:"
+    },
+    "peerDependencies": {
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0"
+    },
+    "devDependencies": {
+        "@saroh/eslint-config": "workspace:*",
+        "@saroh/tsconfig": "workspace:*",
+        "@testing-library/react": "^16.1.0",
+        "@types/node": "catalog:",
+        "@types/react": "19.2.15",
+        "@types/react-dom": "catalog:react19",
+        "eslint": "catalog:",
+        "jsdom": "^25.0.1",
+        "react": "catalog:react19",
+        "react-dom": "catalog:react19",
+        "typescript": "catalog:",
+        "vitest": "^4.1.12"
+    }
+}

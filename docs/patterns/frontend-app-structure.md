@@ -235,6 +235,18 @@ accounts and the operator console. `pnpm run check:titles` and
   solution with no screen of its own trade captured has no `hero` and no
   segment `shot`: it is drawn as words, never beside another trade's
   screen.
+- **A /for/ trade page is one file in `@saroh/search-pages`** (DEC-193):
+  `content/for/<slug>.mdx`, YAML frontmatter (the words, then the sample
+  business under `scene`) and the questions as `## question` + plain
+  answer paragraphs. After editing one, run
+  `pnpm --filter @saroh/search-pages content`: the files are embedded in
+  `src/content.gen.ts` because the admin preview runs on Workers (no file
+  system, no eval), and a test fails while that copy is stale.
+  `searchPageChecks` (gen.py's data checks) must pass for every page. Both
+  apps draw it with `<SearchPage>` and import
+  `@saroh/search-pages/styles.css` (all under `.sp`, Saroh's colours, the
+  apps' `--font-sans`/`--font-display`); links come in as props, so the
+  package reads no env.
 - **A page's sitemap date lives beside its words** (R3, #1187): a content
   module exports `UPDATED`, a provider page's MDX has `updated:`, Help
   and legal pages keep theirs. Change the date with the words;
