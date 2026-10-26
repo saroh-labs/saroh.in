@@ -79,6 +79,8 @@ CREATE INDEX "PhoneVerification_organizationId_createdAt_idx" ON "PhoneVerificat
 
 CREATE INDEX "PhoneVerification_ipHash_createdAt_idx" ON "PhoneVerification"("ipHash", "createdAt");
 
+CREATE UNIQUE INDEX "PhoneVerification_id_organizationId_key" ON "PhoneVerification"("id", "organizationId");
+
 CREATE INDEX "MessagingSend_providerMessageId_idx" ON "MessagingSend"("providerMessageId");
 
 CREATE INDEX "MessagingSend_organizationId_createdAt_idx" ON "MessagingSend"("organizationId", "createdAt");
@@ -95,14 +97,13 @@ ALTER TABLE "PhoneVerification" ADD CONSTRAINT "PhoneVerification_organizationId
 
 ALTER TABLE "MessagingSend" ADD CONSTRAINT "MessagingSend_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE "MessagingSend" ADD CONSTRAINT "MessagingSend_verificationId_fkey" FOREIGN KEY ("verificationId") REFERENCES "PhoneVerification"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "MessagingSend" ADD CONSTRAINT "MessagingSend_verificationId_organizationId_fkey" FOREIGN KEY ("verificationId", "organizationId") REFERENCES "PhoneVerification"("id", "organizationId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE "MessagingWallet" ADD CONSTRAINT "MessagingWallet_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE "MessagingLedgerEntry" ADD CONSTRAINT "MessagingLedgerEntry_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE "MessagingLedgerEntry" ADD CONSTRAINT "MessagingLedgerEntry_sendId_fkey" FOREIGN KEY ("sendId") REFERENCES "MessagingSend"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
 
 -- Money never goes below zero, and no more is held than there is.
 ALTER TABLE "MessagingWallet" ADD CONSTRAINT "MessagingWallet_amounts_check"

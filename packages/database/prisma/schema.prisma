@@ -8858,6 +8858,7 @@ model PhoneVerification {
 
   sends MessagingSend[]
 
+  @@unique([id, organizationId])
   @@index([phoneE164, createdAt])
   @@index([organizationId, createdAt])
   @@index([ipHash, createdAt])
@@ -8871,7 +8872,8 @@ model MessagingSend {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   verificationId String
-  verification   PhoneVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+  // Composite so a send can only belong to its own business's session.
+  verification   PhoneVerification @relation(fields: [verificationId, organizationId], references: [id, organizationId], onDelete: Cascade)
 
   channel           MessagingChannel
   pricePaise        Int
