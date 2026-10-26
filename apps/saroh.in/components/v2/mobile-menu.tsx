@@ -29,12 +29,14 @@ export function MobileMenu({
     pathname,
     resources = [],
     tools = [],
+    solutions = SOLUTION_ITEMS,
     className,
 }: {
     section: NavSection;
     pathname: string;
     resources?: NavItem[];
     tools?: NavItem[];
+    solutions?: NavItem[];
     className?: string;
 }) {
     const [open, setOpen] = useState(false);
@@ -87,6 +89,7 @@ export function MobileMenu({
                     pathname={pathname}
                     resources={resources}
                     tools={tools}
+                    solutionItems={solutions}
                     onClose={close}
                 />
             ) : null}
@@ -99,12 +102,14 @@ function Sheet({
     pathname,
     resources,
     tools,
+    solutionItems,
     onClose,
 }: {
     section: NavSection;
     pathname: string;
     resources: NavItem[];
     tools: NavItem[];
+    solutionItems: NavItem[];
     onClose: () => void;
 }) {
     const root = useRef<HTMLDivElement>(null);
@@ -148,7 +153,7 @@ function Sheet({
             <Accordion
                 id="solutions"
                 label="Solutions"
-                items={SOLUTION_ITEMS}
+                items={solutionItems}
                 pathname={pathname}
                 open={solutions}
                 onToggle={() => setSolutions(!solutions)}

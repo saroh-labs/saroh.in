@@ -105,8 +105,11 @@ describe("<SearchPage>", () => {
     it("shows the pricing it is given, and no Pricing section without it", () => {
         const p = loadSearchPage("home-bakers");
         if (!p) throw new Error("home-bakers is missing");
-        const { rerender } = render(<SearchPage page={p} />);
+        const { container, rerender } = render(<SearchPage page={p} />);
         expect(screen.queryByText("Pricing for home bakers")).toBeNull();
+        // No live Free line: nothing after "No card needed", never a placeholder.
+        expect(container.querySelector(".sp-free")).toBeNull();
+        expect(container.textContent).not.toMatch(/\[[^\]]*\]/);
         rerender(
             <SearchPage
                 page={p}

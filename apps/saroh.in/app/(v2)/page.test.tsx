@@ -16,6 +16,11 @@ vi.mock("@/lib/pricing", () => ({
     readLivePricing: () => Promise.resolve(read.catalog),
 }));
 
+// No /for/ page is live here (DEC-193): solutions link to /solutions/.
+vi.mock("@/lib/search-pages", () => ({
+    solutionLink: (slug: string) => `/solutions/${slug}`,
+}));
+
 /** The site's launch switch (plan KTD-16); the plan section shows once open. */
 const launch = vi.hoisted((): { mode: "waitlist" | "open" } => ({
     mode: "open",

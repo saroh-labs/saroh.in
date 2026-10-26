@@ -1,6 +1,7 @@
 import { featureHref, featureList } from "@/content/features";
 import type { ResourcePage } from "@/content/resources";
 import { solutionHref, solutionList } from "@/content/solutions";
+import type { SolutionSlug } from "@/content/types";
 
 export interface NavItem {
     name: string;
@@ -15,12 +16,21 @@ export const FEATURE_ITEMS: NavItem[] = featureList.map((f) => ({
     href: featureHref(f.slug),
 }));
 
-/** The Solutions menu: three items. */
-export const SOLUTION_ITEMS: NavItem[] = solutionList.map((s) => ({
-    name: s.name,
-    line: s.navLine,
-    href: solutionHref(s.slug),
-}));
+/**
+ * The Solutions menu, each solution at `href(slug)`: the server passes its
+ * /for/ page once that is live (`solutionLink`, DEC-193).
+ */
+export const solutionItems = (
+    href: (slug: SolutionSlug) => string = solutionHref,
+): NavItem[] =>
+    solutionList.map((s) => ({
+        name: s.name,
+        line: s.navLine,
+        href: href(s.slug),
+    }));
+
+/** The Solutions menu at the /solutions/ addresses. */
+export const SOLUTION_ITEMS: NavItem[] = solutionItems();
 
 /**
  * The Resources menu, and the Tools menu: the pages `content/resources.ts`
@@ -43,9 +53,15 @@ export function sectionOf(
     pathname: string,
     resources: readonly NavItem[] = [],
     tools: readonly NavItem[] = [],
+    solutions: readonly NavItem[] = SOLUTION_ITEMS,
 ): NavSection {
     if (FEATURE_ITEMS.some((i) => i.href === pathname)) return "features";
-    if (SOLUTION_ITEMS.some((i) => i.href === pathname)) return "solutions";
+    if (
+        solutions.some((i) => i.href === pathname) ||
+        within(pathname, "/for")
+    ) {
+        return "solutions";
+    }
     if (pathname === "/pricing") return "pricing";
     if (resources.some((i) => within(pathname, i.href))) return "resources";
     if (tools.some((i) => within(pathname, i.href))) return "tools";

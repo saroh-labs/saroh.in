@@ -72,7 +72,10 @@ export function SiteFooter({
     tools = [],
     legal = [],
     cookieChoices = false,
+    solutions = SOLUTION_ITEMS,
 }: {
+    /** The Solutions column, as the server links it (`solutionLink`). */
+    solutions?: NavItem[];
     resources?: NavItem[];
     tools?: NavItem[];
     legal?: { name: string; href: string }[];
@@ -133,7 +136,7 @@ export function SiteFooter({
                         ))}
                     </Column>
                     <Column title="Solutions">
-                        {SOLUTION_ITEMS.map((item) => (
+                        {solutions.map((item) => (
                             <Link
                                 key={item.href}
                                 href={item.href}

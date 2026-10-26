@@ -117,4 +117,67 @@ const launched = (launchMode, accountsUrl) =>
           ]
         : [];
 
-module.exports = { REDIRECTS, temporary, launched };
+/** The four /solutions/ pages (`content/types.ts` SOLUTION_SLUGS; `redirects.test.ts` keeps them equal). */
+const SOLUTION_SLUGS = ["shops", "salons", "gyms", "clinics"];
+
+/**
+ * Each family's own /for/ page, where a page taken off sends its visitors
+ * (DEC-193). Learning has none: no family page fits a tuition centre, so a
+ * Learning page taken off goes Home.
+ * @type {Readonly<Record<string, string>>}
+ */
+const FAMILY_PAGE = {
+    Beauty: "salons",
+    "Fitness and classes": "gyms",
+    Health: "clinics",
+    "Shops and food": "shops",
+};
+
+/**
+ * The redirects the publish list makes (DEC-193, `search-pages.config.js`):
+ *
+ * - `/solutions/<x>` → 301 `/for/<x>` once `/for/<x>` is live; until then
+ *   the solution page keeps serving.
+ * - A page taken off → 302 (it may come back) to its family page when that
+ *   is live, else Home. Not in a preview build, which still builds it as a
+ *   draft.
+ *
+ * Only pages in this commit's code count as live (`familyOf` finds their
+ * file), so nothing lands on a page the build doesn't have, and every
+ * destination is live or Home: never another rule's source.
+ *
+ * @param {{ preview: boolean; live: string[]; takenOff: { path: string }[] } | null} list
+ * @param {(slug: string) => string | null} familyOf
+ * @returns {Redirect[]}
+ */
+const searchRedirects = (list, familyOf) => {
+    if (!list) return [];
+    const slugOf = (/** @type {string} */ p) => p.slice("/for/".length);
+    const live = new Set(
+        list.live.filter((p) => familyOf(slugOf(p)) !== null).map(slugOf),
+    );
+    const solutions = SOLUTION_SLUGS.filter((s) => live.has(s)).map((s) =>
+        moved(`/solutions/${s}`, `/for/${s}`),
+    );
+    if (list.preview) return solutions;
+    const takenOff = list.takenOff
+        .filter((t) => !live.has(slugOf(t.path)))
+        .map((t) => {
+            const page = FAMILY_PAGE[familyOf(slugOf(t.path)) ?? ""];
+            return {
+                source: t.path,
+                destination: page && live.has(page) ? `/for/${page}` : "/",
+                statusCode: /** @type {const} */ (302),
+            };
+        });
+    return [...solutions, ...takenOff];
+};
+
+module.exports = {
+    REDIRECTS,
+    temporary,
+    launched,
+    searchRedirects,
+    FAMILY_PAGE,
+    SOLUTION_SLUGS,
+};
