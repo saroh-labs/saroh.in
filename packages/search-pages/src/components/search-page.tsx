@@ -100,7 +100,7 @@ export function SearchPage({
         <div className="sp">
             <div className="sp-wrap">
                 {draft ? (
-                    <p className="sp-draft">Draft — not on saroh.in</p>
+                    <p className="sp-draft">Draft — not published yet</p>
                 ) : null}
 
                 <section className="sp-hero">

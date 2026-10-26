@@ -74,7 +74,7 @@ describe("<SearchPage>", () => {
         if (!p) throw new Error("salons is missing");
         const { container } = render(<SearchPage page={p} draft />);
         expect(container.querySelectorAll("a[href]")).toHaveLength(0);
-        expect(screen.getByText("Draft — not on saroh.in")).toBeTruthy();
+        expect(screen.getByText("Draft — not published yet")).toBeTruthy();
     });
 
     it("moves the carousel from its labels and opens the rest of Also in Saroh", () => {
