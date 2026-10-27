@@ -245,13 +245,7 @@ const RULES: Rule[] = [
         name: "a link card's hover is CardLink's (V5)",
         pattern: /hover:shadow-mk-(?:lift|card)\b/,
         home: ["components/shared/links/card-link.tsx"],
-        allow: each(
-            "step 6 (V5): its own card hover becomes CardLink (Ink border + shadow-mk-lift)",
-            [
-                "app/(site)/integrations/page.tsx",
-                "components/templates/template-card.tsx",
-            ],
-        ),
+        allow: {},
         files: SITE,
     },
     {

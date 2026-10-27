@@ -5,6 +5,28 @@ import type { ReactNode } from "react";
 
 import { Arrow } from "./arrow";
 
+/** The link card's hover (DEC-195, V5): an Ink border and the lift shadow. */
+const HOVER =
+    "transition-[border-color,box-shadow] duration-base ease-out hover:border-foreground hover:text-foreground hover:shadow-mk-lift";
+
+/** The same hover on a card's frame inside a `group` link (a template's browser frame). */
+export const CARD_GROUP_HOVER =
+    "transition-[border-color,box-shadow] duration-base ease-out group-hover:border-foreground group-hover:shadow-mk-lift";
+
+/**
+ * A white card that is one link, for a card that draws its own inside (the
+ * integrations, Contact's side cards, Previous / Next): the frame, the hover
+ * and the ring. `className` adds its padding and gap.
+ */
+export function cardLinkClasses(className?: string) {
+    return cn(
+        "grid cursor-pointer content-start rounded-mk-card border border-border bg-card text-foreground no-underline",
+        HOVER,
+        ring(),
+        className,
+    );
+}
+
 /**
  * A white card that is one link: Home's "Eight parts" grid and Solutions
  * cards, a feature page's "Works with". Title in Space Grotesk, body, an
@@ -34,10 +56,8 @@ export function CardLink({
     return (
         <Link
             href={href}
-            className={cn(
-                `grid cursor-pointer content-start gap-2 rounded-mk-card border border-border bg-card text-foreground no-underline transition-[border-color,box-shadow] duration-base ease-out hover:border-border-strong hover:text-foreground hover:shadow-mk-card ${ring()}`,
-                size === "md" ? "p-[22px]" : "p-6",
-                className,
+            className={cardLinkClasses(
+                cn("gap-2", size === "md" ? "p-[22px]" : "p-6", className),
             )}
         >
             <span

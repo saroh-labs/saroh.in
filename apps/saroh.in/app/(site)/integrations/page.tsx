@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Container } from "@/components/shared/layout/container";
 import { Arrow } from "@/components/shared/links/arrow";
+import { cardLinkClasses } from "@/components/shared/links/card-link";
 import { Pill } from "@/components/shared/links/pill";
 import { ComingList } from "@/components/shared/sections/coming-list";
 import { PageTitle } from "@/components/shared/sections/page-title";
@@ -12,7 +13,6 @@ import {
     integrationsIndex as page,
     plannedIntegrations,
 } from "@/content/integrations";
-import { ring } from "@/lib/ring";
 import { pageMetadata } from "@/lib/seo";
 
 /**
@@ -53,7 +53,7 @@ export default function IntegrationsPage() {
                         <li key={item.slug} className="grid">
                             <Link
                                 href={integrationHref(item.slug)}
-                                className={`grid cursor-pointer content-start gap-3.5 rounded-[18px] border border-border bg-card p-[22px] text-foreground no-underline transition-[border-color,box-shadow] duration-base ease-out hover:border-foreground hover:text-foreground hover:shadow-mk-lift ${ring()}`}
+                                className={cardLinkClasses("gap-3.5 p-[22px]")}
                             >
                                 <span className="flex items-start gap-3">
                                     <span className="grid">

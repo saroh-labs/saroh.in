@@ -57,6 +57,7 @@ const twMerge = extendTailwindMerge({
                 {
                     shadow: [
                         "mk-card",
+                        "mk-lift",
                         "mk-shot",
                         "mk-hero",
                         "mk-menu",

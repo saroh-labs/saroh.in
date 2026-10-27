@@ -10,10 +10,10 @@ import { linkShown } from "@/content/resources";
 import { SAROH_SOCIAL } from "@/content/social";
 import { cn } from "@/lib/cn";
 import type { LaunchMode } from "@/lib/links";
-import { ring } from "@/lib/ring";
 
 import { Container } from "../shared/layout/container";
 import { Arrow } from "../shared/links/arrow";
+import { cardLinkClasses } from "../shared/links/card-link";
 import { textLinkClasses } from "../shared/links/text-link";
 import { Eyebrow } from "../shared/sections/eyebrow";
 import { Section } from "../shared/sections/section";
@@ -201,14 +201,7 @@ function SideLink({
     body: string;
 }) {
     return (
-        <Link
-            href={href}
-            className={cn(
-                SIDE_CARD,
-                "cursor-pointer gap-1 text-foreground no-underline transition-colors duration-fast ease-out hover:border-foreground hover:text-foreground",
-                ring(),
-            )}
-        >
+        <Link href={href} className={cardLinkClasses("gap-1 px-[22px] py-5")}>
             <span className="text-[16.5px] font-semibold">
                 {title}
                 <Arrow />

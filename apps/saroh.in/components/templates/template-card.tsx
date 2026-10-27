@@ -4,6 +4,7 @@ import { Arrow } from "@/components/shared/links/arrow";
 import type { GalleryTemplate } from "@/content/templates";
 import { ring } from "@/lib/ring";
 
+import { CARD_GROUP_HOVER } from "../shared/links/card-link";
 import { BrowserFrame } from "./browser-frame";
 import { TemplatePageView } from "./template-page-view";
 
@@ -31,7 +32,7 @@ export function TemplateCard({
         >
             <BrowserFrame
                 host={template.sample.host}
-                className="transition-[border-color,box-shadow] duration-base ease-out group-hover:border-foreground group-hover:shadow-mk-lift"
+                className={CARD_GROUP_HOVER}
             >
                 <span className="block aspect-[16/10] overflow-hidden">
                     {home ? (

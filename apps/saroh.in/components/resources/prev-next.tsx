@@ -1,16 +1,16 @@
 import { cn } from "@/lib/cn";
-import { ring } from "@/lib/ring";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 import { Arrow } from "../shared/links/arrow";
+import { cardLinkClasses } from "../shared/links/card-link";
 
 interface Neighbour {
     name: string;
     href: string;
 }
 
-const CARD = `grid min-w-0 cursor-pointer gap-1 rounded-mk-card border border-border bg-card px-5 py-4 text-foreground no-underline transition-colors duration-fast ease-out hover:border-border-strong hover:text-foreground active:bg-mk-hover ${ring()}`;
+const CARD = cardLinkClasses("min-w-0 gap-1 px-5 py-4");
 
 /**
  * Previous and next in a Resources set (plan U1, R1): two cards at the foot
