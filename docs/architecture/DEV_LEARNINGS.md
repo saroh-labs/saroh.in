@@ -6013,3 +6013,9 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** those `opengraph-image.tsx` files read the article's .mdx through `lib/help-docs.ts` / `lib/integration-docs.ts` (`readdirSync`). Cards under a dynamic segment with `generateImageMetadata` are drawn on request by the Worker, which has no `content/` on disk; `generateStaticParams` doesn't make Next pre-draw them. The Solutions and Features cards work because their words are TS modules.
 - **Fix:** `og-cards.config.js` writes `lib/og-cards.gen.ts` (each article's title/area, each integration's name/intro); the cards import that. `lib/og-cards.test.ts` fails when the file is behind the articles, and when any `opengraph-image` imports an .mdx reader or `node:fs`. Checked with `opennextjs-cloudflare preview` (a plain `next start` reads files and hides it).
 - **Also 27 Oct:** `@saroh/search-pages` tests timed out on CI (lazily loaded tools; 5s test / 1s findBy defaults) — the package now sets testTimeout 30s and asyncUtilTimeout 10s.
+
+## site-booking-steps "a pay-now hold survives a step back" failed in full runs (27 Oct 2026)
+
+- **Symptom:** failed twice in a row in 2 of 5 `prepush --all` runs (desk or phone): Back from pay landed on "when", not "details"; passed alone and on re-runs.
+- **Cause:** it booked the Warehouse walkthrough on the same day and last time as site-booking-looks (`count - (phone ? 5 : 1)`). When both ran together one lost the time; `bookUntilOurs`'s retry goes back through "when", so the history behind pay was different.
+- **Fix:** the spec books 4th from the end on desk, 9th on a phone, days no other spec books this service on. Rule: a spec that asserts history or a specific time picks a day/time no other spec uses for the same service (`saroh-browser-tests`: a spec owns its data).
