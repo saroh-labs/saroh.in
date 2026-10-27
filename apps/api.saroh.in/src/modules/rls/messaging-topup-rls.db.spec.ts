@@ -4,7 +4,7 @@ import { isRlsTestMode } from "../../../test/rls-mode";
 
 /**
  * Row-level security on messaging top-ups (#1241, migration
- * `20270101120000_messaging_topup`), over a NOBYPASSRLS role: one business
+ * `20270104120000_messaging_topup`), over a NOBYPASSRLS role: one business
  * sees and changes only its own. Runs only in RLS mode (`TEST_RLS=on`).
  */
 const describeRls = isRlsTestMode() ? describe : describe.skip;

@@ -13,13 +13,19 @@ import {
     routeExists,
     shownLegal,
     shownResources,
-    shownTools,
 } from "@/content/resources";
-import { solutionHref, solutionList } from "@/content/solutions";
+import { solutionList } from "@/content/solutions";
 import type { GalleryTemplate } from "@/content/templates";
 import { galleryTemplates, templateHref } from "@/content/templates";
 import type { LaunchMode } from "@/lib/links";
 import { LAUNCH_MODE } from "@/lib/links";
+import type { PublishList } from "@/lib/search-pages";
+import {
+    liveSearchPages,
+    publishList,
+    shownToolLinks,
+    solutionLink,
+} from "@/lib/search-pages";
 
 /**
  * `/llms.txt` (Resources plan U7, llmstxt.org): the site's name, one line
@@ -56,6 +62,7 @@ export function llmsText(
         "slug" | "name" | "description"
     >[] = galleryTemplates(),
     mode: LaunchMode = LAUNCH_MODE,
+    published: PublishList = publishList(),
 ): string {
     const out: string[] = ["# Saroh", "", `> ${LLMS_SUMMARY}`];
 
@@ -99,15 +106,25 @@ export function llmsText(
             out.push(line(base, featureHref(f.slug), f.name, f.seoDescription));
         }
     }
-    const solutionPages = solutionList.filter((s) =>
-        routeExists(solutionHref(s.slug), ctx.routes),
-    );
+    // A solution whose /for/ page is live is linked there (DEC-193).
+    const solutionPages = solutionList
+        .map((s) => ({ s, href: solutionLink(s.slug, published) }))
+        .filter(({ href }) => routeExists(href, ctx.routes));
     if (solutionPages.length > 0) {
         out.push("", "## Solutions", "");
-        for (const s of solutionPages) {
-            out.push(
-                line(base, solutionHref(s.slug), s.longName, s.seoDescription),
-            );
+        for (const { s, href } of solutionPages) {
+            out.push(line(base, href, s.longName, s.seoDescription));
+        }
+    }
+    // The other live /for/ trade pages, each with its search description.
+    const linked = new Set(solutionPages.map((x) => x.href));
+    const trades = liveSearchPages(published).filter(
+        (p) => !linked.has(p.path) && routeExists(p.path, ctx.routes),
+    );
+    if (trades.length > 0) {
+        out.push("", "## By trade", "");
+        for (const p of trades) {
+            out.push(line(base, p.path, p.name, p.description));
         }
     }
 
@@ -119,7 +136,7 @@ export function llmsText(
         }
     }
 
-    const tools = shownTools(ctx);
+    const tools = shownToolLinks(ctx, published);
     if (tools.length > 0) {
         out.push("", "## Tools", "");
         for (const page of tools) {

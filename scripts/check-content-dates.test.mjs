@@ -12,7 +12,9 @@ const SCRIPT = join(import.meta.dirname, "check-content-dates.mjs");
 
 const HOME = "apps/saroh.in/content/home.ts";
 const RAZORPAY = "apps/saroh.in/content/integrations/razorpay.mdx";
+const SALONS = "packages/search-pages/content/for/salons.mdx";
 const BASE = {
+    [SALONS]: "---\nslug: salons\nupdated: 2026-10-26\n---\n## Old?\nWords\n",
     [HOME]: 'export const UPDATED = "2026-10-12";\nexport const h = "Old words";\n',
     [RAZORPAY]: '---\nslug: razorpay\nupdated: "2026-10-12"\n---\nOld words\n',
     "apps/saroh.in/content/types.ts": "export type A = string;\n",
@@ -83,6 +85,14 @@ test("fails when a provider page's words change but updated: doesn't", () => {
     });
     assert.equal(r.status, 1);
     assert.match(r.stderr, /razorpay\.mdx: its words changed/);
+});
+
+test("fails when a /for/ page's words change but updated: doesn't", () => {
+    const r = check({
+        [SALONS]: "---\nslug: salons\nupdated: 2026-10-26\n---\n## New?\nWords\n",
+    });
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /for\/salons\.mdx: its words changed/);
 });
 
 test("fails when the date is taken out", () => {

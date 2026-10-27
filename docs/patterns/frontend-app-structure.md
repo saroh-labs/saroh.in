@@ -235,12 +235,45 @@ accounts and the operator console. `pnpm run check:titles` and
   solution with no screen of its own trade captured has no `hero` and no
   segment `shot`: it is drawn as words, never beside another trade's
   screen.
+- **A /for/ trade page is one file in `@saroh/search-pages`** (DEC-193):
+  `content/for/<slug>.mdx`, YAML frontmatter (the words, then the sample
+  business under `scene`) and the questions as `## question` + plain
+  answer paragraphs. After editing one, run
+  `pnpm --filter @saroh/search-pages content`: the files are embedded in
+  `src/content.gen.ts` because the admin preview runs on Workers (no file
+  system, no eval), and a test fails while that copy is stale.
+  `searchPageChecks` (gen.py's data checks) must pass for every page. Both
+  apps draw it with `<SearchPage>` and import
+  `@saroh/search-pages/styles.css` (all under `.sp`, Saroh's colours, the
+  apps' `--font-sans`/`--font-display`); links come in as props, so the
+  package reads no env.
+- **A free tool is a file and a component in `@saroh/search-pages`**
+  (#1253, publish-controlled as DEC-193): `content/tools/<slug>.mdx`
+  (name, group, line, search, title, description, updated, h1, lead,
+  phoneLead, how/howPhone, ctaTitle/ctaLine, then the questions) and a
+  default-exported client component in `src/tools/<slug>/index.tsx`,
+  one line in `src/tools/registry.ts`. Build it from `src/tools/parts.tsx`
+  and put the file behind the one `<EmailGate>` (the email is all that
+  leaves the browser; saroh.in sends it to the QR code maker's unlock
+  route through `SiteToolGate`). `toolChecks` must pass. saroh.in draws it
+  at `/tools/<slug>` with `<ToolPage>`; the two app tools (`inApp: true`)
+  keep their own routes and obey the same publish list
+  (`PublishContext.live`). Copy `no-show-cost-calculator` for a new one.
 - **A page's sitemap date lives beside its words** (R3, #1187): a content
   module exports `UPDATED`, a provider page's MDX has `updated:`, Help
   and legal pages keep theirs. Change the date with the words;
   `pnpm check:content-dates` fails a batch that doesn't. /pricing is the
   live catalogue version's `goLiveAt`. Never the build's date
   (`lib/site-pages.ts` `lastModified`).
+- **What a build reads from the API, it reads once, before `next build`**
+  (`search-pages.config.js` + `build-state.config.js`): the /for/ publish
+  list and, once early access is open, `GET /public/pricing`. A production
+  build's `readLivePricing` reads that answer from `.build-pricing.json`,
+  never the API, and writes both answers to `/_build/state.json`. When the
+  API can't be read after the retries, a production build reuses the live
+  site's own `/_build/state.json` and prints a GitHub warning; it fails
+  only when neither answers. A new build-time read joins that file and
+  the snapshot; it never fetches on its own during `next build`.
 - **The site is built at deploy time and nothing deploys on a schedule.** A
   page dated for a day (`publishOn`) appears with the first deploy made on
   or after it. Anything that answers per request about a dated page asks
@@ -249,7 +282,7 @@ accounts and the operator console. `pnpm run check:titles` and
   browser**, through `readAddress` (`lib/page-address.ts`), so the page
   stays one built file: the waitlist form, the link preview tool.
 - **A screenshot is files with a `srcset`**, never `next/image`
-  (`components/v2/shot-image.tsx`). After a capture run
+  (`components/shared/media/shot-image.tsx`). After a capture run
   `pnpm --filter web shots:sizes --force`.
 - **Files Cloudflare serves without the Worker take their headers from
   `public/_headers`**: caching for `/_next/static/*` and `/shots/*`, and

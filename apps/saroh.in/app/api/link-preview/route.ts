@@ -14,22 +14,13 @@ import { NextResponse } from "next/server";
 import { env } from "@/env";
 import type { CheckResult } from "@/lib/link-preview";
 import { linkPreviewHeaders } from "@/lib/link-preview-forward";
-import { relaySecret } from "@/lib/waitlist-forward";
+import { postedText, readPosted, relaySecret } from "@/lib/relay";
 
 const MAX_ADDRESS = 4096;
 
 export async function POST(req: Request) {
-    let posted: unknown;
-    try {
-        posted = await req.json();
-    } catch {
-        posted = null;
-    }
-    const p = (
-        typeof posted === "object" && posted !== null ? posted : {}
-    ) as Record<string, unknown>;
-    const url =
-        typeof p.url === "string" ? p.url.trim().slice(0, MAX_ADDRESS) : "";
+    const p = await readPosted(req);
+    const url = postedText(p, "url", MAX_ADDRESS);
     const fresh = p.fresh === true;
     const fail = (
         failure: "invalid" | "rate-limited" | "unavailable",

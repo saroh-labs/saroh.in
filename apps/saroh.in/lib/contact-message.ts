@@ -6,6 +6,8 @@
  * rules and a server component can call it.
  */
 
+import { isEmailShape } from "@/lib/email-shape";
+
 /** The API's `CONTACT_TOPICS`. */
 export const CONTACT_TOPIC_IDS = ["question", "help", "bug", "other"] as const;
 export type ContactTopicId = (typeof CONTACT_TOPIC_IDS)[number];
@@ -44,8 +46,6 @@ export type ContactResult =
 export const CONTACT_LIMITS = { name: 120, email: 320, message: 5000 } as const;
 export const CONTACT_MESSAGE_MIN = 5;
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 const isTopic = (value: unknown): value is ContactTopicId =>
     (CONTACT_TOPIC_IDS as readonly unknown[]).includes(value);
 
@@ -62,7 +62,7 @@ const wrong: Record<ContactField, (value: string) => boolean> = {
     },
     email: (value) => {
         const email = value.trim();
-        return email.length > CONTACT_LIMITS.email || !EMAIL.test(email);
+        return email.length > CONTACT_LIMITS.email || !isEmailShape(email);
     },
     message: (value) => {
         const message = value.trim();

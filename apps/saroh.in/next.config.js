@@ -1,4 +1,14 @@
-const { REDIRECTS, temporary, launched } = require("./redirects");
+const {
+    REDIRECTS,
+    temporary,
+    launched,
+    searchRedirects,
+} = require("./redirects");
+const {
+    familyOf,
+    loadPublishList,
+    toolExists,
+} = require("./search-pages.config");
 const { builtRoutes } = require("./routes.config");
 
 // A production deployment without API_URL drops every waitlist join, and
@@ -30,6 +40,10 @@ if (missing.length > 0) {
     );
 }
 
+// Which /for/ pages and free tools are live, as `search-pages.config.js` read them just
+// before this build (null under `next dev` or a test: nothing live).
+const searchPages = loadPublishList();
+
 // Every response: HTTPS only from the first visit on, never shown inside
 // another site's frame (so a sign-in or a button can't be dressed up and
 // clicked through from elsewhere), and no guessing a file's type. The app's
@@ -47,7 +61,7 @@ const SECURITY_HEADERS = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     // @saroh/ui ships its entries as source, so Next must compile it.
-    transpilePackages: ["@saroh/ui"],
+    transpilePackages: ["@saroh/ui", "@saroh/search-pages"],
 
     // No database here — saroh.in is the public marketing site (single backend
     // lives at api.saroh.in).
@@ -66,6 +80,9 @@ const nextConfig = {
         // help.saroh.in on) asks "was Help shown when this was built?",
         // not "is it shown now?" (`builtContext`, lib/resources-context.ts).
         SAROH_BUILT_AT: new Date().toISOString(),
+        // The /for/ publish list (DEC-193, `lib/search-pages.ts`); empty
+        // when none was read, which a production build refuses.
+        SAROH_SEARCH_PAGES: searchPages ? JSON.stringify(searchPages) : "",
     },
 
     // No `X-Powered-By: Next.js`: it only tells scanners what to try.
@@ -96,6 +113,7 @@ const nextConfig = {
     async redirects() {
         return [
             ...REDIRECTS,
+            ...searchRedirects(searchPages, familyOf, toolExists),
             ...temporary(process.env.NEXT_PUBLIC_LAUNCH_MODE),
             ...launched(
                 process.env.NEXT_PUBLIC_LAUNCH_MODE,

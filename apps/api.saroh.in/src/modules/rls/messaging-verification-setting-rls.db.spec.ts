@@ -4,7 +4,7 @@ import { isRlsTestMode } from "../../../test/rls-mode";
 
 /**
  * Row-level security on the per-module verification switch (#1242,
- * migration `20270101110000_messaging_verification_settings`), over a
+ * migration `20270104110000_messaging_verification_settings`), over a
  * NOBYPASSRLS role: one business sees and changes only its own switches.
  * Runs only in RLS mode (`TEST_RLS=on`).
  */

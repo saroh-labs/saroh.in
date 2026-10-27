@@ -78,7 +78,7 @@ import { z } from "zod";
  * WhatsApp" button on the V2 pages (#1188). Both must be set, the switch to
  * `on`; anything else, unset included and under `next dev` too, shows
  * nothing. Production leaves them out until Saroh's own WhatsApp number is
- * connected (`components/v2/whatsapp-chat.tsx`).
+ * connected (`components/shared/whatsapp/whatsapp-chat.tsx`).
  *
  * `NEXT_PUBLIC_DEMOS` shows "See a live demo" on the home, pricing and
  * solution heroes (#1191): `on` shows it; anything else, unset included and
@@ -91,7 +91,9 @@ import { z } from "zod";
  * build's page routes into it (`routes.config.js`), so the Resources list links
  * only pages this build has. `SAROH_BUILT_AT` is written the same way: the
  * moment of the build, for what runs per request but must agree with pages
- * drawn at build time (`builtContext`).
+ * drawn at build time (`builtContext`). `SAROH_SEARCH_PAGES` is written the
+ * same way: the /for/ publish list `search-pages.config.js` read from the
+ * API before the build (DEC-193, `lib/search-pages.ts`).
  */
 export const env = createEnv({
     client: {
@@ -170,6 +172,7 @@ export const env = createEnv({
         RESOURCES_PREVIEW: z.string().optional(),
         SAROH_BUILT_ROUTES: z.string().optional(),
         SAROH_BUILT_AT: z.string().optional(),
+        SAROH_SEARCH_PAGES: z.string().optional(),
     },
     shared: {
         NODE_ENV: z.enum(["development", "test", "production"]).optional(),
@@ -183,6 +186,7 @@ export const env = createEnv({
         RESOURCES_PREVIEW: process.env.RESOURCES_PREVIEW,
         SAROH_BUILT_ROUTES: process.env.SAROH_BUILT_ROUTES,
         SAROH_BUILT_AT: process.env.SAROH_BUILT_AT,
+        SAROH_SEARCH_PAGES: process.env.SAROH_SEARCH_PAGES,
         NODE_ENV: process.env.NODE_ENV,
         NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
         NEXT_PUBLIC_LAUNCH_MODE: process.env.NEXT_PUBLIC_LAUNCH_MODE,

@@ -23,21 +23,6 @@ import { isIP } from "node:net";
 export const RELAY_HEADER = "x-saroh-relay";
 const VERSION = "v1";
 
-/** The API's development fallback (`site-secrets.ts`); development and test only. */
-const DEV_RELAY_SECRET =
-    "saroh-dev-insecure-site-relay-secret-not-for-production";
-
-/** The secret to sign with, or null where there is none to use. */
-export function relaySecret(
-    configured: string | undefined,
-    nodeEnv: string | undefined,
-): string | null {
-    if (configured) return configured;
-    if (nodeEnv === "development" || nodeEnv === "test")
-        return DEV_RELAY_SECRET;
-    return null;
-}
-
 const b64 = (value: string | Buffer) =>
     Buffer.from(value).toString("base64url");
 

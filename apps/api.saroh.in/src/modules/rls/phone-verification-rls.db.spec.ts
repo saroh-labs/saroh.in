@@ -4,7 +4,7 @@ import { isRlsTestMode } from "../../../test/rls-mode";
 
 /**
  * Row-level security on Saroh-sent verification codes (#1238, migration
- * `20270101100000_messaging_verification_wallet`), over a NOBYPASSRLS role with
+ * `20270104100000_messaging_verification_wallet`), over a NOBYPASSRLS role with
  * enforcement on: one business sees and writes only its own sessions and
  * sends, and the database refuses a negative send price.
  *

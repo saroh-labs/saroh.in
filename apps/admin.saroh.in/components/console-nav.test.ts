@@ -64,7 +64,10 @@ describe("navFor", () => {
                     "Provider events",
                 ],
             ],
-            ["Product", ["Releases", "Plans and modules", "Usage"]],
+            [
+                "Product",
+                ["Releases", "Plans and modules", "Search pages", "Usage"],
+            ],
             [
                 "Keep it running",
                 [
@@ -131,7 +134,7 @@ describe("navFor", () => {
         ).toEqual([
             ["Home", ["Home"]],
             ["Help customers", ["Businesses", "Reports"]],
-            ["Product", ["Releases", "Usage"]],
+            ["Product", ["Releases", "Search pages", "Usage"]],
             ["Keep it running", ["Health"]],
         ]);
         // An Account manager reaches Home, their own leads board and their

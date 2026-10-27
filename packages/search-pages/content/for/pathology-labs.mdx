@@ -1,0 +1,246 @@
+---
+slug: pathology-labs
+name: Pathology labs
+plural: pathology labs
+pickAs: pathology labs
+family: Health
+search: pathology lab software
+title: Pathology lab software for sample times and bills
+description: "Pathology lab software: patients book a sample time, you tell them what each test needs, and every test gets a bill."
+updated: 2026-10-26
+shape: appointments
+h1: A calmer morning queue, and a bill for every test.
+lead: Software for your pathology lab. Let patients book a sample time, tell them what each test needs, and give a bill for every test.
+phoneLead: Software for your pathology lab. Patients book a sample time, and every test gets a bill.
+problemsTitle: What gets easier in your lab.
+problems:
+  - area: The morning rush
+    quote: The morning queue is every fasting patient at once.
+    title: Spread the morning out
+    body: Patients book a sample time on your booking page. Set how many people each time can take, so the 7am rush spreads across the morning.
+    link: Bookings
+  - area: At the front desk
+    quote: Walk-ins and booked patients end up in one queue.
+    title: Walk-ins in the same diary
+    body: Add a walk-in at the desk with the test and the time. Booked patients keep their place.
+  - area: Your sample hours
+    quote: On Sundays we only take samples till noon.
+    title: Sample hours your way
+    body: Set the hours you take samples each day, and the days you're closed. Patients only see those times.
+  - area: Your regular families
+    quote: The same family comes back every few months.
+    title: Every patient's visits on one page
+    body: Their visits, the tests they booked and your notes, all on one page.
+    link: Customers
+  - area: Getting paid
+    quote: Every patient asks for a bill.
+    title: A bill for every test
+    body: Each visit gets a numbered bill, without GST when the test doesn't carry it. Patients pay by UPI, card or cash.
+    link: Billing
+  - area: Your own website
+    quote: Everyone calls to ask if they need to fast.
+    title: Tests, prices and how to prepare
+    body: Your website shows each test and its price. Add what a test needs, like 10 hours of fasting, and it shows beside it.
+    link: Website
+services:
+  - name: CBC
+    detail: 10 min
+  - name: Thyroid profile
+    detail: 10 min
+related:
+  - name: Clinics
+    slug: clinics
+  - name: Physiotherapy
+    slug: physiotherapy
+  - name: Dental clinics
+    slug: dental-clinics
+ctaTitle: A calm morning, with every sample on time.
+scene:
+  business: Clearview Path Lab
+  site: clearview-path-lab.saroh.app
+  day: Sat 25 Oct
+  place: lab
+  heroAlt: "What a pathology lab's morning looks like in Saroh: a thyroid test booked for a 07:30 sample time, nothing to pay until the visit, a bill with no GST on an exempt test, and a note to lie a regular patient down for his sample."
+  hero:
+    title: Today · Sat 25 Oct
+    count: 42 booked
+    highlight: 1
+    rows:
+      - time: 07:00
+        name: Suresh Nair
+        right: Sugar (fasting)
+      - time: 07:30
+        name: Meena Shah
+        right: Thyroid
+      - time: 07:30
+        name: Arjun Shah
+        right: CBC
+      - time: 08:15
+        name: Ravi Kumar
+        right: CBC · walk-in
+  chips:
+    - icon: cal
+      title: Booked · Sat 07:30 sample
+      sub: Meena Shah · Thyroid profile
+    - icon: ok
+      title: No deposit · pay at the visit
+      sub: By UPI, card or cash at the desk
+      phoneSub: UPI, card or cash
+    - icon: bill
+      title: "Bill #1043 · no GST"
+      sub: Test marked GST-exempt
+    - icon: person
+      title: Suresh · sugar test every 3 months
+      pill: Lie him down for the sample
+  staff: []
+  items:
+    - name: CBC
+      short: CBC
+      len: 10 min
+      who: no fasting needed
+      price: 350
+    - name: Thyroid profile
+      short: Thyroid
+      len: 10 min
+      who: no fasting needed
+      price: 600
+    - name: Fasting blood sugar
+      short: Sugar
+      len: 10 min
+      who: 10 hours' fasting
+      price: 150
+  booking:
+    item: 1
+    staff: ""
+    time: 07:30
+    deposit: none
+    times:
+      - time: 07:00
+        taken: true
+      - time: 07:15
+        taken: true
+      - time: 07:30
+        picked: true
+      - time: 07:45
+      - time: 08:00
+        taken: true
+      - time: 08:15
+      - time: 08:30
+      - time: 09:00
+      - time: 09:30
+      - time: 10:00
+    phoneTimes:
+      - time: 07:00
+        taken: true
+      - time: 07:15
+        taken: true
+      - time: 07:30
+        picked: true
+      - time: 07:45
+      - time: 08:00
+        taken: true
+      - time: 08:15
+      - time: 08:30
+      - time: 09:00
+  today:
+    - time: 07:00
+      name: Suresh
+      who: Sugar
+      status:
+        tone: amb
+        text: Fasting
+    - time: 07:30
+      name: Meena
+      who: Thyroid
+      status:
+        tone: grey
+        text: Booked
+    - time: 08:15
+      name: Ravi
+      who: CBC · walk-in
+      status:
+        tone: grey
+        text: At desk
+  customer:
+    name: Suresh Nair
+    initials: SN
+    stats:
+      - 9 visits
+      - ₹3,450 spent
+    tag: Lie him down for the sample
+    note: Sugar test every 3 months. Next one in January.
+    noteBy: Note · front desk · 25 Jul
+  bill:
+    no: 1043
+    status:
+      tone: paid
+      text: Paid · UPI
+    gstin: false
+    showCodes: true
+    rate: 0
+    noGst: None · exempt treatment
+    lines:
+      - name: Thyroid profile
+        short: Thyroid
+        code: SAC 999316
+        codeStatus: to-confirm
+        amount: 600
+    cgst: 0
+    sgst: 0
+    total: 600
+    foot: null
+  tiles:
+    booking:
+      title: Patients book a sample time
+      line: Set how many people each time can take, and the 7am rush spreads out.
+      phoneLine: Set how many people each time can take.
+    today:
+      title: Today's samples, first thing
+      line: Who's coming at each time, who is fasting, and who walked in.
+      phoneLine: Who's coming, and who is fasting.
+    customer:
+      title: Every patient's visits on one page
+      line: Visits, tests and your notes. Mark a note sensitive.
+      phoneLine: Visits, tests and your notes.
+    bill:
+      title: A bill for every test
+      line: Mark a test GST-exempt once, and its bills leave GST off.
+      phoneLine: Exempt tests, billed without GST.
+    website:
+      title: Your tests and prices online
+      line: Change a price once, and your website shows it.
+      phoneLine: Change a price once, and it shows.
+  quote:
+    text: The morning queue is every fasting patient at once.
+    caption: Sound like your mornings? Patients book a sample time, and each time takes only as many as you set.
+  also:
+    - title: Walk-ins in the same diary
+      line: Add a walk-in at the desk with the test. Booked patients keep their place.
+      icon: person
+    - title: Sample hours your way
+      line: The hours you take samples each day, and the days you're closed.
+    - title: Payment links
+      line: Send a link. They pay by UPI or card, straight to your account.
+    - title: Sensitive notes
+      line: Mark a note sensitive. Only the roles you allow can read it.
+    - title: In their phone's calendar
+      line: Patients add their booking to their own calendar.
+    - title: Who didn't come
+      line: Mark it once, and it shows on the patient's page.
+---
+
+## What does Start free include?
+
+You can set up your website and bookings for free, with no card needed. Move up to a paid plan when you need more.
+
+## Can I limit how many people book each time?
+
+Yes. Set how many people each sample time can take, and it closes when it's full.
+
+## Can walk-ins go in the same diary?
+
+Yes. Add a walk-in at the desk with the test and the time, and booked patients keep their place.
+
+## How do patients pay?
+
+By UPI or card when they book or from a payment link, straight into your own Razorpay or Cashfree account. Cash at the desk works too, and every payment gets a bill.

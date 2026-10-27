@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { formatDay } from "@/lib/format/day";
+
 import { SAROH_CONTACT_EMAIL } from "./contact";
 import type { IsoDay, PublishContext } from "./resources";
 import { isLive } from "./resources";
@@ -9,7 +11,7 @@ import { isLive } from "./resources";
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-10-07";
+export const UPDATED = "2026-10-27";
 
 /**
  * Help (Resources plan U5, design "Saroh Resources - Help" 1a and 2a): the
@@ -233,14 +235,8 @@ export function searchArticles(
 }
 
 /** "6 Oct 2026", as the article's Updated line says it. */
-export function helpDate(day: IsoDay): string {
-    const [y, m, d] = day.split("-").map(Number);
-    const month = new Date(Date.UTC(y, m - 1, d)).toLocaleString("en-GB", {
-        month: "short",
-        timeZone: "UTC",
-    });
-    return `${d} ${month} ${y}`;
-}
+export const helpDate = (day: IsoDay) =>
+    formatDay(day, { month: "short", year: true });
 
 /** "01", as the step's number is set (design 2a). */
 export const stepNumber = (i: number) => String(i + 1).padStart(2, "0");

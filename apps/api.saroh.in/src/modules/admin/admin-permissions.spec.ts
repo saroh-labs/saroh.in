@@ -105,6 +105,14 @@ describe("admin permission policy", () => {
         );
     });
 
+    it("lets only a Platform Owner publish search pages (DEC-193)", () => {
+        const holders = Object.values(AdminRole).filter((role) =>
+            permissionsFor([role]).includes(AdminPermission.SearchPagesPublish),
+        );
+        expect(holders).toEqual([AdminRole.PlatformOwner]);
+        expect(AdminPermission.SearchPagesPublish).toBe("search-pages:publish");
+    });
+
     it("gives Platform Owner every control-plane permission", () => {
         expect(permissionsFor([AdminRole.PlatformOwner])).toEqual(
             ALL_ADMIN_PERMISSIONS,

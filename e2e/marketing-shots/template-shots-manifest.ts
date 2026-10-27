@@ -88,7 +88,7 @@ export function templateShotsSource(shots: readonly CapturedShot[]): string {
  * Keyed by the template's gallery slug, then the page's path (\`/\`,
  * \`/timetable\`). A page with a shot shows it — on the card (its home page,
  * desktop) and in the detail page's frame — and a page without one is drawn
- * from the template's data and colours (\`components/v2/templates/
+ * from the template's data and colours (\`components/templates/
  * template-preview.tsx\`), so the gallery never shows an empty frame while
  * captures are added one by one. \`width\`/\`height\` are the image's CSS size
  * (the file is twice that); the alt text is written by the page from the

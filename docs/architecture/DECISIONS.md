@@ -2503,3 +2503,50 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **Autopay:** marketing and the /for/ pages may say a membership or monthly fee **can renew by UPI Autopay where the business has set it up on its own Razorpay account**; otherwise the bill is ready on the day with a payment link to send. Never "automatic" without that condition.
     - **Owner lines stay as quotes.** They are the words owners use about their day, shown as quotes with no name, photo, business or rating, so they are not testimonials; real testimonials stay off until there are customers to quote (`saroh-product.md` → Saying what is true).
 - Rules: `docs/patterns/saroh-product.md` → Saying what is true; the copy brief for trade pages (outside the repo).
+
+## DEC-193 Search pages are written in the code and go live on saroh.in only when someone publishes them in admin
+
+**Status: Accepted — 2026-10-26** · owner · #1202 ("only the published content should be added to sitemap and indexing"; "this should be a controlled action"); design: admin canvas, page "Search pages: publish control"
+
+- Context:
+    - The 34 `/for/` trade pages (design D, approved 26 Oct) are written in the repo and reviewed on development. The owner wants to choose, page by page, what reaches production, without a code change or a release for each one.
+- Decision:
+    - **The words live in the code; whether a page is live lives in the database.** Each page is one content file in `@saroh/search-pages` (frontmatter + MDX). The API keeps one publish record per page path (live, unpublished, archived, with who and when, and a history). Each environment's admin controls its own site: admin.saroh.io → saroh.io, admin.saroh.in → saroh.in.
+    - **Publishing rebuilds the site.** Publish, Unpublish and Archive (one page or many) save the record and start one web deploy (the same dispatch Deployments uses). The site build reads `GET /public/search-pages`; a production build that can't read it fails rather than guess.
+    - If the API can't be read, a production build reuses the live site's own snapshot of the lists it was last built with (`/_build/state.json`) and warns; it fails only when neither answers.
+    - **Production builds only live pages.** Only they are in the sitemap, `/llms.txt`, the `/for/` list, the menu and the footer. On development every page in the code is built, and a page that isn't live there shows a Draft label and `noindex`.
+    - **Unpublished pages don't break links**: a page taken off redirects (302, it may come back) to its family page, or Home when that isn't live either. A page never published simply doesn't exist. Archived pages are hidden from the admin list and can't be published until restored; archiving a live page takes it off first. Nothing is ever deleted from the code by admin.
+    - **The four `/solutions/` pages keep serving until their `/for/` page is published**; from then on they 301 to it (#1202).
+    - **Later edits to a live page's words go out with normal releases.** Publishing is about whether a page is on the site, not each change of words.
+    - **Admin shows the page exactly as the site will**: the page template and content are one shared package, rendered by the admin's own signed-in, `noindex` preview route (desk and phone), and by saroh.in.
+    - **Who:** a new staff permission, `search-pages:publish`.
+- Rules: `packages/search-pages/`; `apps/api.saroh.in/src/modules/search-pages/`; `apps/saroh.in/app/(site)/for/`; `apps/admin.saroh.in/app/search-pages/`.
+
+## DEC-195 Reuse the shared component; never redraw it
+
+**Status: Accepted — 2026-10-27** · owner · from the saroh.in de-duplication audit (`docs/plans/2026-10-27-001-saroh-in-dedupe-audit.md`); owner: "we need to have this as a rule for the repo … we cannot rewrite duplicate code everywhere, we have to reuse the component"
+
+- Context:
+    - /for/ pages and Home drew their own plan teaser cards beside the Pricing page's plan cards, and the copies had drifted apart (fixed 27 Oct in `553aed795`: one `PricingCards` everywhere). The audit found about 95 more hand-drawn copies on saroh.in (24 groups), 14 copied helpers (two of them bugs, one CodeQL-flagged email regex) and the focus ring written out 64 times. A clone checker would not have caught the teaser: a redraw shares no lines with the original.
+- Decision:
+    - **One component per UI piece.** A page imports it and passes data; it never copies or redraws it. A page that needs it different adds a variant to the one component. A copy is a bug even when it looks the same today.
+    - **Shared pieces live in `components/shared/<group>/`** (after the move step of the plan); feature pieces in their feature folder (DEC-183).
+    - **Logic helpers likewise**: one email check, one day formatter, one money formatter, one list joiner, one way to read a posted body.
+    - **Enforced, as a ratchet**: `apps/saroh.in/lib/consistency/shared-pieces.test.ts` (a regex per piece, today's copies allow-listed with the step that removes them, the list only shrinks) and `pnpm check:dupes` (`scripts/check-dupes.mjs`, our own script, no new dependency: 6+ lines copied across files; `scripts/dupes-baseline.json` only shrinks). Both in `pnpm prepush` and CI's static job.
+    - **saroh.in first** (with `@saroh/search-pages`); other apps join the scan and the clone check as each is cleaned.
+    - **The target looks** (owner, 27 Oct: all twelve of the audit's picks):
+        - V1 text link: the Resources look, underline on hover, stays Saffron 700 (`TextLink`).
+        - V2 breadcrumb: `Breadcrumbs`, `current="brand"` for feature and solution heroes, one "/" separator.
+        - V3 FAQ: `Faq` everywhere on saroh.in; one package FAQ for /for/ and /tools.
+        - V4 Ink closing band: `CtaBand` with `template`, `note={null}` and `size="compact"`.
+        - V5 link card hover: Ink border + `shadow-mk-lift`, in `CardLink`.
+        - V6 page title: two sizes as tokens (`text-mk-page`, `text-mk-article`).
+        - V7 reading column: two widths, article 760 and list 900, as `Container width`, on the site gutter.
+        - V8 "Coming" list: one `ComingList` with the changelog's layout, one data list.
+        - V9 choice chip: one `ChoiceChip`, 36px, 14px, `bg-card`, 44px on touch.
+        - V10 Ink button: `<Button>` on `buttonClasses`, plus `size="xs"` (36-38px) for in-panel actions.
+        - V11 text field: one `fieldClasses({ onInk })`, 16px text.
+        - V12 small caps label: `Eyebrow` with `tone="brand" | "muted" | "on-ink"` and `size="sm"` (11px).
+- Consequences:
+    - The plan's steps (move, non-visual fixes, merges, the looks above, the package) each delete their allow-list entries and shrink the baseline.
+- Rules: `docs/patterns/frontend-design-system.md` → "Shared pieces on saroh.in"; `apps/saroh.in/lib/consistency/shared-pieces.test.ts`; `scripts/check-dupes.mjs`.

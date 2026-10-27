@@ -17,8 +17,17 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = join(import.meta.dirname, "..");
-const APP = "apps/app.saroh.in";
-const SOURCES = ["app", "components", "lib"];
+/**
+ * Each app with its own `lib/format`, and the folders scanned. saroh.in joined
+ * with DEC-195 (B4): a day and a list are written by its `lib/format/`.
+ */
+const APPS = [
+    { app: "apps/app.saroh.in", sources: ["app", "components", "lib"] },
+    {
+        app: "apps/saroh.in",
+        sources: ["app", "components", "lib", "content"],
+    },
+];
 
 /** The one place these calls belong. */
 const FORMAT_MODULE = "lib/format/";
@@ -28,7 +37,7 @@ const FORMAT_MODULE = "lib/format/";
  * can: a new need is nearly always a new option on a formatter.
  */
 const ALLOWED = new Map([
-    // ["lib/example.ts", "why the formatter can't do it"],
+    // ["apps/app.saroh.in/lib/example.ts", "why the formatter can't do it"],
 ]);
 
 const NATIVE = [
@@ -67,7 +76,7 @@ const TOAST_CALL = new RegExp(`(?<![\\w.])(${TOASTS.join("|")})\\(`, "g");
 const isTest = (f) =>
     /\.(test|spec)\.[cm]?[jt]sx?$|__snapshots__|\.test-kit\.ts$/.test(f);
 
-function walk(dir) {
+function walk(APP, dir) {
     return readdirSync(join(root, APP, dir), { recursive: true })
         .map(String)
         .filter((f) => /\.tsx?$/.test(f))
@@ -153,65 +162,64 @@ function stringsIn(code) {
 const problems = [];
 let scanned = 0;
 
-for (const file of SOURCES.flatMap(walk)) {
-    scanned += 1;
-    const raw = readFileSync(join(root, APP, file), "utf8");
-    const src = withoutComments(raw);
-    const lines = src.split("\n");
-    const lineOf = (index) => src.slice(0, index).split("\n").length;
+for (const { app: APP, sources } of APPS)
+    for (const file of sources.flatMap((d) => walk(APP, d))) {
+        scanned += 1;
+        const raw = readFileSync(join(root, APP, file), "utf8");
+        const src = withoutComments(raw);
+        const lines = src.split("\n");
+        const lineOf = (index) => src.slice(0, index).split("\n").length;
 
-    const inFormat = file.startsWith(FORMAT_MODULE);
-    lines.forEach((line, i) => {
-        if (!inFormat && !ALLOWED.has(file)) {
-            for (const [pattern, name, instead] of NATIVE) {
-                if (pattern.test(line)) {
+        const inFormat = file.startsWith(FORMAT_MODULE);
+        lines.forEach((line, i) => {
+            if (!inFormat && !ALLOWED.has(`${APP}/${file}`)) {
+                for (const [pattern, name, instead] of NATIVE) {
+                    if (pattern.test(line)) {
+                        problems.push(
+                            `${APP}/${file}:${i + 1}  ${name}: use ${instead} from @/lib/format`,
+                        );
+                    }
+                }
+            }
+            if (
+                MONEY_LIBS.some((dir) => file.startsWith(dir)) &&
+                FLOAT_PAISE.test(line)
+            ) {
+                problems.push(
+                    `${APP}/${file}:${i + 1}  paise from a float sum: use minorOf() from @/lib/format/money`,
+                );
+            }
+            if (!inFormat && HAND_PLURAL.test(line)) {
+                problems.push(
+                    `${APP}/${file}:${i + 1}  a plural built by hand: use count() or plural() from @/lib/format/plural`,
+                );
+            }
+        });
+
+        for (const m of src.matchAll(TOAST_CALL)) {
+            const open = m.index + m[1].length;
+            const end = closeOf(src, open);
+            if (end === -1) continue;
+            for (const words of stringsIn(src.slice(open + 1, end))) {
+                if (/successfully/i.test(words)) {
                     problems.push(
-                        `${APP}/${file}:${i + 1}  ${name}: use ${instead} from @/lib/format`,
+                        `${APP}/${file}:${lineOf(m.index)}  ${m[1]}: "successfully" says nothing. Say what happened: "Booking moved."`,
+                    );
+                }
+                if (/[A-Za-z]!(\s|$)/.test(words)) {
+                    problems.push(
+                        `${APP}/${file}:${lineOf(m.index)}  ${m[1]}: no exclamation mark in a toast`,
                     );
                 }
             }
         }
-        if (
-            MONEY_LIBS.some((dir) => file.startsWith(dir)) &&
-            FLOAT_PAISE.test(line)
-        ) {
-            problems.push(
-                `${APP}/${file}:${i + 1}  paise from a float sum: use minorOf() from @/lib/format/money`,
-            );
-        }
-        if (!inFormat && HAND_PLURAL.test(line)) {
-            problems.push(
-                `${APP}/${file}:${i + 1}  a plural built by hand: use count() or plural() from @/lib/format/plural`,
-            );
-        }
-    });
-
-    for (const m of src.matchAll(TOAST_CALL)) {
-        const open = m.index + m[1].length;
-        const end = closeOf(src, open);
-        if (end === -1) continue;
-        for (const words of stringsIn(src.slice(open + 1, end))) {
-            if (/successfully/i.test(words)) {
-                problems.push(
-                    `${APP}/${file}:${lineOf(m.index)}  ${m[1]}: "successfully" says nothing. Say what happened: "Booking moved."`,
-                );
-            }
-            if (/[A-Za-z]!(\s|$)/.test(words)) {
-                problems.push(
-                    `${APP}/${file}:${lineOf(m.index)}  ${m[1]}: no exclamation mark in a toast`,
-                );
-            }
-        }
     }
-}
 
 for (const file of ALLOWED.keys()) {
     try {
-        readFileSync(join(root, APP, file));
+        readFileSync(join(root, file));
     } catch {
-        problems.push(
-            `${APP}/${file}  is on the allow-list but no longer exists`,
-        );
+        problems.push(`${file}  is on the allow-list but no longer exists`);
     }
 }
 

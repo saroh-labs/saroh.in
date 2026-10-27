@@ -19,6 +19,7 @@
         "@saroh/auth": "workspace:*",
         "@saroh/error-tracking": "workspace:*",
         "@saroh/pricing-catalog": "workspace:*",
+        "@saroh/search-pages": "workspace:*",
         "@saroh/ui": "workspace:*",
         "@t3-oss/env-nextjs": "^0.13.11",
         "lucide-react": "catalog:",

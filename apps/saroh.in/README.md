@@ -20,7 +20,7 @@ Package name `web` (`pnpm --filter web …`) · served at
 | `/api/revalidate`                    | Called by the API after a pricing publish, to refresh the pricing pages at once         |
 | `/sitemap.xml`, `/robots.txt`        | Every indexable page (`lib/site-pages.ts`); robots keeps crawlers off draft and API     |
 
-Route groups: `(v2)` has the shared nav and footer; `(standalone)` (the
+Route groups: `(site)` has the shared nav and footer; `(standalone)` (the
 waitlist) and `(preview)` (the pricing draft) draw their own chrome.
 
 Old addresses (the first site's `/modules/*` and `/about`, and V1's `/sell`,

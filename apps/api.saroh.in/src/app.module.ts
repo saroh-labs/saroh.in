@@ -49,6 +49,7 @@ import { ProductsModule } from "./modules/products/products.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
 import { ProviderHealthModule } from "./modules/provider-health/provider-health.module";
 import { SavedViewsModule } from "./modules/saved-views/saved-views.module";
+import { SearchPagesModule } from "./modules/search-pages/search-pages.module";
 import { SearchModule } from "./modules/search/search.module";
 import { SelfTestModule } from "./modules/self-test/self-test.module";
 import { SignInOptionsModule } from "./modules/sign-in-options/sign-in-options.module";
@@ -148,6 +149,8 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         ToolsModule,
         BusinessReportsModule,
         ContactMessagesModule,
+        // Search pages published from the console (DEC-193).
+        SearchPagesModule,
         SelfTestModule,
     ],
 })

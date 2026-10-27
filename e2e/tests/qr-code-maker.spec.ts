@@ -109,18 +109,18 @@ test.describe("QR code maker", () => {
         // An unverified address can't say yes to news: no tickbox.
         await expect(page.getByRole("checkbox")).toHaveCount(0);
 
-        await page.getByLabel("Email").fill("owner@shop");
+        await page.getByLabel("Get your QR code").fill("owner@shop");
         await page.getByRole("button", { name: "Get my QR" }).click();
         await expect(page.locator("main").getByRole("alert")).toHaveText(
-            "That email looks incomplete. Check it and try again.",
+            "That email is missing its ending, like .com or .in.",
         );
         await expect(png).toHaveCount(0);
 
         const email = `qr-${stamp(testInfo)}@example.test`;
         const call = page.waitForRequest(
-            (r) => new URL(r.url()).pathname === "/api/qr-code-maker/unlock",
+            (r) => new URL(r.url()).pathname === "/api/tools/unlock",
         );
-        await page.getByLabel("Email").fill(email);
+        await page.getByLabel("Get your QR code").fill(email);
         await page.getByRole("button", { name: "Get my QR" }).click();
         // The email, and nothing about the code: not the link, not the label.
         const sent = await call;

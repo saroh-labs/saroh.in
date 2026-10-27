@@ -3,8 +3,11 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import Link from "next/link";
 
-import { Arrow } from "@/components/v2/arrow";
-import { WaitlistForm } from "@/components/v2/waitlist/waitlist-form";
+import { Arrow } from "@/components/shared/links/arrow";
+import { Pill } from "@/components/shared/links/pill";
+import { textLinkClasses } from "@/components/shared/links/text-link";
+import { Eyebrow } from "@/components/shared/sections/eyebrow";
+import { WaitlistForm } from "@/components/waitlist/waitlist-form";
 import { linkShown } from "@/content/resources";
 import { SAROH_HANDLE, SAROH_SOCIAL } from "@/content/social";
 import { galleryTemplates } from "@/content/templates";
@@ -19,6 +22,7 @@ import {
 } from "@/content/waitlist";
 import { readLaunchOffer } from "@/lib/launch-offer";
 import { resourcesContext } from "@/lib/resources-context";
+import { ring } from "@/lib/ring";
 import { pageMetadata } from "@/lib/seo";
 import { templatesLive } from "@/lib/templates-live";
 import { openingShort } from "@/lib/waitlist";
@@ -65,7 +69,7 @@ const HERO: [string, string][] = [
 /**
  * The waitlist (Waitlist design, plan U30): the site's one ask until
  * launch. It has its own header and footer, as the design draws them, so it
- * sits outside the `(v2)` chrome. The launch offer is the API's (U31); with
+ * sits outside the `(site)` chrome. The launch offer is the API's (U31); with
  * none, the form says it is announced at launch. The page reads no query, so
  * it stays static: the form reads `?plan=`, `?src=` (the CTA builder,
  * `lib/links.ts`), `?ref=` (a referral link) and `?template=` (a gallery
@@ -98,7 +102,7 @@ export default async function WaitlistPage() {
                 <Link
                     href="/"
                     aria-label="Saroh home"
-                    className="flex rounded-sm text-foreground no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground focus-visible:[outline-style:solid]"
+                    className={`flex rounded-sm text-foreground no-underline ${ring({ color: "ink" })}`}
                 >
                     <Wordmark aria-hidden style={{ fontSize: 22 }} />
                 </Link>
@@ -112,9 +116,14 @@ export default async function WaitlistPage() {
                 className={`${FRAME} ${GUTTER} grid flex-1 grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-start gap-[clamp(28px,5vw,64px)] py-[clamp(24px,5vw,64px)]`}
             >
                 <div className="flex flex-col gap-[22px] pt-2">
-                    <h1 className="m-0 text-[11px] font-semibold uppercase leading-[1.5] tracking-[0.1em] text-muted-foreground">
+                    <Eyebrow
+                        as="h1"
+                        tone="muted"
+                        size="sm"
+                        className="m-0 leading-[1.5]"
+                    >
                         {WAITLIST_PAGE.h1}
-                    </h1>
+                    </Eyebrow>
                     <p className="m-0 font-display text-[clamp(40px,6vw,68px)] font-semibold leading-[1.06] tracking-[-0.04em] [text-wrap:balance]">
                         {HERO.map(([initial, rest]) => (
                             <span key={initial}>
@@ -130,16 +139,13 @@ export default async function WaitlistPage() {
                         Made in India, priced in rupees.
                     </p>
                     <div className="flex max-w-[460px] flex-col gap-2.5 border-t border-border pt-5">
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                        <Eyebrow as="span" tone="muted" size="sm">
                             For people who run
-                        </span>
+                        </Eyebrow>
                         <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
                             {HERO_KINDS.map((kind) => (
-                                <li
-                                    key={kind.id}
-                                    className="rounded-full border border-border bg-white px-[11px] py-[5px] text-[13px]"
-                                >
-                                    {kind.label}
+                                <li key={kind.id}>
+                                    <Pill>{kind.label}</Pill>
                                 </li>
                             ))}
                         </ul>
@@ -151,7 +157,10 @@ export default async function WaitlistPage() {
                                 {" "}
                                 <Link
                                     href={WAITLIST_MONEY.link.href}
-                                    className="cursor-pointer whitespace-nowrap rounded-sm font-semibold text-brand-700 no-underline hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground focus-visible:[outline-style:solid]"
+                                    className={textLinkClasses({
+                                        className:
+                                            "whitespace-nowrap font-semibold",
+                                    })}
                                 >
                                     {WAITLIST_MONEY.link.label}
                                     <Arrow />
@@ -190,7 +199,7 @@ export default async function WaitlistPage() {
                                 href={link.href}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="cursor-pointer rounded-sm text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground focus-visible:[outline-style:solid]"
+                                className={textLinkClasses({ tone: "quiet" })}
                             >
                                 {link.label}
                             </a>

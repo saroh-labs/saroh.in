@@ -67,6 +67,7 @@ the right-hand files **before** writing code.
 | Show a toast, an error, or an empty, loading or failed state                                               | `docs/patterns/frontend-error-feedback.md` · `.agents/skills/saroh-product-states/SKILL.md`    |
 | Touch session handling, `packages/auth`, or anything that redirects to sign-in                             | `docs/patterns/frontend-error-feedback.md` · `docs/patterns/backend-auth-and-access.md`        |
 | Style anything, add a token, icon or animation, or draw on a merchant's page                               | `docs/patterns/frontend-design-system.md`                                                      |
+| Draw a UI piece that exists elsewhere, or copy a helper                                                    | `docs/patterns/frontend-design-system.md` → shared pieces · DEC-195                            |
 | Build or change merchant-facing UI in `app.saroh.in`                                                       | `.agents/skills/saroh-four-scenes/SKILL.md`                                                    |
 | Call a UI change done                                                                                      | `docs/patterns/frontend-verification.md` · `.agents/skills/saroh-browser-tests/SKILL.md`       |
 | Add or change an API module, controller, service, DTO or guard                                             | `docs/patterns/backend-nestjs.md` · `.agents/skills/saroh-architecture/SKILL.md`               |

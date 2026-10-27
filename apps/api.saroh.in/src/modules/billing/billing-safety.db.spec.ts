@@ -73,7 +73,7 @@ const tag = `${process.pid}-${Date.now()}`;
 const SELLER: SarohSeller = {
     name: "Saroh",
     legalName: "Example Labs Pvt Ltd",
-    gstin: "29AAAAA0000A1Z5",
+    gstin: "29AAAAA0000A1ZY",
     state: "29",
     address: "1 Test Road, Testville",
     email: "billing@example.test",

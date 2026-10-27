@@ -267,6 +267,44 @@
     | `ProgressBar`, `doneOf`                                                     | `@saroh/ui/progress-bar`                                                   | `value`, `max`, `size`, `tone`, `label` (required). A checklist's count is "2 of 4 done".                                                                                                                                                                                                                              |
     | `.label`                                                                    | `packages/ui/src/globals.css`                                              | 11px, 600, uppercase at 0.1em: every table and list header and eyebrow. The only `uppercase` in the app (code fields excepted).                                                                                                                                                                                        |
 
+- **Adopted** (27 Oct 2026, DEC-195) — **Shared pieces on saroh.in: reuse
+  the component, never redraw it.** Before drawing a card, heading, band,
+  link, chip, field or button, find the one that exists and pass it data; a
+  page that needs it different adds a variant there. A copy is a bug even
+  when it looks the same today (the /for/ and Home plan teaser, 27 Oct:
+  fixed by one `PricingCards`). Logic too: one email check, one day
+  formatter, one list joiner. Shared pieces move to `components/shared/`
+  (step 2 of `docs/plans/2026-10-27-001-saroh-in-dedupe-audit.md`); paths
+  below are where each lives or will live. Gap: the scan's allow-lists are
+  today's copies, each with the step that removes it.
+  Enforced by `apps/saroh.in/lib/consistency/shared-pieces.test.ts` (a
+  redraw: a regex per piece, allow-lists only shrink) and `pnpm check:dupes`
+  (`scripts/check-dupes.mjs`, a copy-paste of 6+ lines across saroh.in and
+  `@saroh/search-pages`; `scripts/dupes-baseline.json` only shrinks, `--update`
+  after removing one). Both run in `pnpm prepush` and CI.
+
+    | Piece                                     | The one                                                                             | Don't hand-draw                                                               |
+    | ----------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+    | Plan cards (price, switches, compare)     | `PricingCards` / `PlanCards`, `components/pricing/`                                 | a price (`text-mk-price*`) or a `PlanCardView` outside the pricing folder     |
+    | A page's pricing section, plan tables     | `PricingSection`, `PlanTable` (`components/pricing/`)                               | its own title + `PricingCards` block, its own table frame                     |
+    | Focus ring                                | `ring()`, `lib/ring.ts`                                                             | the `focus-visible:outline-…` string                                          |
+    | Text link, quiet link                     | `TextLink` (`tone`, `arrow`), `components/shared/links/text-link.tsx`               | `text-brand-700 no-underline` or a muted `no-underline` link class            |
+    | Breadcrumb                                | `Breadcrumbs` (`current="brand"`), `components/shared/nav/breadcrumbs.tsx`          | an `aria-label="Breadcrumb"` list                                             |
+    | FAQ                                       | `Faq`, `components/shared/sections/faq.tsx`                                         | a `<details>` list                                                            |
+    | Ink closing band                          | `CtaBand` (`template`, `note`, `size`), `components/shared/sections/`               | `rounded-mk-band bg-foreground`                                               |
+    | Section H2, page title                    | `Section` / `SectionHeading`, `PageTitle` (`text-mk-page`, `text-mk-article`)       | a raw `<h2 … text-mk-h2…>`, an H1 with its own `text-[clamp(…)]`              |
+    | Reading column                            | `Container width="article" \| "list"`                                               | `max-w-[720…900px]`                                                           |
+    | Small caps label                          | `Eyebrow` (`tone`, `size`)                                                          | `uppercase tracking-[0.1em]`                                                  |
+    | Link card                                 | `CardLink`                                                                          | its own hover shadow                                                          |
+    | Badge                                     | `Pill` (`tone="soon" \| "ok" \| "outline"`)                                         | `bg-mk-soon` badges                                                           |
+    | Button                                    | `Button` / `ButtonLink` (`buttonClasses`), `components/shared/buttons/`             | an Ink `<button>` with `bg-foreground text-background`                        |
+    | Choice chip, text field, email capture    | `ChoiceChip`, `fieldClasses()`, `EmailCapture`, `components/shared/fields/`         | a `h-9 rounded-full` chip, `placeholder:text-…` field classes                 |
+    | Hero buttons ("See it in action · 2 min") | `HeroActions`; the words in `content/`                                              | the label typed in a component                                                |
+    | Feature / solution hero, ruled points     | `ProductHero`, `PointGrid` (`components/shared/sections/`)                          | its own crumb–H1–sub–buttons–shot header, a `border-t pt-4` point list        |
+    | Email check, days, lists, arrows, body    | `isEmailShape()`, `lib/format/`, `nextIndex()`, `readPosted()`, `useBrowserValue()` | an email regex, `Intl`/`toLocale…`, `.slice(0,-1).join(", ")`, `req.json()`   |
+    | Clipboard, file download                  | `copyText` (`@saroh/ui`), `saveFile()` (`@saroh/search-pages/download`)             | `navigator.clipboard`, `URL.createObjectURL`                                  |
+    | Package crumb, FAQ, band, start button    | `packages/search-pages/src/components/page-parts.tsx`                               | `sp-*` / `tp-*` copies; a literal "Start free" (the label comes from `cta()`) |
+
 - **Current** (10 Oct 2026) — **"Draft" and "Live" for every kind of
   thing.** Whether customers can get a product, plan, course, pack, post,
   service or discount code is one of six words, the same whatever the thing:

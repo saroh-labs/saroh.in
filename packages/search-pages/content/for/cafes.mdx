@@ -1,0 +1,260 @@
+---
+slug: cafes
+name: Cafés
+plural: cafés
+pickAs: cafés
+family: Shops and food
+search: cafe billing software
+title: Cafe billing software with kitchen tickets
+description: "Cafe billing software: take the order at the counter, print a ticket for the kitchen, and give a GST bill for every sale."
+updated: 2026-10-26
+shape: orders
+h1: Quick bills at the counter, right orders in the kitchen.
+lead: Cafe billing software for the counter and the kitchen. Take the order, print a ticket for the kitchen, and give a GST bill for every sale.
+phoneLead: Cafe billing software. Take the order, print a kitchen ticket, and give a GST bill.
+problemsTitle: What gets easier in your café.
+problems:
+  - area: The morning rush
+    quote: The morning rush, and orders shouted across the counter.
+    title: Every counter order in one list
+    body: "Take the order and mark how it was paid: cash, UPI or card. Watch it go from being made, to ready, to collected."
+    link: Orders
+  - area: In the kitchen
+    quote: The kitchen made it with sugar again.
+    title: A ticket for the kitchen
+    body: Print a ticket with the notes, like less sugar or no ice. If a regular has an allergy, it shows on the ticket.
+  - area: Bills for expenses
+    quote: Customers ask for a GST bill for their expenses.
+    title: A GST bill for every order
+    body: Each paid order gets a numbered bill. Add your GST number once, and every bill shows the tax.
+    link: Billing
+  - area: Your menu and prices
+    quote: The board says one price, the bill says another.
+    title: Change a price once
+    body: Change a price, and the next bill uses it. Orders already taken keep their price.
+    link: Products
+  - area: What's left on the shelf
+    quote: We ran out of croissants by ten and didn't know.
+    title: Know when the croissants run low
+    body: Count your bakes in the morning, and each sale takes one off. What's running low shows first.
+  - area: Your regulars
+    quote: She comes in every day, and I can't remember her usual.
+    title: Know her usual
+    body: See what each regular usually orders, in which size, and what they've spent.
+    link: Customers
+services:
+  - name: Masala chai
+    detail: regular, large
+  - name: Cold coffee
+    detail: regular, large
+  - name: Butter croissant
+    detail: per piece
+related:
+  - name: Home bakers
+    slug: home-bakers
+  - name: Cloud kitchens
+    slug: cloud-kitchens
+  - name: Gift shops
+    slug: gift-shops
+ctaTitle: Quicker at the counter, right in the kitchen.
+scene:
+  business: Filter & Foam Café
+  site: filter-and-foam.saroh.app
+  day: Sat 25 Oct
+  heroAlt: "What a café's morning looks like in Saroh: counter and phone orders in one list, an office order of 12 chai and 12 croissants for 11 am, croissants counted as they sell, a bill with GST, and a regular who takes oat milk."
+  hero:
+    title: Orders · Sat 25 Oct
+    count: 5 open
+    highlight: 0
+    rows:
+      - time: "#3121"
+        name: Lotus Print Works
+        right: Pick-up
+      - time: "#3120"
+        name: Ankit Sharma
+        right: Preparing
+      - time: "#3119"
+        name: Divya Nair
+        right: Ready
+      - time: "#3118"
+        name: Walk-in
+        right: Collected
+  chips:
+    - icon: cal
+      title: "#3121 · pick-up 11 am"
+      sub: Office order by phone · in the note
+    - icon: ok
+      title: ₹340 paid · UPI
+      sub: Counter order · bill made
+    - icon: bill
+      title: "Bill #1874 · GST"
+      sub: CGST 2.5% + SGST 2.5% shown
+    - icon: person
+      title: "Divya · usual: cold coffee"
+      pill: Oat milk, no dairy
+  items:
+    - name: Masala chai
+      short: Chai
+      len: regular
+      price: 60
+    - name: Cold coffee
+      short: Cold coffee
+      len: regular
+      price: 160
+    - name: Butter croissant
+      short: Croissant
+      len: per piece
+      price: 120
+  orders:
+    count: 5 open
+    foot: Copy it to the office on WhatsApp. They pay by UPI or card.
+    list:
+      - no: 3121
+        name: Lotus Print Works
+        what: 24 items
+        how: Pick-up
+        stage:
+          tone: amb
+          text: New
+        total: 2160
+        note: Phone call · office order, 11 am
+        items: Chai × 12, croissants × 12
+        due: Sat 11 am
+        payLabel: Unpaid
+        detail: Office upstairs. 6 chai with less sugar, 6 regular. Croissants warmed. Pick-up at 11 am.
+      - no: 3120
+        name: Ankit Sharma
+        what: 2 items
+        how: Pick-up
+        stage:
+          tone: grey
+          text: Preparing
+        total: 280
+        note: Counter · cold coffee, no ice
+      - no: 3119
+        name: Divya Nair
+        what: 1 item
+        how: Pick-up
+        stage:
+          tone: paid
+          text: Ready
+        total: 160
+        note: Counter · oat milk
+      - no: 3118
+        name: Walk-in
+        what: 3 items
+        how: Pick-up
+        stage:
+          tone: paid
+          text: Collected
+        total: 340
+        note: Counter · paid by UPI
+      - no: 3117
+        name: Rohit Bose
+        what: 2 items
+        how: Pick-up
+        stage:
+          tone: amb
+          text: New
+        total: 180
+        note: Counter · croissant warmed
+  stock:
+    made:
+      name: Cold coffee
+      short: Cold coffee
+      sizes:
+        - size: Regular
+          price: 160
+        - size: Large
+          price: 210
+    counted:
+      name: Butter croissant
+      short: Croissants
+      sub: Per piece
+      price: 120
+      baked: 24
+      left: 5
+  customer:
+    name: Divya Nair
+    initials: DN
+    stats:
+      - 48 orders
+      - ₹7,680 spent
+    tag: Oat milk, no dairy
+    note: "Usual: regular cold coffee with oat milk. Comes in at 9."
+    noteBy: Note from Sam · 10 Oct
+  bill:
+    no: 1874
+    status:
+      tone: amb
+      text: Unpaid
+    gstin: true
+    showCodes: true
+    rate: 5
+    lines:
+      - name: Masala chai × 12
+        code: SAC 996331
+        codeStatus: to-confirm
+        amount: 685.71
+      - name: Butter croissant × 12
+        code: SAC 996331
+        codeStatus: to-confirm
+        amount: 1371.43
+    cgst: 51.43
+    sgst: 51.43
+    total: 2160
+    foot: Payment link ready to send.
+  tiles:
+    orders:
+      title: Every counter order in one list
+      line: Take the order, then see it go from preparing to ready to collected.
+      phoneLine: Preparing, ready, collected.
+    stock:
+      title: Know when the croissants run low
+      line: Count the morning's croissants. Drinks made to order don't need counting.
+      phoneLine: Croissants counted, drinks made to order.
+    bill:
+      title: A GST bill for every order
+      line: Add your GST number once, and every bill shows the tax.
+      phoneLine: Every bill shows the tax.
+    customer:
+      title: Know her usual
+      line: What each regular orders, and what they can't have.
+      phoneLine: Her usual, and what she can't have.
+    website:
+      title: Your menu and prices on your website
+      line: Change a price once, and your website shows it.
+      phoneLine: Change it once, and it shows.
+  quote:
+    text: The morning rush, and orders shouted across the counter.
+    caption: Sound like your mornings? Each order goes in the list once, with its notes for the kitchen.
+  also:
+    - title: Kitchen tickets
+      line: Print the order for the kitchen, with less sugar or no ice on it.
+    - title: Pick-up or delivery
+      line: Mark each order, and see which go out and which are collected.
+    - title: Payment links
+      line: Copy a link for an office order. They pay by UPI or card.
+    - title: Who sees the money
+      line: Give each helper a role. Only the roles you pick see takings.
+    - title: What's running late
+      line: Orders behind their step show as late in your list.
+    - title: Bills by hand
+      line: Write a bill yourself for an office that orders every week.
+---
+
+## What does Start free include?
+
+You can put your website up and start for free, with no card needed. Move up to a paid plan when you need more.
+
+## Can I print a ticket for the kitchen?
+
+Yes, print a ticket for each order, with notes like less sugar. If a regular has an allergy, it's on the ticket too.
+
+## Can I give a GST bill at the counter?
+
+Yes. Add your GST number once, and every paid sale gets a numbered bill with the tax shown.
+
+## How do customers pay me?
+
+By UPI or card from a payment link, straight into your own Razorpay or Cashfree account, or in cash at the counter. Every paid order gets a numbered bill.

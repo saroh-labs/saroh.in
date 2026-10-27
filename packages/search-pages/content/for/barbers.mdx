@@ -1,0 +1,251 @@
+---
+slug: barbers
+name: Barbers
+plural: barbers
+pickAs: barbers
+family: Beauty
+search: barber shop booking app
+title: Barber shop booking app for regulars and walk-ins
+description: "Barber shop booking app: regulars book their time, walk-ins go in at the counter, and every cut gets a bill, paid by UPI or cash."
+updated: 2026-10-26
+shape: appointments
+h1: Every chair booked, and no one waiting.
+lead: Booking software for barber shops. Take bookings from regulars, add walk-ins at the counter, and get paid by UPI or cash, with a bill for every cut.
+phoneLead: Booking software for barber shops. Take bookings, add walk-ins, and give a bill for every cut.
+demo: See a live salon demo
+problemsTitle: What gets easier in your shop.
+problems:
+  - area: Taking bookings
+    quote: Saturday morning, the phone doesn't stop.
+    title: Regulars book their own chair
+    body: Your booking page shows only the times each barber is free. A regular picks the cut, the barber and the time, and it's theirs.
+    link: Bookings
+  - area: At the counter
+    quote: A walk-in sits down while someone has a booking.
+    title: Walk-ins go in the same diary
+    body: Add a walk-in in a few taps, with the barber and the time. Nobody else can book that chair then.
+  - area: Your team's days
+    quote: Each barber has a different day off.
+    title: Each barber's hours and time off
+    body: Set when each barber works and the days the shop is closed. Customers only see those times.
+  - area: Your regulars
+    quote: I can't remember how he likes it.
+    title: Remember how every regular likes it
+    body: "His visits and your notes on one page: the guard number, the beard shape, the last time he came."
+    link: Customers
+  - area: Getting paid
+    quote: They want a bill for the office.
+    title: A bill for every cut
+    body: Online payments go straight to your own account, and every payment gets a numbered bill. Add your GST number and GST shows on it.
+    link: Billing
+  - area: Your own website
+    quote: People ask on Instagram what a fade costs.
+    title: Your prices on your own website
+    body: Your website shows each service and its price. It's the same list regulars book from.
+    link: Website
+services:
+  - name: Men's haircut
+    detail: 30 min
+  - name: Beard trim & shape
+    detail: 30 min
+related:
+  - name: Salons
+    slug: salons
+  - name: Spas
+    slug: spas
+  - name: Tattoo studios
+    slug: tattoo-studios
+ctaTitle: Every chair full, and nobody waiting.
+scene:
+  business: Sharp Line Barbers
+  site: sharp-line-barbers.saroh.app
+  day: Sat 31 Oct
+  place: shop
+  heroAlt: "What a barber shop's Saturday looks like in Saroh: Karan booked with Imran at 11:00, a walk-in added for Sunny, a ₹100 deposit paid by UPI, bill number 87 with GST, and a note on how Karan likes his fade."
+  hero:
+    title: Today · Sat 31 Oct
+    count: 14 bookings
+    highlight: 1
+    rows:
+      - time: 10:30
+        name: Walk-in
+        right: Sunny
+      - time: 11:00
+        name: Karan Malhotra
+        right: Imran
+      - time: 11:30
+        name: Arjun Pillai
+        right: Beard trim
+      - time: 12:00
+        name: Dev Bhatt
+        right: Haircut & beard
+  chips:
+    - icon: cal
+      title: Booked · Sat 11:00 · Imran
+      sub: Karan Malhotra · Men's haircut
+    - icon: ok
+      title: ₹100 deposit paid · UPI
+      sub: Into your own Razorpay account
+      phoneSub: Into your own Razorpay
+    - icon: bill
+      title: "Bill #87 · GST"
+      sub: CGST 2.5% + SGST 2.5% shown
+    - icon: person
+      title: "Karan · usual: fade, no. 2"
+      pill: Sensitive skin
+  staff:
+    - Imran
+    - Sunny
+  items:
+    - name: Men's haircut
+      short: Haircut
+      len: 30 min
+      who: with Imran or Sunny
+      price: 400
+    - name: Beard trim & shape
+      short: Beard trim
+      len: 30 min
+      who: with anyone
+      price: 250
+    - name: Haircut & beard
+      short: Cut & beard
+      len: 45 min
+      who: with Imran or Sunny
+      price: 600
+  booking:
+    item: 0
+    staff: Imran
+    time: 11:00
+    deposit: quarter
+    depositBy: Karan Malhotra
+    times:
+      - time: 10:00
+      - time: 10:30
+        taken: true
+      - time: 11:00
+        picked: true
+      - time: 11:30
+      - time: 12:00
+        taken: true
+      - time: 13:00
+      - time: 14:00
+        taken: true
+      - time: 15:30
+      - time: 16:30
+      - time: 17:30
+    phoneTimes:
+      - time: 10:00
+      - time: 10:30
+        taken: true
+      - time: 11:00
+        picked: true
+      - time: 11:30
+      - time: 12:00
+        taken: true
+      - time: 13:00
+      - time: 14:00
+        taken: true
+      - time: 15:30
+  today:
+    - time: 10:30
+      name: Walk-in
+      who: Sunny
+      status:
+        tone: grey
+        text: Walk-in
+    - time: 11:00
+      name: Karan
+      who: Imran
+      status:
+        tone: paid
+        text: Deposit paid
+    - time: 11:30
+      name: Arjun
+      who: Sunny
+      status:
+        tone: grey
+        text: Pays at counter
+  customer:
+    name: Karan Malhotra
+    initials: KM
+    stats:
+      - 22 visits
+      - ₹9,850 spent
+    tag: "Sensitive skin: no alcohol after shave"
+    note: Fade, no. 2 on the sides, scissors on top.
+    noteBy: Note from Imran · 17 Oct
+  bill:
+    no: 87
+    status:
+      tone: paid
+      text: Paid · UPI
+    gstin: true
+    showCodes: false
+    rate: 5
+    lines:
+      - name: Haircut & beard
+        code: SAC 999721
+        codeStatus: to-confirm
+        amount: 571.43
+    cgst: 14.29
+    sgst: 14.28
+    total: 600
+    foot: null
+  tiles:
+    booking:
+      title: Regulars book their own chair
+      line: Your booking page shows only the times each barber is free.
+      phoneLine: Only the times each barber is free.
+    deposit:
+      title: Hold the Saturday chair
+      line: Ask for a quarter, half or all of it, into your own Razorpay or Cashfree.
+      phoneLine: Paid into your own Razorpay or Cashfree.
+    today:
+      title: Bookings and walk-ins, one list
+      line: Add a walk-in in a few taps, and that chair is taken.
+      phoneLine: Add a walk-in in a few taps, and that chair is taken.
+    customer:
+      title: Remember how he likes it
+      line: "His visits, spend and your notes: the guard number, the beard shape."
+      phoneLine: Visits and your notes on him.
+    bill:
+      title: A bill for the office
+      line: Add your GST number once, and your bills show the tax.
+      phoneLine: Add your GST number once, and bills show the tax.
+    website:
+      title: What a fade costs, online
+      line: Change a price once, and your website shows it.
+      phoneLine: Change a price once, and it shows.
+  quote:
+    text: Saturday morning, the phone doesn't stop.
+    caption: Sound like your Saturdays? Your booking page shows regulars the free times, so they pick one themselves.
+  also:
+    - title: Packs for regulars
+      line: Sell five haircuts at one price. One comes off each booking.
+    - title: Hours and time off
+      line: Each barber's working days, time off and the days you're closed.
+    - title: Payment links
+      line: Send a link. They pay by UPI or card, and get a bill.
+    - title: Who sees the money
+      line: Give each barber a role. Only the roles you pick see takings.
+    - title: In their phone's calendar
+      line: Customers add their booking to their own calendar.
+    - title: Who didn't come
+      line: Mark it once, and it shows on the customer's page.
+---
+
+## What does Start free include?
+
+You can set up your website and bookings for free, with no card needed. Move up to a paid plan when you need more.
+
+## Can I add a walk-in at the counter?
+
+Yes. Add it in a few taps with the barber and the time, and nobody else can book that chair then.
+
+## Can a regular choose their barber?
+
+Yes. When more than one barber does a service, your booking page offers Anyone or a named person, with only their free times.
+
+## How do customers pay?
+
+By UPI or card when they book or from a payment link, straight into your own Razorpay or Cashfree account. Cash at the desk works too, and every payment gets a bill.

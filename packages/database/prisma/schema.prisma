@@ -8981,3 +8981,47 @@ model MessagingVerificationSetting {
 
   @@unique([organizationId, module])
 }
+
+// Whether a search page on saroh.in (`/for/<slug>`) is live (DEC-193). The
+// words live in `@saroh/search-pages`; this is the one publish record per
+// page path, set by staff in the admin console (search-pages:publish). A
+// path with no row has never been published. Saroh's own site: no
+// organization, so no row-level security policy (named in
+// `packages/database/src/rls-coverage.test.ts`).
+model SearchPage {
+  id              String           @id @default(cuid())
+  // `/for/<slug>`.
+  path            String           @unique
+  status          SearchPageStatus
+  // When it last went live; null while it isn't.
+  liveSince       DateTime?
+  // When it last stopped being live; null if it never was. A page taken
+  // off redirects on the site, so a restored page keeps this.
+  takenOffAt      DateTime?
+  changedAt       DateTime         @default(now())
+  // The staff user (`User.id`) who made the last change.
+  changedByUserId String?
+}
+
+enum SearchPageStatus {
+  LIVE
+  UNPUBLISHED
+  ARCHIVED
+  // Restored from the archive: back where a page with no record starts.
+  DRAFT
+}
+
+// Every publish, unpublish, archive and restore of a search page, oldest
+// to newest. Append-only.
+model SearchPageEvent {
+  id         String            @id @default(cuid())
+  path       String
+  action     String
+  // Null when the page had no record yet.
+  fromStatus SearchPageStatus?
+  toStatus   SearchPageStatus
+  byUserId   String
+  at         DateTime          @default(now())
+
+  @@index([path, at])
+}

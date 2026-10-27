@@ -1,9 +1,22 @@
 import { describe, expect, it } from "vitest";
 
+import { SOLUTION_SLUGS as SITE_SOLUTION_SLUGS } from "./content/types";
 import { SIGN_UP_URL } from "./lib/links";
 import { CRAWL_DISALLOWED, indexedPaths, SERVED_PATHS } from "./lib/site-pages";
 import nextConfig from "./next.config.js";
-import { launched, REDIRECTS, temporary } from "./redirects.js";
+import {
+    FAMILY_PAGE,
+    launched,
+    REDIRECTS,
+    searchRedirects,
+    SOLUTION_SLUGS,
+    temporary,
+} from "./redirects.js";
+import {
+    familyOf,
+    loadPublishList,
+    toolExists,
+} from "./search-pages.config.js";
 
 /** The URLs the V1 sitemap listed, and the addresses before it (plan U26). */
 const OLD_URLS = [
@@ -44,6 +57,7 @@ describe("redirects", () => {
         // The tests run with the switch unset: waitlist mode.
         expect(await nextConfig.redirects?.()).toEqual([
             ...REDIRECTS,
+            ...searchRedirects(loadPublishList(), familyOf, toolExists),
             ...temporary(undefined),
         ]);
     });
@@ -117,6 +131,174 @@ describe("redirects", () => {
 
     it("is a 301 every time", () => {
         for (const r of REDIRECTS) expect(r.statusCode).toBe(301);
+    });
+});
+
+describe("free tool redirects (#1253)", () => {
+    const tools = new Set(["qr-code-maker", "no-show-cost-calculator"]);
+    const exists = (slug: string) => tools.has(slug);
+    const list = (live: string[], takenOff: string[], preview = false) => ({
+        preview,
+        live,
+        takenOff: takenOff.map((path) => ({ path, at: "2026-10-26" })),
+    });
+
+    it("sends a tool taken off to the /tools hub for now (302), or Home with no tool live", () => {
+        expect(
+            searchRedirects(
+                list(
+                    ["/tools/qr-code-maker"],
+                    ["/tools/no-show-cost-calculator"],
+                ),
+                () => null,
+                exists,
+            ),
+        ).toEqual([
+            {
+                source: "/tools/no-show-cost-calculator",
+                destination: "/tools",
+                statusCode: 302,
+            },
+        ]);
+        // The only live tool isn't in this commit's code: no hub to land on.
+        expect(
+            searchRedirects(
+                list(["/tools/gone"], ["/tools/qr-code-maker"]),
+                () => null,
+                exists,
+            ).map((r) => r.destination),
+        ).toEqual(["/"]);
+    });
+
+    it("leaves a tool taken off alone on a preview, and never redirects a live one", () => {
+        expect(
+            searchRedirects(
+                list([], ["/tools/qr-code-maker"], true),
+                () => null,
+                exists,
+            ),
+        ).toEqual([]);
+        expect(
+            searchRedirects(
+                list(["/tools/qr-code-maker"], ["/tools/qr-code-maker"]),
+                () => null,
+                exists,
+            ),
+        ).toEqual([]);
+    });
+});
+
+describe("search page redirects (DEC-193)", () => {
+    /** Families as the content says; "gyms" and "shops" are not in this stub's code. */
+    const FAMILIES: Record<string, string> = {
+        salons: "Beauty",
+        clinics: "Health",
+        "dental-clinics": "Health",
+        "nail-studios": "Beauty",
+        "yoga-studios": "Fitness and classes",
+        "music-classes": "Learning",
+    };
+    const family = (slug: string) => FAMILIES[slug] ?? null;
+    const list = (
+        live: string[],
+        takenOff: string[] = [],
+        preview = false,
+    ) => ({
+        preview,
+        live,
+        takenOff: takenOff.map((path) => ({ path, at: "2026-10-25" })),
+    });
+
+    it("keeps the four solution slugs the site's", () => {
+        expect(SOLUTION_SLUGS).toEqual([...SITE_SOLUTION_SLUGS]);
+        expect(Object.values(FAMILY_PAGE).sort()).toEqual(
+            [...SITE_SOLUTION_SLUGS].sort(),
+        );
+    });
+
+    it("makes none without a list", () => {
+        expect(searchRedirects(null, family)).toEqual([]);
+    });
+
+    it("moves /solutions/<x> for good only once /for/<x> is live and in the code", () => {
+        expect(searchRedirects(list(["/for/salons"]), family)).toEqual([
+            {
+                source: "/solutions/salons",
+                destination: "/for/salons",
+                statusCode: 301,
+            },
+        ]);
+        // Live in the API, but no file for it in this commit: no redirect.
+        expect(searchRedirects(list(["/for/gyms"]), family)).toEqual([]);
+        // A /for/ page that isn't a solution moves nothing.
+        expect(searchRedirects(list(["/for/dental-clinics"]), family)).toEqual(
+            [],
+        );
+    });
+
+    it("sends a page taken off to its live family page, else Home, for now (302)", () => {
+        const rules = searchRedirects(
+            list(
+                ["/for/salons"],
+                [
+                    "/for/nail-studios",
+                    "/for/dental-clinics",
+                    "/for/music-classes",
+                    "/for/yoga-studios",
+                ],
+            ),
+            family,
+        );
+        const to = Object.fromEntries(
+            rules.map((r) => [r.source, [r.destination, r.statusCode]]),
+        );
+        expect(to).toEqual({
+            "/solutions/salons": ["/for/salons", 301],
+            "/for/nail-studios": ["/for/salons", 302],
+            // Clinics isn't live: Home.
+            "/for/dental-clinics": ["/", 302],
+            // Learning has no family page.
+            "/for/music-classes": ["/", 302],
+            "/for/yoga-studios": ["/", 302],
+        });
+    });
+
+    it("never chains, and a family page taken off goes Home", () => {
+        const rules = searchRedirects(
+            list(
+                ["/for/clinics"],
+                ["/for/salons", "/for/nail-studios", "/for/dental-clinics"],
+            ),
+            family,
+        );
+        const sources = new Set(rules.map((r) => r.source));
+        for (const r of rules) expect(sources.has(r.destination)).toBe(false);
+        expect(rules.find((r) => r.source === "/for/salons")?.destination).toBe(
+            "/",
+        );
+        expect(
+            rules.find((r) => r.source === "/for/dental-clinics")?.destination,
+        ).toBe("/for/clinics");
+        // Nothing here shadows a fixed rule or a page the site serves.
+        for (const r of rules) {
+            expect(resolve(r.source)).toBeNull();
+            expect(resolve(r.destination)).toBeNull();
+        }
+    });
+
+    it("leaves taken-off pages alone on a preview, which still builds them as drafts", () => {
+        expect(
+            searchRedirects(
+                list(["/for/salons"], ["/for/nail-studios"], true),
+                family,
+            ),
+        ).toEqual([
+            {
+                source: "/solutions/salons",
+                destination: "/for/salons",
+                statusCode: 301,
+            },
+        ]);
     });
 });
 
