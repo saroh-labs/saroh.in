@@ -28,7 +28,7 @@ import { SOLUTION_SLUGS } from "./types";
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-10-12";
+export const UPDATED = "2026-10-27";
 
 export const solutions: Record<SolutionSlug, Solution> = {
     shops: {
