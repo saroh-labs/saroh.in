@@ -1,3 +1,36 @@
+// jest can't load better-auth's ESM build (as in admin-people.db.spec.ts):
+// the session is a plain row and cookie here. Better Auth's own session
+// path is tested against the real library in packages/auth/src/phone-sign-in.test.ts.
+jest.mock("../../common/auth/auth", () => ({ auth: {} }));
+jest.mock("@saroh/auth", () => ({
+    startPhoneSession: async (
+        _auth: unknown,
+        { userId }: { userId: string },
+    ) => {
+        const { prisma: db } =
+            jest.requireActual<typeof import("@saroh/database")>(
+                "@saroh/database",
+            );
+        const { randomUUID } =
+            jest.requireActual<typeof import("node:crypto")>("node:crypto");
+        const token = randomUUID();
+        await db.session.create({
+            data: {
+                id: randomUUID(),
+                token,
+                userId,
+                expiresAt: new Date(Date.now() + 86_400_000),
+            },
+        });
+        const headers = new Headers();
+        headers.append(
+            "set-cookie",
+            `saroh.session_token=${token}; Path=/; HttpOnly`,
+        );
+        return headers;
+    },
+}));
+
 import { Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
@@ -79,11 +112,11 @@ function token(forPhone: string): string {
     return t;
 }
 
-function signIn(p: string, accessToken: string) {
+function signIn(p: string, accessToken: string, ip = IP) {
     return service.signIn({
         phoneE164: p,
         accessToken,
-        ip: IP,
+        ip,
         headers: new Headers({ "user-agent": "jest" }),
     });
 }
@@ -136,6 +169,7 @@ describe("signing in with a phone", () => {
 
     it("answers a phone with no account in one sentence, with no session", async () => {
         const p = phone();
+        const before = await prisma.session.count();
         await expect(signIn(p, token(p))).rejects.toMatchObject({
             response: {
                 message:
@@ -143,7 +177,7 @@ describe("signing in with a phone", () => {
                 details: { code: "NO_ACCOUNT" },
             },
         });
-        await expect(prisma.session.count()).resolves.toBe(0);
+        await expect(prisma.session.count()).resolves.toBe(before);
         expect(lastWarning(p)).toContain("reason=unknown_phone");
     });
 
@@ -315,13 +349,15 @@ describe("the limits", () => {
     it("caps failed verifies per address", async () => {
         const p = phone();
         await person(p);
+        // An address of its own: earlier tests' failures share IP.
+        const ip = "203.0.113.77";
         // Failures for other numbers from the same address.
         for (let i = 0; i < FAILS_PER_ADDRESS_PER_DAY; i++) {
-            await expect(signIn(phone(), "bad")).rejects.toMatchObject({
+            await expect(signIn(phone(), "bad", ip)).rejects.toMatchObject({
                 status: 400,
             });
         }
-        await expect(signIn(p, token(p))).rejects.toMatchObject({
+        await expect(signIn(p, token(p), ip)).rejects.toMatchObject({
             status: 429,
         });
         expect(lastWarning(p)).toContain("reason=address_failures");
