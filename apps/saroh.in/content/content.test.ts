@@ -153,7 +153,7 @@ describe("solution pages", () => {
                 );
             }
             expect(faqs[s.faq], `${slug}: ${s.faq}`).toBeDefined();
-            expect(s.pricing.featured).not.toBe(s.pricing.second);
+            expect(s.pricing.title).toMatch(/^Pricing for /);
         },
     );
 

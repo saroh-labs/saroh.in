@@ -19,13 +19,9 @@ import {
 } from "@/content/solutions";
 import { SOLUTION_SLUGS } from "@/content/types";
 import { LAUNCH_MODE } from "@/lib/links";
-import {
-    faqWithPlans,
-    freePlanLine,
-    planTeaserFootnote,
-    solutionPlanTeasers,
-} from "@/lib/plan-teasers";
+import { faqWithPlans, freePlanLine } from "@/lib/plan-teasers";
 import { readLivePricing } from "@/lib/pricing";
+import { placeholderPricingModel, pricingPageModel } from "@/lib/pricing-view";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import { breadcrumbLd, faqPageLd } from "@/lib/structured-data";
 
@@ -117,8 +113,11 @@ export default async function SolutionPage({ params }: Props) {
             {LAUNCH_MODE === "open" ? (
                 <SolutionPricing
                     title={s.pricing.title}
-                    plans={solutionPlanTeasers(catalog, s.pricing)}
-                    footnote={planTeaserFootnote(catalog)}
+                    model={
+                        catalog
+                            ? pricingPageModel(catalog)
+                            : placeholderPricingModel()
+                    }
                     src={`solutions-${slug}-pricing`}
                 />
             ) : null}

@@ -58,10 +58,12 @@
 .sp :where(h1, h2, h3, p, figure, blockquote, ul) {
     margin: 0;
 }
-.sp a {
+/* Zero specificity: a component the app slots in (the pricing cards) keeps
+   its own link colours; the page's own links take amber. */
+:where(.sp a) {
     color: var(--sp-amber-text);
 }
-.sp a:hover {
+:where(.sp a:hover) {
     color: var(--sp-ink);
 }
 .sp a:not([href]) {

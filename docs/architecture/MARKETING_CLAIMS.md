@@ -349,6 +349,10 @@ real and the Orders tile is back, #867 and #919 — see IN13.)
 `content/solutions.ts`, `app/(v2)/solutions/[slug]`. Segment rows that
 repeat a feature claim point to it.
 
+The pricing "fit" lines (SO6, SO11, SO17 and the salons one) are no longer
+shown: since 27 Oct every page draws the Pricing page's own plan cards
+(`components/v2/pricing/pricing-cards.tsx`), with no per-trade line.
+
 | ID   | Claim · page                                                                                                                                                                  | Backed by                                             | Status | What's missing                                                                                           | Proposed copy                                                                                                |
 | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | SO1  | Shops headline: "Sell at the counter and online, from one place."                                                                                                             | `new-order.ts`, `public-checkout.service.ts`          | Partly | Online waits for `SITE_SHOP`                                                                             | Keep once the shop ships; until then lead with the counter, orders and stock                                 |

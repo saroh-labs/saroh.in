@@ -108,9 +108,6 @@ export const solutions: Record<SolutionSlug, Solution> = {
         ],
         pricing: {
             title: "Pricing for shops",
-            featured: "grow",
-            fit: "For a shop, that means stock across your locations, weekly orders that renew on their day, and GST invoices.",
-            second: "pro",
         },
         faq: "shops-counter-online",
         closer: "Open tomorrow knowing what to bake.",
@@ -206,9 +203,6 @@ export const solutions: Record<SolutionSlug, Solution> = {
         ],
         pricing: {
             title: "Pricing for salons",
-            featured: "grow",
-            fit: "For a salon, that means deposits at booking, packs of sessions and GST invoices.",
-            second: "free",
         },
         faq: "salons-choose-stylist",
         closer: "Know tomorrow's bookings before you open.",
@@ -293,9 +287,6 @@ export const solutions: Record<SolutionSlug, Solution> = {
         ],
         pricing: {
             title: "Pricing for gyms and studios",
-            featured: "grow",
-            fit: "For a studio, that means class packs, courses and memberships that renew themselves.",
-            second: "free",
         },
         faq: "gyms-pack-and-membership",
         closer: "Fill tomorrow's 7am class.",
@@ -372,9 +363,6 @@ export const solutions: Record<SolutionSlug, Solution> = {
         ],
         pricing: {
             title: "Pricing for clinics",
-            featured: "grow",
-            fit: "For a clinic, that means treatments over several visits, patient notes kept to the right people, and bills of supply.",
-            second: "pro",
         },
         faq: "clinics-medical-notes",
         closer: "Know every patient before they sit down.",

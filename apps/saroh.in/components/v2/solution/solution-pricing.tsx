@@ -1,25 +1,19 @@
-import Link from "next/link";
-
-import type { PlanTeaserView } from "@/lib/plan-teasers";
+import type { PricingPageModel } from "@/lib/pricing-model";
 
 import { Container } from "../container";
-import { PlanTeaserCard } from "./plan-teaser-card";
+import { PricingCards } from "../pricing/pricing-cards";
 
 /**
- * "Pricing for shops": the featured plan with the page's fit line, a second
- * plan, and the link to compare every plan. Takes the teasers ready-made
- * (`lib/plan-teasers.ts`).
+ * "Pricing for shops": the Pricing page's own plan cards (`PricingCards`),
+ * then "Compare every plan".
  */
 export function SolutionPricing({
     title,
-    plans,
-    footnote,
+    model,
     src,
 }: {
     title: string;
-    plans: PlanTeaserView[];
-    /** The words before "Compare every plan", when there are any. */
-    footnote: string | null;
+    model: PricingPageModel;
     src: string;
 }) {
     return (
@@ -34,41 +28,7 @@ export function SolutionPricing({
             >
                 {title}
             </h2>
-            <PlanTeaserGrid plans={plans} footnote={footnote} src={src} />
+            <PricingCards model={model} src={src} compare />
         </Container>
-    );
-}
-
-/** The cards, then the footnote and "Compare every plan": a /for/ page's Pricing too. */
-export function PlanTeaserGrid({
-    plans,
-    footnote,
-    src,
-}: {
-    plans: PlanTeaserView[];
-    footnote: string | null;
-    src: string;
-}) {
-    return (
-        <>
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] gap-4">
-                {plans.map((teaser) => (
-                    <PlanTeaserCard
-                        key={teaser.plan}
-                        teaser={teaser}
-                        src={src}
-                    />
-                ))}
-            </div>
-            <div className="text-mk-note text-muted-foreground">
-                {footnote ? `${footnote} ` : null}
-                <Link
-                    href="/pricing"
-                    className="rounded-sm text-brand-700 no-underline hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
-                >
-                    Compare every plan
-                </Link>
-            </div>
-        </>
     );
 }

@@ -1,29 +1,19 @@
 "use client";
 
-import { useState } from "react";
-
-import { track } from "@/lib/analytics";
 import type { PricingPageModel } from "@/lib/pricing-model";
-import { viewKey } from "@/lib/pricing-model";
 
 import { Container } from "../container";
-import { BillingToggle } from "./billing-toggle";
 import { CompareTable } from "./compare-table";
-import { GstToggle } from "./gst-toggle";
-import { PlanCards } from "./plan-cards";
+import { PricingCards, usePricingSwitches } from "./pricing-cards";
 import { UsageTable } from "./usage-table";
 
 /**
- * Everything on the pricing page the two switches change: the plan cards,
- * the footnote, the usage table and the comparison table's prices. The server
- * worked out every combination (`pricingPageModel`); this only picks one,
- * and sends `pricing_toggle` when the visitor flips a switch.
+ * Everything on the pricing page the two switches change: the shared plan
+ * cards (`PricingCards`, the same on every page), then the usage table and
+ * the comparison table's prices, following the same switches.
  */
 export function PricingPlans({ model }: { model: PricingPageModel }) {
-    const [yearly, setYearly] = useState(false);
-    const [withGst, setWithGst] = useState(model.gst.initial);
-    const view = model.views[viewKey(yearly && !!model.yearly, withGst)];
-    const showControls = !!model.yearly || model.gst.toggle;
+    const switches = usePricingSwitches(model);
 
     return (
         <>
@@ -36,49 +26,14 @@ export function PricingPlans({ model }: { model: PricingPageModel }) {
                 <h2 id="plans-title" className="sr-only">
                     Plans
                 </h2>
-                {showControls ? (
-                    <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2.5">
-                        {model.yearly ? (
-                            <BillingToggle
-                                yearly={yearly}
-                                freeMonths={model.yearly.freeMonths}
-                                onChange={(v) => {
-                                    if (v === yearly) return;
-                                    setYearly(v);
-                                    track("pricing_toggle", {
-                                        control: "yearly",
-                                        value: v,
-                                    });
-                                }}
-                            />
-                        ) : null}
-                        {model.gst.toggle ? (
-                            <GstToggle
-                                checked={withGst}
-                                onChange={(v) => {
-                                    setWithGst(v);
-                                    track("pricing_toggle", {
-                                        control: "gst",
-                                        value: v,
-                                    });
-                                }}
-                            />
-                        ) : null}
-                    </div>
-                ) : null}
-                <PlanCards plans={view.plans} />
-                {view.footnote ? (
-                    <div
-                        aria-live="polite"
-                        className="text-mk-note text-muted-foreground"
-                    >
-                        {view.footnote}
-                    </div>
-                ) : null}
+                <PricingCards model={model} switches={switches} />
             </Container>
-            <UsageTable plans={view.plans} usage={view.usage} />
+            <UsageTable
+                plans={switches.view.plans}
+                usage={switches.view.usage}
+            />
             <CompareTable
-                plans={view.plans}
+                plans={switches.view.plans}
                 rows={model.rows}
                 placeholder={model.placeholder}
             />

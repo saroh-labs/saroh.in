@@ -158,10 +158,6 @@ export interface Solution extends SearchWords {
     segments: SolutionSegment[];
     pricing: {
         title: string;
-        /** The featured plan, with the solution's "fit" line under it. */
-        featured: PlanId;
-        fit: string;
-        second: PlanId;
     };
     /** The question only this solution's page asks. */
     faq: FaqId;

@@ -6,17 +6,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { JsonLd } from "@/components/v2/json-ld";
-import { PlanTeaserGrid } from "@/components/v2/solution/solution-pricing";
+import { PricingCards } from "@/components/v2/pricing/pricing-cards";
 import type { DemoTrade } from "@/content/demos";
 import { FREE_PLAN_LINE } from "@/content/home";
 import { demoHref } from "@/lib/demos";
 import { cta, LAUNCH_MODE } from "@/lib/links";
-import {
-    freePlanLine,
-    homePlanTeasers,
-    planTeaserFootnote,
-} from "@/lib/plan-teasers";
+import { freePlanLine } from "@/lib/plan-teasers";
 import { readLivePricing } from "@/lib/pricing";
+import { pricingPageModel } from "@/lib/pricing-view";
 import { builtSearchPages, FOR_HUB, publishList } from "@/lib/search-pages";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import { breadcrumbLd, faqPageLd } from "@/lib/structured-data";
@@ -108,10 +105,10 @@ export default async function ForPage({ params }: Props) {
                 }
                 pricing={
                     catalog ? (
-                        <PlanTeaserGrid
-                            plans={homePlanTeasers(catalog)}
-                            footnote={planTeaserFootnote(catalog)}
+                        <PricingCards
+                            model={pricingPageModel(catalog)}
                             src={`for-${slug}-pricing`}
+                            compare
                         />
                     ) : undefined
                 }

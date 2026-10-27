@@ -126,7 +126,7 @@ describe("/ (Home)", () => {
             expect(pricing.getByRole("heading", { name })).toBeTruthy();
         }
         expect(
-            pricing.getByText("Billed monthly. Prices before GST."),
+            pricing.getByText(/^Billed monthly\. Prices before GST/),
         ).toBeTruthy();
         expect(
             container.querySelector("[data-plan='grow']")?.textContent,
