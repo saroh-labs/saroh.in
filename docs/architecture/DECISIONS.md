@@ -2550,3 +2550,26 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Consequences:
     - The plan's steps (move, non-visual fixes, merges, the looks above, the package) each delete their allow-list entries and shrink the baseline.
 - Rules: `docs/patterns/frontend-design-system.md` → "Shared pieces on saroh.in"; `apps/saroh.in/lib/consistency/shared-pieces.test.ts`; `scripts/check-dupes.mjs`.
+
+## DEC-194 Free tools are all built in the code, go live only when published in admin, and their results are behind an email
+
+**Status: Accepted — 2026-10-26** · owner: "we create all the pages, and let admin decide when to publish or unpublish them" · written down 27 Oct (it was cited in the code from 26 Oct but missing here)
+
+- Decision:
+    - **Every free tool** (`/tools/<slug>`, 25 browser-only tools in `@saroh/search-pages`) is built in the code and goes live on saroh.in only through admin's Search pages publish control, as DEC-193's /for/ pages do. Only published tools are in the sitemap.
+    - **A tool's result is behind an email** (the package's `EmailGate`), with two exceptions the owner kept: the WhatsApp message templates (one message free) and the refund and cancellation policy generators (reading is free).
+    - **The sample GSTIN is `29AAAAA0000A1ZY`** everywhere a sample shows.
+- Consequences: the Privacy page names the free tools' email (`apps/saroh.in/content/privacy.ts`); the API's gate email names the tool from an allow-list (`apps/api.saroh.in/src/modules/tools/tool-names.ts`).
+
+## DEC-196 A business's customers get codes from Saroh's paid sender or the business's own provider; MSG91's widget is only for Saroh's own sign-in
+
+**Status: Accepted — 2026-10-27** · owner: "they can add their own or use our built-in auth for sending SMS/whatsapp OTPs, this way we will get the benefit as the middlemen"
+
+- Context:
+    - The owner's MSG91 brief (27 Oct) adds phone sign-in for Saroh accounts and for merchant sites' customers. MSG91's OTP widget makes and sends the code itself from the browser and bills Saroh's MSG91 account; it is also the only way to send SMS codes before Saroh has its own DLT registration.
+- Decision:
+    - **Saroh accounts** (owners and staff, accounts.saroh.in) sign in by phone through **MSG91's OTP widget**. The server verifies the widget's token with MSG91 before any session; a client "verified" flag is never trusted. A phone is **added to an email account**, never instead of one. Saroh pays for these codes.
+    - **A business's customers** (sign-in on a merchant site) **never use the widget**. Their codes go either through **Saroh's built-in sender** (DEC-191: server-sent, held against the business's prepaid messaging balance before sending, sold as an add-on with packs) or through **the business's own provider** once connected. A bot on a merchant site can only spend that business's balance, never Saroh's.
+    - **Only `modules/messaging` talks to MSG91**, behind a provider port, so WhatsApp can move to Meta's Cloud API and SMS to Saroh's own DLT templates without touching callers (`docs/architecture/MESSAGING_MSG91.md`).
+- Consequences:
+    - The widget's sends cannot be rate-limited by our server alone; its captcha and per-number limits in MSG91's widget settings are the hard stop, and our server limits verification attempts and checks Turnstile before opening the widget.
