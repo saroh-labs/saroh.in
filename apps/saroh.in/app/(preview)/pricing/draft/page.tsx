@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import Link from "next/link";
 
-import { Container } from "@/components/v2/container";
-import { PreviewBanner } from "@/components/v2/pricing/preview-banner";
-import { PreviewControls } from "@/components/v2/pricing/preview-controls";
-import { PricingPage } from "@/components/v2/pricing/pricing-page";
-import { SiteFooter } from "@/components/v2/site-footer";
-import { SiteNav } from "@/components/v2/site-nav";
+import { PreviewBanner } from "@/components/pricing/preview/preview-banner";
+import { PreviewControls } from "@/components/pricing/preview/preview-controls";
+import { PricingPage } from "@/components/pricing/pricing-page";
+import { Container } from "@/components/shared/layout/container";
+import { SiteFooter } from "@/components/shared/nav/site-footer";
+import { SiteNav } from "@/components/shared/nav/site-nav";
 import { LAUNCH_MODE } from "@/lib/links";
 import { readLivePricing, readPreviewPricing } from "@/lib/pricing";
 import { markChanges } from "@/lib/pricing-marks";
@@ -25,7 +25,7 @@ import { pricingPageModel } from "@/lib/pricing-view";
  * nothing is cached. Not indexed, no referrer, no Google Analytics
  * (`app/site-tags.tsx`); `next.config.js` sets the same as headers.
  *
- * Outside the `(v2)` group so the amber bar sits above the nav, as the
+ * Outside the `(site)` group so the amber bar sits above the nav, as the
  * design draws it; it brings the V2 chrome itself.
  *
  * The bar holds the preview's controls (admin redesign U13, R24): the draft
@@ -149,7 +149,7 @@ export default async function PricingDraftRoute({
     );
 }
 
-/** The `(v2)` layout's chrome, with the preview bar above the nav. */
+/** The `(site)` layout's chrome, with the preview bar above the nav. */
 function Chrome({
     banner,
     children,

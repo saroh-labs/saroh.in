@@ -13,7 +13,7 @@ pricing catalogue at runtime; the findings that need its figures are kept
 outside the repo, beside the plan.
 
 **Audited:** site copy on `feat/marketing-v2` at `c0da5d56`
-(`apps/saroh.in/content/*`, `components/v2/**`, `app/(v2)/**`,
+(`apps/saroh.in/content/*`, `components/**`, `app/(site)/**`,
 `app/(standalone)/waitlist/**`, `e2e/marketing-shots/shots.config.ts`) and
 the rendered pages at `https://saroh.localhost/`. The product was checked on
 `development` at `0a3b2166`. Paths are relative to `apps/api.saroh.in/src/modules/`
@@ -144,7 +144,7 @@ the social handles (D12: WL9).
 
 ## 1. Home
 
-`content/home.ts`, `app/(v2)/page.tsx`, `components/v2/home/*`.
+`content/home.ts`, `app/(site)/page.tsx`, `components/home/*`.
 
 | ID  | Claim · where                                                                                                                          | Backed by                                                                                          | Status | What's missing                                                                                                                                 | Proposed copy                                                                                                                                                                       |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -180,7 +180,7 @@ the social handles (D12: WL9).
 
 ## 2. Features
 
-`content/features.ts`, `app/(v2)/features/[slug]`. The nav lines repeat the
+`content/features.ts`, `app/(site)/features/[slug]`. The nav lines repeat the
 card lines and are covered by the same rows.
 
 ### 2.1 Dashboard (`/features/dashboard`)
@@ -346,12 +346,12 @@ real and the Orders tile is back, #867 and #919 — see IN13.)
 
 ## 3. Solutions
 
-`content/solutions.ts`, `app/(v2)/solutions/[slug]`. Segment rows that
+`content/solutions.ts`, `app/(site)/solutions/[slug]`. Segment rows that
 repeat a feature claim point to it.
 
 The pricing "fit" lines (SO6, SO11, SO17 and the salons one) are no longer
 shown: since 27 Oct every page draws the Pricing page's own plan cards
-(`components/v2/pricing/pricing-cards.tsx`), with no per-trade line.
+(`components/pricing/pricing-cards.tsx`), with no per-trade line.
 
 | ID   | Claim · page                                                                                                                                                                  | Backed by                                             | Status | What's missing                                                                                           | Proposed copy                                                                                                |
 | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -393,7 +393,7 @@ shown: since 27 Oct every page draws the Pricing page's own plan cards
 
 ## 5. Pricing page (copy in the repo)
 
-`content/pricing.ts`, `components/v2/pricing/*`. The plan cards and the
+`content/pricing.ts`, `components/pricing/*`. The plan cards and the
 compare table are catalogue lines, audited outside the repo.
 
 | ID   | Claim                                                                                                                                                                                 | Backed by                                                                                                                           | Status | What's missing                                                                                                 | Proposed copy                                                                                                                                                                                                                                                               |
@@ -430,7 +430,7 @@ Product facts only; which plan names which is kept outside the repo.
 
 ## 6. Waitlist (`/waitlist`)
 
-`content/waitlist.ts`, `components/v2/waitlist/*`, `waitlist/` (API).
+`content/waitlist.ts`, `components/waitlist/*`, `waitlist/` (API).
 
 | ID   | Claim                                                                                                                                                                    | Backed by                                                                                                                                                                                                                           | Status | What's missing                                                                                                  | Proposed copy |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------- | ------------- |
@@ -451,7 +451,7 @@ Product facts only; which plan names which is kept outside the repo.
 
 ## 6a. Link preview tool (`/tools/link-preview`)
 
-`content/link-preview.ts`, `components/v2/tools/*`, `link-preview/` (API).
+`content/link-preview.ts`, `components/tools/*`, `link-preview/` (API).
 
 | ID  | Claim                                                                                                                                                           | Backed by                                                                                                                                                                                                                                             | Status | What's missing                                                                                         | Proposed copy                                                                                      |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
@@ -464,7 +464,7 @@ Product facts only; which plan names which is kept outside the repo.
 
 ## 6b. QR code maker (`/tools/qr-code-maker`)
 
-`content/qr-code-maker.ts`, `components/v2/tools/qr-code-maker.tsx`,
+`content/qr-code-maker.ts`, `components/tools/qr-code-maker/qr-code-maker.tsx`,
 `qr-maker-gate.tsx`, `qr-download.ts`, `app/api/tools/unlock/route.ts`,
 `tools/` (API). QR codes plan U9; design "Saroh QR Codes", screen 02, read
 10 Oct 2026. Published 17 Oct (`content/resources.ts`). The page names no

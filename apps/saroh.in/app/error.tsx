@@ -7,7 +7,7 @@ import { useEffect } from "react";
 
 /**
  * saroh.in's root error boundary, for the pages outside the V2 chrome (the
- * waitlist, the pricing draft) and anything the `(v2)` boundary can't catch.
+ * waitlist, the pricing draft) and anything the `(site)` boundary can't catch.
  * The site is static, so this mostly meets a page whose script failed in the
  * browser. It has no chrome to sit in, so the wordmark says where you are.
  */

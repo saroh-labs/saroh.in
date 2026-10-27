@@ -285,7 +285,7 @@
 
     | Piece                                     | The one                                                                        | Don't hand-draw                                                               |
     | ----------------------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
-    | Plan cards (price, switches, compare)     | `PricingCards` / `PlanCards`, `components/v2/pricing/`                         | a price (`text-mk-price*`) or a `PlanCardView` outside the pricing folder     |
+    | Plan cards (price, switches, compare)     | `PricingCards` / `PlanCards`, `components/pricing/`                            | a price (`text-mk-price*`) or a `PlanCardView` outside the pricing folder     |
     | Focus ring                                | `ring()`, `lib/ring.ts`                                                        | the `focus-visible:outline-…` string                                          |
     | Text link, quiet link                     | `TextLink` (`tone`, `arrow`), `components/shared/links/text-link.tsx`          | `text-brand-700 no-underline` or a muted `no-underline` link class            |
     | Breadcrumb                                | `Breadcrumbs` (`current="brand"`), `components/shared/nav/breadcrumbs.tsx`     | an `aria-label="Breadcrumb"` list                                             |

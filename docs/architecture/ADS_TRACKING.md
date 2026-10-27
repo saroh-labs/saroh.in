@@ -207,7 +207,7 @@ passing through `/welcome`.
 | What a tag may see of the address                       | `apps/saroh.in/lib/page-address.ts`                                  |
 | The referral code kept for setup (not a tag's)          | `apps/saroh.in/lib/referral.ts`, `app/referral-keeper.tsx`           |
 | The cookie notice                                       | `apps/saroh.in/app/site-tags.tsx`                                    |
-| The waitlist conversion                                 | `apps/saroh.in/components/v2/waitlist/waitlist-form.tsx`             |
+| The waitlist conversion                                 | `apps/saroh.in/components/waitlist/waitlist-form.tsx`                |
 | The sign-up hand-off                                    | `apps/saroh.in/lib/welcome.ts`, `lib/welcome-forward.ts`, `/welcome` |
 | accounts' side of it                                    | `apps/accounts.saroh.in/lib/signup-welcome.ts`, `lib/app-urls.ts`    |
 | The check that keeps ad tags off every other app        | `scripts/check-merchant-site-tracking.mjs`                           |

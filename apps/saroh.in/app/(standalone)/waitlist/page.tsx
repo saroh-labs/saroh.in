@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import Link from "next/link";
 
-import { Arrow } from "@/components/v2/arrow";
-import { WaitlistForm } from "@/components/v2/waitlist/waitlist-form";
+import { Arrow } from "@/components/shared/links/arrow";
+import { WaitlistForm } from "@/components/waitlist/waitlist-form";
 import { linkShown } from "@/content/resources";
 import { SAROH_HANDLE, SAROH_SOCIAL } from "@/content/social";
 import { galleryTemplates } from "@/content/templates";
@@ -65,7 +65,7 @@ const HERO: [string, string][] = [
 /**
  * The waitlist (Waitlist design, plan U30): the site's one ask until
  * launch. It has its own header and footer, as the design draws them, so it
- * sits outside the `(v2)` chrome. The launch offer is the API's (U31); with
+ * sits outside the `(site)` chrome. The launch offer is the API's (U31); with
  * none, the form says it is announced at launch. The page reads no query, so
  * it stays static: the form reads `?plan=`, `?src=` (the CTA builder,
  * `lib/links.ts`), `?ref=` (a referral link) and `?template=` (a gallery

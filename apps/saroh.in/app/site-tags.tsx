@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useSyncExternalStore } from "react";
 
-import { buttonClasses } from "@/components/v2/button";
+import { buttonClasses } from "@/components/shared/buttons/button";
 import type { Consent } from "@/lib/consent";
 import { readChoices, subscribeConsent, writeChoices } from "@/lib/consent";
 import { browserTracking } from "@/lib/error-tracking-browser";

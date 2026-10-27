@@ -1,7 +1,7 @@
 import { PUBLISHED_ON } from "@saroh/ui/lib/saroh-links";
 import { describe, expect, it } from "vitest";
 
-import { resourceItems } from "@/components/v2/nav-items";
+import { resourceItems } from "@/components/shared/nav/nav-items";
 import { qrCodeMakerLive } from "@/lib/qr-code-maker-live";
 import { indexedPaths } from "@/lib/site-pages";
 

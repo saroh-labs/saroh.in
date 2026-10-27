@@ -17,7 +17,7 @@ vi.mock("next/link", () => ({
         </a>
     ),
 }));
-vi.mock("@/components/v2/site-chrome", () => ({
+vi.mock("@/components/shared/layout/site-chrome", () => ({
     SiteChrome: ({ children }: { children: ReactNode }) => (
         <main>{children}</main>
     ),

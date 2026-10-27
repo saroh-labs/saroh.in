@@ -2491,7 +2491,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **Later edits to a live page's words go out with normal releases.** Publishing is about whether a page is on the site, not each change of words.
     - **Admin shows the page exactly as the site will**: the page template and content are one shared package, rendered by the admin's own signed-in, `noindex` preview route (desk and phone), and by saroh.in.
     - **Who:** a new staff permission, `search-pages:publish`.
-- Rules: `packages/search-pages/`; `apps/api.saroh.in/src/modules/search-pages/`; `apps/saroh.in/app/(v2)/for/`; `apps/admin.saroh.in/app/search-pages/`.
+- Rules: `packages/search-pages/`; `apps/api.saroh.in/src/modules/search-pages/`; `apps/saroh.in/app/(site)/for/`; `apps/admin.saroh.in/app/search-pages/`.
 
 ## DEC-195 Reuse the shared component; never redraw it
 

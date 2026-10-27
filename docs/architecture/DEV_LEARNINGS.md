@@ -3767,7 +3767,7 @@ files. The optimizer only re-encoded them.
 `/_next/image`. If a browser spec waits on an image's `naturalWidth`, a
 trace showing one `/_next/image` request with no response points at the
 optimizer, not at the page.
-**Category**: marketing · `apps/saroh.in/components/v2/help/help-step.tsx`
+**Category**: marketing · `apps/saroh.in/components/help/help-step.tsx`
 
 ## Permissions — the permission suite's fake API stopped giving a Member any Orders (DEC-098)
 
@@ -4827,7 +4827,7 @@ what is true, and `builtContext()` asks the build's own moment
 page. Launch day is a checklist:
 `docs/architecture/runbooks/LAUNCH_DAY_17_OCT.md`.
 **Check**: `public-headers.test.ts`, `lib/shot-sources.test.ts` (a missing
-sized copy fails, naming the command), `app/(v2)/seo-pages.test.tsx` (the
+sized copy fails, naming the command), `app/(site)/seo-pages.test.tsx` (the
 link preview page takes no props and awaits nothing),
 `lib/help-host.test.ts`.
 **Rule**: a static site's caching is set where its files are served, so

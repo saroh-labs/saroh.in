@@ -50,8 +50,8 @@
         {
             "lines": 15,
             "files": [
-                "apps/saroh.in/components/v2/pricing/compare-table.tsx",
-                "apps/saroh.in/components/v2/pricing/usage-table.tsx"
+                "apps/saroh.in/components/pricing/compare-table.tsx",
+                "apps/saroh.in/components/pricing/usage-table.tsx"
             ],
             "windows": [
                 "c0b4db41a5a5",
@@ -86,8 +86,8 @@
         {
             "lines": 12,
             "files": [
-                "apps/saroh.in/components/v2/pricing/compare-table.tsx",
-                "apps/saroh.in/components/v2/pricing/usage-table.tsx"
+                "apps/saroh.in/components/pricing/compare-table.tsx",
+                "apps/saroh.in/components/pricing/usage-table.tsx"
             ],
             "windows": [
                 "66642909ee09",
@@ -132,7 +132,7 @@
         {
             "lines": 10,
             "files": [
-                "apps/saroh.in/components/v2/tools/qr-download.ts",
+                "apps/saroh.in/components/tools/qr-code-maker/qr-download.ts",
                 "packages/search-pages/src/tools/qr.tsx"
             ],
             "windows": [
@@ -190,8 +190,8 @@
         {
             "lines": 9,
             "files": [
-                "apps/saroh.in/components/v2/tools/link-input.tsx",
-                "apps/saroh.in/components/v2/tools/qr-code-maker.tsx"
+                "apps/saroh.in/components/tools/link-preview/link-input.tsx",
+                "apps/saroh.in/components/tools/qr-code-maker/qr-code-maker.tsx"
             ],
             "windows": [
                 "4e607c6030ee",
@@ -257,8 +257,8 @@
         {
             "lines": 8,
             "files": [
-                "apps/saroh.in/components/v2/about/about-page.tsx",
-                "apps/saroh.in/components/v2/contact/contact-page.tsx"
+                "apps/saroh.in/components/about/about-page.tsx",
+                "apps/saroh.in/components/contact/contact-page.tsx"
             ],
             "windows": [
                 "44bbe61846cf",
@@ -269,8 +269,8 @@
         {
             "lines": 8,
             "files": [
-                "apps/saroh.in/components/v2/contact/contact-form.tsx",
-                "apps/saroh.in/components/v2/pricing/billing-toggle.tsx"
+                "apps/saroh.in/components/contact/contact-form.tsx",
+                "apps/saroh.in/components/pricing/billing-toggle.tsx"
             ],
             "windows": [
                 "aff91dbd94db",
@@ -281,7 +281,7 @@
         {
             "lines": 8,
             "files": [
-                "apps/saroh.in/components/v2/cta-link.tsx",
+                "apps/saroh.in/components/shared/buttons/cta-link.tsx",
                 "apps/saroh.in/lib/links.ts"
             ],
             "windows": [
@@ -293,8 +293,8 @@
         {
             "lines": 8,
             "files": [
-                "apps/saroh.in/components/v2/pricing/compare-table.tsx",
-                "apps/saroh.in/components/v2/pricing/usage-table.tsx"
+                "apps/saroh.in/components/pricing/compare-table.tsx",
+                "apps/saroh.in/components/pricing/usage-table.tsx"
             ],
             "windows": [
                 "824d4b5b77cd",
@@ -305,7 +305,7 @@
         {
             "lines": 8,
             "files": [
-                "apps/saroh.in/components/v2/tools/qr-download.ts",
+                "apps/saroh.in/components/tools/qr-code-maker/qr-download.ts",
                 "packages/search-pages/src/tools/link-in-bio-page-maker/index.tsx"
             ],
             "windows": [
@@ -397,7 +397,7 @@
         {
             "lines": 7,
             "files": [
-                "apps/saroh.in/app/(v2)/error.tsx",
+                "apps/saroh.in/app/(site)/error.tsx",
                 "apps/saroh.in/app/error.tsx"
             ],
             "windows": [
@@ -408,7 +408,7 @@
         {
             "lines": 7,
             "files": [
-                "apps/saroh.in/app/(v2)/error.tsx",
+                "apps/saroh.in/app/(site)/error.tsx",
                 "apps/saroh.in/app/error.tsx",
                 "apps/saroh.in/app/global-error.tsx"
             ],
@@ -420,8 +420,8 @@
         {
             "lines": 7,
             "files": [
-                "apps/saroh.in/app/(v2)/tools/link-preview/page.tsx",
-                "apps/saroh.in/app/(v2)/tools/qr-code-maker/page.tsx"
+                "apps/saroh.in/app/(site)/tools/link-preview/page.tsx",
+                "apps/saroh.in/app/(site)/tools/qr-code-maker/page.tsx"
             ],
             "windows": [
                 "371ffb67fdc7",
@@ -465,8 +465,8 @@
         {
             "lines": 7,
             "files": [
-                "apps/saroh.in/components/v2/about/about-page.tsx",
-                "apps/saroh.in/components/v2/contact/contact-page.tsx"
+                "apps/saroh.in/components/about/about-page.tsx",
+                "apps/saroh.in/components/contact/contact-page.tsx"
             ],
             "windows": [
                 "a94505d6473d",
@@ -476,8 +476,8 @@
         {
             "lines": 7,
             "files": [
-                "apps/saroh.in/components/v2/mobile-menu.tsx",
-                "apps/saroh.in/components/v2/site-nav.tsx"
+                "apps/saroh.in/components/shared/nav/mobile-menu.tsx",
+                "apps/saroh.in/components/shared/nav/site-nav.tsx"
             ],
             "windows": [
                 "2a0e92cc0e6b",
@@ -487,8 +487,8 @@
         {
             "lines": 7,
             "files": [
-                "apps/saroh.in/components/v2/pricing/compare-table.tsx",
-                "apps/saroh.in/components/v2/pricing/usage-table.tsx"
+                "apps/saroh.in/components/pricing/compare-table.tsx",
+                "apps/saroh.in/components/pricing/usage-table.tsx"
             ],
             "windows": [
                 "92413d53f193",
@@ -602,7 +602,7 @@
             "lines": 6,
             "files": [
                 "apps/saroh.in/app/site-tags.tsx",
-                "apps/saroh.in/components/v2/whatsapp-chat.tsx"
+                "apps/saroh.in/components/shared/whatsapp/whatsapp-chat.tsx"
             ],
             "windows": [
                 "a56a96e66bb8"
@@ -611,8 +611,8 @@
         {
             "lines": 6,
             "files": [
-                "apps/saroh.in/components/v2/cta-band.tsx",
-                "apps/saroh.in/components/v2/templates/templates-band.tsx"
+                "apps/saroh.in/components/shared/sections/cta-band.tsx",
+                "apps/saroh.in/components/templates/templates-band.tsx"
             ],
             "windows": [
                 "39891e2d9897"
@@ -621,8 +621,8 @@
         {
             "lines": 6,
             "files": [
-                "apps/saroh.in/components/v2/pricing/compare-table.tsx",
-                "apps/saroh.in/components/v2/pricing/usage-table.tsx"
+                "apps/saroh.in/components/pricing/compare-table.tsx",
+                "apps/saroh.in/components/pricing/usage-table.tsx"
             ],
             "windows": [
                 "4b61bd1ec544"
@@ -631,8 +631,8 @@
         {
             "lines": 6,
             "files": [
-                "apps/saroh.in/components/v2/resources/resource-shell.tsx",
-                "apps/saroh.in/components/v2/templates/browser-frame.tsx"
+                "apps/saroh.in/components/resources/resource-shell.tsx",
+                "apps/saroh.in/components/templates/browser-frame.tsx"
             ],
             "windows": [
                 "aa3aee2be7e0"
@@ -641,8 +641,8 @@
         {
             "lines": 6,
             "files": [
-                "apps/saroh.in/components/v2/tools/qr-maker-gate.tsx",
-                "apps/saroh.in/components/v2/tools/unlock-panel.tsx"
+                "apps/saroh.in/components/tools/qr-code-maker/qr-maker-gate.tsx",
+                "apps/saroh.in/components/tools/link-preview/unlock-panel.tsx"
             ],
             "windows": [
                 "de0605656ea0"

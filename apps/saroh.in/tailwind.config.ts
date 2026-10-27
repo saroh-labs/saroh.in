@@ -68,7 +68,7 @@ const config: Config = {
              * The design's type scale. Display sizes are fluid, as drawn;
              * each carries its tracking, and its line height where the design
              * sets one. Where the design sets none, the text takes the V2
-             * shell's `line-height: normal` (app/(v2)/layout.tsx), as the
+             * shell's `line-height: normal` (app/(site)/layout.tsx), as the
              * design's own page does.
              */
             fontSize: {
