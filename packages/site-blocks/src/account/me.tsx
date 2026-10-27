@@ -163,6 +163,9 @@ export function Me({
     const phoneAdd = api.phoneAdd;
     const canAddPhone =
         phoneAdd !== undefined && (options.ways ?? []).includes("WHATSAPP");
+    // The "Signing in" row only when WhatsApp is part of it; an email-only
+    // account keeps the one row it always had (email shown once).
+    const signInRow = canAddPhone || !!account.signInPhone || !account.email;
     // Email is off and they signed in with it ("Signed up with email?",
     // DEC-196): asked once to add a number, so they never sign up twice.
     // Drawn on the server as dismissed; the browser reads its own "Not now".
@@ -261,35 +264,48 @@ export function Me({
                             >
                                 Edit
                             </button>
-                        </>
-                    }
-                />
-                <AccountRow
-                    title="Signing in"
-                    sub={signIn}
-                    actions={
-                        <>
-                            <button
-                                type="button"
-                                className={smallButton}
-                                onClick={() => setOpen("email")}
-                            >
-                                {account.email ? "Change email" : "Add email"}
-                            </button>
-                            {canAddPhone ? (
+                            {signInRow ? null : (
                                 <button
                                     type="button"
                                     className={smallButton}
-                                    onClick={() => setOpen("phone")}
+                                    onClick={() => setOpen("email")}
                                 >
-                                    {account.signInPhone
-                                        ? "Change WhatsApp number"
-                                        : "Add WhatsApp number"}
+                                    Change email
                                 </button>
-                            ) : null}
+                            )}
                         </>
                     }
                 />
+                {signInRow ? (
+                    <AccountRow
+                        title="Signing in"
+                        sub={signIn}
+                        actions={
+                            <>
+                                <button
+                                    type="button"
+                                    className={smallButton}
+                                    onClick={() => setOpen("email")}
+                                >
+                                    {account.email
+                                        ? "Change email"
+                                        : "Add email"}
+                                </button>
+                                {canAddPhone ? (
+                                    <button
+                                        type="button"
+                                        className={smallButton}
+                                        onClick={() => setOpen("phone")}
+                                    >
+                                        {account.signInPhone
+                                            ? "Change WhatsApp number"
+                                            : "Add WhatsApp number"}
+                                    </button>
+                                ) : null}
+                            </>
+                        }
+                    />
+                ) : null}
             </AccountCard>
 
             {account.healthNotes && notes ? (
