@@ -33,6 +33,7 @@ const twMerge = extendTailwindMerge({
                         "mk-price-lg",
                         "mk-pricing-hero",
                         "mk-h2-xs",
+                        "mk-h2-article",
                         "mk-page",
                         "mk-article",
                         "mk-card-lg",

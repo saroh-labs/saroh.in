@@ -13,6 +13,8 @@ import { Eyebrow } from "./eyebrow";
  *   "Questions", "What it does", "Works with".
  * - `sm` — clamp(28px, 3vw, 34px) at −0.03em: "What it costs to use",
  *   Contact's "Before you write".
+ * - `article` — 26px at −0.02em: an H2 inside an article's column (an
+ *   integration page's sections and its Questions).
  */
 export function SectionHeading({
     eyebrow,
@@ -25,7 +27,7 @@ export function SectionHeading({
     eyebrow?: ReactNode;
     title: ReactNode;
     lead?: ReactNode;
-    size?: "lg" | "md" | "sm";
+    size?: "lg" | "md" | "sm" | "article";
     id?: string;
     className?: string;
 }) {
@@ -40,7 +42,9 @@ export function SectionHeading({
                         ? "text-mk-h2"
                         : size === "md"
                           ? "text-mk-h2-sm"
-                          : "text-mk-h2-xs",
+                          : size === "sm"
+                            ? "text-mk-h2-xs"
+                            : "text-mk-h2-article",
                 )}
             >
                 {title}

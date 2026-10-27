@@ -23,8 +23,8 @@ export function Faq({
     items: FaqItem[];
     title?: string;
     id?: string;
-    /** The heading's size: `sm` inside an article (an integration page). */
-    size?: "md" | "sm";
+    /** The heading's size: `article` inside an article (an integration page). */
+    size?: "md" | "sm" | "article";
     /** E.g. the Features and Solutions designs' `pt-[120px]` (Home's is 110). */
     className?: string;
 }) {

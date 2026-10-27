@@ -11,6 +11,7 @@ import { textLinkClasses } from "@/components/shared/links/text-link";
 import { Breadcrumbs } from "@/components/shared/nav/breadcrumbs";
 import { Faq } from "@/components/shared/sections/faq";
 import { PageTitle } from "@/components/shared/sections/page-title";
+import { SectionHeading } from "@/components/shared/sections/section-heading";
 import {
     INTEGRATION_SLUGS,
     integrationHref,
@@ -56,9 +57,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     });
 }
 
-const H2 =
-    "m-0 font-display text-[26px] font-bold tracking-[-0.02em] [text-wrap:balance]";
-
 export default async function IntegrationPage({ params }: Props) {
     const { provider } = await params;
     if (!isIntegrationSlug(provider)) notFound();
@@ -98,9 +96,11 @@ export default async function IntegrationPage({ params }: Props) {
                     aria-labelledby="does"
                     className="grid gap-3.5 border-t border-border pt-6"
                 >
-                    <h2 id="does" className={H2}>
-                        {fm.doesTitle}
-                    </h2>
+                    <SectionHeading
+                        id="does"
+                        title={fm.doesTitle}
+                        size="article"
+                    />
                     <Body
                         components={{
                             p: (props) => (
@@ -128,9 +128,11 @@ export default async function IntegrationPage({ params }: Props) {
                     width="article"
                     className="border-t border-border pt-6"
                 >
-                    <h2 id="steps" className={H2}>
-                        {stepsTitle}
-                    </h2>
+                    <SectionHeading
+                        id="steps"
+                        title={stepsTitle}
+                        size="article"
+                    />
                 </Container>
                 <IntegrationSteps
                     steps={fm.steps}
@@ -147,7 +149,7 @@ export default async function IntegrationPage({ params }: Props) {
                 <Faq
                     items={fm.faq}
                     id="questions"
-                    size="sm"
+                    size="article"
                     // Inside the article's column: its width and gutter.
                     className="max-w-none px-0 pt-0"
                 />

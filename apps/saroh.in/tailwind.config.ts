@@ -122,6 +122,8 @@ const config: Config = {
                     "clamp(28px, 3vw, 34px)",
                     { letterSpacing: "-0.03em" },
                 ],
+                // An H2 inside an article's column (an integration page).
+                "mk-h2-article": ["26px", { letterSpacing: "-0.02em" }],
                 "mk-card-lg": ["22px", { letterSpacing: "-0.02em" }],
                 "mk-card": ["21px", { letterSpacing: "-0.02em" }],
                 "mk-lead": ["19px", { lineHeight: "1.6" }],
