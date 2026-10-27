@@ -9,6 +9,7 @@ import { JsonLd } from "@/components/shared/layout/json-ld";
 import { Arrow } from "@/components/shared/links/arrow";
 import { textLinkClasses } from "@/components/shared/links/text-link";
 import { Breadcrumbs } from "@/components/shared/nav/breadcrumbs";
+import { Faq } from "@/components/shared/sections/faq";
 import { PageTitle } from "@/components/shared/sections/page-title";
 import {
     INTEGRATION_SLUGS,
@@ -143,29 +144,13 @@ export default async function IntegrationPage({ params }: Props) {
                 width="article"
                 className="grid gap-6 pt-14"
             >
-                <section
-                    aria-labelledby="questions"
-                    className="grid border-t border-border pt-6"
-                >
-                    <h2 id="questions" className={`${H2} mb-2`}>
-                        Questions
-                    </h2>
-                    <dl className="m-0">
-                        {fm.faq.map((item) => (
-                            <div
-                                key={item.q}
-                                className="grid gap-1.5 border-b border-mk-line-soft py-4"
-                            >
-                                <dt className="text-mk-body font-semibold">
-                                    {item.q}
-                                </dt>
-                                <dd className="m-0 text-mk-faq leading-[1.65] text-mk-copy [text-wrap:pretty]">
-                                    {item.a}
-                                </dd>
-                            </div>
-                        ))}
-                    </dl>
-                </section>
+                <Faq
+                    items={fm.faq}
+                    id="questions"
+                    size="sm"
+                    // Inside the article's column: its width and gutter.
+                    className="max-w-none px-0 pt-0"
+                />
                 {links.length > 0 ? (
                     <div className="flex flex-wrap gap-5 text-[15px]">
                         {links.map((l) => (

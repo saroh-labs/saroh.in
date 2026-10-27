@@ -17,11 +17,14 @@ export function Faq({
     items,
     title = "Questions",
     id = "faq",
+    size,
     className,
 }: {
     items: FaqItem[];
     title?: string;
     id?: string;
+    /** The heading's size: `sm` inside an article (an integration page). */
+    size?: "md" | "sm";
     /** E.g. the Features and Solutions designs' `pt-[120px]` (Home's is 110). */
     className?: string;
 }) {
@@ -30,6 +33,7 @@ export function Faq({
             id={id}
             titleId={`${id}-title`}
             title={title}
+            size={size}
             width="list"
             className={cn("mx-0 grid scroll-mt-6 gap-5 pt-[110px]", className)}
         >
