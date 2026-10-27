@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import type { PlanCardView } from "@/lib/pricing-model";
 import { ring } from "@/lib/ring";
+import { eyebrowClasses } from "../shared/sections/eyebrow";
 
 interface LineRow {
     kind: "line";
@@ -84,7 +85,10 @@ export function PlanTable<L extends LineRow>({
                                 <th
                                     scope="rowgroup"
                                     colSpan={plans.length + 1}
-                                    className="border-t border-mk-line-soft px-[22px] pb-2 pt-[22px] text-left text-[12.5px] font-semibold uppercase tracking-[0.1em] text-brand-700"
+                                    className={eyebrowClasses({
+                                        className:
+                                            "border-t border-mk-line-soft px-[22px] pb-2 pt-[22px] text-left",
+                                    })}
                                 >
                                     {r.label}
                                 </th>

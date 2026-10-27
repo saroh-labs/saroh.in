@@ -7,6 +7,7 @@ import type { SegmentView } from "@/content/solutions";
 import { Arrow } from "../shared/links/arrow";
 import { textLinkClasses } from "../shared/links/text-link";
 import { ScreenshotFrame } from "../shared/media/screenshot-frame";
+import { Eyebrow } from "../shared/sections/eyebrow";
 
 /**
  * One "What changes" problem: the area's label, the pain quote with its left
@@ -37,9 +38,9 @@ export function SolutionSegment({
                     segment.shot ? "flex-[1_1_320px]" : "max-w-[68ch]",
                 )}
             >
-                <span className="text-[13px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                <Eyebrow as="span" tone="muted">
                     {segment.label}
-                </span>
+                </Eyebrow>
                 <p className="m-0 border-l-2 border-border pl-3.5 text-[17px] leading-[1.5] text-muted-foreground [text-wrap:pretty]">
                     {segment.pain}
                 </p>

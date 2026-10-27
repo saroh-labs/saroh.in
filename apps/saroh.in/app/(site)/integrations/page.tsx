@@ -5,6 +5,7 @@ import { Arrow } from "@/components/shared/links/arrow";
 import { cardLinkClasses } from "@/components/shared/links/card-link";
 import { Pill } from "@/components/shared/links/pill";
 import { ComingList } from "@/components/shared/sections/coming-list";
+import { Eyebrow } from "@/components/shared/sections/eyebrow";
 import { PageTitle } from "@/components/shared/sections/page-title";
 import {
     integrationHref,
@@ -91,12 +92,9 @@ export default function IntegrationsPage() {
                 aria-labelledby="planned"
                 className="grid gap-1 pt-[72px]"
             >
-                <h2
-                    id="planned"
-                    className="m-0 pb-1 text-mk-eyebrow font-semibold uppercase text-muted-foreground"
-                >
+                <Eyebrow as="h2" id="planned" tone="muted" className="m-0 pb-1">
                     {page.plannedTitle}
-                </h2>
+                </Eyebrow>
                 <p className="m-0 mb-3 max-w-[70ch] text-[15px] leading-[1.6] text-mk-copy">
                     {page.plannedIntro}
                 </p>

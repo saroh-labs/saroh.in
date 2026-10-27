@@ -70,12 +70,14 @@ export function AboutPage({
             >
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,320px),1fr))] items-center gap-10 rounded-mk-band bg-foreground p-[clamp(32px,6vw,72px)] text-background">
                     <div className="grid gap-[14px]">
-                        <h2
+                        <Eyebrow
+                            as="h2"
                             id="about-name"
-                            className="m-0 font-sans text-mk-eyebrow font-semibold uppercase text-mk-on-ink-muted"
+                            tone="on-ink"
+                            className="m-0"
                         >
                             {meaning.eyebrow}
-                        </h2>
+                        </Eyebrow>
                         <div className="flex items-end gap-2.5">
                             <span
                                 lang="hi"
@@ -170,9 +172,9 @@ export function AboutPage({
                 </div>
                 {founder ? (
                     <div className="grid gap-4 rounded-[18px] border border-border bg-card p-7">
-                        <h3 className="m-0 font-sans text-mk-eyebrow font-semibold uppercase text-muted-foreground">
+                        <Eyebrow as="h3" tone="muted" className="m-0">
                             {ABOUT.founder.eyebrow}
-                        </h3>
+                        </Eyebrow>
                         {founder.note.map((paragraph) => (
                             <p
                                 key={paragraph}

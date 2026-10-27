@@ -4,7 +4,9 @@ import localFont from "next/font/local";
 import Link from "next/link";
 
 import { Arrow } from "@/components/shared/links/arrow";
+import { Pill } from "@/components/shared/links/pill";
 import { textLinkClasses } from "@/components/shared/links/text-link";
+import { Eyebrow } from "@/components/shared/sections/eyebrow";
 import { WaitlistForm } from "@/components/waitlist/waitlist-form";
 import { linkShown } from "@/content/resources";
 import { SAROH_HANDLE, SAROH_SOCIAL } from "@/content/social";
@@ -114,9 +116,14 @@ export default async function WaitlistPage() {
                 className={`${FRAME} ${GUTTER} grid flex-1 grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-start gap-[clamp(28px,5vw,64px)] py-[clamp(24px,5vw,64px)]`}
             >
                 <div className="flex flex-col gap-[22px] pt-2">
-                    <h1 className="m-0 text-[11px] font-semibold uppercase leading-[1.5] tracking-[0.1em] text-muted-foreground">
+                    <Eyebrow
+                        as="h1"
+                        tone="muted"
+                        size="sm"
+                        className="m-0 leading-[1.5]"
+                    >
                         {WAITLIST_PAGE.h1}
-                    </h1>
+                    </Eyebrow>
                     <p className="m-0 font-display text-[clamp(40px,6vw,68px)] font-semibold leading-[1.06] tracking-[-0.04em] [text-wrap:balance]">
                         {HERO.map(([initial, rest]) => (
                             <span key={initial}>
@@ -132,16 +139,13 @@ export default async function WaitlistPage() {
                         Made in India, priced in rupees.
                     </p>
                     <div className="flex max-w-[460px] flex-col gap-2.5 border-t border-border pt-5">
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                        <Eyebrow as="span" tone="muted" size="sm">
                             For people who run
-                        </span>
+                        </Eyebrow>
                         <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
                             {HERO_KINDS.map((kind) => (
-                                <li
-                                    key={kind.id}
-                                    className="rounded-full border border-border bg-white px-[11px] py-[5px] text-[13px]"
-                                >
-                                    {kind.label}
+                                <li key={kind.id}>
+                                    <Pill>{kind.label}</Pill>
                                 </li>
                             ))}
                         </ul>

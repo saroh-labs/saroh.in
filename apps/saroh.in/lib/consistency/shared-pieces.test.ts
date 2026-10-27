@@ -208,16 +208,7 @@ const RULES: Rule[] = [
         name: "a small caps label is Eyebrow (V12)",
         pattern: both("\\buppercase\\b", "tracking-\\[0\\.1em\\]"),
         home: ["components/shared/sections/eyebrow.tsx"],
-        allow: each(
-            'step 6 (V12): its own small caps become Eyebrow tone="muted" size="sm"',
-            [
-                "app/(standalone)/waitlist/page.tsx",
-                "components/pricing/plan-table.tsx",
-                "components/resources/on-this-page.tsx",
-                "components/resources/side-nav.tsx",
-                "components/solution/solution-segment.tsx",
-            ],
-        ),
+        allow: {},
         files: SITE,
     },
     {

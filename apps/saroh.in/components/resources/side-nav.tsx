@@ -6,6 +6,7 @@ import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { Eyebrow } from "../shared/sections/eyebrow";
 
 export interface SideNavGroup {
     title: string;
@@ -71,9 +72,9 @@ export function SideNav({
             >
                 {groups.map((group) => (
                     <div key={group.title} className="grid gap-1">
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                        <Eyebrow as="span" tone="muted" size="sm">
                             {group.title}
-                        </span>
+                        </Eyebrow>
                         <ul className="m-0 grid list-none gap-0.5 p-0">
                             {group.items.map((item) => (
                                 <li key={item.href}>
