@@ -4,6 +4,7 @@ import { ToolsHub } from "@saroh/search-pages";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { CtaClickArea } from "@/components/v2/cta-click-area";
 import { JsonLd } from "@/components/v2/json-ld";
 import { routeExists } from "@/content/resources";
 import { cta } from "@/lib/links";
@@ -44,19 +45,23 @@ export default function ToolsHubPage() {
     if (tools.length === 0) notFound();
     // shortcut: "new" is by the content file's date, not when it went live; upgrade if the publish list ever says when.
     const since = now.getTime() - NEW_FOR_DAYS * 86_400_000;
+    const start = cta({ src: "tools-hub" });
     return (
         <>
             <JsonLd
                 data={[breadcrumbLd([{ name: "Home", path: "/" }, TOOLS_HUB])]}
             />
-            <ToolsHub
-                tools={tools}
-                home="/"
-                startFree={cta({ src: "tools-hub" }).href}
-                isNew={(t) =>
-                    !t.inApp && new Date(t.updated).getTime() >= since
-                }
-            />
+            <CtaClickArea src={"tools-hub"} mode={start.mode}>
+                <ToolsHub
+                    tools={tools}
+                    home="/"
+                    startFree={start.href}
+                    startFreeLabel={start.label}
+                    isNew={(t) =>
+                        !t.inApp && new Date(t.updated).getTime() >= since
+                    }
+                />
+            </CtaClickArea>
         </>
     );
 }

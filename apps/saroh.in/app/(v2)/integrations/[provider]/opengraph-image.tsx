@@ -1,6 +1,5 @@
-import { isIntegrationSlug } from "@/content/integrations";
-import { integrationMeta } from "@/lib/integration-docs";
 import { OG_CONTENT_TYPE, OG_SIZE, ogCard } from "@/lib/og-card";
+import { INTEGRATION_CARDS } from "@/lib/og-cards.gen";
 
 /** Each integration page's share card: "Integrations · Razorpay" and its intro's lead. */
 export const size = OG_SIZE;
@@ -18,7 +17,7 @@ export async function generateImageMetadata({
     params: { provider: string } | Promise<{ provider: string }>;
 }) {
     const { provider } = await params;
-    const fm = isIntegrationSlug(provider) ? integrationMeta(provider) : null;
+    const fm = INTEGRATION_CARDS[provider];
     return [
         {
             id: "card",
@@ -35,8 +34,8 @@ export default async function Image({
     params: Promise<{ provider: string }>;
 }) {
     const { provider } = await params;
-    if (!isIntegrationSlug(provider)) return ogCard({ title: "Saroh" });
-    const fm = integrationMeta(provider);
+    const fm = INTEGRATION_CARDS[provider];
+    if (!fm) return ogCard({ title: "Saroh" });
     return ogCard({
         eyebrow: `Integrations · ${fm.name}`,
         title: headline(fm.intro),

@@ -12,6 +12,8 @@ export interface ToolPageLinks {
     hub?: string;
     /** The closing band's Start free. */
     startFree?: string;
+    /** Its words, from the site's one CTA builder. */
+    startFreeLabel?: string;
 }
 
 export interface ToolPageProps {
@@ -140,8 +142,12 @@ export function ToolPage({
                                 <p className="tp-cta-line">{p.ctaLine}</p>
                             ) : null}
                         </div>
-                        <a className="tp-cta-btn" href={links.startFree}>
-                            Start free
+                        <a
+                            className="tp-cta-btn"
+                            href={links.startFree}
+                            data-cta=""
+                        >
+                            {links.startFreeLabel ?? "Start free"}
                         </a>
                     </section>
                 ) : null}

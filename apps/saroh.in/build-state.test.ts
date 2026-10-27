@@ -39,7 +39,7 @@ function routes(api: "up" | "down", site: unknown) {
     const calls: string[] = [];
     const fetcher = vi.fn((url: string) => {
         calls.push(url);
-        if (url.startsWith(API)) {
+        if (new URL(url).origin === API) {
             if (api === "down") return Promise.reject(new Error("down"));
             const body = url.endsWith("/public/pricing") ? PRICING : LIST;
             return Promise.resolve(new Response(JSON.stringify(body)));
@@ -80,7 +80,7 @@ describe("a production build", () => {
         const { fetcher, calls } = routes("up", SNAPSHOT);
         const list = await prebuild(PROD, fetcher, [1], noSleep, at);
         expect(list).toEqual({ preview: false, ...LIST });
-        expect(calls.some((u) => u.startsWith(SITE))).toBe(false);
+        expect(calls.some((u) => new URL(u).origin === SITE)).toBe(false);
         expect(read(at.stateFile)).toEqual({
             v: 1,
             builtAt: "2026-10-26T12:00:00.000Z",
@@ -185,7 +185,7 @@ describe("any other build", () => {
             at,
         );
         expect(list).toEqual({ preview: true, live: [], takenOff: [] });
-        expect(calls.some((u) => u.startsWith(SITE))).toBe(false);
+        expect(calls.some((u) => new URL(u).origin === SITE)).toBe(false);
         expect(fs.existsSync(at.stateFile)).toBe(false);
         expect(fs.existsSync(at.pricingFile)).toBe(false);
     });

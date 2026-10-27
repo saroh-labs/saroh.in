@@ -5,6 +5,7 @@ import { loadToolPage, ToolPage } from "@saroh/search-pages";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { CtaClickArea } from "@/components/v2/cta-click-area";
 import { JsonLd } from "@/components/v2/json-ld";
 import { SiteToolGate } from "@/components/v2/tools/tool-gate";
 import { cta } from "@/lib/links";
@@ -59,6 +60,7 @@ export default async function ToolRoute({ params }: Props) {
     const p = builtTool(slug);
     if (!p) notFound();
 
+    const start = cta({ src: `tool-${slug}` });
     return (
         <>
             <JsonLd
@@ -82,15 +84,18 @@ export default async function ToolRoute({ params }: Props) {
                 ]}
             />
             <SiteToolGate tool={slug}>
-                <ToolPage
-                    page={p}
-                    draft={!isLive(p.path)}
-                    links={{
-                        home: "/",
-                        hub: TOOLS_HUB.path,
-                        startFree: cta({ src: `tool-${slug}` }).href,
-                    }}
-                />
+                <CtaClickArea src={`tool-${slug}`} mode={start.mode}>
+                    <ToolPage
+                        page={p}
+                        draft={!isLive(p.path)}
+                        links={{
+                            home: "/",
+                            hub: TOOLS_HUB.path,
+                            startFree: start.href,
+                            startFreeLabel: start.label,
+                        }}
+                    />
+                </CtaClickArea>
             </SiteToolGate>
         </>
     );

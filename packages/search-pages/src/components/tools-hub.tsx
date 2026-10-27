@@ -12,6 +12,8 @@ export interface ToolsHubProps {
     home?: string;
     /** The closing band's Start free. */
     startFree?: string;
+    /** Its words, from the site's one CTA builder. */
+    startFreeLabel?: string;
 }
 
 /**
@@ -25,6 +27,7 @@ export function ToolsHub({
     isNew = () => false,
     home,
     startFree,
+    startFreeLabel,
 }: ToolsHubProps) {
     const groups = TOOL_GROUPS.map((g) => ({
         group: g,
@@ -88,8 +91,8 @@ export function ToolsHub({
                             without you opening a tool.
                         </p>
                     </div>
-                    <a className="tp-cta-btn" href={startFree}>
-                        Start free
+                    <a className="tp-cta-btn" href={startFree} data-cta="">
+                        {startFreeLabel ?? "Start free"}
                     </a>
                 </section>
             </div>
