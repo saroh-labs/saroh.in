@@ -6,7 +6,9 @@
 
 /** `CustomerDetail.siteAccount`, as the API sends it. */
 export interface SiteAccount {
-    email: string;
+    /** Null for an account made by phone alone (DEC-196). */
+    email: string | null;
+    phone?: string | null;
     status: "ACTIVE" | "BLOCKED";
     linkedAt: string;
     lastSignedInAt: string | null;
@@ -16,10 +18,19 @@ export interface SiteAccount {
 
 /** `GET …/customers/:contactId/account/unlink`. */
 export interface UnlinkPreview {
-    email: string;
+    email: string | null;
+    phone?: string | null;
     moves: { key: string; count: number; label: string }[];
     /** "2 bookings they made online move with them." */
     sentence: string;
+}
+
+/** What they sign in with: the email, or the phone of a phone-only account. */
+export function signsInWith(account: {
+    email: string | null;
+    phone?: string | null;
+}): string {
+    return account.email ?? account.phone ?? "";
 }
 
 /**
@@ -27,16 +38,17 @@ export interface UnlinkPreview {
  * see contact details; everyone else learns only that they sign in.
  */
 export function signsInLine(
-    account: Pick<SiteAccount, "email" | "status">,
+    account: Pick<SiteAccount, "email" | "phone" | "status">,
     showEmail: boolean,
 ): string {
+    const as = signsInWith(account);
     if (account.status === "BLOCKED") {
         return showEmail
-            ? `Blocked from signing in on your website as ${account.email}`
+            ? `Blocked from signing in on your website as ${as}`
             : "Blocked from signing in on your website";
     }
     return showEmail
-        ? `Signs in on your website as ${account.email}`
+        ? `Signs in on your website as ${as}`
         : "Signs in on your website";
 }
 
@@ -45,10 +57,11 @@ export function unlinkConfirm(
     name: string,
     preview: UnlinkPreview,
 ): { title: string; description: string } {
+    const as = signsInWith(preview);
     return {
-        title: `${preview.email} isn't ${name}?`,
+        title: `${as} isn't ${name}?`,
         description: [
-            `Whoever signs in with ${preview.email} gets a customer record of their own and is signed out of your website.`,
+            `Whoever signs in with ${as} gets a customer record of their own and is signed out of your website.`,
             preview.sentence,
             `${name}'s email no longer counts as confirmed, and the two won't be suggested as the same person again. This cannot be undone.`,
         ].join(" "),

@@ -158,7 +158,7 @@ export function CheckoutPay({
                     [customer.name, delivery?.name]
                         .map((n) => n?.trim() ?? "")
                         .find((n) => n !== "") ?? "",
-                email: customer.email,
+                email: customer.email ?? "",
                 // E.164 from the field ("+919845012345"); an older saved
                 // "98450 12345" without its spaces.
                 ...(phone ? { phone } : {}),

@@ -241,6 +241,23 @@ export async function seed(): Promise<void> {
      * seed can't know to give an override. Production's row is made off in
      * the admin console; `update: {}` leaves a row someone set alone.
      */
+    /*
+     * WhatsApp sign-in codes for a business's customers (DEC-196): off for
+     * everyone, as in production, where the owner turns it on per business
+     * in admin's Flags.
+     */
+    await prisma.featureFlag.upsert({
+        where: { key: "CUSTOMER_PHONE_CODES" },
+        update: {},
+        create: {
+            id: "flag_CUSTOMER_PHONE_CODES",
+            key: "CUSTOMER_PHONE_CODES",
+            description:
+                "WhatsApp sign-in codes for a business's customers (DEC-196). Off until the owner approves a business.",
+            enabledByDefault: false,
+        },
+    });
+
     await prisma.featureFlag.upsert({
         where: { key: "WEB_ADDRESS_CHANGE" },
         update: {},

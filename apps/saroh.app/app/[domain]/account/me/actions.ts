@@ -19,9 +19,14 @@ import {
     payNowAnswer,
     refusalMessage,
 } from "@/lib/account-shape";
-import { accountFetch } from "@/lib/customer-session";
+import { accountFetch, sessionCustomer } from "@/lib/customer-session";
 import { siteOrigin } from "@/lib/origin";
-import { codeCallFailed, codeResult, customerFromEmail } from "@/lib/sign-in";
+import {
+    codeCallFailed,
+    codeResult,
+    customerFromEmail,
+    sessionAnswer,
+} from "@/lib/sign-in";
 import { testMode } from "@/lib/test-release";
 import { TEST_RELEASE_REFUSAL } from "@saroh/site-blocks";
 
@@ -115,19 +120,10 @@ export async function confirmEmailChange(
     // The answer is the same whatever happened: read who is signed in now.
     const now = await accountFetch("session");
     if (now?.ok && now.res.ok) {
-        const body = (await now.res.json().catch(() => null)) as {
-            email?: unknown;
-            name?: unknown;
-        } | null;
-        if (typeof body?.email === "string") {
-            return {
-                ok: true,
-                customer: {
-                    email: body.email,
-                    name: typeof body.name === "string" ? body.name : null,
-                },
-            };
-        }
+        const customer = sessionCustomer(
+            await now.res.json().catch(() => null),
+        );
+        if (customer) return { ok: true, customer };
     }
     return { ok: true, customer: customerFromEmail(address) };
 }
@@ -237,4 +233,69 @@ export async function askDataRemoval(): Promise<DataRequestResult> {
         ok: false,
         message: refusalMessage(call.res.status, body, OFFLINE),
     };
+}
+
+const MAX_PHONE = 32;
+
+function cleanPhone(value: unknown): string | null {
+    if (typeof value !== "string") return null;
+    const phone = value.trim();
+    return phone && phone.length <= MAX_PHONE ? phone : null;
+}
+
+/** A WhatsApp code to a number to sign in with (DEC-196). */
+export async function requestPhoneAddCode(
+    phone: string,
+    challenge?: string,
+): Promise<CodeRequestResult> {
+    if (!(await siteOrigin())) return { ok: false, reason: "error" };
+    if (await testMode()) return { ok: false, reason: "test-release" };
+    if (!accountAreaOn()) return { ok: false, reason: "error" };
+    const number = cleanPhone(phone);
+    if (!number) return { ok: false, reason: "phone" };
+    const call = await accountFetch("me/phone/code", {
+        method: "POST",
+        body:
+            typeof challenge === "string" && challenge
+                ? { phone: number, challenge: challenge.slice(0, 2_048) }
+                : { phone: number },
+    });
+    if (!call) return { ok: false, reason: "error" };
+    if (!call.ok) return codeCallFailed(call.reason);
+    return codeResult(call.res.status, await call.res.json().catch(() => null));
+}
+
+/**
+ * Add the number with its code. The API answers the same whatever
+ * happened (a number another account holds stays there), so who is signed
+ * in is read again for what the page shows.
+ */
+export async function confirmPhoneAdd(
+    phone: string,
+    code: string,
+): Promise<VerifyResult> {
+    if (!(await siteOrigin())) return { ok: false, reason: "error" };
+    if (await testMode()) return { ok: false, reason: "test-release" };
+    if (!accountAreaOn()) return { ok: false, reason: "error" };
+    const number = cleanPhone(phone);
+    const digits = typeof code === "string" ? code.replace(/\D/g, "") : "";
+    if (!number || digits.length !== 6) return { ok: false, reason: "invalid" };
+    const call = await accountFetch("me/phone", {
+        method: "POST",
+        body: { phone: number, code: digits },
+    });
+    if (!call?.ok) return { ok: false, reason: "error" };
+    if (call.res.status !== 200) {
+        const answer = sessionAnswer(
+            call.res.status,
+            await call.res.json().catch(() => null),
+        );
+        return answer.ok ? { ok: false, reason: "error" } : answer;
+    }
+    const now = await accountFetch("session");
+    const customer =
+        now?.ok && now.res.ok
+            ? sessionCustomer(await now.res.json().catch(() => null))
+            : null;
+    return customer ? { ok: true, customer } : { ok: false, reason: "error" };
 }

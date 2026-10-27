@@ -26,9 +26,12 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { structuredLogger } from "../../common/logging/structured-logger";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { validationPipeOptions } from "../../common/validation";
 import { AuditAction } from "../audit/audit.service";
+import { MessagingService } from "../messaging/messaging.service";
+import { FakeMessagingProvider } from "../messaging/providers/fake-messaging-provider";
 import { MandatesService } from "../payments/mandates.service";
 import { PaymentsService } from "../payments/payments.service";
 import {
@@ -38,6 +41,7 @@ import {
 import {
     DATA_REQUEST_EMAIL_TYPE,
     DataRequestEmailHandler,
+    dataRequestEventKey,
 } from "../site-accounts/data-request-email.handler";
 import { CloseDataRequestDto } from "./data-requests.dto";
 import { DataRequestsService } from "./data-requests.service";
@@ -404,5 +408,140 @@ describe("the privacy removal marks it done", () => {
                 },
             }),
         ).toBe(0);
+    });
+});
+
+describe("a customer with a phone and no email (DEC-196)", () => {
+    /** A phone-only account and its request, as the account's POST writes it. */
+    async function phoneOnly(ctx: OrganizationContext) {
+        const phone = `+9198450${String(10_000 + ++seq).slice(-5)}`;
+        const contact = await prisma.contact.create({
+            data: {
+                organizationId: ctx.organizationId,
+                email: `phone+${next()}@phone.invalid`,
+                firstName: "Meera",
+                phone,
+            },
+        });
+        const account = await prisma.customerAccount.create({
+            data: {
+                organizationId: ctx.organizationId,
+                contactId: contact.id,
+                phoneE164: phone,
+                phoneVerifiedAt: new Date(),
+            },
+        });
+        const request = await prisma.customerDataRequest.create({
+            data: {
+                organizationId: ctx.organizationId,
+                customerAccountId: account.id,
+                contactId: contact.id,
+                requesterName: "Meera",
+                requesterPhoneE164: phone,
+            },
+        });
+        return { contactId: contact.id, phone, request };
+    }
+
+    const jobsOf = (organizationId: string) =>
+        prisma.job.findMany({
+            where: { organizationId, type: DATA_REQUEST_EMAIL_TYPE },
+            orderBy: { createdAt: "asc" },
+        });
+
+    it("isn't told by Saroh (no WhatsApp from Saroh, owner 27 Oct): logged, the business sees it, and the removal goes ahead", async () => {
+        const ctx = await business();
+        const { contactId, phone, request } = await phoneOnly(ctx);
+        const transport = new FakeMessagingProvider();
+        const emails: string[] = [];
+        const handler = new DataRequestEmailHandler(async (to) => {
+            emails.push(to);
+            return "sent";
+        }, new MessagingService(transport));
+        const warn = jest.spyOn(structuredLogger, "warn");
+        await prisma.job.create({
+            data: {
+                organizationId: ctx.organizationId,
+                type: DATA_REQUEST_EMAIL_TYPE,
+                payload: { requestId: request.id, step: "received" },
+            },
+        });
+
+        const [received] = await jobsOf(ctx.organizationId);
+        await handler.handle(received!);
+        await handler.handle(received!);
+        expect(emails).toEqual([]);
+        expect(transport.messages).toEqual([]);
+        expect(warn).toHaveBeenCalledWith("data_request_whatsapp_not_sent", {
+            organizationId: ctx.organizationId,
+            requestId: request.id,
+            step: "received",
+            reason: "saroh_whatsapp_off",
+        });
+        // Never the number in a log line.
+        expect(JSON.stringify(warn.mock.calls)).not.toContain(phone);
+        const { requests: open } = await requests.list(ctx);
+        expect(open).toEqual([
+            expect.objectContaining({
+                id: request.id,
+                email: null,
+                phone,
+                customerTold: "not-sent",
+            }),
+        ]);
+
+        await removals.remove(ctx, contactId);
+        const done = (await jobsOf(ctx.organizationId)).at(-1)!;
+        await handler.handle(done);
+        expect(transport.messages).toEqual([]);
+        expect(
+            await prisma.customerDataRequest.findUniqueOrThrow({
+                where: { id: request.id },
+            }),
+        ).toMatchObject({
+            status: "DONE",
+            requesterEmail: null,
+            requesterPhoneE164: null,
+        });
+        const { requests: finished } = await requests.list(ctx, "done");
+        expect(finished).toEqual([
+            expect.objectContaining({
+                id: request.id,
+                phone: null,
+                customerTold: "not-sent",
+            }),
+        ]);
+        warn.mockRestore();
+    });
+
+    it("reads a WhatsApp notice that failed after its retries as not sent", async () => {
+        const ctx = await business();
+        const { request } = await phoneOnly(ctx);
+        const message = await prisma.messagingMessage.create({
+            data: {
+                channel: "WHATSAPP",
+                templateName: "data_request_received",
+                templateCategory: "utility",
+                numberHash: "hash",
+                status: "FAILED",
+            },
+        });
+        await prisma.customerNotice.create({
+            data: {
+                organizationId: ctx.organizationId,
+                eventKey: dataRequestEventKey(request.id, "received"),
+                kind: "DATA_REQUEST_RECEIVED",
+                messageId: message.id,
+            },
+        });
+        const { requests: open } = await requests.list(ctx);
+        expect(open[0]).toMatchObject({ customerTold: "not-sent" });
+
+        await prisma.messagingMessage.update({
+            where: { id: message.id },
+            data: { status: "SENT" },
+        });
+        const { requests: again } = await requests.list(ctx);
+        expect(again[0]).toMatchObject({ customerTold: "sent" });
     });
 });

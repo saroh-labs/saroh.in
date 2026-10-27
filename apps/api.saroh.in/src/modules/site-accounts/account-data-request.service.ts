@@ -147,6 +147,7 @@ export class AccountDataRequestService {
                 where: { id: accountId, organizationId },
                 select: {
                     email: true,
+                    phoneE164: true,
                     contactId: true,
                     contact: { select: { firstName: true, lastName: true } },
                 },
@@ -168,6 +169,10 @@ export class AccountDataRequestService {
                     contactId: account.contactId,
                     requesterName: name === "" ? null : name,
                     requesterEmail: account.email,
+                    // Told on WhatsApp only when there is no email (DEC-196).
+                    requesterPhoneE164: account.email
+                        ? null
+                        : account.phoneE164,
                     createdAt: now,
                 },
                 select,

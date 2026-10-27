@@ -3,7 +3,7 @@ import type { ContactEmailVerifiedVia } from "@saroh/database";
 import type { ContactAddress } from "../contacts/contact-address";
 import { ADDRESS_FIELDS, isEmptyAddress } from "../contacts/contact-address";
 import { contactEmailForDisplay } from "../contacts/contact-email";
-import { maskEmail } from "../site-accounts/account-linking.service";
+import { maskSignIn } from "../site-accounts/account-linking.service";
 
 /**
  * What a merge of two customers does (DEC-042, C9), as pure rules: which
@@ -184,7 +184,9 @@ export interface MergeContact extends ContactAddress {
 /** The account that signs in on the business's site (ACTIVE or BLOCKED). */
 export interface MergeAccount {
     id: string;
-    email: string;
+    /** Null for a phone-only account (DEC-196). */
+    email: string | null;
+    phoneE164?: string | null;
 }
 
 /** The older contact is offered as the survivor (default 22). */
@@ -565,12 +567,12 @@ export function accountSentences(plan: AccountPlan): {
 } {
     return {
         seesCombined: plan.seesCombined
-            ? `${maskEmail(plan.seesCombined.email)} signs in on your website and will see everything here`
+            ? `${maskSignIn(plan.seesCombined)} signs in on your website and will see everything here`
             : null,
         stopsReaching: plan.retired
             ? plan.retiredInto
-                ? `${maskEmail(plan.retired.email)} will be asked to sign in with ${maskEmail(plan.retiredInto.email)} instead`
-                : `${maskEmail(plan.retired.email)} will no longer sign in to this record`
+                ? `${maskSignIn(plan.retired)} will be asked to sign in with ${maskSignIn(plan.retiredInto)} instead`
+                : `${maskSignIn(plan.retired)} will no longer sign in to this record`
             : null,
     };
 }

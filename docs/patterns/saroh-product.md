@@ -897,18 +897,17 @@ rules.
   (claim, what backs it, status); a new claim gets its row first.
 - **Current** — There are no customers, testimonials or case studies. Never
   fabricate them.
-- **Current** — Signup is waitlist-only. Open sign-up is built behind the one
-  launch switch, `NEXT_PUBLIC_LAUNCH_MODE=open` on saroh.in (plan U27): every
-  start button then goes to accounts `/signup?plan=&cycle=`, the plan rides
-  through verification to onboarding, is checked there against the live
-  catalogue, and a paid one goes on to its checkout once the business exists
-  (Free otherwise, and an unknown plan says so). The second switch is
-  production accounts' prelaunch key gate (`PRELAUNCH_GATE` in
-  `apps/accounts.saroh.in/wrangler.jsonc`), which keeps sign-in and
-  sign-up to key holders and sends everyone else to the waitlist page on
-  www.saroh.in (`DEV_REDIRECT_PATH`). Flipping
-  both is launch, on the owner's judgement (`PRODUCT.md`); until then no CTA
-  points at sign-up or Sign in. Social publishing is not a
+- **Current** (since the 17 Oct 2026 launch) — **Sign-up is open.** Both
+  launch switches are flipped in production: `NEXT_PUBLIC_LAUNCH_MODE=open`
+  on saroh.in (plan U27), so every start button reads **Start free** and goes
+  to accounts `/signup?plan=&cycle=` (the plan rides through verification to
+  onboarding, is checked there against the live catalogue, and a paid one goes
+  on to its checkout once the business exists; Free otherwise, and an unknown
+  plan says so), and accounts' prelaunch key gate (`PRELAUNCH_GATE` in
+  `apps/accounts.saroh.in/wrangler.jsonc`) is off, so anyone can sign up and
+  Sign in shows. Marketing pages and designs use Start free, never a waitlist.
+  Before launch (until 17 Oct) sign-up was waitlist-only and no CTA
+  pointed at sign-up or Sign in. Social publishing is not a
   current priority and must not be exposed as production-ready (§22). AI
   features are deferred (DEC-015).
 - **Current** — The name Saroh and its wordmark are fixed; palette, type, shape,

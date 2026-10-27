@@ -23,8 +23,10 @@ import { getSignInOptions } from "@/lib/sign-in";
 
 import {
     loadSignInOptions,
+    requestPhoneSignInCode,
     requestSignInCode,
     signOut,
+    verifyPhoneSignInCode,
     verifySignInCode,
 } from "./actions";
 
@@ -141,7 +143,7 @@ export default async function AccountLayout({
                             <AccountCard
                                 labelledBy="account-signed-out"
                                 title="Sign in to your account"
-                                lead={`Sign in to see your bookings, orders, messages and receipts with ${businessName}. We'll send a one-time code to your email.`}
+                                lead={`Sign in to see your bookings, orders, messages and receipts with ${businessName}. We'll send you a one-time code.`}
                                 actions={
                                     <AccountEntry
                                         variant="page"
@@ -150,6 +152,10 @@ export default async function AccountLayout({
                                         api={{
                                             requestCode: requestSignInCode,
                                             verifyCode: verifySignInCode,
+                                            requestPhoneCode:
+                                                requestPhoneSignInCode,
+                                            verifyPhoneCode:
+                                                verifyPhoneSignInCode,
                                         }}
                                         loadOptions={loadSignInOptions}
                                     />
@@ -238,6 +244,8 @@ async function LookAccount({
                         api={{
                             requestCode: requestSignInCode,
                             verifyCode: verifySignInCode,
+                            requestPhoneCode: requestPhoneSignInCode,
+                            verifyPhoneCode: verifyPhoneSignInCode,
                         }}
                         lead={`Sign in to see your bookings, orders, messages and receipts with ${businessName}.`}
                     />

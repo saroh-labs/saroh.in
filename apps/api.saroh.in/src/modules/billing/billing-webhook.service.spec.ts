@@ -16,6 +16,8 @@ jest.mock("@saroh/database", () => {
     const billingAction = { createMany: jest.fn(() => ({ count: 1 })) };
     // No checkout owns these provider subscriptions (U15).
     const billingCheckout = { findUnique: jest.fn(() => null) };
+    // Nor a messaging top-up (#1241).
+    const messagingTopup = { findFirst: jest.fn(() => null) };
     // Merchant delegates — present ONLY so we can assert billing never uses them.
     const merchantPaymentProvider = { findUnique: jest.fn() };
     const paymentIntent = { findFirst: jest.fn(), update: jest.fn() };
@@ -28,6 +30,7 @@ jest.mock("@saroh/database", () => {
         billingWebhookEvent,
         billingAction,
         billingCheckout,
+        messagingTopup,
         // The row lock the reconcile takes.
         $queryRaw: jest.fn(() => []),
         merchantPaymentProvider,

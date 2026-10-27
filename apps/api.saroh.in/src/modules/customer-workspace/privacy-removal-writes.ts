@@ -91,13 +91,13 @@ export async function theirAccounts(
     tx: Tx,
     organizationId: string,
     contactId: string,
-): Promise<{ id: string; email: string }[]> {
+): Promise<{ id: string; email: string | null; phoneE164: string | null }[]> {
     return tx.customerAccount.findMany({
         where: {
             organizationId,
             OR: [{ contactId }, { contact: { mergedIntoId: contactId } }],
         },
-        select: { id: true, email: true },
+        select: { id: true, email: true, phoneE164: true },
         orderBy: { id: "asc" },
     });
 }
@@ -224,8 +224,10 @@ export async function removeDetailsInTx(
             where: {
                 organizationId,
                 destinationHash: {
-                    in: accounts.map((a) =>
-                        destinationHashFor(organizationId, a.email),
+                    in: accounts.flatMap((a) =>
+                        a.email
+                            ? [destinationHashFor(organizationId, a.email)]
+                            : [],
                     ),
                 },
             },

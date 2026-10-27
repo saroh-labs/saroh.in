@@ -190,6 +190,38 @@ const envSchema = z.object({
     // to see the "couldn't send" path and alert. Development, or named
     // outright off production (the CI browser stack); never in production.
     SITE_CODES_EMAIL_FAKE: z.enum(["log", "fail"]).optional(),
+    // Saroh's own MSG91 account (DEC-191): the platform sender of customer
+    // verification codes on WhatsApp, never a merchant's credentials. The
+    // auth key, the integrated WhatsApp number and the approved
+    // authentication template's name. Unset (any of the three) outside
+    // production, codes go to the in-memory fake
+    // (`messaging/providers/messaging-provider.factory.ts`); in production a
+    // send fails, naming the missing variable. The key is never logged.
+    // docs/architecture/MESSAGING_MSG91.md lists every name below.
+    MSG91_AUTH_KEY: z.string().optional(),
+    MSG91_WHATSAPP_NUMBER: z.string().optional(),
+    MSG91_WHATSAPP_TEMPLATE: z.string().optional(),
+    // Approved WhatsApp utility templates: `key=msg91_name` pairs, comma
+    // separated. Callers name the key; an unknown key is refused.
+    MSG91_WHATSAPP_UTILITY_TEMPLATES: z.string().optional(),
+    // The OTP widget (SMS codes until Saroh's own DLT): its id and token are
+    // public client config the browser loads the widget with.
+    MSG91_WIDGET_ID: z.string().optional(),
+    MSG91_WIDGET_TOKEN: z.string().optional(),
+    // Which adapter sends: `msg91` or `fake` (the fake only in development
+    // and test). Unset, MSG91 when configured, else the fake in dev/test.
+    MESSAGING_PROVIDER: z.enum(["msg91", "fake"]).optional(),
+    // A 32-byte AES-256-GCM key (base64 or 64-hex) sealing a queued
+    // WhatsApp send's number and words until the provider accepts it (a
+    // retry). Its own key, never the payments one. Development and test
+    // fall back to a public value; elsewhere a send fails naming it.
+    MESSAGING_ENC_KEY: z.string().optional(),
+    // TEST ONLY in practice: where MSG91 calls go instead of its own API.
+    MSG91_BASE_URL: z.string().url().optional(),
+    // A long random secret the owner also adds as the `x-saroh-webhook-secret`
+    // header in MSG91's webhook settings; delivery reports without it are
+    // refused (`messaging/msg91-webhook.controller.ts`). Unset, all are.
+    MSG91_WEBHOOK_SECRET: z.string().min(32).optional(),
     // The opening-day launch offer (marketing plan U31, OQ-1): how many days
     // of the offer plan a business made through a waitlist invite gets, from
     // the moment it is made. The owner's number, set per instance, never

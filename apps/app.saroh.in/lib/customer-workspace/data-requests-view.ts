@@ -24,7 +24,15 @@ export interface DataRequestRow {
     name: string | null;
     /** The email they asked from; null once done. */
     email: string | null;
+    /** A customer without an email: the WhatsApp number they asked from. */
+    phone?: string | null;
+    /** Whether Saroh told them where it stands now (DEC-196). */
+    customerTold?: "sent" | "not-sent" | "pending";
 }
+
+/** Said when Saroh couldn't tell them: they have no email. */
+export const NOT_TOLD_TEXT =
+    "We couldn't tell them: they have no email. Let them know yourself.";
 
 /** `?status=` on the Requests tab: open when left out. */
 export const REQUEST_FILTERS = ["open", "done", "closed", "all"] as const;
@@ -69,7 +77,7 @@ export function requesterLabel(row: DataRequestRow): string {
     if (row.status === "DONE") return "A removed customer";
     const name = row.name?.trim();
     if (name) return name;
-    return row.email ?? "A customer";
+    return row.email ?? row.phone ?? "A customer";
 }
 
 /** The row's second line: how to find them, or what became of it. */
@@ -80,11 +88,13 @@ export function requestSub(row: DataRequestRow): string {
             ? `Closed without removal: ${row.reason}`
             : "Closed without removal.";
     }
-    const how = row.name?.trim() && row.email ? row.email : null;
+    const from = row.email ?? row.phone ?? null;
+    const how = row.name?.trim() && from ? from : null;
     const linked = row.contactId
         ? null
-        : "Not linked to a customer yet. Find them by their email.";
-    return [how, linked].filter(Boolean).join(" · ");
+        : `Not linked to a customer yet. Find them by their ${row.email || !row.phone ? "email" : "number"}.`;
+    const told = row.customerTold === "not-sent" ? NOT_TOLD_TEXT : null;
+    return [how, linked, told].filter(Boolean).join(" · ");
 }
 
 /** "1 customer asked to remove their data", for the list's banner. */

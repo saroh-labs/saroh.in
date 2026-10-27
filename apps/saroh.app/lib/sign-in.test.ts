@@ -9,6 +9,7 @@ import {
     codeCallFailed,
     codeResult,
     optionsResult,
+    phoneSessionAnswer,
     sessionAnswer,
 } from "./sign-in";
 
@@ -234,5 +235,54 @@ describe("answers in the API's error envelope", () => {
         expect(
             sessionAnswer(409, envelope(409, { signsInAs: "f…@example.in" })),
         ).toEqual({ ok: false, reason: "merged", signsInAs: "f…@example.in" });
+    });
+});
+
+describe("the WhatsApp way (DEC-196)", () => {
+    it("offers it only when the options say so", () => {
+        const base = {
+            businessName: "Kavi Dental",
+            phone: null,
+            challenge: { required: false, siteKey: null },
+        };
+        expect(optionsResult({ ...base, whatsapp: true })?.whatsapp).toBe(true);
+        expect(optionsResult({ ...base, whatsapp: false })).not.toHaveProperty(
+            "whatsapp",
+        );
+        expect(optionsResult(base)).not.toHaveProperty("whatsapp");
+    });
+
+    it("reads a number that isn't a mobile, and one not on WhatsApp", () => {
+        expect(
+            codeResult(400, {
+                error: { details: { field: "phone" } },
+            }),
+        ).toEqual({ ok: false, reason: "phone" });
+        expect(
+            codeResult(422, {
+                error: { details: { code: "NOT_ON_WHATSAPP" } },
+            }),
+        ).toEqual({ ok: false, reason: "not-on-whatsapp" });
+    });
+
+    it("reads a number that needs an email, else answers as a session", () => {
+        expect(
+            phoneSessionAnswer(201, { emailNeeded: true, phoneProof: "p-1" }),
+        ).toEqual({ ok: false, reason: "email-needed", phoneProof: "p-1" });
+        expect(phoneSessionAnswer(201, { emailNeeded: true })).toEqual({
+            ok: false,
+            reason: "error",
+        });
+        expect(
+            phoneSessionAnswer(201, {
+                token: "t",
+                expiresAt: "2026-11-01T00:00:00.000Z",
+            }),
+        ).toMatchObject({ ok: true, token: "t" });
+        expect(
+            phoneSessionAnswer(400, {
+                error: { details: { reason: "invalid" } },
+            }),
+        ).toEqual({ ok: false, reason: "invalid" });
     });
 });

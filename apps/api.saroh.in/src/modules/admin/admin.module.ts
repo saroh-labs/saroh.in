@@ -14,6 +14,7 @@ import { HealthModule } from "../health/health.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { MediaStorageModule } from "../media/media-storage.module";
+import { AdminMessagingUsageController } from "../messaging/admin-messaging-usage.controller";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { AdminPricingController } from "../pricing/admin-pricing.controller";
 import { CatalogueWritesService } from "../pricing/catalogue-writes.service";
@@ -151,6 +152,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         SarohLeadsController,
         // Search pages: list, history, publish (DEC-193).
         SearchPagesController,
+        // Saroh's own sender's monthly counts (messaging core).
+        AdminMessagingUsageController,
         // Home and the header search (admin console redesign U10).
         AdminConsoleController,
         // Who looks after which business (DEC-169, U25).

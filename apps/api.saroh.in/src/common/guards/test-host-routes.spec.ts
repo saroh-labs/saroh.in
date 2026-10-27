@@ -39,6 +39,7 @@ const EXEMPT = [
     "POST public/billing/webhooks/:provider",
     "POST public/payments/return",
     "POST public/webhooks/:provider/:organizationId",
+    "POST public/webhooks/msg91",
 ];
 
 /** Refused from a test host with 409 TEST_RELEASE. */
@@ -48,10 +49,18 @@ const REFUSED = [
     "DELETE public/site-accounts/sessions",
     "POST public/site-accounts/codes",
     "POST public/site-accounts/sessions",
+    "POST public/site-accounts/phone-codes",
+    "POST public/site-accounts/phone-sessions",
+    // A verification code costs the business a message (DEC-191).
+    "POST public/site-accounts/verifications",
+    "POST public/site-accounts/verifications/:id/check",
     // The customer's account.
     "PATCH public/site-accounts/me",
     "POST public/site-accounts/me/email",
     "POST public/site-accounts/me/email/code",
+    // A WhatsApp number to sign in with (DEC-196): it costs the business.
+    "POST public/site-accounts/me/phone",
+    "POST public/site-accounts/me/phone/code",
     "POST public/site-accounts/me/messages",
     "POST public/site-accounts/me/notes",
     // Whether the business may email them, and "Pay now" on an open

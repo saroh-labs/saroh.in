@@ -1,6 +1,9 @@
 "use client";
 
-import { emailOTPClient } from "better-auth/client/plugins";
+import {
+    emailOTPClient,
+    inferAdditionalFields,
+} from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
 /**
@@ -17,7 +20,21 @@ import { createAuthClient } from "better-auth/react";
 export const authClient = createAuthClient({
     baseURL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
     fetchOptions: { credentials: "include" },
-    plugins: [emailOTPClient()],
+    plugins: [
+        emailOTPClient(),
+        // The verified phone on the session's user (DEC-196), as the
+        // server's `user.additionalFields` declares it.
+        inferAdditionalFields({
+            user: {
+                phoneE164: { type: "string", required: false, input: false },
+                phoneVerifiedAt: {
+                    type: "date",
+                    required: false,
+                    input: false,
+                },
+            },
+        }),
+    ],
 });
 
 export const { signIn, signUp, signOut, useSession, getSession, emailOtp } =

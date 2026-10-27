@@ -16,6 +16,7 @@ import { useTestRelease } from "../test-release/context";
 import { SIGN_IN_OFF_TEXT } from "../test-release/words";
 import type {
     CodeRequestResult,
+    SheetWay,
     SignedInCustomer,
     SignInApi,
     SignInOptions,
@@ -25,7 +26,9 @@ import {
     callLine,
     codeDigits,
     looksLikeEmail,
+    looksLikePhone,
     retryText,
+    sheetWays,
     UNAVAILABLE_TEXT,
 } from "./api";
 import { ChallengeWidget } from "./challenge";
@@ -59,6 +62,23 @@ import {
  * On a test release (DEC-071, KTD-9) signing in is off: a first sign-in
  * makes a contact and sends a real code. The sheet takes the email as
  * usual, then says so instead of asking for a code, and nothing is sent.
+ *
+ * The ways follow the business's choice and order (DEC-196, `sheetWays`):
+ * the first opens, the others are "Use … instead" links in that order.
+ * WhatsApp asks for a mobile number and sends the code on WhatsApp,
+ * through the same code step; every WhatsApp code costs the business, so
+ * the challenge is always shown for it. A number no account holds yet
+ * signs up on its own where the business allows a phone alone, and is
+ * otherwise asked for an email, whose code finishes signing in and adds
+ * the number. When WhatsApp answers that it can't send (the business ran
+ * out of balance since the page was drawn), "Use email instead" is offered
+ * even where email wasn't listed: the server has brought email back.
+ * Where email isn't listed at all, "Signed up with email?" still opens
+ * the email code (DEC-196, Follow-ups): the server sends it only to an
+ * account made by email that has no phone, and answers everyone alike.
+ *
+ * Me opens it to change or add the sign-in email ("change-email",
+ * "add-email") and to add a WhatsApp number ("add-phone").
  */
 
 export interface SignInSheetProps {
@@ -71,7 +91,7 @@ export interface SignInSheetProps {
      * Me's change of sign-in email (A5), where the code goes to the new
      * address and `onSignedIn` gets the customer as they now are.
      */
-    purpose?: "book" | "sign-in" | "change-email";
+    purpose?: "book" | "sign-in" | "change-email" | "add-email" | "add-phone";
     onSignedIn: (customer: SignedInCustomer) => void;
 }
 
@@ -115,8 +135,10 @@ export function SignInSheet({
     const opener = useRef<Element | null>(null);
     const testRelease = useTestRelease() !== null;
 
-    // A change of sign-in email is its own errand: nothing of it is kept.
-    const keeps = purpose !== "change-email";
+    // Me's errands (an email or a number to add or change): nothing kept.
+    const changing = purpose === "change-email" || purpose === "add-email";
+    const addingPhone = purpose === "add-phone";
+    const keeps = !changing && !addingPhone;
     // What an earlier load of the page had got to. Nothing is drawn from
     // it until the sheet opens, so the server's blank and the browser's
     // draft can differ.
@@ -125,6 +147,12 @@ export function SignInSheet({
     );
     const [step, setStep] = useState<"email" | "code">(kept?.step ?? "email");
     const [email, setEmail] = useState(kept?.email ?? "");
+    // The way the code goes (DEC-196), the number, and the proof a WhatsApp
+    // code left when the number needs an email to finish.
+    // Null until the customer picks another: then the business's first.
+    const [picked, setPicked] = useState<SheetWay | null>(null);
+    const [phone, setPhone] = useState("");
+    const [phoneProof, setPhoneProof] = useState<string | null>(null);
     // When the code on its way was sent: what makes a restored "Enter the
     // code" step worth showing.
     const [sentAt, setSentAt] = useState<number | null>(kept?.sentAt ?? null);
@@ -144,9 +172,32 @@ export function SignInSheet({
     // when they say a challenge is likely. Derived, not copied, because the
     // options can land after the sheet opened (`AccountEntry`, #838).
     const [askedKey, setAskedKey] = useState<string | null>(null);
+    const canPhone =
+        api.requestPhoneCode !== undefined && api.verifyPhoneCode !== undefined;
+    // The business's ways, in its order (DEC-196); Me's errands have one.
+    const ways: SheetWay[] = addingPhone
+        ? ["phone"]
+        : changing
+          ? ["email"]
+          : sheetWays(options, canPhone);
+    const via: SheetWay = picked ?? ways[0];
+    const byPhone = via === "phone";
+    // A WhatsApp code always asks the challenge, when there is one.
     const siteKey =
         askedKey ??
-        (options.challenge.required ? options.challenge.siteKey : null);
+        (options.challenge.required || byPhone
+            ? options.challenge.siteKey
+            : null);
+    // WhatsApp couldn't send: email is back on the server, so offer it.
+    // Email off: an account made by email still signs in with it.
+    const emailFallback = keeps && !ways.includes("email");
+    const others: SheetWay[] =
+        byPhone &&
+        !addingPhone &&
+        problem?.reason === "unavailable" &&
+        !ways.includes("email")
+            ? ["email"]
+            : ways.filter((way) => way !== via);
 
     // Focus in on open; back to the opener on close.
     useEffect(() => {
@@ -172,16 +223,20 @@ export function SignInSheet({
 
     // Kept for the visit while the sheet is open; never the code.
     useEffect(() => {
-        if (keeps && open) writeSignInDraft({ email, step, sentAt });
-    }, [keeps, open, email, step, sentAt]);
+        if (keeps && open && via === "email" && !phoneProof) {
+            writeSignInDraft({ email, step, sentAt });
+        }
+    }, [keeps, open, email, step, sentAt, via, phoneProof]);
 
     // The page behind stays still while the sheet is open.
     useScrollLock(open);
 
     if (!open) return null;
 
-    const { businessName, phone } = options;
-    const emailReady = looksLikeEmail(email) && (!siteKey || token !== null);
+    const { businessName } = options;
+    const emailReady =
+        (byPhone ? looksLikePhone(phone) : looksLikeEmail(email)) &&
+        (!siteKey || token !== null);
     const codeReady = codeDigits(code).length === 6;
 
     async function sendCode() {
@@ -192,9 +247,11 @@ export function SignInSheet({
         }
         setBusy(true);
         setProblem(null);
-        const result = await api
-            .requestCode(email.trim(), token ?? undefined)
-            .catch((): CodeRequestResult => ({ ok: false, reason: "error" }));
+        const result = await (
+            byPhone && api.requestPhoneCode
+                ? api.requestPhoneCode(phone.trim(), token ?? undefined)
+                : api.requestCode(email.trim(), token ?? undefined)
+        ).catch((): CodeRequestResult => ({ ok: false, reason: "error" }));
         setBusy(false);
         // A challenge token is good for one request.
         setToken(null);
@@ -222,16 +279,33 @@ export function SignInSheet({
         checking.current = true;
         setBusy(true);
         setProblem(null);
-        const result = await api
-            .verifyCode(email.trim(), digits)
-            .catch((): VerifyResult => ({ ok: false, reason: "error" }));
+        const result = await (
+            byPhone && api.verifyPhoneCode
+                ? api.verifyPhoneCode(phone.trim(), digits)
+                : phoneProof
+                  ? api.verifyCode(email.trim(), digits, phoneProof)
+                  : api.verifyCode(email.trim(), digits)
+        ).catch((): VerifyResult => ({ ok: false, reason: "error" }));
         checking.current = false;
         setBusy(false);
+        if (!result.ok && result.reason === "email-needed") {
+            // The number is proved; an email finishes, and takes the number.
+            setPhoneProof(result.phoneProof);
+            setPicked("email");
+            setCode("");
+            setResendAt(null);
+            setAskedKey(null);
+            setStep("email");
+            return;
+        }
         if (result.ok) {
             // Signed in: nothing of the sign-in is kept, here or stored.
             if (keeps) clearSignInDraft();
             setEmail("");
             setCode("");
+            setPhone("");
+            setPhoneProof(null);
+            setPicked(null);
             setStep("email");
             onSignedIn(result.customer);
             onClose();
@@ -252,6 +326,14 @@ export function SignInSheet({
         setStep("email");
         setCode("");
         setProblem(null);
+    }
+
+    /** Another of the business's ways, from the first step. */
+    function switchWay(way: SheetWay) {
+        setPicked(way);
+        setProblem(null);
+        setToken(null);
+        setAskedKey(null);
     }
 
     function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -278,21 +360,34 @@ export function SignInSheet({
         }
     }
 
-    const changing = purpose === "change-email";
     const title =
         step === "code"
             ? "Enter the code"
-            : changing
-              ? "Change your sign-in email"
-              : `Sign in to ${businessName}`;
+            : purpose === "add-email"
+              ? "Add your email"
+              : changing
+                ? "Change your sign-in email"
+                : addingPhone
+                  ? "Add your WhatsApp number"
+                  : phoneProof
+                    ? "Add your email"
+                    : `Sign in to ${businessName}`;
     const lead =
         step === "code"
-            ? `We sent a 6-digit code to ${email.trim()}.`
+            ? byPhone
+                ? `We sent a 6-digit code on WhatsApp to ${phone.trim()}.`
+                : `We sent a 6-digit code to ${email.trim()}.`
             : changing
               ? "We'll send a code to the new address to check it's yours."
-              : purpose === "book"
-                ? "Last step: confirm it's you, then we'll finish. No password."
-                : "No password. We'll send you a one-time code.";
+              : addingPhone
+                ? "You can then sign in with a code on WhatsApp. We'll send one now to check it's yours."
+                : phoneProof
+                  ? "Your number is confirmed. Add your email to finish. We'll send a code to check it's yours."
+                  : purpose === "book"
+                    ? "Last step: confirm it's you, then we'll finish. No password."
+                    : byPhone
+                      ? "No password. We'll send you a one-time code on WhatsApp."
+                      : "No password. We'll send you a one-time code.";
     const expired = problem?.reason === "expired";
     const resendIn = resendWait(resendAt, now);
 
@@ -359,7 +454,21 @@ export function SignInSheet({
                     }}
                     noValidate
                 >
-                    {step === "email" ? (
+                    {step === "email" && byPhone ? (
+                        <label className="mt-3.5 block text-[13.5px] font-medium">
+                            Mobile number
+                            <input
+                                ref={field}
+                                type="tel"
+                                inputMode="tel"
+                                autoComplete="tel"
+                                placeholder="+91 98450 12345"
+                                value={phone}
+                                onChange={(e) => setPhone(e.target.value)}
+                                className={input}
+                            />
+                        </label>
+                    ) : step === "email" ? (
                         <label className="mt-3.5 block text-[13.5px] font-medium">
                             {changing ? "New email" : "Email"}
                             <input
@@ -391,18 +500,28 @@ export function SignInSheet({
                     )}
 
                     {step === "email" && siteKey ? (
-                        <ChallengeWidget siteKey={siteKey} onToken={setToken} />
+                        <ChallengeWidget
+                            key={via}
+                            siteKey={siteKey}
+                            onToken={setToken}
+                        />
                     ) : null}
 
                     {problem ? (
                         <ProblemText
                             problem={problem}
                             businessName={businessName}
-                            phone={phone}
+                            phone={options.phone}
+                            via={via}
+                            emailListed={ways.includes("email")}
                         />
                     ) : null}
 
-                    {step === "email" && !changing ? (
+                    {step === "email" &&
+                    keeps &&
+                    !phoneProof &&
+                    !(emailFallback && !byPhone) &&
+                    (!byPhone || options.phoneOnlySignUp === true) ? (
                         <p className="text-site-muted mt-2.5 text-[12.5px] leading-normal">
                             New here? The same code creates your account.
                         </p>
@@ -426,15 +545,22 @@ export function SignInSheet({
                             : busy
                               ? "Checking…"
                               : changing
-                                ? "Confirm new email"
-                                : "Sign in"}
+                                ? purpose === "add-email"
+                                    ? "Confirm email"
+                                    : "Confirm new email"
+                                : addingPhone
+                                  ? "Confirm number"
+                                  : "Sign in"}
                     </button>
                 </form>
 
                 {step === "code" && expired ? (
                     <button
                         type="button"
-                        onClick={() => void sendCode()}
+                        // A challenge token is good for one request.
+                        onClick={() =>
+                            siteKey ? changeEmail() : void sendCode()
+                        }
                         className={altButton}
                     >
                         Send a new code
@@ -461,7 +587,38 @@ export function SignInSheet({
                         onClick={changeEmail}
                         className={altButton}
                     >
-                        {changing ? "Use another email" : "Change email"}
+                        {changing
+                            ? "Use another email"
+                            : byPhone
+                              ? "Change number"
+                              : "Change email"}
+                    </button>
+                ) : null}
+                {step === "email" && !phoneProof
+                    ? others.map((way) => (
+                          <button
+                              key={way}
+                              type="button"
+                              onClick={() => switchWay(way)}
+                              className={altButton}
+                          >
+                              {way === "phone"
+                                  ? "Use WhatsApp instead"
+                                  : "Use email instead"}
+                          </button>
+                      ))
+                    : null}
+                {step === "email" &&
+                !phoneProof &&
+                emailFallback &&
+                byPhone &&
+                !others.includes("email") ? (
+                    <button
+                        type="button"
+                        onClick={() => switchWay("email")}
+                        className={cn(altButton, "font-normal")}
+                    >
+                        Signed up with email?
                     </button>
                 ) : null}
             </div>
@@ -496,10 +653,16 @@ export function ProblemText({
     problem,
     businessName,
     phone,
+    via = "email",
+    emailListed = true,
 }: {
     problem: Problem;
     businessName: string;
     phone: string | null;
+    /** How the code went: a wrong WhatsApp code says WhatsApp. */
+    via?: "email" | "phone";
+    /** Whether "Use your email instead" can be said (DEC-196). */
+    emailListed?: boolean;
 }) {
     if (problem.reason === "test-release") {
         // Not a failure: what a test release does here, said plainly.
@@ -548,14 +711,28 @@ export function ProblemText({
         case "email":
             body = "Enter your email address, like you@example.in.";
             break;
+        case "phone":
+            body = "Enter an Indian mobile number, like +91 98450 12345.";
+            break;
+        case "not-on-whatsapp":
+            body = emailListed
+                ? "This number isn't on WhatsApp. Use your email instead."
+                : "This number isn't on WhatsApp. Try another number.";
+            break;
         case "invalid":
-            body = "That code isn't right. Check the email and try again.";
+            body =
+                via === "phone"
+                    ? "That code isn't right. Check WhatsApp and try again."
+                    : "That code isn't right. Check the email and try again.";
             break;
         case "expired":
             body = "That code has expired. Send a new one.";
             break;
         case "merged":
-            body = `This email now signs in as ${problem.signsInAs}. Use that email instead.`;
+            body =
+                via === "phone"
+                    ? `This number now signs in as ${problem.signsInAs}. Use that instead.`
+                    : `This email now signs in as ${problem.signsInAs}. Use that email instead.`;
             break;
         case "blocked":
             body = `You can't sign in here. Please contact ${businessName}.`;

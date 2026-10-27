@@ -5,7 +5,9 @@ import type { SignInOptions } from "@saroh/site-blocks";
 import { LookCheckout, lookOf } from "@saroh/site-blocks";
 
 import {
+    requestPhoneSignInCode,
     requestSignInCode,
+    verifyPhoneSignInCode,
     verifySignInCode,
 } from "@/app/[domain]/account/actions";
 import {
@@ -88,6 +90,8 @@ export default async function LookCheckoutPage({
                     signIn: {
                         requestCode: requestSignInCode,
                         verifyCode: verifySignInCode,
+                        requestPhoneCode: requestPhoneSignInCode,
+                        verifyPhoneCode: verifyPhoneSignInCode,
                     },
                 }}
             />

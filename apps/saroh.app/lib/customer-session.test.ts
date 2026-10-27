@@ -140,6 +140,7 @@ describe("calls to the API", () => {
         );
         await expect(getSignedInCustomer()).resolves.toEqual({
             email: "a@b.in",
+            signInPhone: null,
             name: null,
             phone: null,
         });
@@ -164,8 +165,30 @@ describe("calls to the API", () => {
         );
         await expect(getSignedInCustomer()).resolves.toEqual({
             email: "a@b.in",
+            signInPhone: null,
             name: "Asha",
             phone: "98450 12345",
+        });
+    });
+
+    it("keeps an account made by phone alone, with no email (DEC-196)", async () => {
+        jar.value = "tok";
+        fetchMock.mockResolvedValue(
+            new Response(
+                JSON.stringify({
+                    email: null,
+                    signInPhone: "+919845012345",
+                    name: null,
+                    phone: "+919845012345",
+                }),
+                { status: 200 },
+            ),
+        );
+        await expect(getSignedInCustomer()).resolves.toEqual({
+            email: null,
+            signInPhone: "+919845012345",
+            name: null,
+            phone: "+919845012345",
         });
     });
 

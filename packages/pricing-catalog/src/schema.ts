@@ -247,6 +247,30 @@ const catalogShape = z.object({
             ),
         ),
     freeStyles: freeStylesSchema.optional(),
+    /**
+     * What one Saroh-sent verification message costs the business, in paise,
+     * by channel (DEC-191). Absent, or a channel left out: that channel has
+     * no price, and nothing is sent on it.
+     */
+    messagePrices: z
+        .object({
+            whatsapp: paise.optional(),
+            sms: paise.optional(),
+            email: paise.optional(),
+        })
+        .optional(),
+    /**
+     * The money packs a business can buy for its messaging wallet (DEC-191,
+     * #1241): each credits `amountPaise` (before GST). Absent: none sold.
+     */
+    messagePacks: z
+        .array(
+            z.object({
+                id: z.string().trim().min(1).max(64),
+                amountPaise: paise.positive(),
+            }),
+        )
+        .optional(),
 });
 
 function duplicates(ids: readonly string[]): string[] {
@@ -266,6 +290,7 @@ export const catalogSchema = catalogShape.superRefine((c, ctx) => {
         [c.groups.map((g) => g.id), "groups"],
         [c.modules.map((m) => m.id), "modules"],
         [c.addons.map((a) => a.id), "addons"],
+        [(c.messagePacks ?? []).map((m) => m.id), "messagePacks"],
     ] as const) {
         for (const d of duplicates(list))
             issue(`Two ${label} share the id "${d}"`, [label]);

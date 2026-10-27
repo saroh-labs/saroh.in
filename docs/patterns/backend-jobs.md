@@ -121,6 +121,7 @@ waits while holding one.
 | `job-chain:admin.inactivity-sweep`        | Leaving one waiting run of the daily inactivity sweep and managers' email (#1199), as the manager link sweep does                                                                                                                                                                                                                        | `admin/inactivity-sweep.job.ts` (`schedule`)                                        |
 | `job-chain:class-packs.expiring`          | Leaving one waiting run of the pack expiry sweep (DEC-174 U22), as the manager link sweep does                                                                                                                                                                                                                                           | `class-packs/pack-expiring.handler.ts` (`schedule`)                                 |
 | `job-chain:invoice.overdue-remind`        | Leaving one waiting run of the overdue reminder sweep (automatic notices U20), as the manager link sweep does                                                                                                                                                                                                                            | `invoices/overdue-remind.handler.ts` (`schedule`)                                   |
+| `job-chain:messaging.wallet-sweep`        | Leaving one waiting run of the messaging wallet sweep (#1240): stale WhatsApp holds given back, expired balances zeroed, as the manager link sweep does                                                                                                                                                                                  | `messaging/wallet-sweep.handler.ts` (`schedule`)                                    |
 | `plan-meter:<organizationId>:<limitKey>`  | Writes that add to one plan limit (a product, a booking…)                                                                                                                                                                                                                                                                                | `billing/metering.service.ts` (`lockMeter`, U13)                                    |
 | `search-pages:publish`                    | One search-page action at a time (DEC-193), so two can't both read a path as unpublished and write it                                                                                                                                                                                                                                    | `search-pages/search-pages.service.ts` (`act`)                                      |
 
@@ -150,7 +151,7 @@ worker with `runOnce()`; the poll loop does not start under `NODE_ENV=test`.
 
 ## Known gaps
 
-None. A new one is listed here and in `job-consumers.spec.ts`; close a gap
+A new one is listed here and in `job-consumers.spec.ts`; close a gap
 and delete its entry in the same commit.
 
 `analytics.aggregate` was one: its handler was registered (S7-002) and

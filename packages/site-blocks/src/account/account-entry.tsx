@@ -7,6 +7,7 @@ import { useState } from "react";
 import { focusRing } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
 import type { SignedInCustomer, SignInApi, SignInOptions } from "./api";
+import { customerHandle } from "./api";
 import { initials } from "./model";
 import { buttonClasses } from "./parts";
 import { SignInSheet } from "./sign-in-sheet";
@@ -61,7 +62,7 @@ export function AccountEntry({
                     aria-hidden
                     className="bg-site-fg text-site-bg inline-flex size-[38px] shrink-0 items-center justify-center rounded-full text-xs font-bold"
                 >
-                    {initials(customer.name, customer.email)}
+                    {initials(customer.name, customerHandle(customer))}
                 </span>
                 <span className="sr-only sm:not-sr-only">My account</span>
             </Link>

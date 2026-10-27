@@ -12,6 +12,7 @@ import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { personHref } from "@/lib/contacts/person-href";
 import type { DataRequestRow } from "@/lib/customer-workspace/data-requests-view";
 import {
+    NOT_TOLD_TEXT,
     requesterLabel,
     STATUS_WORDS,
 } from "@/lib/customer-workspace/data-requests-view";
@@ -24,6 +25,12 @@ export const REMOVED_FROM_REQUEST =
 
 /** What closing one says. */
 export const CLOSED_TOAST = "Request closed. We've emailed them.";
+
+/** The toasts for a customer with no email (DEC-196): Saroh can't tell them. */
+export const REMOVED_NO_EMAIL =
+    "Their details were removed, and the request is done. They have no email, so let them know yourself.";
+export const CLOSED_NO_EMAIL =
+    "Request closed. They have no email, so let them know yourself.";
 
 /**
  * One request, read first, in the side sheet a Requests row opens
@@ -82,6 +89,16 @@ export function RequestSheet({
                                 {request.email}
                             </span>
                         </Fact>
+                    ) : null}
+                    {!request.email && request.phone ? (
+                        <Fact label="Asked from">
+                            <span data-ph-mask="">
+                                WhatsApp {request.phone}
+                            </span>
+                        </Fact>
+                    ) : null}
+                    {request.customerTold === "not-sent" ? (
+                        <Fact label="Told them">{NOT_TOLD_TEXT}</Fact>
                     ) : null}
                     {request.handledAt ? (
                         <Fact
@@ -149,7 +166,11 @@ export function RequestSheet({
                     onOpenChange={setRemoving}
                     onRemoved={() => {
                         setRemoving(false);
-                        showSuccess(REMOVED_FROM_REQUEST);
+                        showSuccess(
+                            request.email
+                                ? REMOVED_FROM_REQUEST
+                                : REMOVED_NO_EMAIL,
+                        );
                         onChanged();
                     }}
                 />
@@ -161,7 +182,7 @@ export function RequestSheet({
                 onOpenChange={setClosing}
                 onClosed={() => {
                     setClosing(false);
-                    showSuccess(CLOSED_TOAST);
+                    showSuccess(request.email ? CLOSED_TOAST : CLOSED_NO_EMAIL);
                     onChanged();
                 }}
             />

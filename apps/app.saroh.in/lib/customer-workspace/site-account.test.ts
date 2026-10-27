@@ -26,6 +26,15 @@ describe("signsInLine", () => {
             ),
         ).toBe("Blocked from signing in on your website");
     });
+
+    it("names the number of an account made by phone alone (DEC-196)", () => {
+        expect(
+            signsInLine(
+                { email: null, phone: "+919845012345", status: "ACTIVE" },
+                true,
+            ),
+        ).toBe("Signs in on your website as +919845012345");
+    });
 });
 
 describe("unlinkConfirm", () => {

@@ -28,10 +28,13 @@ import {
     AddNoteDto,
     ChangeEmailCodeDto,
     ChangeEmailDto,
+    RequestPhoneCodeDto,
     UpdateDetailsDto,
+    VerifyPhoneCodeDto,
 } from "./dto";
 import type { EmailChanged } from "./email-change.service";
 import { EmailChangeService } from "./email-change.service";
+import { PhoneSignInService } from "./phone-sign-in.service";
 import { ReceiptPdfService } from "./receipt-pdf.service";
 import type { CodeRequested } from "./sign-in-codes.service";
 import type { SiteRelay } from "./site-relay";
@@ -56,6 +59,7 @@ export class AccountController {
         private readonly account: AccountHomeService,
         private readonly emailChange: EmailChangeService,
         private readonly receiptPdfs: ReceiptPdfService,
+        private readonly phone: PhoneSignInService,
     ) {}
 
     /** Who is signed in, their details, and the tabs this business shows. */
@@ -104,6 +108,34 @@ export class AccountController {
         @Body() dto: ChangeEmailDto,
     ): Promise<EmailChanged> {
         return this.emailChange.confirm(customer, relay, dto);
+    }
+
+    /**
+     * Send a WhatsApp code to a phone to sign in with (DEC-196). Answers as
+     * `phone-codes` does; 503 `unavailable` while the site doesn't offer
+     * WhatsApp.
+     */
+    @Post("phone/code")
+    @HttpCode(HttpStatus.ACCEPTED)
+    @Header("Cache-Control", "no-store")
+    requestPhoneCode(
+        @CurrentCustomer() customer: CustomerContext,
+        @RelayContext() relay: SiteRelay,
+        @Body() dto: RequestPhoneCodeDto,
+    ): Promise<CodeRequested> {
+        return this.phone.requestAddCode(customer, relay, dto);
+    }
+
+    /** Add (or replace) the sign-in phone with its code: the same answer every time. */
+    @Post("phone")
+    @HttpCode(HttpStatus.OK)
+    @Header("Cache-Control", "no-store")
+    addPhone(
+        @CurrentCustomer() customer: CustomerContext,
+        @RelayContext() relay: SiteRelay,
+        @Body() dto: VerifyPhoneCodeDto,
+    ): Promise<{ done: true }> {
+        return this.phone.confirmAdd(customer, relay, dto);
     }
 
     /** Paid invoices, for Me's Receipts. */

@@ -26,6 +26,13 @@ export interface MeApi {
     }) => Promise<DetailsResult>;
     /** Code to the new address, then the change: the sign-in sheet's calls. */
     emailChange: SignInApi;
+    /**
+     * A WhatsApp code to a number, then the number added to sign in with
+     * (DEC-196). Left out by an older caller: no "Add WhatsApp number".
+     */
+    phoneAdd?: Required<
+        Pick<SignInApi, "requestPhoneCode" | "verifyPhoneCode">
+    >;
     addNote: (text: string) => Promise<NoteResult>;
     signOut: () => Promise<{ ok: boolean }>;
     signOutEverywhere: () => Promise<{ ok: boolean }>;

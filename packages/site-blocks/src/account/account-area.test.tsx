@@ -1,5 +1,6 @@
 import {
     act,
+    cleanup,
     fireEvent,
     render,
     screen,
@@ -579,6 +580,38 @@ describe("Me", () => {
         expect(api.signOut).toHaveBeenCalled();
         expect(api.signOutEverywhere).not.toHaveBeenCalled();
         expect(router.push).toHaveBeenCalledWith("/");
+    });
+
+    it("asks once to add a WhatsApp number when email is off and they have none", () => {
+        window.localStorage.removeItem("saroh:phone-ask-dismissed");
+        const phoneAdd = {
+            requestPhoneCode: vi.fn(),
+            verifyPhoneCode: vi.fn(),
+        };
+        const draw = () =>
+            render(
+                <Me
+                    account={{ ...ACCOUNT, signInPhone: null }}
+                    receipts={{ ok: true, value: [] }}
+                    notes={null}
+                    options={{ ...OPTIONS, ways: ["WHATSAPP"] }}
+                    api={meApi({ phoneAdd })}
+                />,
+            );
+        draw();
+        expect(
+            screen.getByRole("heading", { name: "Add your WhatsApp number" }),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+        expect(
+            screen.queryByRole("heading", { name: "Add your WhatsApp number" }),
+        ).toBeNull();
+        cleanup();
+        draw();
+        expect(
+            screen.queryByRole("heading", { name: "Add your WhatsApp number" }),
+        ).toBeNull();
+        window.localStorage.removeItem("saroh:phone-ask-dismissed");
     });
 });
 

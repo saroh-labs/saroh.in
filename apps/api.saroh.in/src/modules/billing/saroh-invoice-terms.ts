@@ -18,12 +18,13 @@ import { DEFAULT_TIMEZONE, financialYear } from "../invoices/numbering";
  * states it is IGST.
  */
 
-/** What was charged: the checkout kinds, and a renewal. */
+/** What was charged: the checkout kinds, a renewal, and a messaging top-up. */
 export const SAROH_INVOICE_SOURCES = [
     "NEW",
     "UPGRADE",
     "SCHEDULED",
     "RENEWAL",
+    "TOPUP",
 ] as const;
 export type SarohInvoiceSource = (typeof SAROH_INVOICE_SOURCES)[number];
 
@@ -175,6 +176,9 @@ export function sarohInvoiceNumber(series: string, n: number): string {
 
 /** The charge key of a nominal first month (DEC-093), before its checkout. */
 export const FIRST_MONTH_KEY = "first-month:";
+
+/** A messaging top-up's invoice key (#1241): `topup:<top-up id>`. */
+export const TOPUP_KEY = "topup:";
 
 /** Paise as the paper's rupees string: 12345 → "123.45". */
 export function paiseToRupees(paise: number): string {
