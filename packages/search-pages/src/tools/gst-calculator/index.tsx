@@ -15,6 +15,7 @@ import {
     ToolForm,
     ToolSide,
 } from "../parts";
+import { copyText } from "../td-parts";
 import { gstCalc, OTHER, SLABS, WORDS, working } from "./logic";
 
 const MODES = [
@@ -66,12 +67,7 @@ export default function GstCalculator() {
 
     async function copy() {
         if (!result) return;
-        try {
-            await navigator.clipboard.writeText(working(result));
-            setCopied("yes");
-        } catch {
-            setCopied("failed");
-        }
+        setCopied((await copyText(working(result))) ? "yes" : "failed");
     }
 
     return (

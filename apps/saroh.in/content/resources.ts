@@ -229,6 +229,16 @@ export function isLive(
     return ctx.preview || isPublished(page.publishOn, ctx.now);
 }
 
+/** The page at `slug` in `pages`, only when it is live (DEC-195, B11). */
+export function liveBySlug<T extends { slug: string; publishOn: IsoDay }>(
+    pages: readonly T[],
+    slug: string,
+    ctx: PublishContext,
+): T | null {
+    const page = pages.find((p) => p.slug === slug);
+    return page && isLive(page, ctx) ? page : null;
+}
+
 /** Whether a page may be linked: not switched off, published (a free tool), live, and its route is in this build. */
 export function isShown(
     page: { publishOn: IsoDay; href: string },

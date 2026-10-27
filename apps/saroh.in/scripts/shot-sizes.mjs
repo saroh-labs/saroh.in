@@ -12,7 +12,7 @@
  * `public/shots/v2/<key>.webp` (the capture, `e2e/marketing-shots/capture.ts`)
  * gets `public/shots/v2/sized/<key>-<width>.webp` for every width in
  * `content/shot-widths.json` narrower than itself.
- * `components/v2/shot-image.tsx` names them in a `srcset`
+ * `components/shared/media/shot-image.tsx` names them in a `srcset`
  * (`lib/shot-sources.ts`), and `public/_headers` lets a browser keep them.
  *
  * Run it after a capture, with `--force` for a screenshot taken again:

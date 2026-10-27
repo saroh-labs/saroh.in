@@ -2491,4 +2491,33 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **Later edits to a live page's words go out with normal releases.** Publishing is about whether a page is on the site, not each change of words.
     - **Admin shows the page exactly as the site will**: the page template and content are one shared package, rendered by the admin's own signed-in, `noindex` preview route (desk and phone), and by saroh.in.
     - **Who:** a new staff permission, `search-pages:publish`.
-- Rules: `packages/search-pages/`; `apps/api.saroh.in/src/modules/search-pages/`; `apps/saroh.in/app/(v2)/for/`; `apps/admin.saroh.in/app/search-pages/`.
+- Rules: `packages/search-pages/`; `apps/api.saroh.in/src/modules/search-pages/`; `apps/saroh.in/app/(site)/for/`; `apps/admin.saroh.in/app/search-pages/`.
+
+## DEC-195 Reuse the shared component; never redraw it
+
+**Status: Accepted — 2026-10-27** · owner · from the saroh.in de-duplication audit (`docs/plans/2026-10-27-001-saroh-in-dedupe-audit.md`); owner: "we need to have this as a rule for the repo … we cannot rewrite duplicate code everywhere, we have to reuse the component"
+
+- Context:
+    - /for/ pages and Home drew their own plan teaser cards beside the Pricing page's plan cards, and the copies had drifted apart (fixed 27 Oct in `553aed795`: one `PricingCards` everywhere). The audit found about 95 more hand-drawn copies on saroh.in (24 groups), 14 copied helpers (two of them bugs, one CodeQL-flagged email regex) and the focus ring written out 64 times. A clone checker would not have caught the teaser: a redraw shares no lines with the original.
+- Decision:
+    - **One component per UI piece.** A page imports it and passes data; it never copies or redraws it. A page that needs it different adds a variant to the one component. A copy is a bug even when it looks the same today.
+    - **Shared pieces live in `components/shared/<group>/`** (after the move step of the plan); feature pieces in their feature folder (DEC-183).
+    - **Logic helpers likewise**: one email check, one day formatter, one money formatter, one list joiner, one way to read a posted body.
+    - **Enforced, as a ratchet**: `apps/saroh.in/lib/consistency/shared-pieces.test.ts` (a regex per piece, today's copies allow-listed with the step that removes them, the list only shrinks) and `pnpm check:dupes` (`scripts/check-dupes.mjs`, our own script, no new dependency: 6+ lines copied across files; `scripts/dupes-baseline.json` only shrinks). Both in `pnpm prepush` and CI's static job.
+    - **saroh.in first** (with `@saroh/search-pages`); other apps join the scan and the clone check as each is cleaned.
+    - **The target looks** (owner, 27 Oct: all twelve of the audit's picks):
+        - V1 text link: the Resources look, underline on hover, stays Saffron 700 (`TextLink`).
+        - V2 breadcrumb: `Breadcrumbs`, `current="brand"` for feature and solution heroes, one "/" separator.
+        - V3 FAQ: `Faq` everywhere on saroh.in; one package FAQ for /for/ and /tools.
+        - V4 Ink closing band: `CtaBand` with `template`, `note={null}` and `size="compact"`.
+        - V5 link card hover: Ink border + `shadow-mk-lift`, in `CardLink`.
+        - V6 page title: two sizes as tokens (`text-mk-page`, `text-mk-article`).
+        - V7 reading column: two widths, article 760 and list 900, as `Container width`, on the site gutter.
+        - V8 "Coming" list: one `ComingList` with the changelog's layout, one data list.
+        - V9 choice chip: one `ChoiceChip`, 36px, 14px, `bg-card`, 44px on touch.
+        - V10 Ink button: `<Button>` on `buttonClasses`, plus `size="xs"` (36-38px) for in-panel actions.
+        - V11 text field: one `fieldClasses({ onInk })`, 16px text.
+        - V12 small caps label: `Eyebrow` with `tone="brand" | "muted" | "on-ink"` and `size="sm"` (11px).
+- Consequences:
+    - The plan's steps (move, non-visual fixes, merges, the looks above, the package) each delete their allow-list entries and shrink the baseline.
+- Rules: `docs/patterns/frontend-design-system.md` → "Shared pieces on saroh.in"; `apps/saroh.in/lib/consistency/shared-pieces.test.ts`; `scripts/check-dupes.mjs`.

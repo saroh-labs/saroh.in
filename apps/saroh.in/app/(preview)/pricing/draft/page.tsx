@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import Link from "next/link";
 
-import { Container } from "@/components/v2/container";
-import { PreviewBanner } from "@/components/v2/pricing/preview-banner";
-import { PreviewControls } from "@/components/v2/pricing/preview-controls";
-import { PricingPage } from "@/components/v2/pricing/pricing-page";
-import { SiteFooter } from "@/components/v2/site-footer";
-import { SiteNav } from "@/components/v2/site-nav";
+import { PreviewBanner } from "@/components/pricing/preview/preview-banner";
+import { PreviewControls } from "@/components/pricing/preview/preview-controls";
+import { PricingPage } from "@/components/pricing/pricing-page";
+import { Container } from "@/components/shared/layout/container";
+import { SiteChrome } from "@/components/shared/layout/site-chrome";
+import { textLinkClasses } from "@/components/shared/links/text-link";
 import { LAUNCH_MODE } from "@/lib/links";
 import { readLivePricing, readPreviewPricing } from "@/lib/pricing";
 import { markChanges } from "@/lib/pricing-marks";
@@ -25,8 +25,8 @@ import { pricingPageModel } from "@/lib/pricing-view";
  * nothing is cached. Not indexed, no referrer, no Google Analytics
  * (`app/site-tags.tsx`); `next.config.js` sets the same as headers.
  *
- * Outside the `(v2)` group so the amber bar sits above the nav, as the
- * design draws it; it brings the V2 chrome itself.
+ * Outside the `(site)` group so the amber bar sits above the nav, as the
+ * design draws it; it brings the V2 chrome itself (`SiteChrome preview`).
  *
  * The bar holds the preview's controls (admin redesign U13, R24): the draft
  * or what is live now, desktop or phone width, and Show what changed, which
@@ -55,7 +55,8 @@ export default async function PricingDraftRoute({
 
     if (!read.ok) {
         return (
-            <Chrome
+            <SiteChrome
+                preview
                 banner={
                     <PreviewBanner>
                         {read.reason === "expired"
@@ -81,15 +82,12 @@ export default async function PricingDraftRoute({
                     {/* Published pricing exists once the launch switch opens;
                         before that /pricing waits at the waitlist (Gate W). */}
                     {LAUNCH_MODE === "open" ? (
-                        <Link
-                            href="/pricing"
-                            className="rounded-sm text-brand-700 no-underline hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
-                        >
+                        <Link href="/pricing" className={textLinkClasses()}>
                             See the published pricing
                         </Link>
                     ) : null}
                 </Container>
-            </Chrome>
+            </SiteChrome>
         );
     }
 
@@ -105,9 +103,9 @@ export default async function PricingDraftRoute({
 
     if (view.frame) {
         return (
-            <Chrome banner={null}>
+            <SiteChrome preview>
                 <PricingPage model={model} />
-            </Chrome>
+            </SiteChrome>
         );
     }
 
@@ -143,28 +141,8 @@ export default async function PricingDraftRoute({
     }
 
     return (
-        <Chrome banner={banner}>
+        <SiteChrome preview banner={banner}>
             <PricingPage model={model} />
-        </Chrome>
-    );
-}
-
-/** The `(v2)` layout's chrome, with the preview bar above the nav. */
-function Chrome({
-    banner,
-    children,
-}: {
-    banner: React.ReactNode;
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="min-h-screen bg-background text-foreground [line-height:normal]">
-            <div className="mx-auto max-w-mk-page overflow-x-clip bg-background">
-                {banner}
-                <SiteNav />
-                <main id="main">{children}</main>
-                <SiteFooter />
-            </div>
-        </div>
+        </SiteChrome>
     );
 }

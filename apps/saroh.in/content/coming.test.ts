@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { COMING_NEXT } from "./changelog";
-import { byComingGroup, COMING_GROUPS } from "./coming";
+import { byComingGroup, COMING, COMING_GROUPS } from "./coming";
 import { plannedIntegrations } from "./integrations";
 
 /**
@@ -11,7 +10,7 @@ import { plannedIntegrations } from "./integrations";
  * plan or a price, and the two pages never disagree about a row.
  */
 const lists = [
-    ["Coming next", COMING_NEXT],
+    ["Coming next", COMING],
     ["Planned integrations", plannedIntegrations],
 ] as const;
 
@@ -77,7 +76,12 @@ describe.each(lists)("%s", (_title, rows) => {
 
     it("is words only: a group, a name and a line, and never a link", () => {
         for (const row of rows) {
-            expect(Object.keys(row).sort()).toEqual(["group", "line", "name"]);
+            // `integration` only says which page lists it too.
+            expect(
+                Object.keys(row)
+                    .filter((key) => key !== "integration")
+                    .sort(),
+            ).toEqual(["group", "line", "name"]);
             expect(`${row.name} ${row.line}`).not.toMatch(/https?:|www\.|\//);
         }
     });
@@ -126,7 +130,7 @@ describe.each(lists)("%s", (_title, rows) => {
 describe("the two lists together", () => {
     it("say each integration in the changelog's words, in its group", () => {
         for (const row of plannedIntegrations) {
-            const coming = COMING_NEXT.find((item) => item.line === row.line);
+            const coming = COMING.find((item) => item.line === row.line);
             expect(coming, row.name).toBeTruthy();
             expect(coming?.group, row.name).toBe(row.group);
         }
@@ -135,8 +139,8 @@ describe("the two lists together", () => {
     it("list as integrations only what connects to another service", () => {
         expect(plannedIntegrations.map((row) => row.name)).toEqual([
             "Automatic WhatsApp messages",
-            "Google Calendar",
-            "Google Meet and Zoom",
+            "Google Calendar sync",
+            "Google Meet and Zoom links",
             "Shopify import",
             "PhonePe",
             "Shiprocket",
@@ -146,7 +150,7 @@ describe("the two lists together", () => {
             "Canva",
         ]);
         const planned = plannedIntegrations.map((row) => row.line);
-        const ownWork = COMING_NEXT.filter(
+        const ownWork = COMING.filter(
             (item) => !planned.includes(item.line),
         ).map((item) => item.name);
         expect(ownWork).toEqual([
@@ -159,13 +163,11 @@ describe("the two lists together", () => {
     });
 
     it("drop QR codes once released: they are in the launch entry", () => {
-        expect(COMING_NEXT.find((item) => item.name === "QR codes")).toBe(
-            undefined,
-        );
+        expect(COMING.find((item) => item.name === "QR codes")).toBe(undefined);
     });
 
     it("never promise a booking reminder: none is sent on any channel yet", () => {
-        for (const item of COMING_NEXT) {
+        for (const item of COMING) {
             expect(item.line).not.toMatch(/reminder/i);
         }
     });

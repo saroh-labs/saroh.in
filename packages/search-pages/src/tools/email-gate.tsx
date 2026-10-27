@@ -101,8 +101,10 @@ export interface EmailGateProps {
     children?: ReactNode;
     /** A line under "Sent to …" saying what is ready; none by default. */
     sentLine?: string;
-    /** Overrides the provider's submit (tests). */
+    /** Overrides the provider's submit (tests; saroh.in's own tools). */
     onSubmit?: GateSubmit;
+    /** The consent line, when the tool sends more than the email (the link preview). */
+    note?: string;
 }
 
 /**
@@ -117,6 +119,7 @@ export function EmailGate({
     children,
     sentLine,
     onSubmit,
+    note = GATE_WORDS.note,
 }: EmailGateProps) {
     const ctx = useContext(GateContext);
     const submit = onSubmit ?? ctx.submit;
@@ -233,7 +236,7 @@ export function EmailGate({
                 </span>
             ) : null}
             <span id={`${id}-note`} className="tp-gate-note">
-                {GATE_WORDS.note} <a href={ctx.privacy}>{GATE_WORDS.privacy}</a>
+                {note} <a href={ctx.privacy}>{GATE_WORDS.privacy}</a>
             </span>
         </form>
     );

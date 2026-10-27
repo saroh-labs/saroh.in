@@ -1,7 +1,7 @@
 import { NotFound } from "@saroh/ui/not-found";
 import type { Metadata } from "next";
 
-import { SiteChrome } from "@/components/v2/site-chrome";
+import { SiteChrome } from "@/components/shared/layout/site-chrome";
 import { helpLive } from "@/lib/help-live";
 import { resourcesContext } from "@/lib/resources-context";
 

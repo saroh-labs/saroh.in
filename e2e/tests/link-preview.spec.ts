@@ -178,14 +178,14 @@ test.describe("link preview checker", () => {
 
         // An unverified address can't say yes to news: no tickbox.
         await expect(page.getByRole("checkbox")).toHaveCount(0);
-        await page.getByLabel("Email").fill("not-an-email");
+        await page.getByLabel("Unlock the fix-it report").fill("not-an-email");
         await page.getByRole("button", { name: "Unlock" }).click();
         await expect(page.locator("main").getByRole("alert")).toHaveText(
-            "That email doesn't look right. Check it and try again.",
+            "That email looks incomplete. Check it and try again.",
         );
 
         await page
-            .getByLabel("Email")
+            .getByLabel("Unlock the fix-it report")
             .fill(`lp-${stamp(testInfo)}@example.test`);
         await page.getByRole("button", { name: "Unlock" }).click();
         await expect(

@@ -282,7 +282,7 @@ accounts and the operator console. `pnpm run check:titles` and
   browser**, through `readAddress` (`lib/page-address.ts`), so the page
   stays one built file: the waitlist form, the link preview tool.
 - **A screenshot is files with a `srcset`**, never `next/image`
-  (`components/v2/shot-image.tsx`). After a capture run
+  (`components/shared/media/shot-image.tsx`). After a capture run
   `pnpm --filter web shots:sizes --force`.
 - **Files Cloudflare serves without the Worker take their headers from
   `public/_headers`**: caching for `/_next/static/*` and `/shots/*`, and

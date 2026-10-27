@@ -15,7 +15,8 @@ import { NextResponse } from "next/server";
 import { env } from "@/env";
 import type { ContactResult } from "@/lib/contact-message";
 import { contactBody } from "@/lib/contact-message";
-import { forwardHeaders, relaySecret } from "@/lib/waitlist-forward";
+import { readPosted, relaySecret } from "@/lib/relay";
+import { forwardHeaders } from "@/lib/waitlist-forward";
 
 export async function POST(req: Request) {
     const fail = (
@@ -23,13 +24,7 @@ export async function POST(req: Request) {
         status: number,
     ) => NextResponse.json<ContactResult>({ sent: false, failure }, { status });
 
-    let posted: unknown;
-    try {
-        posted = await req.json();
-    } catch {
-        posted = null;
-    }
-    const body = contactBody(posted);
+    const body = contactBody(await readPosted(req));
     // Not a message from the form at all: no topic the form offers.
     if (!body) return fail("message", 400);
     if ("problem" in body) return fail(body.problem, 400);

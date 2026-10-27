@@ -18,7 +18,7 @@ import type { PlanTeaser, ShotRef } from "./types";
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-10-24";
+export const UPDATED = "2026-10-27";
 
 export interface HeroWord {
     /** The saffron initial. */
@@ -105,3 +105,6 @@ export const TOUR_VIDEO: {
     poster?: string;
     label: string;
 } | null = null;
+
+/** The tour button's words, beside every start button once there is a video. */
+export const TOUR_LABEL = "See it in action · 2 min";

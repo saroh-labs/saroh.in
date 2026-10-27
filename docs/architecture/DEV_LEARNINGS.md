@@ -3767,7 +3767,7 @@ files. The optimizer only re-encoded them.
 `/_next/image`. If a browser spec waits on an image's `naturalWidth`, a
 trace showing one `/_next/image` request with no response points at the
 optimizer, not at the page.
-**Category**: marketing · `apps/saroh.in/components/v2/help/help-step.tsx`
+**Category**: marketing · `apps/saroh.in/components/help/help-step.tsx`
 
 ## Permissions — the permission suite's fake API stopped giving a Member any Orders (DEC-098)
 
@@ -4296,6 +4296,10 @@ second. On CI's runners, beside every other package's tests, it took 5.3 to
 **Rule**: a test that does real work in a loop (decoding, rasterising,
 hashing many inputs) gets an explicit timeout. CI ran this one six times
 slower than the laptop, so the local time says little.
+**Again (27 Oct, #1256)**: saroh.in's `lib/site-pages.test.ts` reads every
+changelog and Help entry and timed out the same way. saroh.in's and
+`@saroh/search-pages`' vitest configs now set `testTimeout: 30_000` for the
+whole app, since most of their tests read content from disk.
 **Category**: tests · `packages/ui/src/lib/qr-art.decode.test.ts`
 
 ## The gate's quick API test step hung for ever on watchman
@@ -4827,7 +4831,7 @@ what is true, and `builtContext()` asks the build's own moment
 page. Launch day is a checklist:
 `docs/architecture/runbooks/LAUNCH_DAY_17_OCT.md`.
 **Check**: `public-headers.test.ts`, `lib/shot-sources.test.ts` (a missing
-sized copy fails, naming the command), `app/(v2)/seo-pages.test.tsx` (the
+sized copy fails, naming the command), `app/(site)/seo-pages.test.tsx` (the
 link preview page takes no props and awaits nothing),
 `lib/help-host.test.ts`.
 **Rule**: a static site's caching is set where its files are served, so

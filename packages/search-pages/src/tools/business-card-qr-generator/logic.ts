@@ -45,8 +45,6 @@ export function phoneProblem(value: string): string | null {
         : `Indian mobile numbers have 10 digits after +91. This one has ${local.length}.`;
 }
 
-export const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 /** A website with https:// in front, as the card links it. */
 export const fullUrl = (v: string) =>
     /^https?:\/\//i.test(v.trim()) ? v.trim() : `https://${v.trim()}`;

@@ -1,14 +1,15 @@
-import type { ComingGroupKey } from "./coming";
 import { NOT_AVAILABLE_YET } from "./coming";
 import type { IsoDay, PublishContext } from "./resources";
 import { isLive } from "./resources";
+
+import { formatDay } from "@/lib/format/day";
 
 /**
  * The day this module's words last changed, the sitemap's `lastmod` for its
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-10-19";
+export const UPDATED = "2026-10-27";
 
 /**
  * The changelog (plan U4, design "Saroh Resources - Changelog" 1a): its
@@ -235,112 +236,6 @@ export const CHANGELOG_ENTRIES: readonly ChangelogEntry[] = [
     },
 ];
 
-/**
- * Planned work, never linked, each marked "Not available yet" (R15, R16),
- * under the group that says roughly when (`./coming`).
- *
- * Every row was checked against the code on `development` on 10 Oct 2026
- * and has its row in the claims ledger (§12, CN1–CN18) before it is here.
- * A row leaves when it is released, for an entry above (QR codes, 20 Oct).
- * A row promises only what isn't built: nothing a merchant can already do
- * is listed as coming (CSV import; their own Meta Pixel and Google
- * Analytics in Website › Settings › Tracking). No row names a plan or a
- * price.
- */
-export interface ComingNext {
-    group: ComingGroupKey;
-    name: string;
-    line: string;
-}
-
-export const COMING_NEXT: readonly ComingNext[] = [
-    {
-        group: "next",
-        // A business can already connect WhatsApp in Settings › Providers
-        // and write to an enquiry by hand; nothing is sent on its own. No
-        // booking reminder exists on any channel yet (ledger BK2, CN1;
-        // #1057), so the line doesn't promise one (20 Oct 2026).
-        name: "Automatic WhatsApp messages",
-        line: "Order updates and pay links sent to your customers on WhatsApp for you.",
-    },
-    {
-        group: "next",
-        name: "Google Calendar sync",
-        line: "Bookings show up in your Google Calendar, and busy times there block the slot in Saroh.",
-    },
-    {
-        group: "next",
-        name: "Google Meet and Zoom links",
-        line: "Online appointments get a meeting link made for them automatically.",
-    },
-    {
-        group: "early-2027",
-        name: "Shopify import",
-        line: "Move products, customers and past orders over from Shopify in one go.",
-    },
-    {
-        group: "early-2027",
-        name: "PhonePe",
-        line: "Take payments through PhonePe, alongside Razorpay and Cashfree.",
-    },
-    {
-        group: "early-2027",
-        // An order that ships already takes a courier's name and a tracking
-        // number typed by hand, so tracking alone isn't what's coming
-        // (ledger CN7).
-        name: "Shiprocket",
-        line: "Shipping labels and courier pick-up for orders that ship, with tracking filled in for you.",
-    },
-    {
-        group: "early-2027",
-        name: "Google Business Profile",
-        line: "Your booking or shop link on your Google listing.",
-    },
-    {
-        group: "early-2027",
-        name: "Tally and Zoho Books export",
-        line: "Send orders and invoices to your accountant in their format.",
-    },
-    {
-        group: "early-2027",
-        name: "Saroh for Android",
-        line: "Run your day from your phone: bookings, walk-ins, orders and payments, in English, Hindi or Hinglish. Works without internet.",
-    },
-    {
-        group: "early-2027",
-        // Invoices already carry the business's logo and GSTIN (ledger
-        // BI7), so the design's "add your logo, colours, GSTIN…" names only
-        // what is new (ledger CN11).
-        name: "Invoice layouts",
-        line: "Pick an invoice layout, set its colours, terms and a signature, and see it before it goes out.",
-    },
-    {
-        group: "early-2027",
-        name: "Sign in with Google",
-        line: "Your customers sign in to your booking or shop page with Google. GitHub too.",
-    },
-    {
-        group: "later",
-        name: "Bring your own login",
-        line: "Already have an app with Firebase, Clerk or Auth0? Your customers keep one account.",
-    },
-    {
-        group: "later",
-        name: "API keys and webhooks",
-        line: "Connect Saroh to your own tools, n8n and AI assistants, with keys you control.",
-    },
-    {
-        group: "later",
-        name: "Social publishing",
-        line: "Make posts from your products and offers in your brand, and post them to Instagram, Facebook, LinkedIn and X.",
-    },
-    {
-        group: "later",
-        name: "Canva",
-        line: "Open any post in Canva to edit it, or bring in designs you've made there, then schedule them from Saroh.",
-    },
-];
-
 export const CHANGELOG = {
     title: "Changelog",
     sub: "What's new in Saroh, written for the people who use it.",
@@ -375,23 +270,11 @@ export function firstEntryDay(): IsoDay | null {
 }
 
 /** "17 Oct 2026", as the list's date column writes it. */
-export function entryDate(day: IsoDay): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        timeZone: "Asia/Kolkata",
-    }).format(new Date(`${day}T12:00:00+05:30`));
-}
+export const entryDate = (day: IsoDay) =>
+    formatDay(day, { month: "short", year: true });
 
 /** "17 October", as the pre-launch line writes it. */
-export function entryDayLong(day: IsoDay): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        day: "numeric",
-        month: "long",
-        timeZone: "Asia/Kolkata",
-    }).format(new Date(`${day}T12:00:00+05:30`));
-}
+export const entryDayLong = (day: IsoDay) => formatDay(day, { month: "long" });
 
 export function findEntry(slug: string): ChangelogEntry | undefined {
     return CHANGELOG_ENTRIES.find((e) => e.slug === slug);

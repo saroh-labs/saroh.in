@@ -76,13 +76,10 @@ export type QrUnlockResult =
           failure: "bad-email" | "rate-limited" | "unavailable";
       };
 
-/** An email worth sending to the API: something@something.something. */
-export const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 /**
  * The email gate's one call: `POST /api/tools/unlock` with the email and
  * the tool's slug, nothing else. The QR code maker's (no slug), and every
- * free tool's (#1253, `components/v2/tools/tool-gate.tsx`).
+ * free tool's (#1253, `components/tools/tool-gate.tsx`).
  */
 export async function unlockWithEmail(
     email: string,

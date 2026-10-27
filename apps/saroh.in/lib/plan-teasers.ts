@@ -9,12 +9,7 @@ import {
 import { faqItems } from "@/content/faq";
 import { FREE_PLAN_LINE } from "@/content/home";
 import type { FaqId, FaqItem } from "@/content/types";
-
-/** "a", "a and b", "a, b and c". */
-export function sentenceList(items: string[]): string {
-    if (items.length <= 1) return items.join("");
-    return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
-}
+import { sentenceList } from "@/lib/format/list";
 
 /** "Your website" → "your website", but "UPI Autopay" stays as it is. */
 function lowerFirst(s: string): string {

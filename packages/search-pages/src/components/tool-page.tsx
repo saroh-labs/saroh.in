@@ -1,5 +1,6 @@
 import type { ToolPageData } from "../tool-schema";
 import { ToolSlot } from "../tools/tool-slot";
+import { ClosingBand, Crumbs, Questions } from "./page-parts";
 
 /**
  * Where a tool page's links go. saroh.in passes its addresses; the admin
@@ -71,17 +72,13 @@ export function ToolPage({
                             Draft — not published yet
                         </p>
                     ) : null}
-                    <nav aria-label="Breadcrumb" className="tp-crumb">
-                        <a className="sp-d" href={links.home}>
-                            Home
-                        </a>
-                        <span aria-hidden="true" className="sp-d">
-                            ›
-                        </span>
-                        <a href={links.hub}>Free tools</a>
-                        <span aria-hidden="true">›</span>
-                        <span aria-current="page">{p.name}</span>
-                    </nav>
+                    <Crumbs
+                        crumbs={[
+                            { name: "Home", href: links.home, deskOnly: true },
+                            { name: "Free tools", href: links.hub },
+                            { name: p.name },
+                        ]}
+                    />
                     <h1 className="tp-h1">{p.h1}</h1>
                     <p className="tp-lead">
                         <Both desk={p.lead} phone={p.phoneLead} />
@@ -119,37 +116,16 @@ export function ToolPage({
                 ) : null}
 
                 {p.questions.length ? (
-                    <section className="tp-faq">
-                        <h2 className="tp-h2">Questions</h2>
-                        <div className="tp-faq-list">
-                            {p.questions.map((q) => (
-                                <details key={q.question}>
-                                    <summary>{q.question}</summary>
-                                    {q.answer.map((a) => (
-                                        <p key={a}>{a}</p>
-                                    ))}
-                                </details>
-                            ))}
-                        </div>
-                    </section>
+                    <Questions questions={p.questions} headingClass="tp-h2" />
                 ) : null}
 
                 {p.ctaTitle ? (
-                    <section className="tp-cta">
-                        <div className="tp-cta-copy">
-                            <h2 className="tp-cta-h">{p.ctaTitle}</h2>
-                            {p.ctaLine ? (
-                                <p className="tp-cta-line">{p.ctaLine}</p>
-                            ) : null}
-                        </div>
-                        <a
-                            className="tp-cta-btn"
-                            href={links.startFree}
-                            data-cta=""
-                        >
-                            {links.startFreeLabel ?? "Start free"}
-                        </a>
-                    </section>
+                    <ClosingBand
+                        title={p.ctaTitle}
+                        line={p.ctaLine}
+                        href={links.startFree}
+                        label={links.startFreeLabel}
+                    />
                 ) : null}
             </div>
         </div>

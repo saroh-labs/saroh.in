@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import { encode } from "uqr";
 
+import { saveFile } from "./download";
+
 /**
  * What the QR tools share (UPI, Google review, menu, Wi-Fi, business card):
  * the code drawn as an SVG and saved as a PNG, both in the browser with the
@@ -71,20 +73,6 @@ export function QrCode({
             <path d={pathOf(m)} fill="#1C1C1A" />
         </svg>
     );
-}
-
-/** Hand the browser a file to save (as the QR code maker's `saveFile`). */
-export function saveFile(blob: Blob, name: string): void {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    a.rel = "noopener";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    // After the click has been handled, so the download has its bytes.
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /** The code as a PNG, drawn on a canvas from its modules. Rejects when the browser can't. */

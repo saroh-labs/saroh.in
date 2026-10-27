@@ -78,7 +78,7 @@ import { z } from "zod";
  * WhatsApp" button on the V2 pages (#1188). Both must be set, the switch to
  * `on`; anything else, unset included and under `next dev` too, shows
  * nothing. Production leaves them out until Saroh's own WhatsApp number is
- * connected (`components/v2/whatsapp-chat.tsx`).
+ * connected (`components/shared/whatsapp/whatsapp-chat.tsx`).
  *
  * `NEXT_PUBLIC_DEMOS` shows "See a live demo" on the home, pricing and
  * solution heroes (#1191): `on` shows it; anything else, unset included and

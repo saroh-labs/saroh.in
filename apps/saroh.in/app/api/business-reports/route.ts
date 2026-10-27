@@ -12,7 +12,8 @@ import { NextResponse } from "next/server";
 import { env } from "@/env";
 import type { ReportResult } from "@/lib/business-report";
 import { reportBody, reportProblem } from "@/lib/business-report";
-import { forwardHeaders, relaySecret } from "@/lib/waitlist-forward";
+import { readPosted, relaySecret } from "@/lib/relay";
+import { forwardHeaders } from "@/lib/waitlist-forward";
 
 export async function POST(req: Request) {
     const fail = (
@@ -20,13 +21,7 @@ export async function POST(req: Request) {
         status: number,
     ) => NextResponse.json<ReportResult>({ sent: false, failure }, { status });
 
-    let posted: unknown;
-    try {
-        posted = await req.json();
-    } catch {
-        posted = null;
-    }
-    const body = reportBody(posted);
+    const body = reportBody(await readPosted(req));
     const problem = reportProblem(body);
     if (problem) return fail(problem, 400);
 

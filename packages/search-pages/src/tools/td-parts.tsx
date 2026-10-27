@@ -215,6 +215,20 @@ export function Paper({
 }
 
 /**
+ * Puts text on the clipboard: true when it took, false when the browser
+ * refused. The package's one clipboard call (DEC-195, A17), as
+ * `@saroh/ui`'s `copyText` is the apps' (a package can't import it).
+ */
+export async function copyText(text: string): Promise<boolean> {
+    try {
+        await navigator.clipboard.writeText(text);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
  * Copies `text` and says so on the button for a few seconds. Returns
  * whether it just copied, and the click handler.
  */
@@ -224,11 +238,7 @@ export function useCopy(text: string) {
     const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
     useEffect(() => () => clearTimeout(timer.current), []);
     async function copy() {
-        try {
-            await navigator.clipboard.writeText(text);
-        } catch {
-            return;
-        }
+        if (!(await copyText(text))) return;
         setCopiedText(text);
         clearTimeout(timer.current);
         timer.current = setTimeout(() => setCopiedText(null), 4000);

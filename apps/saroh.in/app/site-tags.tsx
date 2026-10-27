@@ -4,13 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useSyncExternalStore } from "react";
 
-import { buttonClasses } from "@/components/v2/button";
+import { buttonClasses } from "@/components/shared/buttons/button";
 import type { Consent } from "@/lib/consent";
 import { readChoices, subscribeConsent, writeChoices } from "@/lib/consent";
 import { browserTracking } from "@/lib/error-tracking-browser";
 import type { TagConfig } from "@/lib/ga";
 import { asksConsent, hasAdTags } from "@/lib/ga";
 import { isPreviewPath } from "@/lib/pricing-preview";
+import { ring } from "@/lib/ring";
 import {
     allowedNow,
     browserOptsOut,
@@ -19,6 +20,7 @@ import {
     startRecording,
     syncTags,
 } from "@/lib/tags";
+import { useBrowserValue } from "@/lib/use-browser-value";
 import { WELCOME_PATH } from "@/lib/welcome";
 
 /** Before the browser has been asked (the server's render): show nothing. */
@@ -28,7 +30,6 @@ const UNREAD = "unread";
  * The team cookie is set by a page load, and a browser's privacy signal by
  * its settings: neither changes while a page is open.
  */
-const NO_CHANGES = () => () => undefined;
 const optsOut = () => browserOptsOut();
 
 /**
@@ -84,7 +85,7 @@ export function SiteTags({
         readChoices,
         () => UNREAD,
     );
-    const optedOut = useSyncExternalStore(NO_CHANGES, optsOut, () => false);
+    const optedOut = useBrowserValue(optsOut, false);
     const ready = asksConsent(config) && choices !== UNREAD;
     const preview = isPreviewPath(pathname);
 
@@ -299,7 +300,7 @@ function CookieNotice({
                         {" "}
                         <Link
                             href={privacyHref}
-                            className="cursor-pointer rounded-sm text-foreground underline underline-offset-[3px] hover:text-mk-copy focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] active:text-muted-foreground"
+                            className={`cursor-pointer rounded-sm text-foreground underline underline-offset-[3px] hover:text-mk-copy ${ring()} active:text-muted-foreground`}
                         >
                             Privacy
                         </Link>

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { SearchPageData } from "../schema";
 import { AlsoSvg } from "./icons";
 import { AlsoList, Carousel, StartBar } from "./interactive";
+import { ClosingBand, Crumbs, Questions, StartButton } from "./page-parts";
 import {
     bigTile,
     carouselLabels,
@@ -114,23 +115,22 @@ export function SearchPage({
 
                 <section className="sp-hero">
                     <div className="sp-hero-copy">
-                        <nav aria-label="Breadcrumb" className="sp-crumb">
-                            <a href={links.hub}>Solutions</a>
-                            <span aria-hidden="true">/</span>
-                            <span aria-current="page">{p.name}</span>
-                        </nav>
+                        <Crumbs
+                            brand
+                            crumbs={[
+                                { name: "Solutions", href: links.hub },
+                                { name: p.name },
+                            ]}
+                        />
                         <h1 className="vc-h sp-h1">{p.h1}</h1>
                         <p className="sp-lead">
                             <Both desk={p.lead} phone={p.phoneLead} />
                         </p>
                         <div className="sp-actions">
-                            <a
-                                className="sp-btn"
+                            <StartButton
                                 href={links.startFree}
-                                data-cta=""
-                            >
-                                {links.startFreeLabel ?? "Start free"}
-                            </a>
+                                label={links.startFreeLabel}
+                            />
                             {p.demo ? (
                                 <a className="sp-demo" href={links.demo}>
                                     {p.demo} →
@@ -319,19 +319,12 @@ export function SearchPage({
                     </section>
                 ) : null}
 
-                <section className="sp-faq sp-sec">
-                    <h2 className="sp-h2">Questions</h2>
-                    <div className="sp-faq-list">
-                        {p.questions.map((q, i) => (
-                            <details key={q.question} open={i === 0}>
-                                <summary>{q.question}</summary>
-                                {q.answer.map((a) => (
-                                    <p key={a}>{a}</p>
-                                ))}
-                            </details>
-                        ))}
-                    </div>
-                </section>
+                <Questions
+                    questions={p.questions}
+                    openFirst
+                    headingClass="sp-h2"
+                    className="sp-sec"
+                />
 
                 <section className="sp-related">
                     <h2>Also for {p.plural}</h2>
@@ -348,29 +341,21 @@ export function SearchPage({
                     </div>
                 </section>
 
-                <section className="sp-cta sp-sec">
-                    <div className="sp-cta-copy">
-                        <h2 className="sp-cta-h">{p.ctaTitle}</h2>
-                        <p className="sp-cta-line sp-d">{pre.close}</p>
-                    </div>
-                    <div className="sp-cta-act">
-                        <a
-                            className="sp-btn sp-btn-amber"
-                            href={links.startFree}
-                            data-cta=""
-                        >
-                            {links.startFreeLabel ?? "Start free"}
-                        </a>
-                        <span className="sp-cta-note">
-                            No card needed to start.
-                        </span>
-                    </div>
-                </section>
+                <ClosingBand
+                    className="sp-sec"
+                    title={p.ctaTitle}
+                    line={pre.close}
+                    lineDeskOnly
+                    note="No card needed to start."
+                    href={links.startFree}
+                    label={links.startFreeLabel}
+                />
 
                 <StartBar>
-                    <a className="sp-btn" href={links.startFree} data-cta="">
-                        {links.startFreeLabel ?? "Start free"}
-                    </a>
+                    <StartButton
+                        href={links.startFree}
+                        label={links.startFreeLabel}
+                    />
                 </StartBar>
             </div>
         </div>

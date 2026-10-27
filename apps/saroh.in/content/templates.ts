@@ -7,13 +7,15 @@ import {
 
 import { EARLY_ACCESS_DAY } from "@/content/early-access";
 import type { WaitlistKindId } from "@/content/waitlist";
+import { sentenceList } from "@/lib/format/list";
+import { numberWord } from "@/lib/format/number-words";
 
 /**
  * The day this module's words last changed, the sitemap's `lastmod` for its
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-10-24";
+export const UPDATED = "2026-10-27";
 
 /**
  * The Templates gallery (Resources plan U6, industry templates plan U13):
@@ -422,33 +424,6 @@ export function relatedTemplates(
     ].slice(0, 3);
 }
 
-const NUMBER_WORDS = [
-    "No",
-    "One",
-    "Two",
-    "Three",
-    "Four",
-    "Five",
-    "Six",
-    "Seven",
-    "Eight",
-    "Nine",
-    "Ten",
-    "Eleven",
-    "Twelve",
-];
-
-/** "Seven", for a count at the start of a sentence; digits past twelve. */
-export function countWord(n: number): string {
-    return NUMBER_WORDS[n] ?? String(n);
-}
-
-/** "A, B and C". */
-export function listWords(words: readonly string[]): string {
-    if (words.length <= 1) return words[0] ?? "";
-    return `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
-}
-
 /** The day early access opens, in India (`content/early-access.ts`). */
 export { EARLY_ACCESS_DAY };
 /** As the copy writes it. */
@@ -473,7 +448,7 @@ export const templatesPage = {
         const each =
             n === 1
                 ? "One template, with its own type and colours."
-                : `${countWord(n)} templates, each made for a kind of business, each with its own type and colours.`;
+                : `${numberWord(n, { capital: true })} templates, each made for a kind of business, each with its own type and colours.`;
         const has = (type: string) =>
             templates.some((t) =>
                 t.pages.some((p) => p.sections.some((s) => s.type === type)),
@@ -486,7 +461,7 @@ export const templatesPage = {
             has("plans") ? "memberships" : null,
         ].filter((w): w is string => w !== null);
         if (wired.length === 0) return each;
-        const list = listWords(wired);
+        const list = sentenceList(wired);
         return `${each} ${list.charAt(0).toUpperCase()}${list.slice(1)} are already wired in.`;
     },
     allChip: "All",
@@ -514,25 +489,25 @@ export const templateDetail = {
                 title:
                     titles.length === 1
                         ? "One page"
-                        : `${countWord(titles.length)} pages`,
+                        : `${numberWord(titles.length, { capital: true })} pages`,
                 body:
                     titles.length === 1
                         ? "Everything on one page, in the order a visitor asks for it."
-                        : `${listWords(titles)}.`,
+                        : `${sentenceList(titles)}.`,
             };
         },
         uses(t: GalleryTemplate): { title: string; body: string } {
             return {
                 title: "Runs on what you add",
                 body: t.uses.length
-                    ? `${listWords(t.uses)} come from what you add in Saroh, so the site changes when they do. Until you add one, its section stays off the page.`
+                    ? `${sentenceList(t.uses)} come from what you add in Saroh, so the site changes when they do. Until you add one, its section stays off the page.`
                     : "Everything on it is yours to write, and nothing on it waits for data.",
             };
         },
         look(t: GalleryTemplate): { title: string; body: string } {
             return {
                 title: "Its own look",
-                body: `Set in ${t.type}, in ${t.colourways.length === 1 ? "one colourway" : `${countWord(t.colourways.length).toLowerCase()} colourways`}: ${listWords(t.colourways)}. Nothing in it is Saroh's.`,
+                body: `Set in ${t.type}, in ${t.colourways.length === 1 ? "one colourway" : `${numberWord(t.colourways.length)} colourways`}: ${sentenceList(t.colourways)}. Nothing in it is Saroh's.`,
             };
         },
     },
