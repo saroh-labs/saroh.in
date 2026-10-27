@@ -14,7 +14,7 @@ import { SectionHeading } from "@/components/v2/section-heading";
 import { HOME_FAQ } from "@/content/faq";
 import { featureHref, featureList } from "@/content/features";
 import { home } from "@/content/home";
-import { solutionHref, solutionList } from "@/content/solutions";
+import { solutionList } from "@/content/solutions";
 import { LAUNCH_MODE } from "@/lib/links";
 import { HOME_OG_ALT } from "@/lib/og-card";
 import {
@@ -24,6 +24,7 @@ import {
     planTeaserFootnote,
 } from "@/lib/plan-teasers";
 import { readLivePricing } from "@/lib/pricing";
+import { solutionLink } from "@/lib/search-pages";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import {
     faqPageLd,
@@ -79,7 +80,7 @@ export default async function HomePage() {
             >
                 <Eyebrow>{home.worksFor}</Eyebrow>
                 {solutionList.map((s) => (
-                    <PillLink key={s.slug} href={solutionHref(s.slug)}>
+                    <PillLink key={s.slug} href={solutionLink(s.slug)}>
                         {s.card.name}
                     </PillLink>
                 ))}
@@ -126,7 +127,7 @@ export default async function HomePage() {
                     {solutionList.map((s) => (
                         <CardLink
                             key={s.slug}
-                            href={solutionHref(s.slug)}
+                            href={solutionLink(s.slug)}
                             title={s.card.name}
                             body={s.card.body}
                             meta={s.card.uses}

@@ -117,6 +117,10 @@ export const AdminPermission = {
     // change a sign-in email or confirm another's change. Platform owners
     // and Support.
     PeopleSignInHelp: "people:sign-in-help",
+    // Publish, unpublish, archive or restore saroh.in's search pages, each
+    // of which can rebuild the site (DEC-193). Platform Owners only: no
+    // role owns the marketing site yet.
+    SearchPagesPublish: "search-pages:publish",
 } as const;
 
 export type AdminPermission =

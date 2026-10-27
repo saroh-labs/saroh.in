@@ -78,7 +78,7 @@ export function revalidateHook(): SiteRefresh | null {
     };
 }
 
-function requestFor(hook: SiteRefresh): RequestInit {
+export function requestFor(hook: SiteRefresh): RequestInit {
     if (hook.kind === "deploy") {
         return {
             method: "POST",

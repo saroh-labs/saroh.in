@@ -59,6 +59,10 @@ const NOT_TENANT_OWNED: Record<string, string> = {
         "Who Saroh bills (DEC-167): owned by one person and used by any of their businesses, so no one organization owns it; the API reads and writes it only for its owner.",
     ContactMessage:
         "A message sent from saroh.in/contact (DEC-137); the writer need not have an account, and it belongs to no organization.",
+    SearchPage:
+        "Whether one of Saroh's own search pages on saroh.in is live (DEC-193); Saroh's site, not a business.",
+    SearchPageEvent:
+        "The history of a search page's publish record (DEC-193); Saroh's site, not a business.",
 };
 
 const databaseDir = path.resolve(__dirname, "..");

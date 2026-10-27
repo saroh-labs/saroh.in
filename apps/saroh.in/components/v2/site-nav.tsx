@@ -47,12 +47,15 @@ const CURRENT =
 export function SiteNav({
     resources = [],
     tools = [],
+    solutions = SOLUTION_ITEMS,
 }: {
     resources?: NavItem[];
     tools?: NavItem[];
+    /** The Solutions menu, as the server links it (`solutionLink`). */
+    solutions?: NavItem[];
 }) {
     const pathname = usePathname();
-    const section = sectionOf(pathname, resources, tools);
+    const section = sectionOf(pathname, resources, tools, solutions);
     const [open, setOpen] = useState<MenuId | null>(null);
     const nav = useRef<HTMLElement>(null);
     const featuresButton = useRef<HTMLButtonElement>(null);
@@ -131,7 +134,7 @@ export function SiteNav({
                 <Menu
                     id="solutions"
                     label="Solutions"
-                    items={SOLUTION_ITEMS}
+                    items={solutions}
                     columns={1}
                     current={section === "solutions"}
                     pathname={pathname}
@@ -210,6 +213,7 @@ export function SiteNav({
                 section={section}
                 pathname={pathname}
                 resources={resources}
+                solutions={solutions}
                 tools={tools}
                 className="ml-auto min-[760px]:hidden"
             />

@@ -5,7 +5,7 @@
     "scripts": {
         "dev": "portless saroh next dev",
         "dev:app": "next dev",
-        "build": " next build",
+        "build": "node search-pages.config.js && next build",
         "start": "next start",
         "lint": "eslint .",
         "typecheck": "tsc --noEmit",
@@ -23,6 +23,7 @@
         "@saroh/error-tracking": "workspace:*",
         "@saroh/integrations": "workspace:*",
         "@saroh/pricing-catalog": "workspace:*",
+        "@saroh/search-pages": "workspace:*",
         "@saroh/templates": "workspace:*",
         "@saroh/ui": "workspace:*",
         "@t3-oss/env-nextjs": "^0.13.11",

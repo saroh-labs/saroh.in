@@ -83,7 +83,7 @@ const nextConfig = {
     // Both ship their entries as source rather than a build, so Next has to
     // compile them: @saroh/auth (client/middleware/next) and @saroh/ui (the
     // shared component library — see its source-only consumption contract).
-    transpilePackages: ["@saroh/auth", "@saroh/ui"],
+    transpilePackages: ["@saroh/auth", "@saroh/ui", "@saroh/search-pages"],
 };
 
 export default nextConfig;

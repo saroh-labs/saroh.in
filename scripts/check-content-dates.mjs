@@ -1,6 +1,7 @@
 // A saroh.in page's sitemap date lives beside its words (R3, #1187): each
 // content module (`apps/saroh.in/content/*.ts`) exports `UPDATED`, and each
-// provider page (`content/integrations/*.mdx`) has `updated:` in its
+// provider page (`content/integrations/*.mdx`) and each /for/ page
+// (`packages/search-pages/content/for/*.mdx`) has `updated:` in its
 // frontmatter. `lib/site-pages.ts` dates the page by it, never by the build.
 // This fails when such a file changed since the merge base with
 // origin/development (or the base passed) but its date didn't, so the
@@ -35,7 +36,7 @@ if (!mb) {
 }
 
 const CONTENT =
-    /^apps\/saroh\.in\/content\/(?:[^/]+\.ts|integrations\/[^/]+\.mdx)$/;
+    /^(?:apps\/saroh\.in\/content\/(?:[^/]+\.ts|integrations\/[^/]+\.mdx)|packages\/search-pages\/content\/for\/[^/]+\.mdx)$/;
 const TEST = /\.test\.ts$/;
 
 /** The file's date, or null when it carries none. */
@@ -47,7 +48,14 @@ function dateOf(source) {
 }
 
 // Against the working tree, so an uncommitted edit counts too.
-const changed = git("diff", "--name-only", mb, "--", "apps/saroh.in/content")
+const changed = git(
+    "diff",
+    "--name-only",
+    mb,
+    "--",
+    "apps/saroh.in/content",
+    "packages/search-pages/content/for",
+)
     .split("\n")
     .filter((p) => CONTENT.test(p) && !TEST.test(p));
 

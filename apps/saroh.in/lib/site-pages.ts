@@ -51,6 +51,9 @@ import { integrationMeta } from "@/lib/integration-docs";
 import type { LaunchMode } from "@/lib/links";
 import { llmsText } from "@/lib/llms";
 import { resourcesContext } from "@/lib/resources-context";
+import type { PublishList } from "@/lib/search-pages";
+import { FOR_HUB, liveSearchPages, publishList } from "@/lib/search-pages";
+import { listSearchPages } from "@saroh/search-pages";
 
 /**
  * The site's indexable pages, one list for the sitemap and the redirect test
@@ -65,8 +68,19 @@ import { resourcesContext } from "@/lib/resources-context";
  * published and built, the changelog's live entries, Help's live
  * articles and the gallery's templates, follow. Without
  * one, only the fixed pages: what a redirect may always land on.
+ *
+ * With it too, the live /for/ pages and their hub (DEC-193): never a draft,
+ * and a /solutions/ page no longer once its /for/ page is live (it then
+ * redirects there, `redirects.js`).
  */
-export function indexedPaths(mode: LaunchMode, ctx?: PublishContext): string[] {
+export function indexedPaths(
+    mode: LaunchMode,
+    ctx?: PublishContext,
+    list: PublishList = publishList(),
+): string[] {
+    const forPages: string[] = ctx
+        ? liveSearchPages(list).map((p) => p.path)
+        : [];
     const resources = ctx ? resourcePaths(ctx) : [];
     const entries =
         ctx && resources.includes("/changelog")
@@ -90,7 +104,11 @@ export function indexedPaths(mode: LaunchMode, ctx?: PublishContext): string[] {
         "/",
         ...(mode === "open" ? ["/pricing", "/pricing.md"] : []),
         ...FEATURE_SLUGS.map(featureHref),
-        ...SOLUTION_SLUGS.map(solutionHref),
+        ...SOLUTION_SLUGS.map(solutionHref).filter(
+            (path) =>
+                !forPages.includes(path.replace(/^\/solutions\//, "/for/")),
+        ),
+        ...(forPages.length > 0 ? [FOR_HUB.path, ...forPages] : []),
         ...(mode === "waitlist" ? ["/waitlist"] : []),
         // Who makes Saroh and how to write to it (DEC-137): pages in
         // either launch mode, with no publish date.
@@ -176,6 +194,16 @@ export function lastModified(
     if (article) return dayInIndia(article.updated);
     const provider = INTEGRATION_SLUGS.find((s) => integrationHref(s) === path);
     if (provider) return dayInIndia(integrationMeta(provider).updated);
+    // A /for/ page: its own `updated`; the hub, its newest live page's.
+    const forPage = listSearchPages().find((p) => p.path === path);
+    if (forPage) return dayInIndia(forPage.updated);
+    if (path === FOR_HUB.path) {
+        const day = liveSearchPages()
+            .map((p) => p.updated)
+            .sort()
+            .at(-1);
+        return day ? dayInIndia(day) : undefined;
+    }
     if (path.startsWith(`${TEMPLATES_PATH}/`)) {
         return dayInIndia(TEMPLATES_UPDATED);
     }

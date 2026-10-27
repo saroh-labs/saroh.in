@@ -41,3 +41,6 @@ next-env.d.ts
 .open-next
 .wrangler
 .dev.vars
+
+# The /for/ publish list each build reads (search-pages.config.js)
+/.search-pages.json

@@ -2474,3 +2474,20 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - The API refuses another country on create or change ("Saroh is for businesses in India for now."). A business already saved with another country keeps it and can still save its other details.
     - The country picker stays in the code for when other countries come (#1212); currency and time zones are #1213.
 - Rules: `apps/api.saroh.in/src/modules/organizations/business-country.ts`; `apps/app.saroh.in/lib/organizations/setup-steps.ts`.
+
+## DEC-193 Search pages are written in the code and go live on saroh.in only when someone publishes them in admin
+
+**Status: Accepted — 2026-10-26** · owner · #1202 ("only the published content should be added to sitemap and indexing"; "this should be a controlled action"); design: admin canvas, page "Search pages: publish control"
+
+- Context:
+    - The 34 `/for/` trade pages (design D, approved 26 Oct) are written in the repo and reviewed on development. The owner wants to choose, page by page, what reaches production, without a code change or a release for each one.
+- Decision:
+    - **The words live in the code; whether a page is live lives in the database.** Each page is one content file in `@saroh/search-pages` (frontmatter + MDX). The API keeps one publish record per page path (live, unpublished, archived, with who and when, and a history). Each environment's admin controls its own site: admin.saroh.io → saroh.io, admin.saroh.in → saroh.in.
+    - **Publishing rebuilds the site.** Publish, Unpublish and Archive (one page or many) save the record and start one web deploy (the same dispatch Deployments uses). The site build reads `GET /public/search-pages`; a production build that can't read it fails rather than guess.
+    - **Production builds only live pages.** Only they are in the sitemap, `/llms.txt`, the `/for/` list, the menu and the footer. On development every page in the code is built, and a page that isn't live there shows a Draft label and `noindex`.
+    - **Unpublished pages don't break links**: a page taken off redirects (302, it may come back) to its family page, or Home when that isn't live either. A page never published simply doesn't exist. Archived pages are hidden from the admin list and can't be published until restored; archiving a live page takes it off first. Nothing is ever deleted from the code by admin.
+    - **The four `/solutions/` pages keep serving until their `/for/` page is published**; from then on they 301 to it (#1202).
+    - **Later edits to a live page's words go out with normal releases.** Publishing is about whether a page is on the site, not each change of words.
+    - **Admin shows the page exactly as the site will**: the page template and content are one shared package, rendered by the admin's own signed-in, `noindex` preview route (desk and phone), and by saroh.in.
+    - **Who:** a new staff permission, `search-pages:publish`.
+- Rules: `packages/search-pages/`; `apps/api.saroh.in/src/modules/search-pages/`; `apps/saroh.in/app/(v2)/for/`; `apps/admin.saroh.in/app/search-pages/`.

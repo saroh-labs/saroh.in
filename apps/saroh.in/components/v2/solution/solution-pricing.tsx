@@ -34,6 +34,23 @@ export function SolutionPricing({
             >
                 {title}
             </h2>
+            <PlanTeaserGrid plans={plans} footnote={footnote} src={src} />
+        </Container>
+    );
+}
+
+/** The cards, then the footnote and "Compare every plan": a /for/ page's Pricing too. */
+export function PlanTeaserGrid({
+    plans,
+    footnote,
+    src,
+}: {
+    plans: PlanTeaserView[];
+    footnote: string | null;
+    src: string;
+}) {
+    return (
+        <>
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] gap-4">
                 {plans.map((teaser) => (
                     <PlanTeaserCard
@@ -52,6 +69,6 @@ export function SolutionPricing({
                     Compare every plan
                 </Link>
             </div>
-        </Container>
+        </>
     );
 }

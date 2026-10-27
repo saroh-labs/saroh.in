@@ -5968,3 +5968,29 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** (1) calendar-week clicked `[data-strip-day="<tomorrow>"]` guarded by `isEnabled()` — but when today is the week strip's last day, tomorrow starts the next week and isn't on the strip, so `isEnabled()` on a missing locator hangs 15s and times out. (2) bookings "opens on List" used `region[Free times].or(heading /Closed on|Nothing booked/)` — an open, unbooked day shows **both** "Nothing booked today" and a Free times section, so `.or()` matched two and tripped strict mode.
 - **Fix:** guard with `(await next.count()) > 0` before `isEnabled()`; add `.first()` to the `.or()`. Both in `e2e/tests/`.
 - **Rule:** an e2e assertion about "today"/"tomorrow" must survive week and DST boundaries — `isEnabled()`/`isVisible()` on a locator that may not exist waits the full timeout (use `count()` first), and an `.or()` that can match more than one state needs `.first()`.
+
+## prettier-plugin-tailwindcss glues a class onto the one before it (26 Oct 2026)
+
+- **Symptom:** the /for/ pages' picked time, service and person weren't highlighted, taken times weren't struck through, and pills wrapped. The agent's screenshots had been right; the committed code was not.
+- **Cause:** the commit hook runs Prettier with `prettier-plugin-tailwindcss`, which trims the whitespace at the edges of each string inside a `className` template. `` `vc-time${on ? " on" : ""}` `` became `` `vc-time${on ? "on" : ""}` ``, so the class came out `vc-timeon`.
+- **Fix:** keep the space in the template's fixed text, outside `${…}`: `` `vc-time ${on ? "on" : ""}` `` (or use `cn()`/`clsx`). Every other className template in the repo already did this.
+- **Where the rule lives:** `packages/search-pages/src/search-page.test.tsx` ("class names") fails when a page draws a class `styles.css` doesn't style. Screenshots for review are taken from committed code, never from a working copy before the hook runs.
+
+## `@saroh/search-pages`' index pulled react-dom/server into every Server Component (26 Oct 2026)
+
+- **Symptom:** the admin's first Server Component importing `@saroh/search-pages` failed `next build`: "You're importing a component that imports react-dom/server". Moving the import into a route handler failed the same way ("App Route").
+- **Cause:** `searchPageChecks` (`checks.tsx`) reads a page by drawing it with `renderToStaticMarkup`, and the package index re-exported it, so `listSearchPages()` or `<SearchPage>` from a Server Component brought react-dom/server along. Next refuses it on the whole server graph (Server Components and route handlers); the package's own vitest never sees that rule.
+- **Fix:** the index no longer exports it; it is `@saroh/search-pages/checks` (package.json `exports`). The admin runs it in a client component (`components/search-pages/page-checks.tsx`).
+- **Rule:** a shared package a Next app imports on the server never re-exports a module that imports react-dom/server from its index; that goes behind its own subpath, used from client components or Node scripts. Check a new package with the consuming app's `next build`, not only its own tests.
+
+## A new API controller must be named in the module rollout list (26 Oct 2026)
+
+- **Symptom:** `pnpm prepush --all` failed `module-annotations.spec.ts` ("names every controller under src/modules in one of the lists") after the search-pages unit's own quick gate had passed.
+- **Cause:** the unit added two controllers but no row in `CLASS_LEVEL`, `METHOD_LEVEL` or `NEVER`; its quick gate ran only the affected unit tests.
+- **Fix:** both are in `NEVER` (Saroh's own pages, not a tenant surface). When you add a controller, add its row in the same commit and run that spec. The local Playwright browser cache had also gone missing (`~/Library/Caches/ms-playwright`); `pnpm --filter @saroh/e2e exec playwright install chromium` restores it.
+
+## CodeQL flagged regexes in build-time content checks (26 Oct 2026)
+
+- **Symptom:** PR #1252's CodeQL check failed with four warnings in `packages/search-pages`: polynomial ReDoS on `<[^>]+>`, `[\w.-]+@[\w.-]+` and an unanchored `[^?.]*[?.]`, and double unescaping (`&amp;` replaced before `&lt;`). `pnpm prepush --all` had passed; it doesn't run CodeQL.
+- **Fix:** `[^<>]*` in the tag match, email words found by splitting on spaces first (`emailsIn`), `indexOf` for the first sentence, `&amp;` unescaped last; tests pin each.
+- **Rule:** in any matcher run on text, never put an unbounded class that can match the next token's first character in front of it (`[\w.-]+@`, `<[^>]+>`), and never unescape `&amp;` before the other entities.

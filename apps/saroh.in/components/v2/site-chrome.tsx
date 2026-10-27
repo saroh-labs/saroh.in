@@ -1,4 +1,4 @@
-import { resourceItems } from "@/components/v2/nav-items";
+import { resourceItems, solutionItems } from "@/components/v2/nav-items";
 import { SiteFooter } from "@/components/v2/site-footer";
 import { SiteNav } from "@/components/v2/site-nav";
 import { WhatsAppChat } from "@/components/v2/whatsapp-chat";
@@ -6,6 +6,7 @@ import { shownLegal, shownResources, shownTools } from "@/content/resources";
 import { env } from "@/env";
 import { asksConsent } from "@/lib/ga";
 import { resourcesContext } from "@/lib/resources-context";
+import { publishList, solutionLink } from "@/lib/search-pages";
 import { siteTagConfig } from "@/lib/site-tag-config";
 import { whatsappNumber } from "@/lib/whatsapp";
 
@@ -23,17 +24,25 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
     const ctx = resourcesContext();
     const resources = resourceItems(shownResources(ctx));
     const tools = resourceItems(shownTools(ctx));
+    // A solution goes to its /for/ page once that is live (DEC-193).
+    const published = publishList();
+    const solutions = solutionItems((slug) => solutionLink(slug, published));
     // "Cookie choices" shows wherever the notice can ask: Google Analytics,
     // an advertising tag (DEC-127) or the recorder (DEC-125).
     const analytics = asksConsent(siteTagConfig());
     return (
         <div className="min-h-screen bg-background text-foreground [line-height:normal]">
             <div className="mx-auto max-w-mk-page overflow-x-clip bg-background">
-                <SiteNav resources={resources} tools={tools} />
+                <SiteNav
+                    resources={resources}
+                    tools={tools}
+                    solutions={solutions}
+                />
                 <main id="main">{children}</main>
                 <SiteFooter
                     resources={resources}
                     tools={tools}
+                    solutions={solutions}
                     legal={shownLegal(ctx)}
                     cookieChoices={analytics}
                 />

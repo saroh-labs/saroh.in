@@ -79,6 +79,8 @@ module.exports = {
         // Saroh's own leads (U20): pure specs in the unit project; only
         // saroh-leads.db.spec.ts runs here.
         "<rootDir>/src/modules/saroh-leads/(?!.*\\.db\\.spec\\.ts$)",
+        // Search pages: pure specs run in the unit project.
+        "<rootDir>/src/modules/search-pages/(?!.*\\.db\\.spec\\.ts$)",
         // Commission (U21): pure specs in the unit project; only
         // commission.db.spec.ts runs here.
         "<rootDir>/src/modules/commission/(?!.*\\.db\\.spec\\.ts$)",

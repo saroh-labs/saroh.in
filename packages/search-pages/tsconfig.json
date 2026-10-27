@@ -1,0 +1,6 @@
+{
+    "extends": "@saroh/tsconfig/react-library.json",
+    "compilerOptions": { "noUncheckedIndexedAccess": true, "lib": ["ES2022", "DOM", "DOM.Iterable"], "target": "ES2022" },
+    "include": ["**/*.ts", "**/*.tsx"],
+    "exclude": ["node_modules", "dist"]
+}

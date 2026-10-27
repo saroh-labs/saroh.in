@@ -1,7 +1,8 @@
 import { featureHref, features } from "@/content/features";
-import { solutionHref, solutions } from "@/content/solutions";
+import { solutions } from "@/content/solutions";
 import type { Feature } from "@/content/types";
 import type { LaunchMode } from "@/lib/links";
+import { solutionLink } from "@/lib/search-pages";
 
 import { CardLink } from "../card-link";
 import { Container } from "../container";
@@ -94,7 +95,7 @@ export function FeatureUsedBy({ feature }: { feature: Feature }) {
             </Eyebrow>
             <div className="flex flex-wrap gap-3">
                 {feature.usedBy.map((slug) => (
-                    <PillLink key={slug} href={solutionHref(slug)} size="lg">
+                    <PillLink key={slug} href={solutionLink(slug)} size="lg">
                         {solutions[slug].longName}
                     </PillLink>
                 ))}
