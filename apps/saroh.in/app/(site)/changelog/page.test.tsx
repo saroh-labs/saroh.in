@@ -6,10 +6,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
     CHANGELOG,
     CHANGELOG_ENTRIES,
-    COMING_NEXT,
     changelogView,
 } from "@/content/changelog";
-import { byComingGroup } from "@/content/coming";
+import { byComingGroup, COMING } from "@/content/coming";
 
 import ChangelogPage from "./page";
 
@@ -146,9 +145,7 @@ describe("/changelog", () => {
             .closest("section");
         expect(section).toBeTruthy();
         expect(section?.querySelectorAll("a")).toHaveLength(0);
-        expect(section?.querySelectorAll("li")).toHaveLength(
-            COMING_NEXT.length,
-        );
+        expect(section?.querySelectorAll("li")).toHaveLength(COMING.length);
         expect(
             Array.from(section?.querySelectorAll("li") ?? []).every((li) =>
                 li.textContent.includes(CHANGELOG.notYet),
@@ -169,7 +166,7 @@ describe("/changelog", () => {
             "Early 2027",
             "Later",
         ]);
-        const groups = byComingGroup(COMING_NEXT);
+        const groups = byComingGroup(COMING);
         const lists = within(section).getAllByRole("list");
         expect(lists).toHaveLength(groups.length);
         lists.forEach((list, i) => {
@@ -201,9 +198,7 @@ describe("/changelog", () => {
     });
 
     it("lists CSV import as shipped, never as coming (#816)", () => {
-        expect(COMING_NEXT.map((item) => item.name)).not.toContain(
-            "CSV import",
-        );
+        expect(COMING.map((item) => item.name)).not.toContain("CSV import");
         const launch = CHANGELOG_ENTRIES.find(
             (e) => e.slug === "saroh-is-open",
         );

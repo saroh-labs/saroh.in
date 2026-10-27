@@ -3,8 +3,8 @@ import Link from "next/link";
 import { Container } from "@/components/shared/layout/container";
 import { Arrow } from "@/components/shared/links/arrow";
 import { Pill } from "@/components/shared/links/pill";
+import { ComingList } from "@/components/shared/sections/coming-list";
 import { PageTitle } from "@/components/shared/sections/page-title";
-import { byComingGroup } from "@/content/coming";
 import {
     integrationHref,
     INTEGRATIONS_PATH,
@@ -100,38 +100,7 @@ export default function IntegrationsPage() {
                 <p className="m-0 mb-3 max-w-[70ch] text-[15px] leading-[1.6] text-mk-copy">
                     {page.plannedIntro}
                 </p>
-                {byComingGroup(plannedIntegrations).map((group) => (
-                    <div
-                        key={group.key}
-                        className="grid pt-4 first-of-type:pt-0"
-                    >
-                        <h3
-                            id={`planned-${group.key}`}
-                            className="m-0 pb-2.5 font-mono text-[12.5px] font-normal text-muted-foreground"
-                        >
-                            {group.label}
-                        </h3>
-                        <ul
-                            aria-labelledby={`planned-${group.key}`}
-                            className="m-0 list-none p-0"
-                        >
-                            {group.rows.map((item) => (
-                                <li
-                                    key={item.name}
-                                    className="flex flex-wrap items-baseline gap-x-7 gap-y-2 border-t border-dashed border-border-strong py-5 text-muted-foreground"
-                                >
-                                    <span className="flex-[0_0_200px] text-[18px] font-semibold text-mk-copy">
-                                        {item.name}
-                                    </span>
-                                    <span className="flex-[1_1_340px] text-[15px] leading-[1.55]">
-                                        {item.line}
-                                    </span>
-                                    <Pill tone="outline">{page.notYet}</Pill>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                ))}
+                <ComingList items={plannedIntegrations} idPrefix="planned" />
             </Container>
 
             <Container className="pt-14">

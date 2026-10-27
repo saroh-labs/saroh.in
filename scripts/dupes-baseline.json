@@ -28,26 +28,6 @@
             ]
         },
         {
-            "lines": 16,
-            "files": [
-                "apps/saroh.in/content/changelog.ts",
-                "apps/saroh.in/content/integrations.ts"
-            ],
-            "windows": [
-                "39990154bbdd",
-                "a5cafd63a011",
-                "fa035f933899",
-                "df54864f93e4",
-                "11a663006736",
-                "e93c0f0334b3",
-                "57f7d66d41b5",
-                "27a267fa5f3e",
-                "6e7d0c8122f9",
-                "5d018175d75b",
-                "a5a94e8455c0"
-            ]
-        },
-        {
             "lines": 13,
             "files": [
                 "packages/search-pages/src/checks.tsx",
@@ -402,16 +382,6 @@
             ],
             "windows": [
                 "aa3aee2be7e0"
-            ]
-        },
-        {
-            "lines": 6,
-            "files": [
-                "apps/saroh.in/content/changelog.ts",
-                "apps/saroh.in/content/integrations.ts"
-            ],
-            "windows": [
-                "b4c6d61fbd6e"
             ]
         },
         {

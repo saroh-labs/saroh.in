@@ -70,9 +70,12 @@ describe("/integrations", () => {
             const group = groups[i];
             expect(list.getAttribute("aria-labelledby")).toBe(labels[i].id);
             const rows = within(list).getAllByRole("listitem");
+            // The changelog's layout: the label sits in the first row's
+            // "when" column.
             expect(rows.map((row) => row.textContent)).toEqual(
                 group.rows.map(
-                    (item) => `${item.name}${item.line}${page.notYet}`,
+                    (item, row) =>
+                        `${row === 0 ? group.label : ""}${item.name}${item.line}${page.notYet}`,
                 ),
             );
         });
