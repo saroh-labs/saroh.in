@@ -4296,6 +4296,10 @@ second. On CI's runners, beside every other package's tests, it took 5.3 to
 **Rule**: a test that does real work in a loop (decoding, rasterising,
 hashing many inputs) gets an explicit timeout. CI ran this one six times
 slower than the laptop, so the local time says little.
+**Again (27 Oct, #1256)**: saroh.in's `lib/site-pages.test.ts` reads every
+changelog and Help entry and timed out the same way. saroh.in's and
+`@saroh/search-pages`' vitest configs now set `testTimeout: 30_000` for the
+whole app, since most of their tests read content from disk.
 **Category**: tests · `packages/ui/src/lib/qr-art.decode.test.ts`
 
 ## The gate's quick API test step hung for ever on watchman

@@ -17,6 +17,9 @@ export default defineConfig({
     test: {
         environment: "node",
         globals: true,
+        // CI's runners are slower: a test that reads every changelog and Help
+        // entry timed out at the default 5s there (27 Oct, #1256).
+        testTimeout: 30_000,
         include: [
             "*.test.ts",
             "content/**/*.test.ts",
