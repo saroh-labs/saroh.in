@@ -6,6 +6,8 @@
  * and words each failure.
  */
 
+import { formatTime } from "@/lib/format/day";
+
 export const APPS = [
     "whatsapp",
     "facebook",
@@ -205,15 +207,7 @@ export function checkedLine(
     if (Number.isNaN(at.getTime()) || now - at.getTime() < 60_000) {
         return "Checked just now.";
     }
-    const time = at
-        .toLocaleTimeString("en-IN", {
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-            timeZone: "Asia/Kolkata",
-        })
-        .replace(/\s?(am|pm)$/i, (m) => ` ${m.trim().toLowerCase()}`);
-    return `Checked at ${time}.`;
+    return `Checked at ${formatTime(at)}.`;
 }
 
 /** The longest address the tool reads from a shared link. */

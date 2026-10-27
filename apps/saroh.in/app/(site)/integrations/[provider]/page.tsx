@@ -12,7 +12,9 @@ import {
     INTEGRATIONS_PATH,
     isIntegrationSlug,
 } from "@/content/integrations";
+import { numberWord } from "@/lib/format/number-words";
 import { integrationMeta, loadIntegration } from "@/lib/integration-docs";
+import { ring } from "@/lib/ring";
 import { pageMetadata } from "@/lib/seo";
 import { breadcrumbLd } from "@/lib/structured-data";
 
@@ -50,13 +52,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     });
 }
 
-const COUNT = ["zero", "one", "two", "three", "four", "five", "six", "seven"];
-
 const H2 =
     "m-0 font-display text-[26px] font-bold tracking-[-0.02em] [text-wrap:balance]";
 
-const LINK =
-    "cursor-pointer rounded-sm text-brand-700 no-underline transition-colors duration-fast ease-out hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]";
+const LINK = `cursor-pointer rounded-sm text-brand-700 no-underline transition-colors duration-fast ease-out hover:text-foreground ${ring()}`;
 
 export default async function IntegrationPage({ params }: Props) {
     const { provider } = await params;
@@ -64,7 +63,7 @@ export default async function IntegrationPage({ params }: Props) {
     const { frontmatter: fm, Body } = await loadIntegration(provider);
     const self = integrationHref(provider);
     const links = fm.links.filter((l) => l.href !== self);
-    const stepsTitle = `Connect it in ${COUNT[fm.steps.length] ?? fm.steps.length} steps`;
+    const stepsTitle = `Connect it in ${numberWord(fm.steps.length)} steps`;
 
     return (
         <>
@@ -82,7 +81,7 @@ export default async function IntegrationPage({ params }: Props) {
                         <li>
                             <Link
                                 href={INTEGRATIONS_PATH}
-                                className="cursor-pointer rounded-sm text-muted-foreground no-underline transition-colors duration-fast ease-out hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+                                className={`cursor-pointer rounded-sm text-muted-foreground no-underline transition-colors duration-fast ease-out hover:text-foreground ${ring()}`}
                             >
                                 Integrations
                             </Link>

@@ -2,7 +2,8 @@
 
 import { useId, useState } from "react";
 
-import { EmailGate } from "../email-gate";
+import { saveFile } from "../download";
+import { EMAIL_SHAPE, EmailGate } from "../email-gate";
 import { Field, ToolColumns, ToolForm } from "../parts";
 import {
     DownloadButton,
@@ -12,13 +13,11 @@ import {
     QrCard,
     QrCode,
     QrSample,
-    saveFile,
     useLastGood,
 } from "../qr";
 import type { Contact } from "./logic";
 import {
     DENSE_CHARS,
-    EMAIL,
     fileName,
     phoneProblem,
     readPhone,
@@ -74,7 +73,7 @@ export default function BusinessCardQrGenerator() {
     const id = useId();
 
     const phoneBad = c.phone.trim() !== "" && readPhone(c.phone) === null;
-    const emailBad = c.email.trim() !== "" && !EMAIL.test(c.email.trim());
+    const emailBad = c.email.trim() !== "" && !EMAIL_SHAPE.test(c.email.trim());
     const held = useLastGood<Contact>(
         c.name.trim() && readPhone(c.phone) && !emailBad ? c : null,
         phoneBad || emailBad,

@@ -10,18 +10,16 @@ import { linkShown } from "@/content/resources";
 import { SAROH_SOCIAL } from "@/content/social";
 import { cn } from "@/lib/cn";
 import type { LaunchMode } from "@/lib/links";
+import { ring } from "@/lib/ring";
 
 import { Container } from "../shared/layout/container";
 import { Arrow } from "../shared/links/arrow";
 import { Eyebrow } from "../shared/sections/eyebrow";
 import { ContactForm } from "./contact-form";
 
-const RING =
-    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]";
-
 const TEXT_LINK = cn(
     "cursor-pointer rounded-sm text-brand-700 no-underline transition-colors duration-fast ease-out hover:text-foreground",
-    RING,
+    ring(),
 );
 
 /** The side column's white card. */
@@ -216,7 +214,7 @@ function SideLink({
             className={cn(
                 SIDE_CARD,
                 "cursor-pointer gap-1 text-foreground no-underline transition-colors duration-fast ease-out hover:border-foreground hover:text-foreground",
-                RING,
+                ring(),
             )}
         >
             <span className="text-[16.5px] font-semibold">

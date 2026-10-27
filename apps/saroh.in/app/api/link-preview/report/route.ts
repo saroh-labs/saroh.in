@@ -9,24 +9,14 @@ import { NextResponse } from "next/server";
 import { env } from "@/env";
 import type { UnlockResult } from "@/lib/link-preview";
 import { linkPreviewHeaders } from "@/lib/link-preview-forward";
-import { relaySecret } from "@/lib/waitlist-forward";
+import { postedText, readPosted, relaySecret } from "@/lib/relay";
 
 const MAX_ADDRESS = 4096;
 
 export async function POST(req: Request) {
-    let posted: unknown;
-    try {
-        posted = await req.json();
-    } catch {
-        posted = null;
-    }
-    const p = (
-        typeof posted === "object" && posted !== null ? posted : {}
-    ) as Record<string, unknown>;
-    const email =
-        typeof p.email === "string" ? p.email.trim().slice(0, 320) : "";
-    const url =
-        typeof p.url === "string" ? p.url.trim().slice(0, MAX_ADDRESS) : "";
+    const p = await readPosted(req);
+    const email = postedText(p, "email", 320);
+    const url = postedText(p, "url", MAX_ADDRESS);
     const fail = (
         failure: "bad-email" | "invalid" | "rate-limited" | "unavailable",
         status: number,

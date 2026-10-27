@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 
 import { LegalText } from "@/components/legal/legal-text";
-import { entryDayLong } from "@/content/changelog";
 import { LEGAL_PAGES, isLive } from "@/content/resources";
+import { formatDay } from "@/lib/format/day";
 import { parseLegal } from "@/lib/legal-markdown";
 import { resourcesContext } from "@/lib/resources-context";
 
@@ -22,7 +22,6 @@ export function LegalPage({
 }) {
     const page = LEGAL_PAGES.find((p) => p.id === id);
     if (!page || !isLive(page, resourcesContext())) notFound();
-    const year = page.publishOn.slice(0, 4);
     return (
         <article className="mx-auto grid w-full max-w-[768px] gap-5 px-6 pt-[72px]">
             <h1 className="m-0 font-display text-[clamp(36px,6vw,56px)] font-bold leading-none tracking-[-0.045em]">
@@ -31,7 +30,7 @@ export function LegalPage({
             <p className="m-0 text-[14px] text-muted-foreground">
                 Last updated{" "}
                 <time dateTime={page.publishOn}>
-                    {entryDayLong(page.publishOn)} {year}
+                    {formatDay(page.publishOn, { month: "long", year: true })}
                 </time>
             </p>
             <LegalText blocks={parseLegal(body)} />

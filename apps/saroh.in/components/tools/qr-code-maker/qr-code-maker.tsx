@@ -21,13 +21,12 @@ import {
     typedLink,
     unlockWithEmail,
 } from "@/lib/qr-code-maker";
+import { ring } from "@/lib/ring";
 
 import { readAsDataUrl, saveFile, svgBlob, svgToPng } from "./qr-download";
 import type { QrUnlocked } from "./qr-maker-gate";
 import { QrMakerGate } from "./qr-maker-gate";
 
-const FOCUS =
-    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]";
 const FOCUS_WITHIN =
     "focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-500 focus-within:[outline-style:solid]";
 const FIELD_NAME = "text-sm font-semibold";
@@ -236,7 +235,7 @@ export function QrCodeMaker() {
                                     style={{ backgroundColor: swatch.hex }}
                                     className={`size-[34px] cursor-pointer rounded-full border-[3px] border-background ring-[1.5px] transition-transform duration-fast ease-out hover:scale-105 active:scale-95 ${
                                         on ? "ring-foreground" : "ring-border"
-                                    } ${FOCUS} focus-visible:outline-offset-[3px]`}
+                                    } ${ring({ offset: 3 })}`}
                                 />
                             );
                         })}
@@ -256,7 +255,7 @@ export function QrCodeMaker() {
                         placeholder={copy.label.placeholder}
                         value={label}
                         onChange={(event) => setLabel(event.target.value)}
-                        className={`h-[46px] rounded-[10px] border border-border-strong bg-card px-3.5 text-[15px] text-foreground placeholder:text-mk-hint ${FOCUS}`}
+                        className={`h-[46px] rounded-[10px] border border-border-strong bg-card px-3.5 text-[15px] text-foreground placeholder:text-mk-hint ${ring()}`}
                     />
                 </label>
             </div>

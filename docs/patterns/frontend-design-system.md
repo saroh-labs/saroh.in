@@ -283,25 +283,25 @@
   `@saroh/search-pages`; `scripts/dupes-baseline.json` only shrinks, `--update`
   after removing one). Both run in `pnpm prepush` and CI.
 
-    | Piece                                     | The one                                                                        | Don't hand-draw                                                               |
-    | ----------------------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
-    | Plan cards (price, switches, compare)     | `PricingCards` / `PlanCards`, `components/pricing/`                            | a price (`text-mk-price*`) or a `PlanCardView` outside the pricing folder     |
-    | Focus ring                                | `ring()`, `lib/ring.ts`                                                        | the `focus-visible:outline-…` string                                          |
-    | Text link, quiet link                     | `TextLink` (`tone`, `arrow`), `components/shared/links/text-link.tsx`          | `text-brand-700 no-underline` or a muted `no-underline` link class            |
-    | Breadcrumb                                | `Breadcrumbs` (`current="brand"`), `components/shared/nav/breadcrumbs.tsx`     | an `aria-label="Breadcrumb"` list                                             |
-    | FAQ                                       | `Faq`, `components/shared/sections/faq.tsx`                                    | a `<details>` list                                                            |
-    | Ink closing band                          | `CtaBand` (`template`, `note`, `size`), `components/shared/sections/`          | `rounded-mk-band bg-foreground`                                               |
-    | Section H2, page title                    | `Section` / `SectionHeading`, `PageIntro` (size tokens)                        | a raw `<h2 … text-mk-h2…>`, an H1 with its own `text-[clamp(…)]`              |
-    | Reading column                            | `Container width="article" \| "list"`                                          | `max-w-[720…900px]`                                                           |
-    | Small caps label                          | `Eyebrow` (`tone`, `size`)                                                     | `uppercase tracking-[0.1em]`                                                  |
-    | Link card                                 | `CardLink`                                                                     | its own hover shadow                                                          |
-    | Badge                                     | `Pill` (`tone="soon" \| "ok" \| "outline"`)                                    | `bg-mk-soon` badges                                                           |
-    | Button                                    | `Button` / `ButtonLink` (`buttonClasses`), `components/shared/buttons/`        | an Ink `<button>` with `bg-foreground text-background`                        |
-    | Choice chip, text field, email capture    | `ChoiceChip`, `fieldClasses()`, `EmailCapture`, `components/shared/fields/`    | a `h-9 rounded-full` chip, `placeholder:text-…` field classes                 |
-    | Hero buttons ("See it in action · 2 min") | `HeroActions`; the words in `content/`                                         | the label typed in a component                                                |
-    | Email check, days, lists, arrows, body    | `isEmailShape()`, `lib/format/`, `nextIndex()`, `readPosted()`, `useAddress()` | an email regex, `Intl`/`toLocale…`, `.slice(0,-1).join(", ")`, `req.json()`   |
-    | Clipboard, file download                  | `copyText` (`@saroh/ui`), the package's `saveFile()`                           | `navigator.clipboard`, `URL.createObjectURL`                                  |
-    | Package crumb, FAQ, band, start button    | `packages/search-pages/src/components/page-parts.tsx`                          | `sp-*` / `tp-*` copies; a literal "Start free" (the label comes from `cta()`) |
+    | Piece                                     | The one                                                                             | Don't hand-draw                                                               |
+    | ----------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+    | Plan cards (price, switches, compare)     | `PricingCards` / `PlanCards`, `components/pricing/`                                 | a price (`text-mk-price*`) or a `PlanCardView` outside the pricing folder     |
+    | Focus ring                                | `ring()`, `lib/ring.ts`                                                             | the `focus-visible:outline-…` string                                          |
+    | Text link, quiet link                     | `TextLink` (`tone`, `arrow`), `components/shared/links/text-link.tsx`               | `text-brand-700 no-underline` or a muted `no-underline` link class            |
+    | Breadcrumb                                | `Breadcrumbs` (`current="brand"`), `components/shared/nav/breadcrumbs.tsx`          | an `aria-label="Breadcrumb"` list                                             |
+    | FAQ                                       | `Faq`, `components/shared/sections/faq.tsx`                                         | a `<details>` list                                                            |
+    | Ink closing band                          | `CtaBand` (`template`, `note`, `size`), `components/shared/sections/`               | `rounded-mk-band bg-foreground`                                               |
+    | Section H2, page title                    | `Section` / `SectionHeading`, `PageIntro` (size tokens)                             | a raw `<h2 … text-mk-h2…>`, an H1 with its own `text-[clamp(…)]`              |
+    | Reading column                            | `Container width="article" \| "list"`                                               | `max-w-[720…900px]`                                                           |
+    | Small caps label                          | `Eyebrow` (`tone`, `size`)                                                          | `uppercase tracking-[0.1em]`                                                  |
+    | Link card                                 | `CardLink`                                                                          | its own hover shadow                                                          |
+    | Badge                                     | `Pill` (`tone="soon" \| "ok" \| "outline"`)                                         | `bg-mk-soon` badges                                                           |
+    | Button                                    | `Button` / `ButtonLink` (`buttonClasses`), `components/shared/buttons/`             | an Ink `<button>` with `bg-foreground text-background`                        |
+    | Choice chip, text field, email capture    | `ChoiceChip`, `fieldClasses()`, `EmailCapture`, `components/shared/fields/`         | a `h-9 rounded-full` chip, `placeholder:text-…` field classes                 |
+    | Hero buttons ("See it in action · 2 min") | `HeroActions`; the words in `content/`                                              | the label typed in a component                                                |
+    | Email check, days, lists, arrows, body    | `isEmailShape()`, `lib/format/`, `nextIndex()`, `readPosted()`, `useBrowserValue()` | an email regex, `Intl`/`toLocale…`, `.slice(0,-1).join(", ")`, `req.json()`   |
+    | Clipboard, file download                  | `copyText` (`@saroh/ui`), `saveFile()` (`@saroh/search-pages/download`)             | `navigator.clipboard`, `URL.createObjectURL`                                  |
+    | Package crumb, FAQ, band, start button    | `packages/search-pages/src/components/page-parts.tsx`                               | `sp-*` / `tp-*` copies; a literal "Start free" (the label comes from `cta()`) |
 
 - **Current** (10 Oct 2026) — **"Draft" and "Live" for every kind of
   thing.** Whether customers can get a product, plan, course, pack, post,

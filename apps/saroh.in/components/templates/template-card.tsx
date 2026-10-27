@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Arrow } from "@/components/shared/links/arrow";
 import type { GalleryTemplate } from "@/content/templates";
+import { ring } from "@/lib/ring";
 
 import { BrowserFrame } from "./browser-frame";
 import { TemplatePageView } from "./template-page-view";
@@ -26,7 +27,7 @@ export function TemplateCard({
         <Link
             href={template.href}
             data-template={template.slug}
-            className="group grid cursor-pointer content-start gap-4 rounded-[16px] text-foreground no-underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+            className={`group grid cursor-pointer content-start gap-4 rounded-[16px] text-foreground no-underline ${ring({ offset: 4 })}`}
         >
             <BrowserFrame
                 host={template.sample.host}

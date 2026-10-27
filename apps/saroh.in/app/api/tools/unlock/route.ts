@@ -14,22 +14,13 @@ import { NextResponse } from "next/server";
 import { env } from "@/env";
 import { linkPreviewHeaders } from "@/lib/link-preview-forward";
 import type { QrUnlockResult } from "@/lib/qr-code-maker";
-import { relaySecret } from "@/lib/waitlist-forward";
+import { postedText, readPosted, relaySecret } from "@/lib/relay";
 
 const TOOL_SLUG = /^[a-z0-9-]{1,60}$/;
 
 export async function POST(req: Request) {
-    let posted: unknown;
-    try {
-        posted = await req.json();
-    } catch {
-        posted = null;
-    }
-    const p = (
-        typeof posted === "object" && posted !== null ? posted : {}
-    ) as Record<string, unknown>;
-    const email =
-        typeof p.email === "string" ? p.email.trim().slice(0, 320) : "";
+    const p = await readPosted(req);
+    const email = postedText(p, "email", 320);
     const tool = typeof p.tool === "string" ? p.tool : undefined;
     const fail = (
         failure: "bad-email" | "rate-limited" | "unavailable",

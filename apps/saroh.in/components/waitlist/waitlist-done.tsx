@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import type { WaitlistContent } from "@/content/waitlist";
+import { ring } from "@/lib/ring";
 import { openingLong } from "@/lib/waitlist";
 
 import { ReferralLink } from "./referral-link";
@@ -101,7 +102,7 @@ export function WaitlistDone({
             <button
                 type="button"
                 onClick={onAnother}
-                className="cursor-pointer self-start rounded-sm text-[13px] text-neutral-600 underline underline-offset-[3px] transition-colors duration-fast ease-out hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground focus-visible:[outline-style:solid]"
+                className={`cursor-pointer self-start rounded-sm text-[13px] text-neutral-600 underline underline-offset-[3px] transition-colors duration-fast ease-out hover:text-brand-700 ${ring({ color: "ink" })}`}
             >
                 Add another business
             </button>

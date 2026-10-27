@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import type { GalleryTemplate } from "@/content/templates";
 import { cn } from "@/lib/cn";
+import { ring } from "@/lib/ring";
 
 import { TemplateCard } from "./template-card";
 
@@ -12,8 +13,7 @@ export interface GalleryChip {
     label: string;
 }
 
-const CHIP =
-    "inline-flex h-9 cursor-pointer items-center rounded-full border px-3.5 text-[14px] transition-[background-color,border-color,color,transform] duration-fast ease-out active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]";
+const CHIP = `inline-flex h-9 cursor-pointer items-center rounded-full border px-3.5 text-[14px] transition-[background-color,border-color,color,transform] duration-fast ease-out active:scale-[0.97] ${ring()}`;
 
 /**
  * The gallery's kind chips and cards (Templates design). "All" and one chip

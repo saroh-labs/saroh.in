@@ -3,12 +3,14 @@ import { NOT_AVAILABLE_YET } from "./coming";
 import type { IsoDay, PublishContext } from "./resources";
 import { isLive } from "./resources";
 
+import { formatDay } from "@/lib/format/day";
+
 /**
  * The day this module's words last changed, the sitemap's `lastmod` for its
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-10-19";
+export const UPDATED = "2026-10-27";
 
 /**
  * The changelog (plan U4, design "Saroh Resources - Changelog" 1a): its
@@ -375,23 +377,11 @@ export function firstEntryDay(): IsoDay | null {
 }
 
 /** "17 Oct 2026", as the list's date column writes it. */
-export function entryDate(day: IsoDay): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        timeZone: "Asia/Kolkata",
-    }).format(new Date(`${day}T12:00:00+05:30`));
-}
+export const entryDate = (day: IsoDay) =>
+    formatDay(day, { month: "short", year: true });
 
 /** "17 October", as the pre-launch line writes it. */
-export function entryDayLong(day: IsoDay): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        day: "numeric",
-        month: "long",
-        timeZone: "Asia/Kolkata",
-    }).format(new Date(`${day}T12:00:00+05:30`));
-}
+export const entryDayLong = (day: IsoDay) => formatDay(day, { month: "long" });
 
 export function findEntry(slug: string): ChangelogEntry | undefined {
     return CHANGELOG_ENTRIES.find((e) => e.slug === slug);

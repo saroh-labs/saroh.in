@@ -4,12 +4,10 @@ import { describe, expect, it } from "vitest";
 import {
     GALLERY_KINDS,
     USES_WORDS,
-    countWord,
     galleryChips,
     galleryTemplate,
     galleryTemplates,
     isGalleryTemplate,
-    listWords,
     relatedTemplates,
     templateDetail,
     templatesPage,
@@ -212,14 +210,5 @@ describe("related templates", () => {
         expect(
             relatedTemplates(must("clinic"), templates).map((r) => r.slug),
         ).toEqual(["dietician", "salon", "gym"]);
-    });
-});
-
-describe("words", () => {
-    it("counts and lists", () => {
-        expect(countWord(7)).toBe("Seven");
-        expect(countWord(13)).toBe("13");
-        expect(listWords(["A"])).toBe("A");
-        expect(listWords(["A", "B", "C"])).toBe("A, B and C");
     });
 });

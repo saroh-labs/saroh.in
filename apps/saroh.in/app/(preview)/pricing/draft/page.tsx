@@ -17,6 +17,7 @@ import {
     previewViewFrom,
 } from "@/lib/pricing-preview";
 import { pricingPageModel } from "@/lib/pricing-view";
+import { ring } from "@/lib/ring";
 
 /**
  * `/pricing/draft` — the shared draft of the pricing catalogue, for a staff
@@ -83,7 +84,7 @@ export default async function PricingDraftRoute({
                     {LAUNCH_MODE === "open" ? (
                         <Link
                             href="/pricing"
-                            className="rounded-sm text-brand-700 no-underline hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+                            className={`rounded-sm text-brand-700 no-underline hover:text-foreground ${ring()}`}
                         >
                             See the published pricing
                         </Link>

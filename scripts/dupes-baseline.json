@@ -132,20 +132,6 @@
         {
             "lines": 10,
             "files": [
-                "apps/saroh.in/components/tools/qr-code-maker/qr-download.ts",
-                "packages/search-pages/src/tools/qr.tsx"
-            ],
-            "windows": [
-                "9bf7e550de6d",
-                "9e3ebf91be16",
-                "0004e27f37c8",
-                "f86855772dff",
-                "0937d47bbc9f"
-            ]
-        },
-        {
-            "lines": 10,
-            "files": [
                 "packages/search-pages/src/tools/business-card-qr-generator/index.tsx",
                 "packages/search-pages/src/tools/menu-qr-code-generator/index.tsx",
                 "packages/search-pages/src/tools/review-qr-code-generator/index.tsx",
@@ -171,20 +157,6 @@
                 "fce481b58908",
                 "eb2f1ac2ccc4",
                 "c687e56d23e2"
-            ]
-        },
-        {
-            "lines": 9,
-            "files": [
-                "apps/saroh.in/app/api/link-preview/report/route.ts",
-                "apps/saroh.in/app/api/link-preview/route.ts",
-                "apps/saroh.in/app/api/tools/unlock/route.ts"
-            ],
-            "windows": [
-                "f74792215071",
-                "a59ce88ed521",
-                "5dd2cc2171ca",
-                "da0f45626018"
             ]
         },
         {
@@ -269,13 +241,13 @@
         {
             "lines": 8,
             "files": [
-                "apps/saroh.in/components/contact/contact-form.tsx",
-                "apps/saroh.in/components/pricing/billing-toggle.tsx"
+                "apps/saroh.in/components/pricing/compare-table.tsx",
+                "apps/saroh.in/components/pricing/usage-table.tsx"
             ],
             "windows": [
-                "aff91dbd94db",
-                "a2e3a5c2f95c",
-                "1f532c6120fd"
+                "824d4b5b77cd",
+                "cd20b5533014",
+                "778982bbddca"
             ]
         },
         {
@@ -293,18 +265,6 @@
         {
             "lines": 8,
             "files": [
-                "apps/saroh.in/components/pricing/compare-table.tsx",
-                "apps/saroh.in/components/pricing/usage-table.tsx"
-            ],
-            "windows": [
-                "824d4b5b77cd",
-                "cd20b5533014",
-                "778982bbddca"
-            ]
-        },
-        {
-            "lines": 8,
-            "files": [
                 "apps/saroh.in/components/tools/qr-code-maker/qr-download.ts",
                 "packages/search-pages/src/tools/link-in-bio-page-maker/index.tsx"
             ],
@@ -312,34 +272,6 @@
                 "f6417b681f24",
                 "e95b48229920",
                 "457f0a5fc2d6"
-            ]
-        },
-        {
-            "lines": 8,
-            "files": [
-                "packages/search-pages/src/tools/bill-of-supply-generator/index.tsx",
-                "packages/search-pages/src/tools/quotation-maker/index.tsx",
-                "packages/search-pages/src/tools/receipt-maker/index.tsx"
-            ],
-            "windows": [
-                "d29e3263d6d0",
-                "9e6c269fe120",
-                "88cc5cd8d8a5"
-            ]
-        },
-        {
-            "lines": 8,
-            "files": [
-                "packages/search-pages/src/tools/business-card-qr-generator/index.tsx",
-                "packages/search-pages/src/tools/menu-qr-code-generator/index.tsx",
-                "packages/search-pages/src/tools/review-qr-code-generator/index.tsx",
-                "packages/search-pages/src/tools/upi-qr-code-generator/index.tsx",
-                "packages/search-pages/src/tools/wifi-qr-code-generator/index.tsx"
-            ],
-            "windows": [
-                "bed34f7c0b17",
-                "77c0c09fa77b",
-                "58ead418c518"
             ]
         },
         {
@@ -454,34 +386,12 @@
         {
             "lines": 7,
             "files": [
-                "apps/saroh.in/app/api/link-preview/report/route.ts",
-                "apps/saroh.in/app/api/tools/unlock/route.ts"
-            ],
-            "windows": [
-                "2205d416dec6",
-                "f5e01538f5c3"
-            ]
-        },
-        {
-            "lines": 7,
-            "files": [
                 "apps/saroh.in/components/about/about-page.tsx",
                 "apps/saroh.in/components/contact/contact-page.tsx"
             ],
             "windows": [
                 "a94505d6473d",
                 "9428981335e3"
-            ]
-        },
-        {
-            "lines": 7,
-            "files": [
-                "apps/saroh.in/components/shared/nav/mobile-menu.tsx",
-                "apps/saroh.in/components/shared/nav/site-nav.tsx"
-            ],
-            "windows": [
-                "2a0e92cc0e6b",
-                "91b52972c5b3"
             ]
         },
         {
@@ -498,53 +408,12 @@
         {
             "lines": 7,
             "files": [
-                "packages/search-pages/src/tools/bill-of-supply-generator/index.tsx",
-                "packages/search-pages/src/tools/gst-invoice-generator/index.tsx",
-                "packages/search-pages/src/tools/quotation-maker/index.tsx",
-                "packages/search-pages/src/tools/receipt-maker/index.tsx"
+                "apps/saroh.in/components/shared/nav/mobile-menu.tsx",
+                "apps/saroh.in/components/shared/nav/site-nav.tsx"
             ],
             "windows": [
-                "a0d99a9b7e74",
-                "7774d8a44b72"
-            ]
-        },
-        {
-            "lines": 7,
-            "files": [
-                "packages/search-pages/src/tools/bill-of-supply-generator/index.tsx",
-                "packages/search-pages/src/tools/quotation-maker/index.tsx"
-            ],
-            "windows": [
-                "cfb0d9df7664",
-                "69f3f7a4001c"
-            ]
-        },
-        {
-            "lines": 7,
-            "files": [
-                "packages/search-pages/src/tools/bill-of-supply-generator/index.tsx",
-                "packages/search-pages/src/tools/quotation-maker/index.tsx",
-                "packages/search-pages/src/tools/receipt-maker/index.tsx"
-            ],
-            "windows": [
-                "8ec5851177f3",
-                "ce7438518928"
-            ]
-        },
-        {
-            "lines": 7,
-            "files": [
-                "packages/search-pages/src/tools/break-even-calculator/index.tsx",
-                "packages/search-pages/src/tools/gst-calculator/index.tsx",
-                "packages/search-pages/src/tools/gstin-checker/index.tsx",
-                "packages/search-pages/src/tools/gym-membership-plan-calculator/index.tsx",
-                "packages/search-pages/src/tools/no-show-cost-calculator/index.tsx",
-                "packages/search-pages/src/tools/profit-margin-calculator/index.tsx",
-                "packages/search-pages/src/tools/staff-commission-calculator/index.tsx"
-            ],
-            "windows": [
-                "1ad9dff83ea9",
-                "72d8de60ccd4"
+                "2a0e92cc0e6b",
+                "91b52972c5b3"
             ]
         },
         {
@@ -574,31 +443,6 @@
             ]
         },
         {
-            "lines": 7,
-            "files": [
-                "packages/search-pages/src/tools/gst-calculator/index.tsx",
-                "packages/search-pages/src/tools/gstin-checker/index.tsx",
-                "packages/search-pages/src/tools/gym-membership-plan-calculator/index.tsx",
-                "packages/search-pages/src/tools/no-show-cost-calculator/index.tsx",
-                "packages/search-pages/src/tools/profit-margin-calculator/index.tsx",
-                "packages/search-pages/src/tools/staff-commission-calculator/index.tsx"
-            ],
-            "windows": [
-                "be9cff5710a5",
-                "08cc7d46fb0a"
-            ]
-        },
-        {
-            "lines": 6,
-            "files": [
-                "apps/saroh.in/app/api/link-preview/report/route.ts",
-                "apps/saroh.in/app/api/link-preview/route.ts"
-            ],
-            "windows": [
-                "1b4ed8a5d352"
-            ]
-        },
-        {
             "lines": 6,
             "files": [
                 "apps/saroh.in/app/site-tags.tsx",
@@ -606,16 +450,6 @@
             ],
             "windows": [
                 "a56a96e66bb8"
-            ]
-        },
-        {
-            "lines": 6,
-            "files": [
-                "apps/saroh.in/components/shared/sections/cta-band.tsx",
-                "apps/saroh.in/components/templates/templates-band.tsx"
-            ],
-            "windows": [
-                "39891e2d9897"
             ]
         },
         {
@@ -641,8 +475,18 @@
         {
             "lines": 6,
             "files": [
-                "apps/saroh.in/components/tools/qr-code-maker/qr-maker-gate.tsx",
-                "apps/saroh.in/components/tools/link-preview/unlock-panel.tsx"
+                "apps/saroh.in/components/shared/sections/cta-band.tsx",
+                "apps/saroh.in/components/templates/templates-band.tsx"
+            ],
+            "windows": [
+                "39891e2d9897"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "apps/saroh.in/components/tools/link-preview/unlock-panel.tsx",
+                "apps/saroh.in/components/tools/qr-code-maker/qr-maker-gate.tsx"
             ],
             "windows": [
                 "de0605656ea0"
@@ -666,36 +510,6 @@
             ],
             "windows": [
                 "e7290941b843"
-            ]
-        },
-        {
-            "lines": 6,
-            "files": [
-                "packages/search-pages/src/tools/bill-of-supply-generator/index.tsx",
-                "packages/search-pages/src/tools/quotation-maker/index.tsx"
-            ],
-            "windows": [
-                "eed9fa11169a"
-            ]
-        },
-        {
-            "lines": 6,
-            "files": [
-                "packages/search-pages/src/tools/bill-of-supply-generator/logic.ts",
-                "packages/search-pages/src/tools/gst-invoice-generator/logic.ts"
-            ],
-            "windows": [
-                "12916b631c18"
-            ]
-        },
-        {
-            "lines": 6,
-            "files": [
-                "packages/search-pages/src/tools/bill-of-supply-generator/logic.ts",
-                "packages/search-pages/src/tools/receipt-maker/logic.ts"
-            ],
-            "windows": [
-                "32feb7c57504"
             ]
         },
         {
@@ -756,16 +570,6 @@
             ],
             "windows": [
                 "91d4409be8e0"
-            ]
-        },
-        {
-            "lines": 6,
-            "files": [
-                "packages/search-pages/src/tools/gst-invoice-generator/logic.ts",
-                "packages/search-pages/src/tools/quotation-maker/logic.ts"
-            ],
-            "windows": [
-                "30890dff8fa9"
             ]
         },
         {
@@ -837,18 +641,6 @@
             ],
             "windows": [
                 "3ebee89ca999"
-            ]
-        },
-        {
-            "lines": 6,
-            "files": [
-                "packages/search-pages/src/tools/menu-qr-code-generator/index.tsx",
-                "packages/search-pages/src/tools/review-qr-code-generator/index.tsx",
-                "packages/search-pages/src/tools/upi-qr-code-generator/index.tsx",
-                "packages/search-pages/src/tools/wifi-qr-code-generator/index.tsx"
-            ],
-            "windows": [
-                "69c30954476f"
             ]
         },
         {

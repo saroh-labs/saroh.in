@@ -14,12 +14,13 @@ import {
     earlyAccessOpen,
     galleryTemplate,
     galleryTemplates,
-    listWords,
     relatedTemplates,
     TEMPLATES_PATH,
     templatesPage,
 } from "@/content/templates";
+import { sentenceList } from "@/lib/format/list";
 import { resourcesContext } from "@/lib/resources-context";
+
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import { breadcrumbLd } from "@/lib/structured-data";
 import { templatesLive } from "@/lib/templates-live";
@@ -75,10 +76,13 @@ export default async function TemplatePage({ params }: Props) {
         detail.notes.look(t),
     ];
     const facts: [string, string][] = [
-        [detail.facts.pages, listWords(t.pages.map((p) => p.title))],
-        [detail.facts.uses, t.uses.length ? listWords(t.uses) : "Your website"],
+        [detail.facts.pages, sentenceList(t.pages.map((p) => p.title))],
+        [
+            detail.facts.uses,
+            t.uses.length ? sentenceList(t.uses) : "Your website",
+        ],
         [detail.facts.type, t.type],
-        [detail.facts.colours, listWords(t.colourways)],
+        [detail.facts.colours, sentenceList(t.colourways)],
     ];
     const related = relatedTemplates(t);
 

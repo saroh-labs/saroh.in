@@ -5,6 +5,7 @@ import type { KeyboardEvent } from "react";
 import { useId, useRef, useState } from "react";
 
 import type { IntegrationStep } from "@/content/integrations";
+import { ring } from "@/lib/ring";
 
 /**
  * "Connect it in N steps" (Integrations › provider design): the steps as a
@@ -69,7 +70,7 @@ export function IntegrationSteps({
                                 onClick={() => setCurrent(i)}
                                 onKeyDown={(e) => onKeyDown(e, i)}
                                 className={cn(
-                                    "flex w-full cursor-pointer items-center gap-3.5 rounded-mk-btn border px-4 py-3.5 text-left transition-[background-color,border-color,color] duration-fast ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] active:scale-[0.99]",
+                                    `flex w-full cursor-pointer items-center gap-3.5 rounded-mk-btn border px-4 py-3.5 text-left transition-[background-color,border-color,color] duration-fast ease-out ${ring()} active:scale-[0.99]`,
                                     on
                                         ? "border-foreground bg-foreground text-background"
                                         : "border-border bg-card text-foreground hover:border-border-strong",

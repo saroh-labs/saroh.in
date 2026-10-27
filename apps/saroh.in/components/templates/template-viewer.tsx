@@ -4,13 +4,13 @@ import { useState } from "react";
 
 import type { GalleryTemplate } from "@/content/templates";
 import { cn } from "@/lib/cn";
+import { ring } from "@/lib/ring";
 
 import { BrowserFrame } from "./browser-frame";
 import { TemplatePageView } from "./template-page-view";
 import type { PreviewDevice } from "./template-preview";
 
-const TOGGLE =
-    "inline-flex h-9 cursor-pointer items-center rounded-full px-3.5 text-[14px] transition-[background-color,color,transform] duration-fast ease-out active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]";
+const TOGGLE = `inline-flex h-9 cursor-pointer items-center rounded-full px-3.5 text-[14px] transition-[background-color,color,transform] duration-fast ease-out active:scale-[0.97] ${ring()}`;
 
 function Toggle({
     label,
@@ -109,7 +109,7 @@ export function TemplateViewer({
                         aria-label={`${template.name}, ${page.title} page`}
                         data-template-view={`${page.path}:${device}`}
                         className={cn(
-                            "overflow-y-auto overscroll-contain focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]",
+                            `overflow-y-auto overscroll-contain ${ring({ offset: "inset" })}`,
                             phone
                                 ? "h-[min(720px,80vh)]"
                                 : "aspect-[16/10] max-h-[80vh]",

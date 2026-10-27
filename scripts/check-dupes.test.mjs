@@ -101,3 +101,10 @@ test("whitespace, imports, comments and bracket-only lines don't count", () => {
     ).map((l) => l.text);
     assert.deepEqual(kept, ["const x = 1", "return x"]);
 });
+
+test("a multi-line import's names don't count", () => {
+    const kept = meaningful(
+        'import {\n    DownloadButton,\n    QrCard,\n} from "../qr";\nimport type {\n    A,\n} from "a";\nconst y = 2;\n',
+    ).map((l) => l.text);
+    assert.deepEqual(kept, ["const y = 2"]);
+});

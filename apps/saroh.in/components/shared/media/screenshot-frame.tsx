@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import type { ShotKey } from "@/content/shots";
 import { shots } from "@/content/shots";
+import { ring } from "@/lib/ring";
 
 import { Lightbox } from "./lightbox";
 import { ShotImage } from "./shot-image";
@@ -61,7 +62,7 @@ export function ScreenshotFrame({
                         type="button"
                         title="Click to enlarge"
                         onClick={() => setOpen(true)}
-                        className="block w-full cursor-zoom-in focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+                        className={`block w-full cursor-zoom-in ${ring({ offset: "inset" })}`}
                     >
                         {image}
                     </button>

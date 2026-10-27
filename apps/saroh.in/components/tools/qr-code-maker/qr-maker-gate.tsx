@@ -4,16 +4,14 @@ import Link from "next/link";
 import { useId, useState } from "react";
 
 import { qrCodeMaker as copy } from "@/content/qr-code-maker";
+import { shapedEmail } from "@/lib/email-shape";
 import type { QrUnlockResult } from "@/lib/qr-code-maker";
-import { EMAIL_SHAPE } from "@/lib/qr-code-maker";
+import { ring } from "@/lib/ring";
 
 export type QrUnlocked = Extract<QrUnlockResult, { unlocked: true }>;
 
-const FOCUS =
-    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]";
-
 /** The design's 44px button; each fill below adds its own colours. */
-const BUTTON = `h-11 rounded-[10px] px-[18px] text-[15px] font-semibold transition-colors duration-fast ease-out ${FOCUS}`;
+const BUTTON = `h-11 rounded-[10px] px-[18px] text-[15px] font-semibold transition-colors duration-fast ease-out ${ring()}`;
 const INK_BUTTON = `${BUTTON} cursor-pointer border-none bg-foreground text-background hover:bg-mk-ink-hover active:bg-mk-on-ink-hover`;
 const OUTLINE_BUTTON = `${BUTTON} cursor-pointer border border-border-strong bg-card text-foreground hover:bg-mk-hover active:bg-muted`;
 /** Nothing to download yet: the one disabled treatment, with the reason beside it. */
@@ -111,13 +109,9 @@ export function QrMakerGate({
             className="flex w-full flex-col gap-2 border-t border-mk-line-row pt-4"
             onSubmit={(event) => {
                 event.preventDefault();
-                const value = email.trim();
-                if (!EMAIL_SHAPE.test(value)) {
-                    setInvalid(true);
-                    return;
-                }
-                setInvalid(false);
-                onUnlock(value);
+                const value = shapedEmail(email);
+                setInvalid(!value);
+                if (value) onUnlock(value);
             }}
         >
             <span id={`${errorId}-title`} className="text-sm font-semibold">
@@ -136,7 +130,7 @@ export function QrMakerGate({
                         setEmail(event.target.value);
                         if (invalid) setInvalid(false);
                     }}
-                    className={`h-11 min-w-0 flex-[1_1_180px] rounded-[10px] border border-border-strong bg-card px-3 text-[15px] text-foreground placeholder:text-mk-hint ${FOCUS}`}
+                    className={`h-11 min-w-0 flex-[1_1_180px] rounded-[10px] border border-border-strong bg-card px-3 text-[15px] text-foreground placeholder:text-mk-hint ${ring()}`}
                 />
                 <button
                     type="submit"

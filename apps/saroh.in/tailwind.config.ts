@@ -20,6 +20,8 @@ const mk = (name: string) => `hsl(var(--mk-${name}) / <alpha-value>)`;
 
 const config: Config = {
     ...sharedConfig,
+    // lib/ring.ts spells out the focus ring's classes (DEC-195, C1).
+    content: [...(sharedConfig.content as string[]), "./lib/ring.ts"],
     theme: {
         ...sharedConfig.theme,
         extend: {

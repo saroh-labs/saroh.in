@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { LAUNCH_MODE, SIGN_IN_URL } from "@/lib/links";
+import { ring } from "@/lib/ring";
 
 import { CtaLink } from "../buttons/cta-link";
 import { useFocusTrap } from "../layout/use-focus-trap";
@@ -13,8 +14,7 @@ import type { NavItem, NavSection } from "./nav-items";
 import { FEATURE_ITEMS, SOLUTION_ITEMS } from "./nav-items";
 
 /** A row on the sheet: 52px, 18px Geist 600, a hairline above. */
-const ROW =
-    "flex h-[52px] w-full cursor-pointer items-center border-t border-border text-lg font-semibold text-foreground no-underline hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500";
+const ROW = `flex h-[52px] w-full cursor-pointer items-center border-t border-border text-lg font-semibold text-foreground no-underline hover:text-foreground ${ring()}`;
 
 /**
  * The phone nav (below 760px, Nav design): the start button and a Menu
@@ -75,7 +75,7 @@ export function MobileMenu({
                 aria-expanded={open}
                 aria-controls={open ? "nav-sheet" : undefined}
                 onClick={() => setOpen(true)}
-                className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-[10px] border border-border-strong bg-transparent text-foreground hover:bg-mk-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+                className={`grid size-11 shrink-0 cursor-pointer place-items-center rounded-[10px] border border-border-strong bg-transparent text-foreground hover:bg-mk-hover ${ring()}`}
             >
                 <span aria-hidden className="grid gap-1">
                     <span className="block h-0.5 w-[18px] rounded-sm bg-foreground" />
@@ -136,7 +136,7 @@ function Sheet({
                     type="button"
                     onClick={onClose}
                     aria-label="Close menu"
-                    className="size-11 cursor-pointer rounded-[10px] border border-border-strong bg-transparent text-xl text-foreground hover:bg-mk-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+                    className={`size-11 cursor-pointer rounded-[10px] border border-border-strong bg-transparent text-xl text-foreground hover:bg-mk-hover ${ring()}`}
                 >
                     ×
                 </button>
@@ -252,7 +252,7 @@ function Accordion({
                             aria-current={
                                 item.href === pathname ? "page" : undefined
                             }
-                            className="grid cursor-pointer gap-0.5 rounded-[10px] border border-mk-line-soft bg-card px-3 py-2.5 text-foreground no-underline hover:border-border-strong hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+                            className={`grid cursor-pointer gap-0.5 rounded-[10px] border border-mk-line-soft bg-card px-3 py-2.5 text-foreground no-underline hover:border-border-strong hover:text-foreground ${ring()}`}
                         >
                             <span className="text-[15.5px] font-semibold">
                                 {item.name}

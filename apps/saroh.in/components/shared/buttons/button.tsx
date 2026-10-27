@@ -1,4 +1,5 @@
 import { cn } from "@/lib/cn";
+import { ring } from "@/lib/ring";
 import Link from "next/link";
 import type { AnchorHTMLAttributes, ReactNode } from "react";
 
@@ -20,17 +21,13 @@ export type ButtonVariant =
 export type ButtonSize = "lg" | "md" | "sm";
 
 const BASE =
-    "inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap font-semibold no-underline transition-[background-color,color,transform] duration-fast ease-out active:scale-[0.97] focus-visible:[outline-style:solid] focus-visible:outline-2";
+    "inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap font-semibold no-underline transition-[background-color,color,transform] duration-fast ease-out active:scale-[0.97]";
 
 const VARIANT: Record<ButtonVariant, string> = {
-    primary:
-        "bg-foreground text-background hover:bg-mk-ink-hover hover:text-background focus-visible:outline-offset-2 focus-visible:outline-brand-500",
-    secondary:
-        "border border-border-strong text-foreground hover:bg-mk-hover hover:text-foreground focus-visible:outline-offset-2 focus-visible:outline-brand-500",
-    saffron:
-        "bg-mk-saffron text-foreground hover:bg-mk-saffron-hover hover:text-foreground focus-visible:outline-offset-2 focus-visible:outline-background",
-    "secondary-on-ink":
-        "border border-mk-on-ink-line text-background hover:bg-mk-on-ink-hover hover:text-background focus-visible:outline-offset-2 focus-visible:outline-background",
+    primary: `bg-foreground text-background hover:bg-mk-ink-hover hover:text-background ${ring()}`,
+    secondary: `border border-border-strong text-foreground hover:bg-mk-hover hover:text-foreground ${ring()}`,
+    saffron: `bg-mk-saffron text-foreground hover:bg-mk-saffron-hover hover:text-foreground ${ring({ color: "paper" })}`,
+    "secondary-on-ink": `border border-mk-on-ink-line text-background hover:bg-mk-on-ink-hover hover:text-background ${ring({ color: "paper" })}`,
 };
 
 const SIZE: Record<ButtonSize, string> = {

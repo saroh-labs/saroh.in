@@ -5,16 +5,14 @@ import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/resources/breadcrumbs";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { Arrow } from "@/components/shared/links/arrow";
-import type { ChangelogEntry } from "@/content/changelog";
 import {
     CHANGELOG_ENTRIES,
     changelogHref,
     entryDate,
-    findEntry,
 } from "@/content/changelog";
-import type { PublishContext } from "@/content/resources";
-import { isLive, linkShown } from "@/content/resources";
+import { linkShown, liveBySlug } from "@/content/resources";
 import { resourcesContext } from "@/lib/resources-context";
+import { ring } from "@/lib/ring";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import { articleLd, breadcrumbLd } from "@/lib/structured-data";
 
@@ -34,15 +32,9 @@ interface Props {
     params: Promise<{ slug: string }>;
 }
 
-/** The entry at `slug`, only when it is live. */
-function liveEntry(slug: string, ctx: PublishContext): ChangelogEntry | null {
-    const entry = findEntry(slug);
-    return entry && isLive(entry, ctx) ? entry : null;
-}
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { slug } = await params;
-    const entry = liveEntry(slug, resourcesContext());
+    const entry = liveBySlug(CHANGELOG_ENTRIES, slug, resourcesContext());
     if (!entry) return {};
     const meta = pageMetadata({
         title: pageTitle(`${entry.title} · Changelog`),
@@ -63,7 +55,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ChangelogEntryPage({ params }: Props) {
     const { slug } = await params;
     const ctx = resourcesContext();
-    const entry = liveEntry(slug, ctx);
+    const entry = liveBySlug(CHANGELOG_ENTRIES, slug, ctx);
     if (!entry) notFound();
     const path = changelogHref(entry.slug);
 
@@ -117,7 +109,7 @@ export default async function ChangelogEntryPage({ params }: Props) {
                     {section.link && linkShown(section.link.href, ctx) ? (
                         <Link
                             href={section.link.href}
-                            className="w-fit cursor-pointer rounded-sm text-[14.5px] font-semibold text-brand-700 underline-offset-[3px] hover:text-brand-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] active:text-foreground"
+                            className={`w-fit cursor-pointer rounded-sm text-[14.5px] font-semibold text-brand-700 underline-offset-[3px] hover:text-brand-700 hover:underline ${ring()} active:text-foreground`}
                         >
                             {section.link.label}
                             <Arrow />

@@ -4,19 +4,7 @@
  * network; the link, the logo and the label never leave the page.
  */
 
-/** Hand the browser a file to save. */
-export function saveFile(blob: Blob, name: string): void {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    a.rel = "noopener";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    // After the click has been handled, so the download has its bytes.
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
+export { saveFile } from "@saroh/search-pages/download";
 
 export function svgBlob(svg: string): Blob {
     return new Blob([svg], { type: "image/svg+xml;charset=utf-8" });

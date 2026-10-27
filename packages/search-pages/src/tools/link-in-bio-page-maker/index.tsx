@@ -3,9 +3,10 @@
 import type { ReactNode } from "react";
 import { useId, useState } from "react";
 
+import { saveFile } from "../download";
 import { EmailGate } from "../email-gate";
 import { Field, Note, ToolColumns, ToolForm } from "../parts";
-import { DownloadButton, Downloads, saveFile } from "../qr";
+import { DownloadButton, Downloads } from "../qr";
 import type { BioLink, Colour, Kind } from "./logic";
 import {
     COLOURS,

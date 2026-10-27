@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import type { TagConfig } from "@/lib/ga";
+import { ring } from "@/lib/ring";
 import { readWelcome } from "@/lib/welcome";
 import { forwardWelcome } from "@/lib/welcome-forward";
 
@@ -35,7 +36,7 @@ export function WelcomeForward({
         <a
             ref={link}
             href={`${accountsUrl}/apps`}
-            className="cursor-pointer rounded-sm text-foreground underline underline-offset-[3px] hover:text-mk-copy focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] active:text-muted-foreground"
+            className={`cursor-pointer rounded-sm text-foreground underline underline-offset-[3px] hover:text-mk-copy ${ring()} active:text-muted-foreground`}
         >
             Continue
         </a>

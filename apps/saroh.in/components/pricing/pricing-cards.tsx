@@ -6,6 +6,7 @@ import { useState } from "react";
 import { track } from "@/lib/analytics";
 import type { PricingPageModel, PricingView } from "@/lib/pricing-model";
 import { viewKey } from "@/lib/pricing-model";
+import { ring } from "@/lib/ring";
 
 import { Arrow } from "../shared/links/arrow";
 import { BillingToggle } from "./billing-toggle";
@@ -101,7 +102,7 @@ export function PricingCards({
                     {compare ? (
                         <Link
                             href="/pricing"
-                            className="cursor-pointer rounded-sm font-semibold text-brand-700 no-underline transition-colors duration-fast ease-out hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+                            className={`cursor-pointer rounded-sm font-semibold text-brand-700 no-underline transition-colors duration-fast ease-out hover:text-foreground ${ring()}`}
                         >
                             Compare every plan
                             <Arrow />

@@ -11,7 +11,6 @@ import { ResourceShell } from "@/components/resources/resource-shell";
 import { SideNav } from "@/components/resources/side-nav";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { Arrow } from "@/components/shared/links/arrow";
-import type { HelpFrontmatter } from "@/content/help";
 import {
     areasWithArticles,
     HELP_PATH,
@@ -22,11 +21,12 @@ import {
     summarise,
 } from "@/content/help";
 import type { PublishContext } from "@/content/resources";
-import { isLive } from "@/content/resources";
+import { liveBySlug } from "@/content/resources";
 import { CAPTURED } from "@/content/shots.captured";
 import { helpArticles, loadHelpArticle } from "@/lib/help-docs";
 import { helpLive } from "@/lib/help-live";
 import { resourcesContext } from "@/lib/resources-context";
+import { ring } from "@/lib/ring";
 import { pageMetadata, pageTitle, SITE_URL } from "@/lib/seo";
 import { breadcrumbLd, howToLd, techArticleLd } from "@/lib/structured-data";
 
@@ -50,14 +50,8 @@ interface Props {
     params: Promise<{ slug: string }>;
 }
 
-function liveArticle(
-    slug: string,
-    ctx: PublishContext,
-): HelpFrontmatter | null {
-    if (!helpLive(ctx)) return null;
-    const article = helpArticles().find((a) => a.slug === slug);
-    return article && isLive(article, ctx) ? article : null;
-}
+const liveArticle = (slug: string, ctx: PublishContext) =>
+    helpLive(ctx) ? liveBySlug(helpArticles(), slug, ctx) : null;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { slug } = await params;
@@ -79,11 +73,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
 }
 
-const NEXT_LINK =
-    "w-fit cursor-pointer rounded-sm text-mk-faq font-semibold text-brand-700 no-underline underline-offset-[3px] transition-colors duration-fast ease-out hover:underline active:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]";
+const NEXT_LINK = `w-fit cursor-pointer rounded-sm text-mk-faq font-semibold text-brand-700 no-underline underline-offset-[3px] transition-colors duration-fast ease-out hover:underline active:text-foreground ${ring()}`;
 
-const PROSE_LINK =
-    "rounded-sm font-semibold text-brand-700 underline underline-offset-[3px] transition-colors duration-fast ease-out hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]";
+const PROSE_LINK = `rounded-sm font-semibold text-brand-700 underline underline-offset-[3px] transition-colors duration-fast ease-out hover:text-foreground ${ring()}`;
 
 export default async function HelpArticlePage({ params }: Props) {
     const { slug } = await params;

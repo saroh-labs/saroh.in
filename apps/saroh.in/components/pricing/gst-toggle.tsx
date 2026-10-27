@@ -1,5 +1,7 @@
 "use client";
 
+import { ring } from "@/lib/ring";
+
 /** The Pricing design's "Show prices with GST" box; its default comes from the catalogue. */
 export function GstToggle({
     checked,
@@ -14,7 +16,7 @@ export function GstToggle({
                 type="checkbox"
                 checked={checked}
                 onChange={(e) => onChange(e.target.checked)}
-                className="m-0 h-4 w-4 cursor-pointer accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+                className={`m-0 h-4 w-4 cursor-pointer accent-foreground ${ring()}`}
             />
             Show prices with GST
         </label>

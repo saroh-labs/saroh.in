@@ -1,9 +1,9 @@
 import Link from "next/link";
 
-import { demoTrade } from "@/content/demos";
 import { TOUR_VIDEO } from "@/content/home";
 import type { Solution } from "@/content/types";
-import { demoHref } from "@/lib/demos";
+import { demoHref, demoTrade } from "@/lib/demos";
+import { ring } from "@/lib/ring";
 
 import { ButtonLink } from "../shared/buttons/button";
 import { CtaLink } from "../shared/buttons/cta-link";
@@ -38,7 +38,7 @@ export function SolutionHero({
                 >
                     <Link
                         href="/#solutions"
-                        className="rounded-sm text-muted-foreground no-underline hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+                        className={`rounded-sm text-muted-foreground no-underline hover:text-foreground ${ring()}`}
                     >
                         Solutions
                     </Link>

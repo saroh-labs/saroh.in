@@ -17,19 +17,17 @@ import {
     contactProblems,
     firstName,
 } from "@/lib/contact-message";
+import { ring } from "@/lib/ring";
+import { nextIndex } from "@/lib/roving";
 
 const copy = CONTACT_PAGE.form;
 const done = CONTACT_PAGE.done;
-
-/** The design's focus ring: Saffron 500, two pixels. */
-const RING =
-    "focus-visible:outline-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]";
 
 // `focus:ring-0` takes off the forms plugin's blue ring: the design's ring
 // is the Saffron outline, and the border keeps its own colour.
 const FIELD = cn(
     "w-full min-w-0 rounded-[11px] border bg-white font-sans text-[16px] font-normal text-foreground placeholder:text-muted-foreground focus:ring-0 focus:ring-offset-0 focus-visible:outline-offset-1",
-    RING,
+    ring({ offset: 0 }),
 );
 
 const LABEL = "text-[14.5px] font-semibold";
@@ -109,15 +107,9 @@ export function ContactForm() {
     };
 
     const onChipKey = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
-        const step =
-            e.key === "ArrowRight" || e.key === "ArrowDown"
-                ? 1
-                : e.key === "ArrowLeft" || e.key === "ArrowUp"
-                  ? -1
-                  : 0;
-        if (!step) return;
+        const next = nextIndex(e.key, i, copy.topics.length);
+        if (next === null) return;
         e.preventDefault();
-        const next = (i + step + copy.topics.length) % copy.topics.length;
         setTopic(copy.topics[next].id);
         chips.current[next]?.focus();
     };
@@ -229,7 +221,7 @@ export function ContactForm() {
                     onClick={again}
                     className={cn(
                         "h-11 cursor-pointer rounded-[11px] border border-border-strong bg-transparent px-[18px] font-sans text-[15px] font-semibold text-foreground transition-colors duration-fast ease-out hover:bg-muted focus-visible:outline-offset-2",
-                        RING,
+                        ring({ offset: 0 }),
                     )}
                 >
                     {done.again}
@@ -288,7 +280,7 @@ export function ContactForm() {
                                     // topic wraps inside its chip instead of running
                                     // past the card.
                                     "min-h-10 max-w-full cursor-pointer rounded-full border px-[14px] py-1 font-sans text-[14px] font-semibold leading-tight transition-colors duration-fast ease-out focus-visible:outline-offset-2",
-                                    RING,
+                                    ring({ offset: 0 }),
                                     on
                                         ? "border-foreground bg-foreground text-background"
                                         : "border-border-strong bg-white text-foreground hover:border-foreground",
@@ -449,7 +441,7 @@ export function ContactForm() {
                     disabled={sending}
                     className={cn(
                         "h-[52px] max-w-full cursor-pointer rounded-mk-btn border-none bg-foreground px-[26px] font-sans text-base font-semibold text-background transition-[background-color,transform] duration-fast ease-out hover:bg-mk-ink-hover focus-visible:outline-offset-2 active:scale-[0.98] disabled:cursor-progress",
-                        RING,
+                        ring({ offset: 0 }),
                     )}
                 >
                     {sending ? copy.sending : copy.submit}
@@ -460,7 +452,7 @@ export function ContactForm() {
                         href={`mailto:${SAROH_CONTACT_EMAIL}`}
                         className={cn(
                             "rounded-sm text-brand-700 no-underline transition-colors duration-fast ease-out hover:text-foreground focus-visible:outline-offset-2",
-                            RING,
+                            ring({ offset: 0 }),
                         )}
                     >
                         {SAROH_CONTACT_EMAIL}

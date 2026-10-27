@@ -9,9 +9,14 @@ import { CtaClickArea } from "@/components/shared/buttons/cta-click-area";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { SiteToolGate } from "@/components/tools/tool-gate";
 import { cta } from "@/lib/links";
-import { builtTools, publishList, TOOLS_HUB } from "@/lib/search-pages";
+import {
+    builtTools,
+    isPublished,
+    questionsLd,
+    TOOLS_HUB,
+} from "@/lib/search-pages";
 import { pageMetadata, pageTitle, SITE_URL } from "@/lib/seo";
-import { breadcrumbLd, faqPageLd, toolLd } from "@/lib/structured-data";
+import { breadcrumbLd, toolLd } from "@/lib/structured-data";
 
 /**
  * `/tools/<tool>` (#1253, DEC-193): one page per tool in
@@ -38,8 +43,6 @@ function builtTool(slug: string): ToolPageData | null {
     return built().some((t) => t.slug === slug) ? loadToolPage(slug) : null;
 }
 
-const isLive = (path: string) => publishList().live.includes(path);
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { slug } = await params;
     const p = builtTool(slug);
@@ -51,7 +54,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
             description: p.description,
             path: p.path,
         }),
-        ...(!isLive(p.path) && { robots: { index: false, follow: false } }),
+        ...(!isPublished(p.path) && {
+            robots: { index: false, follow: false },
+        }),
     };
 }
 
@@ -75,19 +80,14 @@ export default async function ToolRoute({ params }: Props) {
                         description: p.description,
                         url: `${SITE_URL}${p.path}`,
                     }),
-                    faqPageLd(
-                        p.questions.map((q) => ({
-                            q: q.question,
-                            a: q.answer.join("\n\n"),
-                        })),
-                    ),
+                    questionsLd(p.questions),
                 ]}
             />
             <SiteToolGate tool={slug}>
                 <CtaClickArea src={`tool-${slug}`} mode={start.mode}>
                     <ToolPage
                         page={p}
-                        draft={!isLive(p.path)}
+                        draft={!isPublished(p.path)}
                         links={{
                             home: "/",
                             hub: TOOLS_HUB.path,

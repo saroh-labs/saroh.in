@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import { readPosted, relaySecret } from "./relay";
 import {
     forwardHeaders,
     joinBody,
     RELAY_HEADER,
-    relaySecret,
     signRelay,
     visitorAddress,
     visitorCountry,
@@ -128,6 +128,18 @@ describe("relaySecret", () => {
         expect(relaySecret(undefined, "test")).toBe(DEV);
         expect(relaySecret(undefined, "production")).toBeNull();
         expect(relaySecret(undefined, undefined)).toBeNull();
+    });
+});
+
+describe("readPosted", () => {
+    const post = (body: string) =>
+        new Request("https://saroh.in/api/x", { method: "POST", body });
+
+    it("reads a JSON object's fields, and none from anything else", async () => {
+        expect(await readPosted(post('{"a":1}'))).toEqual({ a: 1 });
+        expect(await readPosted(post("not json"))).toEqual({});
+        expect(await readPosted(post("null"))).toEqual({});
+        expect(await readPosted(post('"text"'))).toEqual({});
     });
 });
 

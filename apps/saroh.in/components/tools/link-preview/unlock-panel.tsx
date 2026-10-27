@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useId, useState } from "react";
 
 import { linkPreview as copy } from "@/content/link-preview";
+import { shapedEmail } from "@/lib/email-shape";
 import type { UnlockResult } from "@/lib/link-preview";
+import { ring } from "@/lib/ring";
 
 export type Unlocked = Extract<UnlockResult, { unlocked: true }>;
-
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * The dark panel (design 1b, the email version, KTD-5): locked, it asks
@@ -68,7 +68,7 @@ export function UnlockPanel({
                 <pre
                     tabIndex={0}
                     aria-label={copy.tagsTitle}
-                    className="m-0 overflow-x-auto whitespace-pre-wrap rounded-lg bg-mk-on-ink-hover p-3 font-mono text-[11px] leading-[1.6] text-mk-code [overflow-wrap:anywhere] focus-visible:outline-2 focus-visible:outline-background focus-visible:[outline-style:solid]"
+                    className={`m-0 overflow-x-auto whitespace-pre-wrap rounded-lg bg-mk-on-ink-hover p-3 font-mono text-[11px] leading-[1.6] text-mk-code [overflow-wrap:anywhere] ${ring({ offset: 0, color: "paper" })}`}
                 >
                     {unlocked.suggestedTags}
                 </pre>
@@ -92,13 +92,9 @@ export function UnlockPanel({
                 className="grid gap-2"
                 onSubmit={(event) => {
                     event.preventDefault();
-                    const value = email.trim();
-                    if (!EMAIL.test(value)) {
-                        setInvalid(true);
-                        return;
-                    }
-                    setInvalid(false);
-                    onUnlock({ email: value });
+                    const value = shapedEmail(email);
+                    setInvalid(!value);
+                    if (value) onUnlock({ email: value });
                 }}
             >
                 <input
@@ -113,12 +109,12 @@ export function UnlockPanel({
                         setEmail(event.target.value);
                         if (invalid) setInvalid(false);
                     }}
-                    className="h-11 rounded-[9px] border-none bg-card px-3.5 text-[15px] text-foreground placeholder:text-mk-hint focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mk-saffron focus-visible:[outline-style:solid]"
+                    className={`h-11 rounded-[9px] border-none bg-card px-3.5 text-[15px] text-foreground placeholder:text-mk-hint ${ring({ color: "saffron" })}`}
                 />
                 <button
                     type="submit"
                     disabled={pending}
-                    className="h-11 cursor-pointer rounded-[9px] border-none bg-mk-saffron font-semibold text-foreground transition-colors duration-fast ease-out hover:bg-mk-saffron-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-background focus-visible:[outline-style:solid] active:bg-brand-400 disabled:cursor-progress"
+                    className={`h-11 cursor-pointer rounded-[9px] border-none bg-mk-saffron font-semibold text-foreground transition-colors duration-fast ease-out hover:bg-mk-saffron-hover ${ring({ color: "paper" })} active:bg-brand-400 disabled:cursor-progress`}
                 >
                     {pending ? copy.unlocking : copy.unlock}
                 </button>

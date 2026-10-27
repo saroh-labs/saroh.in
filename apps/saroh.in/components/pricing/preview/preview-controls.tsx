@@ -6,6 +6,7 @@ import { useTransition } from "react";
 import { cn } from "@/lib/cn";
 import type { PreviewView } from "@/lib/pricing-preview";
 import { previewHref } from "@/lib/pricing-preview";
+import { ring } from "@/lib/ring";
 
 /**
  * The staff draft preview's controls (admin redesign U13, R24), in the amber
@@ -102,7 +103,7 @@ function Segments({
                     aria-pressed={o.on}
                     onClick={o.on ? undefined : o.pick}
                     className={cn(
-                        "min-h-9 cursor-pointer rounded-[8px] px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground focus-visible:[outline-style:solid]",
+                        `min-h-9 cursor-pointer rounded-[8px] px-3 text-sm font-semibold ${ring({ color: "ink" })}`,
                         o.on
                             ? "bg-background text-foreground shadow-sm"
                             : "bg-transparent text-foreground/80 hover:text-foreground",

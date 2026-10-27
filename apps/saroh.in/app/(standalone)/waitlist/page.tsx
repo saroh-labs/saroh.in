@@ -19,6 +19,7 @@ import {
 } from "@/content/waitlist";
 import { readLaunchOffer } from "@/lib/launch-offer";
 import { resourcesContext } from "@/lib/resources-context";
+import { ring } from "@/lib/ring";
 import { pageMetadata } from "@/lib/seo";
 import { templatesLive } from "@/lib/templates-live";
 import { openingShort } from "@/lib/waitlist";
@@ -98,7 +99,7 @@ export default async function WaitlistPage() {
                 <Link
                     href="/"
                     aria-label="Saroh home"
-                    className="flex rounded-sm text-foreground no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground focus-visible:[outline-style:solid]"
+                    className={`flex rounded-sm text-foreground no-underline ${ring({ color: "ink" })}`}
                 >
                     <Wordmark aria-hidden style={{ fontSize: 22 }} />
                 </Link>
@@ -151,7 +152,7 @@ export default async function WaitlistPage() {
                                 {" "}
                                 <Link
                                     href={WAITLIST_MONEY.link.href}
-                                    className="cursor-pointer whitespace-nowrap rounded-sm font-semibold text-brand-700 no-underline hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground focus-visible:[outline-style:solid]"
+                                    className={`cursor-pointer whitespace-nowrap rounded-sm font-semibold text-brand-700 no-underline hover:text-foreground ${ring({ color: "ink" })}`}
                                 >
                                     {WAITLIST_MONEY.link.label}
                                     <Arrow />
@@ -190,7 +191,7 @@ export default async function WaitlistPage() {
                                 href={link.href}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="cursor-pointer rounded-sm text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground focus-visible:[outline-style:solid]"
+                                className={`cursor-pointer rounded-sm text-muted-foreground no-underline transition-colors hover:text-foreground ${ring({ color: "ink" })}`}
                             >
                                 {link.label}
                             </a>

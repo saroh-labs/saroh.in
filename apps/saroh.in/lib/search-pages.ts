@@ -1,4 +1,8 @@
-import type { ForPageEntry, ToolPageEntry } from "@saroh/search-pages";
+import type {
+    ForPageEntry,
+    Question,
+    ToolPageEntry,
+} from "@saroh/search-pages";
 import { listSearchPages } from "@saroh/search-pages";
 
 import type { PublishContext } from "@/content/resources";
@@ -6,6 +10,7 @@ import { routeExists, shownTools } from "@/content/resources";
 import { solutionHref } from "@/content/solutions";
 import type { SolutionSlug } from "@/content/types";
 import { env } from "@/env";
+import { faqPageLd } from "@/lib/structured-data";
 
 /**
  * The /for/ pages and free tools this build has (DEC-193, #1253). `search-pages.config.js` reads
@@ -57,6 +62,15 @@ export const FOR_HUB = { name: "Solutions", path: "/for" } as const;
 export function publishList(): PublishList {
     return parsePublishList(env.SAROH_SEARCH_PAGES, env.VERCEL_ENV);
 }
+
+/** Whether the page at `path` is live; a preview draws the rest as drafts. */
+export const isPublished = (path: string) => publishList().live.includes(path);
+
+/** A page's questions as FAQPage data, each answer's paragraphs joined. */
+export const questionsLd = (questions: Question[]) =>
+    faqPageLd(
+        questions.map((q) => ({ q: q.question, a: q.answer.join("\n\n") })),
+    );
 
 /** The /for/ pages this build draws: every page on a preview, the live ones otherwise. */
 export function builtSearchPages(

@@ -4,6 +4,8 @@ import type { KeyboardEvent } from "react";
 import { useRef } from "react";
 
 import { cn } from "@/lib/cn";
+import { ring } from "@/lib/ring";
+import { nextIndex } from "@/lib/roving";
 
 /**
  * The Pricing design's Monthly / "Yearly · N months free" switch: a
@@ -27,15 +29,9 @@ export function BillingToggle({
     ];
 
     const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
-        const step =
-            e.key === "ArrowRight" || e.key === "ArrowDown"
-                ? 1
-                : e.key === "ArrowLeft" || e.key === "ArrowUp"
-                  ? -1
-                  : 0;
-        if (!step) return;
+        const next = nextIndex(e.key, i, options.length);
+        if (next === null) return;
         e.preventDefault();
-        const next = (i + step + options.length) % options.length;
         onChange(options[next].yearly);
         refs.current[next]?.focus();
     };
@@ -61,7 +57,7 @@ export function BillingToggle({
                         onClick={() => onChange(o.yearly)}
                         onKeyDown={(e) => onKeyDown(e, i)}
                         className={cn(
-                            "h-9 cursor-pointer rounded-mk-control border-none px-4 text-sm font-semibold transition-colors duration-fast ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] active:scale-[0.98]",
+                            `h-9 cursor-pointer rounded-mk-control border-none px-4 text-sm font-semibold transition-colors duration-fast ease-out ${ring()} active:scale-[0.98]`,
                             on
                                 ? "bg-foreground text-background"
                                 : "bg-transparent text-mk-copy hover:bg-mk-hover",

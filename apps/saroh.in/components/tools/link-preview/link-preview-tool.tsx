@@ -1,12 +1,7 @@
 "use client";
 
-import {
-    useCallback,
-    useEffect,
-    useRef,
-    useState,
-    useSyncExternalStore,
-} from "react";
+import { copyText } from "@saroh/ui/copy-button";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { linkPreview as copy } from "@/content/link-preview";
 import type { CheckResult, UnlockResult } from "@/lib/link-preview";
@@ -20,6 +15,8 @@ import {
     splitScheme,
 } from "@/lib/link-preview";
 import { readAddress } from "@/lib/page-address";
+import { ring } from "@/lib/ring";
+import { useBrowserValue } from "@/lib/use-browser-value";
 
 import { LinkInput } from "./link-input";
 import { CardsGrid, ScorePanel } from "./link-results";
@@ -52,17 +49,10 @@ const GUTTER = "px-mk-gutter";
  * for a caller that already has the address (tests).
  */
 export function LinkPreviewTool({ initialUrl }: { initialUrl?: string }) {
-    const fromAddress = useSyncExternalStore(
-        noSubscription,
-        readShared,
-        () => "",
-    );
+    const fromAddress = useBrowserValue(readShared, "");
     const shared = initialUrl ?? fromAddress;
     return <Tool key={shared} initialUrl={shared || undefined} />;
 }
-
-/** The address doesn't change under the tool: nothing to subscribe to. */
-const noSubscription = () => () => undefined;
 
 /** The shared report's address in this page's query, or "" with none. */
 const readShared = () => sharedAddress(readAddress()) ?? "";
@@ -185,12 +175,7 @@ function Tool({ initialUrl }: { initialUrl?: string }) {
     async function copyLink() {
         if (!result) return;
         const link = reportLink(window.location.origin, result.url);
-        try {
-            await navigator.clipboard.writeText(link);
-            setCopied(copy.copied);
-        } catch {
-            setCopied(copy.copyFailed);
-        }
+        setCopied((await copyText(link)) ? copy.copied : copy.copyFailed);
     }
 
     return (
@@ -225,7 +210,7 @@ function Tool({ initialUrl }: { initialUrl?: string }) {
                                     rest: example.address,
                                 });
                             }}
-                            className="h-[34px] cursor-pointer rounded-full border border-border-strong bg-card px-3.5 text-[13.5px] font-semibold text-foreground transition-colors duration-fast ease-out hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] active:bg-muted"
+                            className={`h-[34px] cursor-pointer rounded-full border border-border-strong bg-card px-3.5 text-[13.5px] font-semibold text-foreground transition-colors duration-fast ease-out hover:border-foreground ${ring()} active:bg-muted`}
                         >
                             {example.label}
                         </button>
@@ -275,14 +260,14 @@ function Tool({ initialUrl }: { initialUrl?: string }) {
                                 onClick={() =>
                                     void check({ scheme, rest }, true)
                                 }
-                                className="h-[38px] cursor-pointer rounded-[9px] border border-border-strong bg-transparent px-3.5 text-sm font-semibold text-foreground transition-colors duration-fast ease-out hover:bg-mk-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] active:bg-muted"
+                                className={`h-[38px] cursor-pointer rounded-[9px] border border-border-strong bg-transparent px-3.5 text-sm font-semibold text-foreground transition-colors duration-fast ease-out hover:bg-mk-hover ${ring()} active:bg-muted`}
                             >
                                 {copy.checkAgain}
                             </button>
                             <button
                                 type="button"
                                 onClick={() => void copyLink()}
-                                className="h-[38px] cursor-pointer rounded-[9px] border-none bg-foreground px-3.5 text-sm font-semibold text-background transition-colors duration-fast ease-out hover:bg-mk-ink-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] active:bg-mk-on-ink-hover"
+                                className={`h-[38px] cursor-pointer rounded-[9px] border-none bg-foreground px-3.5 text-sm font-semibold text-background transition-colors duration-fast ease-out hover:bg-mk-ink-hover ${ring()} active:bg-mk-on-ink-hover`}
                             >
                                 {copied === copy.copied
                                     ? copy.copied

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { faqs } from "@/content/faq";
 import { FREE_PLAN_LINE } from "@/content/home";
 
-import { freePlanLine, sentenceList, startFreeFaq } from "./plan-teasers";
+import { freePlanLine, startFreeFaq } from "./plan-teasers";
 import { fakeCatalog } from "./pricing.fixture";
 
 /** A currency sign (written as an escape: no sign in the repo) or a digit. */
@@ -36,13 +36,5 @@ describe("startFreeFaq", () => {
         const item = startFreeFaq(null, faqs["start-free"]);
         expect(item).toBe(faqs["start-free"]);
         expect(item.a).not.toMatch(NO_PRICE);
-    });
-});
-
-describe("sentenceList", () => {
-    it("joins with commas and a final and", () => {
-        expect(sentenceList([])).toBe("");
-        expect(sentenceList(["a"])).toBe("a");
-        expect(sentenceList(["a", "b", "c"])).toBe("a, b and c");
     });
 });

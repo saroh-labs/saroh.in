@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import type { WaitlistKindId } from "@/content/waitlist";
 import { WAITLIST_KINDS } from "@/content/waitlist";
+import { EMAIL_SHAPE } from "@/lib/email-shape";
+import { formatDay } from "@/lib/format/day";
 import type { PlanId } from "@/lib/links";
 
 /**
@@ -16,13 +18,20 @@ export const WAITLIST_MESSAGES = {
     email: "Enter an email like name@shop.in.",
 } as const;
 
+/**
+ * What a failed join tells the visitor, by the route's code (the waitlist
+ * form and the changelog's sign-up both post to `/api/waitlist`); the form
+ * keeps what they typed.
+ */
+export const SEND_FAILED: Record<string, string> = {
+    RATE_LIMITED: "Too many tries from here. Wait a minute, then try again.",
+    default: "We couldn't add you just now. Try again in a minute.",
+};
+
 const KIND_IDS = WAITLIST_KINDS.map((k) => k.id) as [
     WaitlistKindId,
     ...WaitlistKindId[],
 ];
-
-/** The design's own email check, so the page refuses what the design does. */
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const waitlistSchema = z.object({
     business: z
@@ -35,7 +44,7 @@ export const waitlistSchema = z.object({
         .string()
         .trim()
         .max(320, WAITLIST_MESSAGES.email)
-        .regex(EMAIL, WAITLIST_MESSAGES.email),
+        .regex(EMAIL_SHAPE, WAITLIST_MESSAGES.email),
     city: z.string().trim().max(80),
 });
 
@@ -133,42 +142,16 @@ export type WaitlistResponse =
       };
 
 /** The header's date, as the design writes it: "Tue 5 Mar". */
-export function openingShort(isoDate: string): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-        timeZone: "Asia/Kolkata",
-    })
-        .format(dayOf(isoDate))
-        .replace(",", "");
-}
+export const openingShort = (isoDate: string) =>
+    formatDay(isoDate, { weekday: "short", month: "short" });
 
 /** The done state's date: "Tuesday 5 March". */
-export function openingLong(isoDate: string): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        timeZone: "Asia/Kolkata",
-    })
-        .format(dayOf(isoDate))
-        .replace(",", "");
-}
+export const openingLong = (isoDate: string) =>
+    formatDay(isoDate, { weekday: "long", month: "long" });
 
 /** The note's date: "5 Mar". */
-export function openingDay(isoDate: string): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        day: "numeric",
-        month: "short",
-        timeZone: "Asia/Kolkata",
-    }).format(dayOf(isoDate));
-}
-
-/** Noon in India on that day, so no time zone moves it to another date. */
-function dayOf(isoDate: string): Date {
-    return new Date(`${isoDate}T12:00:00+05:30`);
-}
+export const openingDay = (isoDate: string) =>
+    formatDay(isoDate, { month: "short" });
 
 /**
  * A referral link on this site: the full address to copy, and the design's

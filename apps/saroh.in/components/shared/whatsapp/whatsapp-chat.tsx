@@ -5,6 +5,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { track } from "@/lib/analytics";
 import { readChoices, subscribeConsent } from "@/lib/consent";
+import { ring } from "@/lib/ring";
 import { pageKind } from "@/lib/whatsapp";
 
 /** Before the browser has been asked (the server's render). */
@@ -73,7 +74,7 @@ export function WhatsAppChat({
             onClick={() =>
                 track("whatsapp_click", { page: pageKind(pathname) })
             }
-            className="fixed bottom-5 right-5 z-30 inline-flex size-14 items-center justify-center rounded-full bg-foreground text-background no-underline shadow-mk-menu transition-[background-color,transform,bottom] duration-fast ease-out hover:bg-mk-ink-hover hover:text-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] active:scale-[0.97] motion-reduce:transition-none data-[lifted]:max-[519px]:bottom-[calc(var(--notice-h)+1.5rem)]"
+            className={`fixed bottom-5 right-5 z-30 inline-flex size-14 items-center justify-center rounded-full bg-foreground text-background no-underline shadow-mk-menu transition-[background-color,transform,bottom] duration-fast ease-out hover:bg-mk-ink-hover hover:text-background ${ring()} active:scale-[0.97] motion-reduce:transition-none data-[lifted]:max-[519px]:bottom-[calc(var(--notice-h)+1.5rem)]`}
         >
             <svg aria-hidden viewBox="0 0 24 24" width={26} height={26}>
                 <path

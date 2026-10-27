@@ -6,6 +6,7 @@ import { useId, useState } from "react";
 
 import type { HelpSummary } from "@/content/help";
 import { HELP_EMAIL, helpHome, helpHref, searchArticles } from "@/content/help";
+import { ring } from "@/lib/ring";
 
 /**
  * The Help home's search (design 1a): in the browser, over the published
@@ -49,7 +50,7 @@ export function HelpSearch({ articles }: { articles: HelpSummary[] }) {
                             >
                                 <Link
                                     href={helpHref(a.slug)}
-                                    className="flex min-w-0 cursor-pointer flex-wrap justify-between gap-x-4 gap-y-1 px-5 py-3.5 text-foreground no-underline transition-colors duration-fast ease-out hover:bg-background focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] active:bg-mk-hover"
+                                    className={`flex min-w-0 cursor-pointer flex-wrap justify-between gap-x-4 gap-y-1 px-5 py-3.5 text-foreground no-underline transition-colors duration-fast ease-out hover:bg-background ${ring({ offset: "inset" })} active:bg-mk-hover`}
                                 >
                                     <span className="font-semibold">
                                         {a.title}
@@ -66,7 +67,7 @@ export function HelpSearch({ articles }: { articles: HelpSummary[] }) {
                         Nothing matches that yet. Write to{" "}
                         <a
                             href={`mailto:${HELP_EMAIL}`}
-                            className="cursor-pointer rounded-sm font-semibold text-brand-700 underline-offset-[3px] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+                            className={`cursor-pointer rounded-sm font-semibold text-brand-700 underline-offset-[3px] hover:underline ${ring()}`}
                         >
                             {HELP_EMAIL}
                         </a>{" "}

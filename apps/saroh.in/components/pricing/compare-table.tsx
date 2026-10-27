@@ -3,6 +3,7 @@ import { Fragment } from "react";
 import { PRICE_NOTE } from "@/content/types";
 import { cn } from "@/lib/cn";
 import type { CompareRow, PlanCardView } from "@/lib/pricing-model";
+import { ring } from "@/lib/ring";
 
 import { Container } from "../shared/layout/container";
 
@@ -39,7 +40,7 @@ export function CompareTable({
                 role="region"
                 aria-label="Plan comparison table"
                 tabIndex={0}
-                className="relative min-w-0 overflow-x-auto rounded-[18px] border border-border bg-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+                className={`relative min-w-0 overflow-x-auto rounded-[18px] border border-border bg-card ${ring()}`}
             >
                 <table className="w-full min-w-[680px] table-fixed border-collapse text-[15px]">
                     <thead>

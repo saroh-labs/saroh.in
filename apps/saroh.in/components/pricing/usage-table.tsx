@@ -4,6 +4,7 @@ import { PRICING_COPY } from "@/content/pricing";
 import { cn } from "@/lib/cn";
 import type { PlanCardView, UsageView } from "@/lib/pricing-model";
 import { NOT_INCLUDED } from "@/lib/pricing-model";
+import { ring } from "@/lib/ring";
 
 import { Container } from "../shared/layout/container";
 
@@ -46,7 +47,7 @@ export function UsageTable({
                 role="region"
                 aria-label="Usage table"
                 tabIndex={0}
-                className="relative min-w-0 overflow-x-auto rounded-[18px] border border-border bg-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+                className={`relative min-w-0 overflow-x-auto rounded-[18px] border border-border bg-card ${ring()}`}
             >
                 <table className="w-full min-w-[680px] table-fixed border-collapse text-[15px]">
                     <caption className="sr-only">

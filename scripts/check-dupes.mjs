@@ -59,10 +59,20 @@ const TRIVIAL = /^(?:[()[\]{};,]+|<\/[\w.]*>[);,]*|\/>[);,]*|<>|<\/>)$/;
 export function meaningful(source) {
     const kept = [];
     let inComment = false;
+    let inImport = false;
     source.split("\n").forEach((raw, i) => {
         let line = raw.trim().replace(/\s+/g, " ");
         if (inComment) {
             if (line.includes("*/")) inComment = false;
+            return;
+        }
+        // A multi-line import's names are the import too.
+        if (inImport) {
+            if (/^} from ["']/.test(line)) inImport = false;
+            return;
+        }
+        if (/^import (?:type )?{$/.test(line)) {
+            inImport = true;
             return;
         }
         if (line.startsWith("/*")) {

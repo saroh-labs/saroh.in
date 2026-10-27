@@ -9,6 +9,7 @@ import { drawnIn } from "@/content/launch-words";
 import type { PublishContext } from "@/content/resources";
 import { linkShown } from "@/content/resources";
 import type { LaunchMode } from "@/lib/links";
+import { ring } from "@/lib/ring";
 
 import { CtaLink } from "../shared/buttons/cta-link";
 import { Container } from "../shared/layout/container";
@@ -18,8 +19,7 @@ import { Eyebrow } from "../shared/sections/eyebrow";
 /** Noto Sans Devanagari, loaded by the route (`app/(site)/about/page.tsx`). */
 const HINDI = "font-[family-name:var(--font-devanagari)]";
 
-const TEXT_LINK =
-    "cursor-pointer rounded-sm text-brand-700 no-underline transition-colors duration-fast ease-out hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]";
+const TEXT_LINK = `cursor-pointer rounded-sm text-brand-700 no-underline transition-colors duration-fast ease-out hover:text-foreground ${ring()}`;
 
 /**
  * /about (design "About", DEC-137): the opening, what the name means on an

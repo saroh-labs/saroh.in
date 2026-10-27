@@ -1,4 +1,5 @@
 import { cn } from "@/lib/cn";
+import { ring } from "@/lib/ring";
 import Link from "next/link";
 import type { HTMLAttributes, ReactNode } from "react";
 
@@ -40,7 +41,7 @@ export function PillLink({
         <Link
             href={href}
             className={cn(
-                "inline-flex cursor-pointer items-center rounded-full border border-border bg-card font-semibold text-foreground no-underline transition-colors duration-fast ease-out hover:border-border-strong hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] active:scale-[0.98]",
+                `inline-flex cursor-pointer items-center rounded-full border border-border bg-card font-semibold text-foreground no-underline transition-colors duration-fast ease-out hover:border-border-strong hover:text-foreground ${ring()} active:scale-[0.98]`,
                 size === "md"
                     ? "px-3.5 py-[7px] text-mk-nav"
                     : "px-4 py-2.5 text-[15px]",

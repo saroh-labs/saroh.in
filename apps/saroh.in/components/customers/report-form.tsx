@@ -1,7 +1,7 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useRef, useState } from "react";
 
 import { CUSTOMERS } from "@/content/customers";
 import type { ReportField, ReportResult } from "@/lib/business-report";
@@ -12,6 +12,8 @@ import {
 } from "@/lib/business-report";
 import { cn } from "@/lib/cn";
 import { readAddress } from "@/lib/page-address";
+import { ring } from "@/lib/ring";
+import { useBrowserValue } from "@/lib/use-browser-value";
 import { PhoneInput } from "@saroh/ui/phone-input";
 
 const copy = CUSTOMERS.form;
@@ -31,11 +33,7 @@ const FIELD_MESSAGE: Record<Field, string> = {
 
 const isField = (failure: string): failure is Field => failure in FIELD_MESSAGE;
 
-/** The address in the URL doesn't change while the page is open. */
-const noChange = () => () => undefined;
-
-const INPUT =
-    "min-w-0 rounded-[10px] border bg-white px-3.5 font-sans text-[15px] text-foreground transition-colors duration-fast ease-out placeholder:text-muted-foreground hover:border-foreground focus:ring-0 focus:ring-offset-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]";
+const INPUT = `min-w-0 rounded-[10px] border bg-white px-3.5 font-sans text-[15px] text-foreground transition-colors duration-fast ease-out placeholder:text-muted-foreground hover:border-foreground focus:ring-0 focus:ring-offset-0 ${ring()}`;
 
 /**
  * Report a business (/customers, Terms rev 46): the site's address, what
@@ -54,11 +52,7 @@ const INPUT =
 export function ReportForm() {
     // The link's address until they type their own: read in the browser
     // (the server draws the field empty), so the page stays static.
-    const given = useSyncExternalStore(
-        noChange,
-        () => prefilledSite(readAddress()),
-        () => "",
-    );
+    const given = useBrowserValue(() => prefilledSite(readAddress()), "");
     const [typed, setSite] = useState<string | null>(null);
     const site = typed ?? given;
     const [message, setMessage] = useState("");
@@ -320,7 +314,7 @@ export function ReportForm() {
                 <button
                     type="submit"
                     disabled={state.at === "sending"}
-                    className="min-h-[46px] max-w-full cursor-pointer rounded-[10px] border-none bg-foreground px-[18px] py-2 font-sans text-[15px] font-semibold leading-tight text-background transition-colors duration-fast ease-out hover:bg-mk-ink-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] active:scale-[0.98] disabled:cursor-progress"
+                    className={`min-h-[46px] max-w-full cursor-pointer rounded-[10px] border-none bg-foreground px-[18px] py-2 font-sans text-[15px] font-semibold leading-tight text-background transition-colors duration-fast ease-out hover:bg-mk-ink-hover ${ring()} active:scale-[0.98] disabled:cursor-progress`}
                 >
                     {state.at === "sending" ? copy.sending : copy.submit}
                 </button>

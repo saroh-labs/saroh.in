@@ -16,6 +16,7 @@ import {
 import { helpArticles } from "@/lib/help-docs";
 import { helpLive } from "@/lib/help-live";
 import { resourcesContext } from "@/lib/resources-context";
+import { ring } from "@/lib/ring";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata({
@@ -25,8 +26,7 @@ export const metadata: Metadata = pageMetadata({
     path: HELP_PATH,
 });
 
-const LINK =
-    "w-fit cursor-pointer rounded-sm text-mk-copy no-underline transition-colors duration-fast ease-out hover:text-brand-700 active:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]";
+const LINK = `w-fit cursor-pointer rounded-sm text-mk-copy no-underline transition-colors duration-fast ease-out hover:text-brand-700 active:text-foreground ${ring()}`;
 
 /**
  * Help's home (Resources plan U5, design 1a): the title, a search over the
@@ -94,7 +94,7 @@ export default function HelpPage() {
                         Write to{" "}
                         <a
                             href={`mailto:${HELP_EMAIL}`}
-                            className="cursor-pointer rounded-sm text-brand-700 underline-offset-[3px] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+                            className={`cursor-pointer rounded-sm text-brand-700 underline-offset-[3px] hover:underline ${ring()}`}
                         >
                             {HELP_EMAIL}
                         </a>
@@ -107,7 +107,7 @@ export default function HelpPage() {
                         See what&apos;s changed in the{" "}
                         <Link
                             href="/changelog"
-                            className="cursor-pointer rounded-sm text-brand-700 underline-offset-[3px] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+                            className={`cursor-pointer rounded-sm text-brand-700 underline-offset-[3px] hover:underline ${ring()}`}
                         >
                             changelog
                         </Link>

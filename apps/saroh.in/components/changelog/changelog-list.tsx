@@ -9,6 +9,7 @@ import {
     entryDayLong,
 } from "@/content/changelog";
 import { byComingGroup } from "@/content/coming";
+import { ring } from "@/lib/ring";
 
 import { Arrow } from "../shared/links/arrow";
 
@@ -21,7 +22,7 @@ export function EntryRow({ entry }: { entry: ChangelogEntry }) {
     return (
         <Link
             href={changelogHref(entry.slug)}
-            className={`${ROW} group cursor-pointer py-8 text-foreground no-underline transition-colors duration-fast ease-out hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]`}
+            className={`${ROW} group cursor-pointer py-8 text-foreground no-underline transition-colors duration-fast ease-out hover:text-foreground ${ring({ offset: 4 })}`}
         >
             <span className={DATE_COL}>
                 <time

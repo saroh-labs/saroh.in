@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { TOUR_VIDEO } from "@/content/home";
 import type { Feature } from "@/content/types";
+import { ring } from "@/lib/ring";
 
 import { ButtonLink } from "../shared/buttons/button";
 import { CtaLink } from "../shared/buttons/cta-link";
@@ -36,7 +37,7 @@ export function FeatureHero({
                         <li>
                             <Link
                                 href="/#features"
-                                className="cursor-pointer rounded-sm text-muted-foreground no-underline transition-colors duration-fast ease-out hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+                                className={`cursor-pointer rounded-sm text-muted-foreground no-underline transition-colors duration-fast ease-out hover:text-foreground ${ring()}`}
                             >
                                 Features
                             </Link>

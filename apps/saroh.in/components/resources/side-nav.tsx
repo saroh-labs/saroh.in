@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/cn";
+import { ring } from "@/lib/ring";
 import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -48,7 +49,7 @@ export function SideNav({
                 aria-expanded={open}
                 aria-controls="resource-topics"
                 onClick={() => setOpen(!open)}
-                className="flex h-11 w-full cursor-pointer items-center justify-between rounded-mk-control border border-border-strong bg-card px-3.5 text-[15px] font-semibold text-foreground transition-colors duration-fast ease-out hover:bg-mk-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] active:bg-mk-line-soft min-[900px]:hidden"
+                className={`flex h-11 w-full cursor-pointer items-center justify-between rounded-mk-control border border-border-strong bg-card px-3.5 text-[15px] font-semibold text-foreground transition-colors duration-fast ease-out hover:bg-mk-hover ${ring()} active:bg-mk-line-soft min-[900px]:hidden`}
             >
                 Topics
                 <ChevronDown
@@ -86,7 +87,7 @@ export function SideNav({
                                     ) : (
                                         <Link
                                             href={item.href}
-                                            className="block cursor-pointer rounded-[8px] px-2.5 py-1.5 text-[14.5px] text-mk-copy no-underline transition-colors duration-fast ease-out hover:bg-mk-hover hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] active:bg-mk-line-soft"
+                                            className={`block cursor-pointer rounded-[8px] px-2.5 py-1.5 text-[14.5px] text-mk-copy no-underline transition-colors duration-fast ease-out hover:bg-mk-hover hover:text-foreground ${ring({ offset: "inset" })} active:bg-mk-line-soft`}
                                         >
                                             {item.name}
                                         </Link>

@@ -3,6 +3,7 @@
 import { useRef } from "react";
 
 import type { Shot } from "@/content/shots";
+import { ring } from "@/lib/ring";
 
 import { useFocusTrap } from "../layout/use-focus-trap";
 import { ShotImage } from "./shot-image";
@@ -41,7 +42,7 @@ export function Lightbox({
                 ref={close}
                 type="button"
                 onClick={onClose}
-                className="fixed right-5 top-4 cursor-pointer rounded-md bg-transparent text-sm text-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-background focus-visible:[outline-style:solid]"
+                className={`fixed right-5 top-4 cursor-pointer rounded-md bg-transparent text-sm text-background ${ring({ color: "paper" })}`}
             >
                 Click anywhere or press Esc to close
             </button>

@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 
 import type { WaitlistContent } from "@/content/waitlist";
@@ -10,7 +10,9 @@ import { track } from "@/lib/analytics";
 import { cn } from "@/lib/cn";
 import { readAddress } from "@/lib/page-address";
 import { keptReferral } from "@/lib/referral";
+import { ring } from "@/lib/ring";
 import { fireConversion } from "@/lib/tags";
+import { useBrowserValue } from "@/lib/use-browser-value";
 import type {
     WaitlistResponse,
     WaitlistTemplate,
@@ -20,6 +22,7 @@ import {
     EMPTY_WAITLIST,
     openingDay,
     referralLink,
+    SEND_FAILED,
     WAITLIST_MESSAGES,
     waitlistContext,
     waitlistSchema,
@@ -28,24 +31,12 @@ import {
 import type { WaitlistJoined } from "./waitlist-done";
 import { WaitlistDone } from "./waitlist-done";
 
-const RING =
-    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground focus-visible:[outline-style:solid]";
-
 // `focus:ring-0` takes off the forms plugin's blue focus ring: the design's
-// ring is the Ink outline (RING), and the border keeps its own colour.
+// ring is the Ink outline (ring({ color: "ink" })), and the border keeps its own colour.
 const INPUT = cn(
     "h-[44px] w-full rounded-mk-control border bg-white px-3 font-sans text-[15px] text-foreground placeholder:text-muted-foreground transition-colors duration-fast ease-out hover:border-border-strong focus:ring-0 focus:ring-offset-0",
-    RING,
+    ring({ color: "ink" }),
 );
-
-/** The address doesn't change while the form is open: nothing to subscribe to. */
-const noSubscription = () => () => undefined;
-
-/** What a failed send tells the visitor; the form keeps what they typed. */
-const SEND_FAILED: Record<string, string> = {
-    RATE_LIMITED: "Too many tries from here. Wait a minute, then try again.",
-    default: "We couldn't add you just now. Try again in a minute.",
-};
 
 /**
  * The waitlist card (Waitlist design, plan U30): business name, kind, email
@@ -79,11 +70,7 @@ export function WaitlistForm({
     const [joined, setJoined] = useState<WaitlistJoined | null>(null);
     // The address is read after hydration: the served page is the same
     // for every address ("" on the server).
-    const search = useSyncExternalStore(
-        noSubscription,
-        () => readAddress(),
-        () => "",
-    );
+    const search = useBrowserValue(() => readAddress(), "");
     const slugs = templates.map((t) => t.slug);
     const fromAddress = () =>
         waitlistContext(
@@ -297,7 +284,7 @@ export function WaitlistForm({
                                         }}
                                         className={cn(
                                             "inline-flex h-9 cursor-pointer items-center rounded-full border px-[13px] text-[13px] transition-[background-color,border-color,transform] duration-fast ease-out active:scale-[0.97]",
-                                            RING,
+                                            ring({ color: "ink" }),
                                             on
                                                 ? "border-foreground bg-foreground text-background"
                                                 : cn(
@@ -377,7 +364,7 @@ export function WaitlistForm({
                 disabled={isSubmitting}
                 className={cn(
                     "flex h-[45px] cursor-pointer items-center justify-center rounded-[10px] bg-foreground text-[15px] font-medium text-background transition-[background-color,transform] duration-fast ease-out hover:bg-primary-hover active:scale-[0.98] disabled:cursor-wait disabled:opacity-80",
-                    RING,
+                    ring({ color: "ink" }),
                 )}
             >
                 {isSubmitting ? "Joining…" : "Join the waitlist"}
@@ -404,7 +391,7 @@ export function WaitlistForm({
                     href={`mailto:${WAITLIST_CONTACT}`}
                     className={cn(
                         "cursor-pointer rounded-sm text-muted-foreground underline underline-offset-[3px] hover:text-brand-700",
-                        RING,
+                        ring({ color: "ink" }),
                     )}
                 >
                     {WAITLIST_CONTACT}

@@ -8,16 +8,20 @@ import { notFound } from "next/navigation";
 import { PricingCards } from "@/components/pricing/pricing-cards";
 import { CtaClickArea } from "@/components/shared/buttons/cta-click-area";
 import { JsonLd } from "@/components/shared/layout/json-ld";
-import type { DemoTrade } from "@/content/demos";
 import { FREE_PLAN_LINE } from "@/content/home";
-import { demoHref } from "@/lib/demos";
+import { demoHref, demoTradeOf } from "@/lib/demos";
 import { cta, LAUNCH_MODE } from "@/lib/links";
 import { freePlanLine } from "@/lib/plan-teasers";
 import { readLivePricing } from "@/lib/pricing";
 import { pricingPageModel } from "@/lib/pricing-view";
-import { builtSearchPages, FOR_HUB, publishList } from "@/lib/search-pages";
+import {
+    builtSearchPages,
+    FOR_HUB,
+    isPublished,
+    questionsLd,
+} from "@/lib/search-pages";
 import { pageMetadata, pageTitle } from "@/lib/seo";
-import { breadcrumbLd, faqPageLd } from "@/lib/structured-data";
+import { breadcrumbLd } from "@/lib/structured-data";
 
 /**
  * `/for/<trade>` (DEC-193): one page per file in `@saroh/search-pages`,
@@ -42,16 +46,6 @@ function builtPage(slug: string): SearchPageData | null {
         : null;
 }
 
-const isLive = (path: string) => publishList().live.includes(path);
-
-/** The live demo its words name, when the demo button is on. */
-function demoTradeOf(words: string | undefined): DemoTrade | null {
-    if (!words) return null;
-    if (/\bgym\b/i.test(words)) return "gym";
-    if (/\bsalon\b/i.test(words)) return "salon";
-    return null;
-}
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { slug } = await params;
     const p = builtPage(slug);
@@ -63,7 +57,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
             description: p.description,
             path: p.path,
         }),
-        ...(!isLive(p.path) && { robots: { index: false, follow: false } }),
+        ...(!isPublished(p.path) && {
+            robots: { index: false, follow: false },
+        }),
     };
 }
 
@@ -84,19 +80,14 @@ export default async function ForPage({ params }: Props) {
             <JsonLd
                 data={[
                     breadcrumbLd([FOR_HUB, { name: p.name, path: p.path }]),
-                    faqPageLd(
-                        p.questions.map((q) => ({
-                            q: q.question,
-                            a: q.answer.join("\n\n"),
-                        })),
-                    ),
+                    questionsLd(p.questions),
                 ]}
             />
             <CtaClickArea src={`for-${slug}`} mode={start.mode}>
                 <SearchPage
                     // No button for a demo that isn't on: the words go too.
                     page={demo ? p : { ...p, demo: undefined }}
-                    draft={!isLive(p.path)}
+                    draft={!isPublished(p.path)}
                     links={{
                         startFree: start.href,
                         startFreeLabel: start.label,

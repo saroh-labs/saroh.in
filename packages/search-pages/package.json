@@ -16,6 +16,7 @@
     "exports": {
         ".": "./src/index.ts",
         "./checks": "./src/checks.tsx",
+        "./download": "./src/tools/download.ts",
         "./styles.css": "./src/styles.css"
     },
     "scripts": {

@@ -1,4 +1,5 @@
 import { cn } from "@/lib/cn";
+import { ring } from "@/lib/ring";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -34,7 +35,7 @@ export function CardLink({
         <Link
             href={href}
             className={cn(
-                "grid cursor-pointer content-start gap-2 rounded-mk-card border border-border bg-card text-foreground no-underline transition-[border-color,box-shadow] duration-base ease-out hover:border-border-strong hover:text-foreground hover:shadow-mk-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]",
+                `grid cursor-pointer content-start gap-2 rounded-mk-card border border-border bg-card text-foreground no-underline transition-[border-color,box-shadow] duration-base ease-out hover:border-border-strong hover:text-foreground hover:shadow-mk-card ${ring()}`,
                 size === "md" ? "p-[22px]" : "p-6",
                 className,
             )}

@@ -6,6 +6,7 @@ import { HELP_EMAIL } from "@/content/help";
 import { track } from "@/lib/analytics";
 import { cn } from "@/lib/cn";
 import { readConsent, subscribeConsent } from "@/lib/consent";
+import { ring } from "@/lib/ring";
 
 /**
  * "Did this help?" (design 2a), drawn only where the answer is really
@@ -26,7 +27,7 @@ export function HelpVote({ slug }: { slug: string }) {
     const email = (
         <a
             href={`mailto:${HELP_EMAIL}`}
-            className="cursor-pointer rounded-sm font-semibold text-brand-700 underline-offset-[3px] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+            className={`cursor-pointer rounded-sm font-semibold text-brand-700 underline-offset-[3px] hover:underline ${ring()}`}
         >
             {HELP_EMAIL}
         </a>
@@ -52,7 +53,7 @@ export function HelpVote({ slug }: { slug: string }) {
             onClick={() => answer(v)}
             disabled={vote !== null}
             className={cn(
-                "h-9 cursor-pointer rounded-mk-control border border-border-strong bg-card px-4 text-[14.5px] font-semibold text-foreground transition-colors duration-fast ease-out hover:bg-mk-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] active:bg-mk-line-soft disabled:cursor-default disabled:hover:bg-card",
+                `h-9 cursor-pointer rounded-mk-control border border-border-strong bg-card px-4 text-[14.5px] font-semibold text-foreground transition-colors duration-fast ease-out hover:bg-mk-hover ${ring()} active:bg-mk-line-soft disabled:cursor-default disabled:hover:bg-card`,
                 vote === v &&
                     "border-foreground bg-foreground text-background disabled:hover:bg-foreground",
             )}

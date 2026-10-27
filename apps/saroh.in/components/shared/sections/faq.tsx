@@ -3,6 +3,7 @@ import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 import type { FaqItem } from "@/content/types";
+import { ring } from "@/lib/ring";
 
 import { Container } from "../layout/container";
 
@@ -46,7 +47,9 @@ export function Faq({
                         key={item.q}
                         className="group border-b border-border py-1"
                     >
-                        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-sm py-4 text-[17px] font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] [&::-webkit-details-marker]:hidden">
+                        <summary
+                            className={`flex cursor-pointer list-none items-center justify-between gap-4 rounded-sm py-4 text-[17px] font-semibold ${ring()} [&::-webkit-details-marker]:hidden`}
+                        >
                             {item.q}
                             <ChevronDown
                                 aria-hidden

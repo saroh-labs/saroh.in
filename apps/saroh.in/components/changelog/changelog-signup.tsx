@@ -5,14 +5,10 @@ import { useState } from "react";
 
 import { CHANGELOG } from "@/content/changelog";
 import { cn } from "@/lib/cn";
+import { isEmailShape } from "@/lib/email-shape";
+import { ring } from "@/lib/ring";
 import type { WaitlistResponse } from "@/lib/waitlist";
-import { WAITLIST_MESSAGES } from "@/lib/waitlist";
-
-/** The waitlist's own email check, so this field refuses what that one does. */
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const RATE_LIMITED = "Too many tries from here. Wait a minute, then try again.";
-const FAILED = "We couldn't add you just now. Try again in a minute.";
+import { SEND_FAILED, WAITLIST_MESSAGES } from "@/lib/waitlist";
 
 type State =
     | { at: "idle" | "sending" }
@@ -33,7 +29,7 @@ export function ChangelogSignup() {
     const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const value = email.trim();
-        if (!EMAIL.test(value) || value.length > 320) {
+        if (!isEmailShape(value) || value.length > 320) {
             setState({
                 at: "error",
                 message: WAITLIST_MESSAGES.email,
@@ -64,14 +60,14 @@ export function ChangelogSignup() {
                     : {
                           at: "error",
                           message:
-                              code === "RATE_LIMITED" ? RATE_LIMITED : FAILED,
+                              SEND_FAILED[code ?? ""] ?? SEND_FAILED.default,
                           field: false,
                       },
             );
         } catch {
             setState({
                 at: "error",
-                message: FAILED,
+                message: SEND_FAILED.default,
                 field: false,
             });
         }
@@ -119,7 +115,7 @@ export function ChangelogSignup() {
                             : "changelog-email-note"
                     }
                     className={cn(
-                        "h-[46px] min-w-0 flex-[1_1_240px] rounded-[10px] border bg-white px-3.5 font-sans text-[15px] text-foreground transition-colors duration-fast ease-out placeholder:text-muted-foreground hover:border-foreground focus:ring-0 focus:ring-offset-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]",
+                        `h-[46px] min-w-0 flex-[1_1_240px] rounded-[10px] border bg-white px-3.5 font-sans text-[15px] text-foreground transition-colors duration-fast ease-out placeholder:text-muted-foreground hover:border-foreground focus:ring-0 focus:ring-offset-0 ${ring()}`,
                         fieldError
                             ? "border-destructive"
                             : "border-border-strong",
@@ -128,7 +124,7 @@ export function ChangelogSignup() {
                 <button
                     type="submit"
                     disabled={state.at === "sending"}
-                    className="min-h-[46px] max-w-full cursor-pointer rounded-[10px] border-none bg-foreground px-[18px] py-2 font-sans text-[15px] font-semibold leading-tight text-background transition-colors duration-fast ease-out hover:bg-mk-ink-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] active:scale-[0.98] disabled:cursor-progress"
+                    className={`min-h-[46px] max-w-full cursor-pointer rounded-[10px] border-none bg-foreground px-[18px] py-2 font-sans text-[15px] font-semibold leading-tight text-background transition-colors duration-fast ease-out hover:bg-mk-ink-hover ${ring()} active:scale-[0.98] disabled:cursor-progress`}
                 >
                     {state.at === "sending"
                         ? "Adding you…"

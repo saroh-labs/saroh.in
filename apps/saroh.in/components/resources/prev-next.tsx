@@ -1,4 +1,5 @@
 import { cn } from "@/lib/cn";
+import { ring } from "@/lib/ring";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
@@ -9,8 +10,7 @@ interface Neighbour {
     href: string;
 }
 
-const CARD =
-    "grid min-w-0 cursor-pointer gap-1 rounded-mk-card border border-border bg-card px-5 py-4 text-foreground no-underline transition-colors duration-fast ease-out hover:border-border-strong hover:text-foreground active:bg-mk-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]";
+const CARD = `grid min-w-0 cursor-pointer gap-1 rounded-mk-card border border-border bg-card px-5 py-4 text-foreground no-underline transition-colors duration-fast ease-out hover:border-border-strong hover:text-foreground active:bg-mk-hover ${ring()}`;
 
 /**
  * Previous and next in a Resources set (plan U1, R1): two cards at the foot

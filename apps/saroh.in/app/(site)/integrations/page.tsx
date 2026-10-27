@@ -10,6 +10,7 @@ import {
     integrationsIndex as page,
     plannedIntegrations,
 } from "@/content/integrations";
+import { ring } from "@/lib/ring";
 import { pageMetadata } from "@/lib/seo";
 
 /**
@@ -52,7 +53,7 @@ export default function IntegrationsPage() {
                         <li key={item.slug} className="grid">
                             <Link
                                 href={integrationHref(item.slug)}
-                                className="grid cursor-pointer content-start gap-3.5 rounded-[18px] border border-border bg-card p-[22px] text-foreground no-underline transition-[border-color,box-shadow] duration-base ease-out hover:border-foreground hover:text-foreground hover:shadow-mk-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+                                className={`grid cursor-pointer content-start gap-3.5 rounded-[18px] border border-border bg-card p-[22px] text-foreground no-underline transition-[border-color,box-shadow] duration-base ease-out hover:border-foreground hover:text-foreground hover:shadow-mk-lift ${ring()}`}
                             >
                                 <span className="flex items-start gap-3">
                                     <span className="grid">

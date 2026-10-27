@@ -9,6 +9,8 @@ import type { KeyboardEvent, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { LAUNCH_MODE, SIGN_IN_URL } from "@/lib/links";
+import { ring } from "@/lib/ring";
+import { nextIndex } from "@/lib/roving";
 
 import { CtaLink } from "../buttons/cta-link";
 import { MobileMenu } from "./mobile-menu";
@@ -18,8 +20,7 @@ import { FEATURE_ITEMS, SOLUTION_ITEMS, sectionOf } from "./nav-items";
 type MenuId = "features" | "solutions" | "resources" | "tools";
 
 /** A top-level control: 36px, 9px corners, Paper-dark on hover. */
-const TOP =
-    "flex h-9 cursor-pointer items-center rounded-mk-control px-3 text-foreground no-underline transition-colors duration-fast ease-out hover:bg-mk-hover hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-500";
+const TOP = `flex h-9 cursor-pointer items-center rounded-mk-control px-3 text-foreground no-underline transition-colors duration-fast ease-out hover:bg-mk-hover hover:text-foreground ${ring({ offset: 1 })}`;
 
 /** The current section: underlined in Saffron, 8px below the word. */
 const CURRENT =
@@ -111,7 +112,7 @@ export function SiteNav({
             <Link
                 href="/"
                 aria-label="Saroh home"
-                className="flex shrink-0 rounded-lg text-foreground no-underline focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+                className={`flex shrink-0 rounded-lg text-foreground no-underline ${ring({ offset: 3 })}`}
             >
                 <Wordmark aria-hidden style={{ fontSize: 22 }} />
             </Link>
@@ -299,7 +300,7 @@ function Menu({
                             aria-current={
                                 item.href === pathname ? "page" : undefined
                             }
-                            className="grid cursor-pointer gap-[3px] rounded-[10px] px-3.5 py-3 text-foreground no-underline transition-colors duration-fast ease-out hover:bg-background hover:text-foreground focus-visible:bg-background focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+                            className={`grid cursor-pointer gap-[3px] rounded-[10px] px-3.5 py-3 text-foreground no-underline transition-colors duration-fast ease-out hover:bg-background hover:text-foreground focus-visible:bg-background ${ring({ offset: "inset" })}`}
                         >
                             <span className="text-[15px] font-semibold">
                                 {item.name}
@@ -317,14 +318,12 @@ function Menu({
 
 /** Arrow keys move through a menu's items, wrapping at either end. */
 function moveWithArrows(e: KeyboardEvent<HTMLDivElement>) {
-    const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[
-        e.key
-    ];
-    if (!step) return;
-    e.preventDefault();
     const items = Array.from(e.currentTarget.querySelectorAll("a"));
     const at = items.indexOf(document.activeElement as HTMLAnchorElement);
-    items[(at + step + items.length) % items.length]?.focus();
+    const next = nextIndex(e.key, at, items.length);
+    if (next === null) return;
+    e.preventDefault();
+    items[next]?.focus();
 }
 
 export type { NavSection };
