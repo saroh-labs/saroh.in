@@ -499,7 +499,7 @@ module.exports = {
         // Which social sign-in buttons the accounts pages show: only
         // providers with both keys set. Pure; no DB.
         "<rootDir>/src/modules/sign-in-options/**/*.spec.ts",
-        // Messaging add-ons (#1235): the MSG91 OTP transport and its fake,
+        // Messaging add-ons (#1235): the messaging provider adapter and its fake,
         // with a stubbed fetch. No DB.
         "<rootDir>/src/modules/messaging/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",

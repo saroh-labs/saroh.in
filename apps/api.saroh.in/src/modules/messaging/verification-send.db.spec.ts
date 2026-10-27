@@ -16,7 +16,8 @@ import {
     MessagingController,
     PublicVerificationsController,
 } from "./messaging.controller";
-import { FakeOtpTransport } from "./providers/fake-otp-transport";
+import { MessagingService } from "./messaging.service";
+import { FakeMessagingProvider } from "./providers/fake-messaging-provider";
 import { VerificationSendService } from "./verification-send.service";
 import { VerificationService } from "./verification.service";
 import { WalletService } from "./wallet.service";
@@ -46,12 +47,12 @@ async function publishPrices(edit: (c: Catalog) => void) {
 
 const verification = new VerificationService();
 const wallet = new WalletService();
-const transport = new FakeOtpTransport();
+const transport = new FakeMessagingProvider();
 const send = new VerificationSendService(
     verification,
     wallet,
     new CatalogueService(new ImpactService()),
-    transport,
+    new MessagingService(transport),
 );
 
 async function business(opts: { on?: boolean; balance?: number } = {}) {

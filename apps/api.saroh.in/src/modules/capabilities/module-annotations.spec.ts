@@ -384,6 +384,9 @@ const NEVER: Record<string, string> = {
         "staff control plane (Saroh's own search pages), not a tenant surface",
     "search-pages/public-search-pages.controller.ts":
         "saroh.in's build reads Saroh's own live page list, not a tenant surface",
+    // Messaging core: Saroh's own sender's monthly counts, no business.
+    "messaging/admin-messaging-usage.controller.ts":
+        "staff control plane (Saroh's own sender's usage), not a tenant surface",
 };
 
 /** Controllers with a test of their own below, not a row above. */

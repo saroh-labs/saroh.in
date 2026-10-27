@@ -2,7 +2,6 @@ import {
     ForbiddenException,
     HttpException,
     HttpStatus,
-    Inject,
     Injectable,
     Logger,
     ServiceUnavailableException,
@@ -11,11 +10,8 @@ import {
 import type { VerificationModule } from "@saroh/database";
 
 import { CatalogueService } from "../pricing/catalogue.service";
-import type {
-    OtpSendResult,
-    OtpTransport,
-} from "./providers/otp-transport.port";
-import { OTP_TRANSPORT } from "./providers/otp-transport.port";
+import { MessagingService } from "./messaging.service";
+import type { OtpSendResult } from "./providers/messaging-provider.port";
 import { indianPhoneE164, VerificationService } from "./verification.service";
 import { WalletService } from "./wallet.service";
 
@@ -35,7 +31,7 @@ export class VerificationSendService {
         private readonly verification: VerificationService,
         private readonly wallet: WalletService,
         private readonly catalogue: CatalogueService,
-        @Inject(OTP_TRANSPORT) private readonly transport: OtpTransport,
+        private readonly messaging: MessagingService,
     ) {}
 
     async sendCode(input: {
@@ -83,7 +79,7 @@ export class VerificationSendService {
 
         let result: OtpSendResult;
         try {
-            result = await this.transport.sendWhatsappAuth({
+            result = await this.messaging.sendOtp({
                 toE164: phoneE164,
                 code,
             });

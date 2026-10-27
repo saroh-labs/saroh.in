@@ -8982,6 +8982,79 @@ model MessagingVerificationSetting {
   @@unique([organizationId, module])
 }
 
+// ── Messaging core (messaging core, 27 Oct) ────────────────────────────────────
+// Saroh's own sender, behind the MessagingProvider port. Platform-level: no
+// organization, so no row-level security policy (named in
+// `packages/database/src/rls-coverage.test.ts`). Never a message's text or
+// a number in clear: a number is an HMAC (`numberHash`).
+
+enum MessagingUsageChannel {
+  OTP
+  WHATSAPP
+  SMS
+}
+
+// One outbound send that isn't a verification code (those are MessagingSend),
+// keyed by the provider's message id once accepted.
+model MessagingMessage {
+  id                String              @id @default(cuid())
+  channel           MessagingChannel
+  // Saroh's template key (never the text); null for a free-form reply.
+  templateName      String?
+  // "authentication" or "utility"; null for a free-form reply.
+  templateCategory  String?
+  numberHash        String
+  providerMessageId String?             @unique
+  status            MessagingSendStatus @default(QUEUED)
+  // A short code only, never the provider's words.
+  failureReason     String?
+  // The request sealed (AES-256-GCM, MESSAGING_ENC_KEY) for a retry; cleared
+  // once the provider accepts it or it fails for good.
+  sealedRequest     Json?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  failedAt          DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([numberHash, createdAt])
+}
+
+// Each provider webhook event applied once: a repeat is a no-op.
+model MessagingWebhookEvent {
+  id        String   @id @default(cuid())
+  // The provider's message uuid or request id.
+  eventId   String
+  // The status it reported, or INBOUND.
+  status    String
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, status])
+  @@index([createdAt])
+}
+
+// The last time a number wrote to Saroh's WhatsApp sender: a free-form reply
+// is allowed only within 24 hours of it (Meta's customer service window).
+model MessagingContactWindow {
+  numberHash    String   @id
+  lastInboundAt DateTime
+  updatedAt     DateTime @updatedAt
+}
+
+// How many messages the provider accepted per month and channel (a widget
+// token verified counts as OTP).
+model MessagingUsage {
+  // "YYYY-MM", in UTC.
+  month     String
+  channel   MessagingUsageChannel
+  count     Int                   @default(0)
+  updatedAt DateTime              @updatedAt
+
+  @@id([month, channel])
+}
+
 // Whether a search page on saroh.in (`/for/<slug>`) is live (DEC-193). The
 // words live in `@saroh/search-pages`; this is the one publish record per
 // page path, set by staff in the admin console (search-pages:publish). A

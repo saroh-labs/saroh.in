@@ -63,6 +63,14 @@ const NOT_TENANT_OWNED: Record<string, string> = {
         "Whether one of Saroh's own search pages on saroh.in is live (DEC-193); Saroh's site, not a business.",
     SearchPageEvent:
         "The history of a search page's publish record (DEC-193); Saroh's site, not a business.",
+    MessagingMessage:
+        "A message from Saroh's own WhatsApp or SMS sender (messaging core); Saroh's platform sender, not a business.",
+    MessagingWebhookEvent:
+        "A provider webhook event applied once (messaging core); Saroh's own sender, not a business.",
+    MessagingContactWindow:
+        "When a number last wrote to Saroh's own WhatsApp sender, by its hash (messaging core); not a business.",
+    MessagingUsage:
+        "Saroh's own sender's monthly message counts per channel (messaging core); platform-level, not a business.",
 };
 
 const databaseDir = path.resolve(__dirname, "..");

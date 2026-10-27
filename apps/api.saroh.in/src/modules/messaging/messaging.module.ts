@@ -12,8 +12,9 @@ import {
     MessagingController,
     PublicVerificationsController,
 } from "./messaging.controller";
+import { MESSAGING_SEND_TYPE, MessagingService } from "./messaging.service";
 import { Msg91WebhookController } from "./msg91-webhook.controller";
-import { otpTransportProvider } from "./providers/otp-transport.factory";
+import { messagingProviderProvider } from "./providers/messaging-provider.factory";
 import { TopupService } from "./topup.service";
 import { VerificationSendService } from "./verification-send.service";
 import { VerificationService } from "./verification.service";
@@ -23,7 +24,11 @@ import { WalletService } from "./wallet.service";
 /** How often a stopped wallet sweep chain is looked for and restarted. */
 const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
 
-/** Saroh-sent verification codes and the prepaid balance that pays for them (DEC-191). */
+/**
+ * Saroh-sent verification codes and the prepaid balance that pays for them
+ * (DEC-191), and Saroh's own sender behind the MessagingProvider port
+ * (`MessagingService`, docs/architecture/MESSAGING_MSG91.md).
+ */
 @Module({
     imports: [
         BillingModule,
@@ -37,7 +42,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         Msg91WebhookController,
     ],
     providers: [
-        otpTransportProvider,
+        messagingProviderProvider,
+        MessagingService,
         billingProviderFactoryProvider,
         TopupService,
         VerificationService,
@@ -45,7 +51,12 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         WalletService,
         WalletSweepHandler,
     ],
-    exports: [VerificationService, VerificationSendService, WalletService],
+    exports: [
+        MessagingService,
+        VerificationService,
+        VerificationSendService,
+        WalletService,
+    ],
 })
 export class MessagingModule implements OnModuleInit, OnModuleDestroy {
     private chainCheck?: ReturnType<typeof setInterval>;
@@ -53,11 +64,16 @@ export class MessagingModule implements OnModuleInit, OnModuleDestroy {
     constructor(
         private readonly registry: JobHandlerRegistry,
         private readonly sweep: WalletSweepHandler,
+        private readonly messaging: MessagingService,
     ) {}
 
     /** The wallet sweep (#1240) registers here; never started under test. */
     async onModuleInit(): Promise<void> {
         this.registry.register(WALLET_SWEEP_TYPE, this.sweep.handle);
+        this.registry.register(
+            MESSAGING_SEND_TYPE,
+            this.messaging.handleSendJob,
+        );
         if (env.NODE_ENV === "test") return;
         await this.sweep.ensureScheduled();
         this.chainCheck = setInterval(() => {
